@@ -8,7 +8,7 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
-val appVersionName = "1.3.1"
+val appVersionName = "1.3.2"
 val supportedServerRange = ">=1.3.0"
 
 val lwjglVersion = libs.versions.lwjgl.get()
@@ -164,6 +164,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Dmg)
+            modules("jdk.unsupported")
             packageName = "CConnect"
             packageVersion = appVersionName
             description = "CConnect"
