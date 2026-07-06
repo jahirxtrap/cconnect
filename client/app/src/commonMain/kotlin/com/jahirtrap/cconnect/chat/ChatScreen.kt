@@ -86,8 +86,8 @@ import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.MessagesSquare
 import com.composables.icons.lucide.Paperclip
+import com.composables.icons.lucide.PanelLeftClose
 import com.composables.icons.lucide.PanelLeftOpen
-import com.composables.icons.lucide.PanelRightOpen
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.Slash
 import com.composables.icons.lucide.Sparkles
@@ -1265,7 +1265,7 @@ private fun ColumnScope.ChatPanelContent(
         ) { Icon(Lucide.SquarePen, contentDescription = null) }
         if (onClose != null) {
             TooltipIconButton(label = stringResource(Res.string.menu), onClick = onClose) {
-                Icon(if (drawerMode) Lucide.Menu else Lucide.PanelRightOpen, contentDescription = null)
+                Icon(if (drawerMode) Lucide.Menu else Lucide.PanelLeftClose, contentDescription = null)
             }
         }
     }

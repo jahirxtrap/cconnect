@@ -188,6 +188,14 @@ fun main() {
                 val showLabel = stringResource(Res.string.`open`)
                 val exitLabel = stringResource(Res.string.tray_exit)
                 DisposableEffect(window) {
+                    window.setFocusTraversalKeys(
+                        java.awt.KeyboardFocusManager.FORWARD_TRAVERSAL_KEYS,
+                        setOf(java.awt.AWTKeyStroke.getAWTKeyStroke(java.awt.event.KeyEvent.VK_TAB, 0)),
+                    )
+                    window.setFocusTraversalKeys(
+                        java.awt.KeyboardFocusManager.BACKWARD_TRAVERSAL_KEYS,
+                        setOf(java.awt.AWTKeyStroke.getAWTKeyStroke(java.awt.event.KeyEvent.VK_TAB, java.awt.event.InputEvent.SHIFT_DOWN_MASK)),
+                    )
                     val listener = object : WindowFocusListener {
                         override fun windowGainedFocus(e: WindowEvent?) { Notifier.appInForeground = true }
                         override fun windowLostFocus(e: WindowEvent?) { Notifier.appInForeground = false }
