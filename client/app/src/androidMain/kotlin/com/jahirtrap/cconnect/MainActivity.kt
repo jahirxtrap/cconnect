@@ -157,7 +157,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun handleIntent(intent: Intent) {
-        if (intent.getBooleanExtra(EXTRA_OPEN_CHAT, false)) openChatRequests.intValue++
+        if (intent.getBooleanExtra(EXTRA_OPEN_CHAT, false)) {
+            Notifier.routeToPendingTab()
+            openChatRequests.intValue++
+        }
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {

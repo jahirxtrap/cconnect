@@ -883,6 +883,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
+    private fun currentTabId(): String? = TabsController.tabs.firstOrNull { it.ctx === ctx }?.id
+
     private fun imageUrls(m: SessionMessage, sessionId: String, projectKey: String?): List<String>? =
         m.images?.map { ref ->
             "${baseUrl()}/sessions/$sessionId/images/$ref?project=${UrlCodec.encode(projectKey.orEmpty())}"
@@ -1078,6 +1080,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         getString(Res.string.notif_task_done),
                         _state.value.messages.lastOrNull { it.role == Role.ASSISTANT }?.text
                             ?.lineSequence()?.firstOrNull { it.isNotBlank() }?.take(120),
+                        targetTab = currentTabId(),
                     )
                 }
                 resetStreaming()
@@ -1141,6 +1144,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                             getString(if (question) Res.string.notif_question else Res.string.notif_permission),
                             body,
                             actions,
+                            targetTab = currentTabId(),
                         )
                     }
                 }
