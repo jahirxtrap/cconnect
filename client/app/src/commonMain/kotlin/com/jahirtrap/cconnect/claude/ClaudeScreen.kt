@@ -547,10 +547,8 @@ internal fun ProjectPromptDialog(
 
 @Composable
 private fun usageWindowLabel(id: String): String = when (id) {
-    "five_hour" -> stringResource(Res.string.usage_session)
-    "seven_day" -> stringResource(Res.string.usage_all_models)
-    "seven_day_opus" -> stringResource(Res.string.usage_opus)
-    "seven_day_sonnet" -> stringResource(Res.string.usage_sonnet)
+    "session" -> stringResource(Res.string.usage_session)
+    "weekly_all" -> stringResource(Res.string.usage_all_models)
     else -> id
 }
 

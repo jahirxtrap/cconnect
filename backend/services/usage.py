@@ -1,4 +1,4 @@
-"""Plan token usage (5-hour and weekly windows) as a markdown report."""
+"""Plan token usage (session and weekly windows) as a markdown report."""
 
 from __future__ import annotations
 
@@ -10,18 +10,13 @@ from pathlib import Path
 
 import httpx
 
+from core.cli_manager import bundled_version
 from core.config import CLAUDE_PROJECTS_DIR
 
 logger = logging.getLogger(__name__)
 
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 _CREDENTIALS = Path(CLAUDE_PROJECTS_DIR).parent / ".credentials.json"
-_WINDOWS = (
-    ("five_hour", "5-hour"),
-    ("seven_day", "Weekly"),
-    ("seven_day_opus", "Weekly (Opus)"),
-    ("seven_day_sonnet", "Weekly (Sonnet)"),
-)
 _BAR_WIDTH = 20
 
 
@@ -50,7 +45,7 @@ async def _fetch() -> dict:
         "Authorization": f"Bearer {token}",
         "anthropic-beta": "oauth-2025-04-20",
         "anthropic-version": "2023-06-01",
-        "User-Agent": "cconnect",
+        "User-Agent": f"claude-code/{bundled_version() or '2.0.0'}",
     }
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -66,20 +61,40 @@ async def _fetch() -> dict:
         return {"error": f"Couldn't fetch usage: {type(exc).__name__}"}
 
 
+def _window_id(entry: dict) -> str | None:
+    kind = entry.get("kind")
+    if kind == "session":
+        return "session"
+    if kind == "weekly_all":
+        return "weekly_all"
+    return ((entry.get("scope") or {}).get("model") or {}).get("display_name")
+
+
+def _windows(data: dict) -> list[dict]:
+    out: list[dict] = []
+    for entry in data.get("limits") or []:
+        if not isinstance(entry, dict):
+            continue
+        pct = entry.get("percent")
+        wid = _window_id(entry)
+        if wid and isinstance(pct, (int, float)):
+            out.append({"id": wid, "percent": float(pct), "resets_at": entry.get("resets_at")})
+    return out
+
+
 async def usage_data() -> dict:
     data = await _fetch()
     if "error" in data:
         return {"error": data["error"]}
-    windows = []
-    for key, _label in _WINDOWS:
-        win = data.get(key)
-        if not isinstance(win, dict):
-            continue
-        pct = win.get("utilization")
-        if not isinstance(pct, (int, float)):
-            continue
-        windows.append({"id": key, "percent": float(pct), "resets_at": win.get("resets_at")})
-    return {"plan": _plan_label(), "windows": windows}
+    return {"plan": _plan_label(), "windows": _windows(data)}
+
+
+def _label(wid: str) -> str:
+    if wid == "session":
+        return "Current session"
+    if wid == "weekly_all":
+        return "All models"
+    return wid
 
 
 def _bar(pct: float) -> str:
@@ -111,13 +126,9 @@ def _resets_hint(value) -> str:
     return f"resets in {m}m"
 
 
-def _window_md(label: str, win: dict) -> str | None:
-    if not isinstance(win, dict):
-        return None
-    pct = win.get("utilization")
-    if not isinstance(pct, (int, float)):
-        return None
-    lines = [f"**{label}** • {round(pct)}%", f"`{_bar(pct)}`"]
+def _window_md(win: dict) -> str:
+    pct = win["percent"]
+    lines = [f"**{_label(win['id'])}** • {round(pct)}%", f"`{_bar(pct)}`"]
     hint = _resets_hint(win.get("resets_at"))
     if hint:
         lines.append(hint)
@@ -129,7 +140,7 @@ async def usage_markdown() -> str:
     data = await _fetch()
     if "error" in data:
         return f"_{data['error']}._"
-    rows = [md for key, label in _WINDOWS if (md := _window_md(label, data.get(key))) is not None]
+    rows = [_window_md(w) for w in _windows(data)]
     if not rows:
         return "_The server returned no usage data._"
     return "**Token usage**\n\n" + "\n\n".join(rows)

@@ -5,6 +5,7 @@ import java.awt.EventQueue
 import java.awt.FileDialog
 import java.awt.Frame
 import java.io.File
+import javax.swing.JFileChooser
 
 object FileDialogs {
     private var lastDir: String = System.getProperty("user.home") ?: "."
@@ -57,7 +58,24 @@ object FileDialogs {
     }.getOrNull()
 
     fun chooseDirectory(): File? = runCatching {
-        TinyFileDialogs.tinyfd_selectFolderDialog("Select folder", lastDir + File.separator)
-            ?.let { File(it).also { f -> lastDir = f.absolutePath } }
+        if (isLinux) {
+            val pick: () -> File? = {
+                val chooser = JFileChooser(lastDir).apply {
+                    fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                }
+                if (chooser.showOpenDialog(null) == JFileChooser.APPROVE_OPTION) {
+                    chooser.selectedFile?.also { lastDir = it.absolutePath }
+                } else null
+            }
+            if (EventQueue.isDispatchThread()) pick()
+            else {
+                var result: File? = null
+                EventQueue.invokeAndWait { result = pick() }
+                result
+            }
+        } else {
+            TinyFileDialogs.tinyfd_selectFolderDialog("Select folder", lastDir + File.separator)
+                ?.let { File(it).also { f -> lastDir = f.absolutePath } }
+        }
     }.getOrNull()
 }

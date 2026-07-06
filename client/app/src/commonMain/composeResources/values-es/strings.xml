@@ -157,8 +157,6 @@
     <string name="usage">Uso</string>
     <string name="usage_session">Sesión actual</string>
     <string name="usage_all_models">Todos los modelos</string>
-    <string name="usage_opus">Solo Opus</string>
-    <string name="usage_sonnet">Solo Sonnet</string>
     <string name="resets_in">Se restablece en %1$s</string>
     <string name="resets_on">Se restablece el %1$s</string>
     <string name="architecture">Arquitectura</string>
