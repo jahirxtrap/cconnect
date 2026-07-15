@@ -5,6 +5,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
+from starlette.requests import ClientDisconnect
 from loguru import logger
 from pydantic import BaseModel
 
@@ -183,6 +184,8 @@ def archive_file(path: str, inner: str):
 async def upload_shared(path: str, request: Request):
     try:
         saved = await shared_service.save_upload(path, request.stream())
+    except ClientDisconnect:
+        raise HTTPException(status_code=499, detail="upload cancelled by client")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return api_response(data={"path": saved})
