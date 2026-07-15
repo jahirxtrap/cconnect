@@ -5,7 +5,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from core.responses import api_response
 
-MAX_BODY_SIZE = 25 * 1_048_576
+MAX_BODY_SIZE = 500 * 1_048_576
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
