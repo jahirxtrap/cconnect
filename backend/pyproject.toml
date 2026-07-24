@@ -23,7 +23,7 @@ dependencies = [
 
 [tool.cconnect]
 supported-app = ">=1.3.0"
-supported-cli = ">=2.1.197"
+supported-cli = ">=2.1.219"
 
 [project.optional-dependencies]
 dev = [
