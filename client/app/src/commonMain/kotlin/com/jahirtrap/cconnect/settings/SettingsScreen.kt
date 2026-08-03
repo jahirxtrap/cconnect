@@ -74,6 +74,7 @@ import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Minimize2
+import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Clock
 import com.composables.icons.lucide.Type
 import com.composables.icons.lucide.Lucide
@@ -200,6 +201,7 @@ fun SettingsScreen(
     var environments by remember { mutableStateOf(settings.environments) }
     var activeId by remember { mutableStateOf(settings.activeEnvironment?.id) }
     var caps by remember { mutableStateOf(Capabilities()) }
+    var account by remember { mutableStateOf(caps.defaults.account) }
     var model by remember { mutableStateOf(caps.defaults.model) }
     var effort by remember { mutableStateOf(caps.defaults.effort) }
     var permissionMode by remember { mutableStateOf(caps.defaults.permissionMode) }
@@ -224,6 +226,7 @@ fun SettingsScreen(
         val s = SettingsApi.get()
         if (s != null) {
             model = s.model; effort = s.effort; permissionMode = s.permissionMode; streaming = s.streaming
+            account = s.account.ifEmpty { caps.defaults.account }
             showThinking = s.showThinking; showToolUse = s.showToolUse
             showFileChange = s.showFileChange; showCompact = s.showCompact; showWorking = s.showWorking
         }
@@ -419,6 +422,14 @@ fun SettingsScreen(
                     PreferenceRow(Lucide.Sparkles, stringResource(Res.string.generation), serverSummary("${caps.models.firstOrNull { it.id == model }?.label ?: model} • $effort"), enabled = serverReady) { dialog = SettingsDialog.Generation }
                     PreferenceRow(Lucide.Shield, stringResource(Res.string.permissions), serverSummary(permissionLabel(caps, permissionMode)), enabled = serverReady) { dialog = SettingsDialog.Permissions }
                     PreferenceRow(Lucide.Eye, stringResource(Res.string.visibility), serverSummary(stringResource(Res.string.visibility_summary)), enabled = serverReady) { dialog = SettingsDialog.Visibility }
+                    if (caps.accounts.size > 1) {
+                        PreferenceRow(
+                            Lucide.CircleUser,
+                            stringResource(Res.string.account),
+                            serverSummary(caps.accounts.firstOrNull { it.id == account }?.label ?: account),
+                            enabled = serverReady,
+                        ) { dialog = SettingsDialog.Account }
+                    }
                 }
                 }
                 if (!isWebPlatform && !isAndroidPlatform) {
@@ -723,6 +734,14 @@ fun SettingsScreen(
             onDismiss = { dialog = null },
         )
 
+        SettingsDialog.Account -> ConfirmSelectDialog(
+            title = stringResource(Res.string.account),
+            options = caps.accounts.map { it.id to it.label },
+            selected = account,
+            onConfirm = { account = it; scope.launch { SettingsApi.update(account = it) }; dialog = null },
+            onDismiss = { dialog = null },
+        )
+
         SettingsDialog.Visibility -> VisibilityDialog(
             thinking = showThinking,
             toolUse = showToolUse,
@@ -768,7 +787,7 @@ fun SettingsScreen(
     }
 }
 
-private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer }
+private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer, Account }
 
 @Composable
 private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boolean, connecting: Boolean, onClose: () -> Unit) {

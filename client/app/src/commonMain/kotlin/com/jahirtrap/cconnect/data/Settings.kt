@@ -206,6 +206,7 @@ class Settings {
                     authHeaderName = o["authHeaderName"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     authHeaderValue = o["authHeaderValue"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     directory = o["directory"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    account = o["account"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     model = o["model"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     effort = o["effort"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     permissionMode = o["permissionMode"]?.jsonPrimitive?.contentOrNull.orEmpty(),
@@ -231,6 +232,7 @@ class Settings {
                     put("authHeaderName", p.authHeaderName)
                     put("authHeaderValue", p.authHeaderValue)
                     put("directory", p.directory)
+                    put("account", p.account)
                     put("model", p.model)
                     put("effort", p.effort)
                     put("permissionMode", p.permissionMode)

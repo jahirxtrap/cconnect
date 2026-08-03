@@ -11,34 +11,33 @@ from pathlib import Path
 import httpx
 
 from core.cli_manager import bundled_version
-from core.config import CLAUDE_PROJECTS_DIR
+from services import accounts
 
 logger = logging.getLogger(__name__)
 
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
-_CREDENTIALS = Path(CLAUDE_PROJECTS_DIR).parent / ".credentials.json"
 _BAR_WIDTH = 20
 
 
-def _oauth(field: str) -> str | None:
+def _oauth(field: str, account: str | None = None) -> str | None:
     try:
-        data = json.loads(_CREDENTIALS.read_text(encoding="utf-8"))
+        data = json.loads(accounts.credentials_path(account).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     return (data.get("claudeAiOauth") or {}).get(field)
 
 
-def _plan_label() -> str | None:
-    subscription = _oauth("subscriptionType")
+def _plan_label(account: str | None = None) -> str | None:
+    subscription = _oauth("subscriptionType", account)
     if not subscription:
         return None
     label = subscription.capitalize()
-    match = re.search(r"(\d+x)$", _oauth("rateLimitTier") or "")
+    match = re.search(r"(\d+x)$", _oauth("rateLimitTier", account) or "")
     return f"{label} ({match.group(1)})" if match else label
 
 
-async def _fetch() -> dict:
-    token = _oauth("accessToken")
+async def _fetch(account: str | None = None) -> dict:
+    token = _oauth("accessToken", account)
     if not token:
         return {"error": "No Claude token found (are you signed in to the CLI?)"}
     headers = {
@@ -82,11 +81,11 @@ def _windows(data: dict) -> list[dict]:
     return out
 
 
-async def usage_data() -> dict:
-    data = await _fetch()
+async def usage_data(account: str | None = None) -> dict:
+    data = await _fetch(account)
     if "error" in data:
         return {"error": data["error"]}
-    return {"plan": _plan_label(), "windows": _windows(data)}
+    return {"plan": _plan_label(account), "windows": _windows(data)}
 
 
 def _label(wid: str) -> str:
@@ -135,9 +134,9 @@ def _window_md(win: dict) -> str:
     return "  \n".join(lines)
 
 
-async def usage_markdown() -> str:
+async def usage_markdown(account: str | None = None) -> str:
     """Fetch plan usage and render it as markdown with per-window utilization bars."""
-    data = await _fetch()
+    data = await _fetch(account)
     if "error" in data:
         return f"_{data['error']}._"
     rows = [_window_md(w) for w in _windows(data)]

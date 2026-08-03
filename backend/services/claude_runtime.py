@@ -418,6 +418,7 @@ async def run_prompt(
     resume_at: Optional[str] = None,
     fork: bool = False,
     model: Optional[str] = None,
+    account: Optional[str] = None,
     effort: str = "max",
     partial: bool = False,
     name: Optional[str] = None,
@@ -469,6 +470,10 @@ async def run_prompt(
         cli_path=cli_manager.resolve_cli_path(),
         enable_file_checkpointing=True,
     )
+    from services import accounts
+    account_env = accounts.env_for(account)
+    if account_env:
+        options_kwargs["env"] = account_env
     if ultracode:
         options_kwargs["settings"] = json.dumps({"ultracode": True})
     status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}

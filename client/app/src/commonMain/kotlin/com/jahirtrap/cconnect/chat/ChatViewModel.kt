@@ -79,6 +79,8 @@ data class ChatUiState(
     val model: String = "opus[1m]",
     val effort: String = "xhigh",
     val streamTokens: Boolean = true,
+    val account: String = "default",
+    val accountOverride: String = "",
     val modelOverride: String = "",
     val effortOverride: String = "",
     val permissionOverride: String = "",
@@ -204,6 +206,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val env = activeEnv()
         _state.update {
             it.copy(
+                accountOverride = env?.account ?: "",
                 modelOverride = env?.model ?: "",
                 effortOverride = env?.effort ?: "",
                 permissionOverride = env?.permissionMode ?: "",
@@ -281,7 +284,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun refreshCompat() {
         val caps = CapabilitiesApi.capabilities()
         if (caps != null) {
-            _state.update { it.copy(capabilities = caps) }
+            _state.update { it.copy(capabilities = caps, account = caps.defaults.account) }
             evaluateCompat(caps.serverVersion, caps.supportedApp, caps.cliVersion, caps.supportedCli)
         } else {
             CapabilitiesApi.versionInfo()?.let {
@@ -317,6 +320,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             s.modelOverride.ifEmpty { s.model },
             s.effortOverride.ifEmpty { s.effort },
             s.streamingOverride ?: s.streamTokens,
+            s.accountOverride.ifEmpty { s.account },
         )
     }
 
@@ -536,14 +540,34 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         if (_state.value.connection == ConnectionState.Connected) client.sendSetPermissionMode(effective)
     }
 
+    private fun pushGeneration(
+        model: String? = null,
+        effort: String? = null,
+        partial: Boolean? = null,
+        account: String? = null,
+        cwd: String? = null,
+    ) {
+        if (_state.value.connection == ConnectionState.Connected) {
+            client.sendSetGeneration(model, effort, partial, account, cwd)
+        }
+    }
+
+    fun setAccount(account: String) {
+        settings.updateEnvironment(ctx.environmentId) { it.copy(account = account) }
+        _state.update { it.copy(accountOverride = account) }
+        pushGeneration(account = account.ifEmpty { _state.value.account })
+    }
+
     fun setModel(model: String) {
         settings.updateEnvironment(ctx.environmentId) { it.copy(model = model) }
         _state.update { it.copy(modelOverride = model) }
+        pushGeneration(model = model.ifEmpty { _state.value.model })
     }
 
     fun setEffort(effort: String) {
         settings.updateEnvironment(ctx.environmentId) { it.copy(effort = effort) }
         _state.update { it.copy(effortOverride = effort) }
+        pushGeneration(effort = effort.ifEmpty { _state.value.effort })
     }
 
     fun toggleStreaming() {
@@ -551,6 +575,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val next = !(s.streamingOverride ?: s.streamTokens)
         settings.updateEnvironment(ctx.environmentId) { it.copy(streaming = next) }
         _state.update { it.copy(streamingOverride = next) }
+        pushGeneration(partial = next)
     }
 
     fun newSession() {
@@ -672,7 +697,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     fun selectHistoryProject(projectKey: String?) {
         _state.update { it.copy(historyProjectKey = projectKey) }
         if (projectKey != null) {
-            _state.value.historyProjects.firstOrNull { it.projectKey == projectKey }?.path?.let { ctx.cwd = it }
+            _state.value.historyProjects.firstOrNull { it.projectKey == projectKey }?.path?.let {
+                ctx.cwd = it
+                if (_state.value.sessionId == null) pushGeneration(cwd = it)
+            }
         }
         ChatListStore.forConfig(listConfig())?.let { applyStoreSessions(it.sessions.value) }
     }

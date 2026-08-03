@@ -58,11 +58,17 @@ object CapabilitiesApi {
                     requireConfirmation = o["require_confirmation"]?.jsonPrimitive?.booleanOrNull ?: false,
                 )
             } ?: fallback.commands,
+            accounts = data["accounts"]?.jsonArray?.mapNotNull { el ->
+                val o = el.jsonObject
+                val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                ModelOption(id, o["label"]?.jsonPrimitive?.contentOrNull ?: id)
+            } ?: fallback.accounts,
             defaults = data["defaults"]?.jsonObject?.let { o ->
                 CapabilitiesDefaults(
                     permissionMode = o["permission_mode"]?.jsonPrimitive?.contentOrNull ?: fallback.defaults.permissionMode,
                     effort = o["effort"]?.jsonPrimitive?.contentOrNull ?: fallback.defaults.effort,
                     model = o["model"]?.jsonPrimitive?.contentOrNull ?: fallback.defaults.model,
+                    account = o["account"]?.jsonPrimitive?.contentOrNull ?: fallback.defaults.account,
                 )
             } ?: fallback.defaults,
             serverVersion = data["version"]?.jsonPrimitive?.contentOrNull,

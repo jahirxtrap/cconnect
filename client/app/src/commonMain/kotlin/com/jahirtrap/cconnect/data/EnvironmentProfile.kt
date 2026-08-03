@@ -13,6 +13,7 @@ data class EnvironmentProfile(
     val authHeaderName: String = "",
     val authHeaderValue: String = "",
     val directory: String = "",
+    val account: String = "",             // "" = inherit server default
     val model: String = "",               // "" = inherit server default
     val effort: String = "",              // "" = inherit server default
     val permissionMode: String = "",      // "" = inherit server default

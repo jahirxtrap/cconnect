@@ -17,7 +17,8 @@ from pydantic import BaseModel, ValidationError
 from core.config import DEFAULT_CWD, permission_modes
 from core.responses import api_response
 from middleware.public_auth import ws_bearer_ok
-from schemas.chat import PromptMessage, SetPermissionMessage, StartMessage
+from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, StartMessage
+from services import accounts
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services import settings_store
@@ -62,6 +63,10 @@ class _Session:
         self.session_id: str | None = None
         self.fork: bool = False
         self.base_url: str | None = None
+        self.account: str | None = None
+        self.model: str | None = None
+        self.effort: str = "max"
+        self.partial: bool = False
 
 
 def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None):
@@ -97,9 +102,10 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                 resume=state.session_id,
                 resume_at=resume_at,
                 fork=state.fork,
-                model=_resolve_model(settings_store.get("model")),
-                effort=settings_store.get("effort"),
-                partial=settings_store.get("streaming"),
+                model=_resolve_model(state.model),
+                account=state.account,
+                effort=state.effort,
+                partial=state.partial,
                 name=name,
                 ask_user=ask_user,
                 base_url=state.base_url,
@@ -181,12 +187,12 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
     return factory
 
 
-async def _run_usage(send):
+async def _run_usage(send, account: str | None = None):
     """Send the plan-usage report as a one-off markdown message."""
     from services.usage import usage_markdown
 
     try:
-        md = await usage_markdown()
+        md = await usage_markdown(account)
         await send({"type": "command", "markdown": md})
     except Exception as exc:
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
@@ -242,10 +248,14 @@ async def chat_ws(ws: WebSocket):
                 else:
                     state = _Session()
                     state.cwd = msg.cwd or DEFAULT_CWD
-                    state.permission_mode = settings_store.get("permission_mode")
+                    state.permission_mode = msg.permission_mode or settings_store.get("permission_mode")
                     state.session_id = msg.resume
                     state.fork = msg.fork
                     state.base_url = msg.base_url
+                    state.account = accounts.resolve(msg.account)
+                    state.model = msg.model or settings_store.get("model")
+                    state.effort = msg.effort or settings_store.get("effort")
+                    state.partial = msg.partial if msg.partial is not None else settings_store.get("streaming")
                     session = registry.create(state)
                 if previous is not None and previous is not session:
                     await previous.detach(send)
@@ -289,6 +299,24 @@ async def chat_ws(ws: WebSocket):
                 elif not await _start_turn(session, msg.id, msg.text, msg.attachments):
                     await session.enqueue(msg.id, msg.text, msg.attachments)
 
+            elif mtype == "set_generation":
+                try:
+                    msg = SetGenerationMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None:
+                    if msg.cwd and session.state.session_id is None:
+                        session.state.cwd = msg.cwd
+                    if msg.model is not None:
+                        session.state.model = msg.model
+                    if msg.effort is not None:
+                        session.state.effort = msg.effort
+                    if msg.partial is not None:
+                        session.state.partial = msg.partial
+                    if msg.account is not None:
+                        session.state.account = accounts.resolve(msg.account)
+
             elif mtype == "set_permission_mode":
                 try:
                     msg = SetPermissionMessage(**raw)
@@ -316,7 +344,7 @@ async def chat_ws(ws: WebSocket):
                         await send({"type": "error", "message": "busy: a side question is already running", "channel": side_session.channel})
 
             elif mtype == "usage":
-                spawn(_run_usage(send))
+                spawn(_run_usage(send, session.state.account if session else None))
 
             elif mtype == "interrupt":
                 target = side_session if raw.get("lane") == "side" else session

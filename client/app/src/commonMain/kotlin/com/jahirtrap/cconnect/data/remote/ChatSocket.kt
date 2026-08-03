@@ -114,6 +114,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         model: String,
         effort: String,
         partial: Boolean,
+        account: String = "",
     ) {
         send(buildJsonObject {
             put("type", "start")
@@ -121,6 +122,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             put("permission_mode", permissionMode)
             if (resume != null) put("resume", resume) else put("resume", JsonNull)
             put("fork", false)
+            if (account.isNotEmpty()) put("account", account)
             put("model", model)
             put("effort", effort)
             put("partial", partial)
@@ -146,6 +148,23 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         send(buildJsonObject {
             put("type", "set_permission_mode")
             put("mode", mode)
+        })
+    }
+
+    fun sendSetGeneration(
+        model: String? = null,
+        effort: String? = null,
+        partial: Boolean? = null,
+        account: String? = null,
+        cwd: String? = null,
+    ) {
+        send(buildJsonObject {
+            put("type", "set_generation")
+            cwd?.let { put("cwd", it) }
+            model?.let { put("model", it) }
+            effort?.let { put("effort", it) }
+            partial?.let { put("partial", it) }
+            account?.let { put("account", it) }
         })
     }
 

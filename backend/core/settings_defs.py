@@ -21,6 +21,7 @@ class SettingDef:
 _SHOW_MODES = ("full", "label", "off")
 
 SETTINGS: dict[str, SettingDef] = {
+    "account": SettingDef(None, str, "Claude account used by default for new chats"),
     "model": SettingDef(DEFAULT_MODEL, str, "Claude model alias used for chat generation"),
     "effort": SettingDef(DEFAULT_EFFORT, str, "Reasoning effort: low..max, or ultracode (xhigh + workflow orchestration)"),
     "permission_mode": SettingDef(DEFAULT_PERMISSION_MODE, str, "Default permission mode for new chat sessions"),

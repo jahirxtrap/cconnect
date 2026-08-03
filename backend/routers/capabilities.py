@@ -19,6 +19,7 @@ from core.config import (
     permission_modes,
 )
 from core.responses import api_response
+from services import accounts
 
 router = APIRouter(tags=["Capabilities"])
 
@@ -35,10 +36,12 @@ def get_capabilities():
         "models": MODELS,
         "colors": COLORS,
         "commands": COMMANDS,
+        "accounts": [{"id": a["id"], "label": a["label"]} for a in accounts.list_accounts() if a["logged_in"]],
         "defaults": {
             "permission_mode": DEFAULT_PERMISSION_MODE,
             "effort": DEFAULT_EFFORT,
             "model": DEFAULT_MODEL,
+            "account": accounts.default_account(),
             "partial": False,
         },
     })

@@ -48,6 +48,7 @@ import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Blocks
 import com.composables.icons.lucide.Brain
 import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Eraser
 import com.composables.icons.lucide.FilePen
 import com.composables.icons.lucide.FileText
@@ -64,7 +65,9 @@ import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
 import com.jahirtrap.cconnect.chat.ConnectionState
 import com.jahirtrap.cconnect.data.remote.Backend
+import com.jahirtrap.cconnect.data.remote.AccountsApi
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
+import com.jahirtrap.cconnect.data.remote.SettingsApi
 import com.jahirtrap.cconnect.data.remote.CliApi
 import com.jahirtrap.cconnect.data.remote.GitHubApi
 import com.jahirtrap.cconnect.data.ChatListStore
@@ -81,6 +84,7 @@ import com.jahirtrap.cconnect.ui.CustomIcons
 import com.jahirtrap.cconnect.ui.Claude
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.EnvironmentSelectDialog
+import com.jahirtrap.cconnect.ui.SelectDialog
 import com.jahirtrap.cconnect.ui.LocalRefreshTick
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
@@ -107,6 +111,8 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     var projects by remember { mutableStateOf<List<ProjectInfo>>(emptyList()) }
     var editingProjectPrompt by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<ClaudeApi.Usage?>(null) }
+    var accountsSnapshot by remember { mutableStateOf<AccountsApi.Snapshot?>(null) }
+    var accountMenu by remember { mutableStateOf(false) }
     var serviceStatus by remember { mutableStateOf<ClaudeApi.ServiceStatus?>(null) }
     var loaded by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
@@ -124,7 +130,8 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
         mcpServers = ClaudeApi.mcp()
         userPrompt = ClaudeApi.userPrompt()
         projects = ChatListStore.forConfig(Backend.snapshot())?.projects?.value ?: emptyList()
-        usage = ClaudeApi.usage()
+        accountsSnapshot = AccountsApi.list()
+        usage = ClaudeApi.usage(accountsSnapshot?.default)
         serviceStatus = ClaudeApi.status()
         loaded = true
         refreshing = false
@@ -160,6 +167,11 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                     }
                 },
                 actions = {
+                    if ((accountsSnapshot?.accounts?.count { it.loggedIn } ?: 0) > 1) {
+                        TooltipIconButton(label = stringResource(Res.string.account), onClick = { accountMenu = true }) {
+                            Icon(Lucide.CircleUser, contentDescription = null)
+                        }
+                    }
                     TooltipIconButton(label = stringResource(Res.string.environment), onClick = { envMenu = true }) {
                         Icon(Lucide.Server, contentDescription = null)
                     }
@@ -178,6 +190,22 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                 activeId = state.activeEnvironmentId,
                 onSelect = { if (it != state.activeEnvironmentId) vm.selectEnvironment(it) },
                 onDismiss = { envMenu = false },
+            )
+        }
+        if (accountMenu) {
+            val snapshot = accountsSnapshot
+            SelectDialog(
+                title = stringResource(Res.string.account),
+                options = snapshot?.accounts.orEmpty().filter { it.loggedIn }.map { it.id to it.label },
+                selected = snapshot?.default.orEmpty(),
+                onSelect = { id ->
+                    accountMenu = false
+                    scope.launch {
+                        runCatching { SettingsApi.update(account = id) }
+                        load()
+                    }
+                },
+                onDismiss = { accountMenu = false },
             )
         }
         AppPullToRefresh(
@@ -264,7 +292,9 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                                 color = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.weight(1f),
                             )
-                            current.plan?.let {
+                            val accountLabel = accountsSnapshot?.takeIf { it.accounts.size > 1 }
+                                ?.let { s -> s.accounts.firstOrNull { it.id == s.default }?.label }
+                            listOfNotNull(accountLabel, current.plan).joinToString(" • ").ifBlank { null }?.let {
                                 Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -285,6 +315,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                             }
                         }
                     }
+                    AccountsSection(enabled = serverReady, onChanged = { scope.launch { load() } })
                     SettingsGroup(stringResource(Res.string.extensions)) {
                         val pluginList = extensions?.plugins
                         val enabledCount = pluginList?.count { it.enabled } ?: 0

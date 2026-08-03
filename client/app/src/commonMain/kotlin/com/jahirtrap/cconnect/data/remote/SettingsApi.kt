@@ -13,6 +13,7 @@ import kotlinx.serialization.json.put
 object SettingsApi {
 
     data class Snapshot(
+        val account: String,
         val model: String,
         val effort: String,
         val permissionMode: String,
@@ -31,6 +32,7 @@ object SettingsApi {
         o[key]?.jsonObject?.get("effective")?.jsonPrimitive?.booleanOrNull ?: fallback
 
     private fun parse(o: JsonObject) = Snapshot(
+        account = effectiveStr(o, "account", ""),
         model = effectiveStr(o, "model", "opus"),
         effort = effectiveStr(o, "effort", "xhigh"),
         permissionMode = effectiveStr(o, "permission_mode", "bypassPermissions"),
@@ -45,6 +47,7 @@ object SettingsApi {
     suspend fun get(): Snapshot? = Http.get("/settings")?.jsonObject?.let(::parse)
 
     suspend fun update(
+        account: String? = null,
         model: String? = null,
         effort: String? = null,
         permissionMode: String? = null,
@@ -55,6 +58,7 @@ object SettingsApi {
         showCompact: String? = null,
         showWorking: String? = null,
     ): Snapshot? = Http.post("/settings", buildJsonObject {
+        if (account != null) put("account", account)
         if (model != null) put("model", model)
         if (effort != null) put("effort", effort)
         if (permissionMode != null) put("permission_mode", permissionMode)

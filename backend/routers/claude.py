@@ -13,8 +13,8 @@ router = APIRouter(tags=["Claude"])
 
 
 @router.get("/claude/usage")
-async def get_usage():
-    return api_response(data=await usage_service.usage_data())
+async def get_usage(account: str | None = None):
+    return api_response(data=await usage_service.usage_data(account))
 
 
 @router.get("/claude/status")

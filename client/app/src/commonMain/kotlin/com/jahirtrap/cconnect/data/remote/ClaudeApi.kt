@@ -54,8 +54,9 @@ object ClaudeApi {
 
     data class Usage(val plan: String?, val windows: List<UsageWindow>, val error: String?)
 
-    suspend fun usage(): Usage? {
-        val o = Http.get("/claude/usage")?.jsonObject ?: return null
+    suspend fun usage(account: String? = null): Usage? {
+        val query = account?.takeIf { it.isNotBlank() }?.let { mapOf("account" to it) } ?: emptyMap()
+        val o = Http.get("/claude/usage", query)?.jsonObject ?: return null
         return Usage(
             plan = o["plan"]?.jsonPrimitive?.contentOrNull,
             windows = o["windows"]?.jsonArray?.map { el ->

@@ -104,6 +104,7 @@ data class Capabilities(
     val models: List<ModelOption> = listOf(ModelOption("opus", "Opus 4.7")),
     val colors: List<String> = listOf("red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"),
     val commands: List<CommandOption> = emptyList(),
+    val accounts: List<ModelOption> = emptyList(),
     val defaults: CapabilitiesDefaults = CapabilitiesDefaults(),
     val serverVersion: String? = null,
     val supportedApp: String? = null,   // version range the server accepts, e.g. ">=1.0.8"
@@ -115,6 +116,7 @@ data class CapabilitiesDefaults(
     val permissionMode: String = "bypassPermissions",
     val effort: String = "xhigh",
     val model: String = "opus[1m]",
+    val account: String = "default",
 )
 
 sealed interface ServerEvent {

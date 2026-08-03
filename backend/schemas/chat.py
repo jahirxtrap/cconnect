@@ -8,12 +8,13 @@ from pydantic import BaseModel
 class StartMessage(BaseModel):
     type: Literal["start"]
     cwd: str
-    permission_mode: str = "default"
+    permission_mode: Optional[str] = None
     resume: Optional[str] = None
     fork: bool = False
     model: Optional[str] = None
-    effort: str = "max"
-    partial: bool = False
+    account: Optional[str] = None
+    effort: Optional[str] = None
+    partial: Optional[bool] = None
     base_url: Optional[str] = None
     channel: Optional[str] = None
     last_seq: int = 0
@@ -24,6 +25,15 @@ class PromptMessage(BaseModel):
     text: str
     attachments: list[str] = []
     id: Optional[str] = None
+
+
+class SetGenerationMessage(BaseModel):
+    type: Literal["set_generation"]
+    cwd: Optional[str] = None
+    model: Optional[str] = None
+    effort: Optional[str] = None
+    partial: Optional[bool] = None
+    account: Optional[str] = None
 
 
 class SetPermissionMessage(BaseModel):
