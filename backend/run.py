@@ -9,15 +9,20 @@ import re
 import secrets
 import subprocess
 import sys
+from contextlib import suppress
 from pathlib import Path
 from urllib.parse import urlparse
 
+import psutil
 import qrcode
 
 from core.config import PORT, RESTART_EXIT_CODE, RESTART_FLAG
 from services import system_monitor
 
-_ENV_PATH = Path(__file__).resolve().parent / ".env"
+_BASE_DIR = Path(__file__).resolve().parent
+_ENV_PATH = _BASE_DIR / ".env"
+_PID_PATH = _BASE_DIR / ".detached.pid"
+_DETACHED_LOG = _BASE_DIR / "logs" / "detached.log"
 _TOKEN_VAR = "PUBLIC_ACCESS_TOKEN"
 
 
@@ -101,11 +106,12 @@ def _print_qr(payload: str) -> None:
     sys.stdout.buffer.flush()
 
 
-def _expose(provider: str, port: int) -> None:
+def _expose(provider: str, port: int, keep_running: bool = False) -> None:
     generated = _ensure_public_token()
     if provider == "tailscale":
         public_url = _start_tailscale_funnel(port)
-        atexit.register(_stop_tailscale_funnel)
+        if not keep_running:
+            atexit.register(_stop_tailscale_funnel)
     else:
         _abort(f"unknown --expose provider: {provider}")
         return  # unreachable, satisfies static checkers
@@ -122,15 +128,97 @@ def _expose(provider: str, port: int) -> None:
     _print_qr(json.dumps({"url": public_url, "token": token}, separators=(",", ":")))
 
 
+def _running_pid() -> int | None:
+    """PID of a live detached launcher, or None when the recorded one is gone."""
+    try:
+        pid = int(_PID_PATH.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+    try:
+        process = psutil.Process(pid)
+        if Path(__file__).name in " ".join(process.cmdline()):
+            return pid
+    except (psutil.Error, OSError):
+        pass
+    _PID_PATH.unlink(missing_ok=True)
+    return None
+
+
+def _spawn_detached(child_args: list[str]) -> int:
+    _DETACHED_LOG.parent.mkdir(parents=True, exist_ok=True)
+    handle = _DETACHED_LOG.open("ab")
+    kwargs: dict = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": handle,
+        "stderr": handle,
+        "cwd": str(_BASE_DIR),
+        "env": dict(os.environ),
+        "close_fds": True,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    process = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), *child_args], **kwargs)
+    _PID_PATH.write_text(str(process.pid), encoding="utf-8")
+    return process.pid
+
+
+def _stop_detached() -> None:
+    pid = _running_pid()
+    if pid is None:
+        print("No detached backend is running.")
+    else:
+        try:
+            parent = psutil.Process(pid)
+            targets = parent.children(recursive=True) + [parent]
+            for target in targets:
+                with suppress(psutil.Error):
+                    target.terminate()
+            _, alive = psutil.wait_procs(targets, timeout=10)
+            for target in alive:
+                with suppress(psutil.Error):
+                    target.kill()
+            print(f"Stopped detached backend (pid {pid}).")
+        except (psutil.Error, OSError) as exc:
+            _abort(f"could not stop pid {pid}: {exc}")
+    _PID_PATH.unlink(missing_ok=True)
+    _stop_tailscale_funnel()
+
+
 def main():
     parser = argparse.ArgumentParser(description="CConnect backend launcher.")
     parser.add_argument("--production", action="store_true",
                         help="No reload, multi-worker (Linux/macOS only).")
     parser.add_argument("--expose", choices=["tailscale"], default=None,
                         help="Expose the backend to the public internet via the given provider.")
+    parser.add_argument("--detach", action="store_true",
+                        help="Run in the background and return; the server outlives the terminal.")
+    parser.add_argument("--stop", action="store_true",
+                        help="Stop a backend previously started with --detach.")
     args = parser.parse_args()
 
     is_windows = sys.platform == "win32"
+
+    if args.stop:
+        _stop_detached()
+        return
+
+    if args.detach:
+        running = _running_pid()
+        if running is not None:
+            _abort(f"a detached backend is already running (pid {running}). Use --stop first.")
+        system_monitor.reset_log_file()
+        if args.expose:
+            _expose(args.expose, PORT, keep_running=True)
+        child_args = ["--production"] if args.production else []
+        pid = _spawn_detached(child_args)
+        print(
+            f"  Detached   : pid {pid}"
+            f"\n  Log        : {_DETACHED_LOG}"
+            f"\n  Stop with  : {Path(sys.executable).name} run.py --stop\n"
+        )
+        return
 
     system_monitor.reset_log_file()
     if args.expose:
