@@ -55,7 +55,7 @@ client/app/src/
 ├── commonMain/kotlin/com/jahirtrap/cconnect/
 │   ├── Platform.kt              # expect isWebPlatform / isCoarsePointer() / bringAppToFront() + desktopWindowToFront hook
 │   ├── chat/                    # ChatScreen, ChatBlocks, ChatViewModel(+Factory), Tabs(Controller/Bar/Shortcuts/Context), PermissionUi, ChatUrl(expect)
-│   ├── claude/                  # ClaudeScreen + ClaudeDetailScreen (enum ClaudeKind) — same hub as mobile
+│   ├── claude/                  # ClaudeScreen + ClaudeDetailScreen (enum ClaudeKind) + AccountsSection (accounts + remote OAuth login) — same hub as mobile
 │   ├── data/
 │   │   ├── ChatModels / SessionModels / EnvironmentProfile / QrConnectionPayload / SshProfile+SshStore
 │   │   ├── AppCompat.kt         # version-range compare for the app/server/CLI contract
@@ -63,12 +63,12 @@ client/app/src/
 │   │   ├── Settings.kt / AppPrefs.kt(expect)   # persisted prefs (desktop: java Prefs/file; web: localStorage)
 │   │   ├── MarkdownStore.kt(expect)            # markdown scratchpad text (desktop/android: a file; web: localStorage) — NOT AppPrefs (desktop java Prefs caps a value at 8KB)
 │   │   ├── Clock / DateFormat / NumberFormat    # expect time/number formatting (no kotlinx-datetime dep)
-│   │   └── remote/              # Backend(+Config), Http, ChatSocket, Sessions/Shared/Claude/Cli/Capabilities/Settings/System Api,
+│   │   └── remote/              # Backend(+Config), Http, ChatSocket, Sessions/Shared/Claude/Cli/Capabilities/Settings/System/Network/Accounts Api,
 │   │                           #   GitHubApi, + expect HttpTransport/WebSocketConn/SharedHttp/UrlCodec/AppImageLoader
 │   ├── files/                   # FileExplorerScreen, FilePreviewScreen, UploadManager, FileDrop, FilePicker(expect),
 │   │                           #   AttachmentFile(expect), ClipboardPaste(expect), FilesUrl(expect), SharedActions(expect: URL save/share + local-text save/share), PreviewKind
 │   ├── markdown/MarkdownScreen.kt # notes scratchpad: BasicTextField editor + live MarkdownText preview toggle; local save/save-as/share via SharedActions text funcs
-│   ├── monitor/MonitorScreen.kt # live PC monitor (resource graphs + server logs)
+│   ├── monitor/                 # MonitorScreen (resource graphs + server logs) + NetworkPage (interfaces, Wi-Fi, speed test); the Network tab shows only when the backend reports support
 │   ├── service/                 # Notifier(expect: desktop tray/notify-send; web Notification API) + LocalServer(expect: desktop spawns the backend run.py)
 │   ├── settings/                # SettingsScreen + SettingsComponents (SettingsGroup/PreferenceRow, reused by claude/)
 │   ├── terminal/                # TerminalScreen + TerminalSession(expect) + OsIcons  (SSH; real impl desktop-only)

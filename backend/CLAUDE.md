@@ -70,8 +70,12 @@ backend/
 │   ├── shared.py            # File manager API over backend/shared/
 │   ├── claude.py            # Claude install manager: prompt, plugins, marketplaces, catalog, skills, MCP, memories
 │   ├── system.py            # PC resource snapshot + server logs (monitor screen)
+│   ├── network.py           # Host network status, Wi-Fi control, speed test (monitor screen)
+│   ├── accounts.py          # Claude accounts: list/create/rename/delete, MCP sync, remote OAuth login
 │   └── chat.py              # WS /api/chat/ws
 ├── schemas/
+│   ├── network.py           # Network router request models
+│   ├── accounts.py          # Accounts router request models
 │   └── chat.py              # Inbound WebSocket message models
 ├── mcps/                    # In-process MCP server (auto-registered tools) — see below
 └── services/
@@ -84,7 +88,11 @@ backend/
     ├── claude_manage.py     # Mutations via `claude` CLI subprocess: plugin/marketplace actions, MCP add/remove
     ├── settings_store.py    # Read/write the KV settings; visibility_mode() per block type
     ├── system_monitor.py    # psutil/NVML snapshots + shared on-disk server log (see System monitor)
-    ├── usage.py             # Plan token usage from the CLI's OAuth creds: structured usage_data() (plan tier + windows) for the app, usage_markdown() for the chat's /usage
+    ├── usage.py             # Plan token usage from the selected account's OAuth creds: structured usage_data(account) for the app, usage_markdown(account) for the chat's /usage; reads the `limits` array (session / weekly_all / per-model)
+    ├── accounts.py          # THE source of account paths: each account is its own CLAUDE_CONFIG_DIR under accounts/, with projects+plugins+skills linked back to the primary one. env_for() is the only integration point; is_logged_in() asks `claude auth status --json`
+    ├── account_login.py     # Remote OAuth: drives `claude auth login --claudeai` in a PTY, scrapes the authorization URL, feeds back the pasted code
+    ├── network.py           # Interfaces, Wi-Fi scan/connect/radio, real connectivity check, guarded mutations with rollback + offline watchdog
+    ├── speedtest.py         # Ookla CLI wrapper (jsonl progress); reports unavailable when not installed
     └── shared.py            # List / upload (dedup) / download / mkdir / rename / move / copy / delete under backend/shared/
 ```
 
@@ -176,6 +184,21 @@ Every REST endpoint returns `core.responses.api_response()` —
 | GET | `/api/claude/memories?project=` | Memories: global + per-project (description from frontmatter) |
 | GET | `/api/claude/memories/file?scope=&name=&project=` | A memory file (text/markdown) |
 | DELETE | `/api/claude/memories` | Delete a memory (also prunes its MEMORY.md index line) |
+| GET | `/api/claude/usage?account=<id>` | Plan usage for an account (defaults to the configured one) |
+| GET / POST | `/api/accounts` | List accounts (+ the default) / create one (links shared dirs, copies MCP servers) |
+| PUT / DELETE | `/api/accounts/{id}` | Rename / delete an account (links are detached, the shared history is never touched) |
+| POST | `/api/accounts/{id}/mcp-sync` | Copy the primary account's MCP servers into this one |
+| POST | `/api/accounts/{id}/login` | Start the OAuth flow; returns the authorization URL |
+| POST | `/api/accounts/{id}/login/code` | Submit the code pasted by the user |
+| DELETE | `/api/accounts/{id}/login` | Cancel a login in progress |
+| GET | `/api/network` | Supported flag, connectivity, Wi-Fi radio/SSID, interfaces |
+| GET | `/api/network/wifi` | Networks in range (ssid, signal, security, active, known) |
+| POST | `/api/network/wifi/connect` | Join a network — guarded, returns a job |
+| POST | `/api/network/wifi/radio` | Turn the Wi-Fi radio on/off — guarded |
+| POST | `/api/network/interface` | Bring an interface up/down (Linux) — guarded |
+| POST | `/api/network/auth` | Cache the sudo password for privileged network actions (Linux) |
+| GET | `/api/network/job/{id}` | Outcome of a guarded action (`ok`, `rolled_back`, `failed`, `blocked`) |
+| WS | `/api/network/speedtest/ws` | Speed test progress + result |
 | GET | `/api/claude/usage` | Structured plan usage: `plan` ("Max (20x)", from the CLI credentials' subscriptionType + rateLimitTier) + `windows` (id/percent/resets_at per limit window) |
 | GET | `/api/claude/status` | Claude service status from status.claude.com (Statuspage `summary.json`): `indicator` + `components` + active `incidents`; cached 60s |
 | GET | `/api/system` | Resource snapshot: hostname, os, os_id, arch, cpu_name, uptime, cpu (percent/cores), memory, gpu (NVML; null without NVIDIA), disks |

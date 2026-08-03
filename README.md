@@ -64,6 +64,19 @@ What this does:
 enabled for this node** in the tailnet ACL. Your device needs only an internet
 connection — no Tailscale required.
 
+### Detached (leave it running over SSH)
+
+```bash
+python run.py --detach --expose tailscale
+python run.py --stop
+```
+
+Meant for a VPS you reach over SSH: `--detach` prints the URL, token and QR as
+usual, then hands the terminal back and keeps the server running in its own
+process — closing the session (or the terminal) no longer takes it down. Output
+goes to `backend/logs/detached.log`, the funnel stays up, and `--stop` shuts
+both down. It survives the terminal, not a reboot.
+
 ## Run the backend from the desktop app
 
 The desktop app can start the backend for you instead of running `python run.py`
@@ -168,6 +181,25 @@ PC:
 - See your **plan usage** at a glance — your subscription tier (Pro, Max 5x,
   Max 20x) and a bar per limit window: current session, all models, and the
   per-model weekly caps, each with its reset time.
+- Keep several **Claude accounts** on one backend and switch between them.
+
+### Multiple accounts
+
+One backend can hold more than one Claude login. Add an account from the Claude
+screen and sign in without leaving the app: it hands you a link — copy it, open
+it on whatever device you like, approve the account there and paste the code
+back. Nothing is typed on the server, and each account keeps its own
+credentials, refreshed by the CLI as usual.
+
+What they share is everything you'd want in common — the same conversation
+history, plugins and skills — so switching accounts only changes who pays for
+the turn, not what you see. MCP servers are copied over when the account is
+created, and can be re-synced later.
+
+Pick the account per chat from the composer bar, or set the server-wide default
+from the Claude screen's header (the usage shown there follows it) or in
+Settings. Accounts you haven't signed into yet are listed too, so you can
+finish later.
 
 ## Watch the PC
 
@@ -175,10 +207,26 @@ The **Monitor** screen shows what the machine is doing while Claude works:
 CPU, GPU and memory as live graphs (VRAM and temperature included when
 there's an NVIDIA card), storage per disk, the server's own logs streaming
 in over a dedicated WebSocket, and a device card — OS with its brand icon,
-hostname, uptime, CPU/GPU models. Switch between resources and logs, change
-servers right from the top bar, and **restart the backend remotely** — one
-confirmation, the server relaunches itself and the app reconnects on its
+hostname, uptime, CPU/GPU models. Switch between resources, network and logs,
+change servers right from the top bar, and **restart the backend remotely** —
+one confirmation, the server relaunches itself and the app reconnects on its
 own.
+
+### Network
+
+A **Network** tab manages the PC's connection from wherever you are: whether it
+really has internet (a captive portal counts as no), live upload/download, every
+interface with the one carrying traffic marked, the Wi-Fi networks in range with
+their signal, and an on-demand **speed test** through the Ookla CLI when it's
+installed.
+
+You can also act on it — join another Wi-Fi network, turn the radio off, and on
+Linux bring a wired interface up or down. Since a wrong move over a remote link
+would strand you, every change is guarded: an action that would leave the
+machine with no way out is refused outright, and anything else is applied, then
+verified — if the new network has no internet, the previous one is restored on
+its own. A watchdog does the same if the machine ends up offline for any other
+reason. The tab only appears on backends that support it (Windows and Linux).
 
 ## Built-in features
 
