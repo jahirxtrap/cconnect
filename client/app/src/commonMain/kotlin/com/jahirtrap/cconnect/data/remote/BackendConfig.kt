@@ -28,6 +28,7 @@ data class BackendConfig(
     val systemWsUrl: String get() = "${if (secure) "wss" else "ws"}://$host$portSuffix/api/system/ws"
     val listWsUrl: String get() = "${if (secure) "wss" else "ws"}://$host$portSuffix/api/list/ws"
     val sharedWsUrl: String get() = "${if (secure) "wss" else "ws"}://$host$portSuffix/api/shared/ws"
+    val speedtestWsUrl: String get() = "${if (secure) "wss" else "ws"}://$host$portSuffix/api/network/speedtest/ws"
     val isConfigured: Boolean get() = host.isNotBlank()
 
     @OptIn(ExperimentalEncodingApi::class)

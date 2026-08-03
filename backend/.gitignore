@@ -15,6 +15,9 @@ logs/
 # Stashed definitions of disabled MCP servers
 mcp_disabled.json
 
+# Last known good network configuration (runtime state)
+network_state.json
+
 # User custom prompt
 prompts/USER.md
 

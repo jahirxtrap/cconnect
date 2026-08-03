@@ -18,6 +18,7 @@ object Backend {
     val baseUrl: String get() = snapshot().baseUrl
     val wsUrl: String get() = snapshot().wsUrl
     val systemWsUrl: String get() = snapshot().systemWsUrl
+    val speedtestWsUrl: String get() = snapshot().speedtestWsUrl
     val isConfigured: Boolean get() = host.isNotBlank()
     val authHeaders: List<Pair<String, String>> get() = snapshot().authHeaders
 }

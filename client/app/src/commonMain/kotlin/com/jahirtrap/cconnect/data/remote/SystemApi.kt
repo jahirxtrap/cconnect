@@ -47,6 +47,8 @@ object SystemApi {
         val memoryPercent: Float,
         val gpu: GpuInfo?,
         val disks: List<DiskInfo>,
+        val netRx: Double = 0.0,
+        val netTx: Double = 0.0,
     )
 
     data class LogEntry(
@@ -119,6 +121,8 @@ object SystemApi {
                     percent = d["percent"]?.jsonPrimitive?.floatOrNull ?: 0f,
                 )
             }.orEmpty(),
+            netRx = o["network"]?.jsonObject?.get("rx")?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            netTx = o["network"]?.jsonObject?.get("tx")?.jsonPrimitive?.doubleOrNull ?: 0.0,
         )
     }
 

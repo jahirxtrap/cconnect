@@ -215,4 +215,15 @@ def snapshot() -> dict:
         "memory": {"used": memory.used, "total": memory.total, "percent": memory.percent},
         "gpu": _gpu(),
         "disks": disks,
+        "network": _network(),
     }
+
+
+def _network() -> dict:
+    from services import network
+    if not network.SUPPORTED:
+        return {"supported": False}
+    rates = network.throughput()
+    total_rx = sum(rate["rx"] for rate in rates.values())
+    total_tx = sum(rate["tx"] for rate in rates.values())
+    return {"supported": True, "rx": total_rx, "tx": total_tx, "rates": rates}

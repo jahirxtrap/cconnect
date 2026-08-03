@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -143,6 +145,7 @@ fun RenameDialog(
     confirmLabel: String = stringResource(Res.string.save),
     suffix: String? = null,
     errorOf: ((String) -> String?)? = null,
+    secret: Boolean = false,
 ) {
     var text by remember { mutableStateOf(initial) }
     val error = if (text.isNotBlank()) errorOf?.invoke(text) else null
@@ -161,7 +164,9 @@ fun RenameDialog(
         InputField(
             value = text,
             onValueChange = { text = it },
-            maxLines = 2,
+            maxLines = if (secret) 1 else 2,
+            singleLine = secret,
+            visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier.fillMaxWidth(),
             focusRequester = focusRequester,
             trailingIcon = suffix?.let {

@@ -59,6 +59,7 @@ import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
+import com.jahirtrap.cconnect.data.remote.NetworkApi
 import com.jahirtrap.cconnect.data.remote.SystemApi
 import com.jahirtrap.cconnect.files.formatSize
 import com.jahirtrap.cconnect.terminal.colorForOs
@@ -68,6 +69,7 @@ import com.jahirtrap.cconnect.ui.CenteredProgress
 import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.EnvironmentSelectDialog
+import com.jahirtrap.cconnect.ui.handCursor
 import com.jahirtrap.cconnect.ui.MetricBar
 import com.jahirtrap.cconnect.ui.MetricHeader
 import com.jahirtrap.cconnect.ui.StatusDot
@@ -100,6 +102,9 @@ fun MonitorScreen(onClose: () -> Unit) {
     var followLogs by remember { mutableStateOf(true) }
     var envMenu by remember { mutableStateOf(false) }
     var confirmingRestart by remember { mutableStateOf(false) }
+    var netStatus by remember { mutableStateOf<NetworkApi.Status?>(null) }
+    var netReload by remember { mutableStateOf(0) }
+    LaunchedEffect(netReload) { netStatus = runCatching { NetworkApi.status() }.getOrNull() }
     val scope = rememberCoroutineScope()
     val logScroll = rememberScrollState()
     val activeName = state.environments.firstOrNull { it.id == state.activeEnvironmentId }?.name
@@ -200,8 +205,13 @@ fun MonitorScreen(onClose: () -> Unit) {
             current == null && failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxSize().padding(padding))
             current == null -> CenteredProgress(Modifier.fillMaxSize().padding(padding))
             else -> Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-                val pagerState = rememberPagerState(pageCount = { 2 })
-                val labels = listOf(stringResource(Res.string.resources), stringResource(Res.string.server_logs))
+                val hasNetwork = netStatus?.supported == true
+                val pagerState = rememberPagerState(pageCount = { if (hasNetwork) 3 else 2 })
+                val labels = listOfNotNull(
+                    stringResource(Res.string.resources),
+                    if (hasNetwork) stringResource(Res.string.network) else null,
+                    stringResource(Res.string.server_logs),
+                )
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -212,6 +222,7 @@ fun MonitorScreen(onClose: () -> Unit) {
                             selected = i == pagerState.currentPage,
                             onClick = { scope.launch { pagerState.animateScrollToPage(i) } },
                             shape = SegmentedButtonDefaults.itemShape(index = i, count = labels.size),
+                            modifier = Modifier.handCursor(),
                             icon = {},
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             colors = SegmentedButtonDefaults.colors(
@@ -232,8 +243,11 @@ fun MonitorScreen(onClose: () -> Unit) {
                     }
                 }
                 HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-                    when (page) {
-                        0 -> ResourcesPage(current, gpu, cpuHistory, gpuHistory, memHistory, vramHistory)
+                    when {
+                        page == 0 -> ResourcesPage(current, gpu, cpuHistory, gpuHistory, memHistory, vramHistory)
+                        hasNetwork && page == 1 -> netStatus?.let {
+                            NetworkPage(it, current.netRx, current.netTx, onReload = { netReload++ })
+                        }
                         else -> LogsPage(logs, logScroll)
                     }
                 }
