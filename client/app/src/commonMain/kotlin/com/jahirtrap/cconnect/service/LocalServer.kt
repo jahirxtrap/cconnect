@@ -21,6 +21,7 @@ data class LocalServerConfig(
     val pythonPath: String,
     val mode: String,
     val probePort: Int,
+    val publicHost: String = "",
 )
 
 expect object LocalServer {

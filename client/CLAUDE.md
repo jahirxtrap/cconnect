@@ -328,17 +328,27 @@ stub (no JVM sshj in the browser).
 stubs) lets the desktop app launch and supervise the backend itself instead of
 running `python run.py` by hand. `Settings` holds `localServerEnabled`,
 `localServerDir` (the backend folder), `localServerPython`
-(`auto`/`system`/`custom`) + `localServerPythonPath`, and `localServerMode`
-(`local` / `tailscale`). On launch — or the Settings "Run" button — it resolves a
-Python (`auto` = a venv under the backend dir, else system `python`/`python3`),
-`ProcessBuilder`s `run.py` (`--expose tailscale` in tailscale mode) with
+(`auto`/`system`/`custom`) + `localServerPythonPath`, `localServerMode`
+(`local` / `tailscale` / `caddy`) and `localServerPublicHost` (only read in
+`caddy` mode; empty lets the backend derive an sslip.io name). On launch — or the
+Settings "Run" button — it resolves a Python (`auto` = a venv under the backend
+dir, else system `python`/`python3`), `ProcessBuilder`s `run.py` (any mode other
+than `local` becomes `--expose <mode>`, plus `--public-host` when set) with
 `PYTHONUNBUFFERED=1`, and streams stdout to scrape the **Public URL** / **Token**
 from `--expose`. State (`LocalServerState`: Stopped / Starting / RunningManaged /
 RunningExternal / Failed; `LocalServerError`: BadDir / NoPython / LaunchFailed /
 Crashed) is **derived from the process plus the existing chat WebSocket, never a
 poll loop**: if the port is already open it reports `RunningExternal` and stays
 hands-off; `stop()` kills the process tree; `restart()` waits for the old process
-to exit and the port to free before relaunching. Errors render as red text in the
+to exit and the port to free before relaunching.
+
+Readiness (`LocalServerInfo.ready`) is a **separate signal from reachability**.
+After spawning, a bounded probe watches `127.0.0.1:<probePort>` until it opens
+(up to 30s, and it stops on the first success or if the process dies). Without it
+the panel judged "running" only by whether the *configured environment* answered:
+in local mode that environment is usually the PC's tailnet address, so a backend
+that was already serving read as `Starting` forever until Tailscale came up.
+`localServerStateOf` now takes `info.ready || reachable`. Errors render as red text in the
 panel, which hides when a backend is already running externally.
 
 ## Markdown scratchpad

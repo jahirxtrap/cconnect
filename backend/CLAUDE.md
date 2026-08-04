@@ -42,7 +42,7 @@ marketplaces, MCP servers, skills, memories) and a shared-folder file manager.
 ```
 backend/
 ├── main.py                  # FastAPI app; lifespan ensures auth + SDK; router auto-discovery; catch-all 404; GZipMiddleware(minimum_size=512)
-├── run.py                   # Supervisor launcher: runs uvicorn as a child and relaunches it on restart requests; --expose tailscale brings up Funnel + token + QR. The desktop client's local-server panel can spawn this too (see client/CLAUDE.md)
+├── run.py                   # Supervisor launcher: runs uvicorn as a child and relaunches it on restart requests; --expose {tailscale,caddy} resolves the public URL + token + QR. The desktop client's local-server panel can spawn this too (see client/CLAUDE.md)
 ├── pyproject.toml           # version + [tool.cconnect] supported-app / supported-cli (the version contract)
 ├── Dockerfile
 ├── .env.example
@@ -102,6 +102,7 @@ backend/
 |---|---|---|---|
 | `python run.py` | unset | `None` | Open backend (no auth) |
 | `python run.py --expose tailscale` | `1` | from env / `.env` | Bearer required on every `/api/*` except `/api/health` |
+| `python run.py --expose caddy` | `1` | from env / `.env` | Same gate; the URL points at the reverse proxy instead of a Funnel |
 
 `core/config.PUBLIC_ACCESS_TOKEN` is gated by `CCONNECT_AUTH_ACTIVE` so that a
 token sitting in `.env` from a previous expose run doesn't accidentally lock
@@ -111,19 +112,47 @@ on every platform, so the gate is consistent across reload and no-reload.
 `PublicAuthMiddleware` enforces the gate; `_ws_bearer_ok()` in `routers/chat.py`
 validates the same header on the WebSocket handshake before `accept()`.
 
-## `--expose tailscale`
+## `--expose <provider>`
+
+Steps 1, 2 and 4 are shared by every provider; only step 3 differs.
 
 1. `os.environ["CCONNECT_AUTH_ACTIVE"] = "1"` is set in `run.py` before
    `uvicorn.run()` so the worker import of `core.config` sees it.
 2. If `PUBLIC_ACCESS_TOKEN` is unset, a fresh `secrets.token_urlsafe(32)` is
    persisted in `.env` and set in `os.environ`.
-3. `tailscale funnel --bg <port>` is started.
+3. The provider resolves the public URL (below).
 4. The public URL, port, token, and a QR (`{"url":"...","token":"..."}` JSON) are
    printed to the terminal. The mobile app scans this QR to autoconfigure.
-5. `atexit` calls `tailscale funnel --https=443 off` to clean up.
 
-**Tailnet requirements:** Tailscale signed in, Funnel allowed for this node in
-the tailnet ACL.
+Providers fall into two shapes, and `_expose` covers both: one where `run.py`
+**creates** the exposure and has to tear it down, and one where the exposure
+already exists and `run.py` only advertises it.
+
+### `tailscale`
+
+`tailscale funnel --bg <port>` is started and the URL parsed from its output;
+`atexit` calls `tailscale funnel --https=443 off` to clean up. Requires
+Tailscale signed in and Funnel allowed for this node in the tailnet ACL.
+
+### `caddy`
+
+For a reverse proxy already terminating TLS in front of the backend — Caddy,
+nginx, anything. There is no process to start or stop: the proxy is a service of
+its own, so this provider only builds `https://<host>` and turns the Bearer gate
+on. The hostname comes from `--public-host`, else `PUBLIC_HOSTNAME` in `.env`,
+else `<user>-<dashed public IPv4>.sslip.io` — sslip.io decodes the address from
+the name itself, so that default needs no DNS setup.
+
+The default **aborts** when no globally routable IPv4 exists on any interface
+(`_public_ipv4` skips loopback, RFC1918 and CGNAT, so Tailscale's `100.x` never
+qualifies): behind NAT the name would resolve to an unreachable address and the
+QR would fail only once scanned. `_warn_if_unserved` covers the rest of that
+class of silent failure, warning when the hostname does not resolve to one of
+this machine's addresses or when nothing is listening on `:443`.
+
+Because the proxy outlives the process, `--stop` must not blindly close a Funnel
+that was never opened: `--detach` records the provider in `.detached.provider`
+and `_stop_detached` reads it back.
 
 ## Version contract
 
@@ -520,6 +549,7 @@ All config lives in environment variables. `core/config.py` auto-loads
 | `DEFAULT_MODEL` | `opus` | Fallback when `start` omits it |
 | `AUTO_UPDATE_SDK` | `1` | `pip install -U claude-agent-sdk` on startup |
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token, honored only when `CCONNECT_AUTH_ACTIVE=1` |
+| `PUBLIC_HOSTNAME` | — | Hostname the proxy serves, for `--expose caddy`; `--public-host` wins over it |
 
 ## Reload
 

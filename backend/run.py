@@ -2,11 +2,14 @@
 
 import argparse
 import atexit
+import getpass
 import io
+import ipaddress
 import json
 import os
 import re
 import secrets
+import socket
 import subprocess
 import sys
 from contextlib import suppress
@@ -22,8 +25,11 @@ from services import system_monitor
 _BASE_DIR = Path(__file__).resolve().parent
 _ENV_PATH = _BASE_DIR / ".env"
 _PID_PATH = _BASE_DIR / ".detached.pid"
+_PROVIDER_PATH = _BASE_DIR / ".detached.provider"
 _DETACHED_LOG = _BASE_DIR / "logs" / "detached.log"
 _TOKEN_VAR = "PUBLIC_ACCESS_TOKEN"
+_HOSTNAME_VAR = "PUBLIC_HOSTNAME"
+_PROVIDERS = ("tailscale", "caddy")
 
 
 def _abort(msg: str) -> None:
@@ -96,6 +102,65 @@ def _stop_tailscale_funnel() -> None:
         pass
 
 
+def _local_ipv4() -> list[str]:
+    found = []
+    for entries in psutil.net_if_addrs().values():
+        for entry in entries:
+            if entry.family != socket.AF_INET:
+                continue
+            with suppress(ValueError):
+                found.append(str(ipaddress.ip_address(entry.address)))
+    return found
+
+
+def _public_ipv4() -> str | None:
+    """First globally routable IPv4, read from the interfaces so it works offline."""
+    return next((ip for ip in _local_ipv4() if ipaddress.ip_address(ip).is_global), None)
+
+
+def _dns_label(value: str) -> str:
+    return re.sub(r"[^a-z0-9-]+", "-", value.lower()).strip("-")[:24]
+
+
+def _default_public_host() -> str:
+    """Zero-setup hostname: sslip.io decodes the address out of the name itself."""
+    address = _public_ipv4()
+    if not address:
+        _abort(
+            "--expose caddy could not derive a hostname: this machine has no globally routable "
+            "IPv4, so the sslip.io default would resolve to an address nobody can reach.\n"
+            f"Pass --public-host <name> or set {_HOSTNAME_VAR} in .env."
+        )
+    user = _dns_label(getpass.getuser())
+    if not user:
+        _abort("--expose caddy could not build a DNS label from the user name. Pass --public-host.")
+    return f"{user}-{address.replace('.', '-')}.sslip.io"
+
+
+def _warn_if_unserved(host: str, port: int) -> None:
+    """The proxy is configured outside this repo, so a bad hostname fails only once scanned."""
+    try:
+        resolved = {info[4][0] for info in socket.getaddrinfo(host, None, socket.AF_INET)}
+    except OSError:
+        print(f"  ! {host} does not resolve yet — the QR will fail until its DNS record exists")
+        return
+    if not resolved & set(_local_ipv4()):
+        print(f"  ! {host} resolves to {', '.join(sorted(resolved))}, none of them this machine")
+    with socket.socket() as probe:
+        probe.settimeout(1.5)
+        if probe.connect_ex(("127.0.0.1", 443)) != 0:
+            print(f"  ! nothing is listening on :443 — start the proxy that forwards to :{port}")
+
+
+def _caddy_url(public_host: str, port: int) -> str:
+    host = (public_host or os.environ.get(_HOSTNAME_VAR, "")).strip().rstrip("/")
+    if "://" in host:
+        host = urlparse(host).netloc
+    host = host or _default_public_host()
+    _warn_if_unserved(host, port)
+    return f"https://{host}"
+
+
 def _print_qr(payload: str) -> None:
     qr = qrcode.QRCode(border=1)
     qr.add_data(payload)
@@ -106,12 +171,14 @@ def _print_qr(payload: str) -> None:
     sys.stdout.buffer.flush()
 
 
-def _expose(provider: str, port: int, keep_running: bool = False) -> None:
+def _expose(provider: str, port: int, public_host: str = "", keep_running: bool = False) -> None:
     generated = _ensure_public_token()
     if provider == "tailscale":
         public_url = _start_tailscale_funnel(port)
         if not keep_running:
             atexit.register(_stop_tailscale_funnel)
+    elif provider == "caddy":
+        public_url = _caddy_url(public_host, port)
     else:
         _abort(f"unknown --expose provider: {provider}")
         return  # unreachable, satisfies static checkers
@@ -142,6 +209,13 @@ def _running_pid() -> int | None:
         pass
     _PID_PATH.unlink(missing_ok=True)
     return None
+
+
+def _detached_provider() -> str:
+    """Which provider the detached run exposed with, so --stop only tears down what it started."""
+    with suppress(OSError):
+        return _PROVIDER_PATH.read_text(encoding="utf-8").strip()
+    return ""
 
 
 def _spawn_detached(child_args: list[str]) -> int:
@@ -183,15 +257,20 @@ def _stop_detached() -> None:
         except (psutil.Error, OSError) as exc:
             _abort(f"could not stop pid {pid}: {exc}")
     _PID_PATH.unlink(missing_ok=True)
-    _stop_tailscale_funnel()
+    if _detached_provider() == "tailscale":
+        _stop_tailscale_funnel()
+    _PROVIDER_PATH.unlink(missing_ok=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description="CConnect backend launcher.")
     parser.add_argument("--production", action="store_true",
                         help="No reload, multi-worker (Linux/macOS only).")
-    parser.add_argument("--expose", choices=["tailscale"], default=None,
+    parser.add_argument("--expose", choices=list(_PROVIDERS), default=None,
                         help="Expose the backend to the public internet via the given provider.")
+    parser.add_argument("--public-host", default="",
+                        help="Hostname the reverse proxy serves (--expose caddy). Falls back to "
+                             f"{_HOSTNAME_VAR}, then to <user>-<ip>.sslip.io.")
     parser.add_argument("--detach", action="store_true",
                         help="Run in the background and return; the server outlives the terminal.")
     parser.add_argument("--stop", action="store_true",
@@ -210,7 +289,8 @@ def main():
             _abort(f"a detached backend is already running (pid {running}). Use --stop first.")
         system_monitor.reset_log_file()
         if args.expose:
-            _expose(args.expose, PORT, keep_running=True)
+            _expose(args.expose, PORT, args.public_host, keep_running=True)
+            _PROVIDER_PATH.write_text(args.expose, encoding="utf-8")
         child_args = ["--production"] if args.production else []
         pid = _spawn_detached(child_args)
         print(
@@ -222,7 +302,7 @@ def main():
 
     system_monitor.reset_log_file()
     if args.expose:
-        _expose(args.expose, PORT)
+        _expose(args.expose, PORT, args.public_host)
 
     # Disabled on Windows: uvicorn's reload worker breaks the Claude CLI's asyncio subprocess.
     reload = not args.production and not is_windows

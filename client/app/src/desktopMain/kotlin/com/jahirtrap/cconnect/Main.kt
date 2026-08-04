@@ -130,6 +130,7 @@ fun main() {
                 pythonPath = settings.localServerPythonPath,
                 mode = settings.localServerMode,
                 probePort = settings.activeEnvironment?.port ?: 8723,
+                publicHost = settings.localServerPublicHost,
             )
         )
     }

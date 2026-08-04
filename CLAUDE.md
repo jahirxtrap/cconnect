@@ -45,8 +45,9 @@ See `backend/CLAUDE.md` and `client/CLAUDE.md` for module-specific rules.
 - Backend port `8723`, runs on the user's PC.
 - Two transport modes:
   - **Local**: both devices on the same tailnet; phone hits `http://<tailnet-host>:8723`.
-  - **Public**: `python run.py --expose tailscale` brings up Tailscale Funnel on
-    443; phone hits `https://<funnel>.ts.net` with a Bearer token.
+  - **Public**: `python run.py --expose <provider>` publishes it over HTTPS with a
+    Bearer token. `tailscale` brings up a Funnel on 443 (`https://<funnel>.ts.net`);
+    `caddy` points at a reverse proxy that already fronts the backend.
 - Claude auth: the SDK uses the **Claude Code CLI's OAuth subscription** (no API
   key). `core/sdk.ensure_subscription_auth()` drops `ANTHROPIC_API_KEY` so the
   CLI's session wins.
@@ -69,7 +70,7 @@ when a change requires a newer counterpart.
 ## Auth model
 
 - Plain `python run.py` → no auth. Open backend on the tailnet.
-- `python run.py --expose tailscale` → sets `CCONNECT_AUTH_ACTIVE=1` and a
+- `python run.py --expose <tailscale|caddy>` → sets `CCONNECT_AUTH_ACTIVE=1` and a
   `PUBLIC_ACCESS_TOKEN` (auto-generated if absent, persisted in `.env`).
   `core/config` honors the token only when the flag is set, so a leftover
   token in `.env` never accidentally locks down a plain local run.
@@ -82,6 +83,7 @@ when a change requires a newer counterpart.
 ```bash
 cd backend && python run.py                    # Local HTTP (no auth)
 cd backend && python run.py --expose tailscale # Public HTTPS via Funnel
+cd backend && python run.py --expose caddy --public-host cc.example.com  # Public HTTPS via a reverse proxy
 cd backend && python run.py --production       # Multi-worker (Linux/macOS)
 ```
 

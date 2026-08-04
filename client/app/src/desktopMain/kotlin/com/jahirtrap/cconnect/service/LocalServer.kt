@@ -79,7 +79,12 @@ actual object LocalServer {
             return
         }
         val cmd = mutableListOf(python, "run.py")
-        if (config.mode == "tailscale") { cmd += "--expose"; cmd += "tailscale" }
+        if (config.mode != "local") {
+            cmd += "--expose"; cmd += config.mode
+            if (config.mode == "caddy" && config.publicHost.isNotBlank()) {
+                cmd += "--public-host"; cmd += config.publicHost.trim()
+            }
+        }
         val proc = runCatching {
             ProcessBuilder(cmd).directory(dir).redirectErrorStream(true)
                 .also { it.environment()["PYTHONUNBUFFERED"] = "1" }

@@ -90,6 +90,10 @@ class Settings {
         get() = prefs.getString("local_server_mode", "local") ?: "local"
         set(value) = prefs.edit { putString("local_server_mode", value) }
 
+    var localServerPublicHost: String
+        get() = prefs.getString("local_server_public_host", "") ?: ""
+        set(value) = prefs.edit { putString("local_server_public_host", value) }
+
     var tabsState: String
         get() = prefs.getString("tabs_state", "") ?: ""
         set(value) = prefs.edit { putString("tabs_state", value) }

@@ -436,7 +436,7 @@ fun SettingsScreen(
                     val lsInfo by LocalServer.status.collectAsState()
                     val lsPort = environments.firstOrNull { it.id == activeId }?.port ?: 8723
                     val lsState = localServerStateOf(lsInfo, serverReady, loading)
-                    val lsConfig = LocalServerConfig(settings.localServerDir, settings.localServerPython, settings.localServerPythonPath, settings.localServerMode, lsPort)
+                    val lsConfig = LocalServerConfig(settings.localServerDir, settings.localServerPython, settings.localServerPythonPath, settings.localServerMode, lsPort, settings.localServerPublicHost)
                     SettingsGroup(
                         label = stringResource(Res.string.local_server),
                         labelTrailing = {
@@ -795,11 +795,12 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
     var python by remember { mutableStateOf(settings.localServerPython) }
     var pythonPath by remember { mutableStateOf(settings.localServerPythonPath) }
     var mode by remember { mutableStateOf(settings.localServerMode) }
+    var publicHost by remember { mutableStateOf(settings.localServerPublicHost) }
     val info by LocalServer.status.collectAsState()
     val scope = rememberCoroutineScope()
     val lsState = localServerStateOf(info, reachable, connecting)
 
-    fun config() = LocalServerConfig(dir, python, pythonPath, mode, probePort)
+    fun config() = LocalServerConfig(dir, python, pythonPath, mode, probePort, publicHost)
 
     CompactDialog(
         onDismiss = onClose,
@@ -830,6 +831,7 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
                 settings.localServerPython = python
                 settings.localServerPythonPath = pythonPath
                 settings.localServerMode = mode
+                settings.localServerPublicHost = publicHost.trim()
                 LocalServer.restart(config())
                 onClose()
             }) { Text(stringResource(Res.string.accept)) }
@@ -879,8 +881,20 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
             listOf(
                 "local" to stringResource(Res.string.mode_local),
                 "tailscale" to stringResource(Res.string.mode_tailscale),
+                "caddy" to stringResource(Res.string.mode_caddy),
             ),
         ) { mode = it }
+        if (mode == "caddy") {
+            Box(Modifier.height(8.dp))
+            InputField(
+                value = publicHost,
+                onValueChange = { publicHost = it },
+                label = { Text(stringResource(Res.string.public_host)) },
+                placeholder = { Text(stringResource(Res.string.public_host_hint)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
         val localLabel = stringResource(Res.string.local_url)
         val publicLabel = stringResource(Res.string.public_url)
         val tokenLabel = stringResource(Res.string.token)
@@ -896,7 +910,7 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
             lsState == LocalServerState.RunningExternal -> null
             else -> buildString {
                 appendLine("$localLabel: http://localhost:$probePort")
-                if (mode == "tailscale") {
+                if (mode != "local") {
                     info.publicUrl?.let { appendLine("$publicLabel: $it") }
                     info.token?.let { appendLine("$tokenLabel: $it") }
                 }

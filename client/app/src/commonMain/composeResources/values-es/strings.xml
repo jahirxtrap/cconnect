@@ -370,6 +370,9 @@
     <string name="run_mode">Modo</string>
     <string name="mode_local">Local</string>
     <string name="mode_tailscale">Tailscale</string>
+    <string name="mode_caddy">Proxy inverso (Caddy)</string>
+    <string name="public_host">Nombre de host público</string>
+    <string name="public_host_hint">Vacío para derivarlo de la IP pública</string>
     <string name="status_label">Estado</string>
     <string name="server_stopped">Detenido</string>
     <string name="server_starting">Iniciando</string>

@@ -23,7 +23,8 @@ WebAssembly and hosted as a static site (see [Web app](#web-app)).
 
 ## Run modes
 
-The backend runs in two modes. Both use the same `python run.py` entry.
+The backend runs local or public, and public has two providers. All of them use
+the same `python run.py` entry.
 
 ### Local HTTP (no auth)
 
@@ -64,6 +65,35 @@ What this does:
 **Requirement (PC only):** Tailscale installed, signed in, and **Funnel
 enabled for this node** in the tailnet ACL. Your device needs only an internet
 connection — no Tailscale required.
+
+### Public HTTPS behind your own proxy
+
+```bash
+python run.py --expose caddy --public-host cc.example.com
+```
+
+Same result as the funnel — public URL, token, QR — but the HTTPS comes from a
+reverse proxy you already run instead of Tailscale. Natural fit for a VPS, which
+has a public IP and doesn't need a tunnel to be reachable, and for serving more
+than one backend from the same machine: each hostname routes to its own port and
+keeps its own token. With Caddy that's the whole config:
+
+```
+cc.example.com { reverse_proxy 127.0.0.1:8723 }
+```
+
+The certificate is Let's Encrypt's, so any name that resolves to the machine
+works — your own domain, a free `duckdns.org` subdomain, or nothing at all:
+**omit `--public-host` and the backend derives `<user>-<public-ip>.sslip.io`**,
+a name sslip.io resolves straight back to that address with no registration. Set
+`PUBLIC_HOSTNAME` in `backend/.env` to avoid repeating the flag.
+
+Nothing is started or stopped here: the proxy is a service of its own, so this
+mode only publishes where it answers and turns the token on. That means the
+hostname has to be one your proxy actually serves — CConnect warns before
+printing the QR when the name doesn't resolve to this machine or when nothing is
+listening on 443. On a machine behind NAT the sslip.io default can't work, so it
+refuses to guess and asks for a hostname instead.
 
 ### Detached (leave it running over SSH)
 
