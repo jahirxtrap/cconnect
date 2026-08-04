@@ -1,7 +1,0 @@
-# Place this file at the ROOT of your project (same level as settings.gradle).
-# DO NOT COMMIT this file. Add 'key.properties' to .gitignore.
-
-storeFile=keystore.jks      # Or absolute path, e.g. C:/Users/you/keystore.jks
-storePassword=REPLACE_ME_STORE_PASSWORD
-keyAlias=REPLACE_ME_ALIAS
-keyPassword=REPLACE_ME_KEY_PASSWORD

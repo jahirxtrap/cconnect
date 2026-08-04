@@ -21,8 +21,7 @@ publicly over a Tailscale Funnel.
 Package: `com.jahirtrap.cconnect`. **This is the single CConnect app** — desktop,
 web and Android all build from `commonMain`; real platform differences live behind
 expect/actual and the `LocalIsTouch` / `isWebPlatform` / `isAndroidPlatform`
-locals. `mobile/` is the old standalone Android app, now **legacy** — not built or
-kept in sync.
+locals.
 
 ---
 
@@ -34,8 +33,8 @@ ChatScreen (UI) ──> ChatViewModel ──> ChatSocket (WebSocketConn) ──>
 ```
 
 - Single ViewModel per screen; state via `StateFlow<ChatUiState>`. The VM and all
-  business logic live in **`commonMain`** and are shared verbatim with both
-  targets (and conceptually with mobile).
+  business logic live in **`commonMain`** and are shared verbatim across the three
+  targets.
 - Networking is abstracted behind **expect/actual**: `data/remote/HttpTransport`,
   `WebSocketConn`, `SharedHttp`, `UrlCodec`, `AppImageLoader` and the
   `GitHubApi` cache hooks have a desktop actual (OkHttp + JVM) and a wasmJs
@@ -55,7 +54,7 @@ client/app/src/
 ├── commonMain/kotlin/com/jahirtrap/cconnect/
 │   ├── Platform.kt              # expect isWebPlatform / isCoarsePointer() / bringAppToFront() + desktopWindowToFront hook
 │   ├── chat/                    # ChatScreen, ChatBlocks, ChatViewModel(+Factory), Tabs(Controller/Bar/Shortcuts/Context), PermissionUi, ChatUrl(expect)
-│   ├── claude/                  # ClaudeScreen + ClaudeDetailScreen (enum ClaudeKind) + AccountsSection (accounts + remote OAuth login) — same hub as mobile
+│   ├── claude/                  # ClaudeScreen + ClaudeDetailScreen (enum ClaudeKind) + AccountsSection (accounts + remote OAuth login)
 │   ├── data/
 │   │   ├── ChatModels / SessionModels / EnvironmentProfile / QrConnectionPayload / SshProfile+SshStore
 │   │   ├── AppCompat.kt         # version-range compare for the app/server/CLI contract
@@ -132,7 +131,7 @@ divergence behind an expect/actual.
   from `LocalWindowInfo.containerSize`. Drives the responsive panel.
 - Uses: `focusable = !LocalIsTouch.current` on the field-style dropdowns
   (SelectField, the chat SelectorChip, AbovePopupMenu) — touch keeps `false`
-  like mobile (a focusable popup misbehaves on touch); mouse gets `true` so Esc
+  (a focusable popup misbehaves on touch); mouse gets `true` so Esc
   closes them; reload/refresh buttons hidden when `LocalIsTouch`; pull-to-refresh
   gated by touch (Settings/Claude/Monitor — the chat list and Files are live over
   `/api/list/ws` + `/api/shared/ws`, no manual refresh); interactive scrollbars
@@ -149,9 +148,8 @@ The chat's environments/projects/sessions panel adapts to `LocalMobileLayout`:
   desktop↔mobile switch so it always starts closed in mobile.
 - **Wide layout** → the inline 64↔300dp sidebar `Surface` (its own persisted
   `expanded`), independent of the drawer state.
-- Matches mobile's `MaterialExpressiveTheme(MotionScheme...)` wrapping. The
-  drawer's close button shows on non-touch (the desktop/web difference from
-  mobile); on touch it's null (gesture/scrim only).
+- Wrapped in `MaterialExpressiveTheme(MotionScheme...)`. The drawer's close
+  button shows on non-touch; on touch it's null (gesture/scrim only).
 
 ## Tabs (multiple chat sessions)
 
@@ -246,7 +244,7 @@ DPAPI via JNA; plain elsewhere).
 ## WebSocket event handling
 
 `ChatSocket` parses server JSON into `ServerEvent`; `ChatViewModel.onEvent` turns
-each into a `ChatMessage` or state mutation — identical to mobile. Notable:
+each into a `ChatMessage` or state mutation. Notable:
 
 | Event | Role / Effect |
 |---|---|
@@ -268,11 +266,11 @@ transcript window (100 initial / 500 tail cap), chat attachments (sequential
 upload to `shared/uploads/` then `attachments:[relpaths]`; backend builds the
 native vision blocks), the file manager, FilePreview (typed renderer + optional
 delete via the route-level overlay), the Claude manager, the Monitor (system WS),
-markdown rendering, code-edit diffs, and rewind all behave as documented in
-`mobile/CLAUDE.md` — the logic is shared `commonMain`. Differences from mobile:
+markdown rendering, code-edit diffs, and rewind all live in shared `commonMain`,
+so they behave identically on every target. Platform-specific differences:
 
 - **Drag & drop upload** (`files/FileDrop.kt`, `Modifier.fileDropTarget`) — OS
-  file drops into chat and the files folder (mobile N/A); desktop reads
+  file drops into chat and the files folder (Android N/A); desktop reads
   `DragData.FilesList`, web `transferData.domDataTransferOrNull.files`.
 - **Previews/HTML** open in the browser tab on web / a window on desktop, not a
   WebView.
@@ -300,7 +298,7 @@ non-`silent` items above the composer.
 
 ## Version compatibility & updates
 
-Same split as mobile and `backend/CLAUDE.md`: **compat** (AppOutdated /
+Same split as `backend/CLAUDE.md`: **compat** (AppOutdated /
 ServerOutdated / CliOutdated NoticeCards) comes from the backend
 (`CapabilitiesApi` → `evaluateCompat`); **"update available"** comes only from
 **GitHub** (`checkForUpdates()` on open + the Settings button →
@@ -376,7 +374,7 @@ Save / Save As / Share map to the local-text `SharedActions` funcs
   unsigned). The web is served from Cloudflare Pages (`_redirects`
   `/* /index.html 200` gives SPA routing so `/files` etc. survive a reload);
   desktop installers are built per-OS (Linux on `ubuntu-22.04` so the `.deb` links
-  against jammy libs). `mobile/` is not built in CI.
+  against jammy libs).
 - **Version contract:** `appVersionName` + `SUPPORTED_SERVER` are generated into
   `BuildConfig` (see the `generateBuildConfig` task) — keep them in step with the
   backend's `[tool.cconnect]` table. `appVersionName` + `appVersionCode` are also
@@ -387,8 +385,7 @@ Save / Save As / Share map to the local-text `SharedActions` funcs
 1. **One app, many platforms.** desktop/web/Android share `commonMain`; gate real
    divergences by `LocalIsTouch` / `isWebPlatform` / `isAndroidPlatform` /
    expect-actual (touch: pull-to-refresh, system back, swipe scroll; desktop/web:
-   mouse buttons, OS clipboard, drag&drop, window). `mobile/` is legacy — do not
-   keep it in sync.
+   mouse buttons, OS clipboard, drag&drop, window).
 2. **Backend is the source of truth.** Mirror its event shapes verbatim.
 3. **Real platform divergence goes behind expect/actual**, not ad-hoc branches in
    `commonMain`.

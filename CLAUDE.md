@@ -29,9 +29,6 @@ Changes to API contracts, event shapes, or schemas have to be reflected in both.
   **desktop** app (Windows/Linux/macOS), a **web** app (WebAssembly, hosted on
   Cloudflare Pages) and a native **Android** app, all over the same WebSocket/REST
   contract.
-- **Mobile** (`mobile/`): the original standalone Android app (Jetpack Compose).
-  **Legacy — kept for reference only, not built or shipped.** The client's Android
-  target replaces it.
 
 See `backend/CLAUDE.md` and `client/CLAUDE.md` for module-specific rules.
 
@@ -100,16 +97,11 @@ cd client && ./gradlew :androidApp:assembleRelease              # Android APK (s
 `.github/workflows/android.yml` builds the client's Android APK on push/PR and
 uploads it as an artifact (signed when the `KEYSTORE_*` repo secrets are set).
 
-### Mobile (legacy)
-`mobile/` is the original standalone Android app — kept for reference, **not built
-or shipped**. The client's `androidApp` target replaces it.
-
 ## Key Rules
 
 1. **Monorepo consistency** — backend and client must agree on event types, field
    names, and the QR payload shape (`{url, token}` JSON). The client is the single
-   app (desktop/web/Android share `commonMain`); `mobile/` is legacy and no longer
-   kept in sync.
+   app: desktop, web and Android all build from `commonMain`.
 2. **Version contract** — when a feature needs a newer app/server/CLI, update
    `version` / `supported-app` / `supported-cli` in `backend/pyproject.toml`
    and the app's `versionName` / `SUPPORTED_SERVER` accordingly.
