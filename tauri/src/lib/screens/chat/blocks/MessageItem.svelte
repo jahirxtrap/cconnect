@@ -3,7 +3,8 @@
   import Bot from "@lucide/svelte/icons/bot";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
-  import type { ChatMessage, Role } from "$lib/data/chatModels";
+  import type { Snippet } from "svelte";
+  import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
@@ -22,9 +23,10 @@
     nextRole: Role | null;
     running: boolean;
     onAnswer?: (requestId: string, optionId: string) => void;
+    questions?: Snippet<[InteractionData]>;
   }
 
-  const { message, prevRole, nextRole, running, onAnswer }: Props = $props();
+  const { message, prevRole, nextRole, running, onAnswer, questions }: Props = $props();
 
   const top = $derived(gapAbove(prevRole, message.role));
   const bottom = $derived(gapBelow(message.role, nextRole));
@@ -75,12 +77,16 @@
     </Collapsible>
   {:else if message.role === "interaction"}
     {#if message.interaction}
-      <InteractionBlock
-        data={message.interaction}
-        toolName={message.toolName}
-        input={message.text}
-        onAnswer={onAnswer ?? (() => {})}
-      />
+      {#if message.interaction.kind === "questions" && questions}
+        {@render questions(message.interaction)}
+      {:else}
+        <InteractionBlock
+          data={message.interaction}
+          toolName={message.toolName}
+          input={message.text}
+          onAnswer={onAnswer ?? (() => {})}
+        />
+      {/if}
     {/if}
   {:else if message.role === "file_change"}
     <FileChangeBlock path={message.path ?? ""} diffLines={message.diffLines ?? []} labelOnly={message.labelOnly} />

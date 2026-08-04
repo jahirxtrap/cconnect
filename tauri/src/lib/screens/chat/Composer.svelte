@@ -7,11 +7,13 @@
 
   interface Props {
     streaming: boolean;
+    pendingInput: string | null;
+    onConsumePending: () => string | null;
     onSend: (text: string) => void;
     onInterrupt: () => void;
   }
 
-  const { streaming, onSend, onInterrupt }: Props = $props();
+  const { streaming, pendingInput, onConsumePending, onSend, onInterrupt }: Props = $props();
 
   const MAX_ROWS = 10;
 
@@ -31,6 +33,15 @@
     const line = Number.parseFloat(getComputedStyle(field).lineHeight) || 20;
     field.style.height = `${Math.min(field.scrollHeight, line * MAX_ROWS)}px`;
   };
+
+  $effect(() => {
+    if (pendingInput === null) return;
+    const restored = onConsumePending();
+    if (restored === null) return;
+    text = restored;
+    field?.focus();
+    resize();
+  });
 
   const onkeydown = (event: KeyboardEvent) => {
     if (event.key !== "Enter" || event.shiftKey) return;

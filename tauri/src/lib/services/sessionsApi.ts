@@ -1,4 +1,12 @@
+import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { http } from "./http";
+
+export interface MessagesPage {
+  items: SessionMessage[];
+  startIndex: number;
+  hasMore: boolean;
+  contextTokens: number | null;
+}
 
 export interface RewindPoint {
   id: string;
@@ -32,6 +40,31 @@ const toPreview = (data: RewindWire | null): RewindPreview | null =>
   };
 
 export const sessionsApi = {
+  async messages(
+    sessionId: string,
+    project: string,
+    limit = 200,
+    beforeIndex: number | null = null,
+  ): Promise<MessagesPage> {
+    const data = await http.get<{
+      items?: Record<string, unknown>[];
+      start_index?: number;
+      has_more?: boolean | string;
+      context_tokens?: number;
+    }>(`/sessions/${sessionId}/messages`, {
+      project,
+      limit,
+      ...(beforeIndex === null ? {} : { before_index: beforeIndex }),
+    });
+    if (!data) return { items: [], startIndex: 0, hasMore: false, contextTokens: null };
+    return {
+      items: (data.items ?? []).map(parseSessionMessage),
+      startIndex: data.start_index ?? 0,
+      hasMore: data.has_more === true || data.has_more === "true",
+      contextTokens: data.context_tokens ?? null,
+    };
+  },
+
   async checkpoints(sessionId: string, project: string): Promise<RewindPoint[]> {
     const data = await http.get<Array<{ id?: string; rewind_id?: string; text?: string }>>(
       `/sessions/${sessionId}/checkpoints`,
