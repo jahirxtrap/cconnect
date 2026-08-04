@@ -23,7 +23,11 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChatPanel from "./ChatPanel.svelte";
+  import Composer from "./Composer.svelte";
+  import MessageList from "./MessageList.svelte";
   import { chatState } from "./state.svelte";
+
+  chatState.start();
 
   const RAIL_WIDTH = 64;
   const PANEL_WIDTH = 300;
@@ -114,7 +118,15 @@
     </AppTopBar>
 
     <div class="min-h-0 flex-1">
-      <EmptyState text={t("NO_CHATS")} class="h-full" />
+      {#if chatState.messages.length}
+        <MessageList
+          messages={chatState.messages}
+          pendingToolIds={chatState.pendingToolIds}
+          onAnswer={(requestId, optionId) => chatState.answerInteraction(requestId, optionId)}
+        />
+      {:else}
+        <EmptyState text={t("NO_CHATS")} class="h-full" />
+      {/if}
     </div>
 
     {#if notices.length}
@@ -129,6 +141,12 @@
         {/each}
       </div>
     {/if}
+
+    <Composer
+      streaming={chatState.streaming}
+      onSend={(text) => chatState.send(text)}
+      onInterrupt={() => chatState.interrupt()}
+    />
   </div>
 </div>
 
