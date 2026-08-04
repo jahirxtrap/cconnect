@@ -22,6 +22,9 @@ export interface EnvironmentProfile {
   streaming: boolean | null;
 }
 
+export const address = (profile: EnvironmentProfile) =>
+  profile.port !== null ? `${profile.host}:${profile.port}` : profile.host;
+
 const secure = (profile: EnvironmentProfile) => profile.kind === "https";
 
 const portSuffix = (profile: EnvironmentProfile) => {
