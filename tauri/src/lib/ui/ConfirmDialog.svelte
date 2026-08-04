@@ -14,10 +14,9 @@
   const { title, text, confirmLabel, onConfirm, onDismiss }: Props = $props();
 </script>
 
-<CompactDialog {title} {onDismiss}>
+<CompactDialog {title} description={text} {onDismiss}>
   {#snippet buttons()}
-    <Button onclick={onDismiss}>{t("CANCEL")}</Button>
-    <Button onclick={onConfirm}>{confirmLabel}</Button>
+    <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
+    <Button onclick={onConfirm} variant="filled">{confirmLabel}</Button>
   {/snippet}
-  <p class="text-body-md text-on-surface-variant">{text}</p>
 </CompactDialog>

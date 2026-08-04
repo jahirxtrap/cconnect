@@ -44,8 +44,6 @@ const ALIASES: Record<string, string> = {
 let pending: Promise<HighlighterCore> | null = null;
 const loaded = new Set<string>();
 
-// Shiki is pulled in on demand so the initial bundle stays free of the
-// highlighter core and its regex engine.
 const highlighter = () => {
   pending ??= (async () => {
     const [{ createHighlighterCore }, { createJavaScriptRegexEngine }] = await Promise.all([

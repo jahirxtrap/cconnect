@@ -7,7 +7,7 @@
   import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { formatClock } from "$lib/data/time";
+  import { formatClock, formatDateTime } from "$lib/data/time";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import AgentBlock from "./AgentBlock.svelte";
   import Collapsible from "./Collapsible.svelte";
@@ -34,20 +34,20 @@
 
 <div class="w-full" style="padding-top: {top}px; padding-bottom: {bottom}px">
   {#if message.role === "user"}
-    <div class="w-full bg-surface-variant px-4 py-3">
+    <div class="mx-3 rounded-md bg-surface-variant px-4 py-3">
       {#if message.text}
-        <p class="text-body-md whitespace-pre-wrap">{message.text}</p>
+        <p class="text-body-lg whitespace-pre-wrap">{message.text}</p>
       {/if}
-      {#if message.timestamp !== null && settings.showTimestamps}
-        <div class="flex items-end justify-end gap-1.5">
-          <span class="text-label-md text-on-surface-variant">{formatClock(message.timestamp)}</span>
+      {#if message.timestamp !== null || message.sendStatus === "error"}
+        <div class="mt-1 flex items-center justify-end gap-1.5">
+          {#if message.timestamp !== null}
+            <span class="text-label-md text-on-surface-variant">
+              {settings.showTimestamps ? formatDateTime(message.timestamp) : formatClock(message.timestamp)}
+            </span>
+          {/if}
           {#if message.sendStatus === "error"}
             <TriangleAlert size={14} class="text-error" />
           {/if}
-        </div>
-      {:else if message.sendStatus === "error"}
-        <div class="flex justify-end">
-          <TriangleAlert size={14} class="text-error" />
         </div>
       {/if}
     </div>

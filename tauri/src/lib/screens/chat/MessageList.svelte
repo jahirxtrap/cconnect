@@ -35,7 +35,6 @@
     void messages.at(-1)?.text;
     void messages.length;
     if (!container) return;
-    // Prepending older messages would shift the viewport; keep the read position.
     if (anchorHeight !== null && container.scrollHeight > anchorHeight) {
       container.scrollTop += container.scrollHeight - anchorHeight;
       anchorHeight = null;

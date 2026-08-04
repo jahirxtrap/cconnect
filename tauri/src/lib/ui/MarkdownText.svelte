@@ -17,7 +17,6 @@
     {#if part.kind === "code"}
       <CodeBlock code={part.code} lang={part.lang} />
     {:else}
-      <!-- eslint-disable-next-line svelte/no-at-html-tags -->
       {@html part.html}
     {/if}
   {/each}

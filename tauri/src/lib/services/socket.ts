@@ -64,7 +64,7 @@ export class ReconnectingSocket {
       try {
         this.handlers.onMessage(JSON.parse(event.data as string));
       } catch {
-        // A malformed frame is skipped; the stream stays open.
+        return;
       }
     };
     socket.onclose = () => generation === this.#generation && this.#scheduleReopen();

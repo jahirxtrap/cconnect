@@ -33,8 +33,10 @@
 
 <CompactDialog {title} {onDismiss}>
   {#snippet buttons()}
-    <Button onclick={onDismiss}>{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(text)} enabled={!!text.trim() && !error}>{confirmLabel}</Button>
+    <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
+    <Button onclick={() => onConfirm(text)} variant="filled" enabled={!!text.trim() && !error}>
+      {confirmLabel}
+    </Button>
   {/snippet}
   <InputField
     value={text}

@@ -12,9 +12,15 @@
   const { text, onclick, icon: IconComponent, enabled = true }: Props = $props();
 </script>
 
-<Pressable {onclick} {enabled} class="flex w-full items-center px-5 py-2.5 {enabled ? '' : 'opacity-40'}">
-  {#if IconComponent}
-    <IconComponent size={20} class="mr-3.5 shrink-0" />
-  {/if}
-  <span class="truncate text-body-md">{text}</span>
-</Pressable>
+<div class="px-5">
+  <Pressable
+    {onclick}
+    {enabled}
+    class="flex w-full items-center gap-3 rounded-sm px-2 py-2 {enabled ? '' : 'opacity-40'}"
+  >
+    {#if IconComponent}
+      <IconComponent size={16} class="shrink-0 text-on-surface-variant" />
+    {/if}
+    <span class="truncate text-body-md">{text}</span>
+  </Pressable>
+</div>

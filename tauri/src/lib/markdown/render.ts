@@ -4,8 +4,6 @@ export type Segment =
   | { kind: "html"; html: string }
   | { kind: "code"; code: string; lang: string | null };
 
-// html: false keeps raw tags in the source escaped, so only markdown-generated
-// markup reaches the DOM.
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
 
 export const renderInline = (markdown: string): string => md.renderInline(markdown);

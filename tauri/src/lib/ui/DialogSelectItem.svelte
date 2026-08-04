@@ -28,15 +28,13 @@
   <Pressable
     {onclick}
     {enabled}
-    class="flex w-full items-center rounded-item py-3 pl-3 {trailing ? 'pr-1' : 'pr-3'} {selected
-      ? 'bg-accent/14'
-      : ''} {enabled ? '' : 'opacity-40'}"
+    class="flex w-full items-center gap-3 rounded-sm px-2 py-2 {selected ? 'bg-on-surface/8' : ''} {enabled
+      ? ''
+      : 'opacity-40'}"
   >
     <SelectionDot {selected} />
-    <div class="ml-3 min-w-0 flex-1">
-      <p class="truncate text-label-lg {mono ? 'font-mono' : ''} {selected ? 'text-accent' : ''}">
-        {label}
-      </p>
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-body-md {mono ? 'font-mono' : ''}">{label}</p>
       {#if subtitle}
         <p class="truncate text-body-sm text-on-surface-variant">{subtitle}</p>
       {/if}

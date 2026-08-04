@@ -14,9 +14,9 @@
   {checked}
   {onCheckedChange}
   disabled={!enabled}
-  class="inline-flex h-[18px] w-8 shrink-0 cursor-pointer items-center rounded-full border-2 transition-colors data-[state=checked]:border-accent data-[state=checked]:bg-accent data-[state=unchecked]:border-on-surface-variant data-[state=unchecked]:bg-transparent disabled:cursor-default disabled:opacity-40"
+  class="inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none data-[state=checked]:bg-accent data-[state=unchecked]:bg-outline-variant disabled:cursor-default disabled:opacity-40"
 >
   <Switch.Thumb
-    class="pointer-events-none block size-3 rounded-full transition-transform data-[state=checked]:translate-x-[15px] data-[state=checked]:bg-on-accent data-[state=unchecked]:translate-x-[2px] data-[state=unchecked]:bg-on-surface-variant"
+    class="pointer-events-none block size-4 rounded-full bg-surface shadow-sm transition-transform data-[state=checked]:translate-x-4.5 data-[state=unchecked]:translate-x-0.5"
   />
 </Switch.Root>

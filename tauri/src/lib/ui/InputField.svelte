@@ -29,6 +29,9 @@
     trailing,
   }: Props = $props();
 
+  const FIELD_CLASS =
+    "min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant";
+
   let field = $state<HTMLInputElement | HTMLTextAreaElement | null>(null);
 
   const handle = (event: Event) => oninput((event.currentTarget as HTMLInputElement).value);
@@ -40,10 +43,10 @@
 
 <div class={className}>
   {#if label}
-    <p class="mb-1 text-label-md text-on-surface-variant">{label}</p>
+    <p class="mb-1.5 text-label-lg">{label}</p>
   {/if}
   <div
-    class="flex w-full items-center rounded-xs border border-outline-variant px-3 py-2.5 focus-within:border-accent"
+    class="flex w-full items-center gap-2 rounded-sm border border-outline-variant px-3 py-2 transition-colors focus-within:border-accent"
   >
     {#if singleLine}
       <input
@@ -53,7 +56,7 @@
         {placeholder}
         {onkeydown}
         oninput={handle}
-        class="min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant"
+        class={FIELD_CLASS}
       />
     {:else}
       <textarea
@@ -63,11 +66,9 @@
         {onkeydown}
         rows={minLines}
         oninput={handle}
-        class="min-w-0 flex-1 resize-none bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant"
+        class="{FIELD_CLASS} field-auto no-scrollbar max-h-80 resize-y"
       ></textarea>
     {/if}
-    {#if trailing}
-      <div class="ml-2 shrink-0">{@render trailing()}</div>
-    {/if}
+    {@render trailing?.()}
   </div>
 </div>

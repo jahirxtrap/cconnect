@@ -15,6 +15,7 @@ export { default as IconButton } from "./IconButton.svelte";
 export { default as InputField } from "./InputField.svelte";
 export { default as ListRow } from "./ListRow.svelte";
 export { default as MenuItem } from "./MenuItem.svelte";
+export { default as MenuSub } from "./MenuSub.svelte";
 export { default as MetricBar } from "./MetricBar.svelte";
 export { default as NoticeCard } from "./NoticeCard.svelte";
 export { default as OutlinedPanel } from "./OutlinedPanel.svelte";

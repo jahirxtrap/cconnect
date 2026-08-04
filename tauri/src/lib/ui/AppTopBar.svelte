@@ -13,7 +13,7 @@
   const { title, subtitle, class: className = "", navigationIcon, subtitleLeading, actions }: Props = $props();
 </script>
 
-<header class="flex h-14 shrink-0 items-center gap-1 bg-background px-1 {className}">
+<header class="flex h-12 shrink-0 items-center gap-1 bg-background px-1 {className}">
   {@render navigationIcon?.()}
   <div class="ml-3 min-w-0 flex-1">
     <p class="truncate text-title-lg">{title}</p>

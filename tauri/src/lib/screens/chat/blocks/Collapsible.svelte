@@ -26,7 +26,7 @@
     class="flex w-full items-center gap-1.5 text-left {labelOnly ? 'cursor-default' : 'cursor-pointer'}"
   >
     {#if IconComponent}
-      <IconComponent size={16} class="shrink-0 text-on-surface-variant" />
+      <IconComponent size={16} class="shrink-0 text-accent" />
     {/if}
     <span class="min-w-0 flex-1 truncate text-label-lg {labelClass}">{label}</span>
     {#if running}

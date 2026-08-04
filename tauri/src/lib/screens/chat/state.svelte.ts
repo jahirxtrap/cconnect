@@ -18,6 +18,7 @@ import { backend } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
 import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
 import { sessionsApi, type RewindPoint, type RewindPreview } from "$lib/services/sessionsApi";
+import { uploadAttachment } from "$lib/services/uploadApi";
 
 const DEFAULTS = {
   permissionMode: "bypassPermissions",
@@ -28,6 +29,14 @@ const DEFAULTS = {
 
 const HISTORY_PAGE = 100;
 const COMPACT_COMMAND = "/compact";
+
+export interface Attachment {
+  id: number;
+  file: File;
+  name: string;
+  size: number;
+  progress: number;
+}
 
 class ChatState {
   connection = $state<ConnectionState>("connecting");
@@ -53,6 +62,8 @@ class ChatState {
   historyProjectKey = $state<string | null>(null);
 
   queue = $state<QueuedMessage[]>([]);
+  attachments = $state<Attachment[]>([]);
+  uploading = $state(false);
   oldestLoadedIndex = $state<number | null>(null);
   transcriptLoading = $state(false);
   transcriptExhausted = $state(false);
@@ -73,6 +84,7 @@ class ChatState {
   #assistantId: number | null = null;
   #thinkingId: number | null = null;
   #outgoing = 0;
+  #attachmentId = 0;
   #sent = new Set<string>();
   #silent = new Set<string>();
   #optimisticChipId: string | null = null;
@@ -87,6 +99,47 @@ class ChatState {
       void this.#loadCapabilities();
       return () => this.#socket.close();
     });
+  }
+
+  addAttachments(files: File[]) {
+    if (this.uploading) return;
+    this.attachments = [
+      ...this.attachments,
+      ...files.map((file) => ({
+        id: this.#attachmentId++,
+        file,
+        name: file.name,
+        size: file.size,
+        progress: 0,
+      })),
+    ];
+  }
+
+  removeAttachment(id: number) {
+    if (this.uploading) return;
+    this.attachments = this.attachments.filter((item) => item.id !== id);
+  }
+
+  async submit(text: string) {
+    const pending = this.attachments;
+    if (!text.trim() && !pending.length) return;
+    let uploaded: string[] = [];
+    if (pending.length) {
+      this.uploading = true;
+      const results = await Promise.all(
+        pending.map((item) =>
+          uploadAttachment(item.file, (progress) => {
+            this.attachments = this.attachments.map((current) =>
+              current.id === item.id ? { ...current, progress } : current,
+            );
+          }),
+        ),
+      );
+      uploaded = results.filter((path): path is string => path !== null);
+      this.uploading = false;
+      this.attachments = [];
+    }
+    this.send(text, uploaded);
   }
 
   send(text: string, attachments: string[] = []) {
@@ -403,7 +456,6 @@ class ChatState {
     };
   }
 
-  // Tool/file-change events carrying a parent id belong inside that agent's block.
   #nest(flat: { message: ChatMessage; parent: string | null }[]): ChatMessage[] {
     const result: ChatMessage[] = [];
     const agentAt = new Map<string, number>();

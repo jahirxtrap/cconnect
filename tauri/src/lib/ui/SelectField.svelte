@@ -20,7 +20,7 @@
 
 <div class={className}>
   <p class="mb-1 text-label-md text-on-surface-variant">{label}</p>
-  <PopupMenu {open} matchTriggerWidth onOpenChange={(value) => (open = value)}>
+  <PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
     {#snippet trigger()}
       <span
         class="flex w-full cursor-pointer items-center rounded-xs border px-3 py-2.5 {open

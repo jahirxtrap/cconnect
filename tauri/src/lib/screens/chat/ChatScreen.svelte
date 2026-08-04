@@ -8,7 +8,7 @@
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
   import { navigation } from "$lib/app/navigation.svelte";
-  import type { InteractionData, QueuedMessage } from "$lib/data/chatModels";
+  import { isPending, type InteractionData, type QueuedMessage } from "$lib/data/chatModels";
   import type { SessionInfo } from "$lib/data/models";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
@@ -33,12 +33,14 @@
   import QueueRow from "./QueueRow.svelte";
   import QuestionsBlock from "./blocks/QuestionsBlock.svelte";
   import RewindDialog from "./RewindDialog.svelte";
+  import TaskIndicator from "./TaskIndicator.svelte";
   import { chatState } from "./state.svelte";
 
   chatState.start();
 
   const RAIL_WIDTH = 64;
   const PANEL_WIDTH = 300;
+  const SESSION_ID_PREVIEW = 8;
 
   const NOTICE_KEYS: Record<CompatNotice, string> = {
     app_outdated: "COMPAT_APP_OUTDATED",
@@ -55,6 +57,22 @@
   let queuePreview = $state<QueuedMessage | null>(null);
 
   const notices = $derived(serverStatus.notices.filter((notice) => !dismissed.includes(notice)));
+
+  const waitingUser = $derived(
+    chatState.messages.some((item) => item.interaction !== null && isPending(item.interaction)),
+  );
+
+  const status = $derived.by(() => {
+    if (chatState.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
+    if (chatState.connection === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
+    if (waitingUser) return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
+    if (chatState.streaming) return { dot: "bg-gray", spinner: true, text: t("WORKING") };
+    return {
+      dot: "bg-green",
+      spinner: false,
+      text: chatState.sessionId?.slice(0, SESSION_ID_PREVIEW) ?? t("NEW_CHAT"),
+    };
+  });
 
   const setExpanded = (value: boolean) => {
     expanded = value;
@@ -114,7 +132,7 @@
   {/if}
 
   <div class="flex min-w-0 flex-1 flex-col">
-    <AppTopBar title={t("APP_NAME")} subtitle={chatState.cwd || null}>
+    <AppTopBar title={t("APP_NAME")} subtitle={status.text}>
       {#snippet navigationIcon()}
         {#if layout.mobile}
           <TooltipIconButton label={t("MENU")} onclick={() => (drawer = true)}>
@@ -123,7 +141,14 @@
         {/if}
       {/snippet}
       {#snippet subtitleLeading()}
-        <StatusDot class={serverStatus.online ? "bg-green" : "bg-red"} />
+        {#if status.spinner}
+          <span class="size-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>
+        {:else}
+          <StatusDot class={status.dot} />
+        {/if}
+      {/snippet}
+      {#snippet actions()}
+        <TaskIndicator todos={chatState.todos} />
       {/snippet}
     </AppTopBar>
 
@@ -159,32 +184,40 @@
       <QueueRow queue={chatState.visibleQueue} onOpen={(item) => (queuePreview = item)} />
     {/if}
 
-    <ChatToolbar
-      capabilities={chatState.capabilities}
-      model={chatState.model}
-      effort={chatState.effort}
-      permissionMode={chatState.permissionMode}
-      streamTokens={chatState.streamTokens}
-      contextTokens={chatState.contextTokens}
-      onModel={(value) => chatState.setModel(value)}
-      onEffort={(value) => chatState.setEffort(value)}
-      onPermissionMode={(value) => chatState.setPermissionMode(value)}
-      onStreamTokens={() => chatState.toggleStreamTokens()}
-      onRewind={() => {
-        rewindOpen = true;
-        void chatState.loadRewindPoints();
-      }}
-    />
-
     <Composer
       streaming={chatState.streaming}
+      attachments={chatState.attachments}
+      uploading={chatState.uploading}
+      commands={chatState.capabilities?.commands ?? []}
       pendingInput={chatState.pendingInput}
       onConsumePending={() => chatState.consumePendingInput()}
-      onSend={(text) => chatState.send(text)}
+      onSend={(text) => void chatState.submit(text)}
       onInterrupt={() => chatState.interrupt()}
+      onAttach={(files) => chatState.addAttachments(files)}
+      onRemoveAttachment={(id) => chatState.removeAttachment(id)}
+      {controls}
     />
   </div>
 </div>
+
+{#snippet controls()}
+  <ChatToolbar
+    capabilities={chatState.capabilities}
+    model={chatState.model}
+    effort={chatState.effort}
+    permissionMode={chatState.permissionMode}
+    streamTokens={chatState.streamTokens}
+    contextTokens={chatState.contextTokens}
+    onModel={(value) => chatState.setModel(value)}
+    onEffort={(value) => chatState.setEffort(value)}
+    onPermissionMode={(value) => chatState.setPermissionMode(value)}
+    onStreamTokens={() => chatState.toggleStreamTokens()}
+    onRewind={() => {
+      rewindOpen = true;
+      void chatState.loadRewindPoints();
+    }}
+  />
+{/snippet}
 
 {#snippet questions(data: InteractionData)}
   <QuestionsBlock

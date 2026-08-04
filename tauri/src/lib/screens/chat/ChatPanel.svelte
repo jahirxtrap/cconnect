@@ -32,24 +32,25 @@
   const { drawerMode, onClose, onAfterSelect, onRename, onColor, onDelete }: Props = $props();
 </script>
 
-<div class="flex h-full min-h-0 flex-col bg-surface">
-  <div class="flex h-14 shrink-0 items-center px-2">
+<div class="flex h-full min-h-0 flex-col border-r border-outline-variant bg-surface">
+  <div class="flex h-12 shrink-0 items-center gap-1 px-2">
     <EnvironmentSelector class="min-w-0 flex-1" />
     <TooltipIconButton
       label={t("NEW_SESSION")}
+      class="size-8"
       onclick={() => {
         chatState.newSession();
         onAfterSelect();
       }}
     >
-      <SquarePen size={20} />
+      <SquarePen size={18} />
     </TooltipIconButton>
     {#if onClose}
-      <TooltipIconButton label={t("MENU")} onclick={onClose}>
+      <TooltipIconButton label={t("MENU")} onclick={onClose} class="size-8">
         {#if drawerMode}
-          <Menu size={20} />
+          <Menu size={18} />
         {:else}
-          <PanelLeftClose size={20} />
+          <PanelLeftClose size={18} />
         {/if}
       </TooltipIconButton>
     {/if}
@@ -62,7 +63,9 @@
     />
   </div>
 
-  <div class="min-h-0 flex-1 overflow-y-auto py-1.5">
+  <p class="shrink-0 px-4 pt-2 pb-1 text-label-md text-on-surface-variant">{t("RECENTS")}</p>
+
+  <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pb-2">
     {#if chatState.historySessions.length}
       {#each chatState.historySessions as session (session.sessionId)}
         <ConversationRow
@@ -85,25 +88,25 @@
     {/if}
   </div>
 
-  <div class="flex shrink-0 items-center px-2 py-2">
-    <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
-      <Folder size={20} />
+  <div class="flex shrink-0 items-center gap-0.5 border-t border-outline-variant px-2 py-1.5">
+    <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()} class="size-8">
+      <Folder size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.open("claude")}>
-      <ClaudeIcon size={20} />
+    <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.open("claude")} class="size-8">
+      <ClaudeIcon size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.open("monitor")}>
-      <Activity size={20} />
+    <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.open("monitor")} class="size-8">
+      <Activity size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.open("terminal")}>
-      <SquareTerminal size={20} />
+    <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.open("terminal")} class="size-8">
+      <SquareTerminal size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.open("markdown")}>
-      <Type size={20} />
+    <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.open("markdown")} class="size-8">
+      <Type size={17} />
     </TooltipIconButton>
     <div class="flex-1"></div>
-    <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
-      <Settings size={20} />
+    <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()} class="size-8">
+      <Settings size={17} />
     </TooltipIconButton>
   </div>
 </div>

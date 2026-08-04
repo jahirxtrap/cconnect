@@ -63,7 +63,7 @@
       {/if}
     </button>
   </div>
-  <pre class="overflow-x-auto px-2.5 py-2 font-mono text-body-sm leading-snug"><code
+  <pre class="scrollbar-thin overflow-x-auto px-2.5 py-2 font-mono text-body-sm leading-snug"><code
       >{#if html}{@html html}{:else}{body}{/if}</code
     ></pre>
 </div>

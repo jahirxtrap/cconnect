@@ -25,28 +25,26 @@
   };
 </script>
 
-<div class="px-2">
-  <div
-    class="flex items-center rounded-item pr-1 pl-4 {selected ? 'bg-accent/14' : ''}"
-    oncontextmenu={(event) => {
-      event.preventDefault();
-      menu = true;
-    }}
-    role="presentation"
-  >
-    <Pressable
-      onclick={onOpen}
-      onlongclick={() => (menu = true)}
-      class="min-w-0 flex-1 truncate py-3 text-body-md {selected ? 'font-semibold text-accent' : ''}"
-    >
-      {title}
-    </Pressable>
+<div
+  class="group flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/6 {selected
+    ? 'bg-on-surface/10'
+    : ''}"
+  oncontextmenu={(event) => {
+    event.preventDefault();
+    menu = true;
+  }}
+  role="presentation"
+>
+  <Pressable onclick={onOpen} onlongclick={() => (menu = true)} class="min-w-0 flex-1 truncate px-2 py-2 text-body-md">
+    {title}
+  </Pressable>
+  <div class="opacity-0 transition-opacity group-hover:opacity-100 data-[open=true]:opacity-100" data-open={menu}>
     <PopupMenu open={menu} align="end" onOpenChange={(value) => (menu = value)}>
       {#snippet trigger()}
         <span
-          class="inline-flex size-10 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
+          class="inline-flex size-7 cursor-pointer items-center justify-center rounded-sm transition-colors hover:bg-on-surface/10"
         >
-          <EllipsisVertical size={20} />
+          <EllipsisVertical size={16} class="text-on-surface-variant" />
         </span>
       {/snippet}
       <MenuItem text={t("RENAME")} onclick={() => run(onRename)} />

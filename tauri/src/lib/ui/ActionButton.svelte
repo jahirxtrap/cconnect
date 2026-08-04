@@ -15,7 +15,7 @@
 
 <Button {onclick} {enabled} variant="outlined" class={className}>
   {#if IconComponent}
-    <IconComponent size={18} class="shrink-0" />
+    <IconComponent size={16} class="shrink-0" />
   {/if}
   <span class="truncate">{text}</span>
 </Button>

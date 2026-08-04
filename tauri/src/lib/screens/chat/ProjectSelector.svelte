@@ -26,12 +26,14 @@
   });
 </script>
 
-<PopupMenu {open} matchTriggerWidth onOpenChange={(value) => (open = value)}>
+<PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
   {#snippet trigger()}
-    <span class="flex w-full cursor-pointer items-center rounded-xs px-2 py-2.5 {className}">
-      <FolderOpen size={18} class="shrink-0 text-accent" />
-      <span class="ml-2 min-w-0 flex-1 truncate text-left text-label-lg">{label}</span>
-      <ChevronDown size={24} class="shrink-0 text-on-surface-variant" />
+    <span
+      class="flex w-full cursor-pointer items-center rounded-item px-2 py-2 transition-colors hover:bg-on-surface/6 {className}"
+    >
+      <FolderOpen size={16} class="shrink-0 text-accent" />
+      <span class="ml-2 min-w-0 flex-1 truncate text-left text-body-md">{label}</span>
+      <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
     </span>
   {/snippet}
   <MenuItem
