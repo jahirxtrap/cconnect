@@ -7,6 +7,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
+  import SettingsScreen from "$lib/screens/settings/SettingsScreen.svelte";
 
   theme.start();
   layout.start();
@@ -32,6 +33,8 @@
 <div class="h-full bg-background text-on-background">
   {#if navigation.route === "chat"}
     <ChatScreen />
+  {:else if navigation.route === "settings"}
+    <SettingsScreen />
   {:else}
     <Screen title={t(TITLES[navigation.route])} />
   {/if}
