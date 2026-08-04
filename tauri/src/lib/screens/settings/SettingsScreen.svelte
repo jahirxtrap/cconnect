@@ -1,9 +1,7 @@
 <script lang="ts">
   import Bell from "@lucide/svelte/icons/bell";
   import Clock from "@lucide/svelte/icons/clock";
-  import CircleUser from "@lucide/svelte/icons/circle-user";
   import History from "@lucide/svelte/icons/history";
-  import Info from "@lucide/svelte/icons/info";
   import Languages from "@lucide/svelte/icons/languages";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
   import Monitor from "@lucide/svelte/icons/monitor";
@@ -15,7 +13,6 @@
   import Type from "@lucide/svelte/icons/type";
   import { navigation } from "$lib/app/navigation.svelte";
   import Screen from "$lib/app/Screen.svelte";
-  import { APP_VERSION } from "$lib/data/build";
   import { settings } from "$lib/data/settings.svelte";
   import { ACCENTS } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
@@ -27,6 +24,7 @@
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import AboutGroup from "./AboutGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import EnvironmentsDialog from "./EnvironmentsDialog.svelte";
   import NotificationsDialog from "./NotificationsDialog.svelte";
@@ -169,10 +167,7 @@
       />
     </SettingsGroup>
 
-    <SettingsGroup label={t("ABOUT")}>
-      <PreferenceRow icon={Info} title={t("APP_NAME")} summary={t("VERSION_LABEL", APP_VERSION)} />
-      <PreferenceRow icon={CircleUser} title={t("CREATOR")} summary="jahirtrap" />
-    </SettingsGroup>
+    <AboutGroup />
   </div>
 </Screen>
 
