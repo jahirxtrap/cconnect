@@ -3,6 +3,7 @@
   import Plus from "@lucide/svelte/icons/plus";
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTauri } from "$lib/platform";
   import { address, backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -21,9 +22,9 @@
   const blank = (): EnvironmentProfile => ({
     id: crypto.randomUUID(),
     name: "",
-    kind: "http",
+    kind: isTauri ? "http" : "https",
     host: "",
-    port: DEFAULT_PORT,
+    port: isTauri ? DEFAULT_PORT : null,
     authKind: "none",
     authToken: "",
     authUser: "",

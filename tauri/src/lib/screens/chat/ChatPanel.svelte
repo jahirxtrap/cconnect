@@ -63,9 +63,7 @@
     />
   </div>
 
-  <p class="shrink-0 px-4 pt-2 pb-1 text-label-md text-on-surface-variant">{t("RECENTS")}</p>
-
-  <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+  <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
     {#if chatState.historySessions.length}
       {#each chatState.historySessions as session (session.sessionId)}
         <ConversationRow

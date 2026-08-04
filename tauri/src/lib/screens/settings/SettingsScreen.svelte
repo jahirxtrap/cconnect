@@ -74,7 +74,7 @@
 </script>
 
 <Screen title={t("SETTINGS")}>
-  <div class="mx-auto flex w-full max-w-2xl flex-col gap-4 p-4">
+  <div class="flex w-full flex-col gap-4 p-4">
     <SettingsGroup label={t("SETTINGS_APPEARANCE")}>
       <PreferenceRow
         icon={themeIcon}

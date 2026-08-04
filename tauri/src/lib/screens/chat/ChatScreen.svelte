@@ -20,7 +20,6 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import Drawer from "$lib/ui/Drawer.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -153,18 +152,14 @@
     </AppTopBar>
 
     <div class="min-h-0 flex-1">
-      {#if chatState.messages.length}
-        <MessageList
-          messages={chatState.messages}
-          pendingToolIds={chatState.pendingToolIds}
-          loadingOlder={chatState.transcriptLoading}
-          onAnswer={(requestId, optionId) => chatState.answerInteraction(requestId, optionId)}
-          onLoadOlder={() => chatState.loadOlder()}
-          {questions}
-        />
-      {:else}
-        <EmptyState text={t("NO_CHATS")} class="h-full" />
-      {/if}
+      <MessageList
+        messages={chatState.messages}
+        pendingToolIds={chatState.pendingToolIds}
+        loadingOlder={chatState.transcriptLoading}
+        onAnswer={(requestId, optionId) => chatState.answerInteraction(requestId, optionId)}
+        onLoadOlder={() => chatState.loadOlder()}
+        {questions}
+      />
     </div>
 
     {#if notices.length}
