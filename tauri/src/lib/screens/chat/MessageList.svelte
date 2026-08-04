@@ -47,6 +47,20 @@
     return true;
   };
 
+  const onKeydown = (event: KeyboardEvent) => {
+    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "a") return;
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
+    if (!container) return;
+    event.preventDefault();
+    const selection = window.getSelection();
+    if (!selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
   const toBottom = () => {
     if (!container) return;
     follow = true;
@@ -65,6 +79,8 @@
     if (follow) container.scrollTop = container.scrollHeight;
   });
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <div class="relative h-full">
   <div bind:this={container} {onscroll} class="selectable h-full overflow-y-auto">
