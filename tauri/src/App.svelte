@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { navigation } from "$lib/app/navigation.svelte";
+  import { navigation, type Route } from "$lib/app/navigation.svelte";
   import Screen from "$lib/app/Screen.svelte";
   import { chatList } from "$lib/data/chatList.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -11,29 +11,29 @@
 
   theme.start();
   layout.start();
+  navigation.start();
   chatList.start();
   serverStatus.start();
 
-  const TITLES = {
-    settings: "SETTINGS",
-    explorer: "FILES",
-    claude: "CLAUDE",
-    monitor: "MONITOR",
-    terminal: "TERMINAL",
-    markdown: "MARKDOWN",
-  } as const;
+  const TITLES: Record<Exclude<Route, "/" | "/settings">, string> = {
+    "/files": "FILES",
+    "/claude": "CLAUDE",
+    "/monitor": "MONITOR",
+    "/terminal": "TERMINAL",
+    "/markdown": "MARKDOWN",
+  };
 </script>
 
 <svelte:window
   onkeydown={(event) => {
-    if (event.key === "Escape" && navigation.route !== "chat") navigation.back();
+    if (event.key === "Escape" && navigation.route !== "/") navigation.back();
   }}
 />
 
 <div class="h-full bg-background text-on-background">
-  {#if navigation.route === "chat"}
+  {#if navigation.route === "/"}
     <ChatScreen />
-  {:else if navigation.route === "settings"}
+  {:else if navigation.route === "/settings"}
     <SettingsScreen />
   {:else}
     <Screen title={t(TITLES[navigation.route])} />

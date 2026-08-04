@@ -111,16 +111,16 @@
           <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
             <Folder size={20} />
           </TooltipIconButton>
-          <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.open("claude")}>
+          <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")}>
             <ClaudeIcon size={20} />
           </TooltipIconButton>
-          <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.open("monitor")}>
+          <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")}>
             <Activity size={20} />
           </TooltipIconButton>
-          <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.open("terminal")}>
+          <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")}>
             <SquareTerminal size={20} />
           </TooltipIconButton>
-          <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.open("markdown")}>
+          <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.navigate("/markdown")}>
             <Type size={20} />
           </TooltipIconButton>
           <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
