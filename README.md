@@ -273,6 +273,29 @@ agent so they're available out of the box from the phone:
   live. Your personal additions go in `USER.md`, edited straight from the
   Claude screen.
 
+## Optional tools
+
+`pip install -e .` covers everything the backend imports; the Claude Code CLI is
+the only hard requirement on top. A handful of features reach for a program that
+isn't a Python package, so they're worth installing if you want the full set —
+none of them is needed to start the server, and each one degrades on its own.
+
+- **Tailscale** — the `--expose tailscale` mode and its QR pairing. Without it
+  you're limited to local access, unless you front the backend yourself.
+- **Caddy** (or nginx, or any reverse proxy) — the `--expose caddy` mode. Unlike
+  the rest of this list it isn't a binary you install and forget: it's a service
+  you configure and leave running, and CConnect never starts or stops it.
+- **git** — the Claude screen clones plugin marketplaces with it. The backend
+  never calls it directly; the CLI does, which is why it's easy to miss.
+- **unrar** and **rar** — reading and writing `.rar` in the file manager, one
+  binary each. On Windows, WinRAR provides both and the backend finds them under
+  `Program Files` without touching `PATH`; on Debian and Ubuntu they're the
+  `unrar` and `rar` packages (`unrar-free` is a limited reimplementation and
+  chokes on recent archives); on macOS, Homebrew's `rar` formula covers both.
+  Every other format the file manager offers works out of the box.
+- **Ookla speedtest** — the speed test in Monitor → Network, which otherwise
+  reports the CLI as unavailable.
+
 ## Staying current
 
 The app and the backend declare which versions of each other — and of the
