@@ -11,6 +11,7 @@ export { default as DialogActionItem } from "./DialogActionItem.svelte";
 export { default as DialogSelectItem } from "./DialogSelectItem.svelte";
 export { default as Drawer } from "./Drawer.svelte";
 export { default as EmptyState } from "./EmptyState.svelte";
+export { default as GithubIcon } from "./GithubIcon.svelte";
 export { default as IconButton } from "./IconButton.svelte";
 export { default as InputField } from "./InputField.svelte";
 export { default as ListRow } from "./ListRow.svelte";

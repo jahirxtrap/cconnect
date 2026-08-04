@@ -1,10 +1,7 @@
 <script lang="ts">
-  interface Props {
-    size?: number;
-    class?: string;
-  }
+  import type { LucideProps } from "@lucide/svelte";
 
-  const { size = 24, class: className = "" }: Props = $props();
+  const { size = 24, class: className = "" }: LucideProps = $props();
 </script>
 
 <svg

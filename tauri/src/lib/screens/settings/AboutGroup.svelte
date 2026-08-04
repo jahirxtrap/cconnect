@@ -10,11 +10,13 @@
     latestRelease,
     ownerProfile,
     RELEASES_URL,
+    REPO_URL,
     type Profile,
     type Release,
   } from "$lib/services/githubApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppLogo from "$lib/ui/AppLogo.svelte";
+  import GithubIcon from "$lib/ui/GithubIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -91,6 +93,17 @@
     title={t("SUPPORT_CREATOR")}
     summary={KOFI_URL.replace("https://", "")}
     onclick={() => open(KOFI_URL)}
+  >
+    {#snippet trailing()}
+      <ExternalLink size={14} class="text-on-surface-variant" />
+    {/snippet}
+  </PreferenceRow>
+
+  <PreferenceRow
+    icon={GithubIcon}
+    title={t("REPOSITORY")}
+    summary={REPO_URL.replace("https://", "")}
+    onclick={() => open(REPO_URL)}
   >
     {#snippet trailing()}
       <ExternalLink size={14} class="text-on-surface-variant" />
