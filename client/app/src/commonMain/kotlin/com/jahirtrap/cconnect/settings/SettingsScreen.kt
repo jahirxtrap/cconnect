@@ -943,8 +943,8 @@ private fun ConfirmTooltipButton(
 
 private fun localServerStateOf(info: LocalServerInfo, reachable: Boolean, connecting: Boolean): LocalServerState = when {
     info.error != null -> LocalServerState.Failed
-    reachable && info.managed -> LocalServerState.RunningManaged
-    reachable -> LocalServerState.RunningExternal
+    (info.ready || reachable) && info.managed -> LocalServerState.RunningManaged
+    info.ready || reachable -> LocalServerState.RunningExternal
     info.managed || connecting -> LocalServerState.Starting
     else -> LocalServerState.Stopped
 }

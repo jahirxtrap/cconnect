@@ -22,6 +22,7 @@ actual object LocalServer {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var process: Process? = null
     private var readerJob: Job? = null
+    private var readyJob: Job? = null
     @Volatile private var startedByUs = false
     private val lastLines = ArrayDeque<String>()
 
@@ -37,13 +38,17 @@ actual object LocalServer {
         process = null
         readerJob?.cancel()
         readerJob = null
+        readyJob?.cancel()
+        readyJob = null
         if (proc != null && startedByUs) {
             runCatching { proc.toHandle().descendants().forEach { it.destroy() } }
             runCatching { proc.destroy() }
             runCatching { if (proc.isAlive) proc.destroyForcibly() }
         }
         startedByUs = false
-        _status.update { it.copy(managed = false, error = null, errorDetail = null, publicUrl = null, token = null) }
+        _status.update {
+            it.copy(managed = false, ready = false, error = null, errorDetail = null, publicUrl = null, token = null)
+        }
     }
 
     actual fun restart(config: LocalServerConfig) {
@@ -65,7 +70,7 @@ actual object LocalServer {
         }
         if (isPortOpen("127.0.0.1", config.probePort)) {
             startedByUs = false
-            _status.update { it.copy(managed = false, error = null, errorDetail = null) }
+            _status.update { it.copy(managed = false, ready = true, error = null, errorDetail = null) }
             return
         }
         val python = resolvePython(config, dir)
@@ -87,7 +92,20 @@ actual object LocalServer {
         process = proc
         startedByUs = true
         lastLines.clear()
-        _status.update { it.copy(managed = true, error = null, errorDetail = null, publicUrl = null, token = null) }
+        _status.update {
+            it.copy(managed = true, ready = false, error = null, errorDetail = null, publicUrl = null, token = null)
+        }
+        // The configured environment may be a tailnet address that answers long after the backend does.
+        readyJob = scope.launch {
+            repeat(60) {
+                if (!proc.isAlive) return@launch
+                if (isPortOpen("127.0.0.1", config.probePort)) {
+                    _status.update { it.copy(ready = true) }
+                    return@launch
+                }
+                delay(500)
+            }
+        }
         readerJob = scope.launch {
             runCatching {
                 proc.inputStream.bufferedReader().forEachLine { line ->
@@ -100,7 +118,9 @@ actual object LocalServer {
                 process = null
                 startedByUs = false
                 val tail = lastLines.toList().takeLast(12).joinToString("\n").trim()
-                _status.update { it.copy(managed = false, error = LocalServerError.Crashed, errorDetail = tail.ifBlank { null }) }
+                _status.update {
+                    it.copy(managed = false, ready = false, error = LocalServerError.Crashed, errorDetail = tail.ifBlank { null })
+                }
             }
         }
     }

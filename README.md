@@ -35,10 +35,12 @@ python run.py
 ```
 
 - Backend listens on `:8723`, no auth.
-- **Requirement:** both PC and your device have **Tailscale** installed and
-  signed into the same account. Your device connects using the PC's tailnet IP
-  (`100.x.x.x`) shown in the Tailscale app, e.g. `http://100.x.x.x:8723`.
-  No funnel needed.
+- **From the same machine** — the desktop app, or a browser on the PC — use
+  `http://localhost:8723`. Nothing else to install.
+- **From another device**, both it and the PC need **Tailscale**, signed into the
+  same account: connect to the PC's tailnet IP (`100.x.x.x`) shown in the
+  Tailscale app, e.g. `http://100.x.x.x:8723`. No funnel needed. Tailscale is how
+  your phone reaches the PC here, not something the backend itself requires.
 
 ### Public HTTPS (token-gated, exposes the PC over the internet)
 

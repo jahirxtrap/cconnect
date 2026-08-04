@@ -8,6 +8,7 @@ enum class LocalServerError { BadDir, NoPython, LaunchFailed, Crashed }
 
 data class LocalServerInfo(
     val managed: Boolean = false,
+    val ready: Boolean = false,
     val error: LocalServerError? = null,
     val errorDetail: String? = null,
     val publicUrl: String? = null,
