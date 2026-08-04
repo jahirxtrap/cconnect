@@ -1,9 +1,7 @@
-- Use several Claude accounts on one backend and switch between them, sharing the same history, plugins and skills
-- Sign in to a new account from the app: open the link on any device, approve it there and paste the code back
-- New Network tab in the Monitor: connection status, live traffic, interfaces, Wi-Fi networks and a speed test
-- Switch Wi-Fi networks or turn the radio off remotely, with automatic rollback if the new network has no internet
-- The backend can now run detached with `--detach`, so it keeps running after you close the terminal or SSH session
-- The model, effort and permission mode picked in a chat are now applied by the server
+- Expose the backend through a reverse proxy you already run with `--expose caddy`, same token and QR as the funnel but on a hostname you control
+- Use your own domain or a free DuckDNS subdomain for it, or leave it empty and let the backend derive one from the machine's public IP
+- Pick the new mode and its hostname from the desktop app's local server panel
+- The local server panel no longer waits on Tailscale to notice a backend that is already running on the machine
 
 > [!NOTE]
 > The web version is available at https://cconnect.pages.dev/

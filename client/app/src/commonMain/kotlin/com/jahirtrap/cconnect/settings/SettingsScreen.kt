@@ -890,7 +890,6 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
                 value = publicHost,
                 onValueChange = { publicHost = it },
                 label = { Text(stringResource(Res.string.public_host)) },
-                placeholder = { Text(stringResource(Res.string.public_host_hint)) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
