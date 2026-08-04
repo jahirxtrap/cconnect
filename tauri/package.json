@@ -1,0 +1,39 @@
+{
+  "name": "cconnect",
+  "private": true,
+  "version": "1.4.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "svelte-check --tsconfig ./tsconfig.json && vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@lucide/svelte": "^1.28.0",
+    "@tauri-apps/api": "^2.9.0",
+    "@tauri-apps/plugin-dialog": "^2.4.0",
+    "@tauri-apps/plugin-fs": "^2.4.2",
+    "@tauri-apps/plugin-notification": "^2.3.1",
+    "@tauri-apps/plugin-opener": "^2.5.0",
+    "@tauri-apps/plugin-store": "^2.4.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
+    "bits-ui": "^2.18.1",
+    "markdown-it": "^15.0.0",
+    "shiki": "^4.4.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.0.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/markdown-it": "^14.1.2",
+    "@types/node": "^26.1.2",
+    "svelte": "^5.56.8",
+    "svelte-check": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^5.9.3",
+    "vite": "^8.2.0"
+  }
+}

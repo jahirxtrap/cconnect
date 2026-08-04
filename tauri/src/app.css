@@ -1,0 +1,20 @@
+@import "./lib/design/tokens.css";
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--c-background);
+  color: var(--c-on-background);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--c-accent) 32%, transparent);
+}
