@@ -1,8 +1,11 @@
 <script lang="ts">
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import type { ChatMessage, InteractionData } from "$lib/data/chatModels";
+  import { settings } from "$lib/data/settings.svelte";
+  import { dayIndex } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
 
   interface Props {
@@ -33,6 +36,17 @@
     }
   };
 
+  const separatorAt = (index: number) => {
+    if (!settings.showTimestamps) return false;
+    const current = messages[index].timestamp;
+    if (current === null) return false;
+    for (let i = index - 1; i >= 0; i--) {
+      const previous = messages[i].timestamp;
+      if (previous !== null) return dayIndex(previous) !== dayIndex(current);
+    }
+    return true;
+  };
+
   const toBottom = () => {
     if (!container) return;
     follow = true;
@@ -53,11 +67,14 @@
 </script>
 
 <div class="relative h-full">
-  <div bind:this={container} {onscroll} class="h-full overflow-y-auto">
+  <div bind:this={container} {onscroll} class="selectable h-full overflow-y-auto">
     {#if loadingOlder}
       <CenteredProgress size={20} class="py-3" />
     {/if}
     {#each messages as item, index (item.id)}
+      {#if separatorAt(index)}
+        <DateSeparator millis={item.timestamp ?? 0} />
+      {/if}
       <MessageItem
         message={item}
         prevRole={messages[index - 1]?.role ?? null}
@@ -75,9 +92,9 @@
       onclick={toBottom}
       title={t("SCROLL_TO_BOTTOM")}
       aria-label={t("SCROLL_TO_BOTTOM")}
-      class="absolute right-3 bottom-3 inline-flex size-10 cursor-pointer items-center justify-center rounded-full bg-accent text-background shadow-lg transition-opacity hover:opacity-90"
+      class="absolute right-3 bottom-3 inline-flex size-10 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
     >
-      <ChevronDown size={20} />
+      <ChevronDown size={24} />
     </button>
   {/if}
 </div>

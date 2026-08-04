@@ -23,7 +23,7 @@
     type="button"
     disabled={labelOnly}
     onclick={() => (expanded = !expanded)}
-    class="flex w-full items-center gap-1.5 text-left {labelOnly ? 'cursor-default' : 'cursor-pointer'}"
+    class="flex w-full items-center gap-1.5 text-left select-none {labelOnly ? 'cursor-default' : 'cursor-pointer'}"
   >
     {#if IconComponent}
       <IconComponent size={16} class="shrink-0 text-accent" />
