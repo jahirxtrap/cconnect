@@ -122,7 +122,10 @@
     const element = container;
     if (!element) return;
     measureScrollbar();
-    const observer = new ResizeObserver(measureScrollbar);
+    const observer = new ResizeObserver(() => {
+      measureScrollbar();
+      if (follow) element.scrollTop = element.scrollHeight;
+    });
     observer.observe(element);
     return () => observer.disconnect();
   });

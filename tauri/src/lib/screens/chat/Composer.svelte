@@ -12,6 +12,7 @@
   import type { Snippet } from "svelte";
   import type { QueuedMessage } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
+  import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
@@ -36,6 +37,7 @@
     onAttach: (files: File[]) => void;
     onRemoveAttachment: (id: number) => void;
     onCloseSide?: (() => void) | null;
+    sessionColor?: string | null;
     controls?: Snippet;
   }
 
@@ -55,8 +57,11 @@
     onAttach,
     onRemoveAttachment,
     onCloseSide = null,
+    sessionColor = null,
     controls,
   }: Props = $props();
+
+  const accent = $derived(sessionColorOf(sessionColor));
 
   const PERCENT = 100;
 
@@ -129,7 +134,10 @@
   <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div
     onclick={focusField}
-    class="cursor-text rounded-lg border border-outline-variant bg-surface focus-within:border-outline"
+    style={accent ? `border-color: ${accent}; box-shadow: inset 0 0 0 1px ${accent}` : undefined}
+    class="cursor-text rounded-lg border bg-surface {accent
+      ? ''
+      : 'border-outline-variant focus-within:border-outline'}"
   >
     {#if queue.length}
       <div

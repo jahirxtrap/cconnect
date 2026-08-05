@@ -158,7 +158,7 @@
 <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
   <SettingsGroup label={t("NETWORK_STATE")}>
     {#snippet labelTrailing()}
-      <StatusDot class={connectivityDot} />
+      <StatusDot class={connectivityDot} box={20} dot={12} />
     {/snippet}
     <PreferenceRow
       icon={Globe}
@@ -196,7 +196,11 @@
               onCheckedChange={() => void run(item.name, () => networkApi.setInterface(item.name, !item.up))}
             />
           {:else}
-            <StatusDot class={item.internet ? "bg-green" : item.up ? "bg-orange" : "bg-outline-variant"} />
+            <StatusDot
+              class={item.internet ? "bg-green" : item.up ? "bg-orange" : "bg-outline-variant"}
+              box={20}
+              dot={12}
+            />
           {/if}
         {/snippet}
       </PreferenceRow>
@@ -249,7 +253,7 @@
             {#if busy === network.ssid}
               <LoadingIndicator size={20} />
             {:else if network.active}
-              <StatusDot class="bg-green" />
+              <StatusDot class="bg-green" box={20} dot={12} />
             {/if}
           {/snippet}
         </PreferenceRow>

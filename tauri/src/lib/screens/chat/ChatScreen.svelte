@@ -67,7 +67,8 @@
   let rewindOpen = $state(false);
   let queuedId = $state<string | null>(null);
   let sharedLink = $state<{ url: string; filename: string } | null>(null);
-  let sideHeight = $state(45);
+  let sideHeight = $state(58);
+  let sideDragging = $state(false);
   let dropOver = $state(false);
 
   const canAttach = $derived(!chat.sideOpen);
@@ -242,7 +243,13 @@
       }}
       ondrop={onDrop}
     >
-      <div class="min-h-0 flex-1">
+      <div class="relative min-h-0 flex-1">
+        <div
+          class="overflow-hidden {chat.sideOpen && !sideDragging
+            ? 'transition-[height] duration-200 ease-out'
+            : ''}"
+          style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
+        >
         <MessageList
         messages={chat.messages}
         pendingToolIds={chat.pendingToolIds}
@@ -260,6 +267,19 @@
         onSharedLink={(url, filename) => (sharedLink = { url, filename })}
         {questions}
       />
+        </div>
+        {#if chat.sideOpen}
+          <SidePanel
+            messages={chat.sideMessages}
+            height={sideHeight}
+            onHeight={(value) => (sideHeight = value)}
+            onDragging={(value) => (sideDragging = value)}
+            onClear={() => chat.clearSideChat()}
+            onClose={() => chat.closeSideChat()}
+            onAnswer={(requestId, optionId) => chat.answerSideInteraction(requestId, optionId)}
+            {questions}
+          />
+        {/if}
     </div>
 
     {#if notices.length}
@@ -278,18 +298,6 @@
       </div>
     {/if}
 
-    {#if chat.sideOpen}
-      <SidePanel
-        messages={chat.sideMessages}
-        height={sideHeight}
-        onHeight={(value) => (sideHeight = value)}
-        onClear={() => chat.clearSideChat()}
-        onClose={() => chat.closeSideChat()}
-        onAnswer={(requestId, optionId) => chat.answerSideInteraction(requestId, optionId)}
-        {questions}
-      />
-    {/if}
-
     <Composer
       streaming={chat.sideOpen ? chat.sideStreaming : chat.streaming}
       draft={chat.sideOpen ? chat.sideDraft : chat.draft}
@@ -306,7 +314,8 @@
       onAttach={(files) => chat.addAttachments(files)}
       onRemoveAttachment={(id) => chat.removeAttachment(id)}
         onCloseSide={chat.sideOpen ? () => chat.closeSideChat() : null}
-        {controls}
+        sessionColor={chat.sessionColor}
+        controls={chat.sideOpen ? undefined : controls}
       />
     </div>
   </div>

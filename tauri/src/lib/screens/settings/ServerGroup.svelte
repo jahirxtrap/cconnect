@@ -75,7 +75,7 @@
     {#if loading}
       <LoadingIndicator size={20} />
     {:else}
-      <StatusDot class={ready ? "bg-green" : "bg-red"} />
+      <StatusDot class={ready ? "bg-green" : "bg-red"} box={20} dot={12} />
     {/if}
   {/snippet}
 

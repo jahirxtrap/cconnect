@@ -81,6 +81,10 @@
           onRename={() => onRename(session)}
           onAutoRename={() => void chat.autoRename(session)}
           onColor={() => onColor(session)}
+          onOpenNewTab={() => {
+            tabs.openSessionTab(session, tabs.active?.environmentId ?? null);
+            onAfterSelect();
+          }}
           onDelete={() => onDelete(session)}
         />
       {/each}

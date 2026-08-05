@@ -53,6 +53,7 @@ export interface ChatContext {
   sessionId: string | null;
   projectKey: string | null;
   cwd: string;
+  color?: string | null;
 }
 
 export class ChatState {
@@ -156,6 +157,7 @@ export class ChatState {
     this.environmentId = context.environmentId;
     this.sessionId = context.sessionId;
     this.projectKey = context.projectKey;
+    this.sessionColor = context.color ?? null;
     this.cwd = context.cwd || this.environment?.directory || settings.cwd;
     this.#loadEnvOverrides();
     this.#applyDefaultProject();

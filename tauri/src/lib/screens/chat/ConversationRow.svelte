@@ -12,10 +12,12 @@
     onRename: () => void;
     onAutoRename: () => void;
     onColor: () => void;
+    onOpenNewTab: () => void;
     onDelete: () => void;
   }
 
-  const { title, selected, onOpen, onRename, onAutoRename, onColor, onDelete }: Props = $props();
+  const { title, selected, onOpen, onRename, onAutoRename, onColor, onOpenNewTab, onDelete }: Props =
+    $props();
 
   let menu = $state(false);
 
@@ -55,6 +57,7 @@
       <MenuItem text={t("RENAME")} onclick={() => run(onRename)} />
       <MenuItem text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
       <MenuItem text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
+      <MenuItem text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
       <MenuItem text={t("DELETE")} onclick={() => run(onDelete)} />
     </PopupMenu>
   </div>

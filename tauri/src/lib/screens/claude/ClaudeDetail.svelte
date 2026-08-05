@@ -341,14 +341,14 @@
         <EmptyState text={t("STATUS_UNKNOWN")} class="h-full" />
       {:else}
         <div class="flex items-center gap-3 px-4 py-3">
-          <StatusDot class={indicatorTone(service.indicator)} />
+          <StatusDot class={indicatorTone(service.indicator)} box={18} dot={12} />
           <p class="text-title-md">{indicatorLabel(service.indicator)}</p>
         </div>
         {#each service.components as component (component.name)}
           <div class="flex items-center gap-3 px-4 py-2">
             <p class="min-w-0 flex-1 truncate text-body-lg">{component.name}</p>
             <p class="text-body-sm text-on-surface-variant">{componentLabel(component.status)}</p>
-            <StatusDot class={componentTone(component.status)} />
+            <StatusDot class={componentTone(component.status)} box={16} dot={10} />
           </div>
         {/each}
         <p class="px-4 pt-4 pb-1 text-label-lg text-accent">{t("STATUS_INCIDENTS")}</p>
@@ -364,7 +364,7 @@
               class="block w-full px-4 py-2 text-left {incident.shortlink ? 'cursor-pointer' : 'cursor-default'}"
             >
               <div class="flex items-center gap-2">
-                <StatusDot class={indicatorTone(incident.impact)} />
+                <StatusDot class={indicatorTone(incident.impact)} box={14} dot={9} />
                 <span class="min-w-0 flex-1 truncate text-body-lg">{incident.name}</span>
               </div>
               {#if incident.latest}

@@ -97,7 +97,7 @@
         {#if busy === account.id}
           <LoadingIndicator size={20} />
         {:else}
-          <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} />
+          <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} box={20} dot={12} />
         {/if}
       {/snippet}
     </PreferenceRow>

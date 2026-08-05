@@ -62,7 +62,7 @@
     {#if phase === "starting"}
       <LoadingIndicator size={20} />
     {:else}
-      <StatusDot class={tone} />
+      <StatusDot class={tone} box={20} dot={12} />
     {/if}
   {/snippet}
 

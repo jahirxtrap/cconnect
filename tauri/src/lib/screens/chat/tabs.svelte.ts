@@ -95,6 +95,7 @@ class Tabs {
       sessionId: tab.sessionId,
       projectKey: tab.projectKey,
       cwd: tab.cwd,
+      color: tab.color,
     });
     created.tabId = tab.id;
     created.onContextChange = () => this.#syncContext(tab.id, created);

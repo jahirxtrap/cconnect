@@ -163,6 +163,8 @@
           {#snippet labelTrailing()}
             <StatusDot
               class={service && service.error === null ? indicatorTone(service.indicator) : "bg-gray"}
+              box={20}
+              dot={12}
             />
           {/snippet}
           <PreferenceRow

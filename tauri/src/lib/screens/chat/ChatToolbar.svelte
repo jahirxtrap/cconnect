@@ -63,8 +63,7 @@
   const CONTEXT_LIMIT = 200_000;
   const ITEM_CLASS =
     "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 text-label-lg transition-colors hover:bg-on-surface/8";
-  const STATE_CLASS =
-    "flex h-8 shrink-0 items-center gap-1 rounded-sm border border-outline-variant px-2.5 text-label-md";
+  const STATE_CLASS = "flex h-8 shrink-0 items-center gap-1.5 px-2 text-label-lg";
 
   let openMenu = $state<"model" | "effort" | "permission" | null>(null);
 
@@ -110,7 +109,7 @@
 >
   {#if disconnected}
     <span class={STATE_CLASS}>
-      <StatusDot class="bg-red" />
+      <StatusDot class="bg-red" box={16} dot={10} />
       {t("DISCONNECTED")}
     </span>
   {:else if connecting || !ready}
