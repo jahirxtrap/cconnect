@@ -17,11 +17,13 @@
   import Screen from "$lib/app/Screen.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
-  import { ACCENTS } from "$lib/design/accents";
+  import { ACCENTS, DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isTauri, isTouch } from "$lib/platform";
   import { address, backend } from "$lib/services/backend.svelte";
+  import { notifier } from "$lib/services/notifier.svelte";
+  import { settingsApi } from "$lib/services/settingsApi";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -105,14 +107,16 @@
   );
 
   const reset = () => {
+    settings.cwd = "";
     theme.setMode("system");
-    theme.setAccent(DEFAULT_ACCENT);
+    theme.setDynamicColor(false);
+    theme.setAccent(DEFAULT_ACCENT_INDEX);
     theme.setFontStyle("flat");
     i18n.set("system");
+    void settingsApi.reset();
+    refreshTick++;
     dialog = null;
   };
-
-  const DEFAULT_ACCENT = 4;
 </script>
 
 <Screen title={t("SETTINGS")} {refreshing} onRefresh={() => refreshTick++}>
@@ -176,7 +180,7 @@
       <PreferenceRow
         icon={Bell}
         title={t("NOTIFICATIONS")}
-        summary={t("NOTIFICATIONS_STATE", activeNotifications)}
+        summary={notifier.granted ? t("NOTIFICATIONS_STATE", activeNotifications) : t("NOTIFICATIONS_DISABLED")}
         onclick={() => (dialog = "notifications")}
       />
       {#if isTauri}
@@ -277,8 +281,8 @@
 {:else if dialog === "reset"}
   <ConfirmDialog
     title={t("RESET_SETTINGS")}
-    text={t("RESET_SETTINGS_SUMMARY")}
-    confirmLabel={t("CONFIRM")}
+    text={t("RESET_SETTINGS_CONFIRM")}
+    confirmLabel={t("ACCEPT")}
     onConfirm={reset}
     onDismiss={() => (dialog = null)}
   />

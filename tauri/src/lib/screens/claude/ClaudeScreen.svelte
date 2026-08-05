@@ -114,10 +114,29 @@
 
   $effect(() => {
     void backend.activeId;
-    void chat.connected;
-    void desktop.refreshTick;
+    loaded = false;
     void load();
   });
+
+  $effect(() => {
+    if (chat.connected) void load();
+  });
+
+  $effect(() => {
+    if (desktop.refreshTick > 0) {
+      refreshing = true;
+      void load();
+    }
+  });
+
+  $effect(() =>
+    navigation.intercept(() => {
+      if (detail === null) return false;
+      detail = null;
+      void load();
+      return true;
+    }),
+  );
 </script>
 
 {#if detail}

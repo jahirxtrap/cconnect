@@ -20,6 +20,14 @@
   let editing = $state<SshProfile | null>(null);
   let adding = $state(false);
   let deleting = $state<SshProfile | null>(null);
+
+  $effect(() =>
+    navigation.intercept(() => {
+      if (active === null) return false;
+      active = null;
+      return true;
+    }),
+  );
 </script>
 
 {#if active}

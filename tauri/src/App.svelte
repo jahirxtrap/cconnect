@@ -45,9 +45,9 @@
           : control && key === "w"
             ? (tabs.closeActive(), true)
             : event.altKey && event.key === "ArrowRight"
-              ? (tabs.moveActive(1), true)
+              ? (tabs.selectNext(), true)
               : event.altKey && event.key === "ArrowLeft"
-                ? (tabs.moveActive(-1), true)
+                ? (tabs.selectPrev(), true)
                 : false;
     if (handled) event.preventDefault();
   };

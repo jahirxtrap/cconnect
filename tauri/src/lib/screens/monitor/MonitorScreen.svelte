@@ -84,6 +84,7 @@
     memHistory = [];
     vramHistory = [];
     logs = [];
+    followLogs = true;
     reloadNetwork();
     const socket = systemApi.stream({
       onInfo: (snapshot) => {

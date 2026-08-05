@@ -630,22 +630,23 @@ export class ChatState {
     this.rewindPoints = [];
   }
 
-  async rewind(mode: "both" | "conversation") {
+  async rewind(mode: "both" | "conversation"): Promise<boolean> {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     const point = this.rewindTarget;
-    if (!sessionId || !project || !point || this.rewindBusy) return;
+    if (!sessionId || !project || !point || this.rewindBusy) return false;
     this.rewindBusy = true;
     const result = await this.#sessions.rewind(sessionId, project, point, mode);
     if (!result) {
       this.rewindBusy = false;
-      return;
+      return false;
     }
     await this.#reloadConversation();
     this.rewindTarget = null;
     this.rewindPreview = null;
     this.rewindBusy = false;
     this.pendingInput = point.text;
+    return true;
   }
 
   consumePendingInput(): string | null {

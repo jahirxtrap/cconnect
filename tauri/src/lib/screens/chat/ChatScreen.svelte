@@ -419,10 +419,10 @@
     busy={chat.rewindBusy}
     onSelect={(point) => void chat.selectRewindPoint(point)}
     onBack={() => chat.clearRewindTarget()}
-    onRewind={(mode) => {
-      void chat.rewind(mode);
-      rewindOpen = false;
-    }}
+    onRewind={(mode) =>
+      void chat.rewind(mode).then((done) => {
+        if (done) rewindOpen = false;
+      })}
     onDismiss={() => {
       chat.dismissRewind();
       rewindOpen = false;

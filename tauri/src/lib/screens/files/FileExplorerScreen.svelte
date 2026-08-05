@@ -22,6 +22,7 @@
   import Trash from "@lucide/svelte/icons/trash";
   import X from "@lucide/svelte/icons/x";
   import { DropdownMenu } from "bits-ui";
+  import { untrack } from "svelte";
   import { slide } from "svelte/transition";
   import { navigation } from "$lib/app/navigation.svelte";
   import { formatSize, isArchive } from "$lib/data/format";
@@ -127,6 +128,7 @@
   let dropOver = $state(false);
   let dropTarget = $state<string | null>(null);
   let dragging = $state<string[] | null>(null);
+  let seenUploads = new Set<number>();
 
   const environment = $derived(backend.active);
 
@@ -298,28 +300,63 @@
     if (files.length) pendingUploads = files;
   };
 
+  const shortcutsEnabled = $derived(
+    !searching &&
+      renaming === null &&
+      !creatingFolder &&
+      !confirmingDelete &&
+      extractRequest === null &&
+      compressing === null &&
+      navigation.preview === null,
+  );
+
   const onKeydown = (event: KeyboardEvent) => {
     const active = document.activeElement;
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
     if (event.key === "Escape") {
-      const consumed = selecting || searching || transfer !== null;
+      const consumed = selecting || searching || archive !== null || !!path || transfer !== null;
       if (selecting) exitSelection();
       else if (searching) {
         searching = false;
         searchQuery = "";
-      } else if (transfer) transfer = null;
+      } else if (archive !== null || path) goUp();
+      else if (transfer) transfer = null;
       if (consumed) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
       return;
     }
-    if (event.key === "Delete" && selected.length) confirmingDelete = true;
+    if (event.key === "Delete" && selected.length) {
+      confirmingDelete = true;
+      return;
+    }
+    if (!(event.ctrlKey || event.metaKey) || !shortcutsEnabled) return;
+    const key = event.key.toLowerCase();
+    if ((key === "c" || key === "x") && archive === null && selected.length) {
+      startTransfer(key === "c" ? "copy" : "move");
+      event.preventDefault();
+    } else if (key === "v" && transfer && transferAllowed) {
+      void runTransfer();
+      event.preventDefault();
+    }
+  };
+
+  const onPaste = (event: ClipboardEvent) => {
+    if (!shortcutsEnabled || archive !== null || transfer) return;
+    const files = Array.from(event.clipboardData?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+    pendingUploads = files;
   };
 
   $effect(() => {
     window.addEventListener("keydown", onKeydown, true);
-    return () => window.removeEventListener("keydown", onKeydown, true);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKeydown, true);
+      window.removeEventListener("paste", onPaste);
+    };
   });
 
   $effect(() => {
@@ -341,6 +378,11 @@
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
+  });
+
+  $effect(() => {
+    void backend.activeId;
+    untrack(() => (transfer = null));
   });
 
   $effect(() => {
@@ -380,8 +422,19 @@
   });
 
   $effect(() => {
-    const done = uploads.items.filter((item) => item.status === "done" && item.dir === path);
-    if (done.length) void reload();
+    void path;
+    seenUploads = new Set(
+      untrack(() => uploads.items)
+        .filter((item) => item.status !== "uploading")
+        .map((item) => item.id),
+    );
+  });
+
+  $effect(() => {
+    const finished = uploads.items.filter((item) => item.status !== "uploading");
+    const fresh = finished.filter((item) => !seenUploads.has(item.id));
+    seenUploads = new Set(finished.map((item) => item.id));
+    if (fresh.some((item) => item.status === "done" && item.dir === untrack(() => path))) void reload();
   });
 </script>
 

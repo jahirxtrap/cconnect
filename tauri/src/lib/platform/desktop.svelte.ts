@@ -9,6 +9,8 @@ const TRAY_ID = "cconnect";
 class Desktop {
   refreshTick = $state(0);
 
+  #trayActive = false;
+
   async start() {
     if (!isTauri) return;
     await this.#window();
@@ -23,7 +25,7 @@ class Desktop {
     if (settings.windowMaximized) await current.maximize();
 
     void current.onCloseRequested(async (event) => {
-      if (!settings.minimizeToTray) return;
+      if (!settings.minimizeToTray || !this.#trayActive) return;
       event.preventDefault();
       await current.hide();
     });
@@ -99,6 +101,7 @@ class Desktop {
           if (event.type === "Click" && event.button === "Left" && event.buttonState === "Up") void show();
         },
       });
+      this.#trayActive = true;
     } catch {
       return;
     }
