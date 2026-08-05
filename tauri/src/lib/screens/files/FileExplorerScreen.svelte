@@ -38,7 +38,13 @@
     sharedApi,
     type SharedEntry,
   } from "$lib/services/sharedApi";
-  import { downloadShared, openSharedExternally, saveSharedAs } from "$lib/services/sharedFiles";
+  import {
+    downloadShared,
+    openAllSharedExternally,
+    openSharedExternally,
+    saveAllShared,
+    saveSharedAs,
+  } from "$lib/services/sharedFiles";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -701,9 +707,9 @@
         label={t("SHARE")}
         enabled={canShare}
         onclick={() => {
-          selectedEntries.forEach((entry) =>
-            void openSharedExternally(downloadUrl(child(entry.name)), entry.name),
-          );
+          const files = selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.name)), name: entry.name }));
+          if (files.length === 1) void openSharedExternally(files[0].url, files[0].name);
+          else void openAllSharedExternally(files);
           exitSelection();
         }}
       />
@@ -765,9 +771,12 @@
               <MenuItem
                 text={t("SAVE_AS")}
                 onclick={() => {
-                  selectedEntries.forEach((entry) =>
-                    void saveSharedAs(downloadUrl(child(entry.name)), entry.name),
-                  );
+                  const files = selectedEntries.map((entry) => ({
+                    url: downloadUrl(child(entry.name)),
+                    name: entry.name,
+                  }));
+                  if (files.length === 1) void saveSharedAs(files[0].url, files[0].name);
+                  else void saveAllShared(files);
                   exitSelection();
                 }}
               >

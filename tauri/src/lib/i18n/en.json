@@ -43,6 +43,7 @@
   "SSH_USER": "User",
   "SSH_PASSWORD": "Password",
   "SSH_DISCONNECT": "Disconnect",
+  "KEYBOARD": "Keyboard",
   "SSH_CONNECTING": "Connecting",
   "SSH_CONNECTED": "Connected",
   "SSH_CLOSED": "Disconnected",

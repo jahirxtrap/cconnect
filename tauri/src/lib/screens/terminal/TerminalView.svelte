@@ -22,6 +22,10 @@
 
   let container = $state<HTMLDivElement | null>(null);
   let field = $state<HTMLTextAreaElement | null>(null);
+
+  export function focus() {
+    field?.focus();
+  }
   let cellWidth = $state(8);
   let cursorOn = $state(true);
 
@@ -107,8 +111,21 @@
     }
   };
 
+  const selectionText = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.isCollapsed) return "";
+    return container?.contains(selection.anchorNode) ? selection.toString() : "";
+  };
+
   const onkeydown = (event: KeyboardEvent) => {
-    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "c") return;
+    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "c") {
+      const text = selectionText();
+      if (text) {
+        event.preventDefault();
+        void navigator.clipboard.writeText(text);
+      }
+      return;
+    }
     if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "v") return;
     const bytes = keyBytes(event);
     if (bytes) {
@@ -148,6 +165,10 @@
     void snapshot;
     if (container) container.scrollTop = container.scrollHeight;
   });
+
+  $effect(() => {
+    field?.focus();
+  });
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
@@ -158,7 +179,9 @@
   role="application"
   aria-label="terminal"
   tabindex="-1"
-  onclick={() => field?.focus()}
+  onclick={() => {
+    if (!selectionText()) field?.focus();
+  }}
 >
   {#each snapshot.lines as cells, index (index)}
     {@const cursorCol =
@@ -169,8 +192,8 @@
       {/each}
       {#if cursorCol >= 0 && cursorOn}
         <span
-          class="pointer-events-none absolute top-0 bottom-0 bg-on-background/60"
-          style="left: {cursorCol * cellWidth}px; width: {cellWidth}px"
+          class="pointer-events-none absolute top-0 bottom-0 opacity-60"
+          style="left: {cursorCol * cellWidth}px; width: {cellWidth}px; background: {foreground}"
         ></span>
       {/if}
     </div>

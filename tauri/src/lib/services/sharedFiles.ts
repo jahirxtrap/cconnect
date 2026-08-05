@@ -1,4 +1,10 @@
+import { isTauri } from "$lib/platform";
 import { authHeadersOf, backend, type Profile } from "./backend.svelte";
+
+export interface SharedItem {
+  url: string;
+  name: string;
+}
 
 const fetchShared = async (url: string, profile: Profile = backend.active): Promise<Blob | null> => {
   try {
@@ -75,6 +81,25 @@ const saveBlobAs = async (blob: Blob, filename: string) => {
 export const saveSharedAs = async (url: string, filename: string) => {
   const blob = await fetchShared(url);
   if (blob) await saveBlobAs(blob, filename);
+};
+
+export const saveAllShared = async (items: SharedItem[]) => {
+  if (!isTauri) {
+    for (const item of items) await downloadShared(item.url, item.name);
+    return;
+  }
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const directory = await open({ directory: true, multiple: false });
+  if (typeof directory !== "string") return;
+  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  for (const item of items) {
+    const blob = await fetchShared(item.url);
+    if (blob) await writeFile(`${directory}/${item.name}`, new Uint8Array(await blob.arrayBuffer()));
+  }
+};
+
+export const openAllSharedExternally = async (items: SharedItem[]) => {
+  await navigator.clipboard.writeText(items.map((item) => item.url).join("\n"));
 };
 
 export const openSharedExternally = async (url: string, filename: string) => {

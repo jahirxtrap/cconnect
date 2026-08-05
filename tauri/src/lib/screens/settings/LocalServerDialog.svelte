@@ -1,12 +1,13 @@
 <script lang="ts">
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import Folder from "@lucide/svelte/icons/folder";
   import { isTauri } from "$lib/platform";
-  import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
     onDismiss: () => void;
@@ -57,11 +58,14 @@
     <Button onclick={save}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-3">
-    <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine>
-      {#snippet trailing()}
-        <ActionButton text={t("CHOOSE")} onclick={() => void pick(true)} />
-      {/snippet}
-    </InputField>
+    <div class="flex items-end gap-2">
+      <div class="min-w-0 flex-1">
+        <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine />
+      </div>
+      <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(true)}>
+        <Folder size={20} />
+      </TooltipIconButton>
+    </div>
 
     <SelectField
       label={t("PYTHON")}
@@ -71,16 +75,19 @@
     />
 
     {#if python === "custom"}
-      <InputField
-        value={pythonPath}
-        oninput={(value) => (pythonPath = value)}
-        label={t("PYTHON_PATH")}
-        singleLine
-      >
-        {#snippet trailing()}
-          <ActionButton text={t("CHOOSE")} onclick={() => void pick(false)} />
-        {/snippet}
-      </InputField>
+      <div class="flex items-end gap-2">
+        <div class="min-w-0 flex-1">
+          <InputField
+            value={pythonPath}
+            oninput={(value) => (pythonPath = value)}
+            label={t("PYTHON_PATH")}
+            singleLine
+          />
+        </div>
+        <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(false)}>
+          <Folder size={20} />
+        </TooltipIconButton>
+      </div>
     {/if}
 
     <SelectField label={t("RUN_MODE")} selected={mode} options={MODE_OPTIONS} onSelect={(value) => (mode = value)} />
