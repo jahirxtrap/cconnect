@@ -167,7 +167,7 @@
       ></textarea>
     </div>
 
-    <div class="no-scrollbar flex items-center gap-1 overflow-x-auto px-2.5 pt-1.5 pb-2.5">
+    <div class="flex items-center gap-1 px-2.5 pt-1.5 pb-2.5">
       {#if onCloseSide}
         <button
           type="button"
@@ -213,8 +213,11 @@
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
 
-      {@render controls?.()}
-      <div class="flex-1"></div>
+      {#if controls}
+        {@render controls()}
+      {:else}
+        <div class="flex-1"></div>
+      {/if}
 
       {#if streaming}
         <button

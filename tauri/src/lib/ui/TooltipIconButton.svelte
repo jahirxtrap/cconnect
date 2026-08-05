@@ -1,7 +1,6 @@
 <script lang="ts">
   import { Tooltip } from "bits-ui";
   import type { Snippet } from "svelte";
-  import { isTouch } from "$lib/platform";
 
   interface Props {
     label: string;
@@ -35,12 +34,12 @@
     open = false;
   };
 
-  const show = () => {
-    if (!isTouch) open = true;
+  const show = (event: PointerEvent) => {
+    if (event.pointerType !== "touch") open = true;
   };
 
-  const pressStart = () => {
-    if (!isTouch || !enabled) return;
+  const pressStart = (event: PointerEvent) => {
+    if (event.pointerType !== "touch" || !enabled) return;
     longPressed = false;
     timer = setTimeout(() => {
       longPressed = true;

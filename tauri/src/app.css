@@ -8,9 +8,17 @@ body,
   overscroll-behavior: none;
 }
 
-[class*="overflow-y-auto"],
-[class*="overflow-x-auto"] {
-  overscroll-behavior: contain;
+[class*="overflow-y-auto"] {
+  overscroll-behavior-y: contain;
+}
+
+[class*="overflow-x-auto"]:not([class*="overflow-y-"]) {
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+:focus {
+  outline: none;
 }
 
 html {
@@ -271,6 +279,8 @@ a > .md-link-icon:last-child {
 
 .markdown pre {
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   background: var(--c-surface-variant);
   border-radius: var(--radius-panel);
   padding: 0.5rem 0.625rem;
@@ -290,6 +300,8 @@ a > .md-link-icon:last-child {
 .markdown table {
   display: block;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
   border-collapse: collapse;
 }
 

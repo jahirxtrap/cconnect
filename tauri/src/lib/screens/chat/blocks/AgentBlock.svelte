@@ -18,14 +18,13 @@
 <Collapsible
   label={message.toolName ?? t("AGENT")}
   icon={Bot}
+  preview={message.text}
   labelOnly={message.labelOnly || labelMode || !message.children.length}
   {running}
   labelClass="text-accent"
+  bodyClass="mt-1 -mx-4 pl-3"
 >
-  <div class="-mx-4 flex flex-col">
-    {#if message.text.trim()}
-      <p class="px-4 text-body-sm text-on-surface-variant">{message.text}</p>
-    {/if}
+  <div class="flex flex-col">
     {#each message.children as child, index (child.id)}
       <MessageItem
         message={child}

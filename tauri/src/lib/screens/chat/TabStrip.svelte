@@ -94,47 +94,66 @@
 
   const onPointerDown = (event: PointerEvent, id: string) => {
     if (event.button !== 0) return;
-    const target = event.currentTarget as HTMLElement;
+    event.preventDefault();
     const startX = event.clientX;
     const startY = event.clientY;
     const touch = event.pointerType === "touch";
     let started = false;
+    let panning = false;
+    let lastX = startX;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
-    target.setPointerCapture(event.pointerId);
+    const detach = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onUp);
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+    };
+
     if (touch) timer = setTimeout(() => ((started = true), startDrag(id)), LONG_PRESS_MS);
 
     const onMove = (move: PointerEvent) => {
+      if (move.pointerId !== event.pointerId) return;
       if (!started) {
         const dx = move.clientX - startX;
         const dy = move.clientY - startY;
         if (touch) {
-          if (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) {
+          if (!panning && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
             if (timer !== null) clearTimeout(timer);
             timer = null;
+            panning = Math.abs(dx) >= Math.abs(dy);
+            if (!panning) {
+              detach();
+              return;
+            }
           }
+          if (panning && strip) strip.scrollLeft -= move.clientX - lastX;
+          lastX = move.clientX;
           return;
         }
         if (Math.abs(dx) <= DRAG_THRESHOLD || Math.abs(dx) < Math.abs(dy)) return;
         started = true;
+        lastX = move.clientX;
         startDrag(id);
       }
-      dragDx += move.movementX;
+      dragDx += move.clientX - lastX;
+      lastX = move.clientX;
       reorder(id);
     };
 
-    const onUp = () => {
-      target.removeEventListener("pointermove", onMove);
-      target.removeEventListener("pointerup", onUp);
-      target.removeEventListener("pointercancel", onUp);
-      if (timer !== null) clearTimeout(timer);
+    const onUp = (up: Event) => {
+      if (up instanceof PointerEvent && up.pointerId !== event.pointerId) return;
+      detach();
       if (started) endDrag();
-      else onSelect(id);
+      else if (!panning) onSelect(id);
     };
 
-    target.addEventListener("pointermove", onMove);
-    target.addEventListener("pointerup", onUp);
-    target.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onUp);
   };
 
   const onWheel = (event: WheelEvent) => {
@@ -181,7 +200,7 @@
       onpointerdown={(event) => onPointerDown(event, tab.id)}
       onkeydown={(event) => event.key === "Enter" && onSelect(tab.id)}
       style="transform: translateX({dragging ? dragDx : 0}px); z-index: {dragging ? 1 : 0}"
-      class="flex h-8 shrink-0 cursor-pointer touch-none items-center gap-2 rounded-item pr-1.5 pl-2.5 transition-colors {active
+      class="flex h-8 shrink-0 cursor-pointer touch-none items-center gap-1.5 rounded-item pr-1 pl-2.5 transition-colors select-none {active
         ? 'bg-surface-variant text-on-surface'
         : 'text-on-surface-variant hover:bg-on-surface/6'}"
     >

@@ -12,6 +12,7 @@
     running?: boolean;
     labelClass?: string;
     iconClass?: string;
+    bodyClass?: string;
     children?: Snippet;
   }
 
@@ -23,6 +24,7 @@
     running = false,
     labelClass = "text-on-surface-variant",
     iconClass = "text-accent",
+    bodyClass = "mt-1",
     children,
   }: Props = $props();
 
@@ -69,6 +71,6 @@
     {/if}
   </button>
   {#if expanded && children}
-    <div class="mt-1">{@render children()}</div>
+    <div class={bodyClass}>{@render children()}</div>
   {/if}
 </div>

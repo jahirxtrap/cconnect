@@ -25,7 +25,7 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
-  import SelectDialog from "$lib/ui/SelectDialog.svelte";
+  import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
@@ -53,10 +53,16 @@
     { value: "es", label: "Español" },
   ];
 
+  const FONT_FAMILIES: Record<FontStyle, string> = {
+    system: "system-ui, sans-serif",
+    flat: '"CConnect Flat", system-ui, sans-serif',
+    color: '"CConnect Color", system-ui, sans-serif',
+  };
+
   const FONT_OPTIONS = [
-    { value: "flat", label: t("FONT_FLAT") },
-    { value: "color", label: t("FONT_COLOR") },
-    { value: "system", label: t("FONT_SYSTEM") },
+    { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.system },
+    { value: "flat", label: t("FONT_FLAT"), font: FONT_FAMILIES.flat },
+    { value: "color", label: t("FONT_COLOR"), font: FONT_FAMILIES.color },
   ];
 
   let dialog = $state<Dialog | null>(null);
@@ -240,12 +246,18 @@
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "font"}
+  {#snippet fontPreview(option: SelectOption)}
+    <span class="flex size-10 items-center justify-center text-[22px]" style="font-family: {option.font}"
+      >😃</span
+    >
+  {/snippet}
   <SelectDialog
     title={t("FONT")}
     options={FONT_OPTIONS}
     selected={theme.fontStyle}
     onSelect={(value) => theme.setFontStyle(value as FontStyle)}
     onDismiss={() => (dialog = null)}
+    optionTrailing={fontPreview}
   />
 {:else if dialog === "accent"}
   <AccentDialog onDismiss={() => (dialog = null)} />

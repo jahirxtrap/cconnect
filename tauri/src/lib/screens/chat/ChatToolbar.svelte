@@ -101,91 +101,93 @@
   {/if}
 </div>
 
-{#if disconnected}
-  <span class={STATE_CLASS}>
-    <StatusDot class="bg-red" />
-    {t("DISCONNECTED")}
-  </span>
-{:else if connecting || !ready}
-  <span class={STATE_CLASS}>
-    <span class="size-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>
-    {connecting ? t("CONNECTING") : t("LOADING")}
-  </span>
-{:else}
-  <PopupMenu open={openMenu === "model"} side="top" onOpenChange={(open) => (openMenu = open ? "model" : null)}>
-    {#snippet trigger()}
-      <span class={ITEM_CLASS}>
-        <Sparkles size={18} class="shrink-0 text-accent" />
-        <span class="max-w-40 truncate">{modelLabel}</span>
-        <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
-      </span>
-    {/snippet}
-    {#each modelOptions as option (option.value)}
-      <MenuItem
-        text={option.label}
-        selected={option.value === modelSelected}
-        onclick={() => {
-          onModel(option.value);
-          openMenu = null;
-        }}
-      />
-    {/each}
-  </PopupMenu>
+<div class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+  {#if disconnected}
+    <span class={STATE_CLASS}>
+      <StatusDot class="bg-red" />
+      {t("DISCONNECTED")}
+    </span>
+  {:else if connecting || !ready}
+    <span class={STATE_CLASS}>
+      <span class="size-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>
+      {connecting ? t("CONNECTING") : t("LOADING")}
+    </span>
+  {:else}
+    <PopupMenu open={openMenu === "model"} side="top" onOpenChange={(open) => (openMenu = open ? "model" : null)}>
+      {#snippet trigger()}
+        <span class={ITEM_CLASS}>
+          <Sparkles size={18} class="shrink-0 text-accent" />
+          <span class="max-w-40 truncate">{modelLabel}</span>
+          <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
+        </span>
+      {/snippet}
+      {#each modelOptions as option (option.value)}
+        <MenuItem
+          text={option.label}
+          selected={option.value === modelSelected}
+          onclick={() => {
+            onModel(option.value);
+            openMenu = null;
+          }}
+        />
+      {/each}
+    </PopupMenu>
 
-  <PopupMenu open={openMenu === "effort"} side="top" onOpenChange={(open) => (openMenu = open ? "effort" : null)}>
-    {#snippet trigger()}
-      <span class={ITEM_CLASS}>
-        <Gauge size={18} class="shrink-0 text-accent" />
-        <span class="max-w-24 truncate">{effort}</span>
-        <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
-      </span>
-    {/snippet}
-    {#each effortOptions as option (option.value)}
-      <MenuItem
-        text={option.label}
-        selected={option.value === effortSelected}
-        onclick={() => {
-          onEffort(option.value);
-          openMenu = null;
-        }}
-      />
-    {/each}
-  </PopupMenu>
+    <PopupMenu open={openMenu === "effort"} side="top" onOpenChange={(open) => (openMenu = open ? "effort" : null)}>
+      {#snippet trigger()}
+        <span class={ITEM_CLASS}>
+          <Gauge size={18} class="shrink-0 text-accent" />
+          <span class="max-w-24 truncate">{effort}</span>
+          <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
+        </span>
+      {/snippet}
+      {#each effortOptions as option (option.value)}
+        <MenuItem
+          text={option.label}
+          selected={option.value === effortSelected}
+          onclick={() => {
+            onEffort(option.value);
+            openMenu = null;
+          }}
+        />
+      {/each}
+    </PopupMenu>
 
-  <PopupMenu
-    open={openMenu === "permission"}
-    side="top"
-    onOpenChange={(open) => (openMenu = open ? "permission" : null)}
-  >
-    {#snippet trigger()}
-      <span class={ITEM_CLASS}>
-        <permission.icon size={18} class="shrink-0 {permission.tone}" />
-        <span class="max-w-32 truncate">{permissionLabel}</span>
-        <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
-      </span>
-    {/snippet}
-    {#each permissionOptions as option (option.value)}
-      {@const style = permissionStyle(option.value || permissionMode)}
-      <MenuItem
-        text={option.label}
-        selected={option.value === permissionSelected}
-        onclick={() => {
-          onPermissionMode(option.value);
-          openMenu = null;
-        }}
-      >
-        {#snippet leading()}
-          <style.icon size={18} class="shrink-0 {style.tone}" />
-        {/snippet}
-      </MenuItem>
-    {/each}
-  </PopupMenu>
+    <PopupMenu
+      open={openMenu === "permission"}
+      side="top"
+      onOpenChange={(open) => (openMenu = open ? "permission" : null)}
+    >
+      {#snippet trigger()}
+        <span class={ITEM_CLASS}>
+          <permission.icon size={18} class="shrink-0 {permission.tone}" />
+          <span class="max-w-32 truncate">{permissionLabel}</span>
+          <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
+        </span>
+      {/snippet}
+      {#each permissionOptions as option (option.value)}
+        {@const style = permissionStyle(option.value || permissionMode)}
+        <MenuItem
+          text={option.label}
+          selected={option.value === permissionSelected}
+          onclick={() => {
+            onPermissionMode(option.value);
+            openMenu = null;
+          }}
+        >
+          {#snippet leading()}
+            <style.icon size={18} class="shrink-0 {style.tone}" />
+          {/snippet}
+        </MenuItem>
+      {/each}
+    </PopupMenu>
 
-  <TooltipIconButton label={t("STREAMING")} onclick={onStreamTokens} class="size-8">
-    <Radio size={18} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
-  </TooltipIconButton>
-
-  {#if contextTokens !== null && contextTokens > 0}
-    <ContextRing tokens={contextTokens} limit={model.includes("1m") ? CONTEXT_LIMIT_LARGE : CONTEXT_LIMIT} />
+    <TooltipIconButton label={t("STREAMING")} onclick={onStreamTokens} class="size-8">
+      <Radio size={18} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
+    </TooltipIconButton>
   {/if}
+</div>
+
+{#if !disconnected && !connecting && ready && contextTokens !== null && contextTokens > 0}
+  <ContextRing tokens={contextTokens} limit={model.includes("1m") ? CONTEXT_LIMIT_LARGE : CONTEXT_LIMIT} />
 {/if}

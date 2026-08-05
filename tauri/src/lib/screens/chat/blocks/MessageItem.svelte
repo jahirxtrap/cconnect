@@ -19,6 +19,7 @@
   import CompactBlock from "./CompactBlock.svelte";
   import FileChangeBlock from "./FileChangeBlock.svelte";
   import InteractionBlock from "./InteractionBlock.svelte";
+  import PlanBlock from "./PlanBlock.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow } from "./gaps";
 
@@ -111,13 +112,7 @@
       <MarkdownText text={message.text} />
     </Collapsible>
   {:else if message.role === "plan"}
-    <Collapsible
-      label={t("PLAN")}
-      icon={Lightbulb}
-      labelClass="text-accent"
-    >
-      <MarkdownText text={message.text} {onSharedLink} />
-    </Collapsible>
+    <PlanBlock markdown={message.text} {onSharedLink} />
   {:else if message.role === "interaction"}
     {#if message.interaction}
       {#if message.interaction.kind === "questions" && questions}
@@ -142,7 +137,7 @@
   {:else if message.role === "notification"}
     <div class="flex w-full items-center gap-1.5 px-4">
       <Bell size={16} class="shrink-0 text-accent" />
-      <p class="min-w-0 flex-1 text-label-lg text-accent">
+      <p class="line-clamp-2 min-w-0 flex-1 text-label-lg text-accent">
         {t("NOTIFICATION")}
         {#if message.text.trim()}
           <span class="text-on-surface-variant">&nbsp;&nbsp;{message.text}</span>

@@ -1,5 +1,47 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "CConnect Flat";
+  src: url("./fonts/cconnect_flat_regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CConnect Flat";
+  src: url("./fonts/cconnect_flat_bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CConnect Color";
+  src: url("./fonts/cconnect_color_regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CConnect Color";
+  src: url("./fonts/cconnect_color_bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CConnect Mono";
+  src: url("./fonts/cconnect_mono_regular.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "CConnect Mono";
+  src: url("./fonts/cconnect_mono_bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
+}
+
 @theme {
   --color-background: var(--c-background);
   --color-on-background: var(--c-on-background);
@@ -66,12 +108,31 @@
   --text-headline--line-height: 28px;
   --text-headline--font-weight: 600;
 
-  --font-sans: "CConnect", system-ui, sans-serif;
+  --font-sans: "CConnect Flat", system-ui, sans-serif;
   --font-mono: "CConnect Mono", ui-monospace, monospace;
 }
 
 :root {
   --c-accent: #3f51b5;
+}
+
+[data-font="flat"] {
+  --font-sans: "CConnect Flat", system-ui, sans-serif;
+  --font-mono: "CConnect Mono", ui-monospace, monospace;
+}
+
+[data-font="color"] {
+  --font-sans: "CConnect Color", system-ui, sans-serif;
+  --font-mono: "CConnect Mono", ui-monospace, monospace;
+}
+
+[data-font="system"] {
+  --font-sans: system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+}
+
+[data-font] {
+  font-family: var(--font-sans);
 }
 
 :root,

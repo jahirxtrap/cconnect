@@ -12,18 +12,29 @@
   const { path, diffLines, labelOnly }: Props = $props();
 
   const LINE_CLASS: Record<DiffLine["kind"], string> = {
-    header: "text-on-surface-variant",
+    header: "text-gray",
     hunk: "text-blue bg-blue-bg",
     add: "text-green bg-green-bg",
     del: "text-red bg-red-bg",
     ctx: "text-on-surface-variant",
+  };
+
+  const PREFIX: Record<DiffLine["kind"], string> = {
+    header: "",
+    hunk: "",
+    add: "+",
+    del: "-",
+    ctx: " ",
   };
 </script>
 
 <Collapsible label={path} icon={FilePen} labelOnly={labelOnly || !diffLines.length} labelClass="text-accent">
   <div class="w-full overflow-x-auto rounded-panel bg-surface-variant py-1 font-mono text-body-sm leading-snug">
     {#each diffLines as line, index (index)}
-      <div class="px-2.5 whitespace-pre {LINE_CLASS[line.kind]}">{line.text || " "}</div>
+      <div class="px-2.5 py-px whitespace-pre {LINE_CLASS[line.kind]}">{!line.text &&
+        !PREFIX[line.kind]
+          ? " "
+          : `${PREFIX[line.kind]}${line.text}`}</div>
     {/each}
   </div>
 </Collapsible>

@@ -9,6 +9,7 @@
 
   const LONG_PRESS_MS = 400;
   const DRAG_THRESHOLD = 8;
+  const RELEASE_MS = 140;
   const HALF = 2;
 
   let open = $state(false);
@@ -16,6 +17,7 @@
   let dragX = $state(0);
   let dragY = $state(0);
   let dragTarget = $state(-1);
+  let releasing = $state(false);
 
   const cards = new Map<string, HTMLElement>();
 
@@ -27,8 +29,10 @@
   const centerOf = (id: string) => {
     const element = cards.get(id);
     if (!element) return null;
-    const bounds = element.getBoundingClientRect();
-    return { x: bounds.left + bounds.width / HALF, y: bounds.top + bounds.height / HALF };
+    return {
+      x: element.offsetLeft + element.offsetWidth / HALF,
+      y: element.offsetTop + element.offsetHeight / HALF,
+    };
   };
 
   const draggingFrom = $derived(
@@ -72,13 +76,33 @@
     dragTarget = -1;
   };
 
+  const release = (id: string, to: number) => {
+    const from = centerOf(id);
+    const into = centerOf(tabs.list[to]?.id ?? "");
+    if (!from || !into) {
+      tabs.move(id, to);
+      endDrag();
+      return;
+    }
+    releasing = true;
+    dragX = into.x - from.x;
+    dragY = into.y - from.y;
+    setTimeout(() => {
+      tabs.move(id, to);
+      releasing = false;
+      endDrag();
+    }, RELEASE_MS);
+  };
+
   const onPointerDown = (event: PointerEvent, id: string) => {
-    if (event.button !== 0) return;
-    const target = event.currentTarget as HTMLElement;
+    if (event.button !== 0 || releasing) return;
+    event.preventDefault();
     const startX = event.clientX;
     const startY = event.clientY;
     const touch = event.pointerType === "touch";
     let started = false;
+    let lastX = startX;
+    let lastY = startY;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const begin = () => {
@@ -89,10 +113,19 @@
       dragTarget = tabs.list.findIndex((tab) => tab.id === id);
     };
 
-    target.setPointerCapture(event.pointerId);
+    const detach = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("blur", onUp);
+      if (timer !== null) clearTimeout(timer);
+      timer = null;
+    };
+
     if (touch) timer = setTimeout(begin, LONG_PRESS_MS);
 
     const onMove = (move: PointerEvent) => {
+      if (move.pointerId !== event.pointerId) return;
       if (!started) {
         const dx = move.clientX - startX;
         const dy = move.clientY - startY;
@@ -100,38 +133,42 @@
           if ((Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) && timer !== null) {
             clearTimeout(timer);
             timer = null;
+            detach();
           }
           return;
         }
         if (Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
         begin();
+        lastX = move.clientX;
+        lastY = move.clientY;
       }
-      dragX += move.movementX;
-      dragY += move.movementY;
+      dragX += move.clientX - lastX;
+      dragY += move.clientY - lastY;
+      lastX = move.clientX;
+      lastY = move.clientY;
       const origin = centerOf(id);
       if (!origin) return;
       const best = nearest(origin.x + dragX, origin.y + dragY);
       if (best >= 0) dragTarget = best;
     };
 
-    const onUp = () => {
-      target.removeEventListener("pointermove", onMove);
-      target.removeEventListener("pointerup", onUp);
-      target.removeEventListener("pointercancel", onUp);
-      if (timer !== null) clearTimeout(timer);
+    const onUp = (up: Event) => {
+      if (up instanceof PointerEvent && up.pointerId !== event.pointerId) return;
+      detach();
       if (!started) {
         tabs.select(id);
         open = false;
         return;
       }
       const from = tabs.list.findIndex((tab) => tab.id === id);
-      if (from >= 0 && dragTarget >= 0 && dragTarget !== from) tabs.move(id, dragTarget);
-      endDrag();
+      if (from >= 0 && dragTarget >= 0 && dragTarget !== from) release(id, dragTarget);
+      else endDrag();
     };
 
-    target.addEventListener("pointermove", onMove);
-    target.addEventListener("pointerup", onUp);
-    target.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("blur", onUp);
   };
 </script>
 
@@ -146,6 +183,7 @@
 <Dialog.Root bind:open>
   <Dialog.Portal>
     <Dialog.Content
+      onOpenAutoFocus={(event) => event.preventDefault()}
       class="fixed inset-0 z-50 flex flex-col bg-surface text-on-surface"
       aria-label={t("TABS")}
     >
@@ -179,7 +217,11 @@
               tabs.select(tab.id);
               open = false;
             }}
-            style="transform: translate({shift.x}px, {shift.y}px); z-index: {dragging ? 1 : 0}"
+            style="transform: translate({shift.x}px, {shift.y}px); z-index: {dragging
+              ? 1
+              : 0}; transition: {draggingId !== null && (!dragging || releasing)
+              ? `transform ${RELEASE_MS}ms ease-out`
+              : 'none'}"
             class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {active
               ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
               : 'border-outline-variant text-on-surface-variant'}"

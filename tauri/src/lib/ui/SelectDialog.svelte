@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
@@ -9,6 +9,7 @@
     value: string;
     label: string;
     subtitle?: string | null;
+    font?: string | null;
   }
 
   interface Props {
@@ -18,9 +19,11 @@
     onDismiss: () => void;
     onSelect?: (value: string) => void;
     onConfirm?: (value: string) => void;
+    optionTrailing?: Snippet<[SelectOption]>;
   }
 
-  const { title, options, selected, onDismiss, onSelect, onConfirm }: Props = $props();
+  const { title, options, selected, onDismiss, onSelect, onConfirm, optionTrailing }: Props =
+    $props();
 
   let choice = $state(untrack(() => selected));
 </script>
@@ -33,17 +36,27 @@
     {/if}
   {/snippet}
   {#each options as option (option.value)}
-    <DialogSelectItem
-      label={option.label}
-      subtitle={option.subtitle}
-      selected={option.value === (onConfirm ? choice : selected)}
-      onclick={() => {
+    {@const props = {
+      label: option.label,
+      subtitle: option.subtitle,
+      labelFont: option.font,
+      selected: option.value === (onConfirm ? choice : selected),
+      onclick: () => {
         choice = option.value;
         if (!onConfirm) {
           onSelect?.(option.value);
           onDismiss();
         }
-      }}
-    />
+      },
+    }}
+    {#if optionTrailing}
+      <DialogSelectItem {...props}>
+        {#snippet trailing()}
+          {@render optionTrailing(option)}
+        {/snippet}
+      </DialogSelectItem>
+    {:else}
+      <DialogSelectItem {...props} />
+    {/if}
   {/each}
 </CompactDialog>
