@@ -22,7 +22,9 @@
   </DropdownMenu.SubTrigger>
   <DropdownMenu.SubContent
     sideOffset={4}
-    class="menu-surface scrollbar-thin z-50 max-h-96 min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+    collisionPadding={8}
+    avoidCollisions={true}
+    class="menu-surface scrollbar-thin z-50 max-h-96 max-w-[calc(100vw-1rem)] min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
   >
     {@render children()}
   </DropdownMenu.SubContent>

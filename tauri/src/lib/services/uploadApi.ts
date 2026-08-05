@@ -1,16 +1,26 @@
-import { backend } from "./backend.svelte";
+import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 
 const UPLOAD_DIR = "uploads";
 const OK_MIN = 200;
 const OK_MAX = 299;
 
-const uploadUrl = (name: string) => `${backend.baseUrl}/shared/${UPLOAD_DIR}/${encodeURIComponent(name)}`;
+const encodePath = (path: string) =>
+  path
+    .split("/")
+    .filter(Boolean)
+    .map((segment) => encodeURIComponent(segment))
+    .join("/");
 
-export const uploadAttachment = (file: File, onProgress: (value: number) => void): Promise<string | null> =>
+export const uploadAttachment = (
+  file: File,
+  onProgress: (value: number) => void,
+  profile: Profile = backend.active,
+  path = `${UPLOAD_DIR}/${file.name}`,
+): Promise<string | null> =>
   new Promise((resolve) => {
     const request = new XMLHttpRequest();
-    request.open("PUT", uploadUrl(file.name));
-    for (const [header, value] of Object.entries(backend.authHeaders)) request.setRequestHeader(header, value);
+    request.open("PUT", `${baseUrlOf(profile)}/shared/${encodePath(path)}`);
+    for (const [header, value] of Object.entries(authHeadersOf(profile))) request.setRequestHeader(header, value);
     request.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
     };

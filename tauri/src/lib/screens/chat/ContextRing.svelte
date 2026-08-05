@@ -29,7 +29,7 @@
 
 <Tooltip.Provider>
   <Tooltip.Root delayDuration={200}>
-    <Tooltip.Trigger class="flex size-8 shrink-0 items-center justify-center">
+    <Tooltip.Trigger class="flex size-8 shrink-0 cursor-pointer items-center justify-center">
       <svg width={SIZE} height={SIZE} viewBox="0 0 {SIZE} {SIZE}" class="-rotate-90">
         <circle
           cx={SIZE / 2}
@@ -57,7 +57,7 @@
     <Tooltip.Portal>
       <Tooltip.Content
         sideOffset={6}
-        class="z-50 rounded-panel bg-surface-variant px-2 py-1 text-body-sm shadow-lg"
+        class="z-50 rounded-sm bg-surface-variant px-3 py-2 text-body-md shadow-lg"
       >
         {format(tokens)} / {format(limit)} · {percent}%
       </Tooltip.Content>

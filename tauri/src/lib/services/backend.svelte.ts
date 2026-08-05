@@ -22,6 +22,8 @@ export interface EnvironmentProfile {
   streaming: boolean | null;
 }
 
+export type Profile = EnvironmentProfile | null;
+
 export const address = (profile: EnvironmentProfile) =>
   profile.port !== null ? `${profile.host}:${profile.port}` : profile.host;
 
@@ -37,6 +39,38 @@ const origin = (profile: EnvironmentProfile, socket: boolean) => {
   return `${scheme}://${profile.host}${portSuffix(profile)}`;
 };
 
+export const isConfigured = (profile: Profile): profile is EnvironmentProfile => !!profile?.host;
+
+export const baseUrlOf = (profile: Profile) => (isConfigured(profile) ? `${origin(profile, false)}/api` : "");
+
+export const socketUrlOf = (profile: Profile, path: string) => {
+  if (!isConfigured(profile)) return "";
+  const url = `${origin(profile, true)}/api${path}`;
+  const token = profile.authKind === "bearer" ? profile.authToken : "";
+  return token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
+};
+
+export const authHeadersOf = (profile: Profile): Record<string, string> => {
+  if (!profile) return {};
+  if (profile.authKind === "bearer" && profile.authToken) {
+    return { Authorization: `Bearer ${profile.authToken}` };
+  }
+  if (profile.authKind === "basic" && (profile.authUser || profile.authPassword)) {
+    return { Authorization: `Basic ${btoa(`${profile.authUser}:${profile.authPassword}`)}` };
+  }
+  if (profile.authKind === "header" && profile.authHeaderName && profile.authHeaderValue) {
+    return { [profile.authHeaderName]: profile.authHeaderValue };
+  }
+  return {};
+};
+
+export const profileKey = (profile: Profile) =>
+  isConfigured(profile)
+    ? `${baseUrlOf(profile)}|${Object.entries(authHeadersOf(profile))
+        .map(([header, value]) => `${header}=${value}`)
+        .join(",")}`
+    : "";
+
 class Backend {
   environments = $state<EnvironmentProfile[]>(store.get("environments", []));
   activeId = $state<string | null>(store.get("environments.active", null));
@@ -45,31 +79,18 @@ class Backend {
     this.environments.find((profile) => profile.id === this.activeId) ?? this.environments[0] ?? null,
   );
 
-  readonly configured = $derived(!!this.active?.host);
+  readonly configured = $derived(isConfigured(this.active));
 
-  readonly baseUrl = $derived(this.active ? `${origin(this.active, false)}/api` : "");
+  readonly baseUrl = $derived(baseUrlOf(this.active));
 
-  readonly authHeaders = $derived.by<Record<string, string>>(() => {
-    const profile = this.active;
-    if (!profile) return {};
-    if (profile.authKind === "bearer" && profile.authToken) {
-      return { Authorization: `Bearer ${profile.authToken}` };
-    }
-    if (profile.authKind === "basic" && (profile.authUser || profile.authPassword)) {
-      return { Authorization: `Basic ${btoa(`${profile.authUser}:${profile.authPassword}`)}` };
-    }
-    if (profile.authKind === "header" && profile.authHeaderName && profile.authHeaderValue) {
-      return { [profile.authHeaderName]: profile.authHeaderValue };
-    }
-    return {};
-  });
+  readonly authHeaders = $derived(authHeadersOf(this.active));
+
+  find(id: string | null): Profile {
+    return this.environments.find((profile) => profile.id === id) ?? this.active;
+  }
 
   socketUrl(path: string): string {
-    const profile = this.active;
-    if (!profile) return "";
-    const token = profile.authKind === "bearer" ? profile.authToken : "";
-    const url = `${origin(profile, true)}/api${path}`;
-    return token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
+    return socketUrlOf(this.active, path);
   }
 
   select(id: string) {

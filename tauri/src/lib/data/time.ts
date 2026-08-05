@@ -9,3 +9,16 @@ const MILLIS_PER_DAY = 86_400_000;
 
 export const dayIndex = (millis: number): number =>
   Math.trunc((millis - new Date(millis).getTimezoneOffset() * MILLIS_PER_MINUTE) / MILLIS_PER_DAY);
+
+export const formatDayTime = (millis: number): string =>
+  new Date(millis).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+export const parseIsoMillis = (value: string): number | null => {
+  const millis = Date.parse(value);
+  return Number.isNaN(millis) ? null : millis;
+};

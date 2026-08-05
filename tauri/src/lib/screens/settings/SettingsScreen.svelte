@@ -4,15 +4,18 @@
   import History from "@lucide/svelte/icons/history";
   import Languages from "@lucide/svelte/icons/languages";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
-  import Monitor from "@lucide/svelte/icons/monitor";
   import Moon from "@lucide/svelte/icons/moon";
   import Palette from "@lucide/svelte/icons/palette";
   import Server from "@lucide/svelte/icons/server";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Sun from "@lucide/svelte/icons/sun";
+  import SunMoon from "@lucide/svelte/icons/sun-moon";
+  import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Type from "@lucide/svelte/icons/type";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { desktop } from "$lib/platform/desktop.svelte";
   import Screen from "$lib/app/Screen.svelte";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { ACCENTS } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
@@ -24,12 +27,19 @@
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
+  import { claudeChangelog } from "$lib/services/githubApi";
   import AboutGroup from "./AboutGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import EnvironmentsDialog from "./EnvironmentsDialog.svelte";
+  import LocalServerGroup from "./LocalServerGroup.svelte";
   import NotificationsDialog from "./NotificationsDialog.svelte";
+  import ServerGroup from "./ServerGroup.svelte";
 
   type Dialog = "theme" | "language" | "font" | "accent" | "environments" | "notifications" | "reset";
+
+  let cliChangelog = $state<string | null | undefined>(undefined);
 
   const THEME_OPTIONS = [
     { value: "system", label: t("THEME_SYSTEM") },
@@ -50,10 +60,33 @@
   ];
 
   let dialog = $state<Dialog | null>(null);
+  let refreshTick = $state(0);
 
-  const themeIcon = $derived(
-    theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : Monitor,
-  );
+  $effect(() => {
+    const tick = refreshTick + desktop.refreshTick;
+    if (tick > 0) void serverStatus.refresh();
+  });
+  let serverSection = $state<HTMLDivElement | null>(null);
+  let aboutSection = $state<HTMLDivElement | null>(null);
+  let flashed = $state<string | null>(null);
+
+  const FLASH_MS = 1200;
+
+  $effect(() => {
+    const target = navigation.settingsHighlight;
+    if (!target) return;
+    const section = target === "cli" ? serverSection : aboutSection;
+    if (!section) return;
+    section.scrollIntoView({ block: "start", behavior: "smooth" });
+    flashed = target;
+    const timer = setTimeout(() => {
+      flashed = null;
+      navigation.settingsHighlight = null;
+    }, FLASH_MS);
+    return () => clearTimeout(timer);
+  });
+
+  const themeIcon = $derived(theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : SunMoon);
 
   const label = (options: { value: string; label: string }[], value: string) =>
     options.find((option) => option.value === value)?.label ?? value;
@@ -74,7 +107,12 @@
 </script>
 
 <Screen title={t("SETTINGS")}>
-  <div class="flex w-full flex-col gap-4 p-4">
+  {#snippet actions()}
+    <TooltipIconButton label={t("REFRESH")} onclick={() => refreshTick++}>
+      <RotateCw size={20} />
+    </TooltipIconButton>
+  {/snippet}
+  <div class="flex w-full flex-col px-4 pb-4">
     <SettingsGroup label={t("SETTINGS_APPEARANCE")}>
       <PreferenceRow
         icon={themeIcon}
@@ -91,7 +129,7 @@
       <PreferenceRow
         icon={Palette}
         title={t("ACCENT")}
-        summary={ACCENTS[theme.accentIndex]?.name}
+        summary={theme.dynamicColor && theme.systemAccent ? t("ACCENT_DYNAMIC") : ACCENTS[theme.accentIndex]?.name}
         onclick={() => (dialog = "accent")}
       >
         {#snippet trailing()}
@@ -103,7 +141,11 @@
         title={t("FONT")}
         summary={label(FONT_OPTIONS, theme.fontStyle)}
         onclick={() => (dialog = "font")}
-      />
+      >
+        {#snippet trailing()}
+          <span class="flex size-10 items-center justify-center text-[22px]" data-font={theme.fontStyle}>😃</span>
+        {/snippet}
+      </PreferenceRow>
       <PreferenceRow
         icon={Clock}
         title={t("SHOW_TIMESTAMPS")}
@@ -158,6 +200,14 @@
       />
     </SettingsGroup>
 
+    <div bind:this={serverSection} class={flashed === "cli" ? "flash-highlight" : ""}>
+      <ServerGroup onChangelog={(version) => (cliChangelog = version)} />
+    </div>
+
+    {#if isTauri}
+      <LocalServerGroup serverReady={backend.configured} />
+    {/if}
+
     <SettingsGroup>
       <PreferenceRow
         icon={History}
@@ -167,7 +217,9 @@
       />
     </SettingsGroup>
 
-    <AboutGroup />
+    <div bind:this={aboutSection} class={flashed === "about" ? "flash-highlight" : ""}>
+      <AboutGroup />
+    </div>
   </div>
 </Screen>
 
@@ -209,4 +261,9 @@
     onConfirm={reset}
     onDismiss={() => (dialog = null)}
   />
+{/if}
+
+{#if cliChangelog !== undefined}
+  {@const version = cliChangelog}
+  <ChangelogDialog load={() => claudeChangelog(version)} onDismiss={() => (cliChangelog = undefined)} />
 {/if}

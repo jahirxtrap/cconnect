@@ -3,8 +3,10 @@
   import { ACCENTS } from "$lib/design/accents";
   import { theme } from "$lib/design/theme.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTauri } from "$lib/platform";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
 
   interface Props {
     onDismiss: () => void;
@@ -18,7 +20,19 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
 
-  <div class="grid w-80 max-w-full grid-cols-6 gap-3">
+  {#if isTauri && theme.systemAccent}
+    <button
+      type="button"
+      onclick={() => theme.setDynamicColor(!theme.dynamicColor)}
+      class="mb-4 flex w-full cursor-pointer items-center gap-3 rounded-sm px-1 py-1.5 text-left transition-colors hover:bg-on-surface/8"
+    >
+      <span class="size-5 shrink-0 rounded-full" style="background: {theme.systemAccent}"></span>
+      <span class="min-w-0 flex-1 text-body-md">{t("ACCENT_DYNAMIC")}</span>
+      <CompactSwitch checked={theme.dynamicColor} onCheckedChange={(value) => theme.setDynamicColor(value)} />
+    </button>
+  {/if}
+
+  <div class="grid w-80 max-w-full grid-cols-6 gap-3" class:opacity-40={theme.dynamicColor}>
     {#each ACCENTS as accent, index (accent.name)}
       <button
         type="button"

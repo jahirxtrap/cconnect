@@ -8,15 +8,17 @@
   interface Props {
     message: ChatMessage;
     running: boolean;
+    labelMode?: boolean;
+    onSharedLink?: (url: string, filename: string) => void;
   }
 
-  const { message, running }: Props = $props();
+  const { message, running, labelMode = false, onSharedLink }: Props = $props();
 </script>
 
 <Collapsible
   label={message.toolName ?? t("AGENT")}
   icon={Bot}
-  labelOnly={message.labelOnly || !message.children.length}
+  labelOnly={message.labelOnly || labelMode || !message.children.length}
   {running}
   labelClass="text-accent"
 >
@@ -30,6 +32,7 @@
         prevRole={message.children[index - 1]?.role ?? null}
         nextRole={message.children[index + 1]?.role ?? null}
         running={false}
+        {onSharedLink}
       />
     {/each}
   </div>

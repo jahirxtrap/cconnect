@@ -8,7 +8,6 @@
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { chatList } from "$lib/data/chatList.svelte";
   import type { SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -18,7 +17,7 @@
   import ConversationRow from "./ConversationRow.svelte";
   import EnvironmentSelector from "./EnvironmentSelector.svelte";
   import ProjectSelector from "./ProjectSelector.svelte";
-  import { chatState } from "./state.svelte";
+  import { tabs } from "./tabs.svelte";
 
   interface Props {
     drawerMode: boolean;
@@ -30,23 +29,28 @@
   }
 
   const { drawerMode, onClose, onAfterSelect, onRename, onColor, onDelete }: Props = $props();
+
+  const chat = $derived(tabs.state);
 </script>
 
 <div class="flex h-full min-h-0 flex-col border-r border-outline-variant bg-surface">
-  <div class="flex h-12 shrink-0 items-center gap-1 px-2">
-    <EnvironmentSelector class="min-w-0 flex-1" />
+  <div class="flex h-14 shrink-0 items-center px-2">
+    <EnvironmentSelector
+      class="min-w-0 flex-1"
+      selected={chat.environmentId}
+      onSelect={(id) => chat.selectEnvironment(id)}
+    />
     <TooltipIconButton
       label={t("NEW_SESSION")}
-      class="size-8"
       onclick={() => {
-        chatState.newSession();
+        chat.newSession();
         onAfterSelect();
       }}
     >
       <SquarePen size={18} />
     </TooltipIconButton>
     {#if onClose}
-      <TooltipIconButton label={t("MENU")} onclick={onClose} class="size-8">
+      <TooltipIconButton label={t("MENU")} onclick={onClose}>
         {#if drawerMode}
           <Menu size={18} />
         {:else}
@@ -58,28 +62,29 @@
 
   <div class="shrink-0 px-2">
     <ProjectSelector
-      selected={chatState.historyProjectKey}
-      onSelect={(projectKey) => chatState.selectHistoryProject(projectKey)}
+      projects={chat.historyProjects}
+      selected={chat.historyProjectKey}
+      onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
     />
   </div>
 
   <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
-    {#if chatState.historySessions.length}
-      {#each chatState.historySessions as session (session.sessionId)}
+    {#if chat.historySessions.length}
+      {#each chat.historySessions as session (session.sessionId)}
         <ConversationRow
           title={session.title ?? session.preview ?? session.sessionId.slice(0, 8)}
-          selected={session.sessionId === chatState.sessionId}
+          selected={session.sessionId === chat.sessionId}
           onOpen={() => {
-            chatState.openSession(session);
+            chat.openSession(session);
             onAfterSelect();
           }}
           onRename={() => onRename(session)}
-          onAutoRename={() => void chatState.autoRename(session)}
+          onAutoRename={() => void chat.autoRename(session)}
           onColor={() => onColor(session)}
           onDelete={() => onDelete(session)}
         />
       {/each}
-    {:else if chatList.loading}
+    {:else if chat.historyLoading}
       <CenteredProgress class="h-full" />
     {:else}
       <EmptyState text={t("NO_CHATS")} class="h-full" />
@@ -87,23 +92,23 @@
   </div>
 
   <div class="flex shrink-0 items-center gap-0.5 border-t border-outline-variant px-2 py-1.5">
-    <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()} class="size-8">
+    <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
       <Folder size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")} class="size-8">
+    <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")}>
       <ClaudeIcon size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")} class="size-8">
+    <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")}>
       <Activity size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")} class="size-8">
+    <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")}>
       <SquareTerminal size={17} />
     </TooltipIconButton>
-    <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.navigate("/markdown")} class="size-8">
+    <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.navigate("/markdown")}>
       <Type size={17} />
     </TooltipIconButton>
     <div class="flex-1"></div>
-    <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()} class="size-8">
+    <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
       <Settings size={17} />
     </TooltipIconButton>
   </div>

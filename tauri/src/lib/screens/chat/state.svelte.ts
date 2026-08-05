@@ -1,4 +1,4 @@
-import { chatList } from "$lib/data/chatList.svelte";
+import { chatListFor } from "$lib/data/chatList.svelte";
 import {
   emptyInteraction,
   isPending,
@@ -11,13 +11,17 @@ import {
   type Role,
   type TodoItem,
 } from "$lib/data/chatModels";
-import type { SessionInfo } from "$lib/data/models";
+import type { ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings } from "$lib/data/settings.svelte";
-import { backend } from "$lib/services/backend.svelte";
-import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
+import { t } from "$lib/i18n/index.svelte";
+import { notifier } from "$lib/services/notifier.svelte";
+import { backend, baseUrlOf } from "$lib/services/backend.svelte";
+import { createCapabilitiesApi, type Capabilities, type CommandOption } from "$lib/services/capabilitiesApi";
 import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
-import { sessionsApi, type RewindPoint, type RewindPreview } from "$lib/services/sessionsApi";
+import { createHttp } from "$lib/services/http";
+import { createSettingsApi } from "$lib/services/settingsApi";
+import { createSessionsApi, type RewindPoint, type RewindPreview } from "$lib/services/sessionsApi";
 import { uploadAttachment } from "$lib/services/uploadApi";
 
 const DEFAULTS = {
@@ -29,6 +33,12 @@ const DEFAULTS = {
 
 const HISTORY_PAGE = 100;
 const COMPACT_COMMAND = "/compact";
+const PROJECT_KEY_SEPARATOR = /[^A-Za-z0-9]/g;
+const PREVIEW_LENGTH = 120;
+const NOTIFICATION_BODY_LENGTH = 120;
+const MILLIS_PER_SECOND = 1000;
+
+const projectKeyOf = (path: string) => path.replace(PROJECT_KEY_SEPARATOR, "-");
 
 export interface Attachment {
   id: number;
@@ -38,7 +48,17 @@ export interface Attachment {
   progress: number;
 }
 
-class ChatState {
+export interface ChatContext {
+  environmentId: string | null;
+  sessionId: string | null;
+  projectKey: string | null;
+  cwd: string;
+}
+
+export class ChatState {
+  onContextChange: (() => void) | null = null;
+  tabId: string | null = null;
+
   connection = $state<ConnectionState>("connecting");
   messages = $state<ChatMessage[]>([]);
   streaming = $state(false);
@@ -48,18 +68,34 @@ class ChatState {
   contextTokens = $state<number | null>(null);
   pendingToolIds = $state<string[]>([]);
 
+  environmentId = $state<string | null>(null);
   sessionId = $state<string | null>(null);
   projectKey = $state<string | null>(null);
-  cwd = $state(settings.cwd);
+  sessionColor = $state<string | null>(null);
+  cwd = $state("");
 
   permissionMode = $state(DEFAULTS.permissionMode);
   model = $state(DEFAULTS.model);
   effort = $state(DEFAULTS.effort);
   account = $state(DEFAULTS.account);
   streamTokens = $state(true);
+  showWorking = $state("label");
+  showThinking = $state("full");
+  showToolUse = $state("label");
+  showFileChange = $state("full");
+  showCompact = $state("full");
+
+  permissionOverride = $state("");
+  modelOverride = $state("");
+  effortOverride = $state("");
+  accountOverride = $state("");
+  streamingOverride = $state<boolean | null>(null);
+
   capabilities = $state<Capabilities | null>(null);
+  capabilitiesReady = $state(false);
 
   historyProjectKey = $state<string | null>(null);
+  draft = $state("");
 
   queue = $state<QueuedMessage[]>([]);
   attachments = $state<Attachment[]>([]);
@@ -68,6 +104,15 @@ class ChatState {
   transcriptLoading = $state(false);
   transcriptExhausted = $state(false);
 
+  sideMessages = $state<ChatMessage[]>([]);
+  sideStreaming = $state(false);
+  sideOpen = $state(false);
+  sideFullscreen = $state(false);
+  sideDraft = $state("");
+  #sideSessionId: string | null = null;
+  #sideBoundSessionId: string | null = null;
+  #sideAssistantId: number | null = null;
+
   rewindPoints = $state<RewindPoint[]>([]);
   rewindLoading = $state(false);
   rewindTarget = $state<RewindPoint | null>(null);
@@ -75,11 +120,28 @@ class ChatState {
   rewindBusy = $state(false);
   pendingInput = $state<string | null>(null);
 
-  readonly historySessions = $derived(chatList.sessionsOf(this.historyProjectKey));
+  readonly environment = $derived(backend.find(this.environmentId));
+  readonly list = $derived(chatListFor(this.environment));
+  readonly historyLoading = $derived(this.list?.loading ?? true);
+  readonly historySessions = $derived(this.list?.sessionsOf(this.historyProjectKey) ?? []);
+  readonly historyProjects = $derived(this.#withDefaultProject(this.list?.projects ?? []));
   readonly connected = $derived(this.connection === "connected");
   readonly visibleQueue = $derived(this.queue.filter((item) => !this.#silent.has(item.id)));
 
-  #socket = new ChatSocket((side, parent, event) => this.#onEvent(side, parent, event));
+  readonly effectiveModel = $derived(this.modelOverride || this.model);
+  readonly effectiveEffort = $derived(this.effortOverride || this.effort);
+  readonly effectiveAccount = $derived(this.accountOverride || this.account);
+  readonly effectivePermissionMode = $derived(this.permissionOverride || this.permissionMode);
+  readonly effectiveStreamTokens = $derived(this.streamingOverride ?? this.streamTokens);
+
+  #http = createHttp(() => this.environment);
+  #sessions = createSessionsApi(this.#http);
+  #capabilities = createCapabilitiesApi(this.#http);
+  #settings = createSettingsApi(this.#http);
+  #socket = new ChatSocket(
+    (side, parent, event) => this.#onEvent(side, parent, event),
+    () => this.environment,
+  );
   #nextId = 1;
   #assistantId: number | null = null;
   #thinkingId: number | null = null;
@@ -90,15 +152,87 @@ class ChatState {
   #optimisticChipId: string | null = null;
   #optimisticMessageId: number | null = null;
 
-  start() {
-    $effect(() => {
-      void backend.baseUrl;
-      this.#socket.close();
-      this.#socket.resetResume();
-      this.#socket.connect();
-      void this.#loadCapabilities();
-      return () => this.#socket.close();
-    });
+  constructor(context: ChatContext) {
+    this.environmentId = context.environmentId;
+    this.sessionId = context.sessionId;
+    this.projectKey = context.projectKey;
+    this.cwd = context.cwd || this.environment?.directory || settings.cwd;
+    this.#loadEnvOverrides();
+    this.#applyDefaultProject();
+    this.#connect();
+    if (context.sessionId && context.projectKey) {
+      void this.#loadTranscript({
+        sessionId: context.sessionId,
+        projectKey: context.projectKey,
+        path: context.cwd || null,
+        lastActive: null,
+        size: 0,
+        preview: null,
+        title: null,
+        color: null,
+      });
+    }
+  }
+
+  dispose() {
+    this.#socket.close();
+  }
+
+  reconnect() {
+    this.#socket.close();
+    this.#socket.resetResume();
+    this.#connect();
+  }
+
+  selectEnvironment(id: string) {
+    if (id === this.environmentId) return;
+    this.environmentId = id;
+    backend.select(id);
+    this.cwd = this.environment?.directory ?? "";
+    this.onContextChange?.();
+    this.#socket.close();
+    this.connection = "disconnected";
+    this.capabilitiesReady = false;
+    this.sessionId = null;
+    this.projectKey = null;
+    this.sessionColor = null;
+    this.streaming = false;
+    this.#resetTranscript();
+    this.#loadEnvOverrides();
+    this.historyProjectKey = null;
+    this.#applyDefaultProject();
+    this.#connect();
+  }
+
+  #connect() {
+    this.connection = "connecting";
+    this.#socket.connect();
+    void this.#refreshServerInfo();
+  }
+
+  #loadEnvOverrides() {
+    const profile = this.environment;
+    this.accountOverride = profile?.account ?? "";
+    this.modelOverride = profile?.model ?? "";
+    this.effortOverride = profile?.effort ?? "";
+    this.permissionOverride = profile?.permissionMode ?? "";
+    this.streamingOverride = profile?.streaming ?? null;
+  }
+
+  #applyDefaultProject() {
+    const directory = this.environment?.directory ?? "";
+    if (!directory) return;
+    const target = projectKeyOf(directory);
+    const known = this.list?.projects.find((item) => item.projectKey === target || item.path === directory);
+    this.historyProjectKey = known?.projectKey ?? target;
+  }
+
+  #withDefaultProject(projects: ProjectInfo[]): ProjectInfo[] {
+    const directory = this.environment?.directory ?? "";
+    if (!directory) return projects;
+    const target = projectKeyOf(directory);
+    if (projects.some((item) => item.projectKey === target || item.path === directory)) return projects;
+    return [{ projectKey: target, path: directory, name: null, sessionCount: 0, lastActive: null }, ...projects];
   }
 
   addAttachments(files: File[]) {
@@ -128,11 +262,15 @@ class ChatState {
       this.uploading = true;
       const results = await Promise.all(
         pending.map((item) =>
-          uploadAttachment(item.file, (progress) => {
-            this.attachments = this.attachments.map((current) =>
-              current.id === item.id ? { ...current, progress } : current,
-            );
-          }),
+          uploadAttachment(
+            item.file,
+            (progress) => {
+              this.attachments = this.attachments.map((current) =>
+                current.id === item.id ? { ...current, progress } : current,
+              );
+            },
+            this.environment,
+          ),
         ),
       );
       uploaded = results.filter((path): path is string => path !== null);
@@ -197,9 +335,122 @@ class ChatState {
     this.#socket.sendInterrupt();
   }
 
+  openSideChat() {
+    if (this.#sideBoundSessionId !== this.sessionId) {
+      this.#sideBoundSessionId = this.sessionId;
+      this.sideMessages = [];
+      this.#sideSessionId = null;
+    }
+    this.sideOpen = true;
+  }
+
+  closeSideChat() {
+    this.sideOpen = false;
+    this.sideFullscreen = false;
+  }
+
+  setSideFullscreen(value: boolean) {
+    this.sideFullscreen = value;
+  }
+
+  clearSideChat() {
+    this.#sideAssistantId = null;
+    this.#sideSessionId = null;
+    this.#sideBoundSessionId = this.sessionId;
+    this.sideMessages = [];
+    this.sideOpen = true;
+  }
+
+  sendSideQuestion(text: string) {
+    const body = text.trim();
+    if (!body || this.sideStreaming) return;
+    this.#sideAssistantId = null;
+    this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "user", { text: body })];
+    this.sideStreaming = true;
+    this.#socket.sendAsk(body, this.#sideSessionId);
+  }
+
+  stopSide() {
+    if (this.sideStreaming) this.#socket.sendInterrupt("side");
+  }
+
+  answerSideInteraction(requestId: string, optionId: string) {
+    this.#socket.sendInteractionResponse(requestId, optionId, null);
+    this.sideMessages = this.sideMessages.map((item) =>
+      item.interaction?.requestId === requestId
+        ? { ...item, interaction: { ...item.interaction, resolved: optionId } }
+        : item,
+    );
+  }
+
+  #onSideEvent(event: ServerEvent) {
+    switch (event.type) {
+      case "ask_working":
+        if (this.showWorking === "label") {
+          this.#sideAssistantId = null;
+          this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "working")];
+        }
+        break;
+      case "ask_text": {
+        const current = this.#sideAssistantId;
+        if (current === null) {
+          const id = this.#nextId++;
+          this.#sideAssistantId = id;
+          this.sideMessages = [...this.sideMessages, newMessage(id, "assistant", { text: event.text })];
+        } else {
+          this.sideMessages = this.sideMessages.map((item) =>
+            item.id === current ? { ...item, text: item.text + event.text } : item,
+          );
+        }
+        break;
+      }
+      case "ask_session":
+        this.#sideSessionId = event.sessionId;
+        break;
+      case "interaction_request":
+        this.#sideAssistantId = null;
+        if (!this.sideMessages.some((item) => item.interaction?.requestId === event.requestId)) {
+          this.sideMessages = [
+            ...this.sideMessages.filter(
+              (item) => !(item.role === "tool" && item.toolUseId === event.toolUseId),
+            ),
+            newMessage(this.#nextId++, "interaction", {
+              text: event.input ?? "",
+              toolName: event.toolName,
+              toolUseId: event.toolUseId,
+              interaction: {
+                ...emptyInteraction(event.requestId, event.kind),
+                options: event.options,
+                title: event.title,
+                questions: event.questions,
+                drafts: event.questions.map(() => ({ selected: [], freeText: "", notes: "" })),
+              },
+            }),
+          ];
+        }
+        break;
+      case "interrupted":
+        this.#sideAssistantId = null;
+        this.sideStreaming = false;
+        this.sideMessages = [
+          ...this.sideMessages.filter(
+            (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
+          ),
+          newMessage(this.#nextId++, "interrupted"),
+        ];
+        break;
+      case "done":
+      case "error":
+        this.#sideAssistantId = null;
+        this.sideStreaming = false;
+        break;
+    }
+  }
+
   newSession() {
     this.sessionId = null;
     this.projectKey = null;
+    this.sessionColor = null;
     this.#resetTranscript();
     this.streaming = false;
     this.#socket.resetResume();
@@ -209,14 +460,32 @@ class ChatState {
   openSession(session: SessionInfo) {
     this.sessionId = session.sessionId;
     this.projectKey = session.projectKey;
-    if (session.path) {
+    this.sessionColor = session.color;
+    if (session.path && session.path !== this.cwd) {
       this.cwd = session.path;
-      settings.cwd = session.path;
+      this.onContextChange?.();
     }
     this.#resetTranscript();
     this.#socket.resetResume();
     void this.#loadTranscript(session);
     this.#startSession(session.sessionId);
+  }
+
+  restoreSession(sessionId: string, projectKey: string) {
+    if (this.sessionId === sessionId) return;
+    const known = this.list?.sessions.find((item) => item.sessionId === sessionId);
+    this.openSession(
+      known ?? {
+        sessionId,
+        projectKey,
+        path: null,
+        lastActive: null,
+        size: 0,
+        preview: null,
+        title: null,
+        color: null,
+      },
+    );
   }
 
   loadOlder() {
@@ -282,7 +551,7 @@ class ChatState {
     const project = this.#projectKey();
     if (!sessionId || !project) return;
     this.rewindLoading = true;
-    this.rewindPoints = await sessionsApi.checkpoints(sessionId, project);
+    this.rewindPoints = await this.#sessions.checkpoints(sessionId, project);
     this.rewindLoading = false;
   }
 
@@ -292,7 +561,7 @@ class ChatState {
     if (!sessionId || !project) return;
     this.rewindTarget = point;
     this.rewindPreview = null;
-    const preview = await sessionsApi.rewindPreview(sessionId, project, point.id);
+    const preview = await this.#sessions.rewindPreview(sessionId, project, point.id);
     if (this.rewindTarget?.id === point.id) this.rewindPreview = preview;
   }
 
@@ -308,7 +577,7 @@ class ChatState {
     const point = this.rewindTarget;
     if (!sessionId || !project || !point) return;
     this.rewindBusy = true;
-    const result = await sessionsApi.rewind(sessionId, project, point, mode);
+    const result = await this.#sessions.rewind(sessionId, project, point, mode);
     this.rewindBusy = false;
     if (!result?.canRewind) return;
     this.pendingInput = point.text;
@@ -325,6 +594,12 @@ class ChatState {
 
   selectHistoryProject(projectKey: string | null) {
     this.historyProjectKey = projectKey;
+    if (!projectKey) return;
+    const path = this.historyProjects.find((item) => item.projectKey === projectKey)?.path;
+    if (!path || path === this.cwd) return;
+    this.cwd = path;
+    this.onContextChange?.();
+    if (!this.sessionId) this.#pushGeneration({ cwd: path });
   }
 
   answerInteraction(requestId: string, optionId: string) {
@@ -333,67 +608,135 @@ class ChatState {
   }
 
   setPermissionMode(mode: string) {
-    this.permissionMode = mode;
-    this.#socket.sendSetPermissionMode(mode);
+    this.#updateEnvironment({ permissionMode: mode });
+    this.permissionOverride = mode;
+    if (this.connected) this.#socket.sendSetPermissionMode(mode || this.permissionMode);
   }
 
   setModel(model: string) {
-    this.model = model;
-    this.#socket.sendSetGeneration({ model });
+    this.#updateEnvironment({ model });
+    this.modelOverride = model;
+    this.#pushGeneration({ model: model || this.model });
   }
 
   setEffort(effort: string) {
-    this.effort = effort;
-    this.#socket.sendSetGeneration({ effort });
+    this.#updateEnvironment({ effort });
+    this.effortOverride = effort;
+    this.#pushGeneration({ effort: effort || this.effort });
   }
 
   setAccount(account: string) {
-    this.account = account;
-    this.#socket.sendSetGeneration({ account });
+    this.#updateEnvironment({ account });
+    this.accountOverride = account;
+    this.#pushGeneration({ account: account || this.account });
   }
 
   toggleStreamTokens() {
-    this.streamTokens = !this.streamTokens;
-    this.#socket.sendSetGeneration({ partial: this.streamTokens });
+    const next = !this.effectiveStreamTokens;
+    this.#updateEnvironment({ streaming: next });
+    this.streamingOverride = next;
+    this.#pushGeneration({ partial: next });
+  }
+
+  runCommand(command: CommandOption) {
+    if (command.kind === "usage") {
+      this.#append(newMessage(this.#nextId++, "user", { text: `/${command.name}` }));
+      this.#socket.sendUsage();
+      return;
+    }
+    if (command.kind === "client" && command.name === "clear") {
+      this.clearConversation();
+      return;
+    }
+    void this.submit(`/${command.name}`);
+  }
+
+  clearConversation() {
+    if (this.streaming) return;
+    const sessionId = this.sessionId;
+    const project = this.projectKey;
+    if (sessionId && project) {
+      void this.#sessions.remove(sessionId, project);
+      this.list?.removeSession(sessionId);
+    }
+    this.newSession();
   }
 
   async autoRename(session: SessionInfo) {
-    if (session.projectKey) await sessionsApi.autoRename(session.sessionId, session.projectKey);
+    if (!session.projectKey) return;
+    const title = await this.#sessions.autoRename(session.sessionId, session.projectKey);
+    if (title) this.#updateHistoryTitle(session.sessionId, title);
   }
 
   async rename(session: SessionInfo, title: string) {
-    if (session.projectKey) await sessionsApi.rename(session.sessionId, session.projectKey, title);
+    const clean = title.trim();
+    if (!session.projectKey || !clean) return;
+    if (await this.#sessions.rename(session.sessionId, session.projectKey, clean)) {
+      this.#updateHistoryTitle(session.sessionId, clean);
+    }
   }
 
   async setColor(session: SessionInfo, color: string) {
-    if (session.projectKey) await sessionsApi.setColor(session.sessionId, session.projectKey, color);
+    if (!session.projectKey) return;
+    if (!(await this.#sessions.setColor(session.sessionId, session.projectKey, color))) return;
+    const known = this.list?.sessions.find((item) => item.sessionId === session.sessionId);
+    if (known) this.list?.upsertSession({ ...known, color });
+    if (this.sessionId === session.sessionId) this.sessionColor = color;
   }
 
   async remove(session: SessionInfo) {
     if (!session.projectKey) return;
-    await sessionsApi.remove(session.sessionId, session.projectKey);
+    if (!(await this.#sessions.remove(session.sessionId, session.projectKey))) return;
+    this.list?.removeSession(session.sessionId);
     if (this.sessionId === session.sessionId) this.newSession();
   }
 
-  async #loadCapabilities() {
-    const capabilities = await capabilitiesApi.capabilities();
-    if (!capabilities) return;
-    this.capabilities = capabilities;
-    this.permissionMode = capabilities.defaults.permissionMode || this.permissionMode;
-    this.model = capabilities.defaults.model || this.model;
-    this.effort = capabilities.defaults.effort || this.effort;
-    this.account = capabilities.defaults.account || this.account;
+  #updateHistoryTitle(sessionId: string, title: string) {
+    const known = this.list?.sessions.find((item) => item.sessionId === sessionId);
+    if (known) this.list?.upsertSession({ ...known, title });
+  }
+
+  #updateEnvironment(patch: Parameters<typeof backend.update>[1]) {
+    backend.update(this.environmentId ?? this.environment?.id ?? null, patch);
+  }
+
+  #pushGeneration(patch: Parameters<ChatSocket["sendSetGeneration"]>[0]) {
+    if (this.connected) this.#socket.sendSetGeneration(patch);
+  }
+
+  async #refreshServerInfo() {
+    const capabilities = await this.#capabilities.capabilities();
+    if (capabilities) {
+      this.capabilities = capabilities;
+      this.account = capabilities.defaults.account || this.account;
+      this.permissionMode = capabilities.defaults.permissionMode || this.permissionMode;
+      this.model = capabilities.defaults.model || this.model;
+      this.effort = capabilities.defaults.effort || this.effort;
+    }
+    const snapshot = await this.#settings.get();
+    if (snapshot) {
+      this.model = snapshot.model;
+      this.effort = snapshot.effort;
+      this.permissionMode = snapshot.permissionMode;
+      this.streamTokens = snapshot.streaming;
+      this.showWorking = snapshot.showWorking;
+      this.showThinking = snapshot.showThinking;
+      this.showToolUse = snapshot.showToolUse;
+      this.showFileChange = snapshot.showFileChange;
+      this.showCompact = snapshot.showCompact;
+    }
+    this.capabilitiesReady = true;
   }
 
   #startSession(resume: string | null) {
     this.#socket.sendStart({
       cwd: this.cwd,
-      permissionMode: this.permissionMode,
+      permissionMode: this.effectivePermissionMode,
       resume,
-      model: this.model,
-      effort: this.effort,
-      partial: this.streamTokens,
-      account: this.account,
+      model: this.effectiveModel,
+      effort: this.effectiveEffort,
+      partial: this.effectiveStreamTokens,
+      account: this.effectiveAccount,
     });
   }
 
@@ -426,17 +769,31 @@ class ChatState {
   async #loadTranscript(session: SessionInfo) {
     const project = session.projectKey;
     if (!project) return;
-    const page = await sessionsApi.messages(session.sessionId, project, HISTORY_PAGE * 2);
+    const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE * 2);
     if (this.sessionId !== session.sessionId) return;
     const visible = page.items.filter(isVisible);
-    this.messages = this.#nest(visible.map((item, index) => this.#fromSession(item, index)));
+    this.messages = this.#nest(
+      visible.map((item, index) => this.#fromSession(item, index, session.sessionId, project)),
+    );
     this.#nextId = visible.length;
     this.oldestLoadedIndex = visible.length ? page.startIndex : null;
     this.transcriptExhausted = !page.hasMore;
     this.contextTokens = page.contextTokens;
   }
 
-  #fromSession(item: SessionMessage, id: number): { message: ChatMessage; parent: string | null } {
+  #imageUrls(item: SessionMessage, sessionId: string, projectKey: string | null): string[] | null {
+    if (!item.images?.length) return null;
+    const base = baseUrlOf(this.environment);
+    const project = encodeURIComponent(projectKey ?? "");
+    return item.images.map((ref) => `${base}/sessions/${sessionId}/images/${ref}?project=${project}`);
+  }
+
+  #fromSession(
+    item: SessionMessage,
+    id: number,
+    sessionId: string,
+    projectKey: string | null,
+  ): { message: ChatMessage; parent: string | null } {
     return {
       message: newMessage(id, item.role, {
         text: item.text,
@@ -449,7 +806,7 @@ class ChatState {
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
         result: item.result,
-        images: item.images,
+        images: this.#imageUrls(item, sessionId, projectKey),
         timestamp: item.timestamp,
       }),
       parent: item.parent,
@@ -585,7 +942,9 @@ class ChatState {
       return;
     }
     const older = items.filter(isVisible);
-    const prepended = this.#nest(older.map((item, index) => this.#fromSession(item, this.#nextId + index)));
+    const prepended = this.#nest(
+      older.map((item, index) => this.#fromSession(item, this.#nextId + index, sessionId, this.projectKey)),
+    );
     this.#nextId += older.length;
     this.messages = [...prepended, ...this.messages];
     this.oldestLoadedIndex = startIndex;
@@ -638,7 +997,10 @@ class ChatState {
   }
 
   #onEvent(side: boolean, parent: string | null, event: ServerEvent) {
-    if (side) return;
+    if (side) {
+      this.#onSideEvent(event);
+      return;
+    }
     if (parent !== null) {
       this.#onAgentChild(parent, event);
       return;
@@ -652,6 +1014,7 @@ class ChatState {
         break;
       case "ready": {
         this.connection = "connected";
+        void this.#refreshServerInfo();
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         this.streaming = event.running;
@@ -797,13 +1160,41 @@ class ChatState {
       case "context":
         this.contextTokens = event.contextTokens ?? this.contextTokens;
         break;
-      case "result":
+      case "result": {
         this.#assistantId = null;
         this.#thinkingId = null;
-        this.sessionId = event.sessionId ?? this.sessionId;
+        const sessionId = event.sessionId ?? this.sessionId;
+        const list = this.list;
+        if (sessionId && list && !list.sessions.some((item) => item.sessionId === sessionId)) {
+          list.upsertSession({
+            sessionId,
+            projectKey: this.projectKey,
+            path: this.cwd,
+            lastActive: Date.now() / MILLIS_PER_SECOND,
+            size: 0,
+            preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
+            title: null,
+            color: this.sessionColor,
+          });
+        }
+        this.sessionId = sessionId;
+        if (this.#sideBoundSessionId === null) this.#sideBoundSessionId = sessionId;
         this.contextTokens = event.contextTokens ?? this.contextTokens;
         break;
+      }
       case "done":
+        if (this.streaming && settings.notifyTaskDone) {
+          void notifier.notify(
+            t("NOTIF_TASK_DONE"),
+            this.messages
+              .filter((item) => item.role === "assistant")
+              .at(-1)
+              ?.text.split("\n")
+              .find((line) => line.trim())
+              ?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null,
+            this.tabId,
+          );
+        }
         this.#resetStreaming();
         this.#pumpQueue();
         break;
@@ -855,6 +1246,14 @@ class ChatState {
               interaction: data,
             }),
           ];
+          if (settings.notifyInteraction) {
+            const question = event.kind === "questions";
+            void notifier.notify(
+              t(question ? "NOTIF_QUESTION" : "NOTIF_PERMISSION"),
+              (question ? event.questions[0]?.question : event.toolName)?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null,
+              this.tabId,
+            );
+          }
         }
         break;
       case "interaction_resolved":
@@ -873,4 +1272,3 @@ class ChatState {
   }
 }
 
-export const chatState = new ChatState();

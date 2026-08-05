@@ -26,8 +26,15 @@ class I18n {
       ? template.replace(/\{(\d+)\}/g, (_, index) => String(args[Number(index) - 1] ?? ""))
       : template;
   }
+
+  plural(key: string, count: number, ...args: Array<string | number>): string {
+    return this.t(`${key}_${count === 1 ? "ONE" : "OTHER"}`, count, ...args);
+  }
 }
 
 export const i18n = new I18n();
 
 export const t = (key: string, ...args: Array<string | number>) => i18n.t(key, ...args);
+
+export const plural = (key: string, count: number, ...args: Array<string | number>) =>
+  i18n.plural(key, count, ...args);

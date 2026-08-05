@@ -35,14 +35,19 @@
   }}
   role="presentation"
 >
-  <Pressable onclick={onOpen} onlongclick={() => (menu = true)} class="min-w-0 flex-1 truncate px-2 py-2 text-body-md">
+  <Pressable
+    onclick={onOpen}
+    onlongclick={() => (menu = true)}
+    hover={false}
+    class="min-w-0 flex-1 truncate px-2 py-2 text-body-md"
+  >
     {title}
   </Pressable>
-  <div class="opacity-0 transition-opacity group-hover:opacity-100 data-[open=true]:opacity-100" data-open={menu}>
+  <div>
     <PopupMenu open={menu} align="end" onOpenChange={(value) => (menu = value)}>
       {#snippet trigger()}
         <span
-          class="inline-flex size-7 cursor-pointer items-center justify-center rounded-sm transition-colors hover:bg-on-surface/10"
+          class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/10"
         >
           <EllipsisVertical size={16} class="text-on-surface-variant" />
         </span>

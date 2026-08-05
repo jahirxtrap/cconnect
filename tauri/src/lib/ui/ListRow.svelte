@@ -4,12 +4,20 @@
   import Pressable from "./Pressable.svelte";
 
   interface Props {
-    icon: IconSource;
     title: string;
+    icon?: IconSource;
     subtitle?: string | null;
     iconClass?: string;
+    dim?: boolean;
     onclick?: () => void;
     onlongclick?: () => void;
+    oncontextmenu?: () => void;
+    draggable?: boolean;
+    ondragstart?: () => void;
+    ondragend?: () => void;
+    ondragover?: () => void;
+    ondragleave?: () => void;
+    ondrop?: () => void;
     class?: string;
     leading?: Snippet;
     subtitleTrailing?: Snippet;
@@ -21,8 +29,16 @@
     title,
     subtitle,
     iconClass = "text-accent",
+    dim = false,
     onclick,
     onlongclick,
+    oncontextmenu,
+    draggable = false,
+    ondragstart,
+    ondragend,
+    ondragover,
+    ondragleave,
+    ondrop,
     class: className = "",
     leading,
     subtitleTrailing,
@@ -30,10 +46,34 @@
   }: Props = $props();
 </script>
 
-<Pressable {onclick} {onlongclick} class="flex w-full items-center py-1.5 pr-2 pl-4 {className}">
+<div
+  {draggable}
+  ondragstart={ondragstart}
+  ondragend={ondragend}
+  ondragover={(event) => {
+    if (!ondragover) return;
+    event.preventDefault();
+    ondragover();
+  }}
+  ondragleave={ondragleave}
+  ondrop={(event) => {
+    if (!ondrop) return;
+    event.preventDefault();
+    ondrop();
+  }}
+  role="presentation"
+>
+<Pressable
+  {onclick}
+  {onlongclick}
+  {oncontextmenu}
+  class="flex w-full items-center py-1.5 pr-2 pl-4 {dim ? 'opacity-50' : ''} {className}"
+>
   {@render leading?.()}
-  <IconComponent size={24} class="shrink-0 {iconClass}" />
-  <div class="ml-3.5 min-w-0 flex-1">
+  {#if IconComponent}
+    <IconComponent size={24} class="shrink-0 {iconClass}" />
+  {/if}
+  <div class="min-w-0 flex-1 {IconComponent || leading ? 'ml-3.5' : ''}">
     <p class="truncate text-body-lg">{title}</p>
     {#if subtitle}
       <div class="flex items-center">
@@ -43,4 +83,6 @@
     {/if}
   </div>
   {@render trailing?.()}
+
 </Pressable>
+</div>

@@ -6,7 +6,7 @@ import {
   type QuestionDraft,
   type TodoItem,
 } from "$lib/data/chatModels";
-import { backend } from "./backend.svelte";
+import { backend, baseUrlOf, socketUrlOf, type Profile } from "./backend.svelte";
 
 export type ServerEvent =
   | { type: "connecting" }
@@ -123,7 +123,10 @@ export class ChatSocket {
   #sideLastSeq = 0;
   #sideResume: string | null = null;
 
-  constructor(private readonly onEvent: (side: boolean, parent: string | null, event: ServerEvent) => void) {}
+  constructor(
+    private readonly onEvent: (side: boolean, parent: string | null, event: ServerEvent) => void,
+    private readonly profile: () => Profile = () => backend.active,
+  ) {}
 
   connect() {
     this.#closed = false;
@@ -160,7 +163,7 @@ export class ChatSocket {
       model: options.model,
       effort: options.effort,
       partial: options.partial,
-      base_url: backend.baseUrl,
+      base_url: baseUrlOf(this.profile()),
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,
       ...(this.#sideChannel ? { side_channel: this.#sideChannel, side_last_seq: this.#sideLastSeq } : {}),
@@ -237,7 +240,7 @@ export class ChatSocket {
   }
 
   #open() {
-    const url = backend.socketUrl("/chat/ws");
+    const url = socketUrlOf(this.profile(), "/chat/ws");
     if (!url) return;
     const generation = ++this.#generation;
     this.#socket?.close();

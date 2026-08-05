@@ -1,12 +1,17 @@
 <script lang="ts">
+  import ScanQrCode from "@lucide/svelte/icons/scan-qr-code";
   import { untrack } from "svelte";
+  import { parseQrPayload } from "$lib/data/qrPayload";
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import type { AuthKind, EnvironmentProfile } from "$lib/services/backend.svelte";
+  import { nativeScanAvailable, qrScanAvailable, scanNative } from "$lib/services/qrScanner";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
+  import QrScanDialog from "$lib/ui/QrScanDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
     profile: EnvironmentProfile;
@@ -68,6 +73,31 @@
   let authToken = $state(initial.authToken);
   let authUser = $state(initial.authUser);
   let authPassword = $state(initial.authPassword);
+  let scanning = $state(false);
+
+  const qrAvailable = qrScanAvailable();
+
+  const startScan = async () => {
+    if (!nativeScanAvailable()) {
+      scanning = true;
+      return;
+    }
+    const raw = await scanNative();
+    if (raw) applyQr(raw);
+  };
+
+  const applyQr = (raw: string) => {
+    const payload = parseQrPayload(raw);
+    if (!payload) return;
+    const parsed = parseHostInput(payload.url);
+    if (!parsed) return;
+    scanning = false;
+    kind = parsed.kind;
+    host = parsed.host;
+    port = parsed.kind === "https" ? "" : parsed.port;
+    authKind = "bearer";
+    authToken = payload.token;
+  };
   let authHeaderName = $state(initial.authHeaderName);
   let authHeaderValue = $state(initial.authHeaderValue);
   let directory = $state(initial.directory);
@@ -112,6 +142,13 @@
 </script>
 
 <CompactDialog title={isNew ? t("ADD_ENVIRONMENT") : t("EDIT_ENVIRONMENT")} {onDismiss}>
+  {#snippet titleTrailing()}
+    {#if qrAvailable}
+      <TooltipIconButton label={t("SCAN_QR")} onclick={() => void startScan()} class="size-9">
+        <ScanQrCode size={20} />
+      </TooltipIconButton>
+    {/if}
+  {/snippet}
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={save} variant="filled" enabled={!!host.trim()}>{t("SAVE")}</Button>
@@ -175,3 +212,7 @@
     />
   </div>
 </CompactDialog>
+
+{#if scanning}
+  <QrScanDialog onScan={applyQr} onDismiss={() => (scanning = false)} />
+{/if}

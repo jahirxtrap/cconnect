@@ -1,5 +1,5 @@
 import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
-import { http } from "./http";
+import { http, type HttpClient } from "./http";
 
 export interface MessagesPage {
   items: SessionMessage[];
@@ -39,7 +39,7 @@ const toPreview = (data: RewindWire | null): RewindPreview | null =>
     deletions: data.deletions ?? 0,
   };
 
-export const sessionsApi = {
+export const createSessionsApi = (http: HttpClient) => ({
   async messages(
     sessionId: string,
     project: string,
@@ -112,4 +112,8 @@ export const sessionsApi = {
   async setColor(sessionId: string, project: string, color: string): Promise<boolean> {
     return (await http.post(`/sessions/${sessionId}/color`, { project, color })) !== null;
   },
-};
+});
+
+export type SessionsApi = ReturnType<typeof createSessionsApi>;
+
+export const sessionsApi = createSessionsApi(http);

@@ -2,6 +2,7 @@
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
+  import Hourglass from "@lucide/svelte/icons/hourglass";
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import Plus from "@lucide/svelte/icons/plus";
   import Slash from "@lucide/svelte/icons/slash";
@@ -9,6 +10,7 @@
   import X from "@lucide/svelte/icons/x";
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
+  import type { QueuedMessage } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
@@ -20,8 +22,12 @@
 
   interface Props {
     streaming: boolean;
+    draft: string;
+    onDraft: (value: string) => void;
     attachments: Attachment[];
     uploading: boolean;
+    queue: QueuedMessage[];
+    onOpenQueued: (item: QueuedMessage) => void;
     commands: CommandOption[];
     pendingInput: string | null;
     onConsumePending: () => string | null;
@@ -29,13 +35,18 @@
     onInterrupt: () => void;
     onAttach: (files: File[]) => void;
     onRemoveAttachment: (id: number) => void;
+    onCloseSide?: (() => void) | null;
     controls?: Snippet;
   }
 
   const {
     streaming,
+    draft,
+    onDraft,
     attachments,
     uploading,
+    queue,
+    onOpenQueued,
     commands,
     pendingInput,
     onConsumePending,
@@ -43,26 +54,29 @@
     onInterrupt,
     onAttach,
     onRemoveAttachment,
+    onCloseSide = null,
     controls,
   }: Props = $props();
 
   const PERCENT = 100;
 
-  let text = $state("");
+  const queueLabel = (item: QueuedMessage) =>
+    item.text || item.attachments.map((path) => path.split(/[\\/]/).pop()).join(", ");
+
   let field = $state<HTMLTextAreaElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
   let menu = $state(false);
 
-  const canSend = $derived(!uploading && (!!text.trim() || attachments.length > 0));
+  const canSend = $derived(!uploading && (!!draft.trim() || attachments.length > 0));
 
   const submit = () => {
     if (!canSend) return;
-    onSend(text);
-    text = "";
+    onSend(draft);
+    onDraft("");
   };
 
   const insertCommand = (name: string) => {
-    text = `/${name} `;
+    onDraft(`/${name} `);
     menu = false;
     field?.focus();
   };
@@ -77,7 +91,7 @@
     if (pendingInput === null) return;
     const restored = onConsumePending();
     if (restored === null) return;
-    text = restored;
+    onDraft(restored);
     field?.focus();
   });
 
@@ -88,6 +102,11 @@
     submit();
   };
 
+  const focusField = (event: MouseEvent) => {
+    if ((event.target as HTMLElement).closest("button, a, input, textarea")) return;
+    field?.focus();
+  };
+
   const onpaste = (event: ClipboardEvent) => {
     const files = Array.from(event.clipboardData?.files ?? []);
     if (!files.length) return;
@@ -96,10 +115,22 @@
   };
 </script>
 
-<div class="shrink-0 px-3 pb-3">
-  <div class="rounded-lg border border-outline-variant bg-surface focus-within:border-outline">
+<div class="shrink-0 p-3">
+  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
+  <div
+    onclick={focusField}
+    class="cursor-text rounded-lg border border-outline-variant bg-surface focus-within:border-outline"
+  >
+    {#if queue.length}
+      <div class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3">
+        {#each queue as item (item.id)}
+          <Chip name={queueLabel(item)} icon={Hourglass} onclick={() => onOpenQueued(item)} />
+        {/each}
+      </div>
+    {/if}
+
     {#if attachments.length}
-      <div class="scrollbar-thin flex gap-1.5 overflow-x-auto px-3 pt-3">
+      <div class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}">
         {#each attachments as item (item.id)}
           <Chip name={item.name} icon={isArchive(item.name) ? FolderArchive : FileIcon}>
             {#snippet trailing()}
@@ -123,10 +154,11 @@
       </div>
     {/if}
 
-    <div class="px-3.5 pt-3">
+    <div class="px-3.5 {attachments.length ? 'pt-2.5' : 'pt-3.5'}">
       <textarea
         bind:this={field}
-        bind:value={text}
+        value={draft}
+      oninput={(event) => onDraft((event.currentTarget as HTMLTextAreaElement).value)}
         {onkeydown}
         {onpaste}
         rows="1"
@@ -135,10 +167,22 @@
       ></textarea>
     </div>
 
-    <div class="flex items-center gap-1 px-2 pt-1 pb-2">
+    <div class="no-scrollbar flex items-center gap-1 overflow-x-auto px-2.5 pt-1.5 pb-2.5">
+      {#if onCloseSide}
+        <button
+          type="button"
+          onclick={onCloseSide}
+          aria-label={t("CLOSE")}
+          title={t("CLOSE")}
+          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface-variant transition-colors hover:bg-on-surface/10"
+        >
+          <X size={18} />
+        </button>
+      {/if}
       <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
         <DropdownMenu.Trigger
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
+          disabled={!!onCloseSide}
+          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 disabled:hidden"
           aria-label={t("ATTACH_FILES")}
         >
           <Plus size={18} />
@@ -178,7 +222,7 @@
           onclick={onInterrupt}
           aria-label={t("STOP")}
           title={t("STOP")}
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-sm border border-outline-variant transition-colors hover:bg-on-surface/8"
+          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-accent transition-opacity hover:opacity-90"
         >
           <Square size={13} class="fill-current" />
         </button>

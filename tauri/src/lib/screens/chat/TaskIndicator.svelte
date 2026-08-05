@@ -27,11 +27,11 @@
 {#if todos.length}
   <DropdownMenu.Root {open} onOpenChange={(value) => (open = value)}>
     <DropdownMenu.Trigger
-      class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
+      class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
       aria-label={t("TASKS")}
     >
       <span
-        class="flex size-5 items-center justify-center rounded-full"
+        class="flex size-6 items-center justify-center rounded-full"
         style="background: conic-gradient(var(--c-accent) 0deg {doneAngle}deg, var(--c-on-surface-variant) {doneAngle}deg {doneAngle +
           runningAngle}deg, color-mix(in srgb, var(--c-on-background) 15%, transparent) {doneAngle +
           runningAngle}deg 360deg)"

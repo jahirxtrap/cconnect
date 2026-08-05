@@ -1,13 +1,18 @@
 <script lang="ts">
   import Bell from "@lucide/svelte/icons/bell";
   import Bot from "@lucide/svelte/icons/bot";
+  import FileIcon from "@lucide/svelte/icons/file";
+  import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import type { Snippet } from "svelte";
   import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
+  import { isArchive } from "$lib/data/format";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
+  import { userContent } from "$lib/data/userContent";
+  import Chip from "$lib/ui/Chip.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import AgentBlock from "./AgentBlock.svelte";
   import Collapsible from "./Collapsible.svelte";
@@ -22,39 +27,75 @@
     prevRole: Role | null;
     nextRole: Role | null;
     running: boolean;
+    gluedTop?: boolean;
+    labelMode?: boolean;
     onAnswer?: (requestId: string, optionId: string) => void;
+    onSharedLink?: (url: string, filename: string) => void;
     questions?: Snippet<[InteractionData]>;
   }
 
-  const { message, prevRole, nextRole, running, onAnswer, questions }: Props = $props();
+  const {
+    message,
+    prevRole,
+    nextRole,
+    running,
+    gluedTop = false,
+    labelMode = false,
+    onAnswer,
+    onSharedLink,
+    questions,
+  }: Props = $props();
 
-  const top = $derived(gapAbove(prevRole, message.role));
+  const top = $derived(gluedTop ? 0 : gapAbove(prevRole, message.role));
   const bottom = $derived(gapBelow(message.role, nextRole));
 </script>
 
 <div class="w-full" style="padding-top: {top}px; padding-bottom: {bottom}px">
   {#if message.role === "user"}
-    <div class="w-full bg-surface-variant px-4 py-3">
-      {#if message.text}
-        <p class="text-body-lg whitespace-pre-wrap">{message.text}</p>
+    {@const content = userContent(message)}
+    {@const showTime = message.timestamp !== null && settings.showTimestamps}
+    <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {content.attachments.length ? 'gap-1.5' : ''}">
+      {#if content.body}
+        <p class="text-body-md whitespace-pre-wrap">{content.body}</p>
       {/if}
-      {#if (message.timestamp !== null && settings.showTimestamps) || message.sendStatus === "error"}
-        <div class="mt-1 flex items-center justify-end gap-1.5 select-none">
-          {#if message.timestamp !== null && settings.showTimestamps}
-            <span class="text-label-md text-on-surface-variant">{formatClock(message.timestamp)}</span>
+      {#if content.attachments.length || showTime || message.sendStatus === "error"}
+        <div class="flex w-full items-end">
+          {#if content.attachments.length}
+            <div class="scrollbar-thin flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+              {#each content.attachments as attachment (attachment.url)}
+                <Chip
+                  name={attachment.name}
+                  icon={isArchive(attachment.name) ? FolderArchive : FileIcon}
+                  onclick={() => onSharedLink?.(attachment.url, attachment.name)}
+                />
+              {/each}
+            </div>
+          {:else}
+            <div class="flex-1"></div>
+          {/if}
+          {#if showTime}
+            <span class="pl-2 text-label-md text-on-surface-variant select-none">
+              {formatClock(message.timestamp ?? 0)}
+            </span>
           {/if}
           {#if message.sendStatus === "error"}
-            <TriangleAlert size={14} class="text-error" />
+            <TriangleAlert size={14} class="ml-1.5 shrink-0 text-error" />
           {/if}
         </div>
       {/if}
     </div>
   {:else if message.role === "assistant"}
     <div class="w-full px-4">
-      <MarkdownText text={message.text} />
+      <MarkdownText text={message.text} {onSharedLink} />
     </div>
   {:else if message.role === "thinking"}
-    <Collapsible label={t("THINKING")} icon={Lightbulb} labelOnly={message.labelOnly} {running}>
+    <Collapsible
+      label={t("THINKING")}
+      icon={Lightbulb}
+      labelOnly={message.labelOnly || labelMode}
+      iconClass="text-on-surface-variant"
+      {running}
+    >
       <MarkdownText text={message.text} class="text-on-surface-variant" />
     </Collapsible>
   {:else if message.role === "working"}
@@ -62,7 +103,7 @@
   {:else if message.role === "tool"}
     <ToolBlock name={message.toolName} input={message.text} result={message.result} {running} />
   {:else if message.role === "tool_result"}
-    <Collapsible label={t("RESULT")} labelOnly={message.labelOnly}>
+    <Collapsible label={t("RESULT")} labelOnly={message.labelOnly || labelMode}>
       <MarkdownText text={message.text} />
     </Collapsible>
   {:else if message.role === "summary"}
@@ -70,8 +111,12 @@
       <MarkdownText text={message.text} />
     </Collapsible>
   {:else if message.role === "plan"}
-    <Collapsible label={t("PLAN")} icon={Lightbulb} labelClass="text-accent">
-      <MarkdownText text={message.text} />
+    <Collapsible
+      label={t("PLAN")}
+      icon={Lightbulb}
+      labelClass="text-accent"
+    >
+      <MarkdownText text={message.text} {onSharedLink} />
     </Collapsible>
   {:else if message.role === "interaction"}
     {#if message.interaction}
@@ -87,13 +132,13 @@
       {/if}
     {/if}
   {:else if message.role === "file_change"}
-    <FileChangeBlock path={message.path ?? ""} diffLines={message.diffLines ?? []} labelOnly={message.labelOnly} />
+    <FileChangeBlock path={message.path ?? ""} diffLines={message.diffLines ?? []} labelOnly={message.labelOnly || labelMode} />
   {:else if message.role === "compact"}
     {#if message.compact}
       <CompactBlock compact={message.compact} />
     {/if}
   {:else if message.role === "agent"}
-    <AgentBlock {message} {running} />
+    <AgentBlock {message} {running} {labelMode} {onSharedLink} />
   {:else if message.role === "notification"}
     <div class="flex w-full items-center gap-1.5 px-4">
       <Bell size={16} class="shrink-0 text-accent" />

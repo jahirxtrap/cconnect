@@ -1,4 +1,5 @@
 import { accentAt, DEFAULT_ACCENT_INDEX } from "./accents";
+import { isTauri } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 
 export type ThemeMode = "system" | "light" | "dark";
@@ -6,32 +7,29 @@ export type FontStyle = "flat" | "color" | "system";
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
-const contrastOn = (hex: string): string => {
-  const value = hex.replace("#", "");
-  const [r, g, b] = [0, 2, 4].map((i) => parseInt(value.slice(i, i + 2), 16) / 255);
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return luminance > 0.55 ? "#000000" : "#ffffff";
-};
-
 class Theme {
   mode = $state<ThemeMode>(store.get("theme.mode", "system"));
   accentIndex = $state<number>(store.get("theme.accent", DEFAULT_ACCENT_INDEX));
   fontStyle = $state<FontStyle>(store.get("theme.font", "flat"));
+  dynamicColor = $state<boolean>(store.get("theme.dynamic", false));
   systemDark = $state(false);
+  systemAccent = $state<string | null>(null);
 
   readonly dark = $derived(this.mode === "system" ? this.systemDark : this.mode === "dark");
-  readonly accent = $derived(accentAt(this.accentIndex));
+  readonly accent = $derived(
+    this.dynamicColor ? (this.systemAccent ?? accentAt(this.accentIndex)) : accentAt(this.accentIndex),
+  );
 
   start() {
     const media = prefersDark();
     this.systemDark = media.matches;
     media.addEventListener("change", (event) => (this.systemDark = event.matches));
+    void this.#loadSystemAccent();
 
     $effect(() => {
       const root = document.documentElement;
       root.dataset.theme = this.dark ? "dark" : "light";
       root.style.setProperty("--c-accent", this.accent);
-      root.style.setProperty("--c-on-accent", contrastOn(this.accent));
       root.dataset.font = this.fontStyle;
     });
   }
@@ -44,6 +42,17 @@ class Theme {
   setAccent(index: number) {
     this.accentIndex = index;
     store.set("theme.accent", index);
+  }
+
+  setDynamicColor(enabled: boolean) {
+    this.dynamicColor = enabled;
+    store.set("theme.dynamic", enabled);
+  }
+
+  async #loadSystemAccent() {
+    if (!isTauri) return;
+    const { invoke } = await import("@tauri-apps/api/core");
+    this.systemAccent = await invoke<string | null>("system_accent").catch(() => null);
   }
 
   setFontStyle(style: FontStyle) {

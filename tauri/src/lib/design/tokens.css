@@ -34,21 +34,28 @@
   --radius-item: 8px;
   --radius-group: 12px;
 
-  --text-body-lg: 15px;
+  --text-body-lg: 16px;
   --text-body-lg--line-height: 24px;
   --text-body-md: 14px;
-  --text-body-md--line-height: 21px;
+  --text-body-md--line-height: 20px;
   --text-body-sm: 12px;
-  --text-body-sm--line-height: 18px;
-  --text-label-lg: 13px;
-  --text-label-lg--line-height: 18px;
+  --text-body-sm--line-height: 16px;
+  --text-label-lg: 14px;
+  --text-label-lg--line-height: 20px;
   --text-label-lg--font-weight: 600;
   --text-label-md: 12px;
   --text-label-md--line-height: 16px;
-  --text-label-md--font-weight: 500;
+  --text-label-md--font-weight: 600;
   --text-title-md: 15px;
   --text-title-md--line-height: 20px;
   --text-title-md--font-weight: 600;
+  --text-topbar-title: 22px;
+  --text-topbar-title--line-height: 24px;
+  --text-topbar-title--font-weight: 400;
+  --text-topbar-subtitle: 11px;
+  --text-topbar-subtitle--line-height: 12px;
+  --text-topbar-subtitle--font-weight: 500;
+
   --text-title-lg: 17px;
   --text-title-lg--line-height: 24px;
   --text-title-lg--font-weight: 600;
@@ -65,7 +72,6 @@
 
 :root {
   --c-accent: #3f51b5;
-  --c-on-accent: #ffffff;
 }
 
 :root,
@@ -76,7 +82,7 @@
   --c-surface-variant: #f0f0f0;
   --c-on-surface-variant: #4a4a4a;
   --c-outline: #79747e;
-  --c-outline-variant: #d8d8d8;
+  --c-outline-variant: #cac4d0;
   --c-error: #b3261e;
   --c-on-accent: #ffffff;
   --c-scrollbar: #0000003d;
@@ -102,7 +108,7 @@
   --c-surface-variant: #1b1b1b;
   --c-on-surface-variant: #b5b5b5;
   --c-outline: #938f99;
-  --c-outline-variant: #2f2f2f;
+  --c-outline-variant: #49454f;
   --c-error: #ffb4ab;
   --c-on-accent: #000000;
   --c-scrollbar: #ffffff33;

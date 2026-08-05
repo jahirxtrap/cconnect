@@ -1,19 +1,19 @@
 <script lang="ts">
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
-  import { chatList } from "$lib/data/chatList.svelte";
   import type { ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
 
   interface Props {
+    projects: ProjectInfo[];
     selected: string | null;
     onSelect: (projectKey: string | null) => void;
     class?: string;
   }
 
-  const { selected, onSelect, class: className = "" }: Props = $props();
+  const { projects, selected, onSelect, class: className = "" }: Props = $props();
 
   let open = $state(false);
 
@@ -21,7 +21,7 @@
 
   const label = $derived.by(() => {
     if (selected === null) return t("ALL_PROJECTS");
-    const project = chatList.projects.find((item) => item.projectKey === selected);
+    const project = projects.find((item) => item.projectKey === selected);
     return project ? projectLabel(project) : selected;
   });
 </script>
@@ -44,7 +44,7 @@
       open = false;
     }}
   />
-  {#each chatList.projects as project (project.projectKey)}
+  {#each projects as project (project.projectKey)}
     <MenuItem
       text={projectLabel(project)}
       selected={selected === project.projectKey}

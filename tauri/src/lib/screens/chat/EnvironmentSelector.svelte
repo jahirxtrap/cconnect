@@ -7,12 +7,16 @@
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
 
   interface Props {
+    selected: string | null;
+    onSelect: (id: string) => void;
     class?: string;
   }
 
-  const { class: className = "" }: Props = $props();
+  const { selected, onSelect, class: className = "" }: Props = $props();
 
   let open = $state(false);
+
+  const profile = $derived(backend.find(selected));
 
   const options = $derived(
     backend.environments.map((profile) => ({
@@ -23,12 +27,12 @@
   );
 </script>
 
-{#if backend.active}
+{#if profile}
   <Pressable onclick={() => (open = true)} class="flex items-center rounded-xs px-2 py-1 {className}">
     <AppLogo />
     <div class="ml-2 min-w-0 flex-1">
-      <p class="truncate text-title-md">{backend.active.name}</p>
-      <p class="truncate text-label-md text-on-surface-variant">{address(backend.active)}</p>
+      <p class="truncate text-title-md">{profile.name}</p>
+      <p class="truncate text-label-md text-on-surface-variant">{address(profile)}</p>
     </div>
     <ChevronDown size={24} class="shrink-0 text-on-surface-variant" />
   </Pressable>
@@ -43,8 +47,8 @@
   <SelectDialog
     title={t("ENVIRONMENT")}
     {options}
-    selected={backend.active?.id ?? ""}
-    onSelect={(id) => backend.select(id)}
+    selected={profile?.id ?? ""}
+    {onSelect}
     onDismiss={() => (open = false)}
   />
 {/if}

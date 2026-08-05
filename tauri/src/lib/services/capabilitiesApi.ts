@@ -1,4 +1,4 @@
-import { http } from "./http";
+import { http, type HttpClient } from "./http";
 
 export interface LabeledOption {
   id: string;
@@ -67,7 +67,7 @@ const toVersion = (data: VersionWire): VersionInfo => ({
 const toOptions = (raw: Array<{ id?: string; label?: string }> | undefined): LabeledOption[] =>
   (raw ?? []).filter((option) => option.id).map((option) => ({ id: option.id!, label: option.label ?? option.id! }));
 
-export const capabilitiesApi = {
+export const createCapabilitiesApi = (http: HttpClient) => ({
   async versionInfo(): Promise<VersionInfo | null> {
     const data = await http.get<VersionWire>("/health");
     return data && toVersion(data);
@@ -99,4 +99,6 @@ export const capabilitiesApi = {
       ...toVersion(data),
     };
   },
-};
+});
+
+export const capabilitiesApi = createCapabilitiesApi(http);

@@ -13,22 +13,21 @@
 
   const { name, input, result, running }: Props = $props();
 
-  const empty = $derived(!input.trim() && !result?.trim());
 </script>
 
 <Collapsible
   label={name ?? t("TOOLS")}
   icon={SquareTerminal}
-  labelOnly={empty}
+  preview={input}
   {running}
   labelClass="text-accent"
 >
-  <div class="flex flex-col gap-1.5">
-    {#if input.trim()}
-      <CodeBlock code={input} />
-    {/if}
-    {#if result?.trim()}
-      <CodeBlock code={result} />
-    {/if}
-  </div>
+  {#if input.trim()}
+    <p class="pt-1 font-mono text-body-sm whitespace-pre-wrap text-on-surface-variant">{input}</p>
+  {/if}
+  {#if result?.trim()}
+    <div class="mt-1.5">
+      <CodeBlock code={result} lang={t("RESULT")} />
+    </div>
+  {/if}
 </Collapsible>

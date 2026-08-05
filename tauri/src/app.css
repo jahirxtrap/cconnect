@@ -4,6 +4,13 @@ html,
 body,
 #app {
   height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+[class*="overflow-y-auto"],
+[class*="overflow-x-auto"] {
+  overscroll-behavior: contain;
 }
 
 html {
@@ -43,6 +50,49 @@ html[data-theme="dark"] {
 .menu-surface {
   transform-origin: var(--bits-floating-transform-origin);
   animation: menu-enter 120ms ease-out;
+}
+
+.drop-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--c-accent);
+  border-radius: var(--radius-group);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.flash-highlight {
+  position: relative;
+}
+
+.flash-highlight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-group);
+  background: var(--c-on-background);
+  pointer-events: none;
+  animation: flash-highlight 1200ms ease-out forwards;
+}
+
+@keyframes flash-highlight {
+  0%,
+  60% {
+    opacity: 0.12;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes indeterminate {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(350%);
+  }
 }
 
 @keyframes menu-enter {
@@ -101,6 +151,11 @@ textarea,
   background: color-mix(in srgb, var(--c-accent) 32%, transparent);
 }
 
+.markdown {
+  font-size: var(--text-body-md);
+  line-height: var(--text-body-md--line-height);
+}
+
 .markdown > *:first-child {
   margin-top: 0;
 }
@@ -146,11 +201,27 @@ textarea,
 }
 
 .markdown ul {
-  list-style: disc;
+  list-style: "•  ";
+}
+
+.markdown ul ul {
+  list-style: "◦  ";
+}
+
+.markdown ul ul ul {
+  list-style: "▪  ";
 }
 
 .markdown ol {
   list-style: decimal;
+}
+
+.markdown li.task {
+  list-style: "☐  ";
+}
+
+.markdown li.task-done {
+  list-style: "☑  ";
 }
 
 .markdown li::marker {
@@ -160,6 +231,29 @@ textarea,
 .markdown a {
   color: var(--c-accent);
   text-decoration: underline;
+}
+
+.md-link-icon {
+  display: inline-block;
+  width: 1.05em;
+  height: 1.05em;
+  vertical-align: -0.18em;
+}
+
+a > .md-link-icon:first-child {
+  margin-inline-end: 0.15em;
+}
+
+a > .md-link-icon:last-child {
+  margin-inline-start: 0.15em;
+}
+
+.markdown details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.markdown details[open] > summary svg {
+  transform: rotate(90deg);
 }
 
 .markdown code {
@@ -201,7 +295,13 @@ textarea,
 
 .markdown th,
 .markdown td {
-  border: 1px solid var(--c-outline-variant);
-  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--c-outline-variant);
+  min-width: 140px;
+  padding: 0.375rem;
   text-align: start;
+  font-size: var(--text-body-sm);
+}
+
+.markdown th {
+  font-weight: 700;
 }

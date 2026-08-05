@@ -4,7 +4,9 @@
   interface Props {
     onclick?: () => void;
     onlongclick?: () => void;
+    oncontextmenu?: () => void;
     enabled?: boolean;
+    hover?: boolean;
     title?: string;
     class?: string;
     children: Snippet;
@@ -13,7 +15,9 @@
   const {
     onclick,
     onlongclick,
+    oncontextmenu,
     enabled = true,
+    hover = true,
     title,
     class: className = "",
     children,
@@ -48,7 +52,7 @@
   };
 </script>
 
-{#if onclick || onlongclick}
+{#if onclick || onlongclick || oncontextmenu}
   <button
     type="button"
     disabled={!enabled}
@@ -57,8 +61,16 @@
     onpointerdown={start}
     onpointerup={cancel}
     onpointerleave={cancel}
-    oncontextmenu={onlongclick ? (event) => event.preventDefault() : undefined}
-    class="cursor-pointer text-left transition-colors enabled:hover:bg-on-surface/8 disabled:cursor-default {className}"
+    oncontextmenu={oncontextmenu || onlongclick
+      ? (event) => {
+          event.preventDefault();
+          cancel();
+          oncontextmenu?.();
+        }
+      : undefined}
+    class="cursor-pointer text-left transition-colors disabled:cursor-default {hover
+      ? 'enabled:hover:bg-on-surface/8'
+      : ''} {className}"
   >
     {@render children()}
   </button>
