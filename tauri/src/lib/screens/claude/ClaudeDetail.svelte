@@ -544,7 +544,7 @@
           installCandidate = null;
           void runAction(() => claudeApi.pluginAction("install", `${entry.name}@${catalogMarket ?? ""}`));
         }}
-        variant="filled"
+       
       >
         {t("INSTALL")}
       </Button>
@@ -679,7 +679,7 @@
           addingMcp = false;
           void runAction(() => claudeApi.mcpAdd(mcpName.trim(), mcpTarget.trim(), mcpTransport));
         }}
-        variant="filled"
+       
         enabled={!!mcpName.trim() && !!mcpTarget.trim()}
       >
         {t("ADD")}

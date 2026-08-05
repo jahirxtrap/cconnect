@@ -58,15 +58,32 @@ class Navigation {
     this.preview = request;
   }
 
-  back() {
+  intercept(handler: () => boolean) {
+    this.#interceptors.push(handler);
+    return () => {
+      this.#interceptors = this.#interceptors.filter((item) => item !== handler);
+    };
+  }
+
+  close(): boolean {
+    for (let index = this.#interceptors.length - 1; index >= 0; index--) {
+      if (this.#interceptors[index]()) return true;
+    }
     if (this.preview) {
       this.preview = null;
-      return;
+      return true;
     }
+    return false;
+  }
+
+  back() {
+    if (this.close()) return;
     this.settingsHighlight = null;
     this.explorerArchive = null;
     window.history.back();
   }
+
+  #interceptors: (() => boolean)[] = [];
 }
 
 export const navigation = new Navigation();

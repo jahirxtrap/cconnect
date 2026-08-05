@@ -3,6 +3,7 @@
   import CornerDownRight from "@lucide/svelte/icons/corner-down-right";
   import MessageSquare from "@lucide/svelte/icons/message-square";
   import Play from "@lucide/svelte/icons/play";
+  import { untrack } from "svelte";
   import type { InteractionData } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -25,8 +26,10 @@
 
   const TAB_LABEL_MAX = 18;
 
-  let page = $state(0);
-  let showNotes = $state(false);
+  let page = $state(
+    untrack(() => Math.min(Math.max(data.activeQuestion, 0), Math.max(data.questions.length - 1, 0))),
+  );
+  let showNotes = $state(untrack(() => (data.drafts[data.activeQuestion]?.notes ?? "") !== ""));
 
   const many = $derived(data.questions.length > 1);
   const question = $derived(data.questions[page]);

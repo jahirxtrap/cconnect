@@ -18,13 +18,16 @@
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTouch } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import type { CommandOption } from "$lib/services/capabilitiesApi";
   import { downloadUrl, relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
+  import ColorDialog from "$lib/ui/ColorDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import Drawer from "$lib/ui/Drawer.svelte";
@@ -49,6 +52,7 @@
 
   const chat = $derived(tabs.state);
 
+  const IME_MARGIN = 1;
   const RAIL_WIDTH = 64;
   const PANEL_WIDTH = 300;
   const SESSION_ID_PREVIEW = 8;
@@ -63,6 +67,8 @@
   let expanded = $state(settings.sidebarExpanded);
   let renameTarget = $state<SessionInfo | null>(null);
   let deleteTarget = $state<SessionInfo | null>(null);
+  let colorTarget = $state<SessionInfo | null>(null);
+  let confirmCommand = $state<CommandOption | null>(null);
   let dismissed = $state<CompatNotice[]>([]);
   let rewindOpen = $state(false);
   let queuedId = $state<string | null>(null);
@@ -73,12 +79,24 @@
 
   const canAttach = $derived(!chat.sideOpen);
 
+  const dialogOpen = $derived(
+    renameTarget !== null ||
+      deleteTarget !== null ||
+      colorTarget !== null ||
+      confirmCommand !== null ||
+      rewindOpen ||
+      queuedId !== null ||
+      sharedLink !== null ||
+      navigation.preview !== null ||
+      (layout.mobile && drawer),
+  );
+
   const onPaste = (event: ClipboardEvent) => {
     if (event.defaultPrevented) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement) return;
     const files = Array.from(event.clipboardData?.files ?? []);
-    if (!files.length || !canAttach) return;
+    if (!files.length || !canAttach || dialogOpen) return;
     event.preventDefault();
     chat.addAttachments(files);
   };
@@ -135,6 +153,32 @@
   $effect(() => {
     if (!layout.mobile) drawer = false;
   });
+
+  $effect(() => {
+    const viewport = window.visualViewport;
+    if (!isTouch || !viewport) return;
+    const onResize = () => {
+      const active = document.activeElement;
+      if (viewport.height < window.innerHeight - IME_MARGIN || !(active instanceof HTMLElement)) return;
+      active.blur();
+    };
+    viewport.addEventListener("resize", onResize);
+    return () => viewport.removeEventListener("resize", onResize);
+  });
+
+  $effect(() =>
+    navigation.intercept(() => {
+      if (chat.sideOpen) {
+        chat.closeSideChat();
+        return true;
+      }
+      if (drawer) {
+        drawer = false;
+        return true;
+      }
+      return false;
+    }),
+  );
 </script>
 
 <svelte:window onpaste={onPaste} />
@@ -151,11 +195,11 @@
           onClose={() => setExpanded(false)}
           onAfterSelect={() => {}}
           onRename={(session) => (renameTarget = session)}
-          onColor={() => {}}
+          onColor={(session) => (colorTarget = session)}
           onDelete={(session) => (deleteTarget = session)}
         />
       {:else}
-        <div class="flex h-full flex-col items-center py-2">
+        <div class="flex h-full flex-col items-center border-r border-outline-variant py-2">
           <TooltipIconButton label={t("MENU")} onclick={() => setExpanded(true)}>
             <PanelLeftOpen size={20} />
           </TooltipIconButton>
@@ -194,19 +238,16 @@
         onClose={(id) => tabs.close(id)}
       />
     {/if}
-    <AppTopBar title={t("APP_NAME")} subtitle={status.text}>
-      {#snippet navigationIcon()}
-        {#if layout.mobile}
-          <TooltipIconButton label={t("MENU")} onclick={() => (drawer = true)}>
-            <Menu size={20} />
-          </TooltipIconButton>
-        {/if}
-      {/snippet}
+    <AppTopBar
+      title={t("APP_NAME")}
+      subtitle={status.text}
+      navigationIcon={layout.mobile ? menuButton : undefined}
+    >
       {#snippet subtitleLeading()}
         {#if status.spinner}
-          <LoadingIndicator size={14} />
+          <LoadingIndicator size={12} />
         {:else}
-          <StatusDot class={status.dot} />
+          <StatusDot class={status.dot} box={8} />
         {/if}
       {/snippet}
       {#snippet actions()}
@@ -264,6 +305,7 @@
         }}
         onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
         onLoadOlder={() => chat.loadOlder()}
+        onFollowChange={(following) => (chat.followBottom = following)}
         onSharedLink={(url, filename) => (sharedLink = { url, filename })}
         {questions}
       />
@@ -275,8 +317,9 @@
             onHeight={(value) => (sideHeight = value)}
             onDragging={(value) => (sideDragging = value)}
             onClear={() => chat.clearSideChat()}
+            streaming={chat.sideStreaming}
             onClose={() => chat.closeSideChat()}
-            onAnswer={(requestId, optionId) => chat.answerSideInteraction(requestId, optionId)}
+            onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
             {questions}
           />
         {/if}
@@ -306,10 +349,14 @@
       uploading={!chat.sideOpen && chat.uploading}
       queue={chat.sideOpen ? [] : chat.visibleQueue}
       onOpenQueued={(item) => (queuedId = item.id)}
-      commands={chat.capabilities?.commands ?? []}
+      commands={chat.sessionId !== null && chat.connected && !chat.streaming
+        ? (chat.capabilities?.commands ?? [])
+        : []}
       pendingInput={chat.pendingInput}
       onConsumePending={() => chat.consumePendingInput()}
-      onSend={(text) => (chat.sideOpen ? chat.sendSideQuestion(text) : void chat.submit(text))}
+      onSend={(text) => (chat.sideOpen ? chat.sendSideQuestion(text) : chat.submit(text))}
+      onCommand={(command) =>
+        command.requireConfirmation ? (confirmCommand = command) : chat.runCommand(command)}
       onInterrupt={() => (chat.sideOpen ? chat.stopSide() : chat.interrupt())}
       onAttach={(files) => chat.addAttachments(files)}
       onRemoveAttachment={(id) => chat.removeAttachment(id)}
@@ -320,6 +367,12 @@
     </div>
   </div>
 </div>
+
+{#snippet menuButton()}
+  <TooltipIconButton label={t("MENU")} onclick={() => (drawer = true)}>
+    <Menu size={20} />
+  </TooltipIconButton>
+{/snippet}
 
 {#snippet controls()}
   <ChatToolbar
@@ -341,7 +394,7 @@
     onStreamTokens={() => chat.toggleStreamTokens()}
     onQuickChat={() => (chat.sideOpen ? chat.closeSideChat() : chat.openSideChat())}
     quickChatEnabled={chat.sessionId !== null && chat.connected}
-    quickChatActive={chat.sideOpen}
+    quickChatActive={chat.sideMessages.length > 0}
   />
 {/snippet}
 
@@ -365,6 +418,7 @@
     preview={chat.rewindPreview}
     busy={chat.rewindBusy}
     onSelect={(point) => void chat.selectRewindPoint(point)}
+    onBack={() => chat.clearRewindTarget()}
     onRewind={(mode) => {
       void chat.rewind(mode);
       rewindOpen = false;
@@ -425,13 +479,18 @@
 {/if}
 
 {#if layout.mobile}
-  <Drawer open={drawer} width={PANEL_WIDTH} onDismiss={() => (drawer = false)}>
+  <Drawer
+    open={drawer}
+    width={PANEL_WIDTH}
+    onDismiss={() => (drawer = false)}
+    onOpen={() => (drawer = true)}
+  >
     <ChatPanel
       drawerMode
       onClose={layout.touch ? null : () => (drawer = false)}
       onAfterSelect={() => (drawer = false)}
       onRename={(session) => (renameTarget = session)}
-      onColor={() => {}}
+      onColor={(session) => (colorTarget = session)}
       onDelete={(session) => (deleteTarget = session)}
     />
   </Drawer>
@@ -446,6 +505,30 @@
       renameTarget = null;
     }}
     onDismiss={() => (renameTarget = null)}
+  />
+{/if}
+
+{#if colorTarget}
+  {@const target = colorTarget}
+  <ColorDialog
+    colors={chat.capabilities?.colors ?? []}
+    selected={target.color}
+    onSelect={(color) => void chat.setColor(target, color)}
+    onDismiss={() => (colorTarget = null)}
+  />
+{/if}
+
+{#if confirmCommand}
+  {@const command = confirmCommand}
+  <ConfirmDialog
+    title="/{command.name}"
+    text={command.description}
+    confirmLabel={t("CONFIRM")}
+    onConfirm={() => {
+      chat.runCommand(command);
+      confirmCommand = null;
+    }}
+    onDismiss={() => (confirmCommand = null)}
   />
 {/if}
 

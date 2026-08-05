@@ -3,17 +3,20 @@
   import type { Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
+  import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { navigation } from "./navigation.svelte";
 
   interface Props {
     title: string;
     subtitle?: string | null;
+    refreshing?: boolean;
+    onRefresh?: (() => void) | null;
     actions?: Snippet;
     children?: Snippet;
   }
 
-  const { title, subtitle, actions, children }: Props = $props();
+  const { title, subtitle, refreshing = false, onRefresh = null, actions, children }: Props = $props();
 </script>
 
 <div class="flex h-full flex-col">
@@ -24,7 +27,7 @@
       </TooltipIconButton>
     {/snippet}
   </AppTopBar>
-  <div class="min-h-0 flex-1 overflow-y-auto">
+  <PullToRefresh {refreshing} {onRefresh}>
     {@render children?.()}
-  </div>
+  </PullToRefresh>
 </div>

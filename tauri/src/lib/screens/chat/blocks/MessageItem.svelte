@@ -31,6 +31,8 @@
     running: boolean;
     gluedTop?: boolean;
     labelMode?: boolean;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
     onAnswer?: (requestId: string, optionId: string) => void;
     onSharedLink?: (url: string, filename: string) => void;
     questions?: Snippet<[InteractionData]>;
@@ -43,6 +45,8 @@
     running,
     gluedTop = false,
     labelMode = false,
+    expanded = null,
+    onToggle = null,
     onAnswer,
     onSharedLink,
     questions,
@@ -100,23 +104,32 @@
       labelOnly={message.labelOnly || labelMode}
       iconClass="text-on-surface-variant"
       {running}
+      {expanded}
+      {onToggle}
     >
       <MarkdownText text={message.text} class="text-on-surface-variant" />
     </Collapsible>
   {:else if message.role === "working"}
     <Collapsible label={t("WORKING")} icon={Bot} labelOnly {running} />
   {:else if message.role === "tool"}
-    <ToolBlock name={message.toolName} input={message.text} result={message.result} {running} />
+    <ToolBlock
+      name={message.toolName}
+      input={message.text}
+      result={message.result}
+      {running}
+      {expanded}
+      {onToggle}
+    />
   {:else if message.role === "tool_result"}
-    <Collapsible label={t("RESULT")} labelOnly={message.labelOnly || labelMode}>
+    <Collapsible label={t("RESULT")} labelOnly={message.labelOnly || labelMode} {expanded} {onToggle}>
       <MarkdownText text={message.text} />
     </Collapsible>
   {:else if message.role === "summary"}
-    <Collapsible label={t("SUMMARY")}>
+    <Collapsible label={t("SUMMARY")} {expanded} {onToggle}>
       <MarkdownText text={message.text} />
     </Collapsible>
   {:else if message.role === "plan"}
-    <PlanBlock markdown={message.text} {onSharedLink} />
+    <PlanBlock markdown={message.text} {expanded} {onToggle} {onSharedLink} />
   {:else if message.role === "interaction"}
     {#if message.interaction}
       {#if message.interaction.kind === "questions" && questions}
@@ -126,18 +139,26 @@
           data={message.interaction}
           toolName={message.toolName}
           input={message.text}
+          {expanded}
+          {onToggle}
           onAnswer={onAnswer ?? (() => {})}
         />
       {/if}
     {/if}
   {:else if message.role === "file_change"}
-    <FileChangeBlock path={message.path ?? ""} diffLines={message.diffLines ?? []} labelOnly={message.labelOnly || labelMode} />
+    <FileChangeBlock
+      path={message.path ?? ""}
+      diffLines={message.diffLines ?? []}
+      labelOnly={message.labelOnly || labelMode}
+      {expanded}
+      {onToggle}
+    />
   {:else if message.role === "compact"}
     {#if message.compact}
-      <CompactBlock compact={message.compact} />
+      <CompactBlock compact={message.compact} {expanded} {onToggle} />
     {/if}
   {:else if message.role === "agent"}
-    <AgentBlock {message} {running} {labelMode} {onSharedLink} />
+    <AgentBlock {message} {running} {labelMode} {expanded} {onToggle} {onSharedLink} />
   {:else if message.role === "notification"}
     <div class="flex w-full items-center gap-1.5 px-4">
       <Bell size={16} class="shrink-0 text-accent" />

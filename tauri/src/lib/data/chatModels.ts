@@ -91,6 +91,7 @@ export interface ChatMessage {
 }
 
 export interface TodoItem {
+  id: string | null;
   content: string;
   status: string;
   activeForm: string;

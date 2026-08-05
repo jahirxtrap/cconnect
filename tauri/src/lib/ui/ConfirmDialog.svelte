@@ -17,6 +17,6 @@
 <CompactDialog {title} description={text} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={onConfirm} variant="filled">{confirmLabel}</Button>
+    <Button onclick={onConfirm}>{confirmLabel}</Button>
   {/snippet}
 </CompactDialog>

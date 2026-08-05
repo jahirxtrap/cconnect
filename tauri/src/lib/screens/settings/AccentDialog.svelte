@@ -32,14 +32,14 @@
     </button>
   {/if}
 
-  <div class="grid w-80 max-w-full grid-cols-6 gap-3" class:opacity-40={theme.dynamicColor}>
+  <div class="grid grid-cols-5 justify-items-center gap-y-3" class:opacity-40={theme.dynamicColor}>
     {#each ACCENTS as accent, index (accent.name)}
       <button
         type="button"
         title={accent.name}
         aria-label={accent.name}
         onclick={() => theme.setAccent(index)}
-        class="flex size-9 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
+        class="flex size-10 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
         style="background: {accent.value}"
       >
         {#if theme.accentIndex === index}

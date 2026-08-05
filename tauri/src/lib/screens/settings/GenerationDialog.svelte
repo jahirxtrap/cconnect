@@ -26,7 +26,7 @@
 <CompactDialog title={t("GENERATION")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(selectedModel, selectedEffort, streamTokens)} variant="filled">
+    <Button onclick={() => onConfirm(selectedModel, selectedEffort, streamTokens)}>
       {t("SAVE")}
     </Button>
   {/snippet}

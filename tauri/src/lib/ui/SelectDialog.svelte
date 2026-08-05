@@ -32,7 +32,7 @@
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     {#if onConfirm}
-      <Button onclick={() => onConfirm(choice)} variant="filled">{t("SAVE")}</Button>
+      <Button onclick={() => onConfirm(choice)}>{t("SAVE")}</Button>
     {/if}
   {/snippet}
   {#each options as option (option.value)}

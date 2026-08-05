@@ -34,7 +34,7 @@
 <CompactDialog title={t("VISIBILITY")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(values)} variant="filled">{t("SAVE")}</Button>
+    <Button onclick={() => onConfirm(values)}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-3.5">
     <SelectField

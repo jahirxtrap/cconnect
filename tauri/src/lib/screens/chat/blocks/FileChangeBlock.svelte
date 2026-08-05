@@ -8,9 +8,11 @@
     path: string;
     diffLines: DiffLine[];
     labelOnly: boolean;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
   }
 
-  const { path, diffLines, labelOnly }: Props = $props();
+  const { path, diffLines, labelOnly, expanded = null, onToggle = null }: Props = $props();
 
   const LINE_CLASS: Record<DiffLine["kind"], string> = {
     header: "text-gray",
@@ -29,7 +31,14 @@
   };
 </script>
 
-<Collapsible label={path} icon={FilePen} labelOnly={labelOnly || !diffLines.length} labelClass="text-accent">
+<Collapsible
+  label={path}
+  icon={FilePen}
+  labelOnly={labelOnly || !diffLines.length}
+  {expanded}
+  {onToggle}
+  labelClass="text-accent"
+>
   <div
     use:hscrollbar
     class="no-scrollbar w-full overflow-x-auto rounded-panel bg-surface-variant py-1 font-mono text-body-sm leading-snug"

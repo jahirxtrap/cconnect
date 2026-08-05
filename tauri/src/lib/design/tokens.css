@@ -91,12 +91,12 @@
   --text-title-md: 15px;
   --text-title-md--line-height: 20px;
   --text-title-md--font-weight: 600;
-  --text-topbar-title: 22px;
-  --text-topbar-title--line-height: 24px;
-  --text-topbar-title--font-weight: 400;
-  --text-topbar-subtitle: 11px;
-  --text-topbar-subtitle--line-height: 12px;
-  --text-topbar-subtitle--font-weight: 500;
+  --text-topbar-title: 17px;
+  --text-topbar-title--line-height: 22px;
+  --text-topbar-title--font-weight: 600;
+  --text-topbar-subtitle: 12px;
+  --text-topbar-subtitle--line-height: 14px;
+  --text-topbar-subtitle--font-weight: 400;
 
   --text-title-lg: 17px;
   --text-title-lg--line-height: 24px;

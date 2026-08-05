@@ -6,10 +6,12 @@
 
   interface Props {
     markdown: string;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
     onSharedLink?: (url: string, filename: string) => void;
   }
 
-  const { markdown, onSharedLink }: Props = $props();
+  const { markdown, expanded = null, onToggle = null, onSharedLink }: Props = $props();
 
   const preview = $derived(
     (markdown.split("\n").find((line) => line.trim()) ?? "").trim().replace(/^[#\s]+/, ""),
@@ -20,6 +22,8 @@
   label={t("PLAN")}
   icon={Lightbulb}
   {preview}
+  {expanded}
+  {onToggle}
   labelClass="text-accent"
   bodyClass="mt-1.5"
 >

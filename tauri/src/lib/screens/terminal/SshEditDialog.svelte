@@ -40,7 +40,7 @@
 <CompactDialog title={t(start ? "EDIT_SSH_HOST" : "ADD_SSH_HOST")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={save} variant="filled" enabled={!!host.trim() && !!user.trim()}>{t("SAVE")}</Button>
+    <Button onclick={save} enabled={!!host.trim() && !!user.trim()}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-2">
     <InputField value={name} oninput={(value) => (name = value)} label={t("SSH_NAME")} singleLine />

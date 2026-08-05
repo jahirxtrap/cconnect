@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Tooltip } from "bits-ui";
   import type { Snippet } from "svelte";
+  import { keyboardNavigation } from "./keyboardNavigation.svelte";
 
   interface Props {
     label: string;
@@ -28,14 +29,33 @@
   let timer: ReturnType<typeof setTimeout> | null = null;
   let longPressed = false;
 
+  let lastX = Number.NaN;
+  let lastY = Number.NaN;
+
+  const onFocus = (event: FocusEvent) => {
+    const target = event.currentTarget as HTMLElement;
+    hide();
+    if (!keyboardNavigation.value) target.blur();
+  };
+
   const hide = () => {
     if (timer !== null) clearTimeout(timer);
     timer = null;
     open = false;
   };
 
+  const leave = () => {
+    lastX = Number.NaN;
+    lastY = Number.NaN;
+    hide();
+  };
+
   const show = (event: PointerEvent) => {
-    if (event.pointerType !== "touch") open = true;
+    if (event.pointerType === "touch") return;
+    const moved = event.clientX !== lastX || event.clientY !== lastY;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    if (moved) open = true;
   };
 
   const pressStart = (event: PointerEvent) => {
@@ -70,20 +90,23 @@
       disabled={!enabled}
       aria-label={label}
       onclick={activate}
-      onpointerenter={show}
-      onpointerleave={hide}
+      onpointermove={show}
+      onpointerleave={leave}
       onpointerdown={pressStart}
       onpointerup={pressEnd}
       onpointercancel={hide}
+      onfocus={onFocus}
       onblur={hide}
       class={TRIGGER_CLASS}
     >
       {@render children()}
     </Tooltip.Trigger>
-    <Tooltip.Portal>
-      <Tooltip.Content sideOffset={4} class="z-50 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
-        {label}
-      </Tooltip.Content>
-    </Tooltip.Portal>
+    {#if open}
+      <Tooltip.Portal>
+        <Tooltip.Content sideOffset={4} class="z-50 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
+          {label}
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    {/if}
   </Tooltip.Root>
 </Tooltip.Provider>

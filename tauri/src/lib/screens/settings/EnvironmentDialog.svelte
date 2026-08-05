@@ -151,7 +151,7 @@
   {/snippet}
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={save} variant="filled" enabled={!!host.trim()}>{t("SAVE")}</Button>
+    <Button onclick={save} enabled={!!host.trim()}>{t("SAVE")}</Button>
   {/snippet}
 
   <div class="flex w-96 max-w-full flex-col gap-2">

@@ -20,7 +20,7 @@
   import { ACCENTS } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
-  import { isTauri } from "$lib/platform";
+  import { isTauri, isTouch } from "$lib/platform";
   import { address, backend } from "$lib/services/backend.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -67,10 +67,13 @@
 
   let dialog = $state<Dialog | null>(null);
   let refreshTick = $state(0);
+  let refreshing = $state(false);
+
+  const tick = $derived(refreshTick + desktop.refreshTick);
 
   $effect(() => {
-    const tick = refreshTick + desktop.refreshTick;
-    if (tick > 0) void serverStatus.refresh();
+    if (tick === 0) return;
+    void serverStatus.refresh();
   });
   let serverSection = $state<HTMLDivElement | null>(null);
   let aboutSection = $state<HTMLDivElement | null>(null);
@@ -112,11 +115,13 @@
   const DEFAULT_ACCENT = 4;
 </script>
 
-<Screen title={t("SETTINGS")}>
+<Screen title={t("SETTINGS")} {refreshing} onRefresh={() => refreshTick++}>
   {#snippet actions()}
-    <TooltipIconButton label={t("REFRESH")} onclick={() => refreshTick++}>
-      <RotateCw size={20} />
-    </TooltipIconButton>
+    {#if !isTouch}
+      <TooltipIconButton label={t("REFRESH")} onclick={() => refreshTick++}>
+        <RotateCw size={20} />
+      </TooltipIconButton>
+    {/if}
   {/snippet}
   <div class="flex w-full flex-col px-4 pb-4">
     <SettingsGroup label={t("SETTINGS_APPEARANCE")}>
@@ -207,7 +212,11 @@
     </SettingsGroup>
 
     <div bind:this={serverSection} class={flashed === "cli" ? "flash-highlight" : ""}>
-      <ServerGroup onChangelog={(version) => (cliChangelog = version)} />
+      <ServerGroup
+        {tick}
+        onLoadingChange={(value) => (refreshing = value)}
+        onChangelog={(version) => (cliChangelog = version)}
+      />
     </div>
 
     {#if isTauri}

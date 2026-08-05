@@ -1,6 +1,6 @@
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 
-const UPLOAD_DIR = "uploads";
+export const UPLOAD_DIR = "uploads";
 const OK_MIN = 200;
 const OK_MAX = 299;
 
@@ -16,6 +16,7 @@ export const uploadAttachment = (
   onProgress: (value: number) => void,
   profile: Profile = backend.active,
   path = `${UPLOAD_DIR}/${file.name}`,
+  signal?: AbortSignal,
 ): Promise<string | null> =>
   new Promise((resolve) => {
     const request = new XMLHttpRequest();
@@ -35,5 +36,7 @@ export const uploadAttachment = (
       }
     };
     request.onerror = () => resolve(null);
+    request.onabort = () => resolve(null);
+    signal?.addEventListener("abort", () => request.abort(), { once: true });
     request.send(file);
   });

@@ -27,8 +27,12 @@
 
   const onKeydown = (event: KeyboardEvent) => {
     if (event.defaultPrevented) return;
-    if (event.key === "Escape" && navigation.route !== "/") {
-      navigation.back();
+    if (event.key === "Escape") {
+      if (navigation.close()) {
+        event.preventDefault();
+        return;
+      }
+      if (navigation.route !== "/") navigation.back();
       return;
     }
     const control = event.ctrlKey || event.metaKey;

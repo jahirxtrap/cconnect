@@ -155,7 +155,21 @@ textarea,
   user-select: text;
 }
 
+[role="dialog"],
+[role="menu"],
+[role="tooltip"],
+.menu-surface {
+  user-select: none;
+}
+
 ::selection {
+  background: transparent;
+}
+
+.selectable::selection,
+.selectable ::selection,
+input::selection,
+textarea::selection {
   background: color-mix(in srgb, var(--c-accent) 32%, transparent);
 }
 

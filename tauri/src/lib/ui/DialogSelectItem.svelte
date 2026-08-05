@@ -30,9 +30,10 @@
   <Pressable
     {onclick}
     {enabled}
+    hover={false}
     class="flex w-full items-center gap-3 rounded-sm py-3 pl-3 {trailing ? 'pr-1' : 'pr-3'} {selected
-      ? 'bg-accent/14'
-      : ''} {enabled ? '' : 'opacity-40'}"
+      ? 'bg-accent/14 enabled:hover:bg-accent/21'
+      : 'enabled:hover:bg-on-surface/8'} {enabled ? '' : 'opacity-40'}"
   >
     <SelectionDot {selected} />
     <div class="min-w-0 flex-1">

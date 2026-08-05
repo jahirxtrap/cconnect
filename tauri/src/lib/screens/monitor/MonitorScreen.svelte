@@ -121,7 +121,7 @@
     {/snippet}
     {#snippet subtitleLeading()}
       {#if failed}
-        <StatusDot class="bg-red" />
+        <StatusDot class="bg-red" box={8} />
       {/if}
     {/snippet}
     {#snippet actions()}

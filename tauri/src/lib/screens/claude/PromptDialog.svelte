@@ -30,7 +30,7 @@
   {/snippet}
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(text)} variant="filled">{t("SAVE")}</Button>
+    <Button onclick={() => onConfirm(text)}>{t("SAVE")}</Button>
   {/snippet}
   <p class="text-body-sm text-on-surface-variant">{summary}</p>
   <div class="mt-2.5">

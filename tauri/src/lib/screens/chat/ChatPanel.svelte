@@ -31,6 +31,12 @@
   const { drawerMode, onClose, onAfterSelect, onRename, onColor, onDelete }: Props = $props();
 
   const chat = $derived(tabs.state);
+
+  let list = $state<HTMLDivElement | null>(null);
+
+  $effect(() => {
+    if (chat.historySessions.length && list) list.scrollTop = 0;
+  });
 </script>
 
 <div class="flex h-full min-h-0 flex-col border-r border-outline-variant bg-surface">
@@ -68,7 +74,7 @@
     />
   </div>
 
-  <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
+  <div bind:this={list} class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
     {#if chat.historySessions.length}
       {#each chat.historySessions as session (session.sessionId)}
         <ConversationRow

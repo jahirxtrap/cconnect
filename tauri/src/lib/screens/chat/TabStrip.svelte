@@ -182,7 +182,7 @@
   bind:this={strip}
   use:hscrollbar={{ touchIndicator: false, wheel: true }}
   role="tablist"
-  class="no-scrollbar flex shrink-0 items-center gap-1.5 overflow-x-auto bg-surface px-1 py-1.5"
+  class="no-scrollbar flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-outline-variant bg-surface px-1 py-1.5"
 >
   {#each tabs.list as tab (tab.id)}
     {@const active = tab.id === tabs.activeId}

@@ -29,7 +29,7 @@
 <CompactDialog title={t("COMPRESS")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(name.trim(), format)} variant="filled" enabled={!!name.trim()}>
+    <Button onclick={() => onConfirm(name.trim(), format)} enabled={!!name.trim()}>
       {t("COMPRESS")}
     </Button>
   {/snippet}

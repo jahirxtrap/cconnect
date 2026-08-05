@@ -209,7 +209,7 @@
   <CompactDialog title={t("ACCOUNT_LOGIN")} onDismiss={cancelLogin}>
     {#snippet buttons()}
       <Button onclick={cancelLogin} variant="outlined">{t("CANCEL")}</Button>
-      <Button onclick={() => void submitCode()} variant="filled" enabled={!!code.trim()}>
+      <Button onclick={() => void submitCode()} enabled={!!code.trim()}>
         {t("ACCOUNT_LOGIN")}
       </Button>
     {/snippet}

@@ -5,6 +5,7 @@
 
   interface Props {
     text: string;
+    description?: string;
     onclick?: () => void;
     selected?: boolean;
     enabled?: boolean;
@@ -16,6 +17,7 @@
 
   const {
     text,
+    description = "",
     onclick,
     selected = false,
     enabled = true,
@@ -33,7 +35,14 @@
   class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors outline-none select-none data-highlighted:bg-on-surface/10 data-disabled:cursor-default data-disabled:opacity-40"
 >
   {@render leading?.()}
-  <span class="min-w-0 flex-1 truncate text-body-md {textClass}">{text}</span>
+  {#if description}
+    <span class="flex min-w-0 flex-1 flex-col">
+      <span class="truncate text-body-md {textClass}">{text}</span>
+      <span class="truncate text-body-sm text-on-surface-variant">{description}</span>
+    </span>
+  {:else}
+    <span class="min-w-0 flex-1 truncate text-body-md {textClass}">{text}</span>
+  {/if}
   {#if selected}
     <Check size={16} class="shrink-0 text-accent" />
   {/if}

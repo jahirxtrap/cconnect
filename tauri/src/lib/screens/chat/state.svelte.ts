@@ -22,7 +22,7 @@ import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi } from "$lib/services/settingsApi";
 import { createSessionsApi, type RewindPoint, type RewindPreview } from "$lib/services/sessionsApi";
-import { uploadAttachment } from "$lib/services/uploadApi";
+import { uploadAttachment, UPLOAD_DIR } from "$lib/services/uploadApi";
 
 const DEFAULTS = {
   permissionMode: "bypassPermissions",
@@ -36,6 +36,8 @@ const COMPACT_COMMAND = "/compact";
 const PROJECT_KEY_SEPARATOR = /[^A-Za-z0-9]/g;
 const PREVIEW_LENGTH = 120;
 const NOTIFICATION_BODY_LENGTH = 120;
+const MESSAGE_TAIL_CAP = 500;
+const MESSAGE_INITIAL_CAP = 100;
 const MILLIS_PER_SECOND = 1000;
 
 const projectKeyOf = (path: string) => path.replace(PROJECT_KEY_SEPARATOR, "-");
@@ -104,6 +106,7 @@ export class ChatState {
   oldestLoadedIndex = $state<number | null>(null);
   transcriptLoading = $state(false);
   transcriptExhausted = $state(false);
+  followBottom = $state(true);
 
   sideMessages = $state<ChatMessage[]>([]);
   sideStreaming = $state(false);
@@ -152,6 +155,10 @@ export class ChatState {
   #silent = new Set<string>();
   #optimisticChipId: string | null = null;
   #optimisticMessageId: number | null = null;
+  #interrupting = false;
+  #uploadAbort: AbortController | null = null;
+  #initial: SessionInfo | null = null;
+  #initialConsumed = false;
 
   constructor(context: ChatContext) {
     this.environmentId = context.environmentId;
@@ -159,21 +166,22 @@ export class ChatState {
     this.projectKey = context.projectKey;
     this.sessionColor = context.color ?? null;
     this.cwd = context.cwd || this.environment?.directory || settings.cwd;
+    this.#initial =
+      context.sessionId && context.projectKey
+        ? {
+            sessionId: context.sessionId,
+            projectKey: context.projectKey,
+            path: context.cwd || null,
+            lastActive: null,
+            size: 0,
+            preview: null,
+            title: null,
+            color: context.color ?? null,
+          }
+        : null;
     this.#loadEnvOverrides();
     this.#applyDefaultProject();
     this.#connect();
-    if (context.sessionId && context.projectKey) {
-      void this.#loadTranscript({
-        sessionId: context.sessionId,
-        projectKey: context.projectKey,
-        path: context.cwd || null,
-        lastActive: null,
-        size: 0,
-        preview: null,
-        title: null,
-        color: null,
-      });
-    }
   }
 
   dispose() {
@@ -208,8 +216,18 @@ export class ChatState {
 
   #connect() {
     this.connection = "connecting";
+    void this.#openSocket();
+  }
+
+  async #openSocket() {
+    await this.#refreshServerInfo();
+    this.#loadEnvOverrides();
+    if (!this.#initialConsumed) {
+      this.#initialConsumed = true;
+      const initial = this.#initial;
+      if (initial) await this.#loadSessionInto(initial);
+    }
     this.#socket.connect();
-    void this.#refreshServerInfo();
   }
 
   #loadEnvOverrides() {
@@ -256,30 +274,53 @@ export class ChatState {
     this.attachments = this.attachments.filter((item) => item.id !== id);
   }
 
-  async submit(text: string) {
+  submit(text: string) {
+    const command = (this.capabilities?.commands ?? []).find((item) => `/${item.name}` === text.trim());
+    if (command) this.runCommand(command);
+    else void this.sendPrompt(text);
+  }
+
+  async sendPrompt(text: string) {
+    const body = text.trim();
     const pending = this.attachments;
-    if (!text.trim() && !pending.length) return;
-    let uploaded: string[] = [];
-    if (pending.length) {
-      this.uploading = true;
-      const results = await Promise.all(
-        pending.map((item) =>
-          uploadAttachment(
-            item.file,
-            (progress) => {
-              this.attachments = this.attachments.map((current) =>
-                current.id === item.id ? { ...current, progress } : current,
-              );
-            },
-            this.environment,
-          ),
-        ),
-      );
-      uploaded = results.filter((path): path is string => path !== null);
-      this.uploading = false;
-      this.attachments = [];
+    if (!body && !pending.length) return;
+    if (!pending.length) {
+      this.send(body);
+      return;
     }
-    this.send(text, uploaded);
+    if (this.uploading) return;
+
+    const abort = new AbortController();
+    this.#uploadAbort = abort;
+    this.uploading = true;
+    const uploaded: string[] = [];
+
+    for (const item of pending) {
+      const path = await uploadAttachment(
+        item.file,
+        (progress) => {
+          this.attachments = this.attachments.map((current) =>
+            current.id === item.id ? { ...current, progress } : current,
+          );
+        },
+        this.environment,
+        `${UPLOAD_DIR}/${item.name}`,
+        abort.signal,
+      );
+      if (path === null) {
+        this.#uploadAbort = null;
+        this.uploading = false;
+        this.attachments = this.attachments.map((current) => ({ ...current, progress: 0 }));
+        this.pendingInput = body || null;
+        return;
+      }
+      uploaded.push(path);
+    }
+
+    this.#uploadAbort = null;
+    this.uploading = false;
+    this.attachments = [];
+    this.send(body, uploaded);
   }
 
   send(text: string, attachments: string[] = []) {
@@ -302,6 +343,7 @@ export class ChatState {
       const compacting = body === COMPACT_COMMAND || body.startsWith(`${COMPACT_COMMAND} `);
       this.#assistantId = null;
       this.#thinkingId = null;
+      this.#capFromTail(MESSAGE_INITIAL_CAP);
       this.streaming = true;
       this.compacting = compacting;
       this.streamStatus = null;
@@ -334,6 +376,13 @@ export class ChatState {
   }
 
   interrupt() {
+    if (this.uploading) {
+      this.#uploadAbort?.abort();
+      return;
+    }
+    if (!this.streaming) return;
+    this.#interrupting = true;
+    this.streamStatus = this.streamStatus === "failed" ? "failed" : null;
     this.#socket.sendInterrupt();
   }
 
@@ -374,15 +423,6 @@ export class ChatState {
 
   stopSide() {
     if (this.sideStreaming) this.#socket.sendInterrupt("side");
-  }
-
-  answerSideInteraction(requestId: string, optionId: string) {
-    this.#socket.sendInteractionResponse(requestId, optionId, null);
-    this.sideMessages = this.sideMessages.map((item) =>
-      item.interaction?.requestId === requestId
-        ? { ...item, interaction: { ...item.interaction, resolved: optionId } }
-        : item,
-    );
   }
 
   #onSideEvent(event: ServerEvent) {
@@ -460,16 +500,12 @@ export class ChatState {
   }
 
   openSession(session: SessionInfo) {
-    this.sessionId = session.sessionId;
-    this.projectKey = session.projectKey;
-    this.sessionColor = session.color;
-    if (session.path && session.path !== this.cwd) {
-      this.cwd = session.path;
-      this.onContextChange?.();
-    }
-    this.#resetTranscript();
+    void this.#openSession(session);
+  }
+
+  async #openSession(session: SessionInfo) {
+    if (!(await this.#loadSessionInto(session))) return;
     this.#socket.resetResume();
-    void this.#loadTranscript(session);
     this.#startSession(session.sessionId);
   }
 
@@ -500,52 +536,69 @@ export class ChatState {
   }
 
   toggleQuestionOption(requestId: string, questionIndex: number, optionId: string) {
-    this.#updateDraft(requestId, questionIndex, (draft, question) => {
-      const selected = draft.selected.includes(optionId)
-        ? draft.selected.filter((id) => id !== optionId)
-        : question.multiSelect
-          ? [...draft.selected, optionId]
+    this.#updateInteraction(requestId, (data) => {
+      if (data.submitted || !data.questions[questionIndex] || !data.drafts[questionIndex]) return data;
+      const multi = data.questions[questionIndex].multiSelect;
+      const draft = data.drafts[questionIndex];
+      const selected = multi
+        ? draft.selected.includes(optionId)
+          ? draft.selected.filter((id) => id !== optionId)
+          : [...draft.selected, optionId]
+        : draft.selected.includes(optionId)
+          ? []
           : [optionId];
-      return { ...draft, selected };
+      const freeText = !multi && selected.length ? "" : draft.freeText;
+      return {
+        ...data,
+        drafts: data.drafts.map((item, index) => (index === questionIndex ? { ...draft, selected, freeText } : item)),
+      };
     });
   }
 
   setQuestionText(requestId: string, questionIndex: number, value: string) {
-    this.#updateDraft(requestId, questionIndex, (draft) => ({ ...draft, freeText: value }));
-  }
-
-  setQuestionNotes(requestId: string, questionIndex: number, value: string) {
-    this.#updateDraft(requestId, questionIndex, (draft) => ({ ...draft, notes: value }));
-  }
-
-  setActiveQuestion(requestId: string, index: number) {
-    this.#updateInteraction(requestId, (data) => ({ ...data, activeQuestion: index }));
-  }
-
-  submitQuestions(requestId: string) {
-    const data = this.messages.find((item) => item.interaction?.requestId === requestId)?.interaction;
-    if (!data) return;
-    this.#socket.sendQuestionsResponse(requestId, data.drafts);
-    this.#updateInteraction(requestId, (current) => ({
-      ...current,
-      submitted: true,
-      summary: current.drafts.map((draft, index) =>
-        [
-          ...draft.selected.map(
-            (id) => current.questions[index]?.options.find((option) => option.id === id)?.label ?? id,
-          ),
-          draft.freeText,
-        ]
-          .filter(Boolean)
-          .join(", "),
-      ),
-      notes: current.drafts.map((draft) => draft.notes),
+    this.#editDraft(requestId, questionIndex, (draft, question) => ({
+      ...draft,
+      freeText: value,
+      selected: question && !question.multiSelect && value.trim() ? [] : draft.selected,
     }));
   }
 
+  setQuestionNotes(requestId: string, questionIndex: number, value: string) {
+    this.#editDraft(requestId, questionIndex, (draft) => ({ ...draft, notes: value }));
+  }
+
+  setActiveQuestion(requestId: string, index: number) {
+    this.#updateInteraction(requestId, (data) =>
+      data.submitted || data.activeQuestion === index ? data : { ...data, activeQuestion: index },
+    );
+  }
+
+  submitQuestions(requestId: string) {
+    const data = this.#findInteraction(requestId);
+    if (!data || data.submitted) return;
+    const drafts = data.drafts.map((draft) => ({
+      ...draft,
+      freeText: draft.freeText.trim(),
+      notes: draft.notes.trim(),
+    }));
+    this.#socket.sendQuestionsResponse(requestId, drafts);
+    const summary = data.questions.map((question, index) => {
+      const draft = drafts[index] ?? { selected: [], freeText: "", notes: "" };
+      const labels = question.options
+        .filter((option) => draft.selected.includes(option.id))
+        .map((option) => option.label)
+        .filter((label): label is string => !!label);
+      return [...labels, ...(draft.freeText ? [draft.freeText] : [])].join(", ");
+    });
+    const notes = data.questions.map((_question, index) => drafts[index]?.notes ?? "");
+    this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, summary, notes }));
+  }
+
   declineQuestions(requestId: string) {
+    const data = this.#findInteraction(requestId);
+    if (!data || data.submitted) return;
     this.#socket.sendQuestionsChat(requestId);
-    this.#updateInteraction(requestId, (data) => ({ ...data, declined: true }));
+    this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, declined: true }));
   }
 
   async loadRewindPoints() {
@@ -567,9 +620,13 @@ export class ChatState {
     if (this.rewindTarget?.id === point.id) this.rewindPreview = preview;
   }
 
-  dismissRewind() {
+  clearRewindTarget() {
     this.rewindTarget = null;
     this.rewindPreview = null;
+  }
+
+  dismissRewind() {
+    this.clearRewindTarget();
     this.rewindPoints = [];
   }
 
@@ -577,15 +634,18 @@ export class ChatState {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     const point = this.rewindTarget;
-    if (!sessionId || !project || !point) return;
+    if (!sessionId || !project || !point || this.rewindBusy) return;
     this.rewindBusy = true;
     const result = await this.#sessions.rewind(sessionId, project, point, mode);
+    if (!result) {
+      this.rewindBusy = false;
+      return;
+    }
+    await this.#reloadConversation();
+    this.rewindTarget = null;
+    this.rewindPreview = null;
     this.rewindBusy = false;
-    if (!result?.canRewind) return;
     this.pendingInput = point.text;
-    this.dismissRewind();
-    const session = this.historySessions.find((item) => item.sessionId === sessionId);
-    if (session) void this.#loadTranscript(session);
   }
 
   consumePendingInput(): string | null {
@@ -606,7 +666,7 @@ export class ChatState {
 
   answerInteraction(requestId: string, optionId: string) {
     this.#socket.sendInteractionResponse(requestId, optionId, null);
-    this.#updateInteraction(requestId, (data) => ({ ...data, resolved: optionId }));
+    this.#updateInteraction(requestId, (data) => (data.resolved === null ? { ...data, resolved: optionId } : data));
   }
 
   setPermissionMode(mode: string) {
@@ -650,7 +710,7 @@ export class ChatState {
       this.clearConversation();
       return;
     }
-    void this.submit(`/${command.name}`);
+    void this.sendPrompt(`/${command.name}`);
   }
 
   clearConversation() {
@@ -678,9 +738,9 @@ export class ChatState {
     }
   }
 
-  async setColor(session: SessionInfo, color: string) {
+  async setColor(session: SessionInfo, color: string | null) {
     if (!session.projectKey) return;
-    if (!(await this.#sessions.setColor(session.sessionId, session.projectKey, color))) return;
+    if (!(await this.#sessions.setColor(session.sessionId, session.projectKey, color ?? ""))) return;
     const known = this.list?.sessions.find((item) => item.sessionId === session.sessionId);
     if (known) this.list?.upsertSession({ ...known, color });
     if (this.sessionId === session.sessionId) this.sessionColor = color;
@@ -744,6 +804,16 @@ export class ChatState {
 
   #append(item: ChatMessage) {
     this.messages = [...this.messages, item];
+    this.#capFromTail(MESSAGE_TAIL_CAP);
+  }
+
+  #capFromTail(cap: number) {
+    if (!this.followBottom || this.messages.length <= cap) return;
+    const kept = this.messages.slice(this.messages.length - cap);
+    const cursor = kept.find((item) => item.sourceIndex >= 0)?.sourceIndex;
+    this.messages = kept;
+    this.oldestLoadedIndex = cursor ?? this.oldestLoadedIndex;
+    this.transcriptExhausted = false;
   }
 
   #projectKey(): string | null {
@@ -766,21 +836,66 @@ export class ChatState {
     this.#silent.clear();
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
+    this.#interrupting = false;
   }
 
-  async #loadTranscript(session: SessionInfo) {
+  async #loadSessionInto(session: SessionInfo): Promise<boolean> {
     const project = session.projectKey;
-    if (!project) return;
-    const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE * 2);
-    if (this.sessionId !== session.sessionId) return;
+    if (!project) return false;
+    const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE);
     const visible = page.items.filter(isVisible);
-    this.messages = this.#nest(
+    const loaded = this.#nest(
       visible.map((item, index) => this.#fromSession(item, index, session.sessionId, project)),
     );
     this.#nextId = visible.length;
-    this.oldestLoadedIndex = visible.length ? page.startIndex : null;
+    this.#assistantId = null;
+    this.#thinkingId = null;
+    this.#optimisticChipId = null;
+    this.#optimisticMessageId = null;
+    this.#sent.clear();
+    this.#silent.clear();
+    this.#interrupting = false;
+    if (session.path && session.path !== this.cwd) {
+      this.cwd = session.path;
+      this.onContextChange?.();
+    }
+    this.messages = loaded;
+    this.sessionId = session.sessionId;
+    this.projectKey = project;
+    this.sessionColor = session.color;
+    this.todos = [];
+    this.streaming = false;
+    this.queue = [];
+    this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
+    this.transcriptLoading = false;
     this.transcriptExhausted = !page.hasMore;
+    this.pendingToolIds = [];
     this.contextTokens = page.contextTokens;
+    return true;
+  }
+
+  async #reloadConversation() {
+    const sessionId = this.sessionId;
+    const project = this.#projectKey();
+    if (!sessionId || !project) return;
+    const page = await this.#sessions.messages(sessionId, project, HISTORY_PAGE);
+    const visible = page.items.filter(isVisible);
+    const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
+    this.#nextId = visible.length;
+    this.#assistantId = null;
+    this.#thinkingId = null;
+    this.#optimisticChipId = null;
+    this.#optimisticMessageId = null;
+    this.#sent.clear();
+    this.#silent.clear();
+    this.#interrupting = false;
+    this.messages = loaded;
+    this.todos = [];
+    this.queue = [];
+    this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
+    this.transcriptLoading = false;
+    this.transcriptExhausted = !page.hasMore;
+    this.pendingToolIds = [];
   }
 
   #imageUrls(item: SessionMessage, sessionId: string, projectKey: string | null): string[] | null {
@@ -841,17 +956,27 @@ export class ChatState {
     }
   }
 
-  #updateDraft(
+  #editDraft(
     requestId: string,
     questionIndex: number,
-    transform: (draft: QuestionDraft, question: InteractionData["questions"][number]) => QuestionDraft,
+    transform: (draft: QuestionDraft, question: InteractionData["questions"][number] | undefined) => QuestionDraft,
   ) {
-    this.#updateInteraction(requestId, (data) => ({
-      ...data,
-      drafts: data.drafts.map((draft, index) =>
-        index === questionIndex ? transform(draft, data.questions[index]) : draft,
-      ),
-    }));
+    this.#updateInteraction(requestId, (data) => {
+      if (data.submitted || !data.drafts[questionIndex]) return data;
+      return {
+        ...data,
+        drafts: data.drafts.map((draft, index) =>
+          index === questionIndex ? transform(draft, data.questions[index]) : draft,
+        ),
+      };
+    });
+  }
+
+  #findInteraction(requestId: string): InteractionData | null {
+    return (
+      [...this.messages, ...this.sideMessages].find((item) => item.interaction?.requestId === requestId)
+        ?.interaction ?? null
+    );
   }
 
   #onAgentChild(parent: string, event: ServerEvent) {
@@ -894,10 +1019,14 @@ export class ChatState {
   #onDequeued(ids: string[], text: string | null) {
     const body = text ?? "";
     const reconcile = this.#optimisticChipId !== null && ids.includes(this.#optimisticChipId);
-    const attachments = this.queue
-      .filter((item) => ids.includes(item.id))
-      .flatMap((item) => item.attachments)
-      .map((item) => item.replace(/^uploads\//, ""));
+    const attachments = [
+      ...new Set(
+        this.queue
+          .filter((item) => ids.includes(item.id))
+          .flatMap((item) => item.attachments)
+          .map((item) => item.replace(/^uploads\//, "")),
+      ),
+    ];
 
     if (body || attachments.length) {
       const compacting = body === COMPACT_COMMAND || body.startsWith(`${COMPACT_COMMAND} `);
@@ -910,6 +1039,7 @@ export class ChatState {
         this.#assistantId = null;
         this.#thinkingId = null;
         if (!this.streaming) {
+          this.#capFromTail(MESSAGE_INITIAL_CAP);
           this.streaming = true;
           this.compacting = compacting;
           this.streamStatus = null;
@@ -957,16 +1087,17 @@ export class ChatState {
   #upsertTodo(id: string, content: string | null, status: string | null) {
     if (!id) return;
     if (status === "deleted") {
-      this.todos = this.todos.filter((todo) => todo.content !== id);
+      this.todos = this.todos.filter((todo) => todo.id !== id);
       return;
     }
-    const existing = this.todos.find((todo) => todo.content === (content ?? ""));
+    const existing = this.todos.find((todo) => todo.id === id);
     const merged: TodoItem = {
+      id,
       content: content ?? existing?.content ?? "",
       status: status ?? existing?.status ?? "pending",
-      activeForm: existing?.activeForm ?? "",
+      activeForm: "",
     };
-    this.todos = existing ? this.todos.map((todo) => (todo === existing ? merged : todo)) : [...this.todos, merged];
+    this.todos = existing ? this.todos.map((todo) => (todo.id === id ? merged : todo)) : [...this.todos, merged];
   }
 
   #stream(currentId: number | null, role: Role, text: string): number {
@@ -982,17 +1113,35 @@ export class ChatState {
   }
 
   #updateInteraction(requestId: string, transform: (data: InteractionData) => InteractionData) {
-    this.messages = this.messages.map((item) =>
-      item.interaction?.requestId === requestId
-        ? { ...item, interaction: transform(item.interaction) }
-        : item,
-    );
+    const apply = (items: ChatMessage[]) =>
+      items.map((item) =>
+        item.interaction?.requestId === requestId ? { ...item, interaction: transform(item.interaction) } : item,
+      );
+    this.messages = apply(this.messages);
+    this.sideMessages = apply(this.sideMessages);
+  }
+
+  #notificationBody(
+    question: boolean,
+    firstQuestion: string | null | undefined,
+    toolName: string | null,
+    input: string | null,
+  ): string | null {
+    if (question) return firstQuestion?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
+    if (toolName !== "ExitPlanMode") return toolName?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
+    const heading = (input ?? "")
+      .split("\n")
+      .find((line) => line.trim())
+      ?.replace(/^[#\s]+/, "")
+      .trim()
+      .slice(0, NOTIFICATION_BODY_LENGTH);
+    return heading || t("PLAN");
   }
 
   #resetStreaming() {
     this.streaming = false;
     this.compacting = false;
-    this.streamStatus = null;
+    this.streamStatus = this.streamStatus === "failed" ? "failed" : null;
     this.pendingToolIds = [];
     this.#assistantId = null;
     this.#thinkingId = null;
@@ -1021,10 +1170,15 @@ export class ChatState {
         this.projectKey = event.project ?? this.projectKey;
         this.streaming = event.running;
         const kept = this.messages.filter((item) => !item.ephemeral);
-        this.messages =
-          event.resumed && event.running && event.committedCount !== null
-            ? kept.filter((item) => item.sourceIndex >= 0 && item.sourceIndex < event.committedCount!)
-            : kept;
+        const committed = event.committedCount;
+        if (!event.resumed || !event.running) {
+          this.messages = kept;
+        } else if (committed !== null) {
+          this.messages = kept.filter((item) => item.sourceIndex >= 0 && item.sourceIndex < committed);
+        } else {
+          const lastUser = kept.findLastIndex((item) => item.role === "user");
+          this.messages = lastUser >= 0 ? kept.slice(0, lastUser + 1) : kept;
+        }
         this.#pumpQueue();
         break;
       }
@@ -1110,7 +1264,9 @@ export class ChatState {
         this.compacting = true;
         break;
       case "status":
-        this.streamStatus = event.kind === "ok" ? null : event.kind;
+        if (!(this.#interrupting && event.kind === "slow")) {
+          this.streamStatus = event.kind === "ok" ? null : event.kind;
+        }
         break;
       case "compact":
         this.#assistantId = null;
@@ -1198,18 +1354,21 @@ export class ChatState {
           );
         }
         this.#resetStreaming();
+        this.#interrupting = false;
         this.#pumpQueue();
         break;
       case "interrupted":
+        this.#interrupting = false;
         this.#assistantId = null;
         this.#thinkingId = null;
         this.messages = this.messages.filter(
           (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
         );
         this.#append(newMessage(this.#nextId++, "interrupted"));
-        this.streaming = false;
+        this.streaming = this.queue.length > 0;
         this.compacting = false;
         this.pendingToolIds = [];
+        this.streamStatus = this.streamStatus === "failed" ? "failed" : null;
         break;
       case "error": {
         this.#resetStreaming();
@@ -1252,7 +1411,7 @@ export class ChatState {
             const question = event.kind === "questions";
             void notifier.notify(
               t(question ? "NOTIF_QUESTION" : "NOTIF_PERMISSION"),
-              (question ? event.questions[0]?.question : event.toolName)?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null,
+              this.#notificationBody(question, event.questions[0]?.question, event.toolName, event.input),
               this.tabId,
             );
           }
@@ -1267,8 +1426,10 @@ export class ChatState {
       case "closed":
         this.#assistantId = null;
         this.#thinkingId = null;
+        this.#sideAssistantId = null;
         this.connection = "disconnected";
         this.streaming = false;
+        this.sideStreaming = false;
         break;
     }
   }

@@ -9,10 +9,11 @@
     input: string;
     result: string | null;
     running: boolean;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
   }
 
-  const { name, input, result, running }: Props = $props();
-
+  const { name, input, result, running, expanded = null, onToggle = null }: Props = $props();
 </script>
 
 <Collapsible
@@ -20,6 +21,8 @@
   icon={SquareTerminal}
   preview={input}
   {running}
+  {expanded}
+  {onToggle}
   labelClass="text-accent"
 >
   {#if input.trim()}

@@ -9,6 +9,7 @@
   import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
   import { settingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
+  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -21,10 +22,12 @@
   import VisibilityDialog from "./VisibilityDialog.svelte";
 
   interface Props {
+    tick?: number;
+    onLoadingChange?: (value: boolean) => void;
     onChangelog: (cliVersion: string | null) => void;
   }
 
-  const { onChangelog }: Props = $props();
+  const { tick = 0, onLoadingChange, onChangelog }: Props = $props();
 
   type Dialog = "cli" | "generation" | "permissions" | "visibility" | "account";
 
@@ -38,10 +41,19 @@
 
   const load = async () => {
     loading = true;
+    onLoadingChange?.(true);
+    if (!backend.configured) {
+      snapshot = null;
+      cli = null;
+      loading = false;
+      onLoadingChange?.(false);
+      return;
+    }
     capabilities = await capabilitiesApi.capabilities();
     snapshot = await settingsApi.get();
     cli = await cliApi.status();
     loading = false;
+    onLoadingChange?.(false);
   };
 
   const summary = (real: string) => (ready ? real : loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE"));
@@ -66,6 +78,8 @@
 
   $effect(() => {
     void backend.activeId;
+    void tabs.state.connected;
+    void tick;
     void load();
   });
 </script>

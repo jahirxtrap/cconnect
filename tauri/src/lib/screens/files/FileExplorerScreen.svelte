@@ -595,7 +595,7 @@
   {#if transfer}
     <div transition:slide={{ duration: SLIDE_MS }} class="flex gap-3 bg-surface px-4 py-2.5">
       <Button onclick={() => (transfer = null)} variant="outlined" class="flex-1">{t("CANCEL")}</Button>
-      <Button onclick={() => void runTransfer()} variant="filled" enabled={transferAllowed} class="flex-1">
+      <Button onclick={() => void runTransfer()} enabled={transferAllowed} class="flex-1">
         {transfer.kind === "move" ? t("MOVE_HERE") : transfer.kind === "copy" ? t("COPY_HERE") : t("EXTRACT_HERE")}
       </Button>
     </div>

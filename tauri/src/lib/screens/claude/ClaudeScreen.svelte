@@ -14,6 +14,7 @@
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { isTouch } from "$lib/platform";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import type { ProjectInfo } from "$lib/data/models";
@@ -30,6 +31,7 @@
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
+  import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
@@ -56,6 +58,7 @@
   let service = $state<ServiceStatus | null>(null);
   let projects = $state<ProjectInfo[]>([]);
   let loaded = $state(false);
+  let refreshing = $state(false);
   let detail = $state<ClaudeKind | null>(null);
   let envOpen = $state(false);
   let accountOpen = $state(false);
@@ -77,6 +80,7 @@
     usage = await claudeApi.usage(accounts?.default ?? null);
     service = await claudeApi.status();
     loaded = true;
+    refreshing = false;
   };
 
   const usageWindowLabel = (id: string) =>
@@ -137,7 +141,7 @@
       {/snippet}
       {#snippet subtitleLeading()}
         {#if !serverReady && loaded}
-          <StatusDot class="bg-red" />
+          <StatusDot class="bg-red" box={8} />
         {/if}
       {/snippet}
       {#snippet actions()}
@@ -149,16 +153,31 @@
         <TooltipIconButton label={t("ENVIRONMENT")} onclick={() => (envOpen = true)}>
           <Server size={20} />
         </TooltipIconButton>
-        <TooltipIconButton label={t("REFRESH")} onclick={() => void load()}>
-          <RotateCw size={20} />
-        </TooltipIconButton>
+        {#if !isTouch}
+          <TooltipIconButton
+            label={t("REFRESH")}
+            onclick={() => {
+              refreshing = true;
+              void load();
+            }}
+          >
+            <RotateCw size={20} />
+          </TooltipIconButton>
+        {/if}
       {/snippet}
     </AppTopBar>
 
-    {#if !loaded}
-      <CenteredProgress class="flex-1" />
-    {:else}
-      <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+    <PullToRefresh
+      {refreshing}
+      onRefresh={() => {
+        refreshing = true;
+        void load();
+      }}
+    >
+      {#if !loaded}
+        <CenteredProgress class="h-full" />
+      {:else}
+        <div class="px-4 pb-4">
         <SettingsGroup label={t("SERVICE_STATUS")}>
           {#snippet labelTrailing()}
             <StatusDot
@@ -254,7 +273,8 @@
           {@render link(Brain, t("MEMORIES"), chat.projectKey ?? "—", "memories")}
         </SettingsGroup>
       </div>
-    {/if}
+      {/if}
+    </PullToRefresh>
   </div>
 {/if}
 

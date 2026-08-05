@@ -2,6 +2,7 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
+  import Play from "@lucide/svelte/icons/play";
   import Shield from "@lucide/svelte/icons/shield";
   import type { InteractionData, InteractionOption } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
@@ -12,10 +13,12 @@
     data: InteractionData;
     toolName: string | null;
     input: string;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
     onAnswer: (requestId: string, optionId: string) => void;
   }
 
-  const { data, toolName, input, onAnswer }: Props = $props();
+  const { data, toolName, input, expanded = null, onToggle = null, onAnswer }: Props = $props();
 
   const DEFAULT_LABELS: Record<string, string> = {
     allow: "PERMISSION_ALLOW",
@@ -34,7 +37,14 @@
   );
   const chosen = $derived(data.options.find((option) => option.id === data.resolved));
 
-  let expanded = $state(false);
+  let localExpanded = $state(false);
+
+  const isExpanded = $derived(expanded ?? localExpanded);
+
+  const toggle = () => {
+    if (onToggle) onToggle();
+    else localExpanded = !localExpanded;
+  };
 </script>
 
 <div class="w-full px-4">
@@ -46,12 +56,12 @@
     {/if}
     <span class="min-w-0 flex-1 truncate text-label-lg text-accent">
       {title}
-      {#if isPlan && !expanded && preview}
+      {#if isPlan && !isExpanded && preview}
         <span class="text-on-surface-variant">&nbsp;&nbsp;{preview}</span>
       {/if}
     </span>
     {#if isPlan}
-      {#if expanded}
+      {#if isExpanded}
         <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
       {:else}
         <ChevronRight size={18} class="shrink-0 text-on-surface-variant" />
@@ -62,7 +72,7 @@
   {#if isPlan}
     <button
       type="button"
-      onclick={() => (expanded = !expanded)}
+      onclick={toggle}
       class="flex w-full cursor-pointer items-center gap-2 text-left"
     >
       {@render header()}
@@ -73,7 +83,7 @@
 
   {#if input.trim()}
     {#if isPlan}
-      {#if expanded}
+      {#if isExpanded}
         <OutlinedPanel class="mt-1.5">
           <MarkdownText text={input} />
         </OutlinedPanel>
@@ -96,8 +106,11 @@
       {/each}
     </div>
   {:else}
-    <p class="mt-1 text-body-sm text-on-surface-variant">
-      {chosen ? optionLabel(chosen) : data.resolved}
-    </p>
+    <div class="mt-1 flex items-center gap-1.5">
+      <Play size={10} class="shrink-0 fill-current text-on-surface-variant" />
+      <p class="min-w-0 flex-1 text-body-sm text-on-surface-variant">
+        {chosen ? optionLabel(chosen) : data.resolved}
+      </p>
+    </div>
   {/if}
 </div>

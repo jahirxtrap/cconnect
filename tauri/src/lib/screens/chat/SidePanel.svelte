@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import Eraser from "@lucide/svelte/icons/eraser";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import type { ChatMessage, InteractionData } from "$lib/data/chatModels";
@@ -8,6 +9,7 @@
 
   interface Props {
     messages: ChatMessage[];
+    streaming: boolean;
     height: number;
     onHeight: (value: number) => void;
     onDragging: (value: boolean) => void;
@@ -17,8 +19,17 @@
     questions?: import("svelte").Snippet<[InteractionData]>;
   }
 
-  const { messages, height, onHeight, onDragging, onClear, onClose, onAnswer, questions }: Props =
-    $props();
+  const {
+    messages,
+    streaming,
+    height,
+    onHeight,
+    onDragging,
+    onClear,
+    onClose,
+    onAnswer,
+    questions,
+  }: Props = $props();
 
   const PEEK = 58;
   const MIN = 0;
@@ -76,10 +87,46 @@
     TOP_CORNER * (1 - Math.min(1, Math.max(0, (height - PEEK) / (MAX - PEEK)))),
   );
 
+  const AT_BOTTOM_PX = 4;
+  const HALF = 2;
+  const SCROLL_BUTTON_GAP = 12;
+
+  let follow = $state(true);
+  let belowFold = $state(0);
+  let viewport = $state(0);
+  let lastTop = 0;
+  let programmatic = false;
+
+  const scrollToEnd = () => {
+    if (!list) return;
+    programmatic = true;
+    list.scrollTop = list.scrollHeight;
+    lastTop = list.scrollTop;
+  };
+
+  const onscroll = () => {
+    if (!list) return;
+    const top = list.scrollTop;
+    const manual = !programmatic;
+    programmatic = false;
+    if (manual && top < lastTop) follow = false;
+    lastTop = top;
+    belowFold = list.scrollHeight - top - list.clientHeight;
+    viewport = list.clientHeight;
+    if (belowFold <= AT_BOTTOM_PX) follow = true;
+  };
+
+  const toBottom = () => {
+    if (!list) return;
+    follow = true;
+    programmatic = true;
+    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+  };
+
   $effect(() => {
     void messages.at(-1)?.text;
     void messages.length;
-    if (list) list.scrollTop = list.scrollHeight;
+    if (follow) scrollToEnd();
   });
 </script>
 
@@ -111,16 +158,31 @@
   </div>
   <div class="h-px shrink-0 bg-outline-variant"></div>
 
-  <div bind:this={list} class="selectable min-h-0 flex-1 overflow-y-auto pt-1.5">
-    {#each messages as item, index (item.id)}
-      <MessageItem
-        message={item}
-        prevRole={messages[index - 1]?.role ?? null}
-        nextRole={messages[index + 1]?.role ?? null}
-        running={false}
-        {onAnswer}
-        {questions}
-      />
-    {/each}
+  <div class="relative min-h-0 flex-1">
+    <div bind:this={list} {onscroll} class="selectable h-full overflow-y-auto pt-1.5">
+      {#each messages as item, index (item.id)}
+        <MessageItem
+          message={item}
+          prevRole={messages[index - 1]?.role ?? null}
+          nextRole={messages[index + 1]?.role ?? null}
+          running={item.role === "working" && index === messages.length - 1 && streaming}
+          {onAnswer}
+          {questions}
+        />
+      {/each}
+    </div>
+
+    {#if !follow && messages.length && viewport > 0 && belowFold > viewport / HALF}
+      <button
+        type="button"
+        onclick={toBottom}
+        title={t("SCROLL_TO_BOTTOM")}
+        aria-label={t("SCROLL_TO_BOTTOM")}
+        style="bottom: {SCROLL_BUTTON_GAP}px; right: {SCROLL_BUTTON_GAP}px"
+        class="absolute inline-flex size-10 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
+      >
+        <ChevronDown size={24} />
+      </button>
+    {/if}
   </div>
 </div>

@@ -117,6 +117,7 @@ export class ChatSocket {
   #attempts = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
 
+  #buffered: string[] = [];
   #channel: string | null = null;
   #lastSeq = 0;
   #sideChannel: string | null = null;
@@ -141,6 +142,7 @@ export class ChatSocket {
     this.#generation++;
     this.#socket?.close(1000);
     this.#socket = null;
+    this.#buffered = [];
     this.resetResume();
   }
 
@@ -231,7 +233,10 @@ export class ChatSocket {
   }
 
   #send(payload: Wire) {
-    if (this.#socket?.readyState === WebSocket.OPEN) this.#socket.send(JSON.stringify(payload));
+    const frame = JSON.stringify(payload);
+    const socket = this.#socket;
+    if (socket?.readyState === WebSocket.OPEN) socket.send(frame);
+    else if (socket?.readyState === WebSocket.CONNECTING) this.#buffered.push(frame);
   }
 
   #clearTimer() {
@@ -244,6 +249,7 @@ export class ChatSocket {
     if (!url) return;
     const generation = ++this.#generation;
     this.#socket?.close();
+    this.#buffered = [];
     this.onEvent(false, null, { type: "connecting" });
     const socket = new WebSocket(url);
     this.#socket = socket;
@@ -251,6 +257,9 @@ export class ChatSocket {
     socket.onopen = () => {
       if (generation !== this.#generation) return;
       this.#attempts = 0;
+      const buffered = this.#buffered;
+      this.#buffered = [];
+      buffered.forEach((frame) => socket.send(frame));
       this.onEvent(false, null, { type: "open" });
     };
     socket.onmessage = (event) => {
@@ -266,6 +275,7 @@ export class ChatSocket {
   }
 
   #drop(reason: string) {
+    this.#buffered = [];
     this.onEvent(false, null, { type: "closed", reason });
     if (this.#closed || this.#timer !== null) return;
     const backoff = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS << Math.min(this.#attempts, MAX_BACKOFF_SHIFT));
@@ -402,6 +412,7 @@ export class ChatSocket {
         return {
           type: "todos",
           items: list(wire, "items").map((item) => ({
+            id: null,
             content: text(item, "content") ?? "",
             status: text(item, "status") ?? "pending",
             activeForm: text(item, "active_form") ?? "",

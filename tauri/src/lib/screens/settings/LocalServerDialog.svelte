@@ -54,7 +54,7 @@
 <CompactDialog title={t("LOCAL_SERVER")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={save} variant="filled">{t("SAVE")}</Button>
+    <Button onclick={save}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-3">
     <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine>

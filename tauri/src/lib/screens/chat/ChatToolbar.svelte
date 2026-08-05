@@ -62,8 +62,8 @@
   const CONTEXT_LIMIT_LARGE = 1_000_000;
   const CONTEXT_LIMIT = 200_000;
   const ITEM_CLASS =
-    "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 text-label-lg transition-colors hover:bg-on-surface/8";
-  const STATE_CLASS = "flex h-8 shrink-0 items-center gap-1.5 px-2 text-label-lg";
+    "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-label-lg transition-colors hover:bg-on-surface/8";
+  const STATE_CLASS = "flex h-8 shrink-0 cursor-default items-center gap-1.5 px-2 text-label-lg";
 
   let openMenu = $state<"model" | "effort" | "permission" | null>(null);
 

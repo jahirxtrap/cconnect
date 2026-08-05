@@ -44,7 +44,7 @@
   {/snippet}
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onSave(project, text)} variant="filled">{t("SAVE")}</Button>
+    <Button onclick={() => onSave(project, text)}>{t("SAVE")}</Button>
   {/snippet}
   <SelectField label={t("PROJECT")} selected={project} {options} onSelect={(value) => (project = value)} />
   <p class="mt-2.5 text-body-sm text-on-surface-variant">{t("PROJECT_PROMPT_SUMMARY")}</p>

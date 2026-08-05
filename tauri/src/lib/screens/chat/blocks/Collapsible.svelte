@@ -14,6 +14,8 @@
     labelClass?: string;
     iconClass?: string;
     bodyClass?: string;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
     children?: Snippet;
   }
 
@@ -26,53 +28,53 @@
     labelClass = "text-on-surface-variant",
     iconClass = "text-accent",
     bodyClass = "mt-1",
+    expanded = null,
+    onToggle = null,
     children,
   }: Props = $props();
 
-  let expanded = $state(false);
-  let header = $state<HTMLElement | null>(null);
+  let localExpanded = $state(false);
 
-  const summary = $derived(expanded ? "" : (preview ?? "").replace(/\s+/g, " ").trim());
+  const isExpanded = $derived(expanded ?? localExpanded);
+
+  const summary = $derived(isExpanded ? "" : (preview ?? "").replace(/\s+/g, " ").trim());
 
   const toggle = () => {
-    const stuck = !!header && header.getBoundingClientRect().top <= header.offsetTop;
-    expanded = !expanded;
-    if (!expanded && stuck) header?.scrollIntoView({ block: "start" });
+    if (onToggle) onToggle();
+    else localExpanded = !localExpanded;
   };
 </script>
 
 <div class="w-full px-4">
-  <div bind:this={header} class={expanded ? "sticky top-0 z-10 bg-background" : ""}>
-    <button
-      type="button"
-      disabled={labelOnly}
-      onclick={toggle}
-      class="flex w-full items-center gap-[6px] text-left transition-colors select-none {labelOnly
-        ? 'cursor-default'
-        : 'cursor-pointer hover:bg-on-surface/8'}"
-    >
-      {#if IconComponent}
-        <IconComponent size={16} class="shrink-0 {iconClass}" />
+  <button
+    type="button"
+    disabled={labelOnly}
+    onclick={toggle}
+    class="flex w-full items-center gap-[6px] text-left transition-colors select-none {labelOnly
+      ? 'cursor-default'
+      : 'cursor-pointer hover:bg-on-surface/8'}"
+  >
+    {#if IconComponent}
+      <IconComponent size={16} class="shrink-0 {iconClass}" />
+    {/if}
+    <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
+      <span class={labelClass}>{label}</span>
+      {#if summary}
+        <span class="ml-1.5 font-normal text-on-surface-variant">{summary}</span>
       {/if}
-      <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
-        <span class={labelClass}>{label}</span>
-        {#if summary}
-          <span class="ml-1.5 font-normal text-on-surface-variant">{summary}</span>
-        {/if}
-      </span>
-      {#if running}
-        <LoadingIndicator size={16} />
+    </span>
+    {#if running}
+      <LoadingIndicator size={16} />
+    {/if}
+    {#if !labelOnly}
+      {#if isExpanded}
+        <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
+      {:else}
+        <ChevronRight size={18} class="shrink-0 text-on-surface-variant" />
       {/if}
-      {#if !labelOnly}
-        {#if expanded}
-          <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
-        {:else}
-          <ChevronRight size={18} class="shrink-0 text-on-surface-variant" />
-        {/if}
-      {/if}
-    </button>
-  </div>
-  {#if expanded && children}
+    {/if}
+  </button>
+  {#if isExpanded && children}
     <div class={bodyClass}>{@render children()}</div>
   {/if}
 </div>

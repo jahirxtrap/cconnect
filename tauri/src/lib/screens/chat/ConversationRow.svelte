@@ -28,9 +28,9 @@
 </script>
 
 <div
-  class="group flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/6 {selected
-    ? 'bg-on-surface/10'
-    : ''}"
+  class="group flex items-center rounded-item pr-1 transition-colors {selected
+    ? 'bg-accent/14 hover:bg-accent/21'
+    : 'hover:bg-on-surface/8'}"
   oncontextmenu={(event) => {
     event.preventDefault();
     menu = true;
@@ -41,7 +41,7 @@
     onclick={onOpen}
     onlongclick={() => (menu = true)}
     hover={false}
-    class="min-w-0 flex-1 truncate px-2 py-2 text-body-md"
+    class="min-w-0 flex-1 truncate px-2 py-2 text-body-md {selected ? 'font-semibold text-accent' : ''}"
   >
     {title}
   </Pressable>

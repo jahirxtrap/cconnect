@@ -4,6 +4,7 @@
   import { DropdownMenu } from "bits-ui";
   import { uploads } from "$lib/data/uploads.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import ProgressRing from "$lib/ui/ProgressRing.svelte";
 
   const RING = 24;
   const STROKE = 2.5;
@@ -79,7 +80,7 @@
         </p>
         <div class="scrollbar-thin max-h-80 overflow-y-auto border-t border-outline-variant py-1">
           {#each items as item (item.id)}
-            <div class="flex items-center gap-2 px-3.5 py-1.5">
+            <div class="flex items-center gap-2.5 px-3.5 py-1.5">
               <span
                 class="min-w-0 flex-1 truncate text-body-md {item.status === 'done'
                   ? 'text-on-surface-variant'
@@ -88,9 +89,7 @@
                 {item.name}
               </span>
               {#if item.status === "uploading"}
-                <span class="text-label-md text-on-surface-variant">
-                  {Math.round(item.progress * 100)}%
-                </span>
+                <ProgressRing value={item.progress} size={20} stroke={2.5} />
                 <button
                   type="button"
                   onclick={() => uploads.cancel(item.id)}

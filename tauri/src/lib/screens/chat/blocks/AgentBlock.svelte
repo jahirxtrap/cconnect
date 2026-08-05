@@ -9,10 +9,19 @@
     message: ChatMessage;
     running: boolean;
     labelMode?: boolean;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
     onSharedLink?: (url: string, filename: string) => void;
   }
 
-  const { message, running, labelMode = false, onSharedLink }: Props = $props();
+  const {
+    message,
+    running,
+    labelMode = false,
+    expanded = null,
+    onToggle = null,
+    onSharedLink,
+  }: Props = $props();
 </script>
 
 <Collapsible
@@ -21,6 +30,8 @@
   preview={message.text}
   labelOnly={message.labelOnly || labelMode || !message.children.length}
   {running}
+  {expanded}
+  {onToggle}
   labelClass="text-accent"
   bodyClass="mt-1 -mx-4 pl-3"
 >

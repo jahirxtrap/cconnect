@@ -18,6 +18,7 @@
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
+  import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import type { Attachment } from "./state.svelte";
 
@@ -30,6 +31,7 @@
     queue: QueuedMessage[];
     onOpenQueued: (item: QueuedMessage) => void;
     commands: CommandOption[];
+    onCommand: (command: CommandOption) => void;
     pendingInput: string | null;
     onConsumePending: () => string | null;
     onSend: (text: string) => void;
@@ -50,6 +52,7 @@
     queue,
     onOpenQueued,
     commands,
+    onCommand,
     pendingInput,
     onConsumePending,
     onSend,
@@ -63,8 +66,6 @@
 
   const accent = $derived(sessionColorOf(sessionColor));
 
-  const PERCENT = 100;
-
   const queueLabel = (item: QueuedMessage) =>
     item.text || item.attachments.map((path) => path.split(/[\\/]/).pop()).join(", ");
 
@@ -72,18 +73,18 @@
   let picker = $state<HTMLInputElement | null>(null);
   let menu = $state(false);
 
-  const canSend = $derived(!uploading && (!!draft.trim() || attachments.length > 0));
+  const canSubmit = $derived(!!draft.trim() || attachments.length > 0);
+  const busy = $derived(streaming || uploading);
 
   const submit = () => {
-    if (!canSend) return;
+    if (!canSubmit) return;
     onSend(draft);
     onDraft("");
   };
 
-  const insertCommand = (name: string) => {
-    onDraft(`/${name} `);
+  const runCommand = (command: CommandOption) => {
     menu = false;
-    field?.focus();
+    onCommand(command);
   };
 
   const pick = (event: Event) => {
@@ -159,9 +160,7 @@
           <Chip name={item.name} icon={isArchive(item.name) ? FolderArchive : FileIcon}>
             {#snippet trailing()}
               {#if uploading}
-                <span class="shrink-0 text-label-md text-on-surface-variant">
-                  {Math.round(item.progress * PERCENT)}%
-                </span>
+                <ProgressRing value={item.progress} size={16} stroke={2} />
               {:else}
                 <button
                   type="button"
@@ -229,7 +228,11 @@
                   <Slash size={16} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
                 {#each commands as command (command.name)}
-                  <MenuItem text="/{command.name}" onclick={() => insertCommand(command.name)} />
+                  <MenuItem
+                    text="/{command.name}"
+                    description={command.description}
+                    onclick={() => runCommand(command)}
+                  />
                 {/each}
               </MenuSub>
             {/if}
@@ -243,7 +246,7 @@
         <div class="flex-1"></div>
       {/if}
 
-      {#if streaming}
+      {#if busy && !canSubmit}
         <button
           type="button"
           onclick={onInterrupt}
@@ -253,17 +256,18 @@
         >
           <Square size={13} class="fill-current" />
         </button>
+      {:else}
+        <button
+          type="button"
+          disabled={!canSubmit}
+          onclick={submit}
+          aria-label={t("SEND")}
+          title={t("SEND")}
+          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-accent transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-30"
+        >
+          <ArrowUp size={18} />
+        </button>
       {/if}
-      <button
-        type="button"
-        disabled={!canSend}
-        onclick={submit}
-        aria-label={t("SEND")}
-        title={t("SEND")}
-        class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-accent transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-30"
-      >
-        <ArrowUp size={18} />
-      </button>
     </div>
   </div>
 

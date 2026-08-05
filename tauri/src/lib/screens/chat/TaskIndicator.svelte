@@ -37,7 +37,7 @@
           runningAngle}deg 360deg)"
       >
         {#if complete}
-          <Check size={12} class="text-on-accent" />
+          <Check size={16} class="text-on-accent" />
         {/if}
       </span>
     </DropdownMenu.Trigger>
@@ -47,21 +47,26 @@
         sideOffset={6}
         class="menu-surface scrollbar-thin z-50 max-h-96 w-80 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
       >
-        <p class="px-2 py-1.5 text-label-lg text-on-surface-variant">
+        <p class="px-3.5 pb-2 text-label-lg font-bold text-on-surface-variant">
           {t("TASKS")} ({done}/{todos.length})
         </p>
+        <div class="mb-1 h-px bg-outline-variant"></div>
         {#each todos as todo, index (index)}
           {@const finished = todo.status === "completed"}
           {@const active = todo.status === "in_progress"}
           <div class="flex items-start gap-2 rounded-sm px-2 py-1.5">
             {#if finished}
-              <SquareCheckBig size={16} class="mt-0.5 shrink-0 text-accent" />
+              <SquareCheckBig size={20} class="mt-px shrink-0 text-accent" />
             {:else if active}
-              <CircleDot size={16} class="mt-0.5 shrink-0 text-accent" />
+              <CircleDot size={20} class="mt-px shrink-0 text-accent" />
             {:else}
-              <Square size={16} class="mt-0.5 shrink-0 text-on-surface-variant" />
+              <Square size={20} class="mt-px shrink-0 text-on-surface-variant" />
             {/if}
-            <span class="min-w-0 flex-1 text-body-md {finished ? 'text-on-surface-variant line-through' : ''}">
+            <span
+              class="min-w-0 flex-1 text-body-md {finished
+                ? 'text-on-surface-variant line-through'
+                : ''} {active ? 'font-semibold' : ''}"
+            >
               {active && todo.activeForm ? todo.activeForm : todo.content}
             </span>
           </div>

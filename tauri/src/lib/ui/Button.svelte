@@ -11,7 +11,7 @@
     children: Snippet;
   }
 
-  const { onclick, variant = "text", enabled = true, class: className = "", children }: Props = $props();
+  const { onclick, variant = "filled", enabled = true, class: className = "", children }: Props = $props();
 
   const VARIANTS: Record<Variant, string> = {
     filled: "bg-accent text-on-accent enabled:hover:opacity-90",

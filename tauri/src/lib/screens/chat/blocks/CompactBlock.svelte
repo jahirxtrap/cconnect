@@ -8,9 +8,11 @@
 
   interface Props {
     compact: CompactData;
+    expanded?: boolean | null;
+    onToggle?: (() => void) | null;
   }
 
-  const { compact }: Props = $props();
+  const { compact, expanded = null, onToggle = null }: Props = $props();
 
   const fmtTokens = (n: number) =>
     n >= 1_000_000
@@ -31,14 +33,21 @@
     return parts.join(" • ");
   });
 
-  let expanded = $state(false);
+  let localExpanded = $state(false);
+
+  const isExpanded = $derived(expanded ?? localExpanded);
+
+  const toggle = () => {
+    if (onToggle) onToggle();
+    else localExpanded = !localExpanded;
+  };
 </script>
 
 <div class="w-full px-4">
   <button
     type="button"
     disabled={!hasSummary}
-    onclick={() => (expanded = !expanded)}
+    onclick={toggle}
     class="flex w-full items-center text-left transition-colors select-none {hasSummary
       ? 'cursor-pointer hover:bg-on-surface/8'
       : 'cursor-default'}"
@@ -50,14 +59,14 @@
       <span class="truncate text-body-sm text-on-surface-variant">{stats}</span>
     {/if}
     {#if hasSummary}
-      {#if expanded}
+      {#if isExpanded}
         <ChevronDown size={18} class="ml-1.5 shrink-0 text-on-surface-variant" />
       {:else}
         <ChevronRight size={18} class="ml-1.5 shrink-0 text-on-surface-variant" />
       {/if}
     {/if}
   </button>
-  {#if expanded && hasSummary}
+  {#if isExpanded && hasSummary}
     <div class="pt-1"><MarkdownText text={compact.summary} /></div>
   {/if}
 </div>
