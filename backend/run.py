@@ -75,6 +75,9 @@ def _start_tailscale_funnel(port: int) -> str:
     """Start Tailscale Funnel in the background and return the public URL."""
     try:
         subprocess.run(["tailscale", "up"], capture_output=True, text=True, timeout=60)
+        # Clear serve/funnel state left by a previous run: a stale config silently
+        # downgrades the funnel to tailnet-only (tailscale/tailscale#19803).
+        subprocess.run(["tailscale", "funnel", "reset"], capture_output=True, timeout=10)
         result = subprocess.run(
             ["tailscale", "funnel", "--bg", str(port)],
             capture_output=True, text=True, check=True, timeout=20,
@@ -95,7 +98,7 @@ def _stop_tailscale_funnel() -> None:
     """Best-effort shutdown of the background funnel on exit."""
     try:
         subprocess.run(
-            ["tailscale", "funnel", "--https=443", "off"],
+            ["tailscale", "funnel", "reset"],
             capture_output=True, timeout=10,
         )
     except Exception:
