@@ -1,14 +1,18 @@
 <script lang="ts">
+  import Palette from "@lucide/svelte/icons/palette";
   import ScanQrCode from "@lucide/svelte/icons/scan-qr-code";
   import { untrack } from "svelte";
   import { parseQrPayload } from "$lib/data/qrPayload";
+  import { accentAt, ACCENTS } from "$lib/design/accents";
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import type { AuthKind, EnvironmentProfile } from "$lib/services/backend.svelte";
   import { nativeScanAvailable, qrScanAvailable, scanNative } from "$lib/services/qrScanner";
   import Button from "$lib/ui/Button.svelte";
+  import ColorDialog from "$lib/ui/ColorDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
+  import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import QrScanDialog from "$lib/ui/QrScanDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -101,6 +105,8 @@
   let authHeaderName = $state(initial.authHeaderName);
   let authHeaderValue = $state(initial.authHeaderValue);
   let directory = $state(initial.directory);
+  let accentIndex = $state<number | null>(initial.accentIndex);
+  let picking = $state(false);
 
   const onHost = (input: string) => {
     const parsed = parseHostInput(input);
@@ -137,6 +143,7 @@
       authHeaderName: authHeaderName.trim(),
       authHeaderValue: authHeaderValue.trim(),
       directory: directory.trim(),
+      accentIndex,
     });
   };
 </script>
@@ -210,9 +217,31 @@
       label={t("ENVIRONMENT_DIRECTORY")}
       singleLine
     />
+    <PreferenceRow
+      icon={Palette}
+      title={t("ENVIRONMENT_ACCENT")}
+      summary={accentIndex === null ? t("COLOR_NONE") : (ACCENTS[accentIndex]?.name ?? "")}
+      onclick={() => (picking = true)}
+    >
+      {#snippet trailing()}
+        {#if accentIndex !== null}
+          <span class="size-4 rounded-full" style="background: {accentAt(accentIndex)}"></span>
+        {/if}
+      {/snippet}
+    </PreferenceRow>
   </div>
 </CompactDialog>
 
 {#if scanning}
   <QrScanDialog onScan={applyQr} onDismiss={() => (scanning = false)} />
+{/if}
+
+{#if picking}
+  <ColorDialog
+    title={t("ENVIRONMENT_ACCENT")}
+    options={ACCENTS.map((accent, index) => ({ value: String(index), color: accent.value, label: accent.name }))}
+    selected={accentIndex === null ? null : String(accentIndex)}
+    onSelect={(value) => (accentIndex = value === null ? null : Number(value))}
+    onDismiss={() => (picking = false)}
+  />
 {/if}

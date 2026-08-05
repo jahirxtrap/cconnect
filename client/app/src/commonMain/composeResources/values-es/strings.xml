@@ -70,6 +70,13 @@
     <string name="streaming_desc">Mostrar el razonamiento y las respuestas mientras se generan</string>
     <string name="permissions">Permisos</string>
     <string name="permission_mode">Modo de permisos por defecto</string>
+    <string name="export_settings">Exportar ajustes</string>
+    <string name="export_settings_summary">Copia entornos, hosts SSH y preferencias</string>
+    <string name="import_settings">Importar ajustes</string>
+    <string name="import_settings_summary">Restaura los ajustes exportados anteriormente</string>
+    <string name="export_settings_warning">Incluye tokens y contraseñas sin cifrar. Consérvalo en un lugar seguro.</string>
+    <string name="import_settings_hint">Pega los ajustes exportados. Reemplazarán a los actuales.</string>
+    <string name="import_settings_failed">No es un respaldo válido.</string>
     <string name="reset_settings">Restablecer ajustes</string>
     <string name="reset_settings_summary">Restaura los valores predeterminados (no afecta a los entornos guardados)</string>
     <string name="reset_settings_confirm">¿Restablecer todos los ajustes a sus valores predeterminados? Los entornos guardados se conservan.</string>

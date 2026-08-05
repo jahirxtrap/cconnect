@@ -15,9 +15,16 @@ class Theme {
   systemDark = $state(false);
   systemAccent = $state<string | null>(null);
 
+  // Set by the active environment: overrides both the picked accent and the system one.
+  environmentAccent = $state<number | null>(null);
+
   readonly dark = $derived(this.mode === "system" ? this.systemDark : this.mode === "dark");
   readonly accent = $derived(
-    this.dynamicColor ? (this.systemAccent ?? accentAt(this.accentIndex)) : accentAt(this.accentIndex),
+    this.environmentAccent !== null
+      ? accentAt(this.environmentAccent)
+      : this.dynamicColor
+        ? (this.systemAccent ?? accentAt(this.accentIndex))
+        : accentAt(this.accentIndex),
   );
 
   start() {

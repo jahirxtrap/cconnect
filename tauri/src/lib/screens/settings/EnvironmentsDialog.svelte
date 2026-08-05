@@ -37,6 +37,7 @@
     effort: "",
     permissionMode: "",
     streaming: null,
+    accentIndex: null,
   });
 
   const DEFAULT_PORT = 8723;

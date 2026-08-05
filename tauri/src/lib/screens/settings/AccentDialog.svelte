@@ -32,18 +32,21 @@
     </button>
   {/if}
 
-  <div class="grid grid-cols-5 justify-items-center gap-y-3" class:opacity-40={theme.dynamicColor}>
+  <div class="grid grid-cols-[repeat(5,2.5rem)] justify-between gap-y-3" class:opacity-40={theme.dynamicColor}>
     {#each ACCENTS as accent, index (accent.name)}
       <button
         type="button"
         title={accent.name}
         aria-label={accent.name}
         onclick={() => theme.setAccent(index)}
-        class="flex size-10 cursor-pointer items-center justify-center rounded-full transition-transform hover:scale-105"
+        class="flex size-10 cursor-pointer items-center justify-center rounded-full text-white transition-shadow hover:shadow-[inset_0_0_0_2px_white] {theme.accentIndex ===
+        index
+          ? 'border-2 border-on-surface'
+          : 'border border-outline-variant'}"
         style="background: {accent.value}"
       >
         {#if theme.accentIndex === index}
-          <Check size={18} class="text-on-accent" />
+          <Check size={20} />
         {/if}
       </button>
     {/each}

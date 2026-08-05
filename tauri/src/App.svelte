@@ -1,6 +1,7 @@
 <script lang="ts">
   import { navigation } from "$lib/app/navigation.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { layout } from "$lib/platform/layout.svelte";
@@ -53,6 +54,10 @@
   };
 
   const blockFileOpen = (event: DragEvent) => event.preventDefault();
+
+  $effect(() => {
+    theme.environmentAccent = backend.active?.accentIndex ?? null;
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} ondragover={blockFileOpen} ondrop={blockFileOpen} />

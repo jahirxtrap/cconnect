@@ -70,6 +70,13 @@
     <string name="streaming_desc">Show reasoning and replies as they are generated</string>
     <string name="permissions">Permissions</string>
     <string name="permission_mode">Default permission mode</string>
+    <string name="export_settings">Export settings</string>
+    <string name="export_settings_summary">Copy environments, SSH hosts and preferences</string>
+    <string name="import_settings">Import settings</string>
+    <string name="import_settings_summary">Restore previously exported settings</string>
+    <string name="export_settings_warning">Includes tokens and passwords in plain text. Keep it safe.</string>
+    <string name="import_settings_hint">Paste the exported settings. They will replace the current ones.</string>
+    <string name="import_settings_failed">Not a valid backup.</string>
     <string name="reset_settings">Reset settings</string>
     <string name="reset_settings_summary">Restore default values (does not affect saved environments)</string>
     <string name="reset_settings_confirm">Restore all settings to their defaults? Saved environments are kept.</string>

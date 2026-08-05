@@ -2,26 +2,33 @@
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
-  import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
 
+  export interface ColorOption {
+    value: string;
+    color: string;
+    label: string;
+  }
+
   interface Props {
-    colors: string[];
+    title: string;
+    options: ColorOption[];
     selected: string | null;
-    onSelect: (color: string | null) => void;
+    onSelect: (value: string | null) => void;
     onDismiss: () => void;
   }
 
-  const { colors, selected, onSelect, onDismiss }: Props = $props();
+  const { title, options, selected, onSelect, onDismiss }: Props = $props();
+
+  const SWATCH_CLASS =
+    "flex size-10 cursor-pointer items-center justify-center rounded-full transition-shadow hover:shadow-[inset_0_0_0_2px_white]";
 
   let picked = $state<string | null>(untrack(() => selected || null));
-
-  const available = $derived(colors.filter((name) => sessionColorOf(name)));
 </script>
 
-<CompactDialog title={t("CONVERSATION_COLOR")} {onDismiss}>
+<CompactDialog {title} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button
@@ -31,13 +38,12 @@
       }}>{t("SAVE")}</Button
     >
   {/snippet}
-  <div class="grid grid-cols-5 justify-items-center gap-y-3">
+  <div class="grid grid-cols-[repeat(5,2.5rem)] justify-between gap-y-3">
     <button
       type="button"
       onclick={() => (picked = null)}
       aria-label={t("COLOR_NONE")}
-      class="flex size-10 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface-variant {picked ===
-      null
+      class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {picked === null
         ? 'border-2 border-on-surface'
         : 'border border-outline-variant'}"
     >
@@ -47,17 +53,18 @@
         <X size={18} />
       {/if}
     </button>
-    {#each available as name (name)}
+    {#each options as option (option.value)}
       <button
         type="button"
-        onclick={() => (picked = name)}
-        aria-label={name}
-        style="background: {sessionColorOf(name)}"
-        class="flex size-10 cursor-pointer items-center justify-center rounded-full text-white {picked === name
+        onclick={() => (picked = option.value)}
+        aria-label={option.label}
+        title={option.label}
+        style="background: {option.color}"
+        class="{SWATCH_CLASS} text-white {picked === option.value
           ? 'border-2 border-on-surface'
           : 'border border-outline-variant'}"
       >
-        {#if picked === name}
+        {#if picked === option.value}
           <Check size={20} />
         {/if}
       </button>

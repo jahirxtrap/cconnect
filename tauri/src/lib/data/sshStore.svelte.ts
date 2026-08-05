@@ -30,6 +30,10 @@ class SshStore {
     this.#save(this.profiles.filter((item) => item.id !== id));
   }
 
+  replaceAll(profiles: SshProfile[]) {
+    this.#save(profiles);
+  }
+
   #save(profiles: SshProfile[]) {
     this.profiles = profiles;
     store.set(KEY, profiles);

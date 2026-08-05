@@ -14,6 +14,7 @@
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { isPending, type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
+  import { sessionColorOf } from "$lib/design/sessionColors";
   import type { SessionInfo } from "$lib/data/models";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
@@ -511,7 +512,10 @@
 {#if colorTarget}
   {@const target = colorTarget}
   <ColorDialog
-    colors={chat.capabilities?.colors ?? []}
+    title={t("CONVERSATION_COLOR")}
+    options={(chat.capabilities?.colors ?? [])
+      .map((name) => ({ value: name, color: sessionColorOf(name) ?? "", label: name }))
+      .filter((option) => option.color)}
     selected={target.color}
     onSelect={(color) => void chat.setColor(target, color)}
     onDismiss={() => (colorTarget = null)}

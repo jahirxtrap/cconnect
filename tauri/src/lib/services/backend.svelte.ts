@@ -20,6 +20,8 @@ export interface EnvironmentProfile {
   effort: string;
   permissionMode: string;
   streaming: boolean | null;
+  // null = follow the app accent; otherwise it overrides it while this environment is active.
+  accentIndex: number | null;
 }
 
 export type Profile = EnvironmentProfile | null;

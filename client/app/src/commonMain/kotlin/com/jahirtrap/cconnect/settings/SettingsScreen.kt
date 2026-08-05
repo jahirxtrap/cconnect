@@ -71,7 +71,11 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Coffee
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Eye
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
+import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.History
+import com.composables.icons.lucide.Upload
 import com.composables.icons.lucide.Languages
 import com.composables.icons.lucide.Minimize2
 import com.composables.icons.lucide.CircleUser
@@ -102,6 +106,7 @@ import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.QrEnvironmentPayload
 import com.jahirtrap.cconnect.data.Settings
+import com.jahirtrap.cconnect.data.SettingsBackup
 import com.jahirtrap.cconnect.data.AppUpdater
 import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.CapabilitiesApi
@@ -249,6 +254,9 @@ fun SettingsScreen(
     LaunchedEffect(refreshTick) { if (refreshTick > 0) { refreshing = true; loadServerSettings(); refreshing = false } }
 
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
+    var backup by remember { mutableStateOf("") }
+    var pendingImport by remember { mutableStateOf("") }
+    var importFailed by remember { mutableStateOf(false) }
     var notifyTaskDone by remember { mutableStateOf(settings.notifyTaskDone) }
     var notifyInteraction by remember { mutableStateOf(settings.notifyInteraction) }
     var showTimestamps by remember { mutableStateOf(settings.showTimestamps) }
@@ -481,6 +489,19 @@ fun SettingsScreen(
                     }
                 }
                 SettingsGroup(label = null) {
+                    PreferenceRow(
+                        Lucide.Upload,
+                        stringResource(Res.string.export_settings),
+                        stringResource(Res.string.export_settings_summary),
+                    ) {
+                        backup = SettingsBackup.export()
+                        dialog = SettingsDialog.Export
+                    }
+                    PreferenceRow(
+                        Lucide.Download,
+                        stringResource(Res.string.import_settings),
+                        stringResource(Res.string.import_settings_summary),
+                    ) { dialog = SettingsDialog.Import }
                     PreferenceRow(Lucide.History, stringResource(Res.string.reset_settings), stringResource(Res.string.reset_settings_summary)) { dialog = SettingsDialog.Reset }
                 }
                 Box(modifier = Modifier.onGloballyPositioned { aboutY = it.positionInParent().y }) {
@@ -783,11 +804,92 @@ fun SettingsScreen(
             onDismiss = { dialog = null },
         )
 
+        SettingsDialog.Export -> {
+            val clipboard = LocalClipboardManager.current
+            BackupDialog(
+                title = stringResource(Res.string.export_settings),
+                hint = stringResource(Res.string.export_settings_warning),
+                value = backup,
+                onValueChange = null,
+                error = false,
+                confirmLabel = stringResource(Res.string.copy),
+                confirmEnabled = true,
+                onConfirm = { clipboard.setText(AnnotatedString(backup)) },
+                onDismiss = { dialog = null },
+            )
+        }
+
+        SettingsDialog.Import -> BackupDialog(
+            title = stringResource(Res.string.import_settings),
+            hint = stringResource(Res.string.import_settings_hint),
+            value = pendingImport,
+            onValueChange = { pendingImport = it; importFailed = false },
+            error = importFailed,
+            confirmLabel = stringResource(Res.string.accept),
+            confirmEnabled = pendingImport.isNotBlank(),
+            onConfirm = {
+                if (SettingsBackup.import(pendingImport.trim())) {
+                    onThemeMode(settings.themeMode); onLanguage(settings.language)
+                    onDynamicColor(settings.dynamicColor); onAccent(settings.accentIndex)
+                    onFontStyle(settings.fontStyle)
+                    environments = settings.environments
+                    activeId = settings.activeEnvironment?.id
+                    chatVm.refreshEnvironments()
+                    scope.launch { loadServerSettings() }
+                    pendingImport = ""
+                    dialog = null
+                } else {
+                    importFailed = true
+                }
+            },
+            onDismiss = { pendingImport = ""; importFailed = false; dialog = null },
+        )
+
         null -> Unit
     }
 }
 
-private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer, Account }
+private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer, Account, Export, Import }
+
+@Composable
+private fun BackupDialog(
+    title: String,
+    hint: String,
+    value: String,
+    onValueChange: ((String) -> Unit)?,
+    error: Boolean,
+    confirmLabel: String,
+    confirmEnabled: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = title,
+        buttons = {
+            TextButton(onClick = onDismiss) { Text(stringResource(if (onValueChange == null) Res.string.close else Res.string.cancel)) }
+            TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(confirmLabel) }
+        },
+    ) {
+        Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.height(8.dp))
+        InputField(
+            value = value,
+            onValueChange = onValueChange ?: {},
+            minLines = 10,
+            maxLines = 10,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        if (error) {
+            Box(Modifier.height(6.dp))
+            Text(
+                stringResource(Res.string.import_settings_failed),
+                style = MaterialTheme.typography.bodySmall,
+                color = palette.red,
+            )
+        }
+    }
+}
 
 @Composable
 private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boolean, connecting: Boolean, onClose: () -> Unit) {

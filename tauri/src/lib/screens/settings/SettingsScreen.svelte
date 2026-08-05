@@ -12,7 +12,10 @@
   import SunMoon from "@lucide/svelte/icons/sun-moon";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Type from "@lucide/svelte/icons/type";
+  import Download from "@lucide/svelte/icons/download";
+  import Upload from "@lucide/svelte/icons/upload";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { exportSettings, importSettings } from "$lib/data/backup";
   import { desktop } from "$lib/platform/desktop.svelte";
   import Screen from "$lib/app/Screen.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -33,13 +36,23 @@
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import { claudeChangelog } from "$lib/services/githubApi";
   import AboutGroup from "./AboutGroup.svelte";
+  import BackupDialog from "./BackupDialog.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import EnvironmentsDialog from "./EnvironmentsDialog.svelte";
   import LocalServerGroup from "./LocalServerGroup.svelte";
   import NotificationsDialog from "./NotificationsDialog.svelte";
   import ServerGroup from "./ServerGroup.svelte";
 
-  type Dialog = "theme" | "language" | "font" | "accent" | "environments" | "notifications" | "reset";
+  type Dialog =
+    | "theme"
+    | "language"
+    | "font"
+    | "accent"
+    | "environments"
+    | "notifications"
+    | "reset"
+    | "export"
+    | "import";
 
   let cliChangelog = $state<string | null | undefined>(undefined);
 
@@ -70,6 +83,7 @@
   let dialog = $state<Dialog | null>(null);
   let refreshTick = $state(0);
   let refreshing = $state(false);
+  let backup = $state("");
 
   const tick = $derived(refreshTick + desktop.refreshTick);
 
@@ -229,6 +243,21 @@
 
     <SettingsGroup>
       <PreferenceRow
+        icon={Upload}
+        title={t("EXPORT_SETTINGS")}
+        summary={t("EXPORT_SETTINGS_SUMMARY")}
+        onclick={() => {
+          backup = exportSettings();
+          dialog = "export";
+        }}
+      />
+      <PreferenceRow
+        icon={Download}
+        title={t("IMPORT_SETTINGS")}
+        summary={t("IMPORT_SETTINGS_SUMMARY")}
+        onclick={() => (dialog = "import")}
+      />
+      <PreferenceRow
         icon={History}
         title={t("RESET_SETTINGS")}
         summary={t("RESET_SETTINGS_SUMMARY")}
@@ -284,6 +313,18 @@
     text={t("RESET_SETTINGS_CONFIRM")}
     confirmLabel={t("ACCEPT")}
     onConfirm={reset}
+    onDismiss={() => (dialog = null)}
+  />
+{:else if dialog === "export"}
+  <BackupDialog mode="export" payload={backup} onDismiss={() => (dialog = null)} />
+{:else if dialog === "import"}
+  <BackupDialog
+    mode="import"
+    onImport={(raw) => {
+      if (!importSettings(raw)) return false;
+      refreshTick++;
+      return true;
+    }}
     onDismiss={() => (dialog = null)}
   />
 {/if}
