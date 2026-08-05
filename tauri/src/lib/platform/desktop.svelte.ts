@@ -1,3 +1,4 @@
+import { navigation } from "$lib/app/navigation.svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { t } from "$lib/i18n/index.svelte";
 import { localServer } from "$lib/services/localServer.svelte";
@@ -57,7 +58,7 @@ class Desktop {
     window.addEventListener("mouseup", (event) => {
       if (event.button === SIDE_BACK) {
         event.preventDefault();
-        window.history.back();
+        navigation.back();
       } else if (event.button === SIDE_FORWARD) {
         event.preventDefault();
         window.history.forward();

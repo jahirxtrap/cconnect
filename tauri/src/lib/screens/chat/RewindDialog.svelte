@@ -6,6 +6,7 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
 
   interface Props {
     points: RewindPoint[];
@@ -47,9 +48,10 @@
       />
     {/each}
     {#if target}
-      <p class="px-5 pt-2 text-body-sm text-on-surface-variant">
+      <p class="flex items-center gap-1 px-5 pt-2 text-body-sm text-on-surface-variant">
         {#if preview === null}
-          …
+          <LoadingIndicator size={13} />
+          {t("LOADING")}
         {:else if preview.canRewind}
           {t("REWIND_FILES_COUNT", preview.filesChanged.length)} · +{preview.insertions} −{preview.deletions}
         {:else}

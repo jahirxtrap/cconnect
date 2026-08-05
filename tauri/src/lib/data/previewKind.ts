@@ -1,4 +1,4 @@
-export type PreviewKind = "image" | "markdown" | "html" | "text" | "none";
+export type PreviewKind = "image" | "markdown" | "html" | "text" | "pdf" | "video" | "audio" | "none";
 
 const MARKDOWN_EXTENSIONS = ["md", "markdown"];
 
@@ -21,6 +21,19 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   svg: "image/svg+xml",
   ico: "image/x-icon",
   pdf: "application/pdf",
+  mp4: "video/mp4",
+  webm: "video/webm",
+  ogv: "video/ogg",
+  mov: "video/quicktime",
+  mkv: "video/x-matroska",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/opus",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  flac: "audio/flac",
 };
 
 const TEXT_APPLICATION_MIMES = [
@@ -73,7 +86,10 @@ export const previewKindOf = (filename: string): PreviewKind => {
   if (MARKDOWN_EXTENSIONS.includes(extension)) return "markdown";
   const mime = guessMimeType(filename);
   if (mime === "text/html") return "html";
+  if (mime === "application/pdf") return "pdf";
   if (mime?.startsWith("image/")) return "image";
+  if (mime?.startsWith("video/")) return "video";
+  if (mime?.startsWith("audio/")) return "audio";
   if (mime?.startsWith("text/")) return "text";
   if (mime && TEXT_APPLICATION_MIMES.includes(mime)) return "text";
   if (TEXT_FALLBACK_EXTENSIONS.includes(extension)) return "text";

@@ -22,8 +22,8 @@
   const { url, filename, onView = null, onOpenInFiles = null, onDismiss }: Props = $props();
 
   const run = (action: () => void) => {
-    onDismiss();
     action();
+    onDismiss();
   };
 </script>
 

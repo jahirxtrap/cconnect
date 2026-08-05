@@ -3,6 +3,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import type { Snippet } from "svelte";
   import type { IconSource } from "$lib/ui/icons";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
 
   interface Props {
     label: string;
@@ -41,35 +42,36 @@
 </script>
 
 <div class="w-full px-4">
-  <button
-    bind:this={header}
-    type="button"
-    disabled={labelOnly}
-    onclick={toggle}
-    class="flex w-full items-center gap-[6px] text-left transition-colors select-none {labelOnly
-      ? 'cursor-default'
-      : 'cursor-pointer hover:bg-on-surface/8'} {expanded ? 'sticky top-0 z-10 bg-background' : ''}"
-  >
-    {#if IconComponent}
-      <IconComponent size={16} class="shrink-0 {iconClass}" />
-    {/if}
-    <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
-      <span class={labelClass}>{label}</span>
-      {#if summary}
-        <span class="ml-1.5 font-normal text-on-surface-variant">{summary}</span>
+  <div bind:this={header} class={expanded ? "sticky top-0 z-10 bg-background" : ""}>
+    <button
+      type="button"
+      disabled={labelOnly}
+      onclick={toggle}
+      class="flex w-full items-center gap-[6px] text-left transition-colors select-none {labelOnly
+        ? 'cursor-default'
+        : 'cursor-pointer hover:bg-on-surface/8'}"
+    >
+      {#if IconComponent}
+        <IconComponent size={16} class="shrink-0 {iconClass}" />
       {/if}
-    </span>
-    {#if running}
-      <span class="size-4 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>
-    {/if}
-    {#if !labelOnly}
-      {#if expanded}
-        <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
-      {:else}
-        <ChevronRight size={18} class="shrink-0 text-on-surface-variant" />
+      <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
+        <span class={labelClass}>{label}</span>
+        {#if summary}
+          <span class="ml-1.5 font-normal text-on-surface-variant">{summary}</span>
+        {/if}
+      </span>
+      {#if running}
+        <LoadingIndicator size={16} />
       {/if}
-    {/if}
-  </button>
+      {#if !labelOnly}
+        {#if expanded}
+          <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
+        {:else}
+          <ChevronRight size={18} class="shrink-0 text-on-surface-variant" />
+        {/if}
+      {/if}
+    </button>
+  </div>
   {#if expanded && children}
     <div class={bodyClass}>{@render children()}</div>
   {/if}

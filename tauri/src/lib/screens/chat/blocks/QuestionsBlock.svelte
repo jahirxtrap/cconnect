@@ -150,7 +150,8 @@
             value={draft.freeText}
             oninput={(value) => onFreeText(page, value)}
             placeholder={t("INTERACTION_OTHER_HINT")}
-            singleLine
+            maxLines={3}
+            onClear={question.multiSelect ? () => onFreeText(page, "") : null}
           />
         {/if}
 
@@ -160,6 +161,9 @@
             value={draft.notes}
             oninput={(value) => onNotes(page, value)}
             placeholder={t("INTERACTION_NOTES_HINT")}
+            maxLines={3}
+            clearAlways
+            onClear={() => (draft.notes.trim() ? onNotes(page, "") : (showNotes = false))}
           />
         {:else}
           <button

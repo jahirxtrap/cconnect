@@ -1,6 +1,7 @@
 <script lang="ts">
   import Eye from "@lucide/svelte/icons/eye";
   import EyeOff from "@lucide/svelte/icons/eye-off";
+  import X from "@lucide/svelte/icons/x";
   import type { Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
 
@@ -12,7 +13,10 @@
     secret?: boolean;
     singleLine?: boolean;
     minLines?: number;
+    maxLines?: number;
     autofocus?: boolean;
+    onClear?: (() => void) | null;
+    clearAlways?: boolean;
     onkeydown?: (event: KeyboardEvent) => void;
     class?: string;
     trailing?: Snippet;
@@ -26,11 +30,18 @@
     secret = false,
     singleLine = false,
     minLines = 1,
+    maxLines,
     autofocus = false,
+    onClear = null,
+    clearAlways = false,
     onkeydown,
     class: className = "",
     trailing,
   }: Props = $props();
+
+  const LINE_HEIGHT = 20;
+
+  const showClear = $derived(onClear !== null && (clearAlways || value.length > 0));
 
   const FIELD_CLASS =
     "min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant";
@@ -70,8 +81,19 @@
         {onkeydown}
         rows={minLines}
         oninput={handle}
-        class="{FIELD_CLASS} field-auto no-scrollbar max-h-80 resize-y"
+        style={maxLines ? `max-height: ${maxLines * LINE_HEIGHT}px` : undefined}
+        class="{FIELD_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
       ></textarea>
+    {/if}
+    {#if showClear}
+      <button
+        type="button"
+        onclick={() => onClear?.()}
+        aria-label={t("CANCEL")}
+        class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+      >
+        <X size={16} />
+      </button>
     {/if}
     {#if secret}
       <button

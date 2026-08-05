@@ -9,7 +9,7 @@
   import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
   import { settingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
@@ -73,7 +73,7 @@
 <SettingsGroup label={t("SETTINGS_SERVER")}>
   {#snippet labelTrailing()}
     {#if loading}
-      <CenteredProgress size={20} />
+      <LoadingIndicator size={20} />
     {:else}
       <StatusDot class={ready ? "bg-green" : "bg-red"} />
     {/if}

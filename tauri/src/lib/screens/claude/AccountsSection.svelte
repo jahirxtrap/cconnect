@@ -5,7 +5,7 @@
   import { settingsApi } from "$lib/services/settingsApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
@@ -95,7 +95,7 @@
     >
       {#snippet trailing()}
         {#if busy === account.id}
-          <CenteredProgress size={20} />
+          <LoadingIndicator size={20} />
         {:else}
           <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} />
         {/if}

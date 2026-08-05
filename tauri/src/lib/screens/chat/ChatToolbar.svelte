@@ -6,6 +6,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import { t } from "$lib/i18n/index.svelte";
   import type { Capabilities } from "$lib/services/capabilitiesApi";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
@@ -62,7 +63,8 @@
   const CONTEXT_LIMIT = 200_000;
   const ITEM_CLASS =
     "flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-2 text-label-lg transition-colors hover:bg-on-surface/8";
-  const STATE_CLASS = "flex h-8 shrink-0 items-center gap-1.5 px-2 text-label-lg text-on-surface-variant";
+  const STATE_CLASS =
+    "flex h-8 shrink-0 items-center gap-1 rounded-sm border border-outline-variant px-2.5 text-label-md";
 
   let openMenu = $state<"model" | "effort" | "permission" | null>(null);
 
@@ -113,7 +115,7 @@
     </span>
   {:else if connecting || !ready}
     <span class={STATE_CLASS}>
-      <span class="size-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>
+      <LoadingIndicator size={16} />
       {connecting ? t("CONNECTING") : t("LOADING")}
     </span>
   {:else}

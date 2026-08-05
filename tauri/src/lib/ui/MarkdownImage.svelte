@@ -1,6 +1,7 @@
 <script lang="ts">
   import ImageOff from "@lucide/svelte/icons/image-off";
   import { backend } from "$lib/services/backend.svelte";
+  import { mediaSrc } from "$lib/services/mediaSource";
   import CenteredProgress from "./CenteredProgress.svelte";
 
   interface Props {
@@ -54,10 +55,12 @@
       class="block w-full cursor-pointer {state === 'loading' ? 'hidden' : ''}"
     >
       <img
-        src={resolved}
+        use:mediaSrc={{
+          url: resolved,
+          onload: () => (state = "ready"),
+          onerror: () => (state = "error"),
+        }}
         alt={alt || ""}
-        onload={() => (state = "ready")}
-        onerror={() => (state = "error")}
         class="mx-auto max-w-full rounded-panel"
       />
     </button>

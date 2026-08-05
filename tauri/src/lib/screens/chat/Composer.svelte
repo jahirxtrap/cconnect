@@ -13,7 +13,6 @@
   import type { QueuedMessage } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
-  import { layout } from "$lib/platform/layout.svelte";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -96,11 +95,21 @@
     field?.focus();
   });
 
+  const insertNewline = () => {
+    if (!field) return;
+    const { selectionStart, selectionEnd, value } = field;
+    const updated = `${value.slice(0, selectionStart)}\n${value.slice(selectionEnd)}`;
+    onDraft(updated);
+    field.value = updated;
+    field.selectionStart = selectionStart + 1;
+    field.selectionEnd = selectionStart + 1;
+  };
+
   const onkeydown = (event: KeyboardEvent) => {
-    if (event.key !== "Enter" || event.shiftKey) return;
-    if (layout.touch) return;
+    if (event.key !== "Enter") return;
     event.preventDefault();
-    submit();
+    if (event.shiftKey || event.ctrlKey || event.metaKey) insertNewline();
+    else submit();
   };
 
   const focusField = (event: MouseEvent) => {

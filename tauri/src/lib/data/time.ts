@@ -1,8 +1,8 @@
 export const formatClock = (millis: number): string =>
-  new Date(millis).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  new Date(millis).toLocaleTimeString(undefined, { timeStyle: "short" });
 
 export const formatDay = (millis: number): string =>
-  new Date(millis).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+  new Date(millis).toLocaleDateString(undefined, { dateStyle: "medium" });
 
 const MILLIS_PER_MINUTE = 60_000;
 const MILLIS_PER_DAY = 86_400_000;

@@ -7,7 +7,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { localServer } from "$lib/services/localServer.svelte";
   import { systemApi } from "$lib/services/systemApi";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -60,7 +60,7 @@
 <SettingsGroup label={t("LOCAL_SERVER")}>
   {#snippet labelTrailing()}
     {#if phase === "starting"}
-      <CenteredProgress size={20} />
+      <LoadingIndicator size={20} />
     {:else}
       <StatusDot class={tone} />
     {/if}

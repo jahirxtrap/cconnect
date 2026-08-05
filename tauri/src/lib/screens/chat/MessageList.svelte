@@ -4,7 +4,6 @@
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
   import StatusProgress from "./blocks/StatusProgress.svelte";
@@ -19,7 +18,6 @@
   interface Props {
     messages: ChatMessage[];
     pendingToolIds: string[];
-    loadingOlder: boolean;
     streaming: boolean;
     compacting: boolean;
     streamStatus: string | null;
@@ -33,7 +31,6 @@
   const {
     messages,
     pendingToolIds,
-    loadingOlder,
     streaming,
     compacting,
     streamStatus,
@@ -148,9 +145,6 @@
 
 <div class="relative h-full">
   <div bind:this={container} {onscroll} class="selectable h-full overflow-y-auto">
-    {#if loadingOlder}
-      <CenteredProgress size={20} class="py-3" />
-    {/if}
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
       {#if separated}

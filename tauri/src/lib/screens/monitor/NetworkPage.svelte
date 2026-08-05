@@ -14,7 +14,7 @@
     type WifiNetwork,
   } from "$lib/services/networkApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -189,7 +189,7 @@
       >
         {#snippet trailing()}
           {#if busy === item.name}
-            <CenteredProgress size={20} />
+            <LoadingIndicator size={20} />
           {:else if controllable}
             <CompactSwitch
               checked={item.up}
@@ -206,7 +206,7 @@
   <SettingsGroup label={t("NETWORK_WIFI")}>
     {#snippet labelTrailing()}
       {#if scanning}
-        <CenteredProgress size={20} />
+        <LoadingIndicator size={20} />
       {/if}
     {/snippet}
     {#if status.wifiRadio !== null}
@@ -218,7 +218,7 @@
       >
         {#snippet trailing()}
           {#if busy === "radio"}
-            <CenteredProgress size={20} />
+            <LoadingIndicator size={20} />
           {:else}
             <CompactSwitch
               checked={radioOn}
@@ -247,7 +247,7 @@
         >
           {#snippet trailing()}
             {#if busy === network.ssid}
-              <CenteredProgress size={20} />
+              <LoadingIndicator size={20} />
             {:else if network.active}
               <StatusDot class="bg-green" />
             {/if}

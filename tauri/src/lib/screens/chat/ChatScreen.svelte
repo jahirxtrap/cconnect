@@ -32,6 +32,7 @@
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChatPanel from "./ChatPanel.svelte";
@@ -202,7 +203,7 @@
       {/snippet}
       {#snippet subtitleLeading()}
         {#if status.spinner}
-          <span class="size-3.5 shrink-0 animate-spin rounded-full border-2 border-accent border-t-transparent"></span>
+          <LoadingIndicator size={14} />
         {:else}
           <StatusDot class={status.dot} />
         {/if}
@@ -245,7 +246,6 @@
         <MessageList
         messages={chat.messages}
         pendingToolIds={chat.pendingToolIds}
-        loadingOlder={chat.transcriptLoading}
         streaming={chat.streaming}
         compacting={chat.compacting}
         streamStatus={chat.streamStatus}
