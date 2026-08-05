@@ -9,6 +9,7 @@
   import InputField from "$lib/ui/InputField.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import { hscrollbar } from "$lib/ui/scrollbar";
 
   interface Props {
     data: InteractionData;
@@ -82,7 +83,10 @@
     {/each}
   {:else}
     {#if many}
-      <div class="mt-1 flex gap-2 overflow-x-auto">
+      <div
+        use:hscrollbar={{ touchIndicator: false }}
+        class="no-scrollbar mt-1 flex gap-2 overflow-x-auto"
+      >
         {#each data.questions as _item, index (index)}
           <button
             type="button"

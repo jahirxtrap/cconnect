@@ -14,6 +14,7 @@
   import { userContent } from "$lib/data/userContent";
   import Chip from "$lib/ui/Chip.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
+  import { hscrollbar } from "$lib/ui/scrollbar";
   import AgentBlock from "./AgentBlock.svelte";
   import Collapsible from "./Collapsible.svelte";
   import CompactBlock from "./CompactBlock.svelte";
@@ -62,7 +63,10 @@
       {#if content.attachments.length || showTime || message.sendStatus === "error"}
         <div class="flex w-full items-end">
           {#if content.attachments.length}
-            <div class="scrollbar-thin flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+            <div
+              use:hscrollbar={{ touchIndicator: false }}
+              class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
+            >
               {#each content.attachments as attachment (attachment.url)}
                 <Chip
                   name={attachment.name}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import FilePen from "@lucide/svelte/icons/file-pen";
   import type { DiffLine } from "$lib/data/chatModels";
+  import { hscrollbar } from "$lib/ui/scrollbar";
   import Collapsible from "./Collapsible.svelte";
 
   interface Props {
@@ -29,7 +30,10 @@
 </script>
 
 <Collapsible label={path} icon={FilePen} labelOnly={labelOnly || !diffLines.length} labelClass="text-accent">
-  <div class="w-full overflow-x-auto rounded-panel bg-surface-variant py-1 font-mono text-body-sm leading-snug">
+  <div
+    use:hscrollbar
+    class="no-scrollbar w-full overflow-x-auto rounded-panel bg-surface-variant py-1 font-mono text-body-sm leading-snug"
+  >
     {#each diffLines as line, index (index)}
       <div class="px-2.5 py-px whitespace-pre {LINE_CLASS[line.kind]}">{!line.text &&
         !PREFIX[line.kind]

@@ -10,6 +10,7 @@
   import CodeBlock from "./CodeBlock.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
+  import { hscrollbar } from "./scrollbar";
 
   interface Props {
     text: string;
@@ -47,7 +48,13 @@
   };
 
   const decorate = (node: HTMLElement) => {
+    const bars: { destroy: () => void }[] = [];
     const apply = () => {
+      for (const scroller of node.querySelectorAll<HTMLElement>("table, pre")) {
+        if (scroller.dataset.scrollbar) continue;
+        scroller.dataset.scrollbar = "true";
+        bars.push(hscrollbar(scroller));
+      }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;
       const [file, archive, external] = sources;
@@ -67,7 +74,12 @@
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(node, { childList: true, subtree: true });
-    return { destroy: () => observer.disconnect() };
+    return {
+      destroy: () => {
+        observer.disconnect();
+        bars.forEach((bar) => bar.destroy());
+      },
+    };
   };
 </script>
 

@@ -10,6 +10,7 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { hscrollbar } from "$lib/ui/scrollbar";
   import ContextRing from "./ContextRing.svelte";
   import { permissionStyle } from "./permissionStyle";
 
@@ -101,7 +102,10 @@
   {/if}
 </div>
 
-<div class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
+<div
+  use:hscrollbar={{ touchIndicator: false, wheel: true, gutter: false }}
+  class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto"
+>
   {#if disconnected}
     <span class={STATE_CLASS}>
       <StatusDot class="bg-red" />

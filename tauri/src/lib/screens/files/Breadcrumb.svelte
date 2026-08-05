@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import House from "@lucide/svelte/icons/house";
+  import { hscrollbar } from "$lib/ui/scrollbar";
 
   interface Props {
     path: string;
@@ -33,7 +34,11 @@
     >
       <House size={20} />
     </button>
-    <div bind:this={scroller} class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto">
+    <div
+      bind:this={scroller}
+      use:hscrollbar={{ touchIndicator: false, wheel: true, gutter: false }}
+      class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
+    >
       {#each segments as segment, index (targetAt(index))}
         <ChevronRight size={16} class="mx-0.5 shrink-0 text-on-surface-variant" />
         <button

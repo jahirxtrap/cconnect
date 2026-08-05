@@ -4,6 +4,7 @@
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { hscrollbar } from "$lib/ui/scrollbar";
   import { tabs } from "./tabs.svelte";
 
   interface Props {
@@ -156,12 +157,6 @@
     window.addEventListener("blur", onUp);
   };
 
-  const onWheel = (event: WheelEvent) => {
-    if (!strip || event.deltaY === 0) return;
-    event.preventDefault();
-    strip.scrollLeft += event.deltaY;
-  };
-
   const plusShift = $derived.by(() => {
     const id = draggingId;
     if (!id || !plus) return 0;
@@ -185,7 +180,7 @@
 
 <div
   bind:this={strip}
-  onwheel={onWheel}
+  use:hscrollbar={{ touchIndicator: false, wheel: true }}
   role="tablist"
   class="no-scrollbar flex shrink-0 items-center gap-1.5 overflow-x-auto bg-surface px-1 py-1.5"
 >

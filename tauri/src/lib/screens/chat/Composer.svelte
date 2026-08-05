@@ -18,6 +18,7 @@
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
+  import { hscrollbar } from "$lib/ui/scrollbar";
   import type { Attachment } from "./state.svelte";
 
   interface Props {
@@ -122,7 +123,10 @@
     class="cursor-text rounded-lg border border-outline-variant bg-surface focus-within:border-outline"
   >
     {#if queue.length}
-      <div class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3">
+      <div
+        use:hscrollbar={{ touchIndicator: false, wheel: true }}
+        class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3"
+      >
         {#each queue as item (item.id)}
           <Chip name={queueLabel(item)} icon={Hourglass} onclick={() => onOpenQueued(item)} />
         {/each}
@@ -130,7 +134,10 @@
     {/if}
 
     {#if attachments.length}
-      <div class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}">
+      <div
+        use:hscrollbar={{ touchIndicator: false, wheel: true }}
+        class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}"
+      >
         {#each attachments as item (item.id)}
           <Chip name={item.name} icon={isArchive(item.name) ? FolderArchive : FileIcon}>
             {#snippet trailing()}

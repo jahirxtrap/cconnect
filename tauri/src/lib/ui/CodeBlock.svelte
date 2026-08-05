@@ -3,6 +3,7 @@
   import Copy from "@lucide/svelte/icons/copy";
   import { theme } from "$lib/design/theme.svelte";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
+  import { hscrollbar } from "./scrollbar";
 
   interface Props {
     code: string;
@@ -63,7 +64,9 @@
       {/if}
     </button>
   </div>
-  <pre class="scrollbar-thin overflow-x-auto px-2.5 py-2 font-mono text-body-sm leading-snug"><code
+  <pre
+    use:hscrollbar
+    class="no-scrollbar overflow-x-auto px-2.5 py-2 font-mono text-body-sm leading-snug"><code
       >{#if html}{@html html}{:else}{body}{/if}</code
     ></pre>
 </div>
