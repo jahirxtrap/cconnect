@@ -1,5 +1,6 @@
 import { transfers } from "$lib/data/transfers.svelte";
 import { isTauri } from "$lib/platform";
+import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDownloads";
 import { authHeadersOf, backend, type Profile } from "./backend.svelte";
 
 export interface SharedItem {
@@ -36,30 +37,64 @@ const fetchTracked = async (
 
 const TEXT_TYPE = "text/markdown";
 
-const saveBlob = (blob: Blob, filename: string) => {
-  const objectUrl = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = objectUrl;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(objectUrl);
+const headersJson = (profile: Profile = backend.active) => JSON.stringify(authHeadersOf(profile));
+
+const saveBlob = async (blob: Blob, filename: string): Promise<boolean> => {
+  if (!isTauri) {
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.click();
+    URL.revokeObjectURL(objectUrl);
+    return true;
+  }
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  try {
+    const { writeFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+    await writeFile(filename, bytes, { baseDir: BaseDirectory.Download });
+    return true;
+  } catch {
+    return false;
+  }
 };
 
-export const downloadShared = (url: string, filename: string) =>
-  transfers.download(filename, async (onProgress, signal) => {
+export const downloadShared = (url: string, filename: string) => {
+  const bridge = androidDownloads();
+  if (bridge) {
+    return transfers.download(filename, (onProgress, signal) => {
+      const id = bridge.enqueue(url, filename, headersJson());
+      if (!id) return Promise.resolve(false);
+      return trackAndroidDownload(bridge, id, onProgress, signal);
+    });
+  }
+  return transfers.download(filename, async (onProgress, signal) => {
     const blob = await fetchTracked(url, onProgress, signal);
-    if (!blob) return false;
-    saveBlob(blob, filename);
-    return true;
+    return blob !== null && (await saveBlob(blob, filename));
   });
+};
 
-export const saveTextToDownloads = (filename: string, text: string) =>
-  saveBlob(new Blob([text], { type: TEXT_TYPE }), filename);
+export const saveTextToDownloads = async (filename: string, text: string) => {
+  const bridge = androidDownloads();
+  if (bridge) return bridge.saveText(filename, text);
+  return saveBlob(new Blob([text], { type: TEXT_TYPE }), filename);
+};
 
-export const saveTextAs = (filename: string, text: string) =>
-  saveBlobAs(new Blob([text], { type: TEXT_TYPE }), filename);
+export const saveTextAs = async (filename: string, text: string) => {
+  const bridge = androidDownloads();
+  if (bridge) {
+    bridge.saveText(filename, text);
+    return;
+  }
+  await saveBlobAs(new Blob([text], { type: TEXT_TYPE }), filename);
+};
 
 export const shareText = async (filename: string, text: string) => {
+  const bridge = androidDownloads();
+  if (bridge) {
+    bridge.shareText(filename, text);
+    return;
+  }
   const file = new File([text], filename, { type: TEXT_TYPE });
   if (navigator.canShare?.({ files: [file] })) {
     try {
@@ -77,7 +112,7 @@ export const shareText = async (filename: string, text: string) => {
       return;
     }
   }
-  saveTextToDownloads(filename, text);
+  await saveTextToDownloads(filename, text);
 };
 
 const saveBlobAs = async (blob: Blob, filename: string) => {
@@ -87,7 +122,7 @@ const saveBlobAs = async (blob: Blob, filename: string) => {
     }
   ).showSaveFilePicker;
   if (!picker) {
-    saveBlob(blob, filename);
+    await saveBlob(blob, filename);
     return;
   }
   try {
@@ -101,6 +136,11 @@ const saveBlobAs = async (blob: Blob, filename: string) => {
 };
 
 export const saveSharedAs = async (url: string, filename: string) => {
+  const bridge = androidDownloads();
+  if (bridge) {
+    bridge.saveAs(url, filename, headersJson());
+    return;
+  }
   if (!isTauri) {
     await transfers.download(filename, async (onProgress, signal) => {
       const blob = await fetchTracked(url, onProgress, signal);
@@ -123,7 +163,7 @@ export const saveSharedAs = async (url: string, filename: string) => {
 };
 
 export const saveAllShared = async (items: SharedItem[]) => {
-  if (!isTauri) {
+  if (androidDownloads() || !isTauri) {
     for (const item of items) await downloadShared(item.url, item.name);
     return;
   }
@@ -146,6 +186,11 @@ export const openAllSharedExternally = async (items: SharedItem[]) => {
 };
 
 export const openSharedExternally = async (url: string, filename: string) => {
+  const bridge = androidDownloads();
+  if (bridge) {
+    bridge.share(url, filename, headersJson());
+    return;
+  }
   let blob: Blob | null = null;
   await transfers.download(filename, async (onProgress, signal) => {
     blob = await fetchTracked(url, onProgress, signal);

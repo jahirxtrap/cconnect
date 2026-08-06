@@ -11,3 +11,7 @@ export const platformName = (): "windows" | "macos" | "linux" | "android" | "ios
   if (/Win/i.test(agent)) return "windows";
   return "linux";
 };
+
+export const isMobile = platformName() === "android" || platformName() === "ios";
+
+export const isDesktop = isTauri && !isMobile;

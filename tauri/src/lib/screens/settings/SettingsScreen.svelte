@@ -1,4 +1,5 @@
 <script lang="ts">
+  import BatteryCharging from "@lucide/svelte/icons/battery-charging";
   import Bell from "@lucide/svelte/icons/bell";
   import Clock from "@lucide/svelte/icons/clock";
   import History from "@lucide/svelte/icons/history";
@@ -23,7 +24,8 @@
   import { ACCENTS, DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
-  import { isTauri, isTouch } from "$lib/platform";
+  import { isDesktop, isTouch } from "$lib/platform";
+  import { androidBackground } from "$lib/platform/androidBackground";
   import { address, backend } from "$lib/services/backend.svelte";
   import { notifier } from "$lib/services/notifier.svelte";
   import { settingsApi } from "$lib/services/settingsApi";
@@ -120,6 +122,23 @@
     [settings.notifyInteraction, settings.notifyTaskDone].filter(Boolean).length,
   );
 
+  let batteryIgnored = $state(androidBackground()?.batteryOptimizationIgnored() ?? false);
+
+  $effect(() => {
+    const bridge = androidBackground();
+    if (!bridge) return;
+    const refresh = () => (batteryIgnored = bridge.batteryOptimizationIgnored());
+    const target = window as unknown as { __cconnectResume?: () => void };
+    target.__cconnectResume = refresh;
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      delete target.__cconnectResume;
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("focus", refresh);
+    };
+  });
+
   const reset = () => {
     settings.cwd = "";
     theme.setMode("system");
@@ -197,7 +216,22 @@
         summary={notifier.granted ? t("NOTIFICATIONS_STATE", activeNotifications) : t("NOTIFICATIONS_DISABLED")}
         onclick={() => (dialog = "notifications")}
       />
-      {#if isTauri}
+      {#if androidBackground()}
+        <PreferenceRow
+          icon={BatteryCharging}
+          title={t("BATTERY_OPTIMIZATION")}
+          summary={t("BATTERY_OPTIMIZATION_SUMMARY")}
+          onclick={() => androidBackground()?.requestIgnoreBatteryOptimization()}
+        >
+          {#snippet trailing()}
+            <CompactSwitch
+              checked={batteryIgnored}
+              onCheckedChange={() => androidBackground()?.requestIgnoreBatteryOptimization()}
+            />
+          {/snippet}
+        </PreferenceRow>
+      {/if}
+      {#if isDesktop}
         <PreferenceRow
           icon={Minimize2}
           title={t("MINIMIZE_TO_TRAY")}
@@ -237,7 +271,7 @@
       />
     </div>
 
-    {#if isTauri}
+    {#if isDesktop}
       <LocalServerGroup serverReady={backend.configured} />
     {/if}
 

@@ -7,6 +7,9 @@ export type FontStyle = "flat" | "color" | "system";
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
+const androidSystemBars = () =>
+  (window as unknown as { AndroidSystemBars?: { setAppearance: (dark: boolean) => void } }).AndroidSystemBars;
+
 class Theme {
   mode = $state<ThemeMode>(store.get("theme.mode", "system"));
   accentIndex = $state<number>(store.get("theme.accent", DEFAULT_ACCENT_INDEX));
@@ -38,6 +41,7 @@ class Theme {
       root.dataset.theme = this.dark ? "dark" : "light";
       root.style.setProperty("--c-accent", this.accent);
       root.dataset.font = this.fontStyle;
+      this.#applySystemBars(this.dark);
     });
   }
 
@@ -60,6 +64,10 @@ class Theme {
     if (!isTauri) return;
     const { invoke } = await import("@tauri-apps/api/core");
     this.systemAccent = await invoke<string | null>("system_accent").catch(() => null);
+  }
+
+  #applySystemBars(dark: boolean) {
+    androidSystemBars()?.setAppearance(dark);
   }
 
   setFontStyle(style: FontStyle) {

@@ -22,6 +22,7 @@
     "fs:default",
     "fs:allow-mkdir",
     "fs:allow-write-file",
+    "fs:allow-download-write-recursive",
     "fs:allow-appdata-write-recursive",
     "notification:default",
     "store:default"

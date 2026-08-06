@@ -52,8 +52,12 @@ class TransferManager {
     const id = this.#start("download", name, "");
     const abort = new AbortController();
     this.#aborts.set(id, abort);
-    const saved = await run((progress) => this.#patch(id, { progress }), abort.signal);
-    this.#settle(id, saved);
+    try {
+      const saved = await run((progress) => this.#patch(id, { progress }), abort.signal);
+      this.#settle(id, saved);
+    } catch {
+      this.#settle(id, false);
+    }
   }
 
   cancel(id: number) {
