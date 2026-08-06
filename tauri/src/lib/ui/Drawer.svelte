@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { isTouch } from "$lib/platform";
+  import { dismissMenus, menusOpen } from "./MenuScrim.svelte";
 
   interface Props {
     open: boolean;
@@ -12,9 +13,9 @@
 
   const { open, onDismiss, onOpen = null, width = 300, children }: Props = $props();
 
-  const EDGE = 20;
   const SLOP = 6;
   const HALF = 2;
+  const FLING_SPEED = 350;
 
   let offset = $state(0);
   let dragging = $state(false);
@@ -23,15 +24,22 @@
   let startY = 0;
   let tracking = false;
   let decided = false;
+  let lastX = 0;
+  let lastAt = 0;
+  let speed = 0;
 
   const onStart = (event: TouchEvent) => {
+    if (menusOpen()) return;
     const touch = event.touches[0];
-    if (!open && (!onOpen || touch.clientX > EDGE)) return;
+    if (!open && !onOpen) return;
     tracking = true;
     decided = false;
     dragging = false;
     startX = touch.clientX;
     startY = touch.clientY;
+    lastX = touch.clientX;
+    lastAt = event.timeStamp;
+    speed = 0;
     offset = open ? width : 0;
   };
 
@@ -49,6 +57,10 @@
         return;
       }
     }
+    const elapsed = event.timeStamp - lastAt;
+    if (elapsed > 0) speed = ((touch.clientX - lastX) / elapsed) * 1000;
+    lastX = touch.clientX;
+    lastAt = event.timeStamp;
     offset = Math.min(width, Math.max(0, (open ? width : 0) + dx));
     event.preventDefault();
   };
@@ -58,7 +70,9 @@
     tracking = false;
     if (!dragging) return;
     dragging = false;
-    if (offset > width / HALF) onOpen?.();
+    const flung = Math.abs(speed) > FLING_SPEED;
+    const opening = flung ? speed > 0 : offset > width / HALF;
+    if (opening) onOpen?.();
     else onDismiss();
   };
 
@@ -79,6 +93,10 @@
   });
 
   const shade = $derived(dragging ? offset / width : open ? 1 : 0);
+
+  $effect(() => {
+    if (!open) dismissMenus();
+  });
 </script>
 
 {#if open || dragging}
@@ -91,8 +109,14 @@
   ></div>
 {/if}
 <aside
-  class="fixed inset-y-0 left-0 z-40 {dragging ? '' : 'transition-transform duration-200'}"
-  style="width: {width}px; transform: translateX({dragging ? offset - width : open ? 0 : -width}px)"
+  class="fixed inset-y-0 left-0 z-40 border-r border-outline-variant bg-surface {dragging
+    ? ''
+    : 'transition-transform duration-200'}"
+  style="width: {width}px; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); transform: translateX({dragging
+    ? offset - width
+    : open
+      ? 0
+      : -width}px)"
 >
   {@render children()}
 </aside>

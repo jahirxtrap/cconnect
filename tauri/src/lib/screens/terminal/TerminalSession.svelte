@@ -111,6 +111,7 @@
 
       unlisten.push(
         await listen<string>(`ssh://data/${id}`, (event) => {
+          if (status === "connecting") status = "connected";
           terminal.write(Uint8Array.from(atob(event.payload), (char) => char.charCodeAt(0)));
         }),
       );
@@ -144,7 +145,6 @@
         return;
       }
       ready = true;
-      status = "connected";
       resize(terminal.cols, terminal.rows);
     };
 
@@ -203,7 +203,7 @@
         />
       {/if}
     </div>
-    <div class="flex shrink-0 items-center gap-1 bg-surface-variant p-1">
+    <div class="flex shrink-0 items-center gap-2 border-t border-outline-variant bg-surface px-3 py-2">
       <div use:hscrollbar={{ touchIndicator: false, wheel: true }} class="no-scrollbar flex flex-1 gap-1 overflow-x-auto">
         {#each SOFT_KEYS as key (key.title)}
           <button
@@ -211,7 +211,7 @@
             title={key.title}
             aria-label={key.title}
             onclick={() => sendKey(key.bytes)}
-            class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface px-2.5 text-label-md transition-colors hover:bg-on-surface/8"
+            class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full px-3 text-label-md text-on-surface-variant transition-colors hover:bg-on-surface/8"
           >
             {#if key.icon}
               {@const Icon = key.icon}
@@ -223,14 +223,14 @@
         {/each}
       </div>
       {#if isTouch}
-        <button
-          type="button"
-          aria-label={t("KEYBOARD")}
-          onclick={() => view?.focus()}
-          class="inline-flex h-8 w-10 shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface transition-colors hover:bg-on-surface/8"
+        <TooltipIconButton
+          label={t("KEYBOARD")}
+          tooltip={false}
+          class="size-8"
+          onclick={() => view?.toggleKeyboard()}
         >
-          <Keyboard size={18} />
-        </button>
+          <Keyboard />
+        </TooltipIconButton>
       {/if}
     </div>
   {/if}

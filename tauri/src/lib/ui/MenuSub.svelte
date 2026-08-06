@@ -2,6 +2,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
+  import { layout } from "$lib/platform/layout.svelte";
 
   interface Props {
     text: string;
@@ -22,9 +23,9 @@
   </DropdownMenu.SubTrigger>
   <DropdownMenu.SubContent
     sideOffset={4}
-    collisionPadding={8}
+    collisionPadding={layout.menuPadding}
     avoidCollisions={true}
-    class="menu-surface scrollbar-thin z-50 max-h-96 max-w-[calc(100vw-1rem)] min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+    class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-sub-content-available-height) max-w-(--bits-dropdown-menu-sub-content-available-width) min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
   >
     {@render children()}
   </DropdownMenu.SubContent>

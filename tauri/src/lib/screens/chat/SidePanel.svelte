@@ -1,5 +1,5 @@
 <script lang="ts">
-  import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import ChevronsDown from "@lucide/svelte/icons/chevrons-down";
   import Eraser from "@lucide/svelte/icons/eraser";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import type { ChatMessage, InteractionData } from "$lib/data/chatModels";
@@ -179,9 +179,9 @@
         title={t("SCROLL_TO_BOTTOM")}
         aria-label={t("SCROLL_TO_BOTTOM")}
         style="bottom: {SCROLL_BUTTON_GAP}px; right: {SCROLL_BUTTON_GAP}px"
-        class="absolute inline-flex size-10 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
+        class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
       >
-        <ChevronDown size={24} />
+        <ChevronsDown size={18} />
       </button>
     {/if}
   </div>

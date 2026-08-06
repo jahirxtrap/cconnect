@@ -13,6 +13,7 @@
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   const SCRATCH_KEY = "markdown.scratch";
@@ -45,6 +46,7 @@
       <TooltipIconButton label={t("FORMATTED_VIEW")} onclick={() => (formatted = !formatted)}>
         <Type size={20} class={formatted ? "text-accent" : ""} />
       </TooltipIconButton>
+      <MenuScrim open={menu} onDismiss={() => (menu = false)} />
       <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
         <DropdownMenu.Trigger
           class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-5"

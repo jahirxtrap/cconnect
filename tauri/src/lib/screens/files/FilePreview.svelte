@@ -10,6 +10,8 @@
   import { previewKindOf } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { platformName } from "$lib/platform";
+  import { layout } from "$lib/platform/layout.svelte";
   import { authHeadersOf, backend } from "$lib/services/backend.svelte";
   import { mediaSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl } from "$lib/services/sharedApi";
@@ -21,7 +23,10 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import ZoomPane from "$lib/ui/ZoomPane.svelte";
+  import PdfView from "./PdfView.svelte";
 
   interface Props {
     url: string;
@@ -32,20 +37,17 @@
 
   const { url, filename, onClose, onDelete = null }: Props = $props();
 
-  const MIN_SCALE = 1;
-  const MAX_SCALE = 6;
-  const DOUBLE_TAP_SCALE = 2.5;
-  const ZOOM_STEP = 0.0015;
-
   let text = $state<string | null>(null);
   let failed = $state(false);
   let loaded = $state(false);
   let version = $state(0);
   let formatted = $state(settings.markdownPreviewFormatted);
+  let menu = $state(false);
   let confirmingDelete = $state(false);
-  let scale = $state(1);
-  let offsetX = $state(0);
-  let offsetY = $state(0);
+  let frame = $state<HTMLIFrameElement | null>(null);
+  let frameWidth = $state(0);
+  let frameHeight = $state(0);
+  let documentWidth = $state(0);
 
   const kind = $derived(previewKindOf(filename));
   const relative = $derived(relativeFromUrl(url));
@@ -56,51 +58,29 @@
     return encoded ? decodeURIComponent(encoded) : null;
   });
 
-  const resetZoom = () => {
-    scale = 1;
-    offsetX = 0;
-    offsetY = 0;
+  const FIT_TAGS =
+    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    `<style>img,video,canvas,svg,table{max-width:100%;height:auto}</style>`;
+
+  const measureDocument = () => {
+    const inner = frame?.contentDocument;
+    if (!inner) return;
+    documentWidth = Math.max(inner.documentElement.scrollWidth, inner.body?.scrollWidth ?? 0, frameWidth);
   };
 
-  const onWheel = (event: WheelEvent) => {
-    if (!event.ctrlKey) return;
-    event.preventDefault();
-    scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, scale - event.deltaY * ZOOM_STEP));
-    if (scale === MIN_SCALE) {
-      offsetX = 0;
-      offsetY = 0;
-    }
-  };
+  const htmlScale = $derived(documentWidth > frameWidth && frameWidth > 0 ? frameWidth / documentWidth : 1);
 
-  const onDoubleClick = () => {
-    if (scale > MIN_SCALE) resetZoom();
-    else scale = DOUBLE_TAP_SCALE;
-  };
-
-  const onPointerDown = (event: PointerEvent) => {
-    if (scale <= MIN_SCALE) return;
-    const target = event.currentTarget as HTMLElement;
-    target.setPointerCapture(event.pointerId);
-    const move = (drag: PointerEvent) => {
-      offsetX += drag.movementX;
-      offsetY += drag.movementY;
-    };
-    const up = () => {
-      target.removeEventListener("pointermove", move);
-      target.removeEventListener("pointerup", up);
-    };
-    target.addEventListener("pointermove", move);
-    target.addEventListener("pointerup", up);
-  };
+  $effect(() => {
+    if (kind !== "html" || frameWidth <= 0) return;
+    measureDocument();
+  });
 
   const document_ = $derived.by(() => {
     if (kind !== "html" || text === null) return null;
     const folder = source.slice(0, source.lastIndexOf("/") + 1);
-    const tag = `<base href="${folder}">`;
-    if (/<base\s/i.test(text)) return text;
-    return /<head[^>]*>/i.test(text)
-      ? text.replace(/<head([^>]*)>/i, `<head$1>${tag}`)
-      : `${tag}${text}`;
+    const base = /<base\s/i.test(text) ? "" : `<base href="${folder}">`;
+    const tags = `${base}${FIT_TAGS}`;
+    return /<head[^>]*>/i.test(text) ? text.replace(/<head([^>]*)>/i, `<head$1>${tags}`) : `${tags}${text}`;
   });
 
   $effect(() => {
@@ -153,7 +133,7 @@
   });
 </script>
 
-<div class="fixed inset-0 z-50 flex flex-col bg-background text-on-background">
+<div class="safe-area fixed inset-0 z-50 flex flex-col bg-background text-on-background">
   <AppTopBar title={t("VIEW")} subtitle={filename}>
     {#snippet navigationIcon()}
       <TooltipIconButton label={t("BACK")} onclick={onClose}>
@@ -172,10 +152,11 @@
           <Type size={20} class={formatted ? "text-accent" : ""} />
         </TooltipIconButton>
       {/if}
-      <DropdownMenu.Root>
+      <MenuScrim open={menu} onDismiss={() => (menu = false)} />
+      <DropdownMenu.Root open={menu} onOpenChange={(value) => (menu = value)}>
         <DropdownMenu.Trigger
           class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-5"
-          aria-label={t("FILES")}
+          aria-label={t("MORE_OPTIONS")}
         >
           <EllipsisVertical size={20} />
         </DropdownMenu.Trigger>
@@ -183,7 +164,8 @@
           <DropdownMenu.Content
             align="end"
             sideOffset={4}
-            class="menu-surface z-50 min-w-44 rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+            collisionPadding={layout.menuPadding}
+            class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-content-available-height) max-w-(--bits-dropdown-menu-content-available-width) min-w-44 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
           >
             <MenuItem text={t("SAVE")} onclick={() => void downloadShared(url, filename)}>
               {#snippet leading()}
@@ -214,13 +196,7 @@
   </AppTopBar>
 
   {#if kind === "image"}
-    <div
-      class="min-h-0 flex-1 overflow-hidden"
-      onwheel={onWheel}
-      ondblclick={onDoubleClick}
-      onpointerdown={onPointerDown}
-      role="presentation"
-    >
+    <ZoomPane class="min-h-0 flex-1">
       <img
         use:mediaSrc={{
           url: source,
@@ -229,17 +205,14 @@
           onerror: () => (failed = true),
         }}
         alt={filename}
-        style="transform: translate({offsetX}px, {offsetY}px) scale({scale})"
-        class="h-full w-full object-contain transition-transform duration-75 {loaded
-          ? ''
-          : 'invisible'} {scale > MIN_SCALE ? 'cursor-grab' : ''}"
+        class="h-full w-full object-contain {loaded ? '' : 'invisible'}"
       />
       {#if failed}
         <EmptyState text={t("FILE_UNAVAILABLE")} class="absolute inset-0" />
       {:else if !loaded}
         <CenteredProgress class="absolute inset-0" />
       {/if}
-    </div>
+    </ZoomPane>
   {:else if kind === "video"}
     <!-- svelte-ignore a11y_media_has_caption -->
     <video
@@ -256,23 +229,34 @@
       ></audio>
     </div>
   {:else if kind === "pdf"}
-    <iframe
-      use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
-      title={filename}
-      class="min-h-0 flex-1 border-0 bg-white"
-    ></iframe>
+    {#if failed}
+      <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
+    {:else if platformName() === "android"}
+      <PdfView url={source} onerror={() => (failed = true)} />
+    {:else}
+      <iframe
+        use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+        title={filename}
+        class="min-h-0 flex-1 border-0 bg-white"
+      ></iframe>
+    {/if}
   {:else if kind === "html"}
     {#if failed}
       <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
     {:else if document_ === null}
       <CenteredProgress class="flex-1" />
     {:else}
-      <iframe
-        srcdoc={document_}
-        title={filename}
-        sandbox="allow-scripts"
-        class="min-h-0 flex-1 border-0 bg-white"
-      ></iframe>
+      <div class="min-h-0 flex-1 overflow-hidden bg-white" bind:clientWidth={frameWidth} bind:clientHeight={frameHeight}>
+        <iframe
+          bind:this={frame}
+          srcdoc={document_}
+          title={filename}
+          onload={measureDocument}
+          sandbox="allow-same-origin"
+          style="width: {documentWidth || frameWidth}px; height: {frameHeight / htmlScale}px; transform: scale({htmlScale}); transform-origin: top left"
+          class="border-0 bg-white"
+        ></iframe>
+      </div>
     {/if}
   {:else if failed}
     <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />

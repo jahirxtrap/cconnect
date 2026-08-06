@@ -6,6 +6,7 @@
   import { DropdownMenu } from "bits-ui";
   import type { TodoItem } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
+  import MenuScrim from "$lib/ui/MenuScrim.svelte";
 
   interface Props {
     todos: TodoItem[];
@@ -32,6 +33,7 @@
 </script>
 
 {#if todos.length}
+  <MenuScrim {open} onDismiss={() => (open = false)} />
   <DropdownMenu.Root {open} onOpenChange={(value) => (open = value)}>
     <DropdownMenu.Trigger
       class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"

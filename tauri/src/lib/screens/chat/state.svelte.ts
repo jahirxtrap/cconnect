@@ -952,8 +952,7 @@ export class ChatState {
     if (this.connection !== "connected") return;
     for (const item of this.queue) {
       if (item.uploading || this.#sent.has(item.id)) continue;
-      this.#sent.add(item.id);
-      this.#socket.sendPrompt(item.text, item.attachments, item.id);
+      if (this.#socket.sendPrompt(item.text, item.attachments, item.id)) this.#sent.add(item.id);
     }
   }
 

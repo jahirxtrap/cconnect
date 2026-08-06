@@ -63,7 +63,10 @@
 
 <svelte:window onkeydown={onKeydown} ondragover={blockFileOpen} ondrop={blockFileOpen} />
 
-<div class="h-full bg-background text-on-background">
+<div
+  class="safe-area bg-background text-on-background"
+  style="height: calc(100% - var(--keyboard, 0px))"
+>
   {#if navigation.route === "/settings"}
     <SettingsScreen />
   {:else if navigation.route === "/monitor"}
@@ -89,6 +92,6 @@
     url={request.url}
     filename={request.name}
     onDelete={request.onDelete}
-    onClose={() => (navigation.preview = null)}
+    onClose={() => navigation.closePreview()}
   />
 {/if}

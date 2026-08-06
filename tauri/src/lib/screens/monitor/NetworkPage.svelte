@@ -222,7 +222,7 @@
       {@const radioOn = status.wifiRadio}
       <PreferenceRow
         icon={Wifi}
-        title={t("NETWORK_WIFI_RADIO")}
+        title={t("NETWORK_WIFI")}
         onclick={busy ? undefined : () => void run("radio", () => networkApi.setRadio(!radioOn))}
       >
         {#snippet trailing()}

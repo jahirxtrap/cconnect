@@ -19,11 +19,9 @@
 </script>
 
 {#if items.length}
-  <div
-    style="padding-bottom: {layout.bottomInset + PANEL_GAP}px"
-    class="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-end px-3 pt-3 sm:px-4"
-  >
+  <div class="safe-area pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-end p-4">
     <div
+      style="margin-bottom: {layout.bottomInset + PANEL_GAP}px"
       class="menu-surface pointer-events-auto w-full overflow-hidden rounded-lg border border-outline-variant bg-surface-variant shadow-lg sm:w-90"
     >
       <div class="flex items-center gap-1 py-1 pr-1 pl-3.5">

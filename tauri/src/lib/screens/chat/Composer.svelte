@@ -17,6 +17,7 @@
   import type { CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
@@ -203,6 +204,7 @@
           <X size={18} />
         </button>
       {/if}
+      <MenuScrim open={menu} onDismiss={() => (menu = false)} />
       <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
         <DropdownMenu.Trigger disabled={!!onCloseSide}>
           {#snippet child({ props })}

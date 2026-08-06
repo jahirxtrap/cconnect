@@ -46,7 +46,7 @@
     {title}
   </Pressable>
   <div>
-    <PopupMenu open={menu} align="end" onOpenChange={(value) => (menu = value)}>
+    <PopupMenu open={menu} align="end" label={t("MORE_OPTIONS")} onOpenChange={(value) => (menu = value)}>
       {#snippet trigger()}
         <span
           class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/10"

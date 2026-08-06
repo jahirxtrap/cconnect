@@ -1,0 +1,46 @@
+<script lang="ts">
+  import { Portal } from "bits-ui";
+  import { layout } from "$lib/platform/layout.svelte";
+
+  interface Props {
+    text: string;
+    anchor: { x: number; top: number; bottom: number } | null;
+  }
+
+  const { text, anchor }: Props = $props();
+
+  const GAP = 6;
+  const EDGE = 8;
+  const HALF = 2;
+
+  let width = $state(0);
+  let height = $state(0);
+
+  const minLeft = $derived(layout.safeLeft + EDGE);
+  const maxLeft = $derived(Math.max(minLeft, window.innerWidth - layout.safeRight - width - EDGE));
+  const left = $derived(anchor === null ? 0 : Math.min(Math.max(anchor.x - width / HALF, minLeft), maxLeft));
+
+  const below = $derived(
+    anchor !== null && anchor.bottom + GAP + height <= window.innerHeight - layout.safeBottom - EDGE,
+  );
+  const top = $derived(
+    anchor === null
+      ? 0
+      : below
+        ? anchor.bottom + GAP
+        : Math.max(layout.safeTop + EDGE, anchor.top - GAP - height),
+  );
+</script>
+
+{#if anchor}
+  <Portal>
+    <div
+      bind:clientWidth={width}
+      bind:clientHeight={height}
+      style="left: {left}px; top: {top}px"
+      class="pointer-events-none fixed z-60 rounded-sm bg-surface-variant px-2 py-1 text-body-sm whitespace-nowrap shadow-lg"
+    >
+      {text}
+    </div>
+  </Portal>
+{/if}

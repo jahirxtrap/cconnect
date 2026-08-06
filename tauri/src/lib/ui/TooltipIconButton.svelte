@@ -1,7 +1,9 @@
 <script lang="ts">
   import { Tooltip } from "bits-ui";
   import type { Snippet } from "svelte";
+  import { isTouch } from "$lib/platform";
   import { keyboardNavigation } from "./keyboardNavigation.svelte";
+  import TouchTip from "./TouchTip.svelte";
 
   interface Props {
     label: string;
@@ -24,8 +26,11 @@
   }: Props = $props();
 
   const BASE_CLASS =
-    "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors enabled:hover:bg-on-surface/8 disabled:cursor-default disabled:opacity-40";
+    "no-callout inline-flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full transition-colors select-none enabled:hover:bg-on-surface/8 disabled:cursor-default disabled:opacity-40";
   const LONG_PRESS_MS = 500;
+  const PRESS_SLOP = 10;
+  const TOUCH_HIDE_MS = 1500;
+  const HALF = 2;
 
   const SIZE_CLASS = /(^|\s)size-\S+/;
   const DEFAULT_SIZE = "size-9";
@@ -37,11 +42,15 @@
   );
 
   let open = $state(false);
+  let touchTip = $state<{ x: number; top: number; bottom: number } | null>(null);
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let hideTimer: ReturnType<typeof setTimeout> | null = null;
   let longPressed = false;
 
   let lastX = Number.NaN;
   let lastY = Number.NaN;
+  let startX = 0;
+  let startY = 0;
 
   const onFocus = (event: FocusEvent) => {
     const target = event.currentTarget as HTMLElement;
@@ -53,6 +62,12 @@
     if (timer !== null) clearTimeout(timer);
     timer = null;
     open = false;
+  };
+
+  const hideTouchTip = () => {
+    if (hideTimer !== null) clearTimeout(hideTimer);
+    hideTimer = null;
+    touchTip = null;
   };
 
   const leave = () => {
@@ -69,13 +84,26 @@
     if (moved) open = true;
   };
 
-  const pressStart = (event: PointerEvent) => {
-    if (event.pointerType !== "touch" || !enabled) return;
+  const pressStart = (event: TouchEvent) => {
+    if (!enabled) return;
+    const touch = event.touches[0];
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    startX = touch.clientX;
+    startY = touch.clientY;
     longPressed = false;
+    if (timer !== null) clearTimeout(timer);
     timer = setTimeout(() => {
       longPressed = true;
-      open = true;
+      touchTip = { x: box.left + box.width / HALF, top: box.top, bottom: box.bottom };
+      if (hideTimer !== null) clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideTouchTip, TOUCH_HIDE_MS);
     }, LONG_PRESS_MS);
+  };
+
+  const pressMove = (event: TouchEvent) => {
+    if (timer === null) return;
+    const touch = event.touches[0];
+    if (Math.abs(touch.clientX - startX) > PRESS_SLOP || Math.abs(touch.clientY - startY) > PRESS_SLOP) pressEnd();
   };
 
   const pressEnd = () => {
@@ -93,38 +121,53 @@
     hide();
     onclick?.();
   };
+
 </script>
 
 {#if !tooltip}
   <button type="button" disabled={!enabled} aria-label={label} onclick={activate} class={TRIGGER_CLASS} {...rest}>
     {@render children()}
   </button>
+{:else if isTouch}
+  <button
+    type="button"
+    disabled={!enabled}
+    aria-label={label}
+    onclick={activate}
+    ontouchstart={pressStart}
+    ontouchmove={pressMove}
+    ontouchend={pressEnd}
+    ontouchcancel={pressEnd}
+    oncontextmenu={(event) => event.preventDefault()}
+    class={TRIGGER_CLASS}
+    {...rest}
+  >
+    {@render children()}
+  </button>
+  <TouchTip text={label} anchor={touchTip} />
 {:else}
-<Tooltip.Provider>
-  <Tooltip.Root {open} onOpenChange={(value) => !value && hide()}>
-    <Tooltip.Trigger
-      disabled={!enabled}
-      aria-label={label}
-      onclick={activate}
-      onpointermove={show}
-      onpointerleave={leave}
-      onpointerdown={pressStart}
-      onpointerup={pressEnd}
-      onpointercancel={hide}
-      onfocus={onFocus}
-      onblur={hide}
-      class={TRIGGER_CLASS}
-      {...rest}
-    >
-      {@render children()}
-    </Tooltip.Trigger>
-    {#if open}
-      <Tooltip.Portal>
-        <Tooltip.Content sideOffset={4} class="z-50 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
-          {label}
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    {/if}
-  </Tooltip.Root>
-</Tooltip.Provider>
+  <Tooltip.Provider>
+    <Tooltip.Root {open} onOpenChange={(value) => !value && hide()}>
+      <Tooltip.Trigger
+        disabled={!enabled}
+        aria-label={label}
+        onclick={activate}
+        onpointermove={show}
+        onpointerleave={leave}
+        onfocus={onFocus}
+        onblur={hide}
+        class={TRIGGER_CLASS}
+        {...rest}
+      >
+        {@render children()}
+      </Tooltip.Trigger>
+      {#if open}
+        <Tooltip.Portal>
+          <Tooltip.Content sideOffset={4} class="z-50 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
+            {label}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      {/if}
+    </Tooltip.Root>
+  </Tooltip.Provider>
 {/if}

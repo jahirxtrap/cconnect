@@ -271,7 +271,9 @@
               <span class="shrink-0 text-on-surface-variant/60">
                 {formatClock(entry.ts * MILLIS_PER_SECOND)}
               </span>
-              <span class="whitespace-pre-wrap {levelClass(entry.level)}">{entry.message}</span>
+              <span class="min-w-0 flex-1 wrap-anywhere whitespace-pre-wrap {levelClass(entry.level)}">
+                {entry.message}
+              </span>
             </div>
           {/each}
         </div>

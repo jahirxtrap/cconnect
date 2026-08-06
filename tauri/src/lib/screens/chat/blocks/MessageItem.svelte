@@ -62,7 +62,7 @@
     {@const showTime = message.timestamp !== null && settings.showTimestamps}
     <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {content.attachments.length ? 'gap-1.5' : ''}">
       {#if content.body}
-        <p class="text-body-md whitespace-pre-wrap">{content.body}</p>
+        <p class="text-body-md wrap-anywhere whitespace-pre-wrap">{content.body}</p>
       {/if}
       {#if content.attachments.length || showTime || message.sendStatus === "error"}
         <div class="flex w-full items-end">

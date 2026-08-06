@@ -1,7 +1,6 @@
 <script lang="ts">
-  import ArrowDown from "@lucide/svelte/icons/arrow-down";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import ArrowUp from "@lucide/svelte/icons/arrow-up";
+  import ArrowUpDown from "@lucide/svelte/icons/arrow-up-down";
   import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
   import Copy from "@lucide/svelte/icons/copy";
   import Download from "@lucide/svelte/icons/download";
@@ -56,7 +55,10 @@
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
+  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuSub from "$lib/ui/MenuSub.svelte";
+  import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SelectionCheck from "$lib/ui/SelectionCheck.svelte";
@@ -134,6 +136,8 @@
   let creatingFolder = $state(false);
   let compressing = $state<string[] | null>(null);
   let extractRequest = $state<ExtractRequest | null>(null);
+  let barMenu = $state(false);
+  let actionsMenu = $state(false);
   let bottomBar = $state(0);
   let pendingUploads = $state<File[]>([]);
   let picker = $state<HTMLInputElement | null>(null);
@@ -237,6 +241,7 @@
         searching = false;
         searchQuery = "";
       }
+      navigation.pushLayer();
       return;
     }
     if (archive !== null) {
@@ -301,13 +306,13 @@
     await reload();
   };
 
-  const setSort = (field: SortKey) => {
-    if (field === sortField) sortAscending = !sortAscending;
-    else {
-      sortField = field;
-      sortAscending = true;
-    }
+  const selectSort = (field: SortKey) => {
+    sortField = field;
     settings.fileSortField = sortField;
+  };
+
+  const toggleSortDirection = () => {
+    sortAscending = !sortAscending;
     settings.fileSortAscending = sortAscending;
   };
 
@@ -427,18 +432,32 @@
       navigation.preview === null,
   );
 
+  const stepBack = () => {
+    if (selecting) {
+      exitSelection();
+      return true;
+    }
+    if (searching) {
+      searching = false;
+      searchQuery = "";
+      return true;
+    }
+    if (transfer) {
+      transfer = null;
+      return true;
+    }
+    if (archive !== null || path) {
+      goUp();
+      return true;
+    }
+    return false;
+  };
+
   const onKeydown = (event: KeyboardEvent) => {
     const active = document.activeElement;
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
     if (event.key === "Escape") {
-      const consumed = selecting || searching || archive !== null || !!path || transfer !== null;
-      if (selecting) exitSelection();
-      else if (searching) {
-        searching = false;
-        searchQuery = "";
-      } else if (archive !== null || path) goUp();
-      else if (transfer) transfer = null;
-      if (consumed) {
+      if (stepBack()) {
         event.preventDefault();
         event.stopImmediatePropagation();
       }
@@ -475,6 +494,8 @@
       window.removeEventListener("paste", onPaste);
     };
   });
+
+  $effect(() => navigation.intercept(stepBack));
 
   $effect(() => {
     watcher.connect();
@@ -550,7 +571,9 @@
     }
     const target = path;
     const timer = setTimeout(() => {
-      void sharedApi.search(target, query).then((result) => (searchResults = result));
+      void sharedApi.search(target, query).then((result) => {
+        if (searching && searchQuery.trim() === query && path === target) searchResults = result;
+      });
     }, SEARCH_DELAY_MS);
     return () => clearTimeout(timer);
   });
@@ -591,7 +614,7 @@
   {:else}
     <AppTopBar title={t("FILES")} subtitle={environment?.name ?? null}>
       {#snippet navigationIcon()}
-        <TooltipIconButton label={t("BACK")} onclick={goUp}>
+        <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
           <ArrowLeft size={20} />
         </TooltipIconButton>
       {/snippet}
@@ -613,7 +636,8 @@
         <TooltipIconButton label={t("ENVIRONMENT")} onclick={() => (envOpen = true)}>
           <Server size={20} />
         </TooltipIconButton>
-        <DropdownMenu.Root>
+        <MenuScrim open={barMenu} onDismiss={() => (barMenu = false)} />
+        <DropdownMenu.Root open={barMenu} onOpenChange={(value) => (barMenu = value)}>
           <DropdownMenu.Trigger
             class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-5"
             aria-label={t("MORE_OPTIONS")}
@@ -624,21 +648,27 @@
             <DropdownMenu.Content
               align="end"
               sideOffset={4}
-              class="menu-surface z-50 min-w-48 rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+              collisionPadding={layout.menuPadding}
+              class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-content-available-height) max-w-(--bits-dropdown-menu-content-available-width) min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
             >
-              {#each SORT_KEYS as key (key)}
-                <MenuItem text={t(SORT_LABELS[key])} selected={key === sortField} onclick={() => setSort(key)}>
+              <MenuSub text={t("SORT_BY")}>
+                {#snippet leading()}
+                  <ArrowUpDown size={16} class="shrink-0 text-on-surface-variant" />
+                {/snippet}
+                {#each SORT_KEYS as key (key)}
+                  <MenuItem
+                    text={t(SORT_LABELS[key])}
+                    selected={key === sortField}
+                    closeOnSelect={false}
+                    onclick={() => selectSort(key)}
+                  />
+                {/each}
+                <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
                   {#snippet trailing()}
-                    {#if key === sortField}
-                      {#if sortAscending}
-                        <ArrowUp size={16} class="text-accent" />
-                      {:else}
-                        <ArrowDown size={16} class="text-accent" />
-                      {/if}
-                    {/if}
+                    <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
                   {/snippet}
                 </MenuItem>
-              {/each}
+              </MenuSub>
               {#if archive === null}
                 <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
                   {#snippet leading()}
@@ -835,7 +865,8 @@
         }}
       />
       <ToolbarAction icon={Trash} label={t("DELETE")} onclick={() => (confirmingDelete = true)} />
-      <DropdownMenu.Root>
+      <MenuScrim open={actionsMenu} onDismiss={() => (actionsMenu = false)} />
+      <DropdownMenu.Root open={actionsMenu} onOpenChange={(value) => (actionsMenu = value)}>
         <DropdownMenu.Trigger
           class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 sm:h-8 sm:w-auto sm:px-3 sm:text-label-lg"
           aria-label={t("MORE")}

@@ -39,7 +39,7 @@
   });
 </script>
 
-<div class="flex h-full min-h-0 flex-col border-r border-outline-variant bg-surface">
+<div class="flex h-full min-h-0 flex-col bg-surface {drawerMode ? '' : 'border-r border-outline-variant'}">
   <div class="flex h-14 shrink-0 items-center px-2">
     <EnvironmentSelector
       class="min-w-0 flex-1"

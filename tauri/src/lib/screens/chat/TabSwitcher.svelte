@@ -174,7 +174,7 @@
 
 <TooltipIconButton label={t("TABS")} onclick={() => (open = true)}>
   <span
-    class="inline-flex size-6 items-center justify-center rounded-[6px] border-[1.5px] border-current text-label-md"
+    class="inline-flex size-[17px] items-center justify-center rounded-[4px] border-[1.5px] border-current text-[11px] leading-none font-semibold"
   >
     {tabs.list.length}
   </span>
@@ -184,7 +184,7 @@
   <Dialog.Portal>
     <Dialog.Content
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="fixed inset-0 z-50 flex flex-col bg-surface text-on-surface"
+      class="safe-area fixed inset-0 z-50 flex flex-col bg-surface text-on-surface"
       aria-label={t("TABS")}
     >
       <div class="flex shrink-0 items-center px-1.5 py-1.5">

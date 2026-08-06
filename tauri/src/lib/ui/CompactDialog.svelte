@@ -17,10 +17,10 @@
 
 <Dialog.Root open onOpenChange={(open) => !open && onDismiss()}>
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-50 bg-black/60" />
+    <Dialog.Overlay class="fixed inset-0 z-60 bg-black/60" />
     <Dialog.Content
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="menu-surface fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-max min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-outline-variant bg-surface p-5 shadow-xl"
+      class="menu-surface fixed top-1/2 left-1/2 z-60 flex max-h-[85%] w-max min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-outline-variant bg-surface p-5 shadow-xl"
     >
       <div class="flex items-start gap-2">
         <div class="min-w-0 flex-1">

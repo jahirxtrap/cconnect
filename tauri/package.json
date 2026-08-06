@@ -21,6 +21,7 @@
     "@tauri-apps/plugin-store": "^2.4.0",
     "bits-ui": "^2.18.1",
     "markdown-it": "^15.0.0",
+    "pdfjs-dist": "^6.2.108",
     "shiki": "^4.4.1",
     "simple-icons": "^16.28.0"
   },

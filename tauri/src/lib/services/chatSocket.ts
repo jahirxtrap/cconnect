@@ -174,7 +174,7 @@ export class ChatSocket {
   }
 
   sendPrompt(prompt: string, attachments: string[] = [], id: string | null = null) {
-    this.#send({
+    return this.#send({
       type: "prompt",
       text: prompt,
       ...(attachments.length ? { attachments } : {}),
@@ -235,8 +235,12 @@ export class ChatSocket {
   #send(payload: Wire) {
     const frame = JSON.stringify(payload);
     const socket = this.#socket;
-    if (socket?.readyState === WebSocket.OPEN) socket.send(frame);
-    else if (socket?.readyState === WebSocket.CONNECTING) this.#buffered.push(frame);
+    if (socket?.readyState === WebSocket.OPEN) {
+      socket.send(frame);
+      return true;
+    }
+    if (socket?.readyState === WebSocket.CONNECTING) this.#buffered.push(frame);
+    return false;
   }
 
   #clearTimer() {

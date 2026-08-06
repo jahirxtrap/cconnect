@@ -26,6 +26,11 @@
   export function focus() {
     field?.focus();
   }
+
+  export function toggleKeyboard() {
+    if (document.activeElement === field) field?.blur();
+    else field?.focus();
+  }
   let cellWidth = $state(8);
   let cursorOn = $state(true);
 
@@ -146,6 +151,25 @@
     if (text) emulator.sendText(text.replace(/\r?\n/g, "\r"));
   };
 
+  const onbeforeinput = (event: InputEvent) => {
+    if (event.inputType === "deleteContentBackward") {
+      event.preventDefault();
+      emulator.send(new Uint8Array([0x7f]));
+      return;
+    }
+    if (event.inputType === "insertLineBreak" || event.inputType === "insertParagraph") {
+      event.preventDefault();
+      emulator.send(new Uint8Array([0x0d]));
+    }
+  };
+
+  const oninput = (event: Event) => {
+    const target = event.currentTarget as HTMLTextAreaElement;
+    if (!target.value) return;
+    emulator.sendText(target.value.replace(/\r?\n/g, "\r"));
+    target.value = "";
+  };
+
   $effect(() => {
     measure();
     if (!container) return;
@@ -174,7 +198,7 @@
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
 <div
   bind:this={container}
-  class="selectable h-full overflow-y-auto p-1 font-mono outline-none"
+  class="selectable h-full overflow-x-hidden overflow-y-auto p-1 font-mono outline-none"
   style="background: {background}; color: {foreground}; font-size: {FONT_SIZE}px; line-height: {LINE_HEIGHT}"
   role="application"
   aria-label="terminal"
@@ -201,8 +225,14 @@
   <textarea
     bind:this={field}
     {onkeydown}
+    {onbeforeinput}
+    {oninput}
     {onpaste}
     aria-hidden="true"
-    class="absolute size-px resize-none border-0 bg-transparent p-0 text-transparent opacity-0 outline-none"
+    autocapitalize="off"
+    autocomplete="off"
+    spellcheck="false"
+    inputmode="text"
+    class="absolute top-0 left-0 size-px resize-none border-0 bg-transparent p-0 text-transparent opacity-0 outline-none"
   ></textarea>
 </div>
