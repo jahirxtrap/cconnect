@@ -199,7 +199,7 @@ def download_shared(path: str):
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    return FileResponse(resolved, filename=resolved.name)
+    return FileResponse(resolved, filename=resolved.name, headers={"Content-Encoding": "identity"})
 
 
 @router.delete("/shared/{path:path}")
