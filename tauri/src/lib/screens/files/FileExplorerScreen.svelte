@@ -14,12 +14,12 @@
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
   import PackageOpen from "@lucide/svelte/icons/package-open";
   import Pencil from "@lucide/svelte/icons/pencil";
-  import Plus from "@lucide/svelte/icons/plus";
   import Save from "@lucide/svelte/icons/save";
   import Search from "@lucide/svelte/icons/search";
   import Server from "@lucide/svelte/icons/server";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
+  import Upload from "@lucide/svelte/icons/upload";
   import X from "@lucide/svelte/icons/x";
   import { DropdownMenu } from "bits-ui";
   import { untrack } from "svelte";
@@ -52,12 +52,13 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import DialogActionItem from "$lib/ui/DialogActionItem.svelte";
+  import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
-  import SelectionDot from "$lib/ui/SelectionDot.svelte";
+  import SelectionCheck from "$lib/ui/SelectionCheck.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import Breadcrumb from "./Breadcrumb.svelte";
   import CompressDialog from "./CompressDialog.svelte";
@@ -87,6 +88,10 @@
   const SEARCH_DELAY_MS = 300;
   const MILLIS_PER_SECOND = 1000;
   const SLIDE_MS = 150;
+  const LONG_PRESS_MS = 500;
+  const DRAG_SLOP = 8;
+  const EDGE_ZONE = 96;
+  const EDGE_STEP = 24;
   const SORT_KEYS: SortKey[] = ["name", "date", "type", "size"];
   const SORT_LABELS: Record<SortKey, string> = {
     name: "SORT_NAME",
@@ -134,7 +139,17 @@
   let dropOver = $state(false);
   let dropTarget = $state<string | null>(null);
   let dragging = $state<string[] | null>(null);
+  let dragPoint = $state<{ x: number; y: number } | null>(null);
+  let marking = $state(false);
+  let list = $state<HTMLElement | null>(null);
   let seenUploads = new Set<number>();
+  let pressTimer: ReturnType<typeof setTimeout> | null = null;
+  let pressOrigin: { x: number; y: number } | null = null;
+  let pendingDrag: string[] | null = null;
+  let captured: number | null = null;
+  let swallowClick = false;
+  let anchor = -1;
+  let markBase: string[] = [];
 
   const environment = $derived(backend.active);
 
@@ -298,6 +313,101 @@
   const detailOf = (entry: SharedEntry) =>
     entry.isDir ? plural("ITEM_COUNT", entry.items) : formatSize(entry.size);
 
+  const rowAt = (x: number, y: number) => {
+    const element = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-row]");
+    if (!element) return null;
+    return { index: Number(element.dataset.row), name: element.dataset.name ?? "" };
+  };
+
+  const scrollEdge = (y: number) => {
+    const box = list?.getBoundingClientRect();
+    if (!box || !list) return;
+    if (y > box.bottom - EDGE_ZONE) list.scrollBy(0, EDGE_STEP);
+    else if (y < box.top + EDGE_ZONE) list.scrollBy(0, -EDGE_STEP);
+  };
+
+  const moved = (event: PointerEvent) =>
+    !!pressOrigin && Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) > DRAG_SLOP;
+
+  const capture = (pointerId: number) => {
+    captured = pointerId;
+    list?.setPointerCapture(pointerId);
+  };
+
+  const endGesture = () => {
+    if (pressTimer !== null) clearTimeout(pressTimer);
+    if (captured !== null && list?.hasPointerCapture(captured)) list.releasePointerCapture(captured);
+    pressTimer = null;
+    pressOrigin = null;
+    pendingDrag = null;
+    captured = null;
+    anchor = -1;
+    markBase = [];
+    marking = false;
+    dragging = null;
+    dragPoint = null;
+    dropTarget = null;
+  };
+
+  const onPointerDown = (event: PointerEvent) => {
+    swallowClick = false;
+    if (transfer || (event.pointerType === "mouse" && event.button !== 0)) return;
+    const row = rowAt(event.clientX, event.clientY);
+    if (!row) return;
+    pressOrigin = { x: event.clientX, y: event.clientY };
+    if (selected.includes(row.name)) {
+      if (archive === null) pendingDrag = selectedEntries.map((entry) => child(entry.name));
+      return;
+    }
+    const pointerId = event.pointerId;
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      anchor = row.index;
+      markBase = selecting ? selected : [];
+      marking = true;
+      selecting = true;
+      selected = [...new Set([...markBase, row.name])];
+      capture(pointerId);
+    }, LONG_PRESS_MS);
+  };
+
+  const onPointerMove = (event: PointerEvent) => {
+    if (pressTimer !== null && moved(event)) {
+      clearTimeout(pressTimer);
+      pressTimer = null;
+      pressOrigin = null;
+    }
+    if (pendingDrag && !dragging && moved(event)) {
+      dragging = pendingDrag;
+      capture(event.pointerId);
+    }
+    if (dragging) {
+      const row = rowAt(event.clientX, event.clientY);
+      const entry = row ? ordered.find((item) => item.name === row.name) : null;
+      dropTarget = entry?.isDir && !dragging.includes(child(entry.name)) ? entry.name : null;
+      dragPoint = { x: event.clientX, y: event.clientY };
+      scrollEdge(event.clientY);
+      return;
+    }
+    if (!marking || anchor < 0) return;
+    const row = rowAt(event.clientX, event.clientY);
+    if (row) {
+      const [from, to] = row.index >= anchor ? [anchor, row.index] : [row.index, anchor];
+      selected = [...new Set([...markBase, ...ordered.slice(from, to + 1).map((entry) => entry.name)])];
+    }
+    scrollEdge(event.clientY);
+  };
+
+  const onPointerUp = () => {
+    const sources = dragging;
+    const target = dropTarget;
+    swallowClick = marking || dragging !== null;
+    endGesture();
+    if (!sources?.length || !target) return;
+    exitSelection();
+    void sharedApi.move(sources, child(target)).then(reload);
+  };
+
   const onDrop = (event: DragEvent) => {
     event.preventDefault();
     dropOver = false;
@@ -371,6 +481,16 @@
   });
 
   $effect(() => {
+    const element = list;
+    if (!element) return;
+    const block = (event: TouchEvent) => {
+      if (marking || dragging) event.preventDefault();
+    };
+    element.addEventListener("touchmove", block, { passive: false });
+    return () => element.removeEventListener("touchmove", block);
+  });
+
+  $effect(() => {
     syncFilesLocation({ path, archive, archiveDir });
   });
 
@@ -397,6 +517,7 @@
     void path;
     void archiveDir;
     exitSelection();
+    endGesture();
     loaded = false;
     entries = [];
     watcher.watch(current === null ? path : current.split("/").slice(0, -1).join("/"));
@@ -447,13 +568,13 @@
 
 <div class="flex h-full flex-col" role="application" aria-label={t("FILES")}>
   {#if selecting}
-    <AppTopBar title={String(selected.length)}>
+    <AppTopBar title={plural("ITEM_COUNT", selected.length)}>
       {#snippet navigationIcon()}
         <TooltipIconButton
           label={t("SELECT_ALL")}
           onclick={() => (selected = allSelected ? [] : entries.map((entry) => entry.name))}
         >
-          <SelectionDot selected={allSelected} />
+          <SelectionCheck selected={allSelected} />
         </TooltipIconButton>
       {/snippet}
       {#snippet actions()}
@@ -472,6 +593,9 @@
       {#snippet actions()}
         <UploadIndicator />
         {#if archive === null}
+          <TooltipIconButton label={t("UPLOAD_FILES")} onclick={() => picker?.click()}>
+            <Upload size={20} />
+          </TooltipIconButton>
           <TooltipIconButton
             label={t("SEARCH")}
             onclick={() => {
@@ -487,7 +611,7 @@
         </TooltipIconButton>
         <DropdownMenu.Root>
           <DropdownMenu.Trigger
-            class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-6"
+            class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-5"
             aria-label={t("MORE_OPTIONS")}
           >
             <EllipsisVertical size={20} />
@@ -527,7 +651,7 @@
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="relative flex min-h-0 flex-1 flex-col {dropOver ? 'drop-ring' : ''}"
+    class="relative flex min-h-0 flex-1 flex-col"
     ondragover={(event) => {
       event.preventDefault();
       dropOver = archive === null;
@@ -538,9 +662,11 @@
     ondrop={onDrop}
   >
   {#if searching}
-    <div class="px-3 py-2">
-      <div class="flex h-11 items-center gap-2.5 rounded-full bg-surface-variant pr-3 pl-3.5">
-        <Search size={18} class="shrink-0 text-on-surface-variant" />
+    <div class="px-4 py-2">
+      <div
+        class="flex h-9 items-center gap-2 rounded-md border border-transparent bg-surface-variant/60 px-3 transition-colors focus-within:border-accent"
+      >
+        <Search size={16} class="shrink-0 text-on-surface-variant" />
         <input
           value={searchQuery}
           oninput={(event) => (searchQuery = (event.currentTarget as HTMLInputElement).value)}
@@ -552,9 +678,9 @@
             type="button"
             onclick={() => (searchQuery = "")}
             aria-label={t("CLEAR")}
-            class="shrink-0 cursor-pointer text-on-surface-variant"
+            class="shrink-0 cursor-pointer text-on-surface-variant transition-colors hover:text-on-surface"
           >
-            <X size={18} />
+            <X size={14} />
           </button>
         {/if}
       </div>
@@ -576,61 +702,50 @@
   {/if}
 
   <div class="relative min-h-0 flex-1">
+    <DropOverlay visible={dropOver} />
     {#if ordered.length}
-      <div class="h-full overflow-y-auto">
-        {#each ordered as entry (entry.name)}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div
+        bind:this={list}
+        onpointerdown={onPointerDown}
+        onpointermove={onPointerMove}
+        onpointerup={onPointerUp}
+        onpointercancel={endGesture}
+        onclickcapture={(event) => {
+          if (!swallowClick) return;
+          swallowClick = false;
+          event.preventDefault();
+          event.stopPropagation();
+        }}
+        class="h-full overflow-y-auto {marking || dragging ? 'touch-none select-none' : ''}"
+      >
+        {#each ordered as entry, index (entry.name)}
           {@const isSelected = selected.includes(entry.name)}
-          <ListRow
-            icon={entry.isDir ? Folder : isArchive(entry.name) ? FolderArchive : FileIcon}
-            title={entry.name}
-            subtitle={formatDayTime(entry.modified * MILLIS_PER_SECOND)}
-            class={dropTarget === entry.name ? "bg-accent/15" : ""}
-            draggable={archive === null}
-            ondragstart={() => {
-              dragging = selected.includes(entry.name)
-                ? selectedEntries.map((item) => child(item.name))
-                : [child(entry.name)];
-            }}
-            ondragend={() => {
-              dragging = null;
-              dropTarget = null;
-            }}
-            ondragover={() => {
-              if (entry.isDir && dragging && !dragging.includes(child(entry.name))) dropTarget = entry.name;
-            }}
-            ondragleave={() => {
-              if (dropTarget === entry.name) dropTarget = null;
-            }}
-            ondrop={() => {
-              const sources = dragging;
-              dropTarget = null;
-              dragging = null;
-              if (!entry.isDir || !sources?.length) return;
-              void sharedApi.move(sources, child(entry.name)).then(reload);
-            }}
-            onclick={() => openEntry(entry)}
-            oncontextmenu={() => {
-              if (transfer) return;
-              selecting = true;
-              toggle(entry.name);
-            }}
-            onlongclick={() => {
-              if (transfer) return;
-              selecting = true;
-              toggle(entry.name);
-            }}
-          >
-            {#snippet leading()}
-              {#if selecting}
-                <div class="mr-2 flex w-6 items-center">
-                  <SelectionDot selected={isSelected} />
-                </div>
-              {/if}
-            {/snippet}
-            {#snippet subtitleTrailing()}
-              <span class="px-2 text-body-sm font-bold text-on-surface-variant">{detailOf(entry)}</span>
-            {/snippet}
-          </ListRow>
+          <div data-row={index} data-name={entry.name}>
+            <ListRow
+              icon={entry.isDir ? Folder : isArchive(entry.name) ? FolderArchive : FileIcon}
+              title={entry.name}
+              subtitle={formatDayTime(entry.modified * MILLIS_PER_SECOND)}
+              class={dropTarget === entry.name ? "bg-accent/15" : ""}
+              onclick={() => openEntry(entry)}
+              oncontextmenu={() => {
+                if (transfer) return;
+                selecting = true;
+                toggle(entry.name);
+              }}
+            >
+              {#snippet leading()}
+                {#if selecting}
+                  <div class="mr-2 flex w-6 items-center">
+                    <SelectionCheck selected={isSelected} />
+                  </div>
+                {/if}
+              {/snippet}
+              {#snippet subtitleTrailing()}
+                <span class="px-2 text-body-sm font-bold text-on-surface-variant">{detailOf(entry)}</span>
+              {/snippet}
+            </ListRow>
+          </div>
         {/each}
       </div>
     {:else if !loaded}
@@ -639,16 +754,6 @@
       <EmptyState text={t("NO_FILES")} class="h-full" />
     {/if}
 
-    {#if !selecting && !transfer && archive === null}
-      <button
-        type="button"
-        onclick={() => picker?.click()}
-        aria-label={t("UPLOAD_FILES")}
-        class="absolute right-4 bottom-4 inline-flex size-12 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-lg transition-opacity hover:opacity-90"
-      >
-        <Plus size={24} />
-      </button>
-    {/if}
   </div>
 
   {#if transfer}
@@ -660,7 +765,10 @@
     </div>
   {:else if selecting && selected.length && archive !== null}
     {@const current = archive}
-    <div transition:slide={{ duration: SLIDE_MS }} class="flex items-center bg-surface py-1">
+    <div
+      transition:slide={{ duration: SLIDE_MS }}
+      class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
+    >
       <ToolbarAction
         icon={PackageOpen}
         label={t("EXTRACT")}
@@ -699,7 +807,10 @@
       />
     </div>
   {:else if selecting && selected.length}
-    <div transition:slide={{ duration: SLIDE_MS }} class="flex items-center bg-surface py-1">
+    <div
+      transition:slide={{ duration: SLIDE_MS }}
+      class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
+    >
       <ToolbarAction icon={FolderInput} label={t("MOVE")} onclick={() => startTransfer("move")} />
       <ToolbarAction icon={Copy} label={t("COPY")} onclick={() => startTransfer("copy")} />
       <ToolbarAction
@@ -716,11 +827,11 @@
       <ToolbarAction icon={Trash} label={t("DELETE")} onclick={() => (confirmingDelete = true)} />
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
-          class="flex min-w-0 flex-1 cursor-pointer flex-col items-center rounded-md py-2 transition-colors hover:bg-on-surface/6"
+          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 sm:h-8 sm:w-auto sm:px-3 sm:text-label-lg"
           aria-label={t("MORE")}
         >
-          <EllipsisVertical size={22} />
-          <span class="mt-0.5 max-w-full truncate px-1 text-label-md">{t("MORE")}</span>
+          <EllipsisVertical size={18} class="shrink-0" />
+          <span class="hidden truncate sm:inline">{t("MORE")}</span>
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
@@ -829,6 +940,15 @@
   {/if}
   </div>
 </div>
+
+{#if dragging && dragPoint}
+  <div
+    style="left: {dragPoint.x + 12}px; top: {dragPoint.y + 12}px"
+    class="pointer-events-none fixed z-50 rounded-sm border border-outline-variant bg-surface-variant px-2 py-1 text-body-sm shadow-lg"
+  >
+    {plural("ITEM_COUNT", dragging.length)}
+  </div>
+{/if}
 
 <input
   bind:this={picker}

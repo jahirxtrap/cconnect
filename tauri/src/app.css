@@ -60,14 +60,15 @@ html[data-theme="dark"] {
   animation: menu-enter 120ms ease-out;
 }
 
-.drop-ring::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border: 2px solid var(--c-accent);
-  border-radius: var(--radius-group);
-  pointer-events: none;
-  z-index: 20;
+.drop-overlay {
+  animation: drop-overlay-enter 120ms ease-out;
+}
+
+@keyframes drop-overlay-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.99);
+  }
 }
 
 .flash-highlight {

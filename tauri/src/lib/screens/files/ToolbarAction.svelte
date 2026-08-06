@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { IconSource } from "$lib/ui/icons";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
     icon: IconSource;
@@ -11,12 +12,17 @@
   const { icon: IconComponent, label, onclick, enabled = true }: Props = $props();
 </script>
 
+<span class="sm:hidden">
+  <TooltipIconButton {label} {onclick} {enabled} class="size-8">
+    <IconComponent />
+  </TooltipIconButton>
+</span>
 <button
   type="button"
   disabled={!enabled}
   {onclick}
-  class="flex min-w-0 flex-1 cursor-pointer flex-col items-center rounded-md py-2 transition-colors hover:bg-on-surface/6 disabled:cursor-default disabled:opacity-40"
+  class="hidden h-8 shrink-0 cursor-pointer items-center gap-2 rounded-full px-3 text-label-lg transition-colors enabled:hover:bg-on-surface/8 disabled:cursor-default disabled:opacity-40 sm:inline-flex"
 >
-  <IconComponent size={22} />
-  <span class="mt-0.5 max-w-full truncate px-1 text-label-md">{label}</span>
+  <IconComponent size={18} class="shrink-0" />
+  <span class="truncate">{label}</span>
 </button>

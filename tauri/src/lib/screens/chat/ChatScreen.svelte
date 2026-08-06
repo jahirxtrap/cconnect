@@ -32,6 +32,7 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import Drawer from "$lib/ui/Drawer.svelte";
+  import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -275,7 +276,7 @@
 
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="relative flex min-h-0 flex-1 flex-col {dropOver ? 'drop-ring' : ''}"
+      class="relative flex min-h-0 flex-1 flex-col"
       ondragover={(event) => {
         event.preventDefault();
         dropOver = canAttach;
@@ -285,6 +286,7 @@
       }}
       ondrop={onDrop}
     >
+      <DropOverlay visible={dropOver} />
       <div class="relative min-h-0 flex-1">
         <div
           class="overflow-hidden {chat.sideOpen && !sideDragging
