@@ -99,6 +99,8 @@
     scanning = false;
   };
 
+  const interfaces = $derived(status.interfaces.filter((item) => item.kind !== "other" || item.up));
+
   const connectivityLabel = $derived(
     status.connectivity === "full"
       ? t("NETWORK_ONLINE")
@@ -177,7 +179,10 @@
   {/if}
 
   <SettingsGroup label={t("NETWORK_INTERFACES")}>
-    {#each status.interfaces.filter((item) => item.kind !== "other" || item.up) as item (item.name)}
+    {#if !interfaces.length}
+      <PreferenceRow icon={Cable} title={t("NETWORK_NO_INTERFACES")} enabled={false} />
+    {/if}
+    {#each interfaces as item (item.name)}
       {@const controllable = status.wiredControl && item.kind === "wired"}
       <PreferenceRow
         icon={item.kind === "wifi" ? Wifi : Cable}

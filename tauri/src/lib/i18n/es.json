@@ -194,6 +194,7 @@
   "NETWORK_WIFI": "Wi-Fi",
   "NETWORK_WIFI_RADIO": "Wi-Fi activado",
   "NETWORK_NO_NETWORKS": "No se encontraron redes",
+  "NETWORK_NO_INTERFACES": "No se encontraron interfaces",
   "NETWORK_SIGNAL": "Señal {1}",
   "NETWORK_TESTING": "Midiendo",
   "NETWORK_CONNECT": "Conectar",

@@ -61,7 +61,7 @@
     <p class="mb-1.5 text-label-lg">{label}</p>
   {/if}
   <div
-    class="flex w-full items-center gap-2 rounded-sm border border-outline-variant px-3 py-2 transition-colors focus-within:border-accent"
+    class="flex w-full items-center gap-2 rounded-md border border-outline-variant px-3 py-2 transition-colors focus-within:border-accent"
   >
     {#if singleLine}
       <input

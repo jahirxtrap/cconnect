@@ -227,7 +227,7 @@
           >
             {#snippet trailing()}
               <TooltipIconButton label={t("CHANGELOG")} enabled={serverReady} onclick={() => (detail = "changelog")}>
-                <FileText size={20} />
+                <FileText size={18} />
               </TooltipIconButton>
             {/snippet}
           </PreferenceRow>

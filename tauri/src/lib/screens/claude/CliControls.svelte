@@ -59,7 +59,7 @@
   });
 </script>
 
-<div class="flex flex-col gap-2.5 px-4 pb-2.5">
+<div class="flex flex-col gap-2.5 px-4 py-3">
   <SelectField label={t("CLI_SOURCE")} selected={source} {options} onSelect={(value) => (source = value)} />
   {#if source === "custom"}
     <InputField

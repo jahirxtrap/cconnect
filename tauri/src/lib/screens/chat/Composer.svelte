@@ -20,6 +20,7 @@
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import type { Attachment } from "./state.svelte";
 
   interface Props {
@@ -203,12 +204,12 @@
         </button>
       {/if}
       <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
-        <DropdownMenu.Trigger
-          disabled={!!onCloseSide}
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 disabled:hidden"
-          aria-label={t("ATTACH_FILES")}
-        >
-          <Plus size={18} />
+        <DropdownMenu.Trigger disabled={!!onCloseSide}>
+          {#snippet child({ props })}
+            <TooltipIconButton label={t("ATTACH_FILES")} tooltip={false} class="size-8 disabled:hidden" {...props}>
+              <Plus />
+            </TooltipIconButton>
+          {/snippet}
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content

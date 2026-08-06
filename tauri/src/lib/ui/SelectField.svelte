@@ -19,16 +19,16 @@
 </script>
 
 <div class={className}>
-  <p class="mb-1 text-label-md text-on-surface-variant">{label}</p>
+  <p class="mb-1.5 text-label-lg">{label}</p>
   <PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
     {#snippet trigger()}
       <span
-        class="flex w-full cursor-pointer items-center rounded-xs border px-3 py-2.5 {open
+        class="flex w-full cursor-pointer items-center gap-2 rounded-md border px-3 py-2 transition-colors {open
           ? 'border-accent'
           : 'border-outline-variant'}"
       >
         <span class="min-w-0 flex-1 truncate text-left text-body-md">{display}</span>
-        <ChevronDown size={24} class="ml-2 shrink-0 text-on-surface-variant" />
+        <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
       </span>
     {/snippet}
     {#each options as option (option.value)}

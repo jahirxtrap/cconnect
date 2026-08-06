@@ -67,13 +67,12 @@
   {#snippet titleTrailing()}
     <TooltipIconButton
       label={t("ADD_ENVIRONMENT")}
-      class="size-8"
       onclick={() => {
         editing = blank();
         isNew = true;
       }}
     >
-      <Plus size={18} />
+      <Plus />
     </TooltipIconButton>
   {/snippet}
   {#snippet buttons()}
@@ -89,21 +88,18 @@
         onclick={() => backend.select(profile.id)}
       >
         {#snippet trailing()}
-          <span class="flex shrink-0 items-center">
-            <TooltipIconButton
-              label={t("EDIT_ENVIRONMENT")}
-              class="size-8"
-              onclick={() => {
-                editing = { ...profile };
-                isNew = false;
-              }}
-            >
-              <Pencil size={15} />
-            </TooltipIconButton>
-            <TooltipIconButton label={t("DELETE")} class="size-8" onclick={() => (deleting = profile)}>
-              <Trash2 size={15} />
-            </TooltipIconButton>
-          </span>
+          <TooltipIconButton
+            label={t("EDIT_ENVIRONMENT")}
+            onclick={() => {
+              editing = { ...profile };
+              isNew = false;
+            }}
+          >
+            <Pencil />
+          </TooltipIconButton>
+          <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)}>
+            <Trash2 />
+          </TooltipIconButton>
         {/snippet}
       </DialogSelectItem>
     {/each}

@@ -71,10 +71,10 @@
 
 {#snippet profileRow(profile: Profile | null, label: string)}
   {#if profile}
-    <Pressable onclick={() => open(profile.url)} class="flex w-full items-center gap-4 px-4 py-3">
-      <img src={profile.avatarUrl} alt="" class="size-8 shrink-0 rounded-full" />
+    <Pressable onclick={() => open(profile.url)} class="flex w-full items-center gap-3 px-4 py-3">
+      <img src={profile.avatarUrl} alt="" class="size-7 shrink-0 rounded-full" />
       <div class="min-w-0 flex-1">
-        <p class="truncate text-body-lg">{profile.name ?? profile.login}</p>
+        <p class="truncate text-body-md font-medium">{profile.name ?? profile.login}</p>
         <p class="truncate text-body-sm text-on-surface-variant">{label}</p>
       </div>
       <ExternalIndicator />
@@ -83,10 +83,10 @@
 {/snippet}
 
 <SettingsGroup label={t("ABOUT")}>
-  <Pressable onclick={() => open(release?.url ?? RELEASES_URL)} class="flex w-full items-center gap-4 px-4 py-3">
+  <Pressable onclick={() => open(release?.url ?? RELEASES_URL)} class="flex w-full items-center gap-3 px-4 py-3">
       <AppLogo size={28} />
       <div class="min-w-0 flex-1">
-      <p class="truncate text-body-lg">{t("APP_NAME")}</p>
+      <p class="truncate text-body-md font-medium">{t("APP_NAME")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>
@@ -100,14 +100,14 @@
           <p class="text-body-sm text-on-surface-variant">{t("UP_TO_DATE")}</p>
         {/if}
       </div>
-    <div class="shrink-0">
-      <TooltipIconButton label={t("CHANGELOG")} onclick={() => (changelogOpen = true)}>
-        <FileText size={20} />
-      </TooltipIconButton>
-    </div>
+      <div class="shrink-0">
+        <TooltipIconButton label={t("CHANGELOG")} onclick={() => (changelogOpen = true)}>
+          <FileText size={18} />
+        </TooltipIconButton>
+      </div>
   </Pressable>
 
-  <div class="px-4 pb-2.5">
+  <div class="px-4 py-3">
     {#if updater.progress !== null}
       <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-variant">
         <div class="h-full bg-accent transition-[width]" style="width: {Math.round(updater.progress * 100)}%"></div>

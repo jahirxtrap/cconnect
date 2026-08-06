@@ -25,7 +25,7 @@
   type="button"
   disabled={!enabled}
   {onclick}
-  class="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-sm px-3 text-label-lg whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40 {VARIANTS[
+  class="inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full px-4 text-label-lg whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40 {VARIANTS[
     variant
   ]} {className}"
 >

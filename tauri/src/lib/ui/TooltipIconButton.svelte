@@ -5,24 +5,35 @@
 
   interface Props {
     label: string;
-    onclick: () => void;
+    onclick?: () => void;
     enabled?: boolean;
+    tooltip?: boolean;
     class?: string;
     children: Snippet;
+    [key: string]: unknown;
   }
 
-  const { label, onclick, enabled = true, class: className = "", children }: Props = $props();
+  const {
+    label,
+    onclick,
+    enabled = true,
+    tooltip = true,
+    class: className = "",
+    children,
+    ...rest
+  }: Props = $props();
 
   const BASE_CLASS =
     "inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors enabled:hover:bg-on-surface/8 disabled:cursor-default disabled:opacity-40";
   const LONG_PRESS_MS = 500;
 
   const SIZE_CLASS = /(^|\s)size-\S+/;
+  const DEFAULT_SIZE = "size-9";
 
   const compact = $derived(/(^|\s)size-8(\s|$)/.test(className));
 
   const TRIGGER_CLASS = $derived(
-    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : "size-10"} ${compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-6"} ${className}`,
+    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-5"} ${className}`,
   );
 
   let open = $state(false);
@@ -80,10 +91,15 @@
       return;
     }
     hide();
-    onclick();
+    onclick?.();
   };
 </script>
 
+{#if !tooltip}
+  <button type="button" disabled={!enabled} aria-label={label} onclick={activate} class={TRIGGER_CLASS} {...rest}>
+    {@render children()}
+  </button>
+{:else}
 <Tooltip.Provider>
   <Tooltip.Root {open} onOpenChange={(value) => !value && hide()}>
     <Tooltip.Trigger
@@ -98,6 +114,7 @@
       onfocus={onFocus}
       onblur={hide}
       class={TRIGGER_CLASS}
+      {...rest}
     >
       {@render children()}
     </Tooltip.Trigger>
@@ -110,3 +127,4 @@
     {/if}
   </Tooltip.Root>
 </Tooltip.Provider>
+{/if}

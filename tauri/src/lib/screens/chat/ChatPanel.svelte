@@ -101,7 +101,7 @@
     {/if}
   </div>
 
-  <div class="flex shrink-0 items-center gap-0.5 border-t border-outline-variant px-2 py-1.5">
+  <div class="flex shrink-0 items-center gap-1 border-t border-outline-variant px-2 py-1.5">
     <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
       <Folder size={17} />
     </TooltipIconButton>

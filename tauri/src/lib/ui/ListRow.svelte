@@ -12,12 +12,6 @@
     onclick?: () => void;
     onlongclick?: () => void;
     oncontextmenu?: () => void;
-    draggable?: boolean;
-    ondragstart?: () => void;
-    ondragend?: () => void;
-    ondragover?: () => void;
-    ondragleave?: () => void;
-    ondrop?: () => void;
     class?: string;
     leading?: Snippet;
     subtitleTrailing?: Snippet;
@@ -33,12 +27,6 @@
     onclick,
     onlongclick,
     oncontextmenu,
-    draggable = false,
-    ondragstart,
-    ondragend,
-    ondragover,
-    ondragleave,
-    ondrop,
     class: className = "",
     leading,
     subtitleTrailing,
@@ -46,23 +34,6 @@
   }: Props = $props();
 </script>
 
-<div
-  {draggable}
-  ondragstart={ondragstart}
-  ondragend={ondragend}
-  ondragover={(event) => {
-    if (!ondragover) return;
-    event.preventDefault();
-    ondragover();
-  }}
-  ondragleave={ondragleave}
-  ondrop={(event) => {
-    if (!ondrop) return;
-    event.preventDefault();
-    ondrop();
-  }}
-  role="presentation"
->
 <Pressable
   {onclick}
   {onlongclick}
@@ -82,7 +53,7 @@
       </div>
     {/if}
   </div>
-  {@render trailing?.()}
-
+  {#if trailing}
+    <div class="flex shrink-0 items-center gap-1">{@render trailing()}</div>
+  {/if}
 </Pressable>
-</div>

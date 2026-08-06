@@ -49,6 +49,8 @@
         <p class="truncate text-body-sm text-on-surface-variant">{subtitle}</p>
       {/if}
     </div>
-    {@render trailing?.()}
+    {#if trailing}
+      <div class="flex shrink-0 items-center gap-1">{@render trailing()}</div>
+    {/if}
   </Pressable>
 </div>

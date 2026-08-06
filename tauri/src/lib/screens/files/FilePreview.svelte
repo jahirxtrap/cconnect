@@ -174,7 +174,7 @@
       {/if}
       <DropdownMenu.Root>
         <DropdownMenu.Trigger
-          class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-6"
+          class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-5"
           aria-label={t("FILES")}
         >
           <EllipsisVertical size={20} />
