@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
 
-  type Variant = "filled" | "outlined" | "ghost" | "text";
+  type Variant = "filled" | "outlined" | "ghost" | "text" | "accent";
 
   interface Props {
     onclick: () => void;
@@ -18,6 +18,7 @@
     outlined: "border border-outline-variant enabled:hover:bg-on-surface/8",
     ghost: "enabled:hover:bg-on-surface/8",
     text: "text-on-surface-variant enabled:hover:text-on-surface",
+    accent: "text-accent enabled:hover:bg-accent/10",
   };
 </script>
 

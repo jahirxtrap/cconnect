@@ -44,6 +44,7 @@
   let envOpen = $state(false);
   let restartOpen = $state(false);
   let logBox = $state<HTMLDivElement | null>(null);
+  let pager = $state<HTMLDivElement | null>(null);
   let followLogs = true;
 
   const environment = $derived(backend.active);
@@ -53,7 +54,15 @@
       ? [t("RESOURCES"), t("NETWORK"), t("SERVER_LOGS")]
       : [t("RESOURCES"), t("SERVER_LOGS")],
   );
-  const logsPage = $derived(hasNetwork ? 2 : 1);
+  const goToPage = (index: number) => {
+    page = index;
+    pager?.scrollTo({ left: index * pager.clientWidth, behavior: "smooth" });
+  };
+
+  const onPagerScroll = () => {
+    if (!pager) return;
+    page = Math.round(pager.scrollLeft / pager.clientWidth);
+  };
 
   const append = (history: number[], value: number) => [...history, value].slice(-HISTORY_CAP);
 
@@ -146,10 +155,15 @@
   {:else}
     {@const current = info}
     <div class="px-4 py-1.5">
-      <SegmentedButtons options={labels} selected={page} onSelect={(index) => (page = index)} />
+      <SegmentedButtons options={labels} selected={page} onSelect={goToPage} />
     </div>
 
-    {#if page === 0}
+    <div
+      bind:this={pager}
+      onscroll={onPagerScroll}
+      class="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
+    >
+      <div class="flex w-full shrink-0 snap-center flex-col">
       <div class="min-h-0 flex-1 overflow-y-auto pb-4">
         <div class="flex gap-3 px-4 py-2">
           {@render graph("CPU", plural("CORES_COUNT", current.cpuCores), current.cpuPercent, cpuHistory)}
@@ -235,9 +249,15 @@
           </SettingsGroup>
         </div>
       </div>
-    {:else if hasNetwork && page === 1 && network}
-      <NetworkPage status={network} rxBytes={current.netRx} txBytes={current.netTx} onReload={reloadNetwork} />
-    {:else if page === logsPage}
+      </div>
+
+      {#if hasNetwork && network}
+        <div class="flex w-full shrink-0 snap-center flex-col">
+          <NetworkPage status={network} rxBytes={current.netRx} txBytes={current.netTx} onReload={reloadNetwork} />
+        </div>
+      {/if}
+
+      <div class="flex w-full shrink-0 snap-center flex-col">
       <div class="min-h-0 flex-1 px-4 pt-2 pb-4">
         <div
           bind:this={logBox}
@@ -256,7 +276,8 @@
           {/each}
         </div>
       </div>
-    {/if}
+      </div>
+    </div>
   {/if}
 </div>
 

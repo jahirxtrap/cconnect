@@ -22,7 +22,7 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
 
-  <div class="w-80 max-w-full">
+  <div>
     {#if !notifier.granted}
       <div class="px-5 pb-3">
         <p class="text-body-sm text-on-surface-variant">{t("NOTIFICATIONS_DISABLED_HINT")}</p>

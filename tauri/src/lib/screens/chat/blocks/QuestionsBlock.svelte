@@ -11,6 +11,7 @@
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
+  import { swipePage } from "$lib/ui/swipe";
 
   interface Props {
     data: InteractionData;
@@ -105,7 +106,13 @@
     {/if}
 
     {#if question}
-      <div class="mt-1">
+      <div
+        class="mt-1"
+        use:swipePage={{
+          onPrevious: () => goto(Math.max(0, page - 1)),
+          onNext: () => goto(Math.min(data.questions.length - 1, page + 1)),
+        }}
+      >
         {#if !many && question.header?.trim()}
           <span class="inline-block rounded-panel bg-accent/14 px-2 py-0.5 text-label-md text-accent">
             {question.header}
