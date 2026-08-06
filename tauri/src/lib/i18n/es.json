@@ -239,6 +239,8 @@
   "UPLOAD_FILES": "Subir archivos",
   "ATTACH_FILES": "Adjuntar archivos",
   "UPLOADS": "Subidas",
+  "TRANSFERS_ACTIVE": "Transfiriendo {1} de {2}",
+  "TRANSFERS_DONE": "Transferencias completadas",
   "NEW_FOLDER": "Nueva carpeta",
   "SORT_BY": "Ordenar",
   "SORT_NAME": "Nombre",

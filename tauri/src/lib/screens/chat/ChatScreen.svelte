@@ -78,6 +78,7 @@
   let sideHeight = $state(58);
   let sideDragging = $state(false);
   let dropOver = $state(false);
+  let composerHeight = $state(0);
 
   const canAttach = $derived(!chat.sideOpen);
 
@@ -113,6 +114,11 @@
   const notices = $derived(serverStatus.notices.filter((notice) => !dismissed.includes(notice)));
 
   const selectTab = (id: string) => tabs.select(id);
+
+  $effect(() => {
+    layout.bottomInset = composerHeight;
+    return () => (layout.bottomInset = 0);
+  });
 
   $effect(() => {
     const environmentIds = [...new Set(tabs.list.map((tab) => tab.environmentId))];
@@ -344,6 +350,7 @@
       </div>
     {/if}
 
+    <div class="shrink-0" bind:clientHeight={composerHeight}>
     <Composer
       streaming={chat.sideOpen ? chat.sideStreaming : chat.streaming}
       draft={chat.sideOpen ? chat.sideDraft : chat.draft}
@@ -367,6 +374,7 @@
         sessionColor={chat.sessionColor}
         controls={chat.sideOpen ? undefined : controls}
       />
+    </div>
     </div>
   </div>
 </div>

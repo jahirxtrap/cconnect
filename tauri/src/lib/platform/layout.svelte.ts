@@ -5,6 +5,7 @@ const MOBILE_MAX_WIDTH = 600;
 class Layout {
   width = $state(window.innerWidth);
   height = $state(window.innerHeight);
+  bottomInset = $state(0);
 
   readonly mobile = $derived(this.height > this.width || this.width < MOBILE_MAX_WIDTH);
   readonly touch = isTouch;

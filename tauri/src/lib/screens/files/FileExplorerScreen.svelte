@@ -29,8 +29,9 @@
   import { isPreviewable } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
   import { formatDayTime } from "$lib/data/time";
-  import { uploads } from "$lib/data/uploads.svelte";
+  import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import {
     archiveFileUrl,
@@ -64,7 +65,6 @@
   import CompressDialog from "./CompressDialog.svelte";
   import { readFilesLocation, syncFilesLocation } from "./filesUrl";
   import ToolbarAction from "./ToolbarAction.svelte";
-  import UploadIndicator from "./UploadIndicator.svelte";
 
   type SortKey = "name" | "date" | "type" | "size";
   type TransferKind = "move" | "copy" | "extract";
@@ -134,6 +134,7 @@
   let creatingFolder = $state(false);
   let compressing = $state<string[] | null>(null);
   let extractRequest = $state<ExtractRequest | null>(null);
+  let bottomBar = $state(0);
   let pendingUploads = $state<File[]>([]);
   let picker = $state<HTMLInputElement | null>(null);
   let dropOver = $state(false);
@@ -481,6 +482,12 @@
   });
 
   $effect(() => {
+    const visible = transfer !== null || (selecting && selected.length > 0);
+    layout.bottomInset = visible ? bottomBar : 0;
+    return () => (layout.bottomInset = 0);
+  });
+
+  $effect(() => {
     const element = list;
     if (!element) return;
     const block = (event: TouchEvent) => {
@@ -550,18 +557,16 @@
 
   $effect(() => {
     void path;
-    seenUploads = new Set(
-      untrack(() => uploads.items)
-        .filter((item) => item.status !== "uploading")
-        .map((item) => item.id),
-    );
+    seenUploads = new Set(untrack(() => transfers.finished).map((item) => item.id));
   });
 
   $effect(() => {
-    const finished = uploads.items.filter((item) => item.status !== "uploading");
+    const finished = transfers.finished;
     const fresh = finished.filter((item) => !seenUploads.has(item.id));
     seenUploads = new Set(finished.map((item) => item.id));
-    if (fresh.some((item) => item.status === "done" && item.dir === untrack(() => path))) void reload();
+    if (fresh.some((item) => item.kind === "upload" && item.status === "done" && item.dir === untrack(() => path))) {
+      void reload();
+    }
   });
 </script>
 
@@ -591,7 +596,6 @@
         </TooltipIconButton>
       {/snippet}
       {#snippet actions()}
-        <UploadIndicator />
         {#if archive === null}
           <TooltipIconButton label={t("UPLOAD_FILES")} onclick={() => picker?.click()}>
             <Upload size={20} />
@@ -757,7 +761,11 @@
   </div>
 
   {#if transfer}
-    <div transition:slide={{ duration: SLIDE_MS }} class="flex gap-3 bg-surface px-4 py-2.5">
+    <div
+      transition:slide={{ duration: SLIDE_MS }}
+      bind:clientHeight={bottomBar}
+      class="flex gap-3 bg-surface px-4 py-2.5"
+    >
       <Button onclick={() => (transfer = null)} variant="outlined" class="flex-1">{t("CANCEL")}</Button>
       <Button onclick={() => void runTransfer()} enabled={transferAllowed} class="flex-1">
         {transfer.kind === "move" ? t("MOVE_HERE") : transfer.kind === "copy" ? t("COPY_HERE") : t("EXTRACT_HERE")}
@@ -767,6 +775,7 @@
     {@const current = archive}
     <div
       transition:slide={{ duration: SLIDE_MS }}
+      bind:clientHeight={bottomBar}
       class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
     >
       <ToolbarAction
@@ -809,6 +818,7 @@
   {:else if selecting && selected.length}
     <div
       transition:slide={{ duration: SLIDE_MS }}
+      bind:clientHeight={bottomBar}
       class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
     >
       <ToolbarAction icon={FolderInput} label={t("MOVE")} onclick={() => startTransfer("move")} />
@@ -983,7 +993,7 @@
     text={plural("UPLOAD_CONFIRM", files.length)}
     confirmLabel={t("UPLOAD")}
     onConfirm={() => {
-      files.forEach((file) => uploads.enqueue(file, path));
+      files.forEach((file) => transfers.upload(file, path));
       pendingUploads = [];
     }}
     onDismiss={() => (pendingUploads = [])}

@@ -15,6 +15,7 @@
   import MonitorScreen from "$lib/screens/monitor/MonitorScreen.svelte";
   import SettingsScreen from "$lib/screens/settings/SettingsScreen.svelte";
   import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
+  import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
 
   theme.start();
   layout.start();
@@ -79,6 +80,8 @@
     <ChatScreen />
   {/if}
 </div>
+
+<TransfersPanel />
 
 {#if navigation.preview}
   {@const request = navigation.preview}
