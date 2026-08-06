@@ -1,3 +1,4 @@
+import { secureStore } from "$lib/platform/secureStorage";
 import { store } from "$lib/platform/storage";
 
 export type AuthKind = "none" | "bearer" | "basic" | "header";
@@ -74,7 +75,7 @@ export const profileKey = (profile: Profile) =>
     : "";
 
 class Backend {
-  environments = $state<EnvironmentProfile[]>(store.get("environments", []));
+  environments = $state<EnvironmentProfile[]>(secureStore.get("environments", []));
   activeId = $state<string | null>(store.get("environments.active", null));
 
   readonly active = $derived(
@@ -102,7 +103,7 @@ class Backend {
 
   save(environments: EnvironmentProfile[]) {
     this.environments = environments;
-    store.set("environments", environments);
+    secureStore.set("environments", environments);
   }
 
   update(id: string | null, patch: Partial<EnvironmentProfile>) {

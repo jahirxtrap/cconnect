@@ -1,4 +1,5 @@
 mod local_server;
+mod secret;
 mod ssh;
 mod system;
 
@@ -39,7 +40,10 @@ pub fn run() {
             local_server::local_server_start,
             local_server::local_server_stop,
             system::system_accent,
-            system::install_update
+            system::install_update,
+            secret::secret_protect,
+            secret::secret_unprotect,
+            secret::secret_available
         ])
         .run(tauri::generate_context!())
         .expect("error while running CConnect");

@@ -1,4 +1,4 @@
-import { store } from "$lib/platform/storage";
+import { secureStore } from "$lib/platform/secureStorage";
 
 export interface SshProfile {
   id: string;
@@ -17,7 +17,7 @@ export const sshAddress = (profile: SshProfile) =>
   `${profile.user}@${profile.host}${profile.port === DEFAULT_PORT ? "" : `:${profile.port}`}`;
 
 class SshStore {
-  profiles = $state<SshProfile[]>(store.get(KEY, []));
+  profiles = $state<SshProfile[]>(secureStore.get(KEY, []));
 
   upsert(profile: SshProfile) {
     const known = this.profiles.some((item) => item.id === profile.id);
@@ -36,7 +36,7 @@ class SshStore {
 
   #save(profiles: SshProfile[]) {
     this.profiles = profiles;
-    store.set(KEY, profiles);
+    secureStore.set(KEY, profiles);
   }
 }
 
