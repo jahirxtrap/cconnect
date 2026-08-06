@@ -1,19 +1,32 @@
 <script lang="ts">
   interface Props {
     value: number;
+    pending?: number;
     size?: number;
     stroke?: number;
     class?: string;
+    pendingClass?: string;
   }
 
-  const { value, size = 16, stroke = 2, class: className = "text-accent" }: Props = $props();
+  const {
+    value,
+    pending = 0,
+    size = 16,
+    stroke = 2,
+    class: className = "text-accent",
+    pendingClass = "text-on-surface-variant",
+  }: Props = $props();
 
   const TRACK_OPACITY = 0.25;
   const QUARTER_TURN = -90;
+  const FULL_TURN = 360;
+
+  const clamp = (input: number) => Math.min(1, Math.max(0, input));
 
   const radius = $derived((size - stroke) / 2);
   const circumference = $derived(2 * Math.PI * radius);
-  const progress = $derived(Math.min(1, Math.max(0, value)));
+  const progress = $derived(clamp(value));
+  const queued = $derived(clamp(pending));
 </script>
 
 <svg width={size} height={size} viewBox="0 0 {size} {size}" class="shrink-0 {className}" aria-hidden="true">
@@ -26,6 +39,20 @@
     stroke-width={stroke}
     opacity={TRACK_OPACITY}
   />
+  {#if queued > 0}
+    <circle
+      cx={size / 2}
+      cy={size / 2}
+      r={radius}
+      fill="none"
+      stroke="currentColor"
+      stroke-width={stroke}
+      stroke-dasharray={circumference}
+      stroke-dashoffset={circumference * (1 - queued)}
+      transform="rotate({QUARTER_TURN + FULL_TURN * progress} {size / 2} {size / 2})"
+      class={pendingClass}
+    />
+  {/if}
   <circle
     cx={size / 2}
     cy={size / 2}

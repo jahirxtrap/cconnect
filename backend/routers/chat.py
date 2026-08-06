@@ -22,6 +22,7 @@ from services import accounts
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services import settings_store
+from services import todos as todos_store
 from services.claude_runtime import run_prompt
 from services.live_sessions import registry
 
@@ -270,8 +271,12 @@ async def chat_ws(ws: WebSocket):
                 })
                 await session.attach(send, last_seq=msg.last_seq, since_committed=bool(by_session))
                 if not session.running and session.state.session_id:
-                    for t in sessions_service.session_tasks(session.state.session_id):
+                    tasks = sessions_service.session_tasks(session.state.session_id)
+                    for t in tasks:
                         await send({"type": "task", **t})
+                    remembered = todos_store.load(session.state.session_id)
+                    if not tasks and remembered:
+                        await send({"type": "todos", "items": remembered})
                 side_channel = raw.get("side_channel")
                 side_resume = raw.get("side_resume")
                 existing_side = registry.get(side_channel) if side_channel else None

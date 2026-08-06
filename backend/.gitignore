@@ -6,6 +6,9 @@ cconnect.db-shm
 # Pending conversation-rewind anchors (runtime state)
 rewind_pending.json
 
+# Last task list per session, replayed on resume (runtime state)
+session_todos.json
+
 # Server log for the monitor screen (one per run)
 logs/
 

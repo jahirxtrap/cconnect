@@ -1166,7 +1166,6 @@ export class ChatState {
         break;
       case "ready": {
         this.connection = "connected";
-        void this.#refreshServerInfo();
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         this.streaming = event.running;

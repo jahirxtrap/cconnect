@@ -12,6 +12,8 @@ import uuid
 
 from loguru import logger
 
+from services import todos as todos_store
+
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
 # on-disk transcript via load_history.
@@ -73,6 +75,8 @@ class LiveSession:
         async with self._lock:
             self._seq += 1
             stamped = {**event, "seq": self._seq, "channel": self.channel}
+            if event.get("type") == "todos":
+                todos_store.remember(self.state.session_id, event.get("items") or [])
             if event.get("type") != "command":
                 self._outbox.append(stamped)
             if event.get("type") in ("done", "interrupted"):

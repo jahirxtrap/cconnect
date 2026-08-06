@@ -6,10 +6,8 @@
   import { t } from "$lib/i18n/index.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
 
-  const RING = 24;
+  const RING = 20;
   const STROKE = 2.5;
-  const FULL_CIRCLE = 360;
-  const HALF = 2;
 
   let open = $state(false);
 
@@ -21,10 +19,6 @@
       ? items.reduce((total, item) => total + (item.status === "uploading" ? item.progress : 1), 0) / items.length
       : 0,
   );
-
-  const radius = (RING - STROKE) / HALF;
-  const circumference = 2 * Math.PI * radius;
-  const center = RING / HALF;
 </script>
 
 {#if items.length}
@@ -36,36 +30,13 @@
     }}
   >
     <DropdownMenu.Trigger
-      class="inline-flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-6"
+      class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
       aria-label={t("UPLOADS")}
     >
       <span class="relative inline-flex items-center justify-center">
-        <svg width={RING} height={RING} viewBox="0 0 {RING} {RING}" aria-hidden="true">
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="currentColor"
-            stroke-width={STROKE}
-            class="text-on-surface/15"
-          />
-          <circle
-            cx={center}
-            cy={center}
-            r={radius}
-            fill="none"
-            stroke="currentColor"
-            stroke-width={STROKE}
-            stroke-linecap="round"
-            stroke-dasharray={circumference}
-            stroke-dashoffset={circumference * (1 - Math.min(1, Math.max(0, progress)))}
-            transform="rotate(-{FULL_CIRCLE / 4} {center} {center})"
-            class="text-accent transition-[stroke-dashoffset]"
-          />
-        </svg>
+        <ProgressRing value={progress} size={RING} stroke={STROKE} class="text-accent transition-[stroke-dashoffset]" />
         {#if allDone}
-          <Check size={14} class="absolute text-accent" />
+          <Check size={12} class="absolute text-accent" />
         {/if}
       </span>
     </DropdownMenu.Trigger>
