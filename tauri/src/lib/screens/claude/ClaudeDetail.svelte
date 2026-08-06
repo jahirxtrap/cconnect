@@ -8,6 +8,7 @@
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import Store from "@lucide/svelte/icons/store";
   import X from "@lucide/svelte/icons/x";
+  import { navigation } from "$lib/app/navigation.svelte";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import {
@@ -37,7 +38,6 @@
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
-  import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { componentLabel, componentTone, incidentLabel, indicatorLabel, indicatorTone } from "./serviceStatus";
@@ -70,7 +70,6 @@
   let skillQuery = $state("");
   let skillSheet = $state<Skill | null>(null);
   let skillFiles = $state<string[] | null>(null);
-  let filePreview = $state<{ url: string; filename: string } | null>(null);
 
   let pluginMenu = $state<Plugin | null>(null);
   let confirmUninstall = $state<Plugin | null>(null);
@@ -169,7 +168,15 @@
 
   const openMemory = (scope: string, name: string) => {
     const project = scope === "global" ? null : memoriesProject;
-    filePreview = { url: claudeApi.memoryUrl(scope, project, name), filename: name };
+    navigation.openPreview({
+      url: claudeApi.memoryUrl(scope, project, name),
+      name,
+      onDelete: () => void claudeApi.deleteMemory(scope, project, name).then(load),
+    });
+  };
+
+  const openSkillFile = (skill: Skill, file: string, name: string) => {
+    navigation.openPreview({ url: claudeApi.skillFileUrl(skill.plugin, skill.id, file), name, onDelete: null });
   };
 
   $effect(() => {
@@ -389,7 +396,7 @@
   {/if}
 </div>
 
-{#if skillSheet && !filePreview}
+{#if skillSheet && !navigation.preview}
   {@const skill = skillSheet}
   <CompactDialog title={skill.name} onDismiss={() => (skillSheet = null)}>
     {#snippet buttons()}
@@ -403,12 +410,7 @@
           <p class="text-body-sm text-on-surface-variant">{skill.description}</p>
         </OutlinedPanel>
       {/if}
-      <OutlinedPanel
-        onclick={() => (filePreview = {
-          url: claudeApi.skillFileUrl(skill.plugin, skill.id, SKILL_FILE),
-          filename: `${skill.id} - ${SKILL_FILE}`,
-        })}
-      >
+      <OutlinedPanel onclick={() => openSkillFile(skill, SKILL_FILE, `${skill.id} - ${SKILL_FILE}`)}>
         <p class="text-body-lg">{SKILL_FILE}</p>
       </OutlinedPanel>
       {@const references = skillFiles.filter((file) => file !== SKILL_FILE)}
@@ -416,12 +418,7 @@
         <p class="mt-3 mb-1.5 text-label-lg text-accent">{t("REFERENCES")}</p>
         <div class="flex flex-col gap-1.5">
           {#each references as file (file)}
-            <OutlinedPanel
-              onclick={() => (filePreview = {
-                url: claudeApi.skillFileUrl(skill.plugin, skill.id, file),
-                filename: file.split("/").pop() ?? file,
-              })}
-            >
+            <OutlinedPanel onclick={() => openSkillFile(skill, file, file.split("/").pop() ?? file)}>
               <p class="text-body-md">{file.split("/").pop()}</p>
               <p class="text-body-sm text-on-surface-variant">{file}</p>
             </OutlinedPanel>
@@ -430,16 +427,6 @@
       {/if}
     {/if}
   </CompactDialog>
-{/if}
-
-{#if filePreview}
-  {@const preview = filePreview}
-  <SharedLinkActionsDialog
-    url={preview.url}
-    filename={preview.filename}
-    onView={() => window.open(preview.url, "_blank", "noopener")}
-    onDismiss={() => (filePreview = null)}
-  />
 {/if}
 
 {#if pluginMenu}
