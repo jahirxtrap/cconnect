@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
+import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 
@@ -86,8 +86,9 @@ fun AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         sheetGesturesEnabled = dismissible,
-        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp),
-        containerColor = AlertDialogDefaults.containerColor,
+        shape = RoundedCornerShape(topStart = Radius.lg, topEnd = Radius.lg),
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
         contentWindowInsets = { WindowInsets(0, 0, 0, 0) },
         properties = appSheetProperties(lightBars),
         dragHandle = null,

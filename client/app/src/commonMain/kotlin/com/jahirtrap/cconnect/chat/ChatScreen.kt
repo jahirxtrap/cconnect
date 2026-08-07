@@ -72,6 +72,7 @@ import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.ChevronDown
+import com.composables.icons.lucide.ChevronsDown
 import com.composables.icons.lucide.CircleDot
 import com.composables.icons.lucide.Clock3
 import com.composables.icons.lucide.EllipsisVertical
@@ -116,7 +117,6 @@ import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -227,7 +227,8 @@ import com.jahirtrap.cconnect.files.isArchive
 import com.jahirtrap.cconnect.files.isPreviewable
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.ModalBottomSheetProperties
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -238,6 +239,7 @@ import com.composables.icons.lucide.History
 import com.jahirtrap.cconnect.data.remote.SessionsApi
 import com.jahirtrap.cconnect.data.remote.SharedApi
 import com.jahirtrap.cconnect.ui.ColorDialog
+import com.jahirtrap.cconnect.ui.ColorOption
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.CenteredProgress
@@ -724,11 +726,11 @@ fun ChatScreen(
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.onBackground,
                                                 shadowElevation = 4.dp,
-                                                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(40.dp).pointerHoverIcon(PointerIcon.Hand),
+                                                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(32.dp).pointerHoverIcon(PointerIcon.Hand),
                                             ) {
                                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                     Icon(
-                                                        Lucide.ChevronDown,
+                                                        Lucide.ChevronsDown,
                                                         contentDescription = stringResource(Res.string.scroll_to_bottom),
                                                         tint = MaterialTheme.colorScheme.background,
                                                     )
@@ -855,7 +857,9 @@ fun ChatScreen(
                     onDismiss = { queuePreview = null },
                     title = stringResource(Res.string.queued_message),
                     buttons = {
-                        TextButton(onClick = { queuePreview = null }) { Text(stringResource(Res.string.close)) }
+                        Button(onClick = { queuePreview = null }, variant = ButtonVariant.Outlined) {
+                            Text(stringResource(Res.string.close))
+                        }
                     },
                 ) {
                     if (q.text.isNotBlank()) {
@@ -907,7 +911,10 @@ fun ChatScreen(
     }
     colorTarget?.let { s ->
         ColorDialog(
-            colors = state.capabilities.colors,
+            title = stringResource(Res.string.conversation_color),
+            options = state.capabilities.colors.mapNotNull { name ->
+                sessionColorOf(name)?.let { ColorOption(name, it, name) }
+            },
             selected = s.color,
             onSelect = { vm.setSessionColor(s, it) },
             onDismiss = { colorTarget = null },
@@ -1016,8 +1023,10 @@ private fun RewindDialog(
         title = stringResource(Res.string.rewind),
         contentPadding = PaddingValues(0.dp),
         buttons = {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(both) }, enabled = !busy) { Text(stringResource(Res.string.accept)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined, enabled = !busy) {
+                Text(stringResource(Res.string.cancel))
+            }
+            Button(onClick = { onConfirm(both) }, enabled = !busy) { Text(stringResource(Res.string.accept)) }
         },
     ) {
         OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
@@ -1216,11 +1225,11 @@ private fun SidePanel(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.onBackground,
                         shadowElevation = 4.dp,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(40.dp),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(32.dp),
                     ) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(
-                                Lucide.ChevronDown,
+                                Lucide.ChevronsDown,
                                 contentDescription = stringResource(Res.string.scroll_to_bottom),
                                 tint = MaterialTheme.colorScheme.background,
                             )

@@ -23,7 +23,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -497,7 +498,9 @@ fun ClaudeDetailScreen(
             onDismiss = { skillSheet = null },
             title = skill.name,
             buttons = {
-                TextButton(onClick = { skillSheet = null }) { Text(stringResource(Res.string.close)) }
+                Button(onClick = { skillSheet = null }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.close))
+                }
             },
         ) {
             val files = skillFiles
@@ -559,7 +562,7 @@ fun ClaudeDetailScreen(
                 }
             },
             buttons = {
-                TextButton(onClick = { pluginMenu = null }, enabled = dialogBusy == null) {
+                Button(onClick = { pluginMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
                     Text(stringResource(Res.string.close))
                 }
             },
@@ -630,8 +633,10 @@ fun ClaudeDetailScreen(
             onDismiss = { installCandidate = null },
             title = entry.name,
             buttons = {
-                TextButton(onClick = { installCandidate = null }) { Text(stringResource(Res.string.cancel)) }
-                TextButton(onClick = {
+                Button(onClick = { installCandidate = null }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.cancel))
+                }
+                Button(onClick = {
                     installCandidate = null
                     runAction { ClaudeApi.pluginAction("install", "${entry.name}@${catalogMarket.orEmpty()}") }
                 }) { Text(stringResource(Res.string.install)) }
@@ -659,7 +664,7 @@ fun ClaudeDetailScreen(
             onDismiss = { if (dialogBusy == null) marketMenu = null },
             title = market.name,
             buttons = {
-                TextButton(onClick = { marketMenu = null }, enabled = dialogBusy == null) {
+                Button(onClick = { marketMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
                     Text(stringResource(Res.string.close))
                 }
             },
@@ -729,7 +734,7 @@ fun ClaudeDetailScreen(
                 }
             },
             buttons = {
-                TextButton(onClick = { mcpMenu = null }, enabled = dialogBusy == null) {
+                Button(onClick = { mcpMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
                     Text(stringResource(Res.string.close))
                 }
             },
@@ -780,7 +785,7 @@ fun ClaudeDetailScreen(
         CompactDialog(
             onDismiss = { actionError = null },
             title = stringResource(Res.string.connection_error),
-            buttons = { TextButton(onClick = { actionError = null }) { Text(stringResource(Res.string.accept)) } },
+            buttons = { Button(onClick = { actionError = null }) { Text(stringResource(Res.string.accept)) } },
         ) {
             Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -796,8 +801,8 @@ private fun McpAddDialog(onConfirm: (String, String, String) -> Unit, onDismiss:
         onDismiss = onDismiss,
         title = stringResource(Res.string.mcp_servers),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(
                 onClick = { onConfirm(name.trim(), target.trim(), transport) },
                 enabled = name.isNotBlank() && target.isNotBlank(),
             ) { Text(stringResource(Res.string.add)) }

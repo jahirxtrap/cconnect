@@ -3,11 +3,13 @@ package com.jahirtrap.cconnect.ui
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.jahirtrap.cconnect.ui.theme.Radius
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
@@ -60,14 +63,15 @@ fun AbovePopupMenu(
                     this.alpha = alpha
                     transformOrigin = TransformOrigin(0f, 1f)
                 },
-                shape = MenuDefaults.shape,
-                color = MenuDefaults.containerColor,
-                tonalElevation = MenuDefaults.TonalElevation,
+                shape = RoundedCornerShape(Radius.md),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                tonalElevation = 0.dp,
                 shadowElevation = MenuDefaults.ShadowElevation,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(vertical = 8.dp)
+                        .padding(4.dp)
                         .width(IntrinsicSize.Max),
                     content = content,
                 )

@@ -18,7 +18,8 @@ import com.jahirtrap.cconnect.ui.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -157,8 +158,8 @@ private fun SshEditDialog(
         onDismiss = onDismiss,
         title = stringResource(if (initial == null) Res.string.add_ssh_host else Res.string.edit_ssh_host),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(
                 onClick = {
                     onConfirm(
                         SshProfile(

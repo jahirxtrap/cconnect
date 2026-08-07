@@ -1,6 +1,7 @@
 package com.jahirtrap.cconnect.ui
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import com.jahirtrap.cconnect.ui.clickable
@@ -25,14 +26,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialogDefaults
-import androidx.compose.material3.BasicAlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,9 +39,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -54,6 +54,8 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.FolderArchive
@@ -66,49 +68,67 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 
-// Compact replacement for Material3 AlertDialog, whose built-in paddings look too airy.
-@OptIn(ExperimentalMaterial3Api::class)
+// Compact replacement for Material3 AlertDialog, whose built-in paddings look too airy
+// and whose 560dp cap keeps dialogs narrower than the design calls for.
 @Composable
 fun CompactDialog(
     onDismiss: () -> Unit,
     title: String,
     buttons: @Composable RowScope.() -> Unit,
+    description: String? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp),
     titleTrailing: (@Composable RowScope.() -> Unit)? = null,
-    content: @Composable ColumnScope.() -> Unit,
+    content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     Dismissable(onDismiss = onDismiss)
-    BasicAlertDialog(onDismissRequest = onDismiss) {
+    val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
+    val available = (windowWidth - 32.dp).coerceAtLeast(0.dp)
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.widthIn(min = 280.dp),
+            modifier = Modifier.widthIn(min = 384.dp.coerceAtMost(available), max = 672.dp.coerceAtMost(available)),
             shape = MaterialTheme.shapes.large,
-            color = AlertDialogDefaults.containerColor,
-            tonalElevation = AlertDialogDefaults.TonalElevation,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            shadowElevation = 16.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Column(modifier = Modifier.heightIn(max = 640.dp).padding(vertical = 14.dp)) {
+            Column(modifier = Modifier.heightIn(max = 640.dp).padding(vertical = 20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = if (titleTrailing != null) 8.dp else 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold, fontSize = 20.sp),
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (description != null) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                description,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     if (titleTrailing != null) titleTrailing()
                 }
-                Spacer(Modifier.height(12.dp))
-                Column(
-                    modifier = Modifier
-                        .weight(1f, fill = false)
-                        .verticalScroll(rememberScrollState())
-                        .padding(contentPadding),
-                    content = content,
-                )
-                Spacer(Modifier.height(12.dp))
+                if (content != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(contentPadding),
+                        content = content,
+                    )
+                }
+                Spacer(Modifier.height(20.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.End,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     content = buttons,
                 )
             }
@@ -127,13 +147,12 @@ fun ConfirmDialog(
     CompactDialog(
         onDismiss = onDismiss,
         title = title,
+        description = text,
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = onConfirm) { Text(confirmLabel) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = onConfirm) { Text(confirmLabel) }
         },
-    ) {
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    )
 }
 
 @Composable
@@ -155,8 +174,8 @@ fun RenameDialog(
         onDismiss = onDismiss,
         title = title,
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(text) }, enabled = text.isNotBlank() && error == null) {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(text) }, enabled = text.isNotBlank() && error == null) {
                 Text(confirmLabel)
             }
         },
@@ -180,10 +199,13 @@ fun RenameDialog(
     }
 }
 
+data class ColorOption(val value: String, val color: Color, val label: String)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ColorDialog(
-    colors: List<String>,
+    title: String,
+    options: List<ColorOption>,
     selected: String?,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
@@ -192,10 +214,10 @@ fun ColorDialog(
     var picked by remember { mutableStateOf(selected) }
     CompactDialog(
         onDismiss = onDismiss,
-        title = stringResource(Res.string.conversation_color),
+        title = title,
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onSelect(picked); onDismiss() }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onSelect(picked); onDismiss() }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         FlowRow(
@@ -205,12 +227,14 @@ fun ColorDialog(
             maxItemsInEachRow = columns,
         ) {
             ColorSwatch(color = null, selected = picked == null, onClick = { picked = null }, icon = Lucide.X)
-            colors.forEach { name ->
-                sessionColorOf(name)?.let { c ->
-                    ColorSwatch(color = c, selected = picked == name, onClick = { picked = name })
-                }
+            options.forEach { option ->
+                ColorSwatch(
+                    color = option.color,
+                    selected = picked == option.value,
+                    onClick = { picked = option.value },
+                )
             }
-            val remainder = (1 + colors.count { sessionColorOf(it) != null }) % columns
+            val remainder = (1 + options.size) % columns
             if (remainder != 0) repeat(columns - remainder) { Spacer(Modifier.size(40.dp)) }
         }
     }
@@ -228,7 +252,7 @@ fun SelectDialog(
         onDismiss = onDismiss,
         title = title,
         contentPadding = PaddingValues(0.dp),
-        buttons = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
+        buttons = { Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) } },
     ) {
         options.forEach { (value, label) ->
             DialogSelectItem(label = label, selected = value == selected, onClick = { onSelect(value); onDismiss() })
@@ -250,8 +274,8 @@ fun ConfirmSelectDialog(
         title = title,
         contentPadding = PaddingValues(0.dp),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(choice) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(choice) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         options.forEach { (value, label) ->
@@ -271,7 +295,7 @@ fun EnvironmentSelectDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.environment),
         contentPadding = PaddingValues(0.dp),
-        buttons = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
+        buttons = { Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) } },
     ) {
         environments.forEach { c ->
             DialogSelectItem(
@@ -298,7 +322,7 @@ fun SharedLinkActionsDialog(
         onDismiss = onDismiss,
         title = filename,
         contentPadding = PaddingValues(0.dp),
-        buttons = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
+        buttons = { Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) } },
     ) {
         if (onView != null) DialogActionItem(stringResource(Res.string.view), Lucide.Eye) { onDismiss(); onView() }
         if (onOpenInFiles != null) DialogActionItem(stringResource(Res.string.open_in_files), Lucide.FolderArchive) { onDismiss(); onOpenInFiles() }

@@ -1,15 +1,14 @@
 package com.jahirtrap.cconnect.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.Composable
@@ -40,9 +39,11 @@ fun NoticeCard(
     )
     SwipeToDismissBox(state = dismissState, backgroundContent = {}) {
         Surface(
-            shape = MaterialTheme.shapes.large,
-            color = AlertDialogDefaults.containerColor,
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 0.dp,
             shadowElevation = 4.dp,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
@@ -55,9 +56,7 @@ fun NoticeCard(
                     modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                 )
                 if (actionLabel != null && onAction != null) {
-                    TextButton(onClick = onAction) {
-                        Text(actionLabel, color = MaterialTheme.colorScheme.primary)
-                    }
+                    Button(onClick = onAction, variant = ButtonVariant.Accent) { Text(actionLabel) }
                 }
                 if (!isTouch) {
                     TooltipIconButton(label = stringResource(Res.string.close), onClick = onDismiss) {

@@ -130,6 +130,7 @@ class Settings {
     }
 
     private fun syncBackend() {
+        Backend.accentIndex = activeEnvironment?.accentIndex
         activeEnvironment?.let {
             Backend.kind = it.kind
             Backend.host = it.host
@@ -215,6 +216,7 @@ class Settings {
                     effort = o["effort"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     permissionMode = o["permissionMode"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     streaming = o["streaming"]?.jsonPrimitive?.booleanOrNull,
+                    accentIndex = o["accentIndex"]?.jsonPrimitive?.intOrNull,
                 )
             }
         }.getOrDefault(emptyList())
@@ -241,6 +243,7 @@ class Settings {
                     put("effort", p.effort)
                     put("permissionMode", p.permissionMode)
                     p.streaming?.let { put("streaming", it) }
+                    p.accentIndex?.let { put("accentIndex", it) }
                 }
             }
         }.toString()

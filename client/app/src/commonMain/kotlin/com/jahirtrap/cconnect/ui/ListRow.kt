@@ -3,6 +3,7 @@ package com.jahirtrap.cconnect.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import com.jahirtrap.cconnect.ui.clickable
 import com.jahirtrap.cconnect.ui.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -74,6 +75,10 @@ fun ListRow(
                 }
             }
         }
-        if (trailing != null) trailing()
+        if (trailing != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                trailing()
+            }
+        }
     }
 }

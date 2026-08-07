@@ -56,7 +56,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -947,7 +948,11 @@ fun FileExplorerScreen(
             onDismiss = { extractRequest = null },
             title = stringResource(Res.string.extract),
             contentPadding = PaddingValues(0.dp),
-            buttons = { TextButton(onClick = { extractRequest = null }) { Text(stringResource(Res.string.cancel)) } },
+            buttons = {
+                Button(onClick = { extractRequest = null }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.cancel))
+                }
+            },
         ) {
             fun run(intoFolder: Boolean) {
                 extractRequest = null
@@ -1134,7 +1139,7 @@ private fun TransferBar(kind: TransferKind, enabled: Boolean, onCancel: () -> Un
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).pointerHoverIcon(PointerIcon.Hand)) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = onCancel, modifier = Modifier.weight(1f), variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
             Button(onClick = onConfirm, enabled = enabled, modifier = Modifier.weight(1f)) {
                 Text(
                     stringResource(
@@ -1162,8 +1167,8 @@ private fun CompressDialog(defaultName: String, onConfirm: (String, String) -> U
         onDismiss = onDismiss,
         title = stringResource(Res.string.compress),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(name.trim(), format) }, enabled = name.isNotBlank()) {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(name.trim(), format) }, enabled = name.isNotBlank()) {
                 Text(stringResource(Res.string.compress))
             }
         },

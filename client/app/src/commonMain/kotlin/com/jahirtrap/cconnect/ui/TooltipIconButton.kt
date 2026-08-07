@@ -2,12 +2,15 @@ package com.jahirtrap.cconnect.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.rememberTooltipState
@@ -28,6 +31,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import com.jahirtrap.cconnect.isAndroidPlatform
+import com.jahirtrap.cconnect.ui.theme.Radius
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -37,7 +41,7 @@ fun TooltipIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    size: Dp = 40.dp,
+    size: Dp = 36.dp,
     icon: @Composable () -> Unit,
 ) {
     val skikoTouch = !isAndroidPlatform && LocalIsTouch.current
@@ -45,7 +49,7 @@ fun TooltipIconButton(
     val scope = rememberCoroutineScope()
     TooltipBox(
         positionProvider = rememberAboveOrBelowPositionProvider(),
-        tooltip = { PlainTooltip { Text(label) } },
+        tooltip = { AppTooltip(label) },
         state = tooltipState,
         enableUserInput = !skikoTouch,
     ) {
@@ -80,7 +84,7 @@ fun TooltipWrap(label: String, content: @Composable () -> Unit) {
     val tooltipState = rememberTooltipState()
     TooltipBox(
         positionProvider = rememberAboveOrBelowPositionProvider(),
-        tooltip = { PlainTooltip { Text(label) } },
+        tooltip = { AppTooltip(label) },
         state = tooltipState,
         enableUserInput = !skikoTouch,
     ) {
@@ -96,7 +100,7 @@ fun TooltipTap(label: String, content: @Composable () -> Unit) {
     val scope = rememberCoroutineScope()
     TooltipBox(
         positionProvider = rememberAboveOrBelowPositionProvider(),
-        tooltip = { PlainTooltip { Text(label) } },
+        tooltip = { AppTooltip(label) },
         state = tooltipState,
         enableUserInput = !skikoTouch,
     ) {
@@ -106,6 +110,23 @@ fun TooltipTap(label: String, content: @Composable () -> Unit) {
         ) {
             content()
         }
+    }
+}
+
+@Composable
+fun AppTooltip(label: String) {
+    Surface(
+        shape = RoundedCornerShape(Radius.sm),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 0.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
     }
 }
 

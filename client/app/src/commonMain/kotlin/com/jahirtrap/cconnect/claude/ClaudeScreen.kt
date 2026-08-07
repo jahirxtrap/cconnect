@@ -24,7 +24,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import com.jahirtrap.cconnect.ui.AppPullToRefresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -512,8 +513,8 @@ internal fun PromptDialog(
             }
         },
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(text) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(text) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         Text(
@@ -550,8 +551,8 @@ internal fun ProjectPromptDialog(
             }
         },
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onSave(project, text) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onSave(project, text) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         SelectField(

@@ -30,6 +30,7 @@
     <string name="auth_header_name">Header name</string>
     <string name="auth_header_value">Header value</string>
     <string name="environment_directory">Directory (Optional)</string>
+    <string name="environment_accent">Environment colour</string>
     <string name="add_environment">Add environment</string>
     <string name="edit_environment">Edit environment</string>
     <string name="scan_qr">Scan QR</string>

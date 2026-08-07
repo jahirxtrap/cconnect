@@ -35,7 +35,8 @@ import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.RenameDialog
 import com.jahirtrap.cconnect.ui.StatusDot
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -115,7 +116,11 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
         CompactDialog(
             onDismiss = { actions = null },
             title = account.label,
-            buttons = { TextButton(onClick = { actions = null }) { Text(stringResource(Res.string.close)) } },
+            buttons = {
+                Button(onClick = { actions = null }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.close))
+                }
+            },
         ) {
             if (!account.loggedIn) {
                 ActionButton(
@@ -220,11 +225,11 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
             },
             title = stringResource(Res.string.account_login),
             buttons = {
-                TextButton(onClick = {
+                Button(variant = ButtonVariant.Outlined, onClick = {
                     login = null
                     scope.launch { runCatching { AccountsApi.cancelLogin(accountId) } }
                 }) { Text(stringResource(Res.string.cancel)) }
-                TextButton(
+                Button(
                     enabled = code.isNotBlank(),
                     onClick = {
                         val entered = code

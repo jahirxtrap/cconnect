@@ -18,6 +18,7 @@ data class EnvironmentProfile(
     val effort: String = "",              // "" = inherit server default
     val permissionMode: String = "",      // "" = inherit server default
     val streaming: Boolean? = null,       // null = inherit server default
+    val accentIndex: Int? = null,         // null = keep the app accent
 ) {
     val address: String get() = if (port != null) "$host:$port" else host
 }

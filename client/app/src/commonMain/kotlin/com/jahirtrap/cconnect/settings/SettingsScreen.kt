@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,7 +39,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import com.jahirtrap.cconnect.ui.TextButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
@@ -60,6 +63,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
 import org.jetbrains.compose.resources.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -156,6 +160,8 @@ import com.jahirtrap.cconnect.ui.ColorSwatch
 import com.jahirtrap.cconnect.ui.CompactSwitch
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.CompactDialog
+import com.jahirtrap.cconnect.ui.ColorDialog
+import com.jahirtrap.cconnect.ui.ColorOption
 import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.ConfirmSelectDialog
 import com.jahirtrap.cconnect.ui.DialogSelectItem
@@ -177,6 +183,7 @@ import com.jahirtrap.cconnect.ui.THEME_MODES
 import com.jahirtrap.cconnect.ui.theme.ACCENTS
 import com.jahirtrap.cconnect.ui.theme.appFontFamily
 import com.jahirtrap.cconnect.ui.theme.palette
+import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.theme.accentAt
 import com.jahirtrap.cconnect.ui.theme.accentNameAt
 import com.jahirtrap.cconnect.ui.theme.dynamicAccent
@@ -514,13 +521,17 @@ fun SettingsScreen(
                                 .fillMaxWidth()
                                 .clickable { uriHandler.openUri(chatState.latestRelease?.url ?: GitHubApi.RELEASES_URL) }
                                 .background(MaterialTheme.colorScheme.onSurface.copy(alpha = aboutFlashAlpha))
-                                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            AppLogo()
-                            Spacer(Modifier.width(16.dp))
+                            AppLogo(28.dp)
+                            Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(stringResource(Res.string.app_name), style = MaterialTheme.typography.bodyLarge)
+                                Text(
+                                    stringResource(Res.string.app_name),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                )
                                 Text(
                                     stringResource(Res.string.version_label, BuildConfig.VERSION_NAME),
                                     style = MaterialTheme.typography.bodySmall,
@@ -547,7 +558,7 @@ fun SettingsScreen(
                                 )
                             }
                             TooltipIconButton(label = stringResource(Res.string.changelog), onClick = { showChangelog = true }) {
-                                Icon(Lucide.FileText, contentDescription = null)
+                                Icon(Lucide.FileText, contentDescription = null, modifier = Modifier.size(20.dp))
                             }
                         }
                         val release = chatState.latestRelease
@@ -558,14 +569,14 @@ fun SettingsScreen(
                             LinearProgressIndicator(
                                 progress = { progress ?: 0f },
                                 drawStopIndicator = {},
-                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                             )
                         }
                         when {
                             pending != null -> ActionButton(
                                 text = stringResource(Res.string.install),
                                 onClick = { AppUpdater.install() },
-                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                             )
                             release?.installerUrl != null -> {
                                 val installerUrl = release.installerUrl
@@ -587,13 +598,13 @@ fun SettingsScreen(
                                             }
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                                 )
                             }
                             release != null && isWebPlatform -> ActionButton(
                                 text = stringResource(Res.string.update_action),
                                 onClick = { AppUpdater.reload() },
-                                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                             )
                             else -> {
                                 var checking by remember { mutableStateOf(false) }
@@ -607,7 +618,7 @@ fun SettingsScreen(
                                             checking = false
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                                 )
                             }
                         }
@@ -644,7 +655,11 @@ fun SettingsScreen(
                 onDismiss = { dialog = null },
                 title = stringResource(Res.string.notifications),
                 contentPadding = PaddingValues(0.dp),
-                buttons = { TextButton(onClick = { dialog = null }) { Text(stringResource(Res.string.close)) } },
+                buttons = {
+                    Button(onClick = { dialog = null }, variant = ButtonVariant.Outlined) {
+                        Text(stringResource(Res.string.close))
+                    }
+                },
             ) {
                 if (!notificationsEnabled) {
                     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -712,7 +727,6 @@ fun SettingsScreen(
             onConfirm = { idx ->
                 if (idx == null) onDynamicColor(true)
                 else { onDynamicColor(false); onAccent(idx) }
-                dialog = null
             },
             onDismiss = { dialog = null },
         )
@@ -867,8 +881,10 @@ private fun BackupDialog(
         onDismiss = onDismiss,
         title = title,
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(if (onValueChange == null) Res.string.close else Res.string.cancel)) }
-            TextButton(onClick = onConfirm, enabled = confirmEnabled) { Text(confirmLabel) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) {
+                Text(stringResource(if (onValueChange == null) Res.string.close else Res.string.cancel))
+            }
+            Button(onClick = onConfirm, enabled = confirmEnabled) { Text(confirmLabel) }
         },
     ) {
         Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -927,8 +943,8 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
             }
         },
         buttons = {
-            TextButton(onClick = onClose) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = {
+            Button(onClick = onClose, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = {
                 settings.localServerDir = dir
                 settings.localServerPython = python
                 settings.localServerPythonPath = pythonPath
@@ -1111,7 +1127,9 @@ private fun FontSelectDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.font),
         contentPadding = PaddingValues(0.dp),
-        buttons = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+        },
     ) {
         options.forEach { value ->
             DialogSelectItem(
@@ -1180,14 +1198,18 @@ private fun ProfileRow(profile: GitHubApi.Profile?, role: String, onOpen: (Strin
                 model = avatar,
                 imageLoader = AppImageLoader.get(context),
                 contentDescription = null,
-                modifier = Modifier.size(32.dp).clip(CircleShape),
+                modifier = Modifier.size(28.dp).clip(CircleShape),
             )
         } else {
-            Box(Modifier.size(32.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant))
+            Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceVariant))
         }
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(profile?.let { it.name ?: it.login } ?: "…", style = MaterialTheme.typography.bodyLarge)
+            Text(
+                profile?.let { it.name ?: it.login } ?: "…",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+            )
             Text(role, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.width(12.dp))
@@ -1197,11 +1219,14 @@ private fun ProfileRow(profile: GitHubApi.Profile?, role: String, onOpen: (Strin
 
 @Composable
 private fun ExternalIndicator() {
-    Icon(
-        Lucide.ExternalLink,
-        contentDescription = null,
-        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+        Icon(
+            Lucide.ExternalLink,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
+    }
 }
 
 @Composable
@@ -1225,23 +1250,40 @@ private fun AccentDialog(
     CompactDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.accent),
-        buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(if (pickedDynamic) null else pickedIndex) }) { Text(stringResource(Res.string.save)) }
-        },
+        buttons = { ActionButton(text = stringResource(Res.string.close), onClick = onDismiss) },
     ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .clickable { pickedDynamic = !pickedDynamic; onConfirm(if (pickedDynamic) null else pickedIndex) }
+                .padding(horizontal = 4.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(20.dp).clip(CircleShape).background(dynamicColor))
+            Spacer(Modifier.width(12.dp))
+            Text(
+                stringResource(Res.string.accent_dynamic),
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            CompactSwitch(checked = pickedDynamic) {
+                pickedDynamic = it
+                onConfirm(if (it) null else pickedIndex)
+            }
+        }
+        Spacer(Modifier.height(16.dp))
         FlowRow(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().alpha(if (pickedDynamic) 0.4f else 1f),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalArrangement = Arrangement.spacedBy(12.dp),
             maxItemsInEachRow = 5,
         ) {
-            ColorSwatch(color = dynamicColor, selected = pickedDynamic, onClick = { pickedDynamic = true }, icon = Lucide.Wand)
             ACCENTS.forEachIndexed { index, (_, color) ->
                 ColorSwatch(
                     color = color,
                     selected = !pickedDynamic && index == pickedIndex,
-                    onClick = { pickedDynamic = false; pickedIndex = index },
+                    onClick = { pickedDynamic = false; pickedIndex = index; onConfirm(index) },
                 )
             }
         }
@@ -1267,7 +1309,9 @@ private fun EnvironmentsDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.environments),
         contentPadding = PaddingValues(0.dp),
-        buttons = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.back)) } },
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.back)) }
+        },
         titleTrailing = if (qrAvailable) ({
             IconButton(
                 onClick = {
@@ -1345,6 +1389,8 @@ private fun EnvironmentEditDialog(
     var authPassword by remember { mutableStateOf(initial?.authPassword ?: "") }
     var authHeaderName by remember { mutableStateOf(initial?.authHeaderName ?: "") }
     var authHeaderValue by remember { mutableStateOf(initial?.authHeaderValue ?: "") }
+    var accentIndex by remember { mutableStateOf(initial?.accentIndex) }
+    var picking by remember { mutableStateOf(false) }
 
     fun defaultPortFor(k: String) = if (k == "https") "443" else "8723"
 
@@ -1370,8 +1416,8 @@ private fun EnvironmentEditDialog(
             }
         }) else null,
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(
                 onClick = {
                     var finalKind = kind
                     var finalHost = host.trim().trimEnd('/')
@@ -1397,6 +1443,7 @@ private fun EnvironmentEditDialog(
                             authHeaderName = authHeaderName.trim(),
                             authHeaderValue = authHeaderValue.trim(),
                             directory = directory.trim(),
+                            accentIndex = accentIndex,
                         )
                     )
                 },
@@ -1474,6 +1521,22 @@ private fun EnvironmentEditDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        PreferenceRow(
+            Lucide.Palette,
+            stringResource(Res.string.environment_accent),
+            accentIndex?.let { accentNameAt(it) } ?: stringResource(Res.string.color_none),
+            trailing = { accentIndex?.let { AccentDot(accentAt(it)) } },
+        ) { picking = true }
+    }
+
+    if (picking) {
+        ColorDialog(
+            title = stringResource(Res.string.environment_accent),
+            options = ACCENTS.mapIndexed { index, accent -> ColorOption(index.toString(), accent.second, accent.first) },
+            selected = accentIndex?.toString(),
+            onSelect = { accentIndex = it?.toIntOrNull() },
+            onDismiss = { picking = false },
+        )
     }
 }
 
@@ -1493,8 +1556,8 @@ private fun GenerationDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.generation),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(m, e, s) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(m, e, s) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         SelectField(stringResource(Res.string.model), m, caps.models.map { it.id to it.label }) { m = it }
@@ -1546,8 +1609,8 @@ private fun VisibilityDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.visibility),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = { onConfirm(th, tu, fc, cp, wk) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(th, tu, fc, cp, wk) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         SelectField(stringResource(Res.string.thinking), th, three) { th = it }
@@ -1596,8 +1659,8 @@ private fun CliDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.cli),
         buttons = {
-            TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
-            TextButton(onClick = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = {
                 scope.launch {
                     CliApi.setSource(source, customPath.trim().ifBlank { null })?.let(onChanged)
                     onDismiss()
@@ -1684,14 +1747,20 @@ private fun ChangelogSheet(onDismiss: () -> Unit) {
         val result = GitHubApi.releaseNotes()
         if (result != null) notes = result else failed = true
     }
-    AppBottomSheet(onDismiss = onDismiss, title = stringResource(Res.string.changelog), showClose = true) {
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.changelog),
+        contentPadding = PaddingValues(horizontal = 20.dp),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) }
+        },
+    ) {
         val items = notes
         when {
-            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth().weight(1f))
-            items == null -> CenteredProgress(Modifier.fillMaxWidth().weight(1f))
+            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth())
+            items == null -> CenteredProgress(Modifier.fillMaxWidth())
             else -> LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(items, key = { it.tag }) { release ->

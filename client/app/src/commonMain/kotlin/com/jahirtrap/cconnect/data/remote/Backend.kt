@@ -1,5 +1,9 @@
 package com.jahirtrap.cconnect.data.remote
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+
 object Backend {
     var kind: String = "http"
     var host: String = ""
@@ -10,6 +14,8 @@ object Backend {
     var authPassword: String = ""
     var authHeaderName: String = ""
     var authHeaderValue: String = ""
+
+    var accentIndex: Int? by mutableStateOf(null)
 
     fun snapshot(): BackendConfig = BackendConfig(
         kind, host, port, authKind, authToken, authUser, authPassword, authHeaderName, authHeaderValue,
