@@ -164,7 +164,7 @@ compose.desktop {
 
         nativeDistributions {
             targetFormats(TargetFormat.Msi, TargetFormat.Exe, TargetFormat.Deb, TargetFormat.Rpm, TargetFormat.Dmg)
-            modules("jdk.unsupported")
+            modules("jdk.unsupported", "jdk.localedata")
             packageName = "CConnect"
             packageVersion = appVersionName
             description = "CConnect"
