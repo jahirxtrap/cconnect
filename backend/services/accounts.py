@@ -8,7 +8,6 @@ primary config dir instead of being copied.
 from __future__ import annotations
 
 import json
-import os
 import re
 import shutil
 import subprocess
@@ -60,19 +59,6 @@ def _claude_json(account_id: Optional[str]) -> Path:
 
 
 def is_logged_in(account_id: Optional[str]) -> bool:
-    executable = shutil.which("claude")
-    if executable:
-        env = dict(os.environ)
-        env.update(env_for(account_id))
-        try:
-            result = subprocess.run(
-                [executable, "auth", "status", "--json"],
-                env=env, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                timeout=20, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            return bool(json.loads(result.stdout or "{}").get("loggedIn"))
-        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
-            pass
     try:
         data = json.loads(credentials_path(account_id).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -96,7 +82,7 @@ def list_accounts() -> list[dict]:
     }]
     if _ACCOUNTS_DIR.is_dir():
         for entry in sorted(_ACCOUNTS_DIR.iterdir()):
-            if entry.is_dir():
+            if entry.is_dir() and not entry.name.endswith(".lock"):
                 items.append({
                     "id": entry.name,
                     "label": _label(entry, entry.name),
@@ -106,15 +92,18 @@ def list_accounts() -> list[dict]:
     return items
 
 
-def default_account() -> str:
+def known_ids() -> set[str]:
+    return {a["id"] for a in list_accounts()}
+
+
+def default_account(known: Optional[set[str]] = None) -> str:
     stored = settings_store.get("account")
-    known = {a["id"] for a in list_accounts()}
-    return stored if stored in known else PRIMARY_ID
+    return stored if stored in (known if known is not None else known_ids()) else PRIMARY_ID
 
 
-def resolve(account_id: Optional[str]) -> str:
-    known = {a["id"] for a in list_accounts()}
-    return account_id if account_id in known else default_account()
+def resolve(account_id: Optional[str], known: Optional[set[str]] = None) -> str:
+    ids = known if known is not None else known_ids()
+    return account_id if account_id in ids else default_account(ids)
 
 
 def _link_dir(source: Path, target: Path) -> None:

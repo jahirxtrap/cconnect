@@ -11,7 +11,9 @@ router = APIRouter(tags=["accounts"])
 
 @router.get("/accounts")
 def get_accounts():
-    return api_response(data={"accounts": accounts.list_accounts(), "default": accounts.default_account()})
+    items = accounts.list_accounts()
+    known = {item["id"] for item in items}
+    return api_response(data={"accounts": items, "default": accounts.default_account(known)})
 
 
 @router.post("/accounts")

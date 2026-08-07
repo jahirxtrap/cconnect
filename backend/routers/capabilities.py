@@ -26,6 +26,7 @@ router = APIRouter(tags=["Capabilities"])
 
 @router.get("/capabilities")
 def get_capabilities():
+    account_list = accounts.list_accounts()
     return api_response(data={
         "version": SERVER_VERSION,
         "supported_app": SUPPORTED_APP,
@@ -36,12 +37,12 @@ def get_capabilities():
         "models": MODELS,
         "colors": COLORS,
         "commands": COMMANDS,
-        "accounts": [{"id": a["id"], "label": a["label"]} for a in accounts.list_accounts() if a["logged_in"]],
+        "accounts": [{"id": a["id"], "label": a["label"]} for a in account_list if a["logged_in"]],
         "defaults": {
             "permission_mode": DEFAULT_PERMISSION_MODE,
             "effort": DEFAULT_EFFORT,
             "model": DEFAULT_MODEL,
-            "account": accounts.default_account(),
+            "account": accounts.default_account({a["id"] for a in account_list}),
             "partial": False,
         },
     })
