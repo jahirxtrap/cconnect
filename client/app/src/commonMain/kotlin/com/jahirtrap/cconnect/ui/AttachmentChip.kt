@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.File
 import com.composables.icons.lucide.Lucide
+import com.jahirtrap.cconnect.ui.theme.Radius
 
 @Composable
 fun AttachmentChip(
@@ -30,20 +31,21 @@ fun AttachmentChip(
     onClick: (() -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.panel)
     Row(
         modifier = modifier
+            .widthIn(max = 240.dp)
             .clip(shape)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
             icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(6.dp))
         Text(
@@ -52,7 +54,7 @@ fun AttachmentChip(
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 180.dp),
+            modifier = Modifier.weight(1f, fill = false),
         )
         if (trailing != null) {
             Spacer(Modifier.width(6.dp))

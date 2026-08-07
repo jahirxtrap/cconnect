@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import com.jahirtrap.cconnect.ui.theme.Radius
 
 @Composable
 fun OutlinedPanel(
@@ -18,7 +19,7 @@ fun OutlinedPanel(
     onClick: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(Radius.panel)
     Column(
         modifier = modifier
             .clip(shape)

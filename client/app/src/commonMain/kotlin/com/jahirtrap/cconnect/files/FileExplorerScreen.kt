@@ -162,6 +162,7 @@ import com.jahirtrap.cconnect.ui.SelectField
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.EnvironmentSelectDialog
 import com.jahirtrap.cconnect.ui.ListRow
+import com.jahirtrap.cconnect.ui.LocalMobileLayout
 import com.jahirtrap.cconnect.ui.RenameDialog
 import com.jahirtrap.cconnect.ui.SelectionDot
 import com.jahirtrap.cconnect.ui.StatusDot
@@ -1308,23 +1309,16 @@ private fun ToolbarAction(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Row(
-        modifier = modifier
-            .height(32.dp)
-            .clip(CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f)
-            .padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    val compact = LocalMobileLayout.current
+    TooltipIconButton(
+        label = label,
+        onClick = onClick,
+        modifier = modifier,
+        enabled = enabled,
+        size = 32.dp,
+        showLabel = !compact,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Icon(icon, contentDescription = null, modifier = Modifier.size(if (compact) 20.dp else 18.dp))
     }
 }
 

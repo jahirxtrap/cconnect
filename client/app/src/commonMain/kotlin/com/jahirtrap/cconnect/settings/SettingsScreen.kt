@@ -37,7 +37,6 @@ import androidx.compose.material3.LoadingIndicator
 import com.jahirtrap.cconnect.ui.AppPullToRefresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import com.jahirtrap.cconnect.ui.Button
 import com.jahirtrap.cconnect.ui.ButtonVariant
@@ -184,7 +183,6 @@ import com.jahirtrap.cconnect.ui.THEME_MODES
 import com.jahirtrap.cconnect.ui.theme.ACCENTS
 import com.jahirtrap.cconnect.ui.theme.appFontFamily
 import com.jahirtrap.cconnect.ui.theme.palette
-import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.theme.DYNAMIC_ACCENT
 import com.jahirtrap.cconnect.ui.theme.accentAt
 import com.jahirtrap.cconnect.ui.theme.accentNameAt
@@ -682,8 +680,9 @@ fun SettingsScreen(
                 }
                 SwitchRow(
                     title = stringResource(Res.string.notify_interaction),
-                    summary = stringResource(Res.string.notify_interaction_summary),
                     checked = notifyInteraction,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    summary = stringResource(Res.string.notify_interaction_summary),
                     enabled = notificationsEnabled,
                 ) {
                     notifyInteraction = it
@@ -691,8 +690,9 @@ fun SettingsScreen(
                 }
                 SwitchRow(
                     title = stringResource(Res.string.notify_task_done),
-                    summary = stringResource(Res.string.notify_task_done_summary),
                     checked = notifyTaskDone,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    summary = stringResource(Res.string.notify_task_done_summary),
                     enabled = notificationsEnabled,
                 ) {
                     notifyTaskDone = it
@@ -1154,32 +1154,39 @@ private fun permissionLabel(caps: Capabilities, mode: String): String =
 @Composable
 private fun SwitchRow(
     title: String,
-    summary: String,
     checked: Boolean,
-    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    summary: String? = null,
+    enabled: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
     onChange: (Boolean) -> Unit,
 ) {
     val alpha = if (enabled) 1f else 0.38f
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable(enabled = enabled) { onChange(!checked) }
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
+        if (leading != null) {
+            leading()
+            Spacer(Modifier.width(12.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
             )
-            Text(
-                summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-            )
+            if (summary != null) {
+                Text(
+                    summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
         CompactSwitch(checked, enabled = enabled, onCheckedChange = onChange)
@@ -1265,23 +1272,11 @@ private fun AccentDialog(
         title = title,
         buttons = { ActionButton(text = stringResource(Res.string.close), onClick = onDismiss) },
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(Radius.sm))
-                .clickable { setDynamic(!dynamic) }
-                .padding(horizontal = 4.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(20.dp).clip(CircleShape).background(systemColor))
-            Spacer(Modifier.width(12.dp))
-            Text(
-                stringResource(Res.string.accent_dynamic),
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.weight(1f),
-            )
-            CompactSwitch(checked = dynamic) { setDynamic(it) }
-        }
+        SwitchRow(
+            title = stringResource(Res.string.accent_dynamic),
+            checked = dynamic,
+            leading = { Box(Modifier.size(20.dp).clip(CircleShape).background(systemColor)) },
+        ) { setDynamic(it) }
         Spacer(Modifier.height(16.dp))
         SwatchGrid(
             count = ACCENTS.size + if (showNone) 1 else 0,
@@ -1584,16 +1579,11 @@ private fun GenerationDialog(
         Spacer(Modifier.height(14.dp))
         SelectField(stringResource(Res.string.effort), e, caps.effortLevels.map { it to it }) { e = it }
         Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth().clickable { s = !s }.padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(Res.string.streaming), style = MaterialTheme.typography.bodyMedium)
-                Text(stringResource(Res.string.streaming_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Switch(checked = s, onCheckedChange = { s = it })
-        }
+        SwitchRow(
+            title = stringResource(Res.string.streaming),
+            checked = s,
+            summary = stringResource(Res.string.streaming_desc),
+        ) { s = it }
     }
 }
 

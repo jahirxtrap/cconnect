@@ -1,7 +1,10 @@
 package com.jahirtrap.cconnect.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -19,10 +22,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -42,8 +47,30 @@ fun TooltipIconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     size: Dp = 36.dp,
+    showLabel: Boolean = false,
     icon: @Composable () -> Unit,
 ) {
+    if (showLabel) {
+        Row(
+            modifier = modifier
+                .height(size)
+                .clip(CircleShape)
+                .clickable(enabled = enabled, onClick = onClick)
+                .alpha(if (enabled) 1f else 0.4f)
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            icon()
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        return
+    }
     val skikoTouch = !isAndroidPlatform && LocalIsTouch.current
     val tooltipState = rememberTooltipState()
     val scope = rememberCoroutineScope()

@@ -1,6 +1,5 @@
 package com.jahirtrap.cconnect.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -39,11 +38,10 @@ fun NoticeCard(
     )
     SwipeToDismissBox(state = dismissState, backgroundContent = {}) {
         Surface(
-            shape = MaterialTheme.shapes.medium,
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 0.dp,
             shadowElevation = 4.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(

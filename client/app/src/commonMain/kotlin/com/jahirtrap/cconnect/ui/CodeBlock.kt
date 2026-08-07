@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
+import com.jahirtrap.cconnect.ui.theme.Radius
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Lucide
@@ -33,7 +34,7 @@ import kotlinx.coroutines.delay
 @Composable
 internal fun CodeBlock(code: String, bg: Color, lang: String) {
     val scroll = rememberScrollState()
-    Surface(color = bg, shape = RoundedCornerShape(6.dp), modifier = Modifier.fillMaxWidth()) {
+    Surface(color = bg, shape = RoundedCornerShape(Radius.panel), modifier = Modifier.fillMaxWidth()) {
         Column {
             CodeBlockHeader(lang, code)
             Text(
