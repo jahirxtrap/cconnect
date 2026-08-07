@@ -164,6 +164,9 @@ import com.jahirtrap.cconnect.ui.ColorDialog
 import com.jahirtrap.cconnect.ui.ColorOption
 import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.ConfirmSelectDialog
+import com.jahirtrap.cconnect.ui.DialogItemPaddingH
+import com.jahirtrap.cconnect.ui.DialogItemPaddingV
+import com.jahirtrap.cconnect.ui.DialogItemShape
 import com.jahirtrap.cconnect.ui.DialogSelectItem
 import com.jahirtrap.cconnect.ui.SecretTextField
 import com.jahirtrap.cconnect.ui.InputField
@@ -1112,7 +1115,7 @@ private fun fontLabel(style: String): String = when (style) {
 
 @Composable
 private fun FontPreview(style: String) {
-    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.width(36.dp).height(28.dp), contentAlignment = Alignment.Center) {
         Text("😃", fontFamily = appFontFamily(style), fontSize = 22.sp)
     }
 }
@@ -1166,9 +1169,9 @@ private fun SwitchRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(DialogItemShape)
             .clickable(enabled = enabled) { onChange(!checked) }
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = DialogItemPaddingH, vertical = DialogItemPaddingV),
     ) {
         if (leading != null) {
             leading()
@@ -1241,8 +1244,8 @@ private fun ExternalIndicator() {
 
 @Composable
 private fun AccentDot(color: Color) {
-    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-        Box(Modifier.size(24.dp).background(color, CircleShape))
+    Box(modifier = Modifier.width(36.dp).height(28.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(20.dp).background(color, CircleShape))
     }
 }
 
@@ -1338,8 +1341,12 @@ private fun EnvironmentsDialog(
                 selected = c.id == activeId,
                 onClick = { onSetActive(c.id) },
                 trailing = {
-                    IconButton(onClick = { editing = c }, modifier = Modifier.size(36.dp)) { Icon(Lucide.Pencil, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    IconButton(onClick = { deleting = c }, modifier = Modifier.size(36.dp)) { Icon(Lucide.Trash, contentDescription = stringResource(Res.string.delete), modifier = Modifier.size(18.dp)) }
+                    TooltipIconButton(label = stringResource(Res.string.edit_environment), onClick = { editing = c }) {
+                        Icon(Lucide.Pencil, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
+                    TooltipIconButton(label = stringResource(Res.string.delete), onClick = { deleting = c }) {
+                        Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(18.dp))
+                    }
                 },
             )
         }

@@ -67,6 +67,10 @@ import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.ConfirmDialog
+import com.jahirtrap.cconnect.ui.DialogItemInset
+import com.jahirtrap.cconnect.ui.DialogItemPaddingH
+import com.jahirtrap.cconnect.ui.DialogItemPaddingV
+import com.jahirtrap.cconnect.ui.DialogItemShape
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.CompactSwitch
@@ -847,8 +851,10 @@ private fun DetailRow(title: String, subtitle: String?, enabled: Boolean, onClic
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = DialogItemInset)
+            .clip(DialogItemShape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = DialogItemPaddingH, vertical = DialogItemPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

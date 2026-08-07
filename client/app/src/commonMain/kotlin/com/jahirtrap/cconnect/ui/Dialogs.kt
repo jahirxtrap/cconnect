@@ -66,6 +66,7 @@ import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.EnvironmentProfile
+import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 
 // Compact replacement for Material3 AlertDialog, whose built-in paddings look too airy
@@ -94,7 +95,7 @@ fun CompactDialog(
         ) {
             Column(modifier = Modifier.heightIn(max = 640.dp).padding(vertical = 20.dp)) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = if (titleTrailing != null) 8.dp else 20.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
@@ -337,6 +338,11 @@ fun SharedLinkActionsDialog(
     }
 }
 
+val DialogItemShape = RoundedCornerShape(Radius.lg)
+val DialogItemInset = 20.dp
+val DialogItemPaddingH = 12.dp
+val DialogItemPaddingV = 10.dp
+
 @Composable
 fun DialogActionItem(
     text: String,
@@ -347,9 +353,11 @@ fun DialogActionItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .padding(horizontal = DialogItemInset)
+            .clip(DialogItemShape)
             .clickable(enabled = enabled, onClick = onClick)
             .alpha(if (enabled) 1f else 0.38f)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = DialogItemPaddingH, vertical = DialogItemPaddingV),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
@@ -385,12 +393,17 @@ fun DialogSelectItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .padding(horizontal = DialogItemInset)
+            .clip(DialogItemShape)
             .then(if (selected) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
             .clickable(enabled = enabled, onClick = onClick)
             .alpha(if (enabled) 1f else 0.38f)
-            .padding(start = 12.dp, end = if (trailing != null) 4.dp else 12.dp, top = 12.dp, bottom = 12.dp),
+            .padding(
+                start = DialogItemPaddingH,
+                end = if (trailing != null) 4.dp else DialogItemPaddingH,
+                top = DialogItemPaddingV,
+                bottom = DialogItemPaddingV,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         SelectionDot(selected)

@@ -2,6 +2,7 @@ package com.jahirtrap.cconnect.ui
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -78,12 +79,22 @@ import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.File
 import com.composables.icons.lucide.FolderArchive
 import com.composables.icons.lucide.ImageOff
+import com.composables.icons.lucide.Info
+import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.MessageSquareWarning
+import com.composables.icons.lucide.OctagonAlert
+import com.composables.icons.lucide.TriangleAlert
 import com.jahirtrap.cconnect.data.remote.AppImageLoader
 import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.UrlCodec
 import com.jahirtrap.cconnect.files.isArchive
 import com.jahirtrap.cconnect.resources.Res
+import com.jahirtrap.cconnect.resources.alert_caution
+import com.jahirtrap.cconnect.resources.alert_important
+import com.jahirtrap.cconnect.resources.alert_note
+import com.jahirtrap.cconnect.resources.alert_tip
+import com.jahirtrap.cconnect.resources.alert_warning
 import com.jahirtrap.cconnect.resources.open
 import com.jahirtrap.cconnect.resources.open_external_link
 import com.jahirtrap.cconnect.resources.open_external_link_message
@@ -98,6 +109,8 @@ import org.intellij.markdown.flavours.gfm.GFMTokenTypes
 import org.intellij.markdown.parser.MarkdownParser
 import org.jetbrains.compose.resources.stringResource
 import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
+import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.palette
 
 private val flavour = GFMFlavourDescriptor()
 
@@ -267,7 +280,7 @@ private fun paragraphSegments(children: List<ASTNode>, src: String): List<MdSegm
 @Composable
 private fun ImageGrid(items: List<Pair<String, String>>) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val width = minOf(IMAGE_TILE_WIDTH, maxWidth)
+        val width = minOf(IMAGE_TILE_HEIGHT * IMAGE_TILE_RATIO, maxWidth)
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(IMAGE_TILE_GAP, Alignment.CenterHorizontally),
@@ -278,8 +291,76 @@ private fun ImageGrid(items: List<Pair<String, String>>) {
     }
 }
 
+private enum class AlertKind { Note, Tip, Important, Warning, Caution }
+
+private class Alert(val kind: AlertKind, val body: String)
+
+private val ALERT_RE = Regex("^\\s*>?\\s*\\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]\\s*$", RegexOption.IGNORE_CASE)
+
+private fun alertOf(raw: String): Alert? {
+    val lines = raw.lines()
+    val match = ALERT_RE.find(lines.firstOrNull().orEmpty()) ?: return null
+    val kind = when (match.groupValues[1].uppercase()) {
+        "NOTE" -> AlertKind.Note
+        "TIP" -> AlertKind.Tip
+        "IMPORTANT" -> AlertKind.Important
+        "WARNING" -> AlertKind.Warning
+        else -> AlertKind.Caution
+    }
+    val body = lines.drop(1).joinToString("\n") { it.trimStart().removePrefix(">").removePrefix(" ") }
+    return Alert(kind, body)
+}
+
+@Composable
+private fun AlertBlock(alert: Alert, ctx: MdContext, depth: Int) {
+    val tone = palette
+    val color = when (alert.kind) {
+        AlertKind.Note -> tone.blue
+        AlertKind.Tip -> tone.green
+        AlertKind.Important -> tone.purple
+        AlertKind.Warning -> tone.yellow
+        AlertKind.Caution -> tone.red
+    }
+    val icon = when (alert.kind) {
+        AlertKind.Note -> Lucide.Info
+        AlertKind.Tip -> Lucide.Lightbulb
+        AlertKind.Important -> Lucide.MessageSquareWarning
+        AlertKind.Warning -> Lucide.TriangleAlert
+        AlertKind.Caution -> Lucide.OctagonAlert
+    }
+    val label = stringResource(
+        when (alert.kind) {
+            AlertKind.Note -> Res.string.alert_note
+            AlertKind.Tip -> Res.string.alert_tip
+            AlertKind.Important -> Res.string.alert_important
+            AlertKind.Warning -> Res.string.alert_warning
+            AlertKind.Caution -> Res.string.alert_caution
+        }
+    )
+    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Box(modifier = Modifier.width(3.dp).fillMaxHeight().background(color))
+        Column(modifier = Modifier.padding(start = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(label, style = MaterialTheme.typography.labelLarge, color = color)
+            }
+            if (alert.body.isNotBlank()) {
+                val tree = remember(alert.body) { MarkdownParser(flavour).buildMarkdownTreeFromString(alert.body) }
+                val inner = remember(alert.body, ctx) { MdContext(alert.body, ctx.linkColor, ctx.codeBg, ctx.monoFamily) }
+                Blocks(tree, inner, depth + 1)
+            }
+        }
+    }
+}
+
 @Composable
 private fun QuoteBlock(node: ASTNode, ctx: MdContext, depth: Int) {
+    val alert = remember(node, ctx.src) { alertOf(node.text(ctx.src)) }
+    if (alert != null) {
+        AlertBlock(alert, ctx, depth)
+        return
+    }
     Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(modifier = Modifier.width(3.dp).fillMaxHeight().background(MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)))
         Column(modifier = Modifier.padding(start = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -531,8 +612,8 @@ private const val EXT_LINK_TAG = "ext_link"
 private const val SHARED_FILE_TAG = "shared_file"
 private const val SHARED_ARCHIVE_TAG = "shared_archive"
 
-private val IMAGE_TILE_WIDTH = 280.dp
-private const val IMAGE_TILE_RATIO = 3f / 4f
+private val IMAGE_TILE_HEIGHT = 280.dp
+private const val IMAGE_TILE_RATIO = 4f / 3f
 private val IMAGE_TILE_GAP = 6.dp
 
 internal val LocalImageDownload = staticCompositionLocalOf<((url: String, filename: String) -> Unit)?> { null }
@@ -553,8 +634,15 @@ private fun MarkdownImage(url: String, alt: String, width: Dp) {
     val onTap = { if (download != null) download(resolved, filenameFromUrl(resolved)) else uriHandler.openUri(resolved) }
     val painter = rememberAsyncImagePainter(model = ImageRequest.Builder(context).data(resolved).build(), imageLoader = loader)
     val state by painter.state.collectAsState()
-    val shape = RoundedCornerShape(6.dp)
-    Box(modifier = Modifier.width(width).aspectRatio(IMAGE_TILE_RATIO), contentAlignment = Alignment.Center) {
+    val shape = RoundedCornerShape(Radius.panel)
+    Box(
+        modifier = Modifier
+            .width(width)
+            .aspectRatio(IMAGE_TILE_RATIO)
+            .clip(shape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+        contentAlignment = Alignment.Center,
+    ) {
         when (state) {
             is AsyncImagePainter.State.Success -> {
                 val sz = painter.intrinsicSize
@@ -564,11 +652,11 @@ private fun MarkdownImage(url: String, alt: String, width: Dp) {
                     painter = painter,
                     contentDescription = alt.ifBlank { null },
                     contentScale = ContentScale.Fit,
-                    modifier = fit.aspectRatio(aspect).clip(shape).clickable(onClick = onTap),
+                    modifier = fit.aspectRatio(aspect).clickable(onClick = onTap),
                 )
             }
             is AsyncImagePainter.State.Error -> Column(
-                modifier = Modifier.fillMaxSize().clip(shape).clickable(onClick = onTap).padding(12.dp),
+                modifier = Modifier.fillMaxSize().clickable(onClick = onTap).padding(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {

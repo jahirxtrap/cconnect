@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -55,6 +54,7 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.SshProfile
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.StatusDot
+import com.jahirtrap.cconnect.ui.StatusSpinner
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.theme.palette
 
@@ -96,8 +96,7 @@ actual fun TerminalSession(
     Scaffold(
         topBar = {
             val sshLeading: (@Composable () -> Unit)? = when (state) {
-                SshConnection.State.Idle, SshConnection.State.Connecting ->
-                    ({ LoadingIndicator(modifier = Modifier.size(8.dp)) })
+                SshConnection.State.Idle, SshConnection.State.Connecting -> ({ StatusSpinner() })
                 SshConnection.State.Connected -> ({ StatusDot(palette.green, box = 8.dp) })
                 else -> ({ StatusDot(palette.red, box = 8.dp) })
             }

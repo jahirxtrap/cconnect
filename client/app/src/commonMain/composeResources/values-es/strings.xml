@@ -252,6 +252,11 @@
     <string name="sort_type">Tipo</string>
     <string name="sort_size">Tamaño</string>
     <string name="sort_ascending">Ascendente</string>
+    <string name="alert_note">Nota</string>
+    <string name="alert_tip">Consejo</string>
+    <string name="alert_important">Importante</string>
+    <string name="alert_warning">Advertencia</string>
+    <string name="alert_caution">Precaución</string>
     <string name="compress">Comprimir</string>
     <string name="extract">Descomprimir</string>
     <string name="extract_to_folder">Descomprimir en «%1$s»</string>
