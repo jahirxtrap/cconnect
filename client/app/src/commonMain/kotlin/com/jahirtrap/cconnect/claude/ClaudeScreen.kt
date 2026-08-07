@@ -282,36 +282,32 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                         }
                     }
                     usage?.takeIf { it.error == null && it.windows.isNotEmpty() }?.let { current ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        val accountLabel = accountsSnapshot?.takeIf { it.accounts.size > 1 }
+                            ?.let { s -> s.accounts.firstOrNull { it.id == s.default }?.label }
+                        val usageLabel = listOfNotNull(accountLabel, current.plan).joinToString(" • ").ifBlank { null }
+                        SettingsGroup(
+                            label = stringResource(Res.string.usage),
+                            labelTrailing = {
+                                if (usageLabel != null) {
+                                    Text(
+                                        usageLabel,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
                         ) {
-                            Text(
-                                stringResource(Res.string.usage),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.weight(1f),
-                            )
-                            val accountLabel = accountsSnapshot?.takeIf { it.accounts.size > 1 }
-                                ?.let { s -> s.accounts.firstOrNull { it.id == s.default }?.label }
-                            listOfNotNull(accountLabel, current.plan).joinToString(" • ").ifBlank { null }?.let {
-                                Text(it, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(24.dp))
-                                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                                .padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(14.dp),
-                        ) {
-                            current.windows.forEach { window ->
-                                MetricBar(
-                                    title = usageWindowLabel(window.id),
-                                    subtitle = resetsLabel(window.resetsAt),
-                                    percent = window.percent,
-                                )
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                current.windows.forEach { window ->
+                                    MetricBar(
+                                        title = usageWindowLabel(window.id),
+                                        subtitle = resetsLabel(window.resetsAt),
+                                        percent = window.percent,
+                                    )
+                                }
                             }
                         }
                     }

@@ -2119,7 +2119,7 @@ private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, onSe
             Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
         }
-        AppDropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = fieldWidth)) {
+        AppDropdownMenu(expanded = open, onDismissRequest = { open = false }, minWidth = fieldWidth) {
             CompactDropdownItem(stringResource(Res.string.all_projects), selected = selected == null) { onSelect(null); open = false }
             projects.forEach { p ->
                 CompactDropdownItem(projectLabel(p), selected = selected == p.projectKey) { onSelect(p.projectKey); open = false }

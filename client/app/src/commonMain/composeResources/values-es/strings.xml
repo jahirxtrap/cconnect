@@ -251,6 +251,7 @@
     <string name="sort_date">Fecha</string>
     <string name="sort_type">Tipo</string>
     <string name="sort_size">Tamaño</string>
+    <string name="sort_ascending">Ascendente</string>
     <string name="compress">Comprimir</string>
     <string name="extract">Descomprimir</string>
     <string name="extract_to_folder">Descomprimir en «%1$s»</string>

@@ -1,9 +1,13 @@
 package com.jahirtrap.cconnect.ui
 
 import androidx.compose.foundation.border
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import com.jahirtrap.cconnect.ui.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,13 +15,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,7 +40,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.ChevronDown
+import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
+import kotlinx.coroutines.delay
+
+private const val SUBMENU_CLOSE_MS = 160L
 
 @Composable
 fun CompactDropdownItem(
@@ -81,6 +89,49 @@ fun CompactDropdownItem(
 }
 
 @Composable
+fun CompactDropdownSubMenu(
+    text: String,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val triggerSource = remember { MutableInteractionSource() }
+    val popupSource = remember { MutableInteractionSource() }
+    val overTrigger by triggerSource.collectIsHoveredAsState()
+    val overPopup by popupSource.collectIsHoveredAsState()
+    LaunchedEffect(overTrigger, overPopup) {
+        if (overTrigger) {
+            onExpandedChange(true)
+        } else if (!overPopup) {
+            delay(SUBMENU_CLOSE_MS)
+            onExpandedChange(false)
+        }
+    }
+    Box(modifier = Modifier.hoverable(triggerSource)) {
+        CompactDropdownItem(
+            text = text,
+            leadingIcon = leadingIcon,
+            trailing = {
+                Icon(
+                    Lucide.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            },
+            onClick = { onExpandedChange(!expanded) },
+        )
+        SubMenuPopup(
+            expanded = expanded,
+            onDismiss = { onExpandedChange(false) },
+            modifier = Modifier.hoverable(popupSource),
+            content = content,
+        )
+    }
+}
+
+@Composable
 fun SelectField(
     label: String,
     selected: String,
@@ -115,7 +166,7 @@ fun SelectField(
             AppDropdownMenu(
                 expanded = open,
                 onDismissRequest = { open = false },
-                modifier = Modifier.widthIn(min = fieldWidth),
+                minWidth = fieldWidth,
                 properties = PopupProperties(focusable = !LocalIsTouch.current),
             ) {
                 options.forEach { (value, text) ->

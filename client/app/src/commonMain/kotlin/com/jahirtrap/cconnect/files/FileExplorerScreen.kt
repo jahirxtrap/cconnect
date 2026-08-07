@@ -154,6 +154,8 @@ import com.jahirtrap.cconnect.ui.ClipboardShortcutHandler
 import com.jahirtrap.cconnect.ui.PreviewOverlay
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
+import com.jahirtrap.cconnect.ui.CompactDropdownSubMenu
+import com.jahirtrap.cconnect.ui.CompactSwitch
 import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.LocalIsTouch
 import com.jahirtrap.cconnect.ui.DialogActionItem
@@ -508,40 +510,55 @@ fun FileExplorerScreen(
                                 TooltipIconButton(label = stringResource(Res.string.more_options), onClick = { barMenu = true }) {
                                     Icon(Lucide.EllipsisVertical, contentDescription = null)
                                 }
-                                AppDropdownMenu(expanded = barMenu, onDismissRequest = { barMenu = false }) {
-                                    CompactDropdownItem(
+                                AppDropdownMenu(
+                                    expanded = barMenu,
+                                    onDismissRequest = { barMenu = false; sortMenu = false },
+                                ) {
+                                    CompactDropdownSubMenu(
                                         text = stringResource(Res.string.sort_by),
-                                        leadingIcon = { Icon(Lucide.ArrowDownUp, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                        onClick = { barMenu = false; sortMenu = true },
-                                    )
-                                    if (archive == null) CompactDropdownItem(
-                                        text = stringResource(Res.string.new_folder),
-                                        leadingIcon = { Icon(Lucide.FolderPlus, contentDescription = null, modifier = Modifier.size(20.dp)) },
-                                        onClick = { barMenu = false; creatingFolder = true },
-                                    )
-                                }
-                                AppDropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                                    SortField.entries.forEach { field ->
-                                        val active = field == sortField
+                                        expanded = sortMenu,
+                                        onExpandedChange = { sortMenu = it },
+                                        leadingIcon = {
+                                            Icon(
+                                                Lucide.ArrowDownUp,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        },
+                                    ) {
+                                        SortField.entries.forEach { field ->
+                                            CompactDropdownItem(
+                                                text = stringResource(field.label),
+                                                selected = field == sortField,
+                                                onClick = {
+                                                    sortField = field
+                                                    settings.fileSortField = field.key
+                                                },
+                                            )
+                                        }
+                                        val toggleDirection = {
+                                            sortAscending = !sortAscending
+                                            settings.fileSortAscending = sortAscending
+                                        }
                                         CompactDropdownItem(
-                                            text = stringResource(field.label),
-                                            trailing = {
-                                                Box(modifier = Modifier.size(20.dp)) {
-                                                    if (active) Icon(
-                                                        if (sortAscending) Lucide.ArrowUp else Lucide.ArrowDown,
-                                                        contentDescription = null,
-                                                        tint = MaterialTheme.colorScheme.primary,
-                                                    )
-                                                }
-                                            },
-                                            color = if (active) MaterialTheme.colorScheme.primary else Color.Unspecified,
-                                            onClick = {
-                                                if (active) sortAscending = !sortAscending else { sortField = field; sortAscending = true }
-                                                settings.fileSortField = sortField.key
-                                                settings.fileSortAscending = sortAscending
-                                            },
+                                            text = stringResource(Res.string.sort_ascending),
+                                            trailing = { CompactSwitch(checked = sortAscending) { toggleDirection() } },
+                                            onClick = toggleDirection,
                                         )
                                     }
+                                    if (archive == null) CompactDropdownItem(
+                                        text = stringResource(Res.string.new_folder),
+                                        leadingIcon = {
+                                            Icon(
+                                                Lucide.FolderPlus,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(16.dp),
+                                            )
+                                        },
+                                        onClick = { barMenu = false; sortMenu = false; creatingFolder = true },
+                                    )
                                 }
                             }
                         },

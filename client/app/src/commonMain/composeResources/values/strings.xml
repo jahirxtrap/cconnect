@@ -251,6 +251,7 @@
     <string name="sort_date">Date</string>
     <string name="sort_type">Type</string>
     <string name="sort_size">Size</string>
+    <string name="sort_ascending">Ascending</string>
     <string name="compress">Compress</string>
     <string name="extract">Extract</string>
     <string name="extract_to_folder">Extract to “%1$s”</string>

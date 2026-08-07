@@ -30,8 +30,10 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
@@ -73,6 +75,7 @@ fun Terminal(
     val cell = remember(style) { measurer.measure("M", style).size }
     val density = LocalDensity.current
     val keyboard = LocalSoftwareKeyboardController.current
+    val clipboard = LocalClipboardManager.current
     val listState = rememberLazyListState()
     var input by remember { mutableStateOf(TextFieldValue(INPUT_SENTINEL, TextRange(INPUT_SENTINEL.length))) }
 
@@ -148,7 +151,16 @@ fun Terminal(
                 .size(1.dp)
                 .focusRequester(focusRequester)
                 .onPreviewKeyEvent { event ->
-                    specialKeyToBytes(event)?.let { terminalEmulator.send(it); true } ?: false
+                    when {
+                        isPasteShortcut(event) -> {
+                            clipboard.getText()?.text?.takeIf { it.isNotEmpty() }?.let {
+                                terminalEmulator.send(pasteBytes(it))
+                            }
+                            true
+                        }
+
+                        else -> specialKeyToBytes(event)?.let { terminalEmulator.send(it); true } ?: false
+                    }
                 },
         )
     }
@@ -190,6 +202,12 @@ private fun buildLine(
         }
     }
 }
+
+private fun isPasteShortcut(event: KeyEvent): Boolean =
+    event.type == KeyEventType.KeyDown && event.key == Key.V && (event.isCtrlPressed || event.isMetaPressed)
+
+private fun pasteBytes(text: String): ByteArray =
+    text.replace("\r\n", "\n").replace('\n', '\r').toByteArray(Charsets.UTF_8)
 
 private fun specialKeyToBytes(event: KeyEvent): ByteArray? {
     if (event.type != KeyEventType.KeyDown) return null

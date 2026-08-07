@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -62,8 +63,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImagePainter
@@ -218,23 +222,58 @@ private fun ParagraphBlock(node: ASTNode, ctx: MdContext) {
         return
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        val run = ArrayList<ASTNode>()
-        for (c in children) {
-            val img = imageOf(c, ctx.src)
-            if (img != null) {
-                if (run.isNotEmpty()) {
-                    val text = inlineOf(run, ctx)
+        paragraphSegments(children, ctx.src).forEach { segment ->
+            when (segment) {
+                is MdSegment.Images -> ImageGrid(segment.items)
+                is MdSegment.Text -> {
+                    val text = inlineOf(segment.nodes, ctx)
                     if (text.isNotBlank()) MdText(text, ctx.codeBg, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium)
-                    run.clear()
                 }
-                MarkdownImage(url = img.first, alt = img.second)
-            } else {
-                run.add(c)
             }
         }
-        if (run.isNotEmpty()) {
-            val text = inlineOf(run, ctx)
-            if (text.isNotBlank()) MdText(text, ctx.codeBg, modifier = Modifier.fillMaxWidth(), style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+private sealed interface MdSegment {
+    data class Text(val nodes: List<ASTNode>) : MdSegment
+    data class Images(val items: List<Pair<String, String>>) : MdSegment
+}
+
+private fun paragraphSegments(children: List<ASTNode>, src: String): List<MdSegment> {
+    val segments = ArrayList<MdSegment>()
+    val run = ArrayList<ASTNode>()
+    val images = ArrayList<Pair<String, String>>()
+    for (child in children) {
+        val image = imageOf(child, src)
+        if (image == null) {
+            run.add(child)
+            continue
+        }
+        if (run.any { it.type != MarkdownTokenTypes.WHITE_SPACE && it.type != MarkdownTokenTypes.EOL }) {
+            if (images.isNotEmpty()) {
+                segments.add(MdSegment.Images(images.toList()))
+                images.clear()
+            }
+            segments.add(MdSegment.Text(run.toList()))
+        }
+        run.clear()
+        images.add(image)
+    }
+    if (images.isNotEmpty()) segments.add(MdSegment.Images(images.toList()))
+    if (run.isNotEmpty()) segments.add(MdSegment.Text(run.toList()))
+    return segments
+}
+
+@Composable
+private fun ImageGrid(items: List<Pair<String, String>>) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val width = minOf(IMAGE_TILE_WIDTH, maxWidth)
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(IMAGE_TILE_GAP, Alignment.CenterHorizontally),
+            verticalArrangement = Arrangement.spacedBy(IMAGE_TILE_GAP),
+        ) {
+            items.forEach { (url, alt) -> MarkdownImage(url = url, alt = alt, width = width) }
         }
     }
 }
@@ -492,10 +531,14 @@ private const val EXT_LINK_TAG = "ext_link"
 private const val SHARED_FILE_TAG = "shared_file"
 private const val SHARED_ARCHIVE_TAG = "shared_archive"
 
+private val IMAGE_TILE_WIDTH = 280.dp
+private const val IMAGE_TILE_RATIO = 3f / 4f
+private val IMAGE_TILE_GAP = 6.dp
+
 internal val LocalImageDownload = staticCompositionLocalOf<((url: String, filename: String) -> Unit)?> { null }
 
 @Composable
-private fun MarkdownImage(url: String, alt: String) {
+private fun MarkdownImage(url: String, alt: String, width: Dp) {
     val context = LocalPlatformContext.current
     val uriHandler = LocalUriHandler.current
     val download = LocalImageDownload.current
@@ -511,23 +554,36 @@ private fun MarkdownImage(url: String, alt: String) {
     val painter = rememberAsyncImagePainter(model = ImageRequest.Builder(context).data(resolved).build(), imageLoader = loader)
     val state by painter.state.collectAsState()
     val shape = RoundedCornerShape(6.dp)
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val maxSide = maxWidth
+    Box(modifier = Modifier.width(width).aspectRatio(IMAGE_TILE_RATIO), contentAlignment = Alignment.Center) {
         when (state) {
             is AsyncImagePainter.State.Success -> {
                 val sz = painter.intrinsicSize
                 val aspect = if (sz.isSpecified && sz.height > 0f) sz.width / sz.height else 1f
-                val imageModifier = if (aspect >= 1f) Modifier.fillMaxWidth().aspectRatio(aspect) else Modifier.height(maxSide).aspectRatio(aspect)
-                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Image(painter = painter, contentDescription = alt.ifBlank { null }, contentScale = ContentScale.Fit, modifier = imageModifier.clip(shape).clickable(onClick = onTap))
-                }
+                val fit = if (aspect >= 1f) Modifier.fillMaxWidth() else Modifier.fillMaxHeight()
+                Image(
+                    painter = painter,
+                    contentDescription = alt.ifBlank { null },
+                    contentScale = ContentScale.Fit,
+                    modifier = fit.aspectRatio(aspect).clip(shape).clickable(onClick = onTap),
+                )
             }
-            is AsyncImagePainter.State.Error -> Row(modifier = Modifier.fillMaxWidth().clip(shape).clickable(onClick = onTap).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            is AsyncImagePainter.State.Error -> Column(
+                modifier = Modifier.fillMaxSize().clip(shape).clickable(onClick = onTap).padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Icon(Lucide.ImageOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.size(8.dp))
-                Text(text = alt.ifBlank { resolved }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    text = alt.ifBlank { resolved },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            else -> CenteredProgress(Modifier.fillMaxWidth().height(140.dp), size = 24.dp)
+            else -> CenteredProgress(Modifier.fillMaxSize(), size = 24.dp)
         }
     }
 }
