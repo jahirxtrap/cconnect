@@ -40,6 +40,7 @@ import com.jahirtrap.cconnect.files.saveTextToDownloads
 import com.jahirtrap.cconnect.files.shareText
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
+import com.jahirtrap.cconnect.ui.AppDropdownMenu
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.Dismissable
@@ -92,7 +93,7 @@ fun MarkdownScreen(onClose: () -> Unit) {
                         TooltipIconButton(label = stringResource(Res.string.files), onClick = { menu = true }) {
                             Icon(Lucide.EllipsisVertical, contentDescription = null)
                         }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        AppDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             CompactDropdownItem(
                                 text = stringResource(Res.string.save),
                                 leadingIcon = { Icon(Lucide.Download, contentDescription = null, modifier = Modifier.size(20.dp)) },

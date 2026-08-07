@@ -55,6 +55,7 @@ import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
+import androidx.compose.ui.draw.drawWithContent
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import kotlin.math.abs
 import org.jetbrains.compose.resources.stringResource
@@ -148,10 +149,20 @@ fun TabStrip() {
         if (vp <= 0) return@LaunchedEffect
         scroll.animateScrollTo((center - vp / 2f).toInt().coerceIn(0, scroll.maxValue))
     }
+    val edge = MaterialTheme.colorScheme.outlineVariant
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
+            .drawWithContent {
+                drawContent()
+                drawLine(
+                    edge,
+                    androidx.compose.ui.geometry.Offset(0f, size.height),
+                    androidx.compose.ui.geometry.Offset(size.width, size.height),
+                    1.dp.toPx(),
+                )
+            }
             .statusBarsPadding()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
             .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)

@@ -29,10 +29,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+private val Centered = LineHeightStyle(
+    alignment = LineHeightStyle.Alignment.Center,
+    trim = LineHeightStyle.Trim.None,
+)
 
 @Composable
 fun AppTopBar(
@@ -62,7 +68,7 @@ fun AppTopBar(
         Column(modifier = Modifier.weight(1f).padding(start = if (navigationIcon != null) 2.dp else 12.dp)) {
             Text(
                 title,
-                style = MaterialTheme.typography.titleLarge.copy(lineHeight = 22.sp),
+                style = MaterialTheme.typography.titleLarge.copy(lineHeight = 22.sp, lineHeightStyle = Centered),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -74,7 +80,7 @@ fun AppTopBar(
                     }
                     Text(
                         subtitle,
-                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp),
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp, lineHeightStyle = Centered),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -82,7 +88,7 @@ fun AppTopBar(
                 }
             }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             actions()
         }
     }

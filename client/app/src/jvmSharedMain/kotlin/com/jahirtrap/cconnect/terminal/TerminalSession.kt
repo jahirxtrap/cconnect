@@ -97,9 +97,9 @@ actual fun TerminalSession(
         topBar = {
             val sshLeading: (@Composable () -> Unit)? = when (state) {
                 SshConnection.State.Idle, SshConnection.State.Connecting ->
-                    ({ LoadingIndicator(modifier = Modifier.size(14.dp)) })
-                SshConnection.State.Connected -> ({ StatusDot(palette.green) })
-                else -> ({ StatusDot(palette.red) })
+                    ({ LoadingIndicator(modifier = Modifier.size(8.dp)) })
+                SshConnection.State.Connected -> ({ StatusDot(palette.green, box = 8.dp) })
+                else -> ({ StatusDot(palette.red, box = 8.dp) })
             }
             AppTopBar(
                 title = profile.name.ifBlank { profile.host },

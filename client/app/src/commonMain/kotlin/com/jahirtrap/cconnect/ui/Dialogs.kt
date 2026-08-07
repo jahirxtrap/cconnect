@@ -201,7 +201,6 @@ fun RenameDialog(
 
 data class ColorOption(val value: String, val color: Color, val label: String)
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ColorDialog(
     title: String,
@@ -210,32 +209,38 @@ fun ColorDialog(
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
     columns: Int = 5,
+    applyOnSelect: Boolean = false,
 ) {
     var picked by remember { mutableStateOf(selected) }
+    val choose: (String?) -> Unit = { value ->
+        if (applyOnSelect) {
+            onSelect(value)
+            onDismiss()
+        } else {
+            picked = value
+        }
+    }
     CompactDialog(
         onDismiss = onDismiss,
         title = title,
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
-            Button(onClick = { onSelect(picked); onDismiss() }) { Text(stringResource(Res.string.save)) }
+            if (!applyOnSelect) {
+                Button(onClick = { onSelect(picked); onDismiss() }) { Text(stringResource(Res.string.save)) }
+            }
         },
     ) {
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            maxItemsInEachRow = columns,
-        ) {
-            ColorSwatch(color = null, selected = picked == null, onClick = { picked = null }, icon = Lucide.X)
-            options.forEach { option ->
+        SwatchGrid(count = options.size + 1, columns = columns) { index ->
+            if (index == 0) {
+                ColorSwatch(color = null, selected = picked == null, onClick = { choose(null) }, icon = Lucide.X)
+            } else {
+                val option = options[index - 1]
                 ColorSwatch(
                     color = option.color,
                     selected = picked == option.value,
-                    onClick = { picked = option.value },
+                    onClick = { choose(option.value) },
                 )
             }
-            val remainder = (1 + options.size) % columns
-            if (remainder != 0) repeat(columns - remainder) { Spacer(Modifier.size(40.dp)) }
         }
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import com.jahirtrap.cconnect.ui.AppDropdownMenu
 import com.jahirtrap.cconnect.ui.clickable
 import com.jahirtrap.cconnect.ui.secondaryClick
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -476,7 +477,7 @@ fun FileExplorerScreen(
                     AppTopBar(
                         title = stringResource(Res.string.files),
                         subtitle = if (failed) stringResource(Res.string.server_unavailable) else activeName,
-                        subtitleLeading = if (failed) ({ StatusDot(palette.red) }) else null,
+                        subtitleLeading = if (failed) ({ StatusDot(palette.red, box = 8.dp) }) else null,
                         navigationIcon = {
                             TooltipIconButton(label = stringResource(Res.string.back), onClick = ::goUp) {
                                 Icon(Lucide.ArrowLeft, contentDescription = null)
@@ -503,7 +504,7 @@ fun FileExplorerScreen(
                                 TooltipIconButton(label = stringResource(Res.string.more_options), onClick = { barMenu = true }) {
                                     Icon(Lucide.EllipsisVertical, contentDescription = null)
                                 }
-                                DropdownMenu(expanded = barMenu, onDismissRequest = { barMenu = false }) {
+                                AppDropdownMenu(expanded = barMenu, onDismissRequest = { barMenu = false }) {
                                     CompactDropdownItem(
                                         text = stringResource(Res.string.sort_by),
                                         leadingIcon = { Icon(Lucide.ArrowDownUp, contentDescription = null, modifier = Modifier.size(20.dp)) },
@@ -515,7 +516,7 @@ fun FileExplorerScreen(
                                         onClick = { barMenu = false; creatingFolder = true },
                                     )
                                 }
-                                DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                                AppDropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                                     SortField.entries.forEach { field ->
                                         val active = field == sortField
                                         CompactDropdownItem(

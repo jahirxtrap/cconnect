@@ -193,7 +193,6 @@
     <string name="network_traffic">Tráfico</string>
     <string name="network_interfaces">Interfaces</string>
     <string name="network_wifi">Wi-Fi</string>
-    <string name="network_wifi_radio">Wi-Fi activado</string>
     <string name="network_no_networks">No se encontraron redes</string>
     <string name="network_signal">Señal %1$s</string>
     <string name="network_testing">Midiendo</string>

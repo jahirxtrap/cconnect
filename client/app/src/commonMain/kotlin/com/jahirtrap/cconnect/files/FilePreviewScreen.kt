@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import com.jahirtrap.cconnect.ui.AppDropdownMenu
 import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowLeft
@@ -168,7 +169,7 @@ fun FilePreviewScreen(
                         TooltipIconButton(label = stringResource(Res.string.files), onClick = { menu = true }) {
                             Icon(Lucide.EllipsisVertical, contentDescription = null)
                         }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        AppDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                             CompactDropdownItem(
                                 text = stringResource(Res.string.save),
                                 leadingIcon = { Icon(Lucide.Download, contentDescription = null, modifier = Modifier.size(20.dp)) },

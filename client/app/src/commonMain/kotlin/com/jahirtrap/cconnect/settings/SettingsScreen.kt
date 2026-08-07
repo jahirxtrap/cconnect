@@ -75,6 +75,7 @@ import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Coffee
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Eye
+import com.composables.icons.lucide.X
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import com.composables.icons.lucide.Download
@@ -149,7 +150,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import com.jahirtrap.cconnect.BuildConfig
 import com.composables.icons.lucide.Github
-import com.jahirtrap.cconnect.ui.AppBottomSheet
 import com.jahirtrap.cconnect.ui.AppLogo
 import com.jahirtrap.cconnect.ui.Claude
 import com.jahirtrap.cconnect.ui.CustomIcons
@@ -157,6 +157,7 @@ import com.jahirtrap.cconnect.ui.ActionButton
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
 import com.jahirtrap.cconnect.ui.ColorSwatch
+import com.jahirtrap.cconnect.ui.SwatchGrid
 import com.jahirtrap.cconnect.ui.CompactSwitch
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.CompactDialog
@@ -184,9 +185,11 @@ import com.jahirtrap.cconnect.ui.theme.ACCENTS
 import com.jahirtrap.cconnect.ui.theme.appFontFamily
 import com.jahirtrap.cconnect.ui.theme.palette
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.DYNAMIC_ACCENT
 import com.jahirtrap.cconnect.ui.theme.accentAt
 import com.jahirtrap.cconnect.ui.theme.accentNameAt
 import com.jahirtrap.cconnect.ui.theme.dynamicAccent
+import com.jahirtrap.cconnect.ui.theme.systemAccent
 import kotlin.uuid.Uuid
 
 private const val KOFI_URL = "https://ko-fi.com/jahirtrap"
@@ -558,7 +561,7 @@ fun SettingsScreen(
                                 )
                             }
                             TooltipIconButton(label = stringResource(Res.string.changelog), onClick = { showChangelog = true }) {
-                                Icon(Lucide.FileText, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(Lucide.FileText, contentDescription = null)
                             }
                         }
                         val release = chatState.latestRelease
@@ -721,12 +724,13 @@ fun SettingsScreen(
         )
 
         SettingsDialog.Accent -> AccentDialog(
-            dynamic = dynamicColor,
-            accentIndex = accentIndex,
-            dynamicColor = dynamicAccent(themeMode),
-            onConfirm = { idx ->
-                if (idx == null) onDynamicColor(true)
-                else { onDynamicColor(false); onAccent(idx) }
+            title = stringResource(Res.string.accent),
+            selected = if (dynamicColor) DYNAMIC_ACCENT else accentIndex,
+            systemColor = dynamicAccent(themeMode),
+            showNone = false,
+            onSelect = { idx ->
+                if (idx == DYNAMIC_ACCENT) onDynamicColor(true)
+                else if (idx != null) { onDynamicColor(false); onAccent(idx) }
             },
             onDismiss = { dialog = null },
         )
@@ -1224,7 +1228,6 @@ private fun ExternalIndicator() {
             Lucide.ExternalLink,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
         )
     }
 }
@@ -1239,51 +1242,59 @@ private fun AccentDot(color: Color) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccentDialog(
-    dynamic: Boolean,
-    accentIndex: Int,
-    dynamicColor: Color,
-    onConfirm: (Int?) -> Unit,
+    title: String,
+    selected: Int?,
+    systemColor: Color,
+    showNone: Boolean,
+    onSelect: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var pickedDynamic by remember { mutableStateOf(dynamic) }
-    var pickedIndex by remember { mutableStateOf(accentIndex) }
+    var picked by remember { mutableStateOf(selected) }
+    var lastIndex by remember { mutableStateOf(selected?.takeIf { it != DYNAMIC_ACCENT } ?: 4) }
+    val dynamic = picked == DYNAMIC_ACCENT
+
+    fun apply(value: Int?) {
+        picked = value
+        onSelect(value)
+    }
+
+    fun setDynamic(on: Boolean) = apply(if (on) DYNAMIC_ACCENT else if (showNone) null else lastIndex)
+
     CompactDialog(
         onDismiss = onDismiss,
-        title = stringResource(Res.string.accent),
+        title = title,
         buttons = { ActionButton(text = stringResource(Res.string.close), onClick = onDismiss) },
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.sm))
-                .clickable { pickedDynamic = !pickedDynamic; onConfirm(if (pickedDynamic) null else pickedIndex) }
+                .clickable { setDynamic(!dynamic) }
                 .padding(horizontal = 4.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(Modifier.size(20.dp).clip(CircleShape).background(dynamicColor))
+            Box(Modifier.size(20.dp).clip(CircleShape).background(systemColor))
             Spacer(Modifier.width(12.dp))
             Text(
                 stringResource(Res.string.accent_dynamic),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.weight(1f),
             )
-            CompactSwitch(checked = pickedDynamic) {
-                pickedDynamic = it
-                onConfirm(if (it) null else pickedIndex)
-            }
+            CompactSwitch(checked = dynamic) { setDynamic(it) }
         }
         Spacer(Modifier.height(16.dp))
-        FlowRow(
-            modifier = Modifier.fillMaxWidth().alpha(if (pickedDynamic) 0.4f else 1f),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            maxItemsInEachRow = 5,
-        ) {
-            ACCENTS.forEachIndexed { index, (_, color) ->
+        SwatchGrid(
+            count = ACCENTS.size + if (showNone) 1 else 0,
+            modifier = Modifier.alpha(if (dynamic) 0.4f else 1f),
+        ) { slot ->
+            if (showNone && slot == 0) {
+                ColorSwatch(color = null, selected = picked == null, onClick = { apply(null) }, icon = Lucide.X)
+            } else {
+                val index = if (showNone) slot - 1 else slot
                 ColorSwatch(
-                    color = color,
-                    selected = !pickedDynamic && index == pickedIndex,
-                    onClick = { pickedDynamic = false; pickedIndex = index; onConfirm(index) },
+                    color = ACCENTS[index].second,
+                    selected = !dynamic && picked == index,
+                    onClick = { lastIndex = index; apply(index) },
                 )
             }
         }
@@ -1391,6 +1402,8 @@ private fun EnvironmentEditDialog(
     var authHeaderValue by remember { mutableStateOf(initial?.authHeaderValue ?: "") }
     var accentIndex by remember { mutableStateOf(initial?.accentIndex) }
     var picking by remember { mutableStateOf(false) }
+    val systemColor = systemAccent() ?: MaterialTheme.colorScheme.primary
+    val dynamicLabel = stringResource(Res.string.accent_dynamic)
 
     fun defaultPortFor(k: String) = if (k == "https") "443" else "8723"
 
@@ -1524,17 +1537,24 @@ private fun EnvironmentEditDialog(
         PreferenceRow(
             Lucide.Palette,
             stringResource(Res.string.environment_accent),
-            accentIndex?.let { accentNameAt(it) } ?: stringResource(Res.string.color_none),
-            trailing = { accentIndex?.let { AccentDot(accentAt(it)) } },
+            when (val picked = accentIndex) {
+                null -> stringResource(Res.string.color_none)
+                DYNAMIC_ACCENT -> dynamicLabel
+                else -> accentNameAt(picked)
+            },
+            trailing = {
+                accentIndex?.let { AccentDot(if (it == DYNAMIC_ACCENT) systemColor else accentAt(it)) }
+            },
         ) { picking = true }
     }
 
     if (picking) {
-        ColorDialog(
+        AccentDialog(
             title = stringResource(Res.string.environment_accent),
-            options = ACCENTS.mapIndexed { index, accent -> ColorOption(index.toString(), accent.second, accent.first) },
-            selected = accentIndex?.toString(),
-            onSelect = { accentIndex = it?.toIntOrNull() },
+            selected = accentIndex,
+            systemColor = systemColor,
+            showNone = true,
+            onSelect = { accentIndex = it },
             onDismiss = { picking = false },
         )
     }

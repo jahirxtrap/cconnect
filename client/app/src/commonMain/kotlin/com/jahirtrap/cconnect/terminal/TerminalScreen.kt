@@ -107,8 +107,12 @@ fun TerminalScreen(onClose: () -> Unit) {
                             subtitle = p.address,
                             onClick = { active = p },
                             trailing = {
-                                IconButton(onClick = { editing = p }, modifier = Modifier.size(40.dp)) { Icon(Lucide.Pencil, contentDescription = null, modifier = Modifier.size(22.dp)) }
-                                IconButton(onClick = { deleting = p }, modifier = Modifier.size(40.dp)) { Icon(Lucide.Trash, contentDescription = stringResource(Res.string.delete), modifier = Modifier.size(22.dp)) }
+                                TooltipIconButton(label = stringResource(Res.string.edit_ssh_host), onClick = { editing = p }) {
+                                    Icon(Lucide.Pencil, contentDescription = null, modifier = Modifier.size(20.dp))
+                                }
+                                TooltipIconButton(label = stringResource(Res.string.delete), onClick = { deleting = p }) {
+                                    Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(20.dp))
+                                }
                             },
                         )
                     }

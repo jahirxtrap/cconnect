@@ -76,7 +76,7 @@ fun ListRow(
             }
         }
         if (trailing != null) {
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 trailing()
             }
         }

@@ -76,7 +76,6 @@ import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.settings.PreferenceRow
 import com.jahirtrap.cconnect.settings.SettingsGroup
 import com.jahirtrap.cconnect.ui.ActionButton
-import com.jahirtrap.cconnect.ui.AppBottomSheet
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
 import com.jahirtrap.cconnect.ui.CompactDialog
@@ -161,7 +160,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
             AppTopBar(
                 title = stringResource(Res.string.claude),
                 subtitle = if (!serverReady && loaded) stringResource(Res.string.server_unavailable) else activeName,
-                subtitleLeading = if (!serverReady && loaded) ({ StatusDot(palette.red) }) else null,
+                subtitleLeading = if (!serverReady && loaded) ({ StatusDot(palette.red, box = 8.dp) }) else null,
                 navigationIcon = {
                     TooltipIconButton(label = stringResource(Res.string.back), onClick = onClose) {
                         Icon(Lucide.ArrowLeft, contentDescription = null)
@@ -450,10 +449,12 @@ private fun CliInlineControls(
     }
     val dirty = source != info.source || (source == "custom" && customPath.trim() != (info.customPath ?: ""))
 
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         SelectField(stringResource(Res.string.cli_source), source, sourceOptions) { source = it }
         if (source == "custom") {
-            Spacer(Modifier.height(10.dp))
             InputField(
                 value = customPath,
                 onValueChange = { customPath = it },
@@ -463,7 +464,6 @@ private fun CliInlineControls(
             )
         }
         if (dirty) {
-            Spacer(Modifier.height(12.dp))
             ActionButton(
                 text = stringResource(Res.string.save),
                 enabled = enabled && !saving && (source != "custom" || customPath.isNotBlank()),
@@ -477,7 +477,6 @@ private fun CliInlineControls(
                 modifier = Modifier.fillMaxWidth(),
             )
         } else if (info.source != "bundled") {
-            Spacer(Modifier.height(12.dp))
             ActionButton(
                 text = stringResource(if (updating) Res.string.cli_updating else Res.string.cli_update),
                 enabled = enabled && !updating,
@@ -608,17 +607,19 @@ fun ClaudeChangelogSheet(cliVersion: String?, onDismiss: () -> Unit) {
         val result = GitHubApi.claudeChangelog(cliVersion)
         if (result != null) notes = result else failed = true
     }
-    AppBottomSheet(onDismiss = onDismiss, title = stringResource(Res.string.changelog), showClose = true) {
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.changelog),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) }
+        },
+    ) {
         val items = notes
         when {
-            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth().weight(1f))
-            items == null -> CenteredProgress(Modifier.fillMaxWidth().weight(1f))
-            else -> LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                items(items, key = { it.tag }) { release ->
+            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth().padding(vertical = 32.dp))
+            items == null -> CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 32.dp))
+            else -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                items.forEach { release ->
                     Column {
                         Text(
                             release.tag,

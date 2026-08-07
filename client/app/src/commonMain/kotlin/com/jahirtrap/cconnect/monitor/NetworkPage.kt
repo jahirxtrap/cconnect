@@ -193,7 +193,7 @@ internal fun NetworkPage(status: NetworkApi.Status, rxBytes: Double, txBytes: Do
                 }
                 PreferenceRow(
                     icon = Lucide.Wifi,
-                    title = stringResource(Res.string.network_wifi_radio),
+                    title = stringResource(Res.string.network_wifi),
                     summary = null,
                     trailing = {
                         if (busy == "radio") LoadingIndicator(modifier = Modifier.size(20.dp))

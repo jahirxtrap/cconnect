@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.ExperimentalFoundationApi
+import com.jahirtrap.cconnect.ui.AppDropdownMenu
 import com.jahirtrap.cconnect.ui.clickable
 import com.jahirtrap.cconnect.ui.combinedClickable
 import androidx.compose.foundation.clickable as foundationClickable
@@ -90,7 +91,7 @@ import com.composables.icons.lucide.Paperclip
 import com.composables.icons.lucide.PanelLeftClose
 import com.composables.icons.lucide.PanelLeftOpen
 import com.composables.icons.lucide.Settings
-import com.composables.icons.lucide.Slash
+import com.composables.icons.lucide.SquareSlash
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Square
 import com.composables.icons.lucide.SquareCheckBig
@@ -99,7 +100,6 @@ import com.composables.icons.lucide.Type
 import com.composables.icons.lucide.SquarePen
 import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.ui.AbovePopupMenu
-import com.jahirtrap.cconnect.ui.AppBottomSheet
 import com.jahirtrap.cconnect.ui.AppLogo
 import com.jahirtrap.cconnect.ui.selectionTextCursor
 import com.jahirtrap.cconnect.ui.AttachmentChip
@@ -111,8 +111,14 @@ import com.jahirtrap.cconnect.ui.DropdownScrim
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.Claude
 import com.jahirtrap.cconnect.ui.StatusDot
+import com.jahirtrap.cconnect.ui.StatusSpinner
 import com.jahirtrap.cconnect.ui.Stop
 import com.jahirtrap.cconnect.ui.theme.palette
+import com.jahirtrap.cconnect.ui.theme.Radius
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.AlertDialog
@@ -437,9 +443,21 @@ fun ChatScreen(
                         val sidebarStart = with(LocalDensity.current) {
                             sidebarInsets.getLeft(this, LocalLayoutDirection.current).toDp()
                         }
+                        val edge = MaterialTheme.colorScheme.outlineVariant
                         Surface(
                             color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier.fillMaxHeight().width(sidebarWidth + sidebarStart),
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(sidebarWidth + sidebarStart)
+                                .drawWithContent {
+                                    drawContent()
+                                    drawLine(
+                                        edge,
+                                        Offset(size.width, 0f),
+                                        Offset(size.width, size.height),
+                                        1.dp.toPx(),
+                                    )
+                                },
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxSize().windowInsetsPadding(sidebarInsets),
@@ -525,11 +543,11 @@ fun ChatScreen(
                             topBar = {
                                 val waitingUser = state.messages.any { it.role == Role.INTERACTION && it.interaction?.pending == true }
                                 val statusLeading: (@Composable () -> Unit) = when {
-                                    state.connection == ConnectionState.Disconnected -> ({ StatusDot(palette.red) })
-                                    state.connection == ConnectionState.Connecting -> ({ LoadingIndicator(modifier = Modifier.size(14.dp)) })
-                                    waitingUser -> ({ StatusDot(palette.orange) })
-                                    state.streaming -> ({ LoadingIndicator(modifier = Modifier.size(14.dp)) })
-                                    else -> ({ StatusDot(palette.green) })
+                                    state.connection == ConnectionState.Disconnected -> ({ StatusDot(palette.red, box = 8.dp) })
+                                    state.connection == ConnectionState.Connecting -> ({ StatusSpinner() })
+                                    waitingUser -> ({ StatusDot(palette.orange, box = 8.dp) })
+                                    state.streaming -> ({ StatusSpinner() })
+                                    else -> ({ StatusDot(palette.green, box = 8.dp) })
                                 }
                                 val statusText = when {
                                     state.connection == ConnectionState.Disconnected -> stringResource(Res.string.server_unavailable)
@@ -546,11 +564,11 @@ fun ChatScreen(
                                     subtitle = statusText,
                                     subtitleLeading = statusLeading,
                                     fullWidth = mobile,
-                                    navigationIcon = {
-                                        if (mobile) TooltipIconButton(label = stringResource(Res.string.menu), onClick = { scope.launch { drawerState.open() } }) {
+                                    navigationIcon = if (mobile) ({
+                                        TooltipIconButton(label = stringResource(Res.string.menu), onClick = { scope.launch { drawerState.open() } }) {
                                             Icon(Lucide.Menu, contentDescription = null)
                                         }
-                                    },
+                                    }) else null,
                                     actions = {
                                         if (state.sessionId != null && !state.streaming) {
                                             TooltipIconButton(
@@ -624,9 +642,8 @@ fun ChatScreen(
                                     val boxHeightPx = constraints.maxHeight.toFloat()
                                     val toolbarReveal = (1f - expansion.value / peek).coerceIn(0f, 1f)
                                     val panelH = expansion.value.coerceAtLeast(peek)
-                                    var toolbarHeightPx by remember { mutableStateOf(TabsController.lastToolbarHeightPx) }
                                     val showTime = vm.showTimestamps
-                                    Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight((1f - panelH * (1f - toolbarReveal)).coerceAtMost(1f - toolbarHeightPx / boxHeightPx).coerceIn(0.0001f, 1f)).clipToBounds()) {
+                                    Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight((1f - panelH * (1f - toolbarReveal)).coerceIn(0.0001f, 1f)).clipToBounds()) {
                                         SelectionContainer(modifier = Modifier.fillMaxSize().selectionTextCursor()) {
                                             LazyColumn(
                                                 state = listState,
@@ -738,51 +755,6 @@ fun ChatScreen(
                                             }
                                         }
                                     }
-                                    Column(
-                                        modifier = Modifier
-                                        .align(Alignment.BottomCenter)
-                                        .fillMaxWidth()
-                                        .onSizeChanged { toolbarHeightPx = it.height; TabsController.lastToolbarHeightPx = it.height }
-                                        .background(MaterialTheme.colorScheme.background)
-                                        .foundationClickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
-                                    ) {
-                                        val queueScroll = TabsController.queueScroll
-                                        val attachScroll = TabsController.attachmentsScroll
-                                        val visibleQueue = state.queue.filterNot { it.silent }
-                                        if (!sideActive && visibleQueue.isNotEmpty()) {
-                                            QueueRow(queue = visibleQueue, scroll = queueScroll, onOpen = { queuePreview = it })
-                                        }
-                                        if (!sideActive && state.attachments.isNotEmpty()) {
-                                            AttachmentsRow(
-                                                attachments = state.attachments,
-                                                uploading = state.uploadingAttachments,
-                                                scroll = attachScroll,
-                                                onRemove = vm::removeAttachment,
-                                            )
-                                        }
-                                        ChatToolbar(
-                                            ready = state.capabilitiesReady,
-                                            disconnected = state.connection == ConnectionState.Disconnected,
-                                            connecting = state.connection == ConnectionState.Connecting,
-                                            model = state.modelOverride.ifEmpty { state.model },
-                                            modelSelected = state.modelOverride,
-                                            models = state.capabilities.models,
-                                            onModel = vm::setModel,
-                                            effort = state.effortOverride.ifEmpty { state.effort },
-                                            effortSelected = state.effortOverride,
-                                            effortLevels = state.capabilities.effortLevels,
-                                            onEffort = vm::setEffort,
-                                            permissionMode = state.permissionOverride.ifEmpty { state.permissionMode },
-                                            permissionSelected = state.permissionOverride,
-                                            permissionModes = state.capabilities.permissionModes,
-                                            onPermissionMode = vm::setPermissionMode,
-                                            streaming = state.streamingOverride ?: state.streamTokens,
-                                            onStreaming = vm::toggleStreaming,
-                                            onQuickChat = vm::openSideChat,
-                                            quickChatActive = sc != null && sc.messages.isNotEmpty(),
-                                            contextTokens = state.contextTokens,
-                                        )
-                                    }
                                     if (sideActive && sc != null) {
                                         val dragModifier = Modifier.pointerInput(boxHeightPx) {
                                             detectVerticalDragGestures(
@@ -825,23 +797,76 @@ fun ChatScreen(
                                         )
                                     }
                                 }
-                                Composer(
-                                    value = if (sideActive) vm.sideDraft else vm.draft,
-                                    onValueChange = { if (sideActive) vm.sideDraft = it else vm.draft = it },
-                                    streaming = if (sideActive) (sc?.streaming ?: false) else state.streaming,
-                                    sessionColor = state.sessionColor,
-                                    commands = state.capabilities.commands,
-                                    onCommand = { cmd -> if (cmd.requireConfirmation) confirmCommand = cmd else vm.runCommand(cmd) },
-                                    onSend = { if (sideActive) vm.sendSideQuestion(it) else vm.submit(it) },
-                                    onStop = { if (sideActive) vm.stopSide() else vm.stop() },
-                                    canSend = state.connection == ConnectionState.Connected,
-                                    commandsEnabled = state.sessionId != null && state.connection == ConnectionState.Connected,
-                                    focusRequester = composerFocus,
-                                    onCloseSide = if (sideActive) dismissSide else null,
-                                    attachments = if (sideActive) emptyList() else state.attachments,
-                                    uploading = !sideActive && state.uploadingAttachments,
-                                    onAttach = if (sideActive) null else ({ scope.launch { vm.addAttachments(pickFiles()) } }),
-                                )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MaterialTheme.colorScheme.background)
+                                        .foundationClickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
+                                    ) {
+                                        val queueScroll = TabsController.queueScroll
+                                        val attachScroll = TabsController.attachmentsScroll
+                                        val visibleQueue = state.queue.filterNot { it.silent }
+                                        val composerChips: (@Composable () -> Unit)? = if (
+                                            !sideActive && (visibleQueue.isNotEmpty() || state.attachments.isNotEmpty())
+                                        ) ({
+                                            if (visibleQueue.isNotEmpty()) {
+                                                QueueRow(queue = visibleQueue, scroll = queueScroll, onOpen = { queuePreview = it })
+                                            }
+                                            if (state.attachments.isNotEmpty()) {
+                                                AttachmentsRow(
+                                                    attachments = state.attachments,
+                                                    uploading = state.uploadingAttachments,
+                                                    scroll = attachScroll,
+                                                    onRemove = vm::removeAttachment,
+                                                    topPadding = if (visibleQueue.isNotEmpty()) 6.dp else 12.dp,
+                                                )
+                                            }
+                                        }) else null
+                                        val composerControls: @Composable RowScope.() -> Unit = {
+                                            ChatToolbar(
+                                            ready = state.capabilitiesReady,
+                                            disconnected = state.connection == ConnectionState.Disconnected,
+                                            connecting = state.connection == ConnectionState.Connecting,
+                                            model = state.modelOverride.ifEmpty { state.model },
+                                            modelSelected = state.modelOverride,
+                                            models = state.capabilities.models,
+                                            onModel = vm::setModel,
+                                            effort = state.effortOverride.ifEmpty { state.effort },
+                                            effortSelected = state.effortOverride,
+                                            effortLevels = state.capabilities.effortLevels,
+                                            onEffort = vm::setEffort,
+                                            permissionMode = state.permissionOverride.ifEmpty { state.permissionMode },
+                                            permissionSelected = state.permissionOverride,
+                                            permissionModes = state.capabilities.permissionModes,
+                                            onPermissionMode = vm::setPermissionMode,
+                                            streaming = state.streamingOverride ?: state.streamTokens,
+                                            onStreaming = vm::toggleStreaming,
+                                            onQuickChat = vm::openSideChat,
+                                            quickChatActive = sc != null && sc.messages.isNotEmpty(),
+                                            contextTokens = state.contextTokens,
+                                            modifier = Modifier.weight(1f),
+                                            )
+                                        }
+                                        Composer(
+                                            value = if (sideActive) vm.sideDraft else vm.draft,
+                                            onValueChange = { if (sideActive) vm.sideDraft = it else vm.draft = it },
+                                            streaming = if (sideActive) (sc?.streaming ?: false) else state.streaming,
+                                            sessionColor = state.sessionColor,
+                                            commands = state.capabilities.commands,
+                                            onCommand = { cmd -> if (cmd.requireConfirmation) confirmCommand = cmd else vm.runCommand(cmd) },
+                                            onSend = { if (sideActive) vm.sendSideQuestion(it) else vm.submit(it) },
+                                            onStop = { if (sideActive) vm.stopSide() else vm.stop() },
+                                            canSend = state.connection == ConnectionState.Connected,
+                                            commandsEnabled = state.sessionId != null && state.connection == ConnectionState.Connected,
+                                            focusRequester = composerFocus,
+                                            onCloseSide = if (sideActive) dismissSide else null,
+                                            attachments = if (sideActive) emptyList() else state.attachments,
+                                            uploading = !sideActive && state.uploadingAttachments,
+                                            onAttach = if (sideActive) null else ({ scope.launch { vm.addAttachments(pickFiles()) } }),
+                                            chips = composerChips,
+                                            controls = if (sideActive) null else composerControls,
+                                        )
+                                    }
                             }
                         }
                     }
@@ -975,24 +1000,24 @@ private fun RewindSheet(
     onSelect: (SessionsApi.RewindPoint) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    AppBottomSheet(onDismiss = onDismiss, title = stringResource(Res.string.rewind), showClose = true) {
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.rewind),
+        contentPadding = PaddingValues(0.dp),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) }
+        },
+    ) {
         when {
-            loading -> CenteredProgress(Modifier.fillMaxWidth().weight(1f))
+            loading -> CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 24.dp))
 
-            points.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text(
-                    text = stringResource(Res.string.rewind_empty),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            points.isEmpty() -> EmptyState(stringResource(Res.string.rewind_empty), Modifier.fillMaxWidth())
 
-            else -> LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 24.dp),
+            else -> Column(
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(points.asReversed()) { point ->
+                points.asReversed().forEach { point ->
                     OutlinedPanel(onClick = { onSelect(point) }, modifier = Modifier.fillMaxWidth()) {
                         Text(
                             text = point.text,
@@ -1293,7 +1318,7 @@ private fun ColumnScope.ChatPanelContent(
     LazyColumn(
         state = drawerListState,
         modifier = Modifier.weight(1f).fillMaxWidth(),
-        contentPadding = PaddingValues(vertical = 6.dp),
+        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
         when {
             state.historySessions.isNotEmpty() -> items(state.historySessions, key = { it.sessionId }) { s ->
@@ -1313,8 +1338,12 @@ private fun ColumnScope.ChatPanelContent(
             else -> item { EmptyState(stringResource(Res.string.no_chats), Modifier.fillParentMaxSize()) }
         }
     }
+    val edge = MaterialTheme.colorScheme.outlineVariant
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .drawBehind { drawLine(edge, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TooltipIconButton(label = stringResource(Res.string.files), onClick = { onOpenExplorer(null) }) {
@@ -1356,10 +1385,10 @@ private fun TaskIndicator(todos: List<TodoItem>) {
     val done = todos.count { it.status == "completed" }
     val inProgress = todos.count { it.status == "in_progress" }
     Box {
-        IconButton(onClick = { open = true }) {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(36.dp)) {
             TaskPie(done = done, inProgress = inProgress, total = todos.size)
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        AppDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             Text(
                 "${stringResource(Res.string.tasks)} ($done/${todos.size})",
                 style = MaterialTheme.typography.labelLarge,
@@ -1448,11 +1477,12 @@ private fun ChatToolbar(
     onQuickChat: () -> Unit = {},
     quickChatActive: Boolean = false,
     contextTokens: Int? = null,
+    modifier: Modifier = Modifier,
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val pstyle = permissionStyle(permissionMode)
     Row(
-        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(top = 6.dp),
+        modifier = modifier.height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TooltipWrap(stringResource(Res.string.quick_chat)) {
@@ -1461,7 +1491,7 @@ private fun ChatToolbar(
                     modifier = Modifier
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(8.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onQuickChat)
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -1576,7 +1606,7 @@ private fun StreamToggle(streaming: Boolean, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxHeight()
             .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1590,7 +1620,7 @@ private fun ToolbarLoadingChip(label: String = stringResource(Res.string.loading
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1605,7 +1635,7 @@ private fun DisconnectedChip() {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1631,7 +1661,7 @@ private fun SelectorChip(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .clickable { open = true }
                 .padding(horizontal = 10.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1722,21 +1752,19 @@ private fun CommandMenuButton(
     Box {
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(32.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
-                .then(if (ready) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier)
-                .pointerInput(ready) {
-                    detectTapGestures { if (ready) open = true }
-                },
+                .then(if (ready) Modifier else Modifier.pointerHoverIcon(PointerIcon.Default))
+                .clickable(enabled = ready) { open = true },
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Lucide.Slash,
+                Lucide.SquareSlash,
                 contentDescription = stringResource(Res.string.commands),
                 tint = if (ready) MaterialTheme.colorScheme.onSurfaceVariant
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                modifier = Modifier.size(20.dp),
+                modifier = Modifier.size(18.dp),
             )
         }
         AbovePopupMenu(expanded = open, onDismiss = { open = false }) {
@@ -1783,8 +1811,10 @@ private fun Composer(
     attachments: List<Attachment> = emptyList(),
     uploading: Boolean = false,
     onAttach: (() -> Unit)? = null,
+    chips: (@Composable () -> Unit)? = null,
+    controls: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(22.dp)
+    val shape = RoundedCornerShape(Radius.lg)
     val accent = sessionColorOf(sessionColor)
     val textStyle = MaterialTheme.typography.bodyLarge
     val density = LocalDensity.current
@@ -1809,35 +1839,26 @@ private fun Composer(
         onValueChange(updated)
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
-        verticalAlignment = Alignment.Bottom,
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, accent ?: MaterialTheme.colorScheme.outlineVariant, shape)
+            .pointerHoverIcon(PointerIcon.Text)
+            .foundationClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { focusRequester?.requestFocus() },
     ) {
-        if (onCloseSide != null) {
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(onClick = onCloseSide),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    Lucide.X,
-                    contentDescription = stringResource(Res.string.close),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            Spacer(Modifier.width(6.dp))
-        } else if (showCommands) {
-            CommandMenuButton(commands = commands, streaming = streaming, enabled = commandsEnabled, onCommand = onCommand)
-            Spacer(Modifier.width(6.dp))
-        }
+        chips?.invoke()
         BasicTextField(
             value = field,
             onValueChange = { field = it; onValueChange(it.text) },
-            modifier = Modifier.weight(1f)
+            modifier = Modifier.fillMaxWidth()
+                .padding(horizontal = 14.dp)
+                .padding(top = 14.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onPreviewKeyEvent { e ->
                     if (e.type == KeyEventType.KeyDown && e.key == Key.Enter) {
@@ -1849,52 +1870,59 @@ private fun Composer(
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             maxLines = 6,
             decorationBox = { innerTextField ->
-                Row(
-                    modifier = Modifier
-                        .clip(shape)
-                        .border(if (accent != null) 2.dp else 1.dp, accent ?: MaterialTheme.colorScheme.outlineVariant, shape)
-                        .padding(horizontal = 14.dp, vertical = 9.dp),
-                    verticalAlignment = Alignment.Bottom,
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (value.isEmpty()) {
-                            Text(
-                                stringResource(Res.string.type_message),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                        innerTextField()
+                Box {
+                    if (value.isEmpty()) {
+                        Text(
+                            stringResource(Res.string.type_message),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    if (onAttach != null) {
-                        Spacer(Modifier.width(8.dp))
-                        Box(modifier = Modifier.height(lineHeight), contentAlignment = Alignment.Center) {
-                            Icon(
-                                Lucide.Paperclip,
-                                contentDescription = stringResource(Res.string.attach_files),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier
-                                    .clip(CircleShape)
-                                    .clickable(enabled = !uploading, onClick = onAttach)
-                                    .requiredSize(22.dp)
-                                    .padding(1.dp),
-                            )
-                        }
-                    }
+                    innerTextField()
                 }
             },
         )
-        Spacer(Modifier.width(6.dp))
-        if (busy && !canSubmit) {
-            CircleActionButton(
-                icon = CustomIcons.Stop,
-                contentDescription = stringResource(Res.string.stop),
-                enabled = true,
-                onClick = onStop,
-            )
-        } else {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (onCloseSide != null) {
+                ComposerButton(
+                    icon = Lucide.X,
+                    contentDescription = stringResource(Res.string.close),
+                    onClick = onCloseSide,
+                    background = MaterialTheme.colorScheme.surfaceVariant,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                if (onAttach != null) {
+                    ComposerButton(
+                        icon = Lucide.Paperclip,
+                        contentDescription = stringResource(Res.string.attach_files),
+                        onClick = onAttach,
+                        enabled = !uploading,
+                        background = MaterialTheme.colorScheme.surfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (showCommands) {
+                    CommandMenuButton(commands = commands, streaming = streaming, enabled = commandsEnabled, onCommand = onCommand)
+                }
+            }
+            if (controls != null) controls() else Spacer(Modifier.weight(1f))
+            if (busy) {
+                ComposerButton(
+                    icon = CustomIcons.Stop,
+                    contentDescription = stringResource(Res.string.stop),
+                    onClick = onStop,
+                    background = MaterialTheme.colorScheme.surfaceVariant,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    iconSize = 14.dp,
+                )
+            }
             CircleActionButton(
                 icon = Lucide.ArrowUp,
                 contentDescription = stringResource(Res.string.send),
@@ -1912,7 +1940,7 @@ private fun QueueRow(queue: List<QueuedMessage>, scroll: ScrollState, onOpen: (Q
             .fillMaxWidth()
             .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
             .horizontalScroll(scroll)
-            .padding(start = 8.dp, end = 8.dp, top = 6.dp),
+            .padding(start = 14.dp, end = 14.dp, top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         queue.forEach { q ->
@@ -1931,13 +1959,14 @@ private fun AttachmentsRow(
     uploading: Boolean,
     scroll: ScrollState,
     onRemove: (Long) -> Unit,
+    topPadding: Dp = 12.dp,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
             .horizontalScroll(scroll)
-            .padding(start = 8.dp, end = 8.dp, top = 6.dp),
+            .padding(start = 14.dp, end = 14.dp, top = topPadding),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         attachments.forEach { attachment ->
@@ -1973,20 +2002,43 @@ private fun CircleActionButton(
     icon: ImageVector,
     contentDescription: String,
     enabled: Boolean,
-    iconSize: Dp = 24.dp,
+    iconSize: Dp = 18.dp,
     onClick: () -> Unit,
 ) {
     val bg = if (enabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
     val fg = if (enabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier = Modifier
-            .size(42.dp)
+            .size(32.dp)
             .clip(CircleShape)
             .background(bg)
+            .then(if (enabled) Modifier else Modifier.pointerHoverIcon(PointerIcon.Default))
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(icon, contentDescription = contentDescription, tint = fg, modifier = Modifier.size(iconSize))
+    }
+}
+
+@Composable
+private fun ComposerButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    background: Color,
+    tint: Color,
+    enabled: Boolean = true,
+    iconSize: Dp = 18.dp,
+) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .background(background)
+            .clickable(enabled = enabled, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(icon, contentDescription = contentDescription, tint = tint, modifier = Modifier.size(iconSize))
     }
 }
 
@@ -2057,17 +2109,17 @@ private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, onSe
             modifier = Modifier
                 .fillMaxWidth()
                 .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
-                .clip(RoundedCornerShape(8.dp))
+                .clip(RoundedCornerShape(Radius.item))
                 .clickable { open = true }
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(Lucide.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Icon(Lucide.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = fieldWidth)) {
+        AppDropdownMenu(expanded = open, onDismissRequest = { open = false }, modifier = Modifier.widthIn(min = fieldWidth)) {
             CompactDropdownItem(stringResource(Res.string.all_projects), selected = selected == null) { onSelect(null); open = false }
             projects.forEach { p ->
                 CompactDropdownItem(projectLabel(p), selected = selected == p.projectKey) { onSelect(p.projectKey); open = false }
@@ -2094,12 +2146,11 @@ private fun ConversationRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(Radius.item))
             .then(if (selected) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
             .combinedClickable(onClick = onOpen, onLongClick = { menu = true })
             .secondaryClick { menu = true }
-            .padding(start = 16.dp, end = 4.dp),
+            .padding(end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -2109,13 +2160,13 @@ private fun ConversationRow(
             fontWeight = if (selected) FontWeight.SemiBold else null,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 8.dp),
         )
         Box {
-            IconButton(onClick = { menu = true }) {
-                Icon(Lucide.EllipsisVertical, contentDescription = null)
+            IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
+                Icon(Lucide.EllipsisVertical, contentDescription = null, modifier = Modifier.size(16.dp))
             }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            AppDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 CompactDropdownItem(stringResource(Res.string.rename)) { menu = false; onRename() }
                 CompactDropdownItem(stringResource(Res.string.auto_rename)) { menu = false; onAutoRename() }
                 CompactDropdownItem(stringResource(Res.string.conversation_color)) { menu = false; onColor() }

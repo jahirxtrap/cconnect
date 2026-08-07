@@ -1,8 +1,10 @@
 package com.jahirtrap.cconnect.claude
 
+import com.jahirtrap.cconnect.ui.AppDropdownMenu
 import com.jahirtrap.cconnect.ui.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -61,7 +63,6 @@ import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
 import com.jahirtrap.cconnect.data.formatDateShort
 import com.jahirtrap.cconnect.data.parseIsoMillis
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
-import com.jahirtrap.cconnect.ui.AppBottomSheet
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
 import com.jahirtrap.cconnect.ui.CompactDialog
@@ -420,18 +421,17 @@ fun ClaudeDetailScreen(
     }
 
     catalogMarket?.let { market ->
-        AppBottomSheet(
+        CompactDialog(
             onDismiss = { catalogMarket = null },
             title = market,
-            showClose = true,
-            dismissible = false,
-            actions = {
+            contentPadding = PaddingValues(0.dp),
+            titleTrailing = {
                 Box {
                     var marketPicker by remember { mutableStateOf(false) }
                     TooltipIconButton(label = stringResource(Res.string.marketplaces), onClick = { marketPicker = true }) {
-                        Icon(Lucide.Store, contentDescription = null)
+                        Icon(Lucide.Store, contentDescription = null, modifier = Modifier.size(20.dp))
                     }
-                    DropdownMenu(expanded = marketPicker, onDismissRequest = { marketPicker = false }) {
+                    AppDropdownMenu(expanded = marketPicker, onDismissRequest = { marketPicker = false }) {
                         extensions?.marketplaces.orEmpty().forEach { entry ->
                             CompactDropdownItem(
                                 text = entry.name,
@@ -440,6 +440,11 @@ fun ClaudeDetailScreen(
                             )
                         }
                     }
+                }
+            },
+            buttons = {
+                Button(onClick = { catalogMarket = null }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.close))
                 }
             },
         ) {
@@ -459,35 +464,33 @@ fun ClaudeDetailScreen(
                         )
                     }
                 } else null,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
             )
             Spacer(Modifier.height(8.dp))
             if (busy) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp))
             }
             val list = catalog
             if (list == null) {
-                CenteredProgress(Modifier.fillMaxWidth().weight(1f))
+                CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 24.dp))
             } else {
-                val filtered = list.filter {
+                list.filter {
                     query.isBlank() || it.name.contains(query, ignoreCase = true) ||
                         it.description?.contains(query, ignoreCase = true) == true
-                }
-                LazyColumn(modifier = Modifier.weight(1f).imePadding()) {
-                    items(filtered, key = { it.name }) { entry ->
-                        DetailRow(
-                            title = entry.name + (entry.version?.let { " - $it" } ?: ""),
-                            subtitle = entry.description,
-                            enabled = entry.installed,
-                            onClick = {
-                                if (entry.installed) {
-                                    pluginMenu = extensions?.plugins?.firstOrNull { it.name == entry.name && it.marketplace == market }
-                                } else {
-                                    installCandidate = entry
-                                }
-                            },
-                        )
-                    }
+                }.forEach { entry ->
+                    DetailRow(
+                        title = entry.name + (entry.version?.let { " - $it" } ?: ""),
+                        subtitle = entry.description,
+                        enabled = entry.installed,
+                        onClick = {
+                            if (entry.installed) {
+                                pluginMenu = extensions?.plugins?.firstOrNull { it.name == entry.name && it.marketplace == market }
+                                catalogMarket = null
+                            } else {
+                                installCandidate = entry
+                            }
+                        },
+                    )
                 }
             }
         }

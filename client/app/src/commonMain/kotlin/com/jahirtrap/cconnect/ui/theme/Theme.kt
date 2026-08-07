@@ -59,6 +59,7 @@ fun CConnectTheme(
     // The background/surfaces stay flat black/white regardless.
     // The active environment overrides both the picked accent and the system one.
     val accentColor = when {
+        environmentAccent == DYNAMIC_ACCENT -> systemAccent() ?: accent
         environmentAccent != null -> accentAt(environmentAccent)
         dynamicColor -> systemAccent() ?: accent
         else -> accent

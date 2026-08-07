@@ -70,8 +70,10 @@ import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.EnvironmentSelectDialog
 import com.jahirtrap.cconnect.ui.handCursor
+import com.jahirtrap.cconnect.settings.SettingsGroup
 import com.jahirtrap.cconnect.ui.MetricBar
 import com.jahirtrap.cconnect.ui.MetricHeader
+import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.theme.palette
@@ -161,7 +163,7 @@ fun MonitorScreen(onClose: () -> Unit) {
             AppTopBar(
                 title = stringResource(Res.string.monitor),
                 subtitle = if (failed) stringResource(Res.string.server_unavailable) else activeName,
-                subtitleLeading = if (failed) ({ StatusDot(palette.red) }) else null,
+                subtitleLeading = if (failed) ({ StatusDot(palette.red, box = 8.dp) }) else null,
                 navigationIcon = {
                     TooltipIconButton(label = stringResource(Res.string.back), onClick = onClose) {
                         Icon(Lucide.ArrowLeft, contentDescription = null)
@@ -221,7 +223,11 @@ fun MonitorScreen(onClose: () -> Unit) {
                         SegmentedButton(
                             selected = i == pagerState.currentPage,
                             onClick = { scope.launch { pagerState.animateScrollToPage(i) } },
-                            shape = SegmentedButtonDefaults.itemShape(index = i, count = labels.size),
+                            shape = SegmentedButtonDefaults.itemShape(
+                                index = i,
+                                count = labels.size,
+                                baseShape = RoundedCornerShape(Radius.sm),
+                            ),
                             modifier = Modifier.handCursor(),
                             icon = {},
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
@@ -305,42 +311,25 @@ private fun ResourcesPage(
             )
         }
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text(
-                stringResource(Res.string.storage),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-            )
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                current.disks.forEach { disk ->
-                    MetricBar(
-                        title = disk.mount,
-                        subtitle = "${formatSize(disk.used)} / ${formatSize(disk.total)}",
-                        percent = disk.percent,
-                    )
+            SettingsGroup(stringResource(Res.string.storage)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    current.disks.forEach { disk ->
+                        MetricBar(
+                            title = disk.mount,
+                            subtitle = "${formatSize(disk.used)} / ${formatSize(disk.total)}",
+                            percent = disk.percent,
+                        )
+                    }
                 }
             }
         }
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-            Text(
-                stringResource(Res.string.information),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
-            )
+            SettingsGroup(stringResource(Res.string.information)) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -366,6 +355,7 @@ private fun ResourcesPage(
                 gpu?.let { InfoRow("VRAM", formatSize(it.memTotal)) }
                 if (current.arch.isNotBlank()) InfoRow(stringResource(Res.string.architecture), current.arch)
             }
+            }
         }
         Spacer(Modifier.height(16.dp))
     }
@@ -381,8 +371,8 @@ private fun LogsPage(logs: List<LogItem>, scroll: ScrollState) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clip(RoundedCornerShape(Radius.md))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
                 .verticalScrollIndicator(scroll)
                 .verticalScroll(scroll)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -422,15 +412,15 @@ private fun InfoRow(label: String, value: String) {
 @Composable
 private fun GraphMetric(title: String, subtitle: String, percent: Float, history: List<Float>, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        MetricHeader(title, subtitle, percent)
+        MetricBar(title, subtitle, percent)
         Spacer(Modifier.height(8.dp))
         Sparkline(
             points = history,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(64.dp)
-                .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                .clip(RoundedCornerShape(Radius.panel))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
         )
     }
 }
@@ -458,7 +448,7 @@ private fun Sparkline(points: List<Float>, modifier: Modifier = Modifier) {
             close()
         }
         drawPath(fill, fillColor)
-        drawPath(line, lineColor, style = Stroke(width = 2.dp.toPx()))
+        drawPath(line, lineColor, style = Stroke(width = 1.dp.toPx()))
     }
 }
 

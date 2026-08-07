@@ -25,5 +25,8 @@ val ACCENTS: List<Pair<String, Color>> = listOf(
     "Blue Grey" to Color(0xFF607D8B),
 )
 
+// Stored instead of a palette index when the accent should follow the system colour.
+const val DYNAMIC_ACCENT = -1
+
 fun accentAt(index: Int): Color = ACCENTS.getOrElse(index) { ACCENTS[4] }.second
 fun accentNameAt(index: Int): String? = ACCENTS.getOrNull(index)?.first
