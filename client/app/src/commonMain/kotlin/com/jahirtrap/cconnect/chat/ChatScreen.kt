@@ -1672,7 +1672,7 @@ private fun SelectorChip(
         }
         if (open) DropdownScrim { open = false }
         if (open) Dismissable { open = false }
-        DropdownMenu(
+        AppDropdownMenu(
             expanded = open,
             onDismissRequest = { open = false },
             properties = PopupProperties(focusable = !LocalIsTouch.current),
@@ -1858,7 +1858,7 @@ private fun Composer(
             onValueChange = { field = it; onValueChange(it.text) },
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = 14.dp)
-                .padding(top = 14.dp)
+                .padding(top = if (chips != null) 6.dp else 14.dp)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onPreviewKeyEvent { e ->
                     if (e.type == KeyEventType.KeyDown && e.key == Key.Enter) {

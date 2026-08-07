@@ -128,6 +128,7 @@ import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.Share2
 import com.composables.icons.lucide.Trash
+import com.composables.icons.lucide.Upload
 import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
@@ -140,6 +141,9 @@ import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.SharedApi
 import com.jahirtrap.cconnect.data.remote.SharedWatchSocket
 import com.jahirtrap.cconnect.ui.AbovePopupMenu
+import com.jahirtrap.cconnect.ui.theme.Radius
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.ui.draw.drawBehind
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.BackInterceptor
 import com.jahirtrap.cconnect.ui.HistoryNavHandler
@@ -485,17 +489,16 @@ fun FileExplorerScreen(
                         },
                         actions = {
                             UploadIndicator()
-                            if (archive == null) TooltipIconButton(
-                                label = stringResource(Res.string.search),
-                                onClick = {
-                                    searching = !searching
-                                    if (!searching) searchQuery = ""
-                                },
-                            ) {
-                                Icon(
-                                    Lucide.Search, contentDescription = null,
-                                    tint = if (searching) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                                )
+                            if (!selecting && currentTransfer == null && archive == null) {
+                                TooltipIconButton(
+                                    label = stringResource(Res.string.upload_files),
+                                    onClick = {
+                                        scope.launch {
+                                            val picked = pickFiles()
+                                            if (picked.isNotEmpty()) pendingUploads = picked
+                                        }
+                                    },
+                                ) { Icon(Lucide.Upload, contentDescription = null) }
                             }
                             TooltipIconButton(label = stringResource(Res.string.environment), onClick = { envMenu = true }) {
                                 Icon(Lucide.Server, contentDescription = null)
@@ -694,29 +697,6 @@ fun FileExplorerScreen(
                 }
             }
         },
-        floatingActionButton = {
-            AnimatedVisibility(
-                visible = !selecting && currentTransfer == null && archive == null,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut(),
-            ) {
-                Surface(
-                    onClick = { scope.launch { val picked = pickFiles(); if (picked.isNotEmpty()) pendingUploads = picked } },
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    shadowElevation = 4.dp,
-                    modifier = Modifier.size(48.dp).pointerHoverIcon(PointerIcon.Hand),
-                ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Icon(
-                            Lucide.Plus,
-                            contentDescription = stringResource(Res.string.upload_files),
-                            tint = MaterialTheme.colorScheme.background,
-                        )
-                    }
-                }
-            }
-        },
     ) { padding ->
         if (envMenu) {
             EnvironmentSelectDialog(
@@ -740,15 +720,15 @@ fun FileExplorerScreen(
                     }
                 },
         ) {
-            if (searching) {
-                SearchBar(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    onClear = { searchQuery = "" },
-                )
-            } else {
-                val displayPath = archive?.let { listOf(it, archiveDir).filter { s -> s.isNotEmpty() }.joinToString("/") } ?: path
-                Breadcrumb(path = displayPath, onNavigate = { target ->
+            val displayPath = archive?.let { listOf(it, archiveDir).filter { s -> s.isNotEmpty() }.joinToString("/") } ?: path
+            PathBar(
+                path = displayPath,
+                searching = searching,
+                query = searchQuery,
+                searchable = archive == null,
+                onQueryChange = { searchQuery = it },
+                onToggleSearch = { searching = !searching; if (!searching) searchQuery = "" },
+                onNavigate = { target ->
                     val current = archive
                     if (current != null && (target == current || target.startsWith("$current/"))) {
                         archiveDir = target.removePrefix(current).trim('/')
@@ -757,8 +737,8 @@ fun FileExplorerScreen(
                         archiveDir = ""
                         path = target
                     }
-                })
-            }
+                },
+            )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 fun itemIndexAt(y: Float): Int? = listState.layoutInfo.visibleItemsInfo
                     .firstOrNull { y >= it.offset && y < it.offset + it.size }?.index
@@ -987,108 +967,125 @@ fun FileExplorerScreen(
 }
 
 @Composable
-private fun SearchBar(query: String, onQueryChange: (String) -> Unit, onClear: () -> Unit) {
+private fun PathBar(
+    path: String,
+    searching: Boolean,
+    query: String,
+    searchable: Boolean,
+    onQueryChange: (String) -> Unit,
+    onToggleSearch: () -> Unit,
+    onNavigate: (String) -> Unit,
+) {
+    val segments = path.split("/").filter { it.isNotEmpty() }
+    val scroll = rememberScrollState()
     val focusRequester = remember { FocusRequester() }
-    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(path, searching) { if (!searching) scroll.animateScrollTo(scroll.maxValue) }
+    LaunchedEffect(searching) { if (searching) runCatching { focusRequester.requestFocus() } }
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .height(44.dp)
-            .padding(start = 14.dp, end = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .height(40.dp)
+            .clip(RoundedCornerShape(Radius.md))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Lucide.Search,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Box(modifier = Modifier.weight(1f)) {
-            if (query.isEmpty()) {
-                Text(
-                    stringResource(Res.string.search),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        if (searching) {
+            Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                Icon(
+                    Lucide.Search,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
                 )
             }
-            BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                singleLine = true,
-                textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+            Box(modifier = Modifier.weight(1f).padding(horizontal = 4.dp)) {
+                if (query.isEmpty()) {
+                    Text(
+                        stringResource(Res.string.search),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+                )
+            }
+            PathBarButton(Lucide.X, stringResource(Res.string.close)) {
+                if (query.isEmpty()) onToggleSearch() else onQueryChange("")
+            }
+        } else {
+            PathBarButton(
+                icon = Lucide.House,
+                contentDescription = "/",
+                active = segments.isEmpty(),
+                onClick = { onNavigate("") },
             )
-        }
-        if (query.isNotEmpty()) {
-            Spacer(Modifier.width(8.dp))
-            Icon(
-                Lucide.X,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.clip(CircleShape).clickable(onClick = onClear).padding(2.dp).size(18.dp),
-            )
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
+                    .horizontalScroll(scroll),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                var cumulative = ""
+                segments.forEachIndexed { i, seg ->
+                    cumulative = if (cumulative.isEmpty()) seg else "$cumulative/$seg"
+                    val target = cumulative
+                    val isLast = i == segments.lastIndex
+                    Icon(
+                        Lucide.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(horizontal = 2.dp).size(14.dp),
+                    )
+                    Text(
+                        seg,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isLast) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isLast) FontWeight.Medium else FontWeight.Normal,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(Radius.sm))
+                            .clickable { onNavigate(target) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            if (searchable) {
+                PathBarButton(Lucide.Search, stringResource(Res.string.search), onClick = onToggleSearch)
+            }
         }
     }
 }
 
 @Composable
-private fun Breadcrumb(path: String, onNavigate: (String) -> Unit) {
-    val segments = path.split("/").filter { it.isNotEmpty() }
-    val scroll = rememberScrollState()
-    LaunchedEffect(path) { scroll.animateScrollTo(scroll.maxValue) }
-    Row(
+private fun PathBarButton(
+    icon: ImageVector,
+    contentDescription: String,
+    active: Boolean = false,
+    onClick: () -> Unit,
+) {
+    Box(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
-            .clip(RoundedCornerShape(percent = 50))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .height(44.dp)
-            .padding(start = 8.dp, end = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .size(32.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Lucide.House,
-            contentDescription = null,
-            tint = if (segments.isEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier
-                .clip(CircleShape)
-                .clickable { onNavigate("") }
-                .padding(6.dp)
-                .size(20.dp),
+            icon,
+            contentDescription = contentDescription,
+            tint = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
         )
-        Row(
-            modifier = Modifier.weight(1f).horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true).horizontalScroll(scroll),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            var cumulative = ""
-            segments.forEachIndexed { i, seg ->
-                cumulative = if (cumulative.isEmpty()) seg else "$cumulative/$seg"
-                val target = cumulative
-                val isLast = i == segments.lastIndex
-                Icon(
-                    Lucide.ChevronRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 2.dp).size(16.dp),
-                )
-                Text(
-                    seg,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isLast) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = if (isLast) FontWeight.SemiBold else FontWeight.Normal,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .clickable { onNavigate(target) }
-                        .padding(horizontal = 4.dp, vertical = 4.dp),
-                )
-            }
-        }
     }
 }
 
@@ -1196,19 +1193,27 @@ private fun ArchiveSelectionToolbar(
     onView: (() -> Unit)?,
     onSave: (() -> Unit)?,
 ) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ToolbarAction(Lucide.PackageOpen, stringResource(Res.string.extract), onClick = onExtract, modifier = Modifier.weight(1f))
-            ToolbarAction(Lucide.Eye, stringResource(Res.string.view), onClick = onView ?: {}, enabled = onView != null, modifier = Modifier.weight(1f))
-            ToolbarAction(Lucide.Download, stringResource(Res.string.save), onClick = onSave ?: {}, enabled = onSave != null, modifier = Modifier.weight(1f))
-        }
+    SelectionBar {
+        ToolbarAction(Lucide.PackageOpen, stringResource(Res.string.extract), onClick = onExtract)
+        ToolbarAction(Lucide.Eye, stringResource(Res.string.view), onClick = onView ?: {}, enabled = onView != null)
+        ToolbarAction(Lucide.Download, stringResource(Res.string.save), onClick = onSave ?: {}, enabled = onSave != null)
     }
+}
+
+@Composable
+private fun SelectionBar(content: @Composable RowScope.() -> Unit) {
+    val edge = MaterialTheme.colorScheme.outlineVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .drawBehind { drawLine(edge, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .navigationBarsPadding()
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
 }
 
 @Composable
@@ -1227,25 +1232,17 @@ private fun SelectionToolbar(
     onExtract: (() -> Unit)?,
 ) {
     var menu by remember { mutableStateOf(false) }
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ToolbarAction(Lucide.FolderInput, stringResource(Res.string.move), onClick = onMove, modifier = Modifier.weight(1f))
-            ToolbarAction(Lucide.Copy, stringResource(Res.string.copy), onClick = onCopy, modifier = Modifier.weight(1f))
-            ToolbarAction(Lucide.Share2, stringResource(Res.string.share), onClick = onShare, enabled = canShare, modifier = Modifier.weight(1f))
-            ToolbarAction(Lucide.Trash, stringResource(Res.string.delete), onClick = onDelete, modifier = Modifier.weight(1f))
+    SelectionBar {
+            ToolbarAction(Lucide.FolderInput, stringResource(Res.string.move), onClick = onMove)
+            ToolbarAction(Lucide.Copy, stringResource(Res.string.copy), onClick = onCopy)
+            ToolbarAction(Lucide.Share2, stringResource(Res.string.share), onClick = onShare, enabled = canShare)
+            ToolbarAction(Lucide.Trash, stringResource(Res.string.delete), onClick = onDelete)
             if (onView != null || onRename != null || onSave != null || onSaveAs != null || onCopyPath != null) {
-                Box(modifier = Modifier.weight(1f)) {
+                Box {
                     ToolbarAction(
                         Lucide.EllipsisVertical,
                         stringResource(Res.string.more),
                         onClick = { menu = true },
-                        modifier = Modifier.fillMaxWidth(),
                     )
                     AbovePopupMenu(expanded = menu, onDismiss = { menu = false }) {
                         if (onView != null) {
@@ -1300,7 +1297,6 @@ private fun SelectionToolbar(
                     }
                 }
             }
-        }
     }
 }
 
@@ -1312,22 +1308,22 @@ private fun ToolbarAction(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    Column(
+    Row(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .height(32.dp)
+            .clip(CircleShape)
             .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.38f)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .alpha(if (enabled) 1f else 0.4f)
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.height(2.dp))
+        Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
         Text(
             label,
-            style = MaterialTheme.typography.labelSmall,
+            style = MaterialTheme.typography.labelLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 4.dp),
         )
     }
 }
@@ -1344,7 +1340,7 @@ private fun UploadIndicator() {
         TooltipIconButton(label = stringResource(Res.string.uploads), onClick = { open = true }) {
             UploadRing(progress = progress, complete = allDone)
         }
-        DropdownMenu(
+        AppDropdownMenu(
             expanded = open,
             onDismissRequest = {
                 open = false

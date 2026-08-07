@@ -112,7 +112,7 @@ fun SelectField(
             }
             if (open) DropdownScrim { open = false }
             if (open) Dismissable { open = false }
-            DropdownMenu(
+            AppDropdownMenu(
                 expanded = open,
                 onDismissRequest = { open = false },
                 modifier = Modifier.widthIn(min = fieldWidth),

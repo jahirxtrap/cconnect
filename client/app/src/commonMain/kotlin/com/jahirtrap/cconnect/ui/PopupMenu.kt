@@ -86,12 +86,14 @@ fun AppDropdownMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     modifier: Modifier = Modifier,
+    properties: PopupProperties = PopupProperties(focusable = true),
     content: @Composable ColumnScope.() -> Unit,
 ) {
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
         modifier = modifier,
+        properties = properties,
         shape = RoundedCornerShape(Radius.md),
         containerColor = MaterialTheme.colorScheme.surfaceVariant,
         tonalElevation = 0.dp,
