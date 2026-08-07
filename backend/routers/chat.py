@@ -104,7 +104,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                 resume_at=resume_at,
                 fork=state.fork,
                 model=_resolve_model(state.model),
-                account=state.account,
+                account=accounts.resolve(state.account),
                 effort=state.effort,
                 partial=state.partial,
                 name=name,
@@ -180,6 +180,7 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
                 question, context, resume_id,
                 partial=settings_store.get("streaming"),
                 ask_user=ask_user,
+                account=main_state.account,
             ):
                 if ev.get("type") == "ask_session" and ev.get("session_id"):
                     side_state.session_id = ev["session_id"]
@@ -246,6 +247,7 @@ async def chat_ws(ws: WebSocket):
                     session = existing
                     if msg.base_url:
                         session.state.base_url = msg.base_url
+                    session.state.account = msg.account
                 else:
                     state = _Session()
                     state.cwd = msg.cwd or DEFAULT_CWD
@@ -253,7 +255,7 @@ async def chat_ws(ws: WebSocket):
                     state.session_id = msg.resume
                     state.fork = msg.fork
                     state.base_url = msg.base_url
-                    state.account = accounts.resolve(msg.account)
+                    state.account = msg.account
                     state.model = msg.model or settings_store.get("model")
                     state.effort = msg.effort or settings_store.get("effort")
                     state.partial = msg.partial if msg.partial is not None else settings_store.get("streaming")
@@ -320,7 +322,7 @@ async def chat_ws(ws: WebSocket):
                     if msg.partial is not None:
                         session.state.partial = msg.partial
                     if msg.account is not None:
-                        session.state.account = accounts.resolve(msg.account)
+                        session.state.account = msg.account
 
             elif mtype == "set_permission_mode":
                 try:
@@ -349,7 +351,7 @@ async def chat_ws(ws: WebSocket):
                         await send({"type": "error", "message": "busy: a side question is already running", "channel": side_session.channel})
 
             elif mtype == "usage":
-                spawn(_run_usage(send, session.state.account if session else None))
+                spawn(_run_usage(send, accounts.resolve(session.state.account if session else None)))
 
             elif mtype == "interrupt":
                 target = side_session if raw.get("lane") == "side" else session

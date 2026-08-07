@@ -761,6 +761,8 @@ async def generate_title(transcript: str) -> str:
     recorded in history like a chat) and is filtered out of the app's history."""
     from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage
 
+    from services import accounts
+
     os.makedirs(AI_WORKDIR, exist_ok=True)
     options = ClaudeAgentOptions(
         cwd=AI_WORKDIR,
@@ -769,6 +771,7 @@ async def generate_title(transcript: str) -> str:
         system_prompt="You write conversation titles. Reply with ONLY the title: 3-6 words, Title Case, no quotes, no trailing punctuation.",
         setting_sources=[],
         cli_path=cli_manager.resolve_cli_path(),
+        env=accounts.env_for(accounts.default_account()),
     )
 
     parts: list[str] = []
@@ -789,10 +792,12 @@ async def ask_side_question(
     resume_id: str | None = None,
     partial: bool = False,
     ask_user: Optional[Callable[[dict], Awaitable[dict]]] = None,
+    account: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """Quick side question in an isolated, resumable session. ``context`` seeds the first turn,
     ``resume_id`` continues it for memory, ``ask_user`` surfaces permission prompts."""
     from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, StreamEvent, UserMessage, ResultMessage, HookMatcher
+    from services import accounts
 
     os.makedirs(AI_WORKDIR, exist_ok=True)
     system = (
@@ -811,6 +816,7 @@ async def ask_side_question(
         include_partial_messages=partial,
         cli_path=cli_manager.resolve_cli_path(),
         resume=resume_id,
+        env=accounts.env_for(accounts.resolve(account)),
     )
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
