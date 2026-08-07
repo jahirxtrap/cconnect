@@ -125,6 +125,11 @@ Open Settings → Connections and add the server: on mobile, scan the QR
 paste the address and token by hand. The connection becomes active immediately
 and the chat reconnects.
 
+Each environment can carry its own colour, which takes over the whole app while
+it's the active one — a glance tells you whether you're driving your laptop or a
+VPS. Leave it unset to keep the accent you picked in Settings, or set it to
+dynamic so that environment follows the system colour.
+
 ## Web app
 
 The desktop UI also runs in the browser — the same Compose code compiled to
@@ -312,7 +317,8 @@ listens somewhere else), and the credentials you log in with — then open it
 to an embedded terminal. On Linux that's your shell user + password;
 on Windows hosts running OpenSSH it's your account password. Password auth
 must be enabled on the target. A keepalive keeps the session connected, with
-a Wi-Fi lock on mobile when the screen turns off.
+a Wi-Fi lock on mobile when the screen turns off, and Ctrl+V pastes the
+clipboard into the terminal.
 
 ### Local
 
