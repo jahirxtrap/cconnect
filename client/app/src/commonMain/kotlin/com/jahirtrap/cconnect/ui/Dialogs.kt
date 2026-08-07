@@ -79,6 +79,7 @@ fun CompactDialog(
     description: String? = null,
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp),
     titleTrailing: (@Composable RowScope.() -> Unit)? = null,
+    header: (@Composable ColumnScope.() -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     Dismissable(onDismiss = onDismiss)
@@ -115,6 +116,10 @@ fun CompactDialog(
                         }
                     }
                     if (titleTrailing != null) titleTrailing()
+                }
+                if (header != null) {
+                    Spacer(Modifier.height(16.dp))
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), content = header)
                 }
                 if (content != null) {
                     Spacer(Modifier.height(16.dp))

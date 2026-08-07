@@ -22,6 +22,7 @@ import com.jahirtrap.cconnect.data.ChatListStore
 import com.jahirtrap.cconnect.data.ChatMessage
 import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.SendStatus
+import com.jahirtrap.cconnect.data.EnvOverrides
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.CommandOption
 import com.jahirtrap.cconnect.data.CompactData
@@ -54,6 +55,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.getString
@@ -195,6 +197,28 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         viewModelScope.launch {
             client.events.collect { (side, parent, event) -> if (side) onSideEvent(event) else onEvent(event, parent) }
         }
+        viewModelScope.launch {
+            EnvOverrides.revision.drop(1).collect { applyForeignOverrides() }
+        }
+    }
+
+    private fun applyForeignOverrides() {
+        val before = _state.value
+        loadEnvOverrides()
+        val after = _state.value
+        if (after.accountOverride != before.accountOverride) pushGeneration(account = after.accountOverride)
+        if (after.modelOverride != before.modelOverride) {
+            pushGeneration(model = after.modelOverride.ifEmpty { after.model })
+        }
+        if (after.effortOverride != before.effortOverride) {
+            pushGeneration(effort = after.effortOverride.ifEmpty { after.effort })
+        }
+        if (after.streamingOverride != before.streamingOverride) {
+            pushGeneration(partial = after.streamingOverride ?: after.streamTokens)
+        }
+        if (after.permissionOverride != before.permissionOverride && after.connection == ConnectionState.Connected) {
+            client.sendSetPermissionMode(after.permissionOverride.ifEmpty { after.permissionMode })
+        }
     }
 
     private fun applyDefaultDirectory() {
@@ -284,7 +308,19 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun refreshCompat() {
         val caps = CapabilitiesApi.capabilities()
         if (caps != null) {
-            _state.update { it.copy(capabilities = caps, account = caps.defaults.account) }
+            val stale = _state.value.accountOverride.takeIf { it.isNotEmpty() }
+                ?.takeIf { id -> caps.accounts.none { it.id == id } }
+            if (stale != null) {
+                settings.updateEnvironment(ctx.environmentId) { it.copy(account = "") }
+                EnvOverrides.bump()
+            }
+            _state.update {
+                it.copy(
+                    capabilities = caps,
+                    account = caps.defaults.account,
+                    accountOverride = if (stale != null) "" else it.accountOverride,
+                )
+            }
             evaluateCompat(caps.serverVersion, caps.supportedApp, caps.cliVersion, caps.supportedCli)
         } else {
             CapabilitiesApi.versionInfo()?.let {
@@ -320,7 +356,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             s.modelOverride.ifEmpty { s.model },
             s.effortOverride.ifEmpty { s.effort },
             s.streamingOverride ?: s.streamTokens,
-            s.accountOverride.ifEmpty { s.account },
+            s.accountOverride,
         )
     }
 
@@ -535,6 +571,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun setPermissionMode(mode: String) {
         settings.updateEnvironment(ctx.environmentId) { it.copy(permissionMode = mode) }
+        EnvOverrides.bump()
         _state.update { it.copy(permissionOverride = mode) }
         val effective = mode.ifEmpty { _state.value.permissionMode }
         if (_state.value.connection == ConnectionState.Connected) client.sendSetPermissionMode(effective)
@@ -554,18 +591,21 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun setAccount(account: String) {
         settings.updateEnvironment(ctx.environmentId) { it.copy(account = account) }
+        EnvOverrides.bump()
         _state.update { it.copy(accountOverride = account) }
-        pushGeneration(account = account.ifEmpty { _state.value.account })
+        pushGeneration(account = account)
     }
 
     fun setModel(model: String) {
         settings.updateEnvironment(ctx.environmentId) { it.copy(model = model) }
+        EnvOverrides.bump()
         _state.update { it.copy(modelOverride = model) }
         pushGeneration(model = model.ifEmpty { _state.value.model })
     }
 
     fun setEffort(effort: String) {
         settings.updateEnvironment(ctx.environmentId) { it.copy(effort = effort) }
+        EnvOverrides.bump()
         _state.update { it.copy(effortOverride = effort) }
         pushGeneration(effort = effort.ifEmpty { _state.value.effort })
     }
@@ -574,6 +614,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val s = _state.value
         val next = !(s.streamingOverride ?: s.streamTokens)
         settings.updateEnvironment(ctx.environmentId) { it.copy(streaming = next) }
+        EnvOverrides.bump()
         _state.update { it.copy(streamingOverride = next) }
         pushGeneration(partial = next)
     }

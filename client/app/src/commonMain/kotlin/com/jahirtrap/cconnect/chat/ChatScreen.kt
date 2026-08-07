@@ -69,6 +69,7 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import com.composables.icons.lucide.Activity
 import com.composables.icons.lucide.Archive
 import com.composables.icons.lucide.Radio
+import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.ArrowUp
 import com.composables.icons.lucide.Check
@@ -827,6 +828,10 @@ fun ChatScreen(
                                             ready = state.capabilitiesReady,
                                             disconnected = state.connection == ConnectionState.Disconnected,
                                             connecting = state.connection == ConnectionState.Connecting,
+                                            account = state.accountOverride.ifEmpty { state.account },
+                                            accountSelected = state.accountOverride,
+                                            accounts = state.capabilities.accounts,
+                                            onAccount = vm::setAccount,
                                             model = state.modelOverride.ifEmpty { state.model },
                                             modelSelected = state.modelOverride,
                                             models = state.capabilities.models,
@@ -1460,6 +1465,10 @@ private fun ChatToolbar(
     ready: Boolean,
     disconnected: Boolean,
     connecting: Boolean,
+    account: String,
+    accountSelected: String,
+    accounts: List<com.jahirtrap.cconnect.data.ModelOption>,
+    onAccount: (String) -> Unit,
     model: String,
     modelSelected: String,
     models: List<com.jahirtrap.cconnect.data.ModelOption>,
@@ -1564,6 +1573,18 @@ private fun ChatToolbar(
                     optionStyle = { styles[it] ?: (pstyle.icon to pstyle.color) },
                     onSelect = onPermissionMode,
                 )
+            }
+            if (accounts.size > 1) {
+                TooltipWrap(stringResource(Res.string.account)) {
+                    SelectorChip(
+                        label = accounts.firstOrNull { it.id == account }?.label ?: account,
+                        icon = Lucide.CircleUser,
+                        tint = accent,
+                        options = listOf("" to defaultLabel) + accounts.map { it.id to it.label },
+                        selected = accountSelected,
+                        onSelect = onAccount,
+                    )
+                }
             }
             TooltipWrap(stringResource(Res.string.streaming)) {
                 StreamToggle(streaming = streaming, onClick = onStreaming)

@@ -67,10 +67,6 @@ import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.ConfirmDialog
-import com.jahirtrap.cconnect.ui.DialogItemInset
-import com.jahirtrap.cconnect.ui.DialogItemPaddingH
-import com.jahirtrap.cconnect.ui.DialogItemPaddingV
-import com.jahirtrap.cconnect.ui.DialogItemShape
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.CompactSwitch
@@ -425,6 +421,7 @@ fun ClaudeDetailScreen(
     }
 
     catalogMarket?.let { market ->
+        var query by remember(market) { mutableStateOf("") }
         CompactDialog(
             onDismiss = { catalogMarket = null },
             title = market,
@@ -451,29 +448,30 @@ fun ClaudeDetailScreen(
                     Text(stringResource(Res.string.close))
                 }
             },
+            header = {
+                InputField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.search)) },
+                    trailingIcon = if (query.isNotEmpty()) {
+                        {
+                            Icon(
+                                Lucide.X,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.clip(CircleShape).clickable { query = "" }.size(18.dp),
+                            )
+                        }
+                    } else null,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (busy) {
+                    Spacer(Modifier.height(8.dp))
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            },
         ) {
-            var query by remember(market) { mutableStateOf("") }
-            InputField(
-                value = query,
-                onValueChange = { query = it },
-                singleLine = true,
-                label = { Text(stringResource(Res.string.search)) },
-                trailingIcon = if (query.isNotEmpty()) {
-                    {
-                        Icon(
-                            Lucide.X,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.clip(CircleShape).clickable { query = "" }.size(18.dp),
-                        )
-                    }
-                } else null,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-            )
-            Spacer(Modifier.height(8.dp))
-            if (busy) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp))
-            }
             val list = catalog
             if (list == null) {
                 CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 24.dp))
@@ -851,10 +849,8 @@ private fun DetailRow(title: String, subtitle: String?, enabled: Boolean, onClic
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = DialogItemInset)
-            .clip(DialogItemShape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = DialogItemPaddingH, vertical = DialogItemPaddingV),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

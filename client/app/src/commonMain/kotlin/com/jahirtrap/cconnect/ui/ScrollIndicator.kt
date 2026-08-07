@@ -23,8 +23,10 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -71,6 +73,7 @@ fun Modifier.verticalScrollIndicator(state: ScrollState, thickness: Dp = 2.dp): 
 }
 
 private val SCROLLBAR_HIT = 16.dp
+private val SCROLLBAR_GAP = 2.dp
 
 @Composable
 fun Modifier.horizontalScrollbar(state: ScrollState, thickness: Dp = 4.dp, touchIndicator: Boolean = true, wheelScroll: Boolean = false): Modifier {
@@ -156,7 +159,12 @@ fun Modifier.horizontalScrollbar(state: ScrollState, thickness: Dp = 4.dp, touch
                 cornerRadius = CornerRadius(px / 2, px / 2),
             )
         }
-        .then(if (!touch && state.maxValue > 0) Modifier.padding(bottom = thickness + 2.dp) else Modifier)
+        .layout { measurable, constraints ->
+            val gutter = if (touch || measurable.maxIntrinsicWidth(constraints.maxHeight) <= constraints.maxWidth) 0
+            else (thickness + SCROLLBAR_GAP).roundToPx()
+            val placeable = measurable.measure(constraints.offset(vertical = -gutter))
+            layout(placeable.width, placeable.height + gutter) { placeable.place(0, 0) }
+        }
 }
 
 @Composable

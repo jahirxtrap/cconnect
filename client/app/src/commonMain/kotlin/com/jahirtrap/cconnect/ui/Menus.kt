@@ -135,17 +135,19 @@ fun CompactDropdownSubMenu(
 fun SelectField(
     label: String,
     selected: String,
-    options: List<Pair<String, String>>,
-    onSelect: (String) -> Unit,
+    options: List<Pair<String, String>> = emptyList(),
+    trailing: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+    onSelect: (String) -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
     var fieldWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
     val display = options.firstOrNull { it.first == selected }?.second ?: selected
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(Radius.md)
     Column {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(4.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge)
+        Spacer(Modifier.height(6.dp))
         Box {
             Row(
                 modifier = Modifier
@@ -153,11 +155,15 @@ fun SelectField(
                     .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
                     .clip(shape)
                     .border(1.dp, if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
-                    .clickable { open = true }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                    .clickable { if (onClick != null) onClick() else open = true }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(display, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                if (trailing != null) {
+                    Spacer(Modifier.width(8.dp))
+                    trailing()
+                }
                 Spacer(Modifier.width(8.dp))
                 Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
             }

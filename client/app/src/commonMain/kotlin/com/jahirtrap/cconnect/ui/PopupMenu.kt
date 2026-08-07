@@ -88,7 +88,7 @@ private fun MenuPopup(
                     .width(IntrinsicSize.Max)
                     .verticalScroll(rememberScrollState()),
             ) {
-                Spacer(Modifier.width(minWidth))
+                Spacer(Modifier.width((minWidth - MenuPadding * 2).coerceAtLeast(0.dp)))
                 content()
             }
         }

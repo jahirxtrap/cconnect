@@ -1536,18 +1536,21 @@ private fun EnvironmentEditDialog(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
-        PreferenceRow(
-            Lucide.Palette,
-            stringResource(Res.string.environment_accent),
-            when (val picked = accentIndex) {
+        Spacer(Modifier.height(8.dp))
+        SelectField(
+            label = stringResource(Res.string.environment_accent),
+            selected = when (val picked = accentIndex) {
                 null -> stringResource(Res.string.color_none)
                 DYNAMIC_ACCENT -> dynamicLabel
-                else -> accentNameAt(picked)
+                else -> accentNameAt(picked).orEmpty()
             },
             trailing = {
-                accentIndex?.let { AccentDot(if (it == DYNAMIC_ACCENT) systemColor else accentAt(it)) }
+                accentIndex?.let {
+                    Box(Modifier.size(20.dp).clip(CircleShape).background(if (it == DYNAMIC_ACCENT) systemColor else accentAt(it)))
+                }
             },
-        ) { picking = true }
+            onClick = { picking = true },
+        )
     }
 
     if (picking) {
