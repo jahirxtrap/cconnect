@@ -318,6 +318,7 @@ private fun ResourcesPage(
                     ?: stringResource(Res.string.battery_on_battery),
                 percent = battery.percent,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                color = if (battery.percent < 20f && !battery.plugged) palette.red else MaterialTheme.colorScheme.primary,
             )
         }
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {

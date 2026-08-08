@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.data.formatDecimal
@@ -40,8 +41,8 @@ fun MetricHeader(title: String, subtitle: String, percent: Float) {
 }
 
 @Composable
-fun MetricBar(title: String, subtitle: String, percent: Float, modifier: Modifier = Modifier) {
-    val barColor = if (percent >= 90f) palette.red else MaterialTheme.colorScheme.primary
+fun MetricBar(title: String, subtitle: String, percent: Float, modifier: Modifier = Modifier, color: Color? = null) {
+    val barColor = color ?: if (percent >= 90f) palette.red else MaterialTheme.colorScheme.primary
     Column(modifier = modifier.fillMaxWidth()) {
         MetricHeader(title, subtitle, percent)
         Spacer(Modifier.height(8.dp))
