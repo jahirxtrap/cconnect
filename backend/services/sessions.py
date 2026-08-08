@@ -448,11 +448,75 @@ def session_context(cwd: str, session_id: str, max_chars: int = 4000) -> str:
     return "\n".join(parts)[-max_chars:]
 
 
-def session_tasks(session_id: str) -> list[dict]:
-    """Current task state Claude persists per session at ~/.claude/tasks/<id>/<n>.json.
-    A resumed chat reads this to restore the task indicator (the SDK doesn't re-stream it)."""
+_TASK_CREATED_RE = re.compile(r"Task #(\d+) created", re.IGNORECASE)
+
+
+def _tasks_from_transcript(project_key: str, session_id: str) -> Optional[list[dict]]:
+    """Task state replayed from the tool calls the transcript recorded.
+
+    Preferred over the on-disk store because that one outlives the tasks: when the CLI
+    loses them, the files stay behind and every resume resurrects a list that no longer
+    exists. Here a call answered "not found" is proof the task is gone."""
+    try:
+        path = _session_file(project_key, session_id)
+    except ValueError:
+        return None
+    if not path.is_file():
+        return None
+
+    calls: dict[str, tuple[str, dict]] = {}
+    tasks: dict[str, dict] = {}
+    seen = False
+    for entry in _iter_lines(path):
+        message = entry.get("message")
+        content = message.get("content") if isinstance(message, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use" and block.get("name") in ("TaskCreate", "TaskUpdate"):
+                calls[block.get("id")] = (block["name"], block.get("input") or {})
+                seen = True
+                continue
+            if block.get("type") != "tool_result":
+                continue
+            call = calls.pop(block.get("tool_use_id"), None)
+            if call is None:
+                continue
+            name, params = call
+            output = _text_from_content(block.get("content")).lower()
+            if "tool_use_error" in output or "inputvalidationerror" in output:
+                continue
+            if name == "TaskCreate":
+                match = _TASK_CREATED_RE.search(output)
+                if match:
+                    tasks[match.group(1)] = {
+                        "id": match.group(1),
+                        "content": str(params.get("subject") or ""),
+                        "status": "pending",
+                    }
+                continue
+            key = str(params.get("taskId") or "")
+            status = params.get("status")
+            if "not found" in output or status == "deleted":
+                tasks.pop(key, None)
+            elif status and key in tasks:
+                tasks[key]["status"] = status
+    return list(tasks.values()) if seen else None
+
+
+def session_tasks(session_id: str, project_key: str = "") -> list[dict]:
+    """Current task state for a resumed chat, which the SDK doesn't re-stream.
+
+    Rebuilt from the transcript when it recorded any task call, otherwise read from the
+    store Claude keeps at ~/.claude/tasks/<id>/<n>.json."""
     if not _SESSION_RE.match(session_id or ""):
         return []
+    if project_key:
+        replayed = _tasks_from_transcript(project_key, session_id)
+        if replayed is not None:
+            return [] if all(t["status"] == "completed" for t in replayed) else replayed
     directory = _base().parent / "tasks" / session_id
     if not directory.is_dir():
         return []

@@ -273,7 +273,10 @@ async def chat_ws(ws: WebSocket):
                 })
                 await session.attach(send, last_seq=msg.last_seq, since_committed=bool(by_session))
                 if not session.running and session.state.session_id:
-                    tasks = sessions_service.session_tasks(session.state.session_id)
+                    tasks = sessions_service.session_tasks(
+                        session.state.session_id,
+                        sessions_service.project_key_for(session.state.cwd or ""),
+                    )
                     for t in tasks:
                         await send({"type": "task", **t})
                     remembered = todos_store.load(session.state.session_id)
