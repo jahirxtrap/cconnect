@@ -252,6 +252,11 @@
     <string name="sort_type">Tipo</string>
     <string name="sort_size">Tamaño</string>
     <string name="sort_ascending">Ascendente</string>
+    <string name="battery">Batería</string>
+    <string name="battery_plugged">Conectado a la corriente</string>
+    <string name="battery_remaining">Quedan %1$s</string>
+    <string name="battery_on_battery">Con batería</string>
+    <string name="network_no_interfaces">No se encontraron interfaces</string>
     <string name="alert_note">Nota</string>
     <string name="alert_tip">Consejo</string>
     <string name="alert_important">Importante</string>

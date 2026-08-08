@@ -252,6 +252,11 @@
     <string name="sort_type">Type</string>
     <string name="sort_size">Size</string>
     <string name="sort_ascending">Ascending</string>
+    <string name="battery">Battery</string>
+    <string name="battery_plugged">Plugged in</string>
+    <string name="battery_remaining">%1$s remaining</string>
+    <string name="battery_on_battery">On battery</string>
+    <string name="network_no_interfaces">No interfaces found</string>
     <string name="alert_note">Note</string>
     <string name="alert_tip">Tip</string>
     <string name="alert_important">Important</string>

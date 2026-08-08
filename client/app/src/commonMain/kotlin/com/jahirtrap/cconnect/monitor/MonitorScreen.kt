@@ -310,6 +310,16 @@ private fun ResourcesPage(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
+        current.battery?.let { battery ->
+            MetricBar(
+                title = stringResource(Res.string.battery),
+                subtitle = if (battery.plugged) stringResource(Res.string.battery_plugged)
+                else battery.secsLeft?.let { stringResource(Res.string.battery_remaining, formatUptime(it.toDouble())) }
+                    ?: stringResource(Res.string.battery_on_battery),
+                percent = battery.percent,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+        }
         Column(modifier = Modifier.padding(horizontal = 16.dp)) {
             SettingsGroup(stringResource(Res.string.storage)) {
                 Column(

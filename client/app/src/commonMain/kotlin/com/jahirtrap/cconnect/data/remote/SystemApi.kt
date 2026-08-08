@@ -33,6 +33,12 @@ object SystemApi {
         val temp: Int?,
     )
 
+    data class BatteryInfo(
+        val percent: Float,
+        val plugged: Boolean,
+        val secsLeft: Long?,
+    )
+
     data class SystemInfo(
         val hostname: String,
         val os: String,
@@ -46,6 +52,7 @@ object SystemApi {
         val memoryTotal: Long,
         val memoryPercent: Float,
         val gpu: GpuInfo?,
+        val battery: BatteryInfo?,
         val disks: List<DiskInfo>,
         val netRx: Double = 0.0,
         val netTx: Double = 0.0,
@@ -110,6 +117,13 @@ object SystemApi {
                     memTotal = gpu["mem_total"]?.jsonPrimitive?.longOrNull ?: 0L,
                     memPercent = gpu["mem_percent"]?.jsonPrimitive?.floatOrNull ?: 0f,
                     temp = gpu["temp"]?.jsonPrimitive?.intOrNull,
+                )
+            },
+            battery = (o["battery"] as? JsonObject)?.let { battery ->
+                BatteryInfo(
+                    percent = battery["percent"]?.jsonPrimitive?.floatOrNull ?: 0f,
+                    plugged = battery["plugged"]?.jsonPrimitive?.contentOrNull == "true",
+                    secsLeft = battery["secsleft"]?.jsonPrimitive?.longOrNull,
                 )
             },
             disks = o["disks"]?.jsonArray?.map { el ->

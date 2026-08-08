@@ -185,6 +185,23 @@ def _cpu_name() -> str | None:
     return None
 
 
+def _battery() -> dict | None:
+    try:
+        battery = psutil.sensors_battery()
+    except Exception:
+        return None
+    if battery is None:
+        return None
+    left = battery.secsleft
+    if left in (psutil.POWER_TIME_UNLIMITED, psutil.POWER_TIME_UNKNOWN) or left is None or left < 0:
+        left = None
+    return {
+        "percent": round(battery.percent, 1),
+        "plugged": bool(battery.power_plugged),
+        "secsleft": left,
+    }
+
+
 def snapshot() -> dict:
     memory = psutil.virtual_memory()
     disks = []
@@ -214,6 +231,7 @@ def snapshot() -> dict:
         },
         "memory": {"used": memory.used, "total": memory.total, "percent": memory.percent},
         "gpu": _gpu(),
+        "battery": _battery(),
         "disks": disks,
         "network": _network(),
     }

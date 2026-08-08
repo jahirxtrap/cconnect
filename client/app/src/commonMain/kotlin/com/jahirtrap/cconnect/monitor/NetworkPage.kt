@@ -150,7 +150,16 @@ internal fun NetworkPage(status: NetworkApi.Status, rxBytes: Double, txBytes: Do
         }
 
         SettingsGroup(label = stringResource(Res.string.network_interfaces)) {
-            status.interfaces.filter { it.kind != "other" || it.up }.forEach { item ->
+            val shown = status.interfaces.filter { it.kind != "other" || it.up }
+            if (shown.isEmpty()) {
+                PreferenceRow(
+                    icon = Lucide.Cable,
+                    title = stringResource(Res.string.network_no_interfaces),
+                    summary = null,
+                    enabled = false,
+                )
+            }
+            shown.forEach { item ->
                 val controllable = status.wiredControl && item.kind == "wired"
                 fun toggleInterface() {
                     busy = item.name

@@ -31,12 +31,14 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
 import com.jahirtrap.cconnect.ui.IconButton
 import com.jahirtrap.cconnect.ui.textHoverCursor
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -444,12 +446,9 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
             }
         }
         if (isExpanded && !labelOnly) {
-            SelectableText(
-                text = text,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
+                MarkdownText(text, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false)
+            }
         }
     }
 }
