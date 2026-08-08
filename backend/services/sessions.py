@@ -452,11 +452,8 @@ _TASK_CREATED_RE = re.compile(r"Task #(\d+) created", re.IGNORECASE)
 
 
 def _tasks_from_transcript(project_key: str, session_id: str) -> Optional[list[dict]]:
-    """Task state replayed from the tool calls the transcript recorded.
-
-    Preferred over the on-disk store because that one outlives the tasks: when the CLI
-    loses them, the files stay behind and every resume resurrects a list that no longer
-    exists. Here a call answered "not found" is proof the task is gone."""
+    """Task state replayed from the recorded tool calls. A call answered "not found"
+    is proof the task is gone, which the on-disk store cannot express."""
     try:
         path = _session_file(project_key, session_id)
     except ValueError:
@@ -507,10 +504,8 @@ def _tasks_from_transcript(project_key: str, session_id: str) -> Optional[list[d
 
 
 def session_tasks(session_id: str, project_key: str = "") -> list[dict]:
-    """Current task state for a resumed chat, which the SDK doesn't re-stream.
-
-    Rebuilt from the transcript when it recorded any task call, otherwise read from the
-    store Claude keeps at ~/.claude/tasks/<id>/<n>.json."""
+    """Current task state for a resumed chat, which the SDK doesn't re-stream. Rebuilt
+    from the transcript, falling back to ~/.claude/tasks/<id>/<n>.json."""
     if not _SESSION_RE.match(session_id or ""):
         return []
     if project_key:
