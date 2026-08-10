@@ -132,7 +132,10 @@ class MainActivity : AppCompatActivity() {
         androidSaveAs = { filename ->
             val deferred = CompletableDeferred<Uri?>()
             saveAsDeferred = deferred
-            runCatching { saveAsLauncher.launch(filename) }
+            if (runCatching { saveAsLauncher.launch(filename) }.isFailure) {
+                saveAsDeferred = null
+                deferred.complete(null)
+            }
             deferred.await()
         }
         enableEdgeToEdge()

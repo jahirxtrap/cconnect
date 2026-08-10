@@ -21,8 +21,9 @@ import java.io.OutputStream
 
 private val client = OkHttpClient()
 
-actual suspend fun downloadShared(url: String, filename: String): Boolean =
+actual suspend fun downloadShared(url: String, filename: String): Boolean = withContext(Dispatchers.IO) {
     enqueueToDownloads(url, filename)
+}
 
 var androidSaveAs: (suspend (filename: String) -> Uri?)? = null
 
@@ -34,8 +35,9 @@ actual suspend fun saveSharedAs(url: String, filename: String): Boolean {
 actual suspend fun openSharedExternally(url: String, filename: String): Boolean =
     openExternally(url, filename)
 
-actual suspend fun saveAllShared(items: List<Pair<String, String>>): Boolean =
+actual suspend fun saveAllShared(items: List<Pair<String, String>>): Boolean = withContext(Dispatchers.IO) {
     items.all { (url, filename) -> enqueueToDownloads(url, filename) }
+}
 
 actual suspend fun openAllSharedExternally(items: List<Pair<String, String>>): Boolean = withContext(Dispatchers.IO) {
     runCatching {

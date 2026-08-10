@@ -6,7 +6,10 @@ import org.w3c.dom.CloseEvent
 import org.w3c.dom.events.Event
 
 actual class WsConnection(private val ws: WebSocket) {
-    actual fun send(text: String) { ws.send(text) }
+    actual fun send(text: String) {
+        if (ws.readyState != WebSocket.OPEN) return
+        runCatching { ws.send(text) }
+    }
     actual fun cancel() { runCatching { ws.close() } }
     actual fun close(code: Int, reason: String?) { runCatching { ws.close(code.toShort(), reason ?: "") } }
 }
