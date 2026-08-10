@@ -180,7 +180,6 @@ def _classify_diff_lines(lines: list[str]) -> list[dict[str, str]]:
     while i < len(lines):
         line = lines[i]
         following = lines[i + 1] if i + 1 < len(lines) else ""
-        # Both sides of the pair name the same file, and MultiEdit repeats it per edit.
         if line.startswith("---") and following.startswith("+++"):
             old_path = line[3:].strip()
             new_path = following[3:].strip()
