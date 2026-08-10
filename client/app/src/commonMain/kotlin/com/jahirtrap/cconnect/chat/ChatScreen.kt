@@ -1614,7 +1614,7 @@ private fun ChatToolbar(
 private fun ContextRing(tokens: Int, limit: Int) {
     val progress = (tokens.toFloat() / limit).coerceIn(0f, 1f)
     val pct = (progress * 100).toInt()
-    Box(modifier = Modifier.padding(start = 4.dp, end = 8.dp)) {
+    Box(modifier = Modifier.padding(start = 4.dp, end = 2.dp)) {
         TooltipTap("${fmtTokens(tokens)} / ${fmtTokens(limit)} • $pct%") {
             Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
