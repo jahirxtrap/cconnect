@@ -175,10 +175,22 @@ def _unified_diff(old: str, new: str, path: str) -> list[str]:
 # +/- is stripped from text because kind already encodes it.
 def _classify_diff_lines(lines: list[str]) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
-    for line in lines:
-        if line.startswith("---") or line.startswith("+++"):
-            out.append({"kind": "header", "text": line})
-        elif line.startswith("@@"):
+    last_header: str | None = None
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        following = lines[i + 1] if i + 1 < len(lines) else ""
+        # Both sides of the pair name the same file, and MultiEdit repeats it per edit.
+        if line.startswith("---") and following.startswith("+++"):
+            old_path = line[3:].strip()
+            new_path = following[3:].strip()
+            for text in ((new_path,) if old_path == new_path else (old_path, new_path)):
+                if text != last_header:
+                    out.append({"kind": "header", "text": text})
+                    last_header = text
+            i += 2
+            continue
+        if line.startswith("@@"):
             out.append({"kind": "hunk", "text": line})
         elif line.startswith("+"):
             out.append({"kind": "add", "text": line[1:]})
@@ -186,6 +198,7 @@ def _classify_diff_lines(lines: list[str]) -> list[dict[str, str]]:
             out.append({"kind": "del", "text": line[1:]})
         else:
             out.append({"kind": "ctx", "text": line[1:] if line.startswith(" ") else line})
+        i += 1
     return out
 
 
