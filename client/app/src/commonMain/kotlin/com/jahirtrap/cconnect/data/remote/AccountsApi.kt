@@ -48,6 +48,11 @@ object AccountsApi {
         Http.delete("/accounts/$id/login")
     }
 
+    fun exportUrl(id: String): String = "${Backend.baseUrl}/accounts/${UrlCodec.encode(id)}/export"
+
+    fun importUrl(label: String): String =
+        "${Backend.baseUrl}/accounts/import?label=${UrlCodec.encode(label)}"
+
     private fun parse(o: JsonObject) = Account(
         id = o["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         label = o["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),

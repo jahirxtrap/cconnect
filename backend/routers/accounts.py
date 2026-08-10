@@ -1,6 +1,6 @@
 """Claude accounts: list, create, rename, delete and remote OAuth login."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 
 from core.responses import api_response
 from schemas.accounts import AccountCreateRequest, AccountRenameRequest, LoginCodeRequest
@@ -35,6 +35,26 @@ def delete_account(account_id: str):
     if not accounts.delete(account_id):
         return api_response(status=404)
     return api_response()
+
+
+@router.post("/accounts/import")
+async def import_account(request: Request, label: str = ""):
+    account = accounts.import_bundle(await request.body(), label)
+    if account is None:
+        return api_response(status=400)
+    return api_response(data=account)
+
+
+@router.get("/accounts/{account_id}/export")
+def export_account(account_id: str):
+    data = accounts.export_bundle(account_id)
+    if data is None:
+        return api_response(status=404)
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{account_id}.zip"'},
+    )
 
 
 @router.post("/accounts/{account_id}/mcp-sync")

@@ -10,3 +10,5 @@ expect suspend fun uploadAttachment(
     path: String,
     onProgress: (Float) -> Unit,
 ): String?
+
+expect suspend fun uploadAccountBundle(file: AttachmentFile, label: String): Boolean

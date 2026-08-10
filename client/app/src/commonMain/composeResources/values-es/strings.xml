@@ -400,4 +400,9 @@
     <string name="public_url">URL pública</string>
     <string name="token">Token</string>
     <string name="restart">Reiniciar</string>
+    <string name="lock_selection">Bloquear</string>
+    <string name="unlock_selection">Desbloquear</string>
+    <string name="account_export">Exportar cuenta</string>
+    <string name="account_import">Importar desde un archivo</string>
+    <string name="account_import_failed">Ese archivo no es una exportación de cuenta válida</string>
 </resources>

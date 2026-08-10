@@ -7,10 +7,12 @@ primary config dir instead of being copied.
 
 from __future__ import annotations
 
+import io
 import json
 import re
 import shutil
 import subprocess
+import zipfile
 
 import sys
 from pathlib import Path
@@ -29,6 +31,12 @@ _META_FILE = "account.json"
 _SHARED_DIRS = ("projects", "plugins", "skills")
 _COPIED_FILES = ("settings.json",)
 _ID_RE = re.compile(r"[^a-z0-9-]+")
+
+_CREDENTIALS_FILE = ".credentials.json"
+_IDENTITY_FILE = ".claude.json"
+_BUNDLE_FILES = (_CREDENTIALS_FILE, "settings.json", _IDENTITY_FILE, _META_FILE)
+_IDENTITY_KEYS = ("oauthAccount", "userID")
+_MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 
 
 def primary_dir() -> Path:
@@ -180,6 +188,97 @@ def rename(account_id: str, label: str) -> bool:
         return False
     (path / _META_FILE).write_text(json.dumps({"label": label.strip() or account_id}), encoding="utf-8")
     return True
+
+
+def _identity(account_id: Optional[str]) -> dict:
+    try:
+        data = json.loads(_claude_json(account_id).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return {}
+    return {key: data[key] for key in _IDENTITY_KEYS if key in data}
+
+
+def export_bundle(account_id: str) -> Optional[bytes]:
+    """Zip the credentials and the account's own config. History, caches, the
+    machine id and the linked projects/plugins/skills are all left out."""
+    if account_id not in known_ids():
+        return None
+    credentials = credentials_path(account_id)
+    if not credentials.is_file():
+        return None
+    base = config_dir(account_id) or primary_dir()
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
+        bundle.writestr(_CREDENTIALS_FILE, credentials.read_bytes())
+        fallback = PRIMARY_LABEL if account_id == PRIMARY_ID else account_id
+        bundle.writestr(_META_FILE, json.dumps({"label": _label(base, fallback)}))
+        settings = base / "settings.json"
+        if settings.is_file():
+            bundle.writestr("settings.json", settings.read_bytes())
+        identity = _identity(account_id)
+        if identity:
+            bundle.writestr(_IDENTITY_FILE, json.dumps(identity, indent=2))
+    return buffer.getvalue()
+
+
+def _read_bundle(data: bytes) -> Optional[dict[str, bytes]]:
+    if len(data) > _MAX_BUNDLE_BYTES:
+        return None
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as bundle:
+            names = set(bundle.namelist())
+            if _CREDENTIALS_FILE not in names:
+                return None
+            if sum(bundle.getinfo(name).file_size for name in names) > _MAX_BUNDLE_BYTES:
+                return None
+            payload = {name: bundle.read(name) for name in _BUNDLE_FILES if name in names}
+    except (zipfile.BadZipFile, OSError, KeyError):
+        return None
+    try:
+        json.loads(payload[_CREDENTIALS_FILE])
+    except json.JSONDecodeError:
+        return None
+    return payload
+
+
+def _bundle_label(payload: dict[str, bytes]) -> str:
+    try:
+        return (json.loads(payload[_META_FILE]).get("label") or "").strip()
+    except (KeyError, json.JSONDecodeError, AttributeError):
+        return ""
+
+
+def _merge_identity(target: Path, raw: Optional[bytes]) -> None:
+    if raw is None:
+        return
+    try:
+        incoming = {k: v for k, v in json.loads(raw).items() if k in _IDENTITY_KEYS}
+    except (json.JSONDecodeError, AttributeError):
+        return
+    if not incoming:
+        return
+    try:
+        current = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        current = {}
+    current.update(incoming)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(current, indent=2), encoding="utf-8")
+
+
+def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
+    """Always lands on a new account, so importing never overwrites a live one."""
+    payload = _read_bundle(data)
+    if payload is None:
+        return None
+    account = create(label.strip() or _bundle_label(payload) or "Account")
+    path = _ACCOUNTS_DIR / account["id"]
+    (path / _CREDENTIALS_FILE).write_bytes(payload[_CREDENTIALS_FILE])
+    if "settings.json" in payload:
+        (path / "settings.json").write_bytes(payload["settings.json"])
+    _merge_identity(path / _IDENTITY_FILE, payload.get(_IDENTITY_FILE))
+    account["logged_in"] = is_logged_in(account["id"])
+    return account
 
 
 def sync_mcp_servers(account_id: str) -> None:

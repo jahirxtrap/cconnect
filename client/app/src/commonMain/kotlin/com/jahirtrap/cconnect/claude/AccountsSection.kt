@@ -25,6 +25,9 @@ import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Lucide
 import com.jahirtrap.cconnect.data.remote.AccountsApi
 import com.jahirtrap.cconnect.data.remote.SettingsApi
+import com.jahirtrap.cconnect.files.downloadShared
+import com.jahirtrap.cconnect.files.pickFiles
+import com.jahirtrap.cconnect.files.uploadAccountBundle
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.settings.PreferenceRow
@@ -55,6 +58,8 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
     var busy by remember { mutableStateOf<String?>(null) }
     var login by remember { mutableStateOf<Pair<String, String>?>(null) }
     var loginError by remember { mutableStateOf<String?>(null) }
+    var importing by remember { mutableStateOf(false) }
+    var importFailed by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload, enabled) {
         if (enabled) snapshot = runCatching { AccountsApi.list() }.getOrNull()
@@ -107,7 +112,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
         ActionButton(
             text = stringResource(Res.string.account_add),
             enabled = enabled,
-            onClick = { adding = true },
+            onClick = { importFailed = false; adding = true },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         )
     }
@@ -149,6 +154,17 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 onClick = { actions = null; renaming = account },
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (account.loggedIn) {
+                Spacer(Modifier.height(6.dp))
+                ActionButton(
+                    text = stringResource(Res.string.account_export),
+                    onClick = {
+                        actions = null
+                        scope.launch { downloadShared(AccountsApi.exportUrl(account.id), "${account.id}.zip") }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
             if (!account.primary) {
                 Spacer(Modifier.height(6.dp))
                 ActionButton(
@@ -170,19 +186,65 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
     }
 
     if (adding) {
-        RenameDialog(
-            initial = "",
-            title = stringResource(Res.string.account_add),
-            confirmLabel = stringResource(Res.string.account_add),
-            onConfirm = { label ->
-                adding = false
-                scope.launch {
-                    runCatching { AccountsApi.create(label) }
-                    refresh()
-                }
-            },
+        var label by remember { mutableStateOf("") }
+        CompactDialog(
             onDismiss = { adding = false },
-        )
+            title = stringResource(Res.string.account_add),
+            buttons = {
+                Button(onClick = { adding = false }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.cancel))
+                }
+                Button(
+                    enabled = label.isNotBlank() && !importing,
+                    onClick = {
+                        val name = label
+                        adding = false
+                        scope.launch {
+                            runCatching { AccountsApi.create(name) }
+                            refresh()
+                        }
+                    },
+                ) { Text(stringResource(Res.string.account_add)) }
+            },
+        ) {
+            InputField(
+                value = label,
+                onValueChange = { label = it },
+                singleLine = true,
+                label = { Text(stringResource(Res.string.account_name)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            ActionButton(
+                text = stringResource(Res.string.account_import),
+                enabled = !importing,
+                onClick = {
+                    scope.launch {
+                        val file = pickFiles().firstOrNull() ?: return@launch
+                        importing = true
+                        importFailed = !uploadAccountBundle(file, label.trim())
+                        importing = false
+                        if (!importFailed) {
+                            adding = false
+                            refresh()
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (importing) {
+                Spacer(Modifier.height(12.dp))
+                LoadingIndicator(modifier = Modifier.size(20.dp))
+            }
+            if (importFailed) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(Res.string.account_import_failed),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+        }
     }
 
     renaming?.let { account ->

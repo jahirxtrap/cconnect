@@ -400,4 +400,9 @@
     <string name="public_url">Public URL</string>
     <string name="token">Token</string>
     <string name="restart">Restart</string>
+    <string name="lock_selection">Lock</string>
+    <string name="unlock_selection">Unlock</string>
+    <string name="account_export">Export account</string>
+    <string name="account_import">Import from a file</string>
+    <string name="account_import_failed">That file is not a valid account export</string>
 </resources>

@@ -22,8 +22,9 @@ private val client = OkHttpClient()
 private val uploadClient = OkHttpClient.Builder().writeTimeout(0, TimeUnit.MILLISECONDS).build()
 private val OCTET_STREAM = "application/octet-stream".toMediaType()
 
-internal suspend fun uploadShared(
-    path: String,
+internal suspend fun uploadBytes(
+    url: String,
+    method: String,
     length: Long,
     open: () -> InputStream?,
     onProgress: (Float) -> Unit,
@@ -47,16 +48,12 @@ internal suspend fun uploadShared(
                 }
             }
         }
-        val request = Request.Builder().url(SharedApi.downloadUrl(path)).put(body).apply {
+        val request = Request.Builder().url(url).method(method, body).apply {
             Backend.authHeaders.forEach { (name, value) -> header(name, value) }
         }.build()
         val call = uploadClient.newCall(request)
         coroutineContext.job.invokeOnCompletion { if (it is CancellationException) call.cancel() }
-        call.execute().use { resp ->
-            if (!resp.isSuccessful) return@use null
-            Json.parseToJsonElement(resp.body?.string().orEmpty())
-                .jsonObject["data"]?.jsonObject?.get("path")?.jsonPrimitive?.contentOrNull
-        }
+        call.execute().use { resp -> if (resp.isSuccessful) resp.body?.string().orEmpty() else null }
     }.getOrNull()
 }
 

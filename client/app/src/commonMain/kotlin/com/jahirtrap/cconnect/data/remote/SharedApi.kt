@@ -1,6 +1,7 @@
 package com.jahirtrap.cconnect.data.remote
 
 import com.jahirtrap.cconnect.data.SharedEntry
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.booleanOrNull
@@ -86,6 +87,10 @@ object SharedApi {
     }) != null
 
     fun downloadUrl(path: String): String = "${Backend.baseUrl}/shared/${encode(path)}"
+
+    internal fun savedPath(body: String): String? = runCatching {
+        Json.parseToJsonElement(body).jsonObject["data"]?.jsonObject?.get("path")?.jsonPrimitive?.contentOrNull
+    }.getOrNull()
 
     fun relativeFromUrl(url: String): String? {
         val prefix = "${Backend.baseUrl}/shared/"
