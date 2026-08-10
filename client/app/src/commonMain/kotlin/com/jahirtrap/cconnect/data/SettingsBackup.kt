@@ -44,6 +44,8 @@ object SettingsBackup {
                 put("minimize_to_tray", settings.minimizeToTray)
                 put("window_maximized", settings.windowMaximized)
                 put("cwd", settings.cwd)
+                put("environment_locked", settings.environmentLocked)
+                put("project_locked", settings.projectLocked)
                 put("file_sort_field", settings.fileSortField)
                 put("file_sort_ascending", settings.fileSortAscending)
                 put("local_server_enabled", settings.localServerEnabled)
@@ -74,6 +76,7 @@ object SettingsBackup {
                         put("effort", environment.effort)
                         put("permission_mode", environment.permissionMode)
                         environment.streaming?.let { put("streaming", it) }
+                        environment.accentIndex?.let { put("accent_index", it) }
                     }
                 }
             }
@@ -112,6 +115,8 @@ object SettingsBackup {
             values.flag("minimize_to_tray")?.let { settings.minimizeToTray = it }
             values.flag("window_maximized")?.let { settings.windowMaximized = it }
             values.text("cwd")?.let { settings.cwd = it }
+            values.flag("environment_locked")?.let { settings.environmentLocked = it }
+            values.flag("project_locked")?.let { settings.projectLocked = it }
             values.text("file_sort_field")?.let { settings.fileSortField = it }
             values.flag("file_sort_ascending")?.let { settings.fileSortAscending = it }
             values.flag("local_server_enabled")?.let { settings.localServerEnabled = it }
@@ -144,6 +149,7 @@ object SettingsBackup {
                     effort = item.text("effort").orEmpty(),
                     permissionMode = item.text("permission_mode").orEmpty(),
                     streaming = item.flag("streaming"),
+                    accentIndex = item.number("accent_index"),
                 )
             }
             if (environments.isNotEmpty()) settings.environments = environments
@@ -166,6 +172,7 @@ object SettingsBackup {
             }
             if (profiles.isNotEmpty()) SshStore().profiles = profiles
         }
+        SelectionLock.reload()
         return true
     }
 

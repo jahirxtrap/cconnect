@@ -136,6 +136,7 @@ fun SelectField(
     label: String,
     selected: String,
     options: List<Pair<String, String>> = emptyList(),
+    enabled: Boolean = true,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     onSelect: (String) -> Unit = {},
@@ -155,7 +156,7 @@ fun SelectField(
                     .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
                     .clip(shape)
                     .border(1.dp, if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
-                    .clickable { if (onClick != null) onClick() else open = true }
+                    .clickable(enabled = enabled) { if (onClick != null) onClick() else open = true }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -164,8 +165,10 @@ fun SelectField(
                     Spacer(Modifier.width(8.dp))
                     trailing()
                 }
-                Spacer(Modifier.width(8.dp))
-                Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                if (enabled) {
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                }
             }
             if (open) DropdownScrim { open = false }
             if (open) Dismissable { open = false }

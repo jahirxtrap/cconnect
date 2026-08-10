@@ -135,6 +135,7 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
 import com.jahirtrap.cconnect.isWebPlatform
+import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.Settings
 import com.jahirtrap.cconnect.data.SharedEntry
 import com.jahirtrap.cconnect.data.remote.Backend
@@ -260,6 +261,7 @@ fun FileExplorerScreen(
     var renaming by remember { mutableStateOf<SharedEntry?>(null) }
     var creatingFolder by remember { mutableStateOf(false) }
     var envMenu by remember { mutableStateOf(false) }
+    val environmentLocked by SelectionLock.environment.collectAsState()
     var barMenu by remember { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
     val settings = remember { Settings() }
@@ -503,9 +505,11 @@ fun FileExplorerScreen(
                                     },
                                 ) { Icon(Lucide.Upload, contentDescription = null) }
                             }
-                            TooltipIconButton(label = stringResource(Res.string.environment), onClick = { envMenu = true }) {
-                                Icon(Lucide.Server, contentDescription = null)
-                            }
+                            TooltipIconButton(
+                                label = stringResource(Res.string.environment),
+                                onClick = { envMenu = true },
+                                enabled = !environmentLocked,
+                            ) { Icon(Lucide.Server, contentDescription = null) }
                             Box {
                                 TooltipIconButton(label = stringResource(Res.string.more_options), onClick = { barMenu = true }) {
                                     Icon(Lucide.EllipsisVertical, contentDescription = null)

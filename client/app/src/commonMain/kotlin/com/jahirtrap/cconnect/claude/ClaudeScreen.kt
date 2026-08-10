@@ -72,6 +72,7 @@ import com.jahirtrap.cconnect.data.remote.SettingsApi
 import com.jahirtrap.cconnect.data.remote.CliApi
 import com.jahirtrap.cconnect.data.remote.GitHubApi
 import com.jahirtrap.cconnect.data.ChatListStore
+import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.settings.PreferenceRow
 import com.jahirtrap.cconnect.settings.SettingsGroup
@@ -117,6 +118,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     var loaded by remember { mutableStateOf(false) }
     var refreshing by remember { mutableStateOf(false) }
     var envMenu by remember { mutableStateOf(false) }
+    val environmentLocked by SelectionLock.environment.collectAsState()
     var showChangelog by remember { mutableStateOf(false) }
     var editingPrompt by remember { mutableStateOf(false) }
     var detail by remember { mutableStateOf<ClaudeKind?>(null) }
@@ -172,9 +174,11 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                             Icon(Lucide.CircleUser, contentDescription = null)
                         }
                     }
-                    TooltipIconButton(label = stringResource(Res.string.environment), onClick = { envMenu = true }) {
-                        Icon(Lucide.Server, contentDescription = null)
-                    }
+                    TooltipIconButton(
+                        label = stringResource(Res.string.environment),
+                        onClick = { envMenu = true },
+                        enabled = !environmentLocked,
+                    ) { Icon(Lucide.Server, contentDescription = null) }
                     if (!LocalIsTouch.current) {
                         TooltipIconButton(label = stringResource(Res.string.refresh), onClick = { refreshing = true; scope.launch { load() } }) {
                             Icon(Lucide.RotateCw, contentDescription = null)
@@ -536,6 +540,7 @@ internal fun ProjectPromptDialog(
 ) {
     var project by remember { mutableStateOf(initialProject) }
     var text by remember { mutableStateOf("") }
+    val projectLocked by SelectionLock.project.collectAsState()
     LaunchedEffect(project) { text = ClaudeApi.projectPrompt(project).orEmpty() }
     CompactDialog(
         onDismiss = onDismiss,
@@ -554,6 +559,7 @@ internal fun ProjectPromptDialog(
             label = stringResource(Res.string.project),
             selected = project,
             options = projects.map { it.projectKey to (it.name ?: it.path ?: it.projectKey) },
+            enabled = !projectLocked,
             onSelect = { project = it },
         )
         Spacer(Modifier.height(10.dp))

@@ -59,6 +59,7 @@ import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
+import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.remote.NetworkApi
 import com.jahirtrap.cconnect.data.remote.SystemApi
 import com.jahirtrap.cconnect.files.formatSize
@@ -103,6 +104,7 @@ fun MonitorScreen(onClose: () -> Unit) {
     var logs by remember { mutableStateOf<List<LogItem>>(emptyList()) }
     var followLogs by remember { mutableStateOf(true) }
     var envMenu by remember { mutableStateOf(false) }
+    val environmentLocked by SelectionLock.environment.collectAsState()
     var confirmingRestart by remember { mutableStateOf(false) }
     var netStatus by remember { mutableStateOf<NetworkApi.Status?>(null) }
     var netReload by remember { mutableStateOf(0) }
@@ -175,9 +177,11 @@ fun MonitorScreen(onClose: () -> Unit) {
                         onClick = { confirmingRestart = true },
                         enabled = !failed && info != null,
                     ) { Icon(Lucide.ServerCog, contentDescription = null) }
-                    TooltipIconButton(label = stringResource(Res.string.environment), onClick = { envMenu = true }) {
-                        Icon(Lucide.Server, contentDescription = null)
-                    }
+                    TooltipIconButton(
+                        label = stringResource(Res.string.environment),
+                        onClick = { envMenu = true },
+                        enabled = !environmentLocked,
+                    ) { Icon(Lucide.Server, contentDescription = null) }
                 },
             )
         },

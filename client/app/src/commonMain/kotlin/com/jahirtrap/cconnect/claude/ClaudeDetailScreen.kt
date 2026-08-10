@@ -60,6 +60,7 @@ import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
+import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.formatDateShort
 import com.jahirtrap.cconnect.data.parseIsoMillis
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
@@ -103,6 +104,7 @@ fun ClaudeDetailScreen(
     var mcpServers by remember { mutableStateOf<List<ClaudeApi.McpServer>?>(null) }
     var memories by remember { mutableStateOf<ClaudeApi.Memories?>(null) }
     var memoriesProject by remember { mutableStateOf<String?>(null) }
+    val projectLocked by SelectionLock.project.collectAsState()
     var serviceStatus by remember { mutableStateOf<ClaudeApi.ServiceStatus?>(null) }
     var loaded by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
@@ -214,7 +216,12 @@ fun ClaudeDetailScreen(
                 val projects = state.historyProjects.map { it.projectKey to (it.name ?: it.path ?: it.projectKey) }
                 if (projects.isNotEmpty()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
-                        SelectField(stringResource(Res.string.all_projects), memoriesProject.orEmpty(), projects) { key ->
+                        SelectField(
+                            label = stringResource(Res.string.all_projects),
+                            selected = memoriesProject.orEmpty(),
+                            options = projects,
+                            enabled = !projectLocked,
+                        ) { key ->
                             memoriesProject = key
                             scope.launch { memories = ClaudeApi.memories(key) }
                         }

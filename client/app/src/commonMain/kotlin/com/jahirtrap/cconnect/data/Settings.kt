@@ -98,6 +98,14 @@ class Settings {
         get() = prefs.getString("tabs_state", "") ?: ""
         set(value) = prefs.edit { putString("tabs_state", value) }
 
+    var environmentLocked: Boolean
+        get() = prefs.getBoolean("environment_locked", false)
+        set(value) = prefs.edit { putBoolean("environment_locked", value) }
+
+    var projectLocked: Boolean
+        get() = prefs.getBoolean("project_locked", false)
+        set(value) = prefs.edit { putBoolean("project_locked", value) }
+
     var fileSortField: String
         get() = prefs.getString("file_sort_field", "date") ?: "date"
         set(value) = prefs.edit { putString("file_sort_field", value) }

@@ -65,6 +65,7 @@ import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.ArrowLeft
@@ -81,6 +82,8 @@ import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.History
 import com.composables.icons.lucide.Upload
 import com.composables.icons.lucide.Languages
+import com.composables.icons.lucide.Lock
+import com.composables.icons.lucide.LockOpen
 import com.composables.icons.lucide.Minimize2
 import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Clock
@@ -109,6 +112,7 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.QrEnvironmentPayload
+import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.Settings
 import com.jahirtrap.cconnect.data.SettingsBackup
 import com.jahirtrap.cconnect.data.AppUpdater
@@ -962,19 +966,16 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
             }) { Text(stringResource(Res.string.accept)) }
         },
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
-            InputField(
-                value = dir,
-                onValueChange = { dir = it },
-                label = { Text(stringResource(Res.string.local_server_folder)) },
-                singleLine = true,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(8.dp))
-            TooltipIconButton(label = stringResource(Res.string.choose), onClick = { scope.launch(Dispatchers.Default) { pickDirectory()?.let { dir = it } } }) {
-                Icon(Lucide.Folder, contentDescription = null)
-            }
-        }
+        InputField(
+            value = dir,
+            onValueChange = { dir = it },
+            label = { Text(stringResource(Res.string.local_server_folder)) },
+            singleLine = true,
+            trailingIcon = {
+                PickerIcon { scope.launch(Dispatchers.Default) { pickDirectory()?.let { dir = it } } }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
         Box(Modifier.height(8.dp))
         SelectField(
             stringResource(Res.string.python), python,
@@ -986,19 +987,16 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
         ) { python = it }
         if (python == "custom") {
             Box(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                InputField(
-                    value = pythonPath,
-                    onValueChange = { pythonPath = it },
-                    label = { Text(stringResource(Res.string.python_path)) },
-                    singleLine = true,
-                    modifier = Modifier.weight(1f),
-                )
-                Spacer(Modifier.width(8.dp))
-                TooltipIconButton(label = stringResource(Res.string.choose), onClick = { scope.launch(Dispatchers.Default) { pickExecutable()?.let { pythonPath = it } } }) {
-                    Icon(Lucide.Folder, contentDescription = null)
-                }
-            }
+            InputField(
+                value = pythonPath,
+                onValueChange = { pythonPath = it },
+                label = { Text(stringResource(Res.string.python_path)) },
+                singleLine = true,
+                trailingIcon = {
+                    PickerIcon { scope.launch(Dispatchers.Default) { pickExecutable()?.let { pythonPath = it } } }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
         Box(Modifier.height(8.dp))
         SelectField(
@@ -1256,6 +1254,7 @@ private fun AccentDialog(
     selected: Int?,
     systemColor: Color,
     showNone: Boolean,
+    closeOnPick: Boolean = false,
     onSelect: (Int?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1286,16 +1285,49 @@ private fun AccentDialog(
             modifier = Modifier.alpha(if (dynamic) 0.4f else 1f),
         ) { slot ->
             if (showNone && slot == 0) {
-                ColorSwatch(color = null, selected = picked == null, onClick = { apply(null) }, icon = Lucide.X)
+                ColorSwatch(
+                    color = null,
+                    selected = picked == null,
+                    onClick = { apply(null); if (closeOnPick) onDismiss() },
+                    icon = Lucide.X,
+                )
             } else {
                 val index = if (showNone) slot - 1 else slot
                 ColorSwatch(
                     color = ACCENTS[index].second,
                     selected = !dynamic && picked == index,
-                    onClick = { lastIndex = index; apply(index) },
+                    onClick = { lastIndex = index; apply(index); if (closeOnPick) onDismiss() },
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PickerIcon(onClick: () -> Unit) {
+    TooltipIconButton(label = stringResource(Res.string.choose), onClick = onClick, size = 24.dp) {
+        Icon(
+            Lucide.Folder,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun LockToggle(locked: Boolean, onToggle: (Boolean) -> Unit, size: Dp = 36.dp) {
+    TooltipIconButton(
+        label = stringResource(if (locked) Res.string.unlock_selection else Res.string.lock_selection),
+        onClick = { onToggle(!locked) },
+        size = size,
+    ) {
+        Icon(
+            if (locked) Lucide.Lock else Lucide.LockOpen,
+            contentDescription = null,
+            tint = if (locked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
     }
 }
 
@@ -1341,6 +1373,10 @@ private fun EnvironmentsDialog(
                 selected = c.id == activeId,
                 onClick = { onSetActive(c.id) },
                 trailing = {
+                    if (c.id == activeId) {
+                        val locked by SelectionLock.environment.collectAsState()
+                        LockToggle(locked = locked, onToggle = { SelectionLock.setEnvironment(it) })
+                    }
                     TooltipIconButton(label = stringResource(Res.string.edit_environment), onClick = { editing = c }) {
                         Icon(Lucide.Pencil, contentDescription = null, modifier = Modifier.size(18.dp))
                     }
@@ -1534,6 +1570,10 @@ private fun EnvironmentEditDialog(
             onValueChange = { directory = it },
             label = { Text(stringResource(Res.string.environment_directory)) },
             singleLine = true,
+            trailingIcon = {
+                val locked by SelectionLock.project.collectAsState()
+                LockToggle(locked = locked, onToggle = { SelectionLock.setProject(it) }, size = 24.dp)
+            },
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -1559,6 +1599,7 @@ private fun EnvironmentEditDialog(
             selected = accentIndex,
             systemColor = systemColor,
             showNone = true,
+            closeOnPick = true,
             onSelect = { accentIndex = it },
             onDismiss = { picking = false },
         )

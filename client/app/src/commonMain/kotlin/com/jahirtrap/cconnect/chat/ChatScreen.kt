@@ -215,6 +215,7 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.ChatMessage
 import com.jahirtrap.cconnect.data.CommandOption
 import com.jahirtrap.cconnect.data.EnvironmentProfile
+import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.PermissionMode
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.QueuedMessage
@@ -1306,9 +1307,11 @@ private fun ColumnScope.ChatPanelContent(
         modifier = Modifier.fillMaxWidth().height(56.dp).padding(start = 8.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val environmentLocked by SelectionLock.environment.collectAsState()
         EnvironmentSelector(
             environments = state.environments,
             activeId = state.activeEnvironmentId,
+            locked = environmentLocked,
             onSelect = { vm.selectEnvironment(it) },
             modifier = Modifier.weight(1f),
         )
@@ -1323,9 +1326,11 @@ private fun ColumnScope.ChatPanelContent(
         }
     }
     Row(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        val projectLocked by SelectionLock.project.collectAsState()
         ProjectSelector(
             projects = state.historyProjects,
             selected = state.historyProjectKey,
+            locked = projectLocked,
             onSelect = vm::selectHistoryProject,
             modifier = Modifier.weight(1f),
         )
@@ -1855,15 +1860,17 @@ private fun Composer(
     val density = LocalDensity.current
     val lineHeight = with(density) { textStyle.lineHeight.toDp() }
     var field by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
-    LaunchedEffect(value) { if (value != field.text) field = TextFieldValue(value, TextRange(value.length)) }
+    if (field.text != value) field = TextFieldValue(value, TextRange(value.length))
 
     val busy = streaming || uploading
     val canSubmit = value.isNotBlank() || attachments.isNotEmpty()
 
     fun trySend(): Boolean {
         if (!canSubmit) return false
-        onSend(value)
+        val text = field.text
+        field = TextFieldValue("")
         onValueChange("")
+        onSend(text)
         return true
     }
 
@@ -2082,6 +2089,7 @@ private fun ComposerButton(
 private fun EnvironmentSelector(
     environments: List<EnvironmentProfile>,
     activeId: String?,
+    locked: Boolean,
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -2098,7 +2106,7 @@ private fun EnvironmentSelector(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable { open = true }
+            .clickable(enabled = !locked) { open = true }
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -2119,7 +2127,7 @@ private fun EnvironmentSelector(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!locked) Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
     if (open) {
         EnvironmentSelectDialog(
@@ -2133,7 +2141,7 @@ private fun EnvironmentSelector(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, onSelect: (String?) -> Unit, modifier: Modifier = Modifier) {
+private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, locked: Boolean, onSelect: (String?) -> Unit, modifier: Modifier = Modifier) {
     var open by remember { mutableStateOf(false) }
     var fieldWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
@@ -2145,14 +2153,14 @@ private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, onSe
                 .fillMaxWidth()
                 .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
                 .clip(RoundedCornerShape(Radius.item))
-                .clickable { open = true }
+                .clickable(enabled = !locked) { open = true }
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Lucide.FolderOpen, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
             Text(label, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+            if (!locked) Icon(Lucide.ChevronDown, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
         }
         AppDropdownMenu(expanded = open, onDismissRequest = { open = false }, minWidth = fieldWidth) {
             CompactDropdownItem(stringResource(Res.string.all_projects), selected = selected == null) { onSelect(null); open = false }
