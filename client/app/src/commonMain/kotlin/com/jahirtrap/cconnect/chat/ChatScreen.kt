@@ -119,6 +119,7 @@ import com.jahirtrap.cconnect.ui.theme.Radius
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.DrawerValue
@@ -415,7 +416,20 @@ fun ChatScreen(
             drawerState = drawerState,
             gesturesEnabled = mobile,
             drawerContent = {
-                ModalDrawerSheet(drawerContainerColor = MaterialTheme.colorScheme.surface) {
+                val drawerEdge = MaterialTheme.colorScheme.outlineVariant
+                ModalDrawerSheet(
+                    drawerShape = RectangleShape,
+                    drawerContainerColor = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.drawWithContent {
+                        drawContent()
+                        drawLine(
+                            drawerEdge,
+                            Offset(size.width, 0f),
+                            Offset(size.width, size.height),
+                            1.dp.toPx(),
+                        )
+                    },
+                ) {
                     if (mobile) ChatPanelContent(
                         state = state,
                         vm = vm,
