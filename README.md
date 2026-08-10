@@ -243,7 +243,9 @@ The **Monitor** screen shows what the machine is doing while Claude works:
 CPU, GPU and memory as live graphs (VRAM and temperature included when
 there's an NVIDIA card), storage per disk, the server's own logs streaming
 in over a dedicated WebSocket, and a device card — OS with its brand icon,
-hostname, uptime, CPU/GPU models. Switch between resources, network and logs,
+hostname, uptime, CPU/GPU models. If the machine runs on a battery — a laptop,
+or a phone hosting the backend — its charge shows there too, with the time left
+when the system reports it. Switch between resources, network and logs,
 change servers right from the top bar, and **restart the backend remotely** —
 one confirmation, the server relaunches itself and the app reconnects on its
 own.
