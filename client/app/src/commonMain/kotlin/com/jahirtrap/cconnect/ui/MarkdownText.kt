@@ -192,9 +192,40 @@ private fun Blocks(parent: ASTNode, ctx: MdContext, depth: Int) {
             i = j + 1
             continue
         }
+        val images = paragraphImages(node, ctx.src)
+        if (images != null) {
+            val run = ArrayList(images)
+            var j = i + 1
+            while (j < children.size) {
+                val next = children[j]
+                if (next.type == MarkdownTokenTypes.EOL || next.type == MarkdownTokenTypes.WHITE_SPACE) {
+                    j++
+                    continue
+                }
+                run.addAll(paragraphImages(next, ctx.src) ?: break)
+                j++
+            }
+            ImageGrid(run)
+            i = j
+            continue
+        }
         RenderNode(node, ctx, depth)
         i++
     }
+}
+
+private fun paragraphImages(node: ASTNode, src: String): List<Pair<String, String>>? {
+    if (node.type != MarkdownElementTypes.PARAGRAPH) return null
+    val images = ArrayList<Pair<String, String>>()
+    for (child in node.children) {
+        val image = imageOf(child, src)
+        if (image != null) {
+            images.add(image)
+            continue
+        }
+        if (child.type != MarkdownTokenTypes.WHITE_SPACE && child.type != MarkdownTokenTypes.EOL) return null
+    }
+    return images.ifEmpty { null }
 }
 
 @Composable
