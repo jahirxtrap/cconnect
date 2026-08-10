@@ -35,6 +35,19 @@ actual suspend fun saveSharedAs(url: String, filename: String): Boolean {
 actual suspend fun openSharedExternally(url: String, filename: String): Boolean =
     openExternally(url, filename)
 
+actual suspend fun openSharedInBrowser(url: String, filename: String): Boolean = withContext(Dispatchers.IO) {
+    runCatching {
+        val file = cacheCopy(url, filename) ?: return@withContext false
+        val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", file)
+        val view = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeOf(filename))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        appContext.startActivity(view)
+        true
+    }.getOrDefault(false)
+}
+
 actual suspend fun saveAllShared(items: List<Pair<String, String>>): Boolean = withContext(Dispatchers.IO) {
     items.all { (url, filename) -> enqueueToDownloads(url, filename) }
 }
@@ -98,15 +111,20 @@ private fun writeToDownloads(filename: String, copy: (OutputStream) -> Unit): Bo
     return true
 }
 
+private fun cacheCopy(url: String, filename: String): File? = runCatching {
+    val dir = File(appContext.cacheDir, "shared").apply { mkdirs() }
+    val file = dedup(dir, filename)
+    client.newCall(authorizedRequest(url)).execute().use { resp ->
+        val body = resp.body ?: return null
+        if (!resp.isSuccessful) return null
+        file.outputStream().use { body.byteStream().copyTo(it) }
+    }
+    file
+}.getOrNull()
+
 private suspend fun openExternally(url: String, filename: String): Boolean = withContext(Dispatchers.IO) {
     runCatching {
-        val dir = File(appContext.cacheDir, "shared").apply { mkdirs() }
-        val file = dedup(dir, filename)
-        client.newCall(authorizedRequest(url)).execute().use { resp ->
-            val body = resp.body ?: return@withContext false
-            if (!resp.isSuccessful) return@withContext false
-            file.outputStream().use { body.byteStream().copyTo(it) }
-        }
+        val file = cacheCopy(url, filename) ?: return@withContext false
         val uri = FileProvider.getUriForFile(appContext, "${appContext.packageName}.fileprovider", file)
         val send = Intent(Intent.ACTION_SEND).apply {
             type = mimeOf(filename)

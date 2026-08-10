@@ -19,6 +19,9 @@ actual suspend fun openSharedExternally(url: String, filename: String): Boolean 
     return true
 }
 
+actual suspend fun openSharedInBrowser(url: String, filename: String): Boolean =
+    FileTransfer.openExternally(url, filename)
+
 actual suspend fun saveAllShared(items: List<Pair<String, String>>): Boolean {
     val dir = withContext(Dispatchers.Default) { FileDialogs.chooseDirectory() } ?: return false
     return FileTransfer.saveAllTo(items, dir)

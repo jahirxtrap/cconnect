@@ -31,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -119,6 +120,7 @@ fun MarkdownText(
     markdown: String,
     modifier: Modifier = Modifier,
     selectable: Boolean = true,
+    dense: Boolean = false,
     onSharedLink: ((url: String, filename: String) -> Unit)? = null,
 ) {
     val root = remember(markdown) { MarkdownParser(flavour).buildMarkdownTreeFromString(markdown) }
@@ -156,18 +158,44 @@ fun MarkdownText(
     }
     val monoFamily = LocalMonoFontFamily.current
     val ctx = remember(markdown, linkColor, codeBg, monoFamily) { MdContext(markdown, linkColor, codeBg, monoFamily) }
-    CompositionLocalProvider(
-        LocalUriHandler provides uriHandler,
-        LocalImageDownload provides onSharedLink,
-    ) {
-        if (selectable) {
-            SelectionContainer(modifier = modifier) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Blocks(root, ctx, depth = 0) }
+    DenseTypography(dense) {
+        CompositionLocalProvider(
+            LocalUriHandler provides uriHandler,
+            LocalImageDownload provides onSharedLink,
+        ) {
+            if (selectable) {
+                SelectionContainer(modifier = modifier) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Blocks(root, ctx, depth = 0) }
+                }
+            } else {
+                Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) { Blocks(root, ctx, depth = 0) }
             }
-        } else {
-            Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) { Blocks(root, ctx, depth = 0) }
         }
     }
+}
+
+private const val DENSE_SCALE = 13f / 14f
+
+@Composable
+private fun DenseTypography(enabled: Boolean, content: @Composable () -> Unit) {
+    if (!enabled) {
+        content()
+        return
+    }
+    MaterialTheme(typography = MaterialTheme.typography.scaled(DENSE_SCALE), content = content)
+}
+
+private fun Typography.scaled(factor: Float): Typography {
+    fun TextStyle.shrink() = copy(fontSize = fontSize * factor, lineHeight = lineHeight * factor)
+    return copy(
+        titleLarge = titleLarge.shrink(),
+        titleMedium = titleMedium.shrink(),
+        titleSmall = titleSmall.shrink(),
+        bodyLarge = bodyLarge.shrink(),
+        bodyMedium = bodyMedium.shrink(),
+        bodySmall = bodySmall.shrink(),
+        labelMedium = labelMedium.shrink(),
+    )
 }
 
 private class MdContext(val src: String, val linkColor: Color, val codeBg: Color, val monoFamily: FontFamily)

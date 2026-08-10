@@ -447,7 +447,7 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
         }
         if (isExpanded && !labelOnly) {
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
-                MarkdownText(text, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false)
+                MarkdownText(text, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false, dense = true)
             }
         }
     }
@@ -763,7 +763,7 @@ private fun CompactBlock(data: CompactData, expanded: Boolean? = null, onToggle:
             }
         }
         if (isExpanded && hasSummary) {
-            MarkdownText(data.summary, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false)
+            MarkdownText(data.summary, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false, dense = true)
         }
     }
 }

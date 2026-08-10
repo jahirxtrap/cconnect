@@ -55,11 +55,10 @@ object SessionsApi {
         project: String,
         limit: Int = 200,
         beforeIndex: Int? = null,
-    ): MessagesPage {
+    ): MessagesPage? {
         val query = mutableMapOf("project" to project, "limit" to limit.toString())
         if (beforeIndex != null) query["before_index"] = beforeIndex.toString()
-        val data = Http.get("/sessions/$sessionId/messages", query)?.jsonObject
-            ?: return MessagesPage(emptyList(), startIndex = 0, hasMore = false)
+        val data = Http.get("/sessions/$sessionId/messages", query)?.jsonObject ?: return null
         val items = data["items"]?.jsonArray?.map(::parseSessionMessage) ?: emptyList()
         return MessagesPage(
             items = items,

@@ -202,6 +202,16 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
+    private suspend fun consumeInitialSession(projectKey: String? = null) {
+        val sid = ctx.initialSessionId
+        if (sid == null) {
+            initialConsumed = true
+            return
+        }
+        val info = sessionInfoFor(sid, projectKey ?: ctx.initialProjectKey)
+        initialConsumed = runCatching { loadSessionInto(info) }.getOrDefault(false)
+    }
+
     private fun applyForeignOverrides() {
         val before = _state.value
         loadEnvOverrides()
@@ -253,12 +263,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             refreshServerInfo()
             loadEnvOverrides()
             _state.update { it.copy(capabilitiesReady = true) }
-            if (!initialConsumed) {
-                initialConsumed = true
-                ctx.initialSessionId?.let { sid ->
-                    runCatching { loadSessionInto(sessionInfoFor(sid, ctx.initialProjectKey)) }
-                }
-            }
+            if (!initialConsumed) consumeInitialSession()
             client.connect()
         }
     }
@@ -782,7 +787,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     private suspend fun loadSessionInto(session: SessionInfo): Boolean {
         val projectKey = session.projectKey ?: return false
-        val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100)
+        val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100) ?: return false
         val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, session.sessionId, projectKey), timestamp = m.timestamp) to m.parent
@@ -879,7 +884,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val s = _state.value
         val sid = s.sessionId ?: return
         val proj = currentProjectKey() ?: return
-        val page = SessionsApi.sessionMessages(sid, proj, limit = 100)
+        val page = SessionsApi.sessionMessages(sid, proj, limit = 100) ?: return
         val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, sid, proj), timestamp = m.timestamp) to m.parent
@@ -1009,6 +1014,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             }
             is ServerEvent.Open -> startSession(_state.value.sessionId)
             is ServerEvent.Ready -> {
+                if (!initialConsumed) consumeInitialSession(event.project)
                 historyLoaded = false
                 _state.update {
                     val sid = event.sessionId ?: it.sessionId

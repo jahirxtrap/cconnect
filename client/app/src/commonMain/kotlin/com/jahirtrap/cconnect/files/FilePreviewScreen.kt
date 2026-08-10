@@ -207,7 +207,7 @@ fun FilePreviewScreen(
             kind == PreviewKind.Html -> HtmlPreview(
                 url = url,
                 filename = filename,
-                onOpenExternally = { scope.launch { openSharedExternally(url, filename) } },
+                onOpenExternally = { scope.launch { openSharedInBrowser(url, filename) } },
                 modifier = Modifier.fillMaxSize().padding(padding),
             )
             failed -> EmptyState(stringResource(Res.string.file_unavailable), Modifier.fillMaxSize().padding(padding))

@@ -19,6 +19,12 @@ actual suspend fun openSharedExternally(url: String, filename: String): Boolean 
     return true
 }
 
+actual suspend fun openSharedInBrowser(url: String, filename: String): Boolean {
+    val header = Backend.authHeaders.firstOrNull()
+    openInNewTab(url, header?.first ?: "", header?.second ?: "")
+    return true
+}
+
 actual suspend fun saveAllShared(items: List<Pair<String, String>>): Boolean {
     items.forEach { (url, name) -> downloadShared(url, name) }
     return true
