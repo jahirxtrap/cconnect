@@ -130,6 +130,12 @@ it's the active one — a glance tells you whether you're driving your laptop or
 VPS. Leave it unset to keep the accent you picked in Settings, or set it to
 dynamic so that environment follows the system colour.
 
+Once you settle on one machine and one project, a **lock** pins them. Close the
+padlock next to the active environment, or next to its working directory, and
+every picker that would switch them goes quiet — the chat, Files, Monitor and
+the Claude screen show the current one as plain text instead of a menu. The
+environments list itself stays open, so there's always a way back.
+
 ## Web app
 
 The desktop UI also runs in the browser — the same Compose code compiled to
@@ -236,6 +242,12 @@ Pick the account per chat from the composer bar, or set the server-wide default
 from the Claude screen's header (the usage shown there follows it) or in
 Settings. Accounts you haven't signed into yet are listed too, so you can
 finish later.
+
+An account can also move between backends. Export it and you get a small zip
+holding its credentials and its own settings — no conversations, no projects,
+nothing tied to the machine it came from. Import it from the same dialog you add
+an account in: the bundle always lands on a **new** account, so it can never
+overwrite a login you're already using.
 
 ## Watch the PC
 

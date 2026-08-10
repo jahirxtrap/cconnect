@@ -1,12 +1,9 @@
-- The Monitor now shows the battery of the machine running the backend — laptops, phones, anything that has one — and skips the card where there is none
-- Opening Files no longer closes the web app when the server is unreachable
-- A resumed chat no longer brings back tasks that were already gone
-- Images sent one per line are tiled together instead of stacked, when there is room for them
-- Dates in the packaged desktop app follow the app language again
-- Downloads on Android no longer block the interface while they are queued
-- The Network tab says so when it finds no interfaces
-- Thinking, result and summary blocks render Markdown instead of raw text
-- Diffs name the file once instead of repeating it as `---` and `+++`
+- Accounts can be exported to a zip and imported on another backend, credentials only — no conversations and nothing tied to the machine
+- The active environment and project can be locked, so no picker in the app switches them by mistake
+- A resumed chat no longer opens empty when the server was still starting up
+- Typing on the web no longer loses characters, and Ctrl+A and Shift+Enter act where the cursor really is
+- Open in browser now opens the file on desktop and web instead of doing nothing
+- The environment colour is kept when you export the settings
 
 > [!NOTE]
 > The web version is available at https://cconnect.pages.dev/
