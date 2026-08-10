@@ -1509,7 +1509,7 @@ private fun ChatToolbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TooltipWrap(stringResource(Res.string.quick_chat)) {
-            Box(modifier = Modifier.fillMaxHeight().padding(start = 8.dp)) {
+            Box(modifier = Modifier.fillMaxHeight().padding(start = 2.dp)) {
                 Row(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -1539,7 +1539,7 @@ private fun ChatToolbar(
                 .weight(1f)
                 .horizontalScrollbar(selectorScroll, touchIndicator = false, wheelScroll = true)
                 .horizontalScroll(selectorScroll)
-                .padding(end = 8.dp),
+                .padding(end = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
