@@ -1336,7 +1336,7 @@ private fun ColumnScope.ChatPanelContent(
         )
     }
     val drawerListState = rememberLazyListState()
-    LaunchedEffect(state.historySessions.size) {
+    LaunchedEffect(state.historyProjectKey) {
         if (state.historySessions.isNotEmpty()) drawerListState.scrollToItem(0)
     }
     LazyColumn(

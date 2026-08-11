@@ -23,6 +23,7 @@ import com.jahirtrap.cconnect.data.ChatMessage
 import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.data.EnvOverrides
+import com.jahirtrap.cconnect.data.ServerDefaults
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.CommandOption
 import com.jahirtrap.cconnect.data.CompactData
@@ -199,6 +200,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
         viewModelScope.launch {
             EnvOverrides.revision.drop(1).collect { applyForeignOverrides() }
+        }
+        viewModelScope.launch {
+            ServerDefaults.revision.drop(1).collect { refreshServerInfo() }
         }
     }
 

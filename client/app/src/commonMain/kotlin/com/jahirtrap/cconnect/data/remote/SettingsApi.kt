@@ -1,5 +1,6 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.ServerDefaults
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -68,7 +69,8 @@ object SettingsApi {
         if (showFileChange != null) put("show_file_change", showFileChange)
         if (showCompact != null) put("show_compact", showCompact)
         if (showWorking != null) put("show_working", showWorking)
-    })?.jsonObject?.let(::parse)
+    })?.jsonObject?.let(::parse)?.also { ServerDefaults.bump() }
 
-    suspend fun reset(): Snapshot? = Http.post("/settings/reset")?.jsonObject?.let(::parse)
+    suspend fun reset(): Snapshot? =
+        Http.post("/settings/reset")?.jsonObject?.let(::parse)?.also { ServerDefaults.bump() }
 }
