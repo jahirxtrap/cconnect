@@ -405,4 +405,5 @@
     <string name="account_export">Export account</string>
     <string name="account_import">Import from a file</string>
     <string name="account_import_failed">That file is not a valid account export</string>
+    <string name="account_relogin">Sign in again</string>
 </resources>

@@ -33,6 +33,16 @@ def _clean(raw: str) -> str:
     return _ANSI_CSI.sub("", _ANSI_OSC.sub("", raw))
 
 
+def _credentials_stamp(account_id: str) -> tuple:
+    """Signing in again leaves ``is_logged_in`` true the whole time, so success is
+    measured by the credentials file actually being rewritten."""
+    try:
+        stat = accounts.credentials_path(account_id).stat()
+    except OSError:
+        return ()
+    return (stat.st_mtime_ns, stat.st_size)
+
+
 def _find_url(text: str) -> Optional[str]:
     for line in text.splitlines():
         match = _URL_RE.search(line)
@@ -88,15 +98,20 @@ class _LoginSession:
     def submit(self, code: str) -> bool:
         if self._proc is None:
             return False
+        before = _credentials_stamp(self.account_id)
+
+        def signed_in() -> bool:
+            return accounts.is_logged_in(self.account_id) and _credentials_stamp(self.account_id) != before
+
         with self._lock:
             self.buffer = ""
         self._proc.write(code.strip() + "\r")
         deadline = time.time() + _LOGIN_TIMEOUT
         while time.time() < deadline and self._proc.isalive():
-            if accounts.is_logged_in(self.account_id):
+            if signed_in():
                 break
             time.sleep(1.0)
-        ok = accounts.is_logged_in(self.account_id)
+        ok = signed_in()
         self.close()
         return ok
 

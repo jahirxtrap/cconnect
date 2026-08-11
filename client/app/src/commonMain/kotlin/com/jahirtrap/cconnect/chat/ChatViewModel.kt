@@ -712,13 +712,22 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         )
     }
 
-    private fun withDefaultProject(projects: List<ProjectInfo>): List<ProjectInfo> {
+    fun withDefaultProject(projects: List<ProjectInfo>): List<ProjectInfo> {
         val dir = activeEnv()?.directory.orEmpty()
         if (dir.isBlank()) return projects
-        val targetKey = dir.replace(Regex("[^A-Za-z0-9]"), "-")
+        val targetKey = projectKeyOf(dir)
         return if (projects.any { it.projectKey == targetKey || it.path == dir }) projects
         else listOf(ProjectInfo(targetKey, dir, null, 0, null)) + projects
     }
+
+    fun defaultProjectKey(projects: List<ProjectInfo>): String? {
+        val dir = activeEnv()?.directory.orEmpty()
+        if (dir.isBlank()) return null
+        val targetKey = projectKeyOf(dir)
+        return projects.firstOrNull { it.projectKey == targetKey || it.path == dir }?.projectKey ?: targetKey
+    }
+
+    private fun projectKeyOf(path: String): String = path.replace(Regex("[^A-Za-z0-9]"), "-")
 
     private fun applyStoreSessions(all: List<SessionInfo>) {
         val key = _state.value.historyProjectKey
@@ -729,13 +738,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         historyLoaded = true
         if (!defaultProjectApplied) {
             defaultProjectApplied = true
-            val dir = activeEnv()?.directory.orEmpty()
-            val selectedKey = if (dir.isBlank()) null else {
-                val targetKey = dir.replace(Regex("[^A-Za-z0-9]"), "-")
-                ChatListStore.forConfig(listConfig())?.projects?.value
-                    ?.firstOrNull { it.projectKey == targetKey || it.path == dir }?.projectKey ?: targetKey
-            }
-            _state.update { it.copy(historyProjectKey = selectedKey) }
+            val known = ChatListStore.forConfig(listConfig())?.projects?.value.orEmpty()
+            _state.update { it.copy(historyProjectKey = defaultProjectKey(known)) }
         }
         observeHistory()
     }
@@ -831,8 +835,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     private fun currentProjectKey(): String? =
-        _state.value.activeProjectKey
-            ?: ctx.cwd.takeIf { it.isNotBlank() }?.replace(Regex("[^A-Za-z0-9]"), "-")
+        _state.value.activeProjectKey ?: ctx.cwd.takeIf { it.isNotBlank() }?.let(::projectKeyOf)
 
     fun loadRewindPoints() {
         val sid = _state.value.sessionId ?: return

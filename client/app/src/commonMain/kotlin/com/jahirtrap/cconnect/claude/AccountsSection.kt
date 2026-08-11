@@ -127,14 +127,12 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 }
             },
         ) {
-            if (!account.loggedIn) {
-                ActionButton(
-                    text = stringResource(Res.string.account_login),
-                    onClick = { actions = null; beginLogin(account) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(6.dp))
-            }
+            ActionButton(
+                text = stringResource(if (account.loggedIn) Res.string.account_relogin else Res.string.account_login),
+                onClick = { actions = null; beginLogin(account) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(6.dp))
             if (account.loggedIn && account.id != defaultId) {
                 ActionButton(
                     text = stringResource(Res.string.account_set_default),
@@ -280,12 +278,16 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
 
     login?.let { (accountId, url) ->
         var code by remember(accountId) { mutableStateOf("") }
+        val loginLabel = stringResource(
+            if (accounts.firstOrNull { it.id == accountId }?.loggedIn == true) Res.string.account_relogin
+            else Res.string.account_login
+        )
         CompactDialog(
             onDismiss = {
                 login = null
                 scope.launch { runCatching { AccountsApi.cancelLogin(accountId) } }
             },
-            title = stringResource(Res.string.account_login),
+            title = loginLabel,
             buttons = {
                 Button(variant = ButtonVariant.Outlined, onClick = {
                     login = null
@@ -304,7 +306,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                             refresh()
                         }
                     },
-                ) { Text(stringResource(Res.string.account_login)) }
+                ) { Text(loginLabel) }
             },
         ) {
             Text(stringResource(Res.string.account_login_hint), style = MaterialTheme.typography.bodyMedium)

@@ -348,7 +348,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                         DetailLink(
                             Lucide.Brain,
                             stringResource(Res.string.memories),
-                            state.activeProjectKey ?: "—",
+                            vm.defaultProjectKey(projects) ?: state.activeProjectKey ?: "—",
                             enabled = serverReady,
                         ) { detail = ClaudeKind.Memories }
                     }
@@ -373,9 +373,10 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
         )
     }
     if (editingProjectPrompt && projects.isNotEmpty()) {
+        val options = vm.withDefaultProject(projects)
         ProjectPromptDialog(
-            projects = projects,
-            initialProject = state.activeProjectKey ?: projects.first().projectKey,
+            projects = options,
+            initialProject = vm.defaultProjectKey(projects) ?: state.activeProjectKey ?: options.first().projectKey,
             onSave = { project, text ->
                 scope.launch {
                     ClaudeApi.setProjectPrompt(project, text)

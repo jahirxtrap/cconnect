@@ -135,7 +135,9 @@ fun ClaudeDetailScreen(
     }
     LaunchedEffect(kind) {
         if (kind == ClaudeKind.Memories) {
-            memoriesProject = memoriesProject ?: state.activeProjectKey
+            memoriesProject = memoriesProject
+                ?: vm.defaultProjectKey(state.historyProjects)
+                ?: state.activeProjectKey
             vm.ensureHistoryLoaded()
         }
         load()
