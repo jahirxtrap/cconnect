@@ -95,37 +95,44 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                 prompt_text, prompt_images = attachments_service.compose_prompt(text, attachments)
             resumed_sid = state.session_id
             resume_at = rewind_service.get_pending(resumed_sid)
-            async for event in run_prompt(
-                prompt=prompt_text,
-                images=prompt_images,
-                cwd=state.cwd,
-                permission_mode=state.permission_mode,
-                resume=state.session_id,
-                resume_at=resume_at,
-                fork=state.fork,
-                model=_resolve_model(state.model),
-                account=accounts.resolve(state.account),
-                effort=state.effort,
-                partial=state.partial,
-                name=name,
-                ask_user=ask_user,
-                base_url=state.base_url,
-                emit=emit,
-                drain=drain(),
-                seed_id=seed_id,
-            ):
-                if event.get("type") == "compact":
-                    compacted = True
-                if event.get("type") == "result" and event.get("session_id"):
-                    state.session_id = event["session_id"]
-                    state.fork = False
-                    if resume_at and not event.get("is_error"):
-                        rewind_service.clear_pending(resumed_sid)
-                    if state.cwd:
-                        sessions_service.record_prompt_history(state.cwd, state.session_id, prompt_text)
-                yield event
+            try:
+                async for event in run_prompt(
+                    prompt=prompt_text,
+                    images=prompt_images,
+                    cwd=state.cwd,
+                    permission_mode=state.permission_mode,
+                    resume=state.session_id,
+                    resume_at=resume_at,
+                    fork=state.fork,
+                    model=_resolve_model(state.model),
+                    account=accounts.resolve(state.account),
+                    effort=state.effort,
+                    partial=state.partial,
+                    name=name,
+                    ask_user=ask_user,
+                    base_url=state.base_url,
+                    emit=emit,
+                    drain=drain(),
+                    seed_id=seed_id,
+                ):
+                    if event.get("type") == "session_started":
+                        state.session_id = event["session_id"]
+                        state.fork = False
+                        continue
+                    if event.get("type") == "compact":
+                        compacted = True
+                    if event.get("type") == "result" and event.get("session_id"):
+                        state.session_id = event["session_id"]
+                        state.fork = False
+                        if resume_at and not event.get("is_error"):
+                            rewind_service.clear_pending(resumed_sid)
+                        if state.cwd:
+                            sessions_service.record_prompt_history(state.cwd, state.session_id, prompt_text)
+                    yield event
+            finally:
+                if state.cwd and state.session_id:
+                    sessions_service.normalize_session_entrypoint(state.cwd, state.session_id)
             if state.cwd and state.session_id:
-                sessions_service.normalize_session_entrypoint(state.cwd, state.session_id)
                 # The token counts and summary are written to the transcript only after the turn.
                 if is_compact_cmd:
                     after = sessions_service.compact_boundary_count(state.cwd, state.session_id)

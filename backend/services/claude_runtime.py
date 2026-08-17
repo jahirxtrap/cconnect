@@ -631,6 +631,8 @@ async def run_prompt(
                     await emit({"type": "status", "kind": "ok"})
             _msid = getattr(message, "session_id", None)
             if isinstance(_msid, str):
+                if _msid != current_sid:
+                    yield {"type": "session_started", "session_id": _msid}
                 current_sid = _msid
             parent = getattr(message, "parent_tool_use_id", None)
             agent_mode = settings_store.visibility_mode("tool_use") if parent else None
