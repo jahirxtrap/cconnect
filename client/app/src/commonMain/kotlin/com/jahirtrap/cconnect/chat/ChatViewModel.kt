@@ -317,17 +317,34 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun refreshCompat() {
         val caps = CapabilitiesApi.capabilities()
         if (caps != null) {
-            val stale = _state.value.accountOverride.takeIf { it.isNotEmpty() }
-                ?.takeIf { id -> caps.accounts.none { it.id == id } }
-            if (stale != null) {
-                settings.updateEnvironment(ctx.environmentId) { it.copy(account = "") }
+            val current = _state.value
+            val staleAccount = current.accountOverride.isNotEmpty() &&
+                caps.accounts.none { it.id == current.accountOverride }
+            val staleModel = current.modelOverride.isNotEmpty() &&
+                caps.models.none { it.id == current.modelOverride }
+            val staleEffort = current.effortOverride.isNotEmpty() &&
+                caps.effortLevels.none { it == current.effortOverride }
+            val stalePermission = current.permissionOverride.isNotEmpty() &&
+                caps.permissionModes.none { it.id == current.permissionOverride }
+            if (staleAccount || staleModel || staleEffort || stalePermission) {
+                settings.updateEnvironment(ctx.environmentId) {
+                    it.copy(
+                        account = if (staleAccount) "" else it.account,
+                        model = if (staleModel) "" else it.model,
+                        effort = if (staleEffort) "" else it.effort,
+                        permissionMode = if (stalePermission) "" else it.permissionMode,
+                    )
+                }
                 EnvOverrides.bump()
             }
             _state.update {
                 it.copy(
                     capabilities = caps,
                     account = caps.defaults.account,
-                    accountOverride = if (stale != null) "" else it.accountOverride,
+                    accountOverride = if (staleAccount) "" else it.accountOverride,
+                    modelOverride = if (staleModel) "" else it.modelOverride,
+                    effortOverride = if (staleEffort) "" else it.effortOverride,
+                    permissionOverride = if (stalePermission) "" else it.permissionOverride,
                 )
             }
             evaluateCompat(caps.serverVersion, caps.supportedApp, caps.cliVersion, caps.supportedCli)

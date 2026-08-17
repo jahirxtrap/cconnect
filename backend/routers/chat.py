@@ -251,7 +251,11 @@ async def chat_ws(ws: WebSocket):
                 else:
                     state = _Session()
                     state.cwd = msg.cwd or DEFAULT_CWD
-                    state.permission_mode = msg.permission_mode or settings_store.get("permission_mode")
+                    requested = msg.permission_mode or settings_store.get("permission_mode")
+                    state.permission_mode = (
+                        requested if requested in permission_modes()
+                        else settings_store.get("permission_mode")
+                    )
                     state.session_id = msg.resume
                     state.fork = msg.fork
                     state.base_url = msg.base_url
