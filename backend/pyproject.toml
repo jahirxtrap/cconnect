@@ -1,6 +1,6 @@
 [project]
 name = "cconnect-backend"
-version = "1.5.2"
+version = "1.5.3"
 description = "Remote bridge between the CConnect client and Claude Code"
 requires-python = ">=3.11"
 dependencies = [
