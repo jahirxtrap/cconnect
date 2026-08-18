@@ -12,21 +12,23 @@
     model: string;
     effort: string;
     streaming: boolean;
-    onConfirm: (model: string, effort: string, streaming: boolean) => void;
+    todoTools: boolean;
+    onConfirm: (model: string, effort: string, streaming: boolean, todoTools: boolean) => void;
     onDismiss: () => void;
   }
 
-  const { capabilities, model, effort, streaming, onConfirm, onDismiss }: Props = $props();
+  const { capabilities, model, effort, streaming, todoTools, onConfirm, onDismiss }: Props = $props();
 
   let selectedModel = $state(untrack(() => model));
   let selectedEffort = $state(untrack(() => effort));
   let streamTokens = $state(untrack(() => streaming));
+  let taskTools = $state(untrack(() => todoTools));
 </script>
 
 <CompactDialog title={t("GENERATION")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(selectedModel, selectedEffort, streamTokens)}>
+    <Button onclick={() => onConfirm(selectedModel, selectedEffort, streamTokens, taskTools)}>
       {t("SAVE")}
     </Button>
   {/snippet}
@@ -49,6 +51,13 @@
       summary={t("STREAMING_DESC")}
       checked={streamTokens}
       onChange={(value) => (streamTokens = value)}
+    />
+    <SwitchRow
+      class="-mt-2"
+      title={t("TASK_TOOLS")}
+      summary={t("TASK_TOOLS_DESC")}
+      checked={taskTools}
+      onChange={(value) => (taskTools = value)}
     />
   </div>
 </CompactDialog>

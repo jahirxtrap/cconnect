@@ -226,6 +226,7 @@ fun SettingsScreen(
     var effort by remember { mutableStateOf(caps.defaults.effort) }
     var permissionMode by remember { mutableStateOf(caps.defaults.permissionMode) }
     var streaming by remember { mutableStateOf(true) }
+    var todoTools by remember { mutableStateOf(false) }
     var showThinking by remember { mutableStateOf("full") }
     var showToolUse by remember { mutableStateOf("label") }
     var showFileChange by remember { mutableStateOf("full") }
@@ -246,6 +247,7 @@ fun SettingsScreen(
         val s = SettingsApi.get()
         if (s != null) {
             model = s.model; effort = s.effort; permissionMode = s.permissionMode; streaming = s.streaming
+            todoTools = s.todoTools
             account = s.account.ifEmpty { caps.defaults.account }
             showThinking = s.showThinking; showToolUse = s.showToolUse
             showFileChange = s.showFileChange; showCompact = s.showCompact; showWorking = s.showWorking
@@ -764,9 +766,10 @@ fun SettingsScreen(
             model = model,
             effort = effort,
             streaming = streaming,
-            onConfirm = { m, e, s ->
-                model = m; effort = e; streaming = s
-                scope.launch { SettingsApi.update(model = m, effort = e, streaming = s) }
+            todoTools = todoTools,
+            onConfirm = { m, e, s, t ->
+                model = m; effort = e; streaming = s; todoTools = t
+                scope.launch { SettingsApi.update(model = m, effort = e, streaming = s, todoTools = t) }
                 dialog = null
             },
             onDismiss = { dialog = null },
@@ -820,6 +823,7 @@ fun SettingsScreen(
                 scope.launch {
                     SettingsApi.reset()?.let {
                         model = it.model; effort = it.effort; permissionMode = it.permissionMode; streaming = it.streaming
+                        todoTools = it.todoTools
                         showThinking = it.showThinking; showToolUse = it.showToolUse
                         showFileChange = it.showFileChange; showCompact = it.showCompact; showWorking = it.showWorking
                     }
@@ -1612,18 +1616,20 @@ private fun GenerationDialog(
     model: String,
     effort: String,
     streaming: Boolean,
-    onConfirm: (String, String, Boolean) -> Unit,
+    todoTools: Boolean,
+    onConfirm: (String, String, Boolean, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var m by remember { mutableStateOf(model) }
     var e by remember { mutableStateOf(effort) }
     var s by remember { mutableStateOf(streaming) }
+    var t by remember { mutableStateOf(todoTools) }
     CompactDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.generation),
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
-            Button(onClick = { onConfirm(m, e, s) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = { onConfirm(m, e, s, t) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
         SelectField(stringResource(Res.string.model), m, caps.models.map { it.id to it.label }) { m = it }
@@ -1635,6 +1641,11 @@ private fun GenerationDialog(
             checked = s,
             summary = stringResource(Res.string.streaming_desc),
         ) { s = it }
+        SwitchRow(
+            title = stringResource(Res.string.task_tools),
+            checked = t,
+            summary = stringResource(Res.string.task_tools_desc),
+        ) { t = it }
     }
 }
 

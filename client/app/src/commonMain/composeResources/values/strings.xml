@@ -69,6 +69,8 @@
     <string name="effort">Effort</string>
     <string name="streaming">Stream tokens</string>
     <string name="streaming_desc">Show reasoning and replies as they are generated</string>
+    <string name="task_tools">Task tracking</string>
+    <string name="task_tools_desc">Let Claude keep a task list, shown in the chat bar. Recent models omit it to save context</string>
     <string name="permissions">Permissions</string>
     <string name="permission_mode">Default permission mode</string>
     <string name="export_settings">Export settings</string>

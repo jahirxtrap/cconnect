@@ -77,6 +77,8 @@
   "EFFORT": "Effort",
   "STREAMING": "Stream tokens",
   "STREAMING_DESC": "Show reasoning and replies as they are generated",
+  "TASK_TOOLS": "Task tracking",
+  "TASK_TOOLS_DESC": "Let Claude keep a task list, shown in the chat bar. Recent models omit it to save context",
   "PERMISSIONS": "Permissions",
   "PERMISSION_MODE": "Default permission mode",
   "RESET_SETTINGS": "Reset settings",

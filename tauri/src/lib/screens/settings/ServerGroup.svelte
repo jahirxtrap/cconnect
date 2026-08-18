@@ -161,7 +161,9 @@
     model={snapshot.model}
     effort={snapshot.effort}
     streaming={snapshot.streaming}
-    onConfirm={(model, effort, streaming) => void apply({ model, effort, streaming })}
+    todoTools={snapshot.todoTools}
+    onConfirm={(model, effort, streaming, todo_tools) =>
+      void apply({ model, effort, streaming, todo_tools })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "permissions" && snapshot}

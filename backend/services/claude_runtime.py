@@ -483,9 +483,11 @@ async def run_prompt(
         enable_file_checkpointing=True,
     )
     from services import accounts
-    account_env = accounts.env_for(account)
-    if account_env:
-        options_kwargs["env"] = account_env
+    session_env = dict(accounts.env_for(account))
+    if settings_store.get("todo_tools"):
+        session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
+    if session_env:
+        options_kwargs["env"] = session_env
     if ultracode:
         options_kwargs["settings"] = json.dumps({"ultracode": True})
     status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}

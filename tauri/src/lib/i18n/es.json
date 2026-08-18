@@ -77,6 +77,8 @@
   "EFFORT": "Esfuerzo",
   "STREAMING": "Transmitir tokens",
   "STREAMING_DESC": "Mostrar el razonamiento y las respuestas mientras se generan",
+  "TASK_TOOLS": "Seguimiento de tareas",
+  "TASK_TOOLS_DESC": "Permitir que Claude mantenga una lista de tareas, visible en la barra del chat. Los modelos recientes la omiten para ahorrar contexto",
   "PERMISSIONS": "Permisos",
   "PERMISSION_MODE": "Modo de permisos por defecto",
   "RESET_SETTINGS": "Restablecer ajustes",

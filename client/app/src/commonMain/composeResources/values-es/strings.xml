@@ -69,6 +69,8 @@
     <string name="effort">Esfuerzo</string>
     <string name="streaming">Transmitir tokens</string>
     <string name="streaming_desc">Mostrar el razonamiento y las respuestas mientras se generan</string>
+    <string name="task_tools">Seguimiento de tareas</string>
+    <string name="task_tools_desc">Permitir que Claude mantenga una lista de tareas, visible en la barra del chat. Los modelos recientes la omiten para ahorrar contexto</string>
     <string name="permissions">Permisos</string>
     <string name="permission_mode">Modo de permisos por defecto</string>
     <string name="export_settings">Exportar ajustes</string>

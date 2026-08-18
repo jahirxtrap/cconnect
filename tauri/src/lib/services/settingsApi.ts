@@ -7,6 +7,7 @@ export interface SettingsSnapshot {
   effort: string;
   permissionMode: string;
   streaming: boolean;
+  todoTools: boolean;
   showThinking: string;
   showToolUse: string;
   showFileChange: string;
@@ -20,6 +21,7 @@ export interface SettingsPatch {
   effort?: string;
   permission_mode?: string;
   streaming?: boolean;
+  todo_tools?: boolean;
   show_thinking?: string;
   show_tool_use?: string;
   show_file_change?: string;
@@ -42,6 +44,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   effort: effectiveStr(wire, "effort", "xhigh"),
   permissionMode: effectiveStr(wire, "permission_mode", "bypassPermissions"),
   streaming: effectiveBool(wire, "streaming", true),
+  todoTools: effectiveBool(wire, "todo_tools", false),
   showThinking: effectiveStr(wire, "show_thinking", "full"),
   showToolUse: effectiveStr(wire, "show_tool_use", "label"),
   showFileChange: effectiveStr(wire, "show_file_change", "full"),
