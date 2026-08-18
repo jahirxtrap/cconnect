@@ -11,7 +11,12 @@ import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import android.view.View
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 
 class MainActivity : TauriActivity() {
   override val handleBackNavigation = false
@@ -47,6 +52,19 @@ class MainActivity : TauriActivity() {
     }
     super.onCreate(savedInstanceState)
     onBackPressedDispatcher.addCallback(this, backCallback)
+    consumeImeInset()
+  }
+
+  private fun consumeImeInset() {
+    val root = findViewById<View>(android.R.id.content)
+    ViewCompat.setOnApplyWindowInsetsListener(root) { view, insets ->
+      val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+      val navigation = insets.getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+      view.updatePadding(bottom = (ime - navigation).coerceAtLeast(0))
+      WindowInsetsCompat.Builder(insets)
+        .setInsets(WindowInsetsCompat.Type.ime(), Insets.NONE)
+        .build()
+    }
   }
 
   override fun onResume() {
