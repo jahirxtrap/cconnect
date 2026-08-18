@@ -8,7 +8,6 @@
   import {
     contributorProfile,
     KOFI_URL,
-    latestRelease,
     ownerProfile,
     releaseNotes,
     RELEASES_URL,
@@ -28,26 +27,25 @@
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
-  let release = $state<Release | null>(null);
   let changelogOpen = $state(false);
   let owner = $state<Profile | null>(null);
   let contributor = $state<Profile | null>(null);
   let checking = $state(false);
 
-  const outdated = $derived(release !== null && release.tag.replace(/^v/, "") !== APP_VERSION);
+  const release = $derived(serverStatus.release);
 
   const open = (url: string) => window.open(url, "_blank", "noopener");
 
   const check = async () => {
     checking = true;
-    release = await latestRelease();
+    await serverStatus.checkRelease(true);
     checking = false;
   };
 
   const updateLabel = $derived(
     updater.pending
       ? t("INSTALL_UPDATE")
-      : outdated
+      : release
         ? t("UPDATE_ACTION")
         : checking
           ? t("CHECKING_UPDATES")
@@ -74,7 +72,7 @@
     <Pressable onclick={() => open(profile.url)} class="flex w-full items-center gap-3 px-4 py-3">
       <img src={profile.avatarUrl} alt="" class="size-7 shrink-0 rounded-full" />
       <div class="min-w-0 flex-1">
-        <p class="truncate text-body-md font-medium">{profile.name ?? profile.login}</p>
+        <p class="truncate text-body-md">{profile.name ?? profile.login}</p>
         <p class="truncate text-body-sm text-on-surface-variant">{label}</p>
       </div>
       <ExternalIndicator />
@@ -86,7 +84,7 @@
   <Pressable onclick={() => open(release?.url ?? RELEASES_URL)} class="flex w-full items-center gap-3 px-4 py-3">
       <AppLogo size={28} />
       <div class="min-w-0 flex-1">
-      <p class="truncate text-body-md font-medium">{t("APP_NAME")}</p>
+      <p class="truncate text-body-md">{t("APP_NAME")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>
@@ -94,9 +92,9 @@
       {#if serverStatus.serverOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_SERVER_OUTDATED")}</p>
       {/if}
-        {#if outdated && release}
+        {#if release}
           <p class="text-body-sm text-accent">{t("UPDATE_AVAILABLE", release.tag)}</p>
-        {:else if release}
+        {:else if serverStatus.releaseChecked && !serverStatus.appOutdated && !serverStatus.serverOutdated}
           <p class="text-body-sm text-on-surface-variant">{t("UP_TO_DATE")}</p>
         {/if}
       </div>
@@ -119,7 +117,7 @@
         enabled={!checking}
         onclick={() => {
           if (updater.pending) void updater.install();
-          else if (outdated && release) void startUpdate(release);
+          else if (release) void startUpdate(release);
           else void check();
         }}
       />

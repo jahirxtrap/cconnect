@@ -4,8 +4,9 @@
   import ServerCog from "@lucide/svelte/icons/server-cog";
   import { navigation } from "$lib/app/navigation.svelte";
   import { formatSize } from "$lib/data/format";
-  import { formatClock } from "$lib/data/time";
+  import { formatLogTime } from "$lib/data/time";
   import { osColor, osIconPath } from "$lib/design/osIcons";
+  import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import { networkApi, type NetworkStatus } from "$lib/services/networkApi";
@@ -21,6 +22,7 @@
   import Sparkline from "$lib/ui/Sparkline.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { animateScrollLeft } from "$lib/ui/animateScroll";
   import NetworkPage from "./NetworkPage.svelte";
 
   const HISTORY_CAP = 90;
@@ -56,7 +58,7 @@
   );
   const goToPage = (index: number) => {
     page = index;
-    pager?.scrollTo({ left: index * pager.clientWidth, behavior: "smooth" });
+    if (pager) animateScrollLeft(pager, index * pager.clientWidth);
   };
 
   const onPagerScroll = () => {
@@ -142,7 +144,7 @@
       >
         <ServerCog size={20} />
       </TooltipIconButton>
-      <TooltipIconButton label={t("ENVIRONMENT")} onclick={() => (envOpen = true)}>
+      <TooltipIconButton label={t("ENVIRONMENT")} enabled={!settings.environmentLocked} onclick={() => (envOpen = true)}>
         <Server size={20} />
       </TooltipIconButton>
     {/snippet}
@@ -194,6 +196,22 @@
               gpu.memPercent,
               vramHistory,
             )}
+          </div>
+        {/if}
+
+        {#if current.battery}
+          {@const battery = current.battery}
+          <div class="px-4 py-2">
+            <MetricBar
+              title={t("BATTERY")}
+              subtitle={battery.plugged
+                ? t("BATTERY_PLUGGED")
+                : battery.secsLeft !== null
+                  ? t("BATTERY_REMAINING", formatUptime(battery.secsLeft))
+                  : t("BATTERY_ON_BATTERY")}
+              percent={battery.percent}
+              alert={battery.percent < 20 && !battery.plugged}
+            />
           </div>
         {/if}
 
@@ -269,7 +287,7 @@
           {#each logs as entry, index (index)}
             <div class="flex gap-2 py-0.5 font-mono text-body-sm">
               <span class="shrink-0 text-on-surface-variant/60">
-                {formatClock(entry.ts * MILLIS_PER_SECOND)}
+                {formatLogTime(entry.ts * MILLIS_PER_SECOND)}
               </span>
               <span class="min-w-0 flex-1 wrap-anywhere whitespace-pre-wrap {levelClass(entry.level)}">
                 {entry.message}

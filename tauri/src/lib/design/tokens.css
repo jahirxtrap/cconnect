@@ -88,6 +88,9 @@
   --text-label-md: 12px;
   --text-label-md--line-height: 16px;
   --text-label-md--font-weight: 600;
+  --text-label-sm: 11px;
+  --text-label-sm--line-height: 16px;
+  --text-label-sm--font-weight: 600;
   --text-title-md: 15px;
   --text-title-md--line-height: 20px;
   --text-title-md--font-weight: 600;

@@ -2,17 +2,24 @@ import MarkdownIt from "markdown-it";
 
 type Token = ReturnType<InstanceType<typeof MarkdownIt>["parse"]>[number];
 
+export interface MarkdownImage {
+  url: string;
+  alt: string;
+}
+
 export type Segment =
   | { kind: "html"; html: string }
   | { kind: "code"; code: string; lang: string | null }
-  | { kind: "image"; url: string; alt: string }
+  | { kind: "images"; items: MarkdownImage[] }
   | { kind: "details"; summary: string; children: Segment[] };
 
 const DETAILS_RE = /<details\b[^>]*>([\s\S]*?)<\/details>/i;
 const SUMMARY_RE = /<summary\b[^>]*>([\s\S]*?)<\/summary>/i;
 const TASK_RE = /^\[([ xX])\]\s+/;
+const ALERT_RE = /^\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)]\s*$/i;
 const DEFAULT_SUMMARY = "Details";
 const ITEM_LOOKAHEAD = 3;
+const ALERT_LOOKAHEAD = 2;
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: false });
 
@@ -27,6 +34,22 @@ md.core.ruler.push("task_markers", (state) => {
     const first = inline.children?.[0];
     if (first) first.content = first.content.replace(TASK_RE, "");
     token.attrJoin("class", match[1].toLowerCase() === "x" ? "task task-done" : "task");
+  });
+  return true;
+});
+
+md.core.ruler.push("github_alerts", (state) => {
+  const tokens = state.tokens;
+  tokens.forEach((token, index) => {
+    if (token.type !== "blockquote_open") return;
+    const inline = tokens.slice(index + 1, index + 1 + ALERT_LOOKAHEAD).find((item) => item.type === "inline");
+    const match = inline?.content.split("\n")[0].match(ALERT_RE);
+    if (!inline || !match) return;
+    const kind = match[1].toLowerCase();
+    token.attrJoin("class", `md-alert md-alert-${kind}`);
+    token.attrSet("data-alert", kind);
+    inline.content = inline.content.split("\n").slice(1).join("\n");
+    inline.children = inline.children?.slice(inline.children.findIndex((child) => child.type === "softbreak") + 1) ?? [];
   });
   return true;
 });
@@ -54,11 +77,19 @@ const inlineSegments = (token: Token): Segment[] => {
       continue;
     }
     flush();
-    result.push({ kind: "image", url: String(url), alt: child.content });
+    result.push({ kind: "images", items: [{ url: String(url), alt: child.content }] });
   }
   flush();
   return result;
 };
+
+const merged = (list: Segment[]): Segment[] =>
+  list.reduce<Segment[]>((acc, segment) => {
+    const last = acc[acc.length - 1];
+    if (segment.kind === "images" && last?.kind === "images") last.items.push(...segment.items);
+    else acc.push(segment.kind === "images" ? { ...segment, items: [...segment.items] } : segment);
+    return acc;
+  }, []);
 
 const fromTokens = (tokens: Token[]): Segment[] => {
   const result: Segment[] = [];
@@ -88,7 +119,7 @@ const fromTokens = (tokens: Token[]): Segment[] => {
     buffer.push(token);
   }
   flush();
-  return result;
+  return merged(result);
 };
 
 export const segments = (markdown: string): Segment[] => {

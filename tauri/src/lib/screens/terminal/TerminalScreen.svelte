@@ -72,10 +72,10 @@
               {/if}
             {/snippet}
             {#snippet trailing()}
-              <TooltipIconButton label={t("EDIT_SSH_HOST")} onclick={() => (editing = profile)}>
+              <TooltipIconButton label={t("EDIT_SSH_HOST")} onclick={() => (editing = profile)} class="[&_svg]:size-5">
                 <Pencil />
               </TooltipIconButton>
-              <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)}>
+              <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)} class="[&_svg]:size-5">
                 <Trash />
               </TooltipIconButton>
             {/snippet}

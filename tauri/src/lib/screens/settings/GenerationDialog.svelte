@@ -4,7 +4,7 @@
   import type { Capabilities } from "$lib/services/capabilitiesApi";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
-  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
+  import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
 
   interface Props {
@@ -43,16 +43,12 @@
       options={capabilities.effortLevels.map((value) => ({ value, label: value }))}
       onSelect={(value) => (selectedEffort = value)}
     />
-    <button
-      type="button"
-      onclick={() => (streamTokens = !streamTokens)}
-      class="flex w-full cursor-pointer items-center gap-3 py-2 text-left"
-    >
-      <span class="min-w-0 flex-1">
-        <span class="block text-body-md">{t("STREAMING")}</span>
-        <span class="block text-body-sm text-on-surface-variant">{t("STREAMING_DESC")}</span>
-      </span>
-      <CompactSwitch checked={streamTokens} onCheckedChange={(value) => (streamTokens = value)} />
-    </button>
+    <SwitchRow
+      class="-mt-2"
+      title={t("STREAMING")}
+      summary={t("STREAMING_DESC")}
+      checked={streamTokens}
+      onChange={(value) => (streamTokens = value)}
+    />
   </div>
 </CompactDialog>

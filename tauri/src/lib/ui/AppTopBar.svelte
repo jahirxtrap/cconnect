@@ -36,7 +36,7 @@
       {/if}
     </div>
     {#if actions}
-      <div class="flex shrink-0 items-center gap-1">{@render actions()}</div>
+      <div class="flex shrink-0 items-center">{@render actions()}</div>
     {/if}
   </div>
 </header>

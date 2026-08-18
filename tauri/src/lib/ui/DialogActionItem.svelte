@@ -16,11 +16,11 @@
   <Pressable
     {onclick}
     {enabled}
-    class="flex w-full items-center gap-3 rounded-sm px-2 py-2 {enabled ? '' : 'opacity-40'}"
+    class="flex w-full items-center gap-3.5 rounded-lg px-3 py-2.5 {enabled ? '' : 'opacity-40'}"
   >
     {#if IconComponent}
-      <IconComponent size={16} class="shrink-0 text-on-surface-variant" />
+      <IconComponent size={20} class="shrink-0 text-on-surface-variant" />
     {/if}
-    <span class="truncate text-body-md">{text}</span>
+    <span class="truncate text-body-lg">{text}</span>
   </Pressable>
 </div>

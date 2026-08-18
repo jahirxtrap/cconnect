@@ -27,7 +27,6 @@ export { default as Pressable } from "./Pressable.svelte";
 export { default as RenameDialog } from "./RenameDialog.svelte";
 export { default as SelectDialog } from "./SelectDialog.svelte";
 export { default as SelectField } from "./SelectField.svelte";
-export { default as SelectionCheck } from "./SelectionCheck.svelte";
 export { default as SelectionDot } from "./SelectionDot.svelte";
 export { default as SettingsGroup } from "./SettingsGroup.svelte";
 export { default as StatusDot } from "./StatusDot.svelte";

@@ -54,6 +54,6 @@
     {/if}
   </div>
   {#if trailing}
-    <div class="flex shrink-0 items-center gap-1">{@render trailing()}</div>
+    <div class="flex shrink-0 items-center">{@render trailing()}</div>
   {/if}
 </Pressable>

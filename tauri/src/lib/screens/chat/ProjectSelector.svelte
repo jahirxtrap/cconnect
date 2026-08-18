@@ -2,6 +2,7 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import type { ProjectInfo } from "$lib/data/models";
+  import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -26,6 +27,12 @@
   });
 </script>
 
+{#if settings.projectLocked}
+  <span class="flex w-full items-center rounded-item px-2 py-2 {className}">
+    <FolderOpen size={16} class="shrink-0 text-accent" />
+    <span class="ml-2 min-w-0 flex-1 truncate text-left text-body-md">{label}</span>
+  </span>
+{:else}
 <PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
   {#snippet trigger()}
     <span
@@ -55,3 +62,4 @@
     />
   {/each}
 </PopupMenu>
+{/if}

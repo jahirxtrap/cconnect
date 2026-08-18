@@ -1,6 +1,6 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import ArrowUpDown from "@lucide/svelte/icons/arrow-up-down";
+  import ArrowDownUp from "@lucide/svelte/icons/arrow-down-up";
   import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
   import Copy from "@lucide/svelte/icons/copy";
   import Download from "@lucide/svelte/icons/download";
@@ -14,7 +14,6 @@
   import PackageOpen from "@lucide/svelte/icons/package-open";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Save from "@lucide/svelte/icons/save";
-  import Search from "@lucide/svelte/icons/search";
   import Server from "@lucide/svelte/icons/server";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
@@ -27,7 +26,7 @@
   import { formatSize, isArchive } from "$lib/data/format";
   import { isPreviewable } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
-  import { formatDayTime } from "$lib/data/time";
+  import { formatDateShort } from "$lib/data/time";
   import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
@@ -61,12 +60,14 @@
   import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
-  import SelectionCheck from "$lib/ui/SelectionCheck.svelte";
+  import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import Breadcrumb from "./Breadcrumb.svelte";
+  import PathBar from "./PathBar.svelte";
   import CompressDialog from "./CompressDialog.svelte";
   import { readFilesLocation, syncFilesLocation } from "./filesUrl";
   import ToolbarAction from "./ToolbarAction.svelte";
+  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
+  import { pastedName } from "$lib/data/pastedFile";
 
   type SortKey = "name" | "date" | "type" | "size";
   type TransferKind = "move" | "copy" | "extract";
@@ -480,7 +481,7 @@
 
   const onPaste = (event: ClipboardEvent) => {
     if (!shortcutsEnabled || archive !== null || transfer) return;
-    const files = Array.from(event.clipboardData?.files ?? []);
+    const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
     if (!files.length) return;
     event.preventDefault();
     pendingUploads = files;
@@ -602,7 +603,7 @@
           label={t("SELECT_ALL")}
           onclick={() => (selected = allSelected ? [] : entries.map((entry) => entry.name))}
         >
-          <SelectionCheck selected={allSelected} />
+          <SelectionDot selected={allSelected} />
         </TooltipIconButton>
       {/snippet}
       {#snippet actions()}
@@ -619,21 +620,12 @@
         </TooltipIconButton>
       {/snippet}
       {#snippet actions()}
-        {#if archive === null}
+        {#if !transfer && archive === null}
           <TooltipIconButton label={t("UPLOAD_FILES")} onclick={() => picker?.click()}>
             <Upload size={20} />
           </TooltipIconButton>
-          <TooltipIconButton
-            label={t("SEARCH")}
-            onclick={() => {
-              searching = !searching;
-              if (!searching) searchQuery = "";
-            }}
-          >
-            <Search size={20} class={searching ? "text-accent" : ""} />
-          </TooltipIconButton>
         {/if}
-        <TooltipIconButton label={t("ENVIRONMENT")} onclick={() => (envOpen = true)}>
+        <TooltipIconButton label={t("ENVIRONMENT")} enabled={!settings.environmentLocked} onclick={() => (envOpen = true)}>
           <Server size={20} />
         </TooltipIconButton>
         <MenuScrim open={barMenu} onDismiss={() => (barMenu = false)} />
@@ -649,11 +641,11 @@
               align="end"
               sideOffset={4}
               collisionPadding={layout.menuPadding}
-              class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-content-available-height) max-w-(--bits-dropdown-menu-content-available-width) min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+              class={MENU_CONTENT_CLASS}
             >
               <MenuSub text={t("SORT_BY")}>
                 {#snippet leading()}
-                  <ArrowUpDown size={16} class="shrink-0 text-on-surface-variant" />
+                  <ArrowDownUp size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
                 {#each SORT_KEYS as key (key)}
                   <MenuItem
@@ -672,7 +664,7 @@
               {#if archive === null}
                 <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
                   {#snippet leading()}
-                    <FolderPlus size={16} class="shrink-0 text-on-surface-variant" />
+                    <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
                   {/snippet}
                 </MenuItem>
               {/if}
@@ -695,45 +687,27 @@
     }}
     ondrop={onDrop}
   >
-  {#if searching}
-    <div class="px-4 py-2">
-      <div
-        class="flex h-9 items-center gap-2 rounded-md border border-transparent bg-surface-variant/60 px-3 transition-colors focus-within:border-accent"
-      >
-        <Search size={16} class="shrink-0 text-on-surface-variant" />
-        <input
-          value={searchQuery}
-          oninput={(event) => (searchQuery = (event.currentTarget as HTMLInputElement).value)}
-          placeholder={t("SEARCH")}
-          class="min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant"
-        />
-        {#if searchQuery}
-          <button
-            type="button"
-            onclick={() => (searchQuery = "")}
-            aria-label={t("CLEAR")}
-            class="shrink-0 cursor-pointer text-on-surface-variant transition-colors hover:text-on-surface"
-          >
-            <X size={14} />
-          </button>
-        {/if}
-      </div>
-    </div>
-  {:else}
-    <Breadcrumb
-      path={archive === null ? path : [archive, archiveDir].filter(Boolean).join("/")}
-      onNavigate={(target) => {
-        const current = archive;
-        if (current !== null && (target === current || target.startsWith(`${current}/`))) {
-          archiveDir = target.slice(current.length).replace(/^\/+/, "");
-        } else {
-          archive = null;
-          archiveDir = "";
-          path = target;
-        }
-      }}
-    />
-  {/if}
+  <PathBar
+    path={archive === null ? path : [archive, archiveDir].filter(Boolean).join("/")}
+    {searching}
+    query={searchQuery}
+    searchable={archive === null}
+    onQueryChange={(value) => (searchQuery = value)}
+    onToggleSearch={() => {
+      searching = !searching;
+      if (!searching) searchQuery = "";
+    }}
+    onNavigate={(target) => {
+      const current = archive;
+      if (current !== null && (target === current || target.startsWith(`${current}/`))) {
+        archiveDir = target.slice(current.length).replace(/^\/+/, "");
+      } else {
+        archive = null;
+        archiveDir = "";
+        path = target;
+      }
+    }}
+  />
 
   <div class="relative min-h-0 flex-1">
     <DropOverlay visible={dropOver} />
@@ -759,7 +733,7 @@
             <ListRow
               icon={entry.isDir ? Folder : isArchive(entry.name) ? FolderArchive : FileIcon}
               title={entry.name}
-              subtitle={formatDayTime(entry.modified * MILLIS_PER_SECOND)}
+              subtitle={formatDateShort(entry.modified * MILLIS_PER_SECOND)}
               class={dropTarget === entry.name ? "bg-accent/15" : ""}
               onclick={() => openEntry(entry)}
               oncontextmenu={() => {
@@ -771,7 +745,7 @@
               {#snippet leading()}
                 {#if selecting}
                   <div class="mr-2 flex w-6 items-center">
-                    <SelectionCheck selected={isSelected} />
+                    <SelectionDot selected={isSelected} />
                   </div>
                 {/if}
               {/snippet}
@@ -868,18 +842,22 @@
       <MenuScrim open={actionsMenu} onDismiss={() => (actionsMenu = false)} />
       <DropdownMenu.Root open={actionsMenu} onOpenChange={(value) => (actionsMenu = value)}>
         <DropdownMenu.Trigger
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 sm:h-8 sm:w-auto sm:px-3 sm:text-label-lg"
+          class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {layout.mobile
+            ? 'w-8'
+            : 'px-3 text-label-lg'}"
           aria-label={t("MORE")}
         >
-          <EllipsisVertical size={18} class="shrink-0" />
-          <span class="hidden truncate sm:inline">{t("MORE")}</span>
+          <EllipsisVertical size={layout.mobile ? 20 : 18} class="shrink-0" />
+          {#if !layout.mobile}
+            <span class="truncate">{t("MORE")}</span>
+          {/if}
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content
             side="top"
             align="end"
             sideOffset={4}
-            class="menu-surface z-50 min-w-48 rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+            class={MENU_CONTENT_CLASS}
           >
             {#if single && !single.isDir && isPreviewable(single.name)}
               <MenuItem
@@ -895,14 +873,14 @@
                 }}
               >
                 {#snippet leading()}
-                  <Eye size={16} class="shrink-0 text-on-surface-variant" />
+                  <Eye size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}
             {#if single}
               <MenuItem text={t("RENAME")} onclick={() => (renaming = single)}>
                 {#snippet leading()}
-                  <Pencil size={16} class="shrink-0 text-on-surface-variant" />
+                  <Pencil size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}
@@ -917,7 +895,7 @@
                 }}
               >
                 {#snippet leading()}
-                  <Download size={16} class="shrink-0 text-on-surface-variant" />
+                  <Download size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
               <MenuItem
@@ -933,7 +911,7 @@
                 }}
               >
                 {#snippet leading()}
-                  <Save size={16} class="shrink-0 text-on-surface-variant" />
+                  <Save size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}
@@ -947,7 +925,7 @@
               }}
             >
               {#snippet leading()}
-                <ClipboardCopy size={16} class="shrink-0 text-on-surface-variant" />
+                <ClipboardCopy size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             <MenuItem
@@ -955,7 +933,7 @@
               onclick={() => (compressing = selectedEntries.map((entry) => child(entry.name)))}
             >
               {#snippet leading()}
-                <FolderArchive size={16} class="shrink-0 text-on-surface-variant" />
+                <FolderArchive size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             {#if single && !single.isDir && isArchive(single.name)}
@@ -970,7 +948,7 @@
                   })}
               >
                 {#snippet leading()}
-                  <PackageOpen size={16} class="shrink-0 text-on-surface-variant" />
+                  <PackageOpen size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}

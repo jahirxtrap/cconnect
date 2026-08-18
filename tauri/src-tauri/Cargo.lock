@@ -547,7 +547,7 @@ dependencies = [
 
 [[package]]
 name = "cconnect"
-version = "1.4.1"
+version = "1.5.3"
 dependencies = [
  "base64 0.23.1",
  "russh",

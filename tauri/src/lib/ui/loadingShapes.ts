@@ -4,7 +4,12 @@ export const SHAPE_COUNT = MORPHS.length;
 
 export const VIEW_BOX = 1 / (SCALE_FACTOR * ACTIVE_INDICATOR_SCALE);
 
-export const pathOf = (index: number, progress: number): string => {
+export interface Shape {
+  path: string;
+  extent: number;
+}
+
+export const pathOf = (index: number, progress: number): Shape => {
   const [start, end] = MORPHS[index % MORPHS.length];
   const points = new Array<number>(start.length);
   let minX = Number.MAX_VALUE;
@@ -29,7 +34,7 @@ export const pathOf = (index: number, progress: number): string => {
   for (let cubic = 0; cubic < points.length; cubic += 8) {
     path += `C${at(cubic + 2)} ${at(cubic + 3)} ${at(cubic + 4)} ${at(cubic + 5)} ${at(cubic + 6)} ${at(cubic + 7)}`;
   }
-  return `${path}Z`;
+  return { path: `${path}Z`, extent: Math.max(maxX - minX, maxY - minY) };
 };
 
 const listeners = new Set<(elapsed: number) => void>();

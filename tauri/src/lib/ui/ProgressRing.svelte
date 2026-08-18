@@ -4,7 +4,9 @@
     pending?: number;
     size?: number;
     stroke?: number;
+    gap?: number;
     class?: string;
+    trackClass?: string | null;
     pendingClass?: string;
   }
 
@@ -13,7 +15,9 @@
     pending = 0,
     size = 16,
     stroke = 2,
+    gap = 4,
     class: className = "text-accent",
+    trackClass = null,
     pendingClass = "text-on-surface-variant",
   }: Props = $props();
 
@@ -27,18 +31,29 @@
   const circumference = $derived(2 * Math.PI * radius);
   const progress = $derived(clamp(value));
   const queued = $derived(clamp(pending));
+  const covered = $derived(circumference * (progress + queued));
+  const trackLength = $derived(
+    progress + queued <= 0 ? circumference : circumference - covered - gap * 2,
+  );
 </script>
 
 <svg width={size} height={size} viewBox="0 0 {size} {size}" class="shrink-0 {className}" aria-hidden="true">
-  <circle
-    cx={size / 2}
-    cy={size / 2}
-    r={radius}
-    fill="none"
-    stroke="currentColor"
-    stroke-width={stroke}
-    opacity={TRACK_OPACITY}
-  />
+  {#if trackLength > 0}
+    <circle
+      cx={size / 2}
+      cy={size / 2}
+      r={radius}
+      fill="none"
+      stroke="currentColor"
+      stroke-width={stroke}
+      stroke-linecap={trackLength < circumference ? "round" : "butt"}
+      stroke-dasharray="{trackLength} {circumference}"
+      stroke-dashoffset={-(covered + gap)}
+      transform="rotate({QUARTER_TURN} {size / 2} {size / 2})"
+      class={trackClass}
+      opacity={trackClass ? undefined : TRACK_OPACITY}
+    />
+  {/if}
   {#if queued > 0}
     <circle
       cx={size / 2}

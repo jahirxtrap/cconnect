@@ -19,7 +19,6 @@
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { isTouch } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
@@ -51,10 +50,10 @@
   import TabSwitcher from "./TabSwitcher.svelte";
   import TaskIndicator from "./TaskIndicator.svelte";
   import { tabs } from "./tabs.svelte";
+  import { pastedName } from "$lib/data/pastedFile";
 
   const chat = $derived(tabs.state);
 
-  const IME_MARGIN = 1;
   const RAIL_WIDTH = 64;
   const PANEL_WIDTH = 300;
   const SESSION_ID_PREVIEW = 8;
@@ -98,7 +97,7 @@
     if (event.defaultPrevented) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement) return;
-    const files = Array.from(event.clipboardData?.files ?? []);
+    const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
     if (!files.length || !canAttach || dialogOpen) return;
     event.preventDefault();
     chat.addAttachments(files);
@@ -160,18 +159,6 @@
 
   $effect(() => {
     if (!layout.mobile) drawer = false;
-  });
-
-  $effect(() => {
-    const viewport = window.visualViewport;
-    if (!isTouch || !viewport) return;
-    const onResize = () => {
-      const active = document.activeElement;
-      if (viewport.height < window.innerHeight - IME_MARGIN || !(active instanceof HTMLElement)) return;
-      active.blur();
-    };
-    viewport.addEventListener("resize", onResize);
-    return () => viewport.removeEventListener("resize", onResize);
   });
 
   $effect(() =>
@@ -253,7 +240,7 @@
     >
       {#snippet subtitleLeading()}
         {#if status.spinner}
-          <LoadingIndicator size={12} />
+          <LoadingIndicator size={8} fill />
         {:else}
           <StatusDot class={status.dot} box={8} />
         {/if}
@@ -295,9 +282,9 @@
       <DropOverlay visible={dropOver} />
       <div class="relative min-h-0 flex-1">
         <div
-          class="overflow-hidden {chat.sideOpen && !sideDragging
-            ? 'transition-[height] duration-200 ease-out'
-            : ''}"
+          class="overflow-hidden {sideDragging
+            ? ''
+            : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
           style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
         >
         <MessageList
@@ -397,6 +384,9 @@
     effortSelected={chat.effortOverride}
     permissionMode={chat.effectivePermissionMode}
     permissionSelected={chat.permissionOverride}
+    account={chat.effectiveAccount}
+    accountSelected={chat.accountOverride}
+    onAccount={(value) => chat.setAccount(value)}
     streamTokens={chat.effectiveStreamTokens}
     contextTokens={chat.contextTokens}
     onModel={(value) => chat.setModel(value)}
@@ -404,7 +394,6 @@
     onPermissionMode={(value) => chat.setPermissionMode(value)}
     onStreamTokens={() => chat.toggleStreamTokens()}
     onQuickChat={() => (chat.sideOpen ? chat.closeSideChat() : chat.openSideChat())}
-    quickChatEnabled={chat.sessionId !== null && chat.connected}
     quickChatActive={chat.sideMessages.length > 0}
   />
 {/snippet}

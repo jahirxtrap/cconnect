@@ -13,7 +13,7 @@
 
   const { mode, payload = "", onImport, onDismiss }: Props = $props();
 
-  const LINES = 12;
+  const LINES = 10;
 
   let draft = $state("");
   let failed = $state(false);
@@ -36,10 +36,10 @@
     {/if}
   {/snippet}
 
-  <div class="flex w-[32rem] max-w-full flex-col gap-2">
+  <div class="flex w-full flex-col gap-2">
     {#if mode === "export"}
       <p class="text-body-sm text-on-surface-variant">{t("EXPORT_SETTINGS_WARNING")}</p>
-      <InputField value={payload} oninput={() => {}} minLines={LINES} maxLines={LINES} class="font-mono" />
+      <InputField value={payload} oninput={() => {}} minLines={LINES} maxLines={LINES} />
     {:else}
       <p class="text-body-sm text-on-surface-variant">{t("IMPORT_SETTINGS_HINT")}</p>
       <InputField
@@ -51,10 +51,9 @@
         minLines={LINES}
         maxLines={LINES}
         autofocus
-        class="font-mono"
       />
       {#if failed}
-        <p class="text-body-sm text-red">{t("IMPORT_SETTINGS_FAILED")}</p>
+        <p class="-mt-0.5 text-body-sm text-red">{t("IMPORT_SETTINGS_FAILED")}</p>
       {/if}
     {/if}
   </div>

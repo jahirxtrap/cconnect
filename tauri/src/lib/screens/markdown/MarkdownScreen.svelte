@@ -15,6 +15,7 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
 
   const SCRATCH_KEY = "markdown.scratch";
   const SAVE_DELAY_MS = 400;
@@ -58,21 +59,21 @@
           <DropdownMenu.Content
             align="end"
             sideOffset={4}
-            class="menu-surface z-50 min-w-44 rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+            class={MENU_CONTENT_CLASS}
           >
             <MenuItem text={t("SAVE")} onclick={() => saveTextToDownloads(filename, text)}>
               {#snippet leading()}
-                <Download size={16} class="shrink-0 text-on-surface-variant" />
+                <Download size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             <MenuItem text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, text)}>
               {#snippet leading()}
-                <Save size={16} class="shrink-0 text-on-surface-variant" />
+                <Save size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             <MenuItem text={t("SHARE")} onclick={() => void shareText(filename, text)}>
               {#snippet leading()}
-                <Share2 size={16} class="shrink-0 text-on-surface-variant" />
+                <Share2 size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
           </DropdownMenu.Content>

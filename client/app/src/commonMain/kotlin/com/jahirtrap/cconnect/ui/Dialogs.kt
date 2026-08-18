@@ -189,8 +189,7 @@ fun RenameDialog(
         InputField(
             value = text,
             onValueChange = { text = it },
-            maxLines = if (secret) 1 else 2,
-            singleLine = secret,
+            singleLine = true,
             visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
             modifier = Modifier.fillMaxWidth(),
             focusRequester = focusRequester,

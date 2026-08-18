@@ -45,7 +45,7 @@ export const createSessionsApi = (http: HttpClient) => ({
     project: string,
     limit = 200,
     beforeIndex: number | null = null,
-  ): Promise<MessagesPage> {
+  ): Promise<MessagesPage | null> {
     const data = await http.get<{
       items?: Record<string, unknown>[];
       start_index?: number;
@@ -56,7 +56,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       limit,
       ...(beforeIndex === null ? {} : { before_index: beforeIndex }),
     });
-    if (!data) return { items: [], startIndex: 0, hasMore: false, contextTokens: null };
+    if (!data) return null;
     return {
       items: (data.items ?? []).map(parseSessionMessage),
       startIndex: data.start_index ?? 0,

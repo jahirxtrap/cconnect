@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigation } from "$lib/app/navigation.svelte";
+  import { serverDefaults } from "$lib/data/serverDefaults.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
@@ -58,6 +59,10 @@
 
   $effect(() => {
     theme.environmentAccent = backend.active?.accentIndex ?? null;
+  });
+
+  $effect(() => {
+    if (serverDefaults.revision > 0) tabs.refreshDefaults();
   });
 </script>
 

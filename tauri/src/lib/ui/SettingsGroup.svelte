@@ -13,7 +13,7 @@
 <div class="w-full">
   {#if label}
     <div class="flex h-9 items-center gap-2">
-      <p class="min-w-0 flex-1 truncate text-label-md tracking-wide text-on-surface-variant uppercase">{label}</p>
+      <p class="min-w-0 flex-1 truncate text-label-md tracking-[0.6px] text-on-surface-variant uppercase">{label}</p>
       {@render labelTrailing?.()}
     </div>
   {:else}

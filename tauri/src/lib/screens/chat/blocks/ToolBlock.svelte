@@ -26,7 +26,7 @@
   labelClass="text-accent"
 >
   {#if input.trim()}
-    <p class="pt-1 font-mono text-body-sm whitespace-pre-wrap text-on-surface-variant">{input}</p>
+    <p class="font-mono text-body-sm whitespace-pre-wrap text-on-surface-variant">{input}</p>
   {/if}
   {#if result?.trim()}
     <div class="mt-1.5">

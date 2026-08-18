@@ -51,7 +51,7 @@
         <span
           class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/10"
         >
-          <EllipsisVertical size={16} class="text-on-surface-variant" />
+          <EllipsisVertical size={16} />
         </span>
       {/snippet}
       <MenuItem text={t("RENAME")} onclick={() => run(onRename)} />

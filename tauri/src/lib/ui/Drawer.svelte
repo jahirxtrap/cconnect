@@ -28,10 +28,23 @@
   let lastAt = 0;
   let speed = 0;
 
+  const scrollsHorizontally = (target: EventTarget | null) => {
+    let node = target as HTMLElement | null;
+    while (node && node !== document.body) {
+      if (node.scrollWidth > node.clientWidth + 1) {
+        const overflow = getComputedStyle(node).overflowX;
+        if (overflow === "auto" || overflow === "scroll") return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  };
+
   const onStart = (event: TouchEvent) => {
     if (menusOpen()) return;
     const touch = event.touches[0];
     if (!open && !onOpen) return;
+    if (scrollsHorizontally(event.target)) return;
     tracking = true;
     decided = false;
     dragging = false;

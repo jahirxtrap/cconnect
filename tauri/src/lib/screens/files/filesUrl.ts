@@ -37,6 +37,6 @@ export const syncFilesLocation = (location: FilesLocation) => {
   if (!onFilesRoute()) return;
   const target = buildUrl(location);
   if (target !== window.location.pathname + window.location.search) {
-    window.history.pushState(null, "", target);
+    window.history.replaceState(null, "", target);
   }
 };

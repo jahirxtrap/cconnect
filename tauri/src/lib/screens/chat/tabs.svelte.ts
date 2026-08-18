@@ -116,6 +116,10 @@ class Tabs {
     for (const state of this.#states.values()) state.reconnect();
   }
 
+  refreshDefaults() {
+    for (const state of this.#states.values()) void state.refreshServerInfo();
+  }
+
   #blank(environmentId: string | null, cwd: string): Tab {
     return {
       id: this.#nextId(),

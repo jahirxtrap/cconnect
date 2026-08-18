@@ -3,10 +3,11 @@
 
   interface Props {
     size?: number;
+    fill?: boolean;
     class?: string;
   }
 
-  const { size = 16, class: className = "text-accent" }: Props = $props();
+  const { size = 16, fill = false, class: className = "text-accent" }: Props = $props();
 
   const MORPH_MS = 650;
   const ROTATION_MS = 4666;
@@ -24,14 +25,16 @@
     return 1 - envelope * (Math.cos(damped * time) + (decay / damped) * Math.sin(damped * time));
   };
 
-  let path = $state(pathOf(0, 0));
+  let shape = $state(pathOf(0, 0));
   let angle = $state(0);
+
+  const box = $derived(fill ? shape.extent : VIEW_BOX);
 
   $effect(() =>
     onFrame((elapsed) => {
       const step = Math.floor(elapsed / MORPH_MS);
       const progress = spring(elapsed % MORPH_MS);
-      path = pathOf(step % SHAPE_COUNT, progress);
+      shape = pathOf(step % SHAPE_COUNT, progress);
       angle = (elapsed / ROTATION_MS) * 360 + (step + progress) * QUARTER;
     }),
   );
@@ -40,9 +43,9 @@
 <svg
   width={size}
   height={size}
-  viewBox="{-VIEW_BOX / 2} {-VIEW_BOX / 2} {VIEW_BOX} {VIEW_BOX}"
+  viewBox="{-box / 2} {-box / 2} {box} {box}"
   class="shrink-0 {className}"
   aria-hidden="true"
 >
-  <path d={path} fill="currentColor" transform="rotate({angle})" />
+  <path d={shape.path} fill="currentColor" transform="rotate({angle})" />
 </svg>

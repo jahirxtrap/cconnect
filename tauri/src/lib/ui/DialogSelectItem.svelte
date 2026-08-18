@@ -31,7 +31,7 @@
     {onclick}
     {enabled}
     hover={false}
-    class="flex w-full items-center gap-3 rounded-sm py-3 pl-3 {trailing ? 'pr-1' : 'pr-3'} {selected
+    class="flex w-full items-center gap-3 rounded-lg py-2.5 pl-3 {trailing ? 'pr-1' : 'pr-3'} {selected
       ? 'bg-accent/14 enabled:hover:bg-accent/21'
       : 'enabled:hover:bg-on-surface/8'} {enabled ? '' : 'opacity-40'}"
   >
@@ -50,7 +50,7 @@
       {/if}
     </div>
     {#if trailing}
-      <div class="flex shrink-0 items-center gap-1">{@render trailing()}</div>
+      <div class="flex shrink-0 items-center">{@render trailing()}</div>
     {/if}
   </Pressable>
 </div>

@@ -38,6 +38,8 @@ export const exportSettings = (): string =>
         minimize_to_tray: settings.minimizeToTray,
         window_maximized: settings.windowMaximized,
         cwd: settings.cwd,
+        environment_locked: settings.environmentLocked,
+        project_locked: settings.projectLocked,
         file_sort_field: settings.fileSortField,
         file_sort_ascending: settings.fileSortAscending,
         local_server_enabled: settings.localServerEnabled,
@@ -104,6 +106,8 @@ const applySettings = (values: Wire) => {
     ["window_maximized", (value) => (settings.windowMaximized = value)],
     ["file_sort_ascending", (value) => (settings.fileSortAscending = value)],
     ["local_server_enabled", (value) => (settings.localServerEnabled = value)],
+    ["environment_locked", (value) => (settings.environmentLocked = value)],
+    ["project_locked", (value) => (settings.projectLocked = value)],
   ];
   for (const [key, apply] of booleans) {
     const value = flag(values, key);

@@ -1,6 +1,7 @@
 <script lang="ts">
   import BatteryCharging from "@lucide/svelte/icons/battery-charging";
   import Bell from "@lucide/svelte/icons/bell";
+  import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Clock from "@lucide/svelte/icons/clock";
   import History from "@lucide/svelte/icons/history";
   import Languages from "@lucide/svelte/icons/languages";
@@ -21,7 +22,7 @@
   import Screen from "$lib/app/Screen.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
-  import { ACCENTS, DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
+  import { ACCENTS, DYNAMIC_ACCENT, DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop, isTouch } from "$lib/platform";
@@ -181,7 +182,7 @@
         onclick={() => (dialog = "accent")}
       >
         {#snippet trailing()}
-          <span class="size-4 rounded-full" style="background: {theme.accent}"></span>
+          <span class="flex h-7 w-9 items-center justify-center"><span class="size-5 rounded-full" style="background: {theme.accent}"></span></span>
         {/snippet}
       </PreferenceRow>
       <PreferenceRow
@@ -191,7 +192,7 @@
         onclick={() => (dialog = "font")}
       >
         {#snippet trailing()}
-          <span class="flex size-10 items-center justify-center text-[22px]" data-font={theme.fontStyle}>😃</span>
+          <span class="flex h-7 w-9 items-center justify-center text-[22px]" data-font={theme.fontStyle}>😃</span>
         {/snippet}
       </PreferenceRow>
       <PreferenceRow
@@ -260,7 +261,11 @@
         title={t("SSH_HOSTS")}
         summary={t("SSH_HOSTS_SUMMARY")}
         onclick={() => navigation.openSshHosts()}
-      />
+      >
+        {#snippet trailing()}
+          <ChevronRight size={24} class="text-on-surface-variant" />
+        {/snippet}
+      </PreferenceRow>
     </SettingsGroup>
 
     <div bind:this={serverSection} class={flashed === "cli" ? "flash-highlight" : ""}>
@@ -323,7 +328,7 @@
   />
 {:else if dialog === "font"}
   {#snippet fontPreview(option: SelectOption)}
-    <span class="flex size-10 items-center justify-center text-[22px]" style="font-family: {option.font}"
+    <span class="flex h-7 w-9 items-center justify-center text-[22px]" style="font-family: {option.font}"
       >😃</span
     >
   {/snippet}
@@ -336,7 +341,18 @@
     optionTrailing={fontPreview}
   />
 {:else if dialog === "accent"}
-  <AccentDialog onDismiss={() => (dialog = null)} />
+  <AccentDialog
+    title={t("ACCENT")}
+    selected={theme.dynamicColor ? DYNAMIC_ACCENT : theme.accentIndex}
+    onSelect={(index) => {
+      if (index === DYNAMIC_ACCENT) theme.setDynamicColor(true);
+      else if (index !== null) {
+        theme.setDynamicColor(false);
+        theme.setAccent(index);
+      }
+    }}
+    onDismiss={() => (dialog = null)}
+  />
 {:else if dialog === "environments"}
   <EnvironmentsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "notifications"}
@@ -365,5 +381,9 @@
 
 {#if cliChangelog !== undefined}
   {@const version = cliChangelog}
-  <ChangelogDialog load={() => claudeChangelog(version)} onDismiss={() => (cliChangelog = undefined)} />
+  <ChangelogDialog
+    load={() => claudeChangelog(version)}
+    limitHeight={false}
+    onDismiss={() => (cliChangelog = undefined)}
+  />
 {/if}

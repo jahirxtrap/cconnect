@@ -10,7 +10,7 @@
   width={size}
   height={size}
   viewBox="0 0 108 108"
-  class="shrink-0 rounded-xs"
+  class="shrink-0 rounded-md"
   aria-hidden="true"
 >
   <path

@@ -7,9 +7,9 @@
 </script>
 
 <span
-  class="flex size-4 shrink-0 items-center justify-center rounded-full border transition-colors {selected
+  class="flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors {selected
     ? 'border-accent'
-    : 'border-outline-variant'}"
+    : 'border-outline'}"
 >
-  <span class="size-2 rounded-full bg-accent transition-transform {selected ? 'scale-100' : 'scale-0'}"></span>
+  <span class="size-2.5 rounded-full bg-accent transition-transform {selected ? 'scale-100' : 'scale-0'}"></span>
 </span>

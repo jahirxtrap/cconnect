@@ -6,6 +6,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
+  import { cubicOut } from "svelte/easing";
 
   interface Props {
     messages: ChatMessage[];
@@ -94,6 +95,8 @@
   let follow = $state(true);
   let belowFold = $state(0);
   let viewport = $state(0);
+  let horizontalScrollbar = $state(0);
+  let verticalScrollbar = $state(0);
   let lastTop = 0;
   let programmatic = false;
 
@@ -113,6 +116,8 @@
     lastTop = top;
     belowFold = list.scrollHeight - top - list.clientHeight;
     viewport = list.clientHeight;
+    verticalScrollbar = list.offsetWidth - list.clientWidth;
+    horizontalScrollbar = list.offsetHeight - list.clientHeight;
     if (belowFold <= AT_BOTTOM_PX) follow = true;
   };
 
@@ -128,13 +133,22 @@
     void messages.length;
     if (follow) scrollToEnd();
   });
+
+  const PANEL_MS = 350;
+
+  const grow = (_node: Element, { duration }: { duration: number }) => ({
+    duration,
+    easing: cubicOut,
+    css: (progress: number) => `height: ${Math.min(MAX, Math.max(MIN, height)) * progress}%`,
+  });
 </script>
 
 <div
   bind:this={panel}
+  transition:grow={{ duration: PANEL_MS }}
   class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background {dragging
     ? ''
-    : 'transition-[height] duration-200 ease-out'}"
+    : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
   style="height: {Math.min(MAX, Math.max(MIN, height))}%; border-top-left-radius: {corner}px; border-top-right-radius: {corner}px"
 >
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -146,20 +160,25 @@
     class="shrink-0 cursor-ns-resize touch-none"
   >
     <div class="flex justify-center pt-2.5 pb-0.5">
-      <span class="h-1 w-8 rounded-xs bg-on-surface-variant/40"></span>
+      <span class="h-1 w-8 rounded-[2px] bg-on-surface-variant/40"></span>
     </div>
-    <div class="flex items-center gap-2 px-4 pt-0.5 pb-1.5">
-      <MessagesSquare size={18} class="shrink-0 text-accent" />
+    <div class="flex items-center px-4 pt-0.5 pb-1.5">
+      <MessagesSquare size={18} class="mr-2 shrink-0 text-accent" />
       <p class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">{t("QUICK_CHAT")}</p>
-      <TooltipIconButton label={t("CLEAR")} enabled={messages.length > 0} onclick={onClear} class="size-8">
-        <Eraser size={18} />
+      <TooltipIconButton
+        label={t("CLEAR")}
+        enabled={messages.length > 0}
+        onclick={onClear}
+        class="size-[18px] [&_svg]:size-[18px]"
+      >
+        <Eraser />
       </TooltipIconButton>
     </div>
   </div>
   <div class="h-px shrink-0 bg-outline-variant"></div>
 
   <div class="relative min-h-0 flex-1">
-    <div bind:this={list} {onscroll} class="selectable h-full overflow-y-auto pt-1.5">
+    <div bind:this={list} {onscroll} class="selectable h-full overflow-y-auto">
       {#each messages as item, index (item.id)}
         <MessageItem
           message={item}
@@ -178,10 +197,10 @@
         onclick={toBottom}
         title={t("SCROLL_TO_BOTTOM")}
         aria-label={t("SCROLL_TO_BOTTOM")}
-        style="bottom: {SCROLL_BUTTON_GAP}px; right: {SCROLL_BUTTON_GAP}px"
+        style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar}px; right: {SCROLL_BUTTON_GAP + verticalScrollbar}px"
         class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
       >
-        <ChevronsDown size={18} />
+        <ChevronsDown size={24} />
       </button>
     {/if}
   </div>

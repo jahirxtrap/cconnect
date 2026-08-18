@@ -27,6 +27,7 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import PdfView from "./PdfView.svelte";
+  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
 
   interface Props {
     url: string;
@@ -165,27 +166,27 @@
             align="end"
             sideOffset={4}
             collisionPadding={layout.menuPadding}
-            class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-content-available-height) max-w-(--bits-dropdown-menu-content-available-width) min-w-44 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+            class={MENU_CONTENT_CLASS}
           >
             <MenuItem text={t("SAVE")} onclick={() => void downloadShared(url, filename)}>
               {#snippet leading()}
-                <Download size={16} class="shrink-0 text-on-surface-variant" />
+                <Download size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             <MenuItem text={t("SAVE_AS")} onclick={() => void saveSharedAs(url, filename)}>
               {#snippet leading()}
-                <Save size={16} class="shrink-0 text-on-surface-variant" />
+                <Save size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             <MenuItem text={t("SHARE")} onclick={() => void openSharedExternally(url, filename)}>
               {#snippet leading()}
-                <Share2 size={16} class="shrink-0 text-on-surface-variant" />
+                <Share2 size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
             {#if onDelete}
               <MenuItem text={t("DELETE")} onclick={() => (confirmingDelete = true)}>
                 {#snippet leading()}
-                  <Trash size={16} class="shrink-0 text-on-surface-variant" />
+                  <Trash size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}

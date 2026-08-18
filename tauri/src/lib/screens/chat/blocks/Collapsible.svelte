@@ -50,21 +50,21 @@
     type="button"
     disabled={labelOnly}
     onclick={toggle}
-    class="flex w-full items-center gap-[6px] text-left transition-colors select-none {labelOnly
+    class="flex w-full items-center text-left transition-colors select-none {labelOnly
       ? 'cursor-default'
       : 'cursor-pointer hover:bg-on-surface/8'}"
   >
     {#if IconComponent}
-      <IconComponent size={16} class="shrink-0 {iconClass}" />
+      <IconComponent size={16} class="mr-[6px] shrink-0 {iconClass}" />
     {/if}
     <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
       <span class={labelClass}>{label}</span>
       {#if summary}
-        <span class="ml-1.5 font-normal text-on-surface-variant">{summary}</span>
+        <span class="ml-1.5 text-on-surface-variant">{summary}</span>
       {/if}
     </span>
     {#if running}
-      <LoadingIndicator size={16} />
+      <LoadingIndicator size={16} class="text-accent {labelOnly ? '' : 'mr-0.5'}" />
     {/if}
     {#if !labelOnly}
       {#if isExpanded}

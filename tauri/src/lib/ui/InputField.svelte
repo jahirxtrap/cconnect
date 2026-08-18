@@ -81,7 +81,9 @@
         {onkeydown}
         rows={minLines}
         oninput={handle}
-        style={maxLines ? `max-height: ${maxLines * LINE_HEIGHT}px` : undefined}
+        style="min-height: {minLines * LINE_HEIGHT}px{maxLines
+          ? `; max-height: ${maxLines * LINE_HEIGHT}px`
+          : ''}"
         class="{FIELD_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
       ></textarea>
     {/if}
@@ -103,9 +105,9 @@
         class="shrink-0 cursor-pointer text-on-surface-variant transition-colors hover:text-on-surface"
       >
         {#if revealed}
-          <EyeOff size={20} />
+          <EyeOff size={24} />
         {:else}
-          <Eye size={20} />
+          <Eye size={24} />
         {/if}
       </button>
     {/if}

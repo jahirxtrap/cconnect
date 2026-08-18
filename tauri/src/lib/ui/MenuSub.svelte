@@ -3,6 +3,7 @@
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { MENU_PADDING, SUBMENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
 
   interface Props {
     text: string;
@@ -22,10 +23,12 @@
     <ChevronRight size={16} class="shrink-0 text-on-surface-variant" />
   </DropdownMenu.SubTrigger>
   <DropdownMenu.SubContent
+    align="start"
     sideOffset={4}
+    alignOffset={-MENU_PADDING}
     collisionPadding={layout.menuPadding}
     avoidCollisions={true}
-    class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-sub-content-available-height) max-w-(--bits-dropdown-menu-sub-content-available-width) min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+    class={SUBMENU_CONTENT_CLASS}
   >
     {@render children()}
   </DropdownMenu.SubContent>

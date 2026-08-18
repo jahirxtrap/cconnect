@@ -89,7 +89,7 @@
       <DropdownMenu.Content
         align="end"
         sideOffset={6}
-        class="menu-surface scrollbar-thin z-50 max-h-96 w-80 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+        class="menu-surface scrollbar-thin z-70 max-h-96 w-80 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
       >
         <p class="px-3.5 pb-2 text-label-lg font-bold text-on-surface-variant">
           {t("TASKS")} ({done}/{todos.length})

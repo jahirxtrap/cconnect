@@ -10,9 +10,10 @@
   interface Props {
     load: () => Promise<ReleaseNotes[] | null>;
     onDismiss: () => void;
+    limitHeight?: boolean;
   }
 
-  const { load, onDismiss }: Props = $props();
+  const { load, onDismiss, limitHeight = true }: Props = $props();
 
   let notes = $state<ReleaseNotes[] | null>(null);
   let failed = $state(false);
@@ -30,11 +31,11 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
   {#if failed}
-    <EmptyState text={t("CONNECTION_ERROR")} class="py-8" />
+    <EmptyState text={t("CONNECTION_ERROR")} class="py-6" />
   {:else if !notes}
-    <CenteredProgress class="py-8" />
+    <CenteredProgress class="w-full py-6" />
   {:else}
-    <div class="selectable flex flex-col gap-4">
+    <div class="selectable flex flex-col gap-4 {limitHeight ? 'max-h-[420px]' : ''}">
       {#each notes as release (release.tag)}
         <div>
           <p class="text-title-md text-accent">{release.tag}</p>

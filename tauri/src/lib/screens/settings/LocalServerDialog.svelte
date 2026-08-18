@@ -57,15 +57,14 @@
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={save}>{t("SAVE")}</Button>
   {/snippet}
-  <div class="flex flex-col gap-3">
-    <div class="flex items-end gap-2">
-      <div class="min-w-0 flex-1">
-        <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine />
-      </div>
-      <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(true)}>
-        <Folder size={20} />
-      </TooltipIconButton>
-    </div>
+  <div class="flex flex-col gap-2">
+    <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine>
+      {#snippet trailing()}
+        <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(true)} class="size-6 [&_svg]:size-[18px]">
+          <Folder />
+        </TooltipIconButton>
+      {/snippet}
+    </InputField>
 
     <SelectField
       label={t("PYTHON")}
@@ -75,19 +74,18 @@
     />
 
     {#if python === "custom"}
-      <div class="flex items-end gap-2">
-        <div class="min-w-0 flex-1">
-          <InputField
-            value={pythonPath}
-            oninput={(value) => (pythonPath = value)}
-            label={t("PYTHON_PATH")}
-            singleLine
-          />
-        </div>
-        <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(false)}>
-          <Folder size={20} />
-        </TooltipIconButton>
-      </div>
+      <InputField
+        value={pythonPath}
+        oninput={(value) => (pythonPath = value)}
+        label={t("PYTHON_PATH")}
+        singleLine
+      >
+        {#snippet trailing()}
+          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(false)} class="size-6 [&_svg]:size-[18px]">
+            <Folder />
+          </TooltipIconButton>
+        {/snippet}
+      </InputField>
     {/if}
 
     <SelectField label={t("RUN_MODE")} selected={mode} options={MODE_OPTIONS} onSelect={(value) => (mode = value)} />

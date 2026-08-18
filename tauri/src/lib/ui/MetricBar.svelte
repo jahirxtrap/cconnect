@@ -5,13 +5,15 @@
     title: string;
     subtitle: string;
     percent: number;
+    alert?: boolean | null;
     class?: string;
   }
 
-  const { title, subtitle, percent, class: className = "" }: Props = $props();
+  const { title, subtitle, percent, alert = null, class: className = "" }: Props = $props();
 
   const ALERT_PERCENT = 90;
   const clamped = $derived(Math.min(100, Math.max(0, percent)));
+  const alerting = $derived(alert ?? percent >= ALERT_PERCENT);
 </script>
 
 <div class="w-full {className}">
@@ -24,7 +26,7 @@
   </div>
   <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-outline-variant">
     <div
-      class="h-full rounded-full transition-[width] {percent >= ALERT_PERCENT ? 'bg-red' : 'bg-accent'}"
+      class="h-full rounded-full transition-[width] {alerting ? 'bg-red' : 'bg-accent'}"
       style="width: {clamped}%"
     ></div>
   </div>

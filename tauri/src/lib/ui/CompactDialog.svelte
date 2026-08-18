@@ -20,9 +20,11 @@
     <Dialog.Overlay class="fixed inset-0 z-60 bg-black/60" />
     <Dialog.Content
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="menu-surface fixed top-1/2 left-1/2 z-60 flex max-h-[85%] w-max min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-outline-variant bg-surface p-5 shadow-xl"
+      class="menu-surface fixed top-1/2 left-1/2 z-60 flex max-h-[min(40rem,85%)] min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(42rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-outline-variant bg-surface p-5 shadow-xl {children
+        ? 'w-[min(42rem,calc(100vw-2rem))]'
+        : 'w-max'}"
     >
-      <div class="flex items-start gap-2">
+      <div class="flex items-center">
         <div class="min-w-0 flex-1">
           <Dialog.Title class="truncate text-dialog-title">{title}</Dialog.Title>
           {#if description}
@@ -34,7 +36,7 @@
         {@render titleTrailing?.()}
       </div>
       {#if children}
-        <div class="scrollbar-thin mt-4 min-h-0 flex-1 overflow-y-auto {padded ? '' : '-mx-5'}">
+        <div class="scrollbar-thin mt-4 min-h-0 flex-1 overflow-x-clip overflow-y-auto {padded ? '' : '-mx-5'}">
           {@render children()}
         </div>
       {/if}

@@ -66,7 +66,7 @@
     {#each data.questions as item, index (index)}
       <div class="mt-1">
         {#if item.header?.trim()}
-          <span class="inline-block rounded-panel bg-accent/14 px-2 py-0.5 text-label-md text-accent">
+          <span class="inline-block rounded-sm bg-accent/14 px-2 py-0.5 text-label-md text-accent">
             {item.header}
           </span>
         {/if}
@@ -95,7 +95,7 @@
           <button
             type="button"
             onclick={() => goto(index)}
-            class="shrink-0 cursor-pointer rounded-xs px-2.5 py-1 text-label-md transition-colors {index === page
+            class="shrink-0 cursor-pointer rounded-md px-2.5 py-[5px] text-label-md transition-colors {index === page
               ? 'bg-accent/18 text-accent'
               : 'bg-surface-variant text-on-surface-variant'}"
           >
@@ -114,7 +114,7 @@
         }}
       >
         {#if !many && question.header?.trim()}
-          <span class="inline-block rounded-panel bg-accent/14 px-2 py-0.5 text-label-md text-accent">
+          <span class="inline-block rounded-sm bg-accent/14 px-2 py-0.5 text-label-md text-accent">
             {question.header}
           </span>
         {/if}
@@ -132,7 +132,7 @@
             >
               <span
                 class="mt-0.5 flex size-4 shrink-0 items-center justify-center border-2 transition-colors {question.multiSelect
-                  ? 'rounded-panel'
+                  ? 'rounded-sm'
                   : 'rounded-full'} {selected ? 'border-accent bg-accent' : 'border-outline'}"
               >
                 {#if selected}

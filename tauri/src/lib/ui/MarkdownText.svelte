@@ -3,6 +3,11 @@
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
+  import Info from "@lucide/svelte/icons/info";
+  import Lightbulb from "@lucide/svelte/icons/lightbulb";
+  import MessageSquareWarning from "@lucide/svelte/icons/message-square-warning";
+  import OctagonAlert from "@lucide/svelte/icons/octagon-alert";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import { isArchive } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import { segments, type Segment } from "$lib/markdown/render";
@@ -15,10 +20,13 @@
   interface Props {
     text: string;
     onSharedLink?: ((url: string, filename: string) => void) | null;
+    dense?: boolean;
     class?: string;
   }
 
-  const { text, onSharedLink = null, class: className = "" }: Props = $props();
+  const { text, onSharedLink = null, dense = false, class: className = "" }: Props = $props();
+
+  const ALERT_KINDS = ["note", "tip", "important", "warning", "caution"];
 
   const parts = $derived(segments(text));
   const sharedPrefix = $derived(`${backend.baseUrl}/shared/`);
@@ -57,7 +65,16 @@
       }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;
-      const [file, archive, external] = sources;
+      const [file, archive, external, ...alerts] = sources;
+      for (const quote of node.querySelectorAll<HTMLElement>("blockquote.md-alert")) {
+        if (quote.dataset.decorated) continue;
+        quote.dataset.decorated = "true";
+        const kind = quote.dataset.alert ?? "note";
+        const title = document.createElement("p");
+        title.className = "md-alert-title";
+        title.append(alerts[ALERT_KINDS.indexOf(kind)].cloneNode(true), t(`ALERT_${kind.toUpperCase()}`));
+        quote.prepend(title);
+      }
       for (const anchor of node.querySelectorAll("a")) {
         if (anchor.dataset.decorated) continue;
         anchor.dataset.decorated = "true";
@@ -87,9 +104,18 @@
   <FileIcon size={16} />
   <FolderArchive size={16} />
   <ExternalLink size={16} />
+  <Info size={16} />
+  <Lightbulb size={16} />
+  <MessageSquareWarning size={16} />
+  <TriangleAlert size={16} />
+  <OctagonAlert size={16} />
 </span>
 
-<div class="markdown flex w-full flex-col gap-1.5 {className}" onclickcapture={onClick} use:decorate>
+<div
+  class="markdown flex w-full flex-col gap-1.5 {dense ? 'markdown-dense' : ''} {className}"
+  onclickcapture={onClick}
+  use:decorate
+>
   {@render blocks(parts)}
 </div>
 
@@ -97,8 +123,12 @@
   {#each list as part, index (index)}
     {#if part.kind === "code"}
       <CodeBlock code={part.code} lang={part.lang} />
-    {:else if part.kind === "image"}
-      <MarkdownImage url={part.url} alt={part.alt} onOpen={open} />
+    {:else if part.kind === "images"}
+      <div class="flex w-full flex-wrap justify-center gap-1.5">
+        {#each part.items as image (image.url)}
+          <MarkdownImage url={image.url} alt={image.alt} onOpen={open} />
+        {/each}
+      </div>
     {:else if part.kind === "details"}
       <details class="w-full">
         <summary

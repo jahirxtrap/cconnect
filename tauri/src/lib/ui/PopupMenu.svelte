@@ -3,6 +3,7 @@
   import type { Snippet } from "svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import MenuScrim from "./MenuScrim.svelte";
+  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
 
   interface Props {
     open: boolean;
@@ -42,7 +43,7 @@
       sideOffset={4}
       collisionPadding={layout.menuPadding}
       style={matchTriggerWidth ? "min-width: var(--bits-dropdown-menu-anchor-width)" : ""}
-      class="menu-surface scrollbar-thin z-50 max-h-(--bits-dropdown-menu-content-available-height) max-w-(--bits-dropdown-menu-content-available-width) min-w-40 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+      class={MENU_CONTENT_CLASS}
     >
       {@render children()}
     </DropdownMenu.Content>

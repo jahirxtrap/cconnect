@@ -4,9 +4,7 @@
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import Hourglass from "@lucide/svelte/icons/hourglass";
   import Paperclip from "@lucide/svelte/icons/paperclip";
-  import Plus from "@lucide/svelte/icons/plus";
-  import Slash from "@lucide/svelte/icons/slash";
-  import Square from "@lucide/svelte/icons/square";
+  import SquareSlash from "@lucide/svelte/icons/square-slash";
   import X from "@lucide/svelte/icons/x";
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
@@ -18,11 +16,12 @@
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuScrim from "$lib/ui/MenuScrim.svelte";
-  import MenuSub from "$lib/ui/MenuSub.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
-  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import StopIcon from "$lib/ui/StopIcon.svelte";
   import type { Attachment } from "./state.svelte";
+  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
+  import { pastedName } from "$lib/data/pastedFile";
 
   interface Props {
     streaming: boolean;
@@ -66,6 +65,9 @@
     controls,
   }: Props = $props();
 
+  const ROUND_CLASS =
+    "ripple inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full";
+
   const accent = $derived(sessionColorOf(sessionColor));
 
   const queueLabel = (item: QueuedMessage) =>
@@ -77,6 +79,7 @@
 
   const canSubmit = $derived(!!draft.trim() || attachments.length > 0);
   const busy = $derived(streaming || uploading);
+  const commandsReady = $derived(commands.length > 0 && !streaming);
 
   const submit = () => {
     if (!canSubmit) return;
@@ -126,7 +129,7 @@
   };
 
   const onpaste = (event: ClipboardEvent) => {
-    const files = Array.from(event.clipboardData?.files ?? []);
+    const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
     if (!files.length) return;
     event.preventDefault();
     onAttach(files);
@@ -137,10 +140,8 @@
   <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div
     onclick={focusField}
-    style={accent ? `border-color: ${accent}; box-shadow: inset 0 0 0 1px ${accent}` : undefined}
-    class="cursor-text rounded-lg border bg-surface {accent
-      ? ''
-      : 'border-outline-variant focus-within:border-outline'}"
+    style={accent ? `border-color: ${accent}` : undefined}
+    class="cursor-text rounded-lg border bg-surface {accent ? '' : 'border-outline-variant'}"
   >
     {#if queue.length}
       <div
@@ -168,9 +169,9 @@
                   type="button"
                   onclick={() => onRemoveAttachment(item.id)}
                   aria-label={t("DELETE")}
-                  class="shrink-0 cursor-pointer text-on-surface-variant hover:text-on-surface"
+                  class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </button>
               {/if}
             {/snippet}
@@ -179,7 +180,7 @@
       </div>
     {/if}
 
-    <div class="px-3.5 {attachments.length ? 'pt-2.5' : 'pt-3.5'}">
+    <div class="px-3.5 {queue.length || attachments.length ? 'pt-1.5' : 'pt-3.5'}">
       <textarea
         bind:this={field}
         value={draft}
@@ -188,7 +189,7 @@
         {onpaste}
         rows="1"
         placeholder={t("TYPE_MESSAGE")}
-        class="field-auto no-scrollbar max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant"
+        class="field-auto no-scrollbar block max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant"
       ></textarea>
     </div>
 
@@ -199,49 +200,49 @@
           onclick={onCloseSide}
           aria-label={t("CLOSE")}
           title={t("CLOSE")}
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface-variant transition-colors hover:bg-on-surface/10"
+          class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant"
         >
           <X size={18} />
         </button>
-      {/if}
-      <MenuScrim open={menu} onDismiss={() => (menu = false)} />
-      <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
-        <DropdownMenu.Trigger disabled={!!onCloseSide}>
-          {#snippet child({ props })}
-            <TooltipIconButton label={t("ATTACH_FILES")} tooltip={false} class="size-8 disabled:hidden" {...props}>
-              <Plus />
-            </TooltipIconButton>
-          {/snippet}
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            side="top"
-            align="start"
-            sideOffset={6}
-            class="menu-surface z-50 max-h-(--bits-dropdown-menu-content-available-height) min-w-48 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+      {:else}
+        <button
+          type="button"
+          disabled={uploading}
+          onclick={() => picker?.click()}
+          aria-label={t("ATTACH_FILES")}
+          title={t("ATTACH_FILES")}
+          class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant disabled:cursor-default"
+        >
+          <Paperclip size={18} />
+        </button>
+        <MenuScrim open={menu} onDismiss={() => (menu = false)} />
+        <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
+          <DropdownMenu.Trigger
+            disabled={!commandsReady}
+            aria-label={t("COMMANDS")}
+            title={t("COMMANDS")}
+            class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant disabled:cursor-default"
           >
-            <MenuItem text={t("ATTACH_FILES")} onclick={() => picker?.click()}>
-              {#snippet leading()}
-                <Paperclip size={16} class="shrink-0 text-on-surface-variant" />
-              {/snippet}
-            </MenuItem>
-            {#if commands.length}
-              <MenuSub text={t("COMMANDS")}>
-                {#snippet leading()}
-                  <Slash size={16} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-                {#each commands as command (command.name)}
-                  <MenuItem
-                    text="/{command.name}"
-                    description={command.description}
-                    onclick={() => runCommand(command)}
-                  />
-                {/each}
-              </MenuSub>
-            {/if}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+            <SquareSlash size={18} class={commandsReady ? "" : "opacity-[0.38]"} />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              side="top"
+              align="start"
+              sideOffset={6}
+              class={MENU_CONTENT_CLASS}
+            >
+              {#each commands as command (command.name)}
+                <MenuItem
+                  text="/{command.name}"
+                  description={command.description}
+                  onclick={() => runCommand(command)}
+                />
+              {/each}
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      {/if}
 
       {#if controls}
         {@render controls()}
@@ -249,28 +250,29 @@
         <div class="flex-1"></div>
       {/if}
 
-      {#if busy && !canSubmit}
+      {#if busy}
         <button
           type="button"
           onclick={onInterrupt}
           aria-label={t("STOP")}
           title={t("STOP")}
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-accent transition-opacity hover:opacity-90"
+          class="{ROUND_CLASS} bg-surface-variant text-on-surface"
         >
-          <Square size={13} class="fill-current" />
-        </button>
-      {:else}
-        <button
-          type="button"
-          disabled={!canSubmit}
-          onclick={submit}
-          aria-label={t("SEND")}
-          title={t("SEND")}
-          class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-accent text-on-accent transition-opacity hover:opacity-90 disabled:cursor-default disabled:opacity-30"
-        >
-          <ArrowUp size={18} />
+          <StopIcon size={14} />
         </button>
       {/if}
+      <button
+        type="button"
+        disabled={!canSubmit}
+        onclick={submit}
+        aria-label={t("SEND")}
+        title={t("SEND")}
+        class="{ROUND_CLASS} {canSubmit
+          ? 'bg-accent text-on-accent'
+          : 'bg-surface-variant text-on-surface-variant'} disabled:cursor-default"
+      >
+        <ArrowUp size={18} />
+      </button>
     </div>
   </div>
 

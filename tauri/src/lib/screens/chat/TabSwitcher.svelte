@@ -174,7 +174,7 @@
 
 <TooltipIconButton label={t("TABS")} onclick={() => (open = true)}>
   <span
-    class="inline-flex size-[17px] items-center justify-center rounded-[4px] border-[1.5px] border-current text-[11px] leading-none font-semibold"
+    class="inline-flex size-[22px] items-center justify-center rounded-sm border-[1.5px] border-current text-label-md"
   >
     {tabs.list.length}
   </span>

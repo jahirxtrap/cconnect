@@ -75,19 +75,19 @@
     type="button"
     onclick={reveal}
     aria-label={t("CONTEXT_USAGE")}
-    class="flex size-8 shrink-0 cursor-pointer items-center justify-center"
+    class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full"
   >
     {@render ring()}
   </button>
   <TouchTip text={summary} anchor={touchTip} />
 {:else}
   <Tooltip.Provider>
-    <Tooltip.Root delayDuration={200}>
-      <Tooltip.Trigger class="flex size-8 shrink-0 cursor-pointer items-center justify-center">
+    <Tooltip.Root delayDuration={0}>
+      <Tooltip.Trigger class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full">
         {@render ring()}
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content sideOffset={6} class="z-50 rounded-sm bg-surface-variant px-3 py-2 text-body-md shadow-lg">
+        <Tooltip.Content sideOffset={4} class="z-75 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
           {summary}
         </Tooltip.Content>
       </Tooltip.Portal>

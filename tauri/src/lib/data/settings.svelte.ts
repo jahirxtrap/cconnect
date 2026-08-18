@@ -19,6 +19,8 @@ const DEFAULTS = {
   local_server_public_host: "",
   window_maximized: true,
   dynamic_color: false,
+  environment_locked: false,
+  project_locked: false,
 };
 
 type Key = keyof typeof DEFAULTS;
@@ -161,6 +163,20 @@ class Settings {
   }
   set dynamicColor(value: boolean) {
     this.#write("dynamic_color", value);
+  }
+
+  get environmentLocked() {
+    return this.#read("environment_locked");
+  }
+  set environmentLocked(value: boolean) {
+    this.#write("environment_locked", value);
+  }
+
+  get projectLocked() {
+    return this.#read("project_locked");
+  }
+  set projectLocked(value: boolean) {
+    this.#write("project_locked", value);
   }
 }
 

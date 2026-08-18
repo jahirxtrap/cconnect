@@ -22,6 +22,8 @@ export const ACCENTS: ReadonlyArray<{ name: string; value: string }> = [
 
 export const DEFAULT_ACCENT_INDEX = 4;
 
+export const DYNAMIC_ACCENT = -1;
+
 export const accentAt = (index: number): string =>
   (ACCENTS[index] ?? ACCENTS[DEFAULT_ACCENT_INDEX]).value;
 

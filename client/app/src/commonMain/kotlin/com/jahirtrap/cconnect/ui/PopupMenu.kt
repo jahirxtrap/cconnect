@@ -20,7 +20,9 @@ import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -105,11 +107,12 @@ fun AppDropdownMenu(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val gap = with(LocalDensity.current) { MenuPadding.roundToPx() }
+    var above by remember { mutableStateOf(false) }
     MenuPopup(
         expanded = expanded,
         onDismiss = onDismissRequest,
-        positionProvider = remember(gap) { BelowAnchorPositionProvider(gap) },
-        origin = TransformOrigin(0f, 0f),
+        positionProvider = remember(gap) { BelowAnchorPositionProvider(gap) { above = it } },
+        origin = TransformOrigin(0f, if (above) 1f else 0f),
         minWidth = minWidth,
         modifier = modifier,
         properties = properties,
@@ -158,7 +161,10 @@ fun SubMenuPopup(
     )
 }
 
-class BelowAnchorPositionProvider(private val gapPx: Int) : PopupPositionProvider {
+class BelowAnchorPositionProvider(
+    private val gapPx: Int,
+    private val onPlacedAbove: (Boolean) -> Unit = {},
+) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -167,7 +173,9 @@ class BelowAnchorPositionProvider(private val gapPx: Int) : PopupPositionProvide
     ): IntOffset {
         val below = anchorBounds.bottom + gapPx
         val above = anchorBounds.top - popupContentSize.height - gapPx
-        val y = if (below + popupContentSize.height <= windowSize.height) below else above.coerceAtLeast(0)
+        val fitsBelow = below + popupContentSize.height <= windowSize.height
+        onPlacedAbove(!fitsBelow)
+        val y = if (fitsBelow) below else above.coerceAtLeast(0)
         val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
         return IntOffset(anchorBounds.left.coerceIn(0, maxX), y)
     }

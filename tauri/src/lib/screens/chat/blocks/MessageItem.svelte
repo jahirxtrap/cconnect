@@ -83,7 +83,7 @@
             <div class="flex-1"></div>
           {/if}
           {#if showTime}
-            <span class="pl-2 text-label-md text-on-surface-variant select-none">
+            <span class="pl-2 text-label-sm text-on-surface-variant select-none">
               {formatClock(message.timestamp ?? 0)}
             </span>
           {/if}
@@ -107,10 +107,16 @@
       {expanded}
       {onToggle}
     >
-      <MarkdownText text={message.text} class="text-on-surface-variant" />
+      <MarkdownText text={message.text} dense class="text-on-surface-variant" />
     </Collapsible>
   {:else if message.role === "working"}
-    <Collapsible label={t("WORKING")} icon={Bot} labelOnly {running} />
+    <Collapsible
+      label={t("WORKING")}
+      icon={Bot}
+      iconClass="text-on-surface-variant"
+      labelOnly
+      {running}
+    />
   {:else if message.role === "tool"}
     <ToolBlock
       name={message.toolName}
@@ -122,11 +128,11 @@
     />
   {:else if message.role === "tool_result"}
     <Collapsible label={t("RESULT")} labelOnly={message.labelOnly || labelMode} {expanded} {onToggle}>
-      <MarkdownText text={message.text} />
+      <MarkdownText text={message.text} dense />
     </Collapsible>
   {:else if message.role === "summary"}
     <Collapsible label={t("SUMMARY")} {expanded} {onToggle}>
-      <MarkdownText text={message.text} />
+      <MarkdownText text={message.text} dense />
     </Collapsible>
   {:else if message.role === "plan"}
     <PlanBlock markdown={message.text} {expanded} {onToggle} {onSharedLink} />

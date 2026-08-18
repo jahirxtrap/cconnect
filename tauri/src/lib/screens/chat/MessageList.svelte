@@ -299,7 +299,7 @@
       style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar}px; right: {SCROLL_BUTTON_GAP + verticalScrollbar}px"
       class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
     >
-      <ChevronsDown size={18} />
+      <ChevronsDown size={24} />
     </button>
   {/if}
 </div>

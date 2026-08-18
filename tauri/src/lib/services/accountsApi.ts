@@ -1,3 +1,4 @@
+import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 
 export interface Account {
@@ -20,6 +21,12 @@ const parse = (data: Wire): Account => ({
   loggedIn: data.logged_in === true,
   primary: data.primary === true,
 });
+
+export const exportUrl = (id: string, profile: Profile = backend.active) =>
+  `${baseUrlOf(profile)}/accounts/${encodeURIComponent(id)}/export`;
+
+export const importUrl = (label: string, profile: Profile = backend.active) =>
+  `${baseUrlOf(profile)}/accounts/import?label=${encodeURIComponent(label)}`;
 
 export const createAccountsApi = (client: HttpClient) => ({
   async list(): Promise<AccountsSnapshot | null> {
@@ -56,6 +63,21 @@ export const createAccountsApi = (client: HttpClient) => ({
 
   async cancelLogin(id: string): Promise<void> {
     await client.delete(`/accounts/${id}/login`);
+  },
+
+  exportUrl,
+
+  async importBundle(file: File, label: string): Promise<boolean> {
+    try {
+      const response = await fetch(importUrl(label), {
+        method: "POST",
+        headers: authHeadersOf(backend.active),
+        body: file,
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
   },
 });
 

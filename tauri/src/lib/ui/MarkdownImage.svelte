@@ -34,35 +34,35 @@
   });
 </script>
 
-{#if state === "error"}
-  <button
-    type="button"
-    onclick={() => onOpen(resolved, filename)}
-    class="flex w-full cursor-pointer items-center gap-2 rounded-panel p-3 text-left text-on-surface-variant"
-  >
-    <ImageOff size={18} class="shrink-0" />
-    <span class="truncate text-body-sm">{alt || resolved}</span>
-  </button>
-{:else}
-  <div class="w-full">
-    {#if state === "loading"}
-      <CenteredProgress class="h-35 w-full" size={24} />
-    {/if}
+<div
+  class="flex aspect-4/3 h-70 max-w-full shrink items-center justify-center overflow-hidden rounded-panel border border-outline-variant"
+>
+  {#if state === "error"}
     <button
       type="button"
       onclick={() => onOpen(resolved, filename)}
-      aria-label={alt || filename}
-      class="block w-full cursor-pointer {state === 'loading' ? 'hidden' : ''}"
+      class="flex size-full cursor-pointer flex-col items-center justify-center gap-2 p-3 text-on-surface-variant"
     >
-      <img
-        use:mediaSrc={{
-          url: resolved,
-          onload: () => (state = "ready"),
-          onerror: () => (state = "error"),
-        }}
-        alt={alt || ""}
-        class="mx-auto max-w-full rounded-panel"
-      />
+      <ImageOff size={18} class="shrink-0" />
+      <span class="line-clamp-2 text-center text-body-sm">{alt || resolved}</span>
     </button>
-  </div>
-{/if}
+  {:else if state === "loading"}
+    <CenteredProgress class="size-full" size={24} />
+  {/if}
+  <button
+    type="button"
+    onclick={() => onOpen(resolved, filename)}
+    aria-label={alt || filename}
+    class="flex size-full cursor-pointer items-center justify-center {state === 'ready' ? '' : 'hidden'}"
+  >
+    <img
+      use:mediaSrc={{
+        url: resolved,
+        onload: () => (state = "ready"),
+        onerror: () => (state = "error"),
+      }}
+      alt={alt || ""}
+      class="max-h-full max-w-full object-contain"
+    />
+  </button>
+</div>

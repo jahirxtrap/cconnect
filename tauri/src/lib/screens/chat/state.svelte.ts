@@ -128,7 +128,7 @@ export class ChatState {
   readonly list = $derived(chatListFor(this.environment));
   readonly historyLoading = $derived(this.list?.loading ?? true);
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProjectKey) ?? []);
-  readonly historyProjects = $derived(this.#withDefaultProject(this.list?.projects ?? []));
+  readonly historyProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly connected = $derived(this.connection === "connected");
   readonly visibleQueue = $derived(this.queue.filter((item) => !this.#silent.has(item.id)));
 
@@ -220,14 +220,21 @@ export class ChatState {
   }
 
   async #openSocket() {
-    await this.#refreshServerInfo();
+    await this.refreshServerInfo();
     this.#loadEnvOverrides();
-    if (!this.#initialConsumed) {
-      this.#initialConsumed = true;
-      const initial = this.#initial;
-      if (initial) await this.#loadSessionInto(initial);
-    }
+    await this.#consumeInitialSession();
     this.#socket.connect();
+  }
+
+  async #consumeInitialSession(projectKey: string | null = null) {
+    if (this.#initialConsumed) return;
+    const initial = this.#initial;
+    if (!initial) {
+      this.#initialConsumed = true;
+      return;
+    }
+    const target = projectKey ? { ...initial, projectKey } : initial;
+    this.#initialConsumed = await this.#loadSessionInto(target);
   }
 
   #loadEnvOverrides() {
@@ -239,15 +246,18 @@ export class ChatState {
     this.streamingOverride = profile?.streaming ?? null;
   }
 
-  #applyDefaultProject() {
+  defaultProjectKey(projects: ProjectInfo[] = this.list?.projects ?? []): string | null {
     const directory = this.environment?.directory ?? "";
-    if (!directory) return;
+    if (!directory) return null;
     const target = projectKeyOf(directory);
-    const known = this.list?.projects.find((item) => item.projectKey === target || item.path === directory);
-    this.historyProjectKey = known?.projectKey ?? target;
+    return projects.find((item) => item.projectKey === target || item.path === directory)?.projectKey ?? target;
   }
 
-  #withDefaultProject(projects: ProjectInfo[]): ProjectInfo[] {
+  #applyDefaultProject() {
+    if (this.environment?.directory) this.historyProjectKey = this.defaultProjectKey();
+  }
+
+  withDefaultProject(projects: ProjectInfo[]): ProjectInfo[] {
     const directory = this.environment?.directory ?? "";
     if (!directory) return projects;
     const target = projectKeyOf(directory);
@@ -670,6 +680,28 @@ export class ChatState {
     this.#updateInteraction(requestId, (data) => (data.resolved === null ? { ...data, resolved: optionId } : data));
   }
 
+  #dropStaleOverrides(capabilities: Capabilities) {
+    const stale = {
+      account: !!this.accountOverride && !capabilities.accounts.some((item) => item.id === this.accountOverride),
+      model: !!this.modelOverride && !capabilities.models.some((item) => item.id === this.modelOverride),
+      effort: !!this.effortOverride && !capabilities.effortLevels.includes(this.effortOverride),
+      permissionMode:
+        !!this.permissionOverride &&
+        !capabilities.permissionModes.some((item) => item.id === this.permissionOverride),
+    };
+    if (!Object.values(stale).some(Boolean)) return;
+    if (stale.account) this.accountOverride = "";
+    if (stale.model) this.modelOverride = "";
+    if (stale.effort) this.effortOverride = "";
+    if (stale.permissionMode) this.permissionOverride = "";
+    this.#updateEnvironment({
+      ...(stale.account ? { account: "" } : {}),
+      ...(stale.model ? { model: "" } : {}),
+      ...(stale.effort ? { effort: "" } : {}),
+      ...(stale.permissionMode ? { permissionMode: "" } : {}),
+    });
+  }
+
   setPermissionMode(mode: string) {
     this.#updateEnvironment({ permissionMode: mode });
     this.permissionOverride = mode;
@@ -767,10 +799,11 @@ export class ChatState {
     if (this.connected) this.#socket.sendSetGeneration(patch);
   }
 
-  async #refreshServerInfo() {
+  async refreshServerInfo() {
     const capabilities = await this.#capabilities.capabilities();
     if (capabilities) {
       this.capabilities = capabilities;
+      this.#dropStaleOverrides(capabilities);
       this.account = capabilities.defaults.account || this.account;
       this.permissionMode = capabilities.defaults.permissionMode || this.permissionMode;
       this.model = capabilities.defaults.model || this.model;
@@ -844,6 +877,7 @@ export class ChatState {
     const project = session.projectKey;
     if (!project) return false;
     const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE);
+    if (!page) return false;
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(
       visible.map((item, index) => this.#fromSession(item, index, session.sessionId, project)),
@@ -880,6 +914,7 @@ export class ChatState {
     const project = this.#projectKey();
     if (!sessionId || !project) return;
     const page = await this.#sessions.messages(sessionId, project, HISTORY_PAGE);
+    if (!page) return;
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
     this.#nextId = visible.length;
@@ -1164,6 +1199,7 @@ export class ChatState {
         this.#startSession(this.sessionId);
         break;
       case "ready": {
+        void this.#consumeInitialSession(event.project);
         this.connection = "connected";
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;

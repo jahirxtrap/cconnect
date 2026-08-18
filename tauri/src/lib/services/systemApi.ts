@@ -18,6 +18,12 @@ export interface GpuInfo {
   temp: number | null;
 }
 
+export interface BatteryInfo {
+  percent: number;
+  plugged: boolean;
+  secsLeft: number | null;
+}
+
 export interface SystemInfo {
   hostname: string;
   os: string;
@@ -31,6 +37,7 @@ export interface SystemInfo {
   memoryTotal: number;
   memoryPercent: number;
   gpu: GpuInfo | null;
+  battery: BatteryInfo | null;
   disks: DiskInfo[];
   netRx: number;
   netTx: number;
@@ -72,6 +79,13 @@ const parseInfo = (raw: Wire): SystemInfo => ({
         memTotal: raw.gpu.mem_total ?? 0,
         memPercent: raw.gpu.mem_percent ?? 0,
         temp: raw.gpu.temp ?? null,
+      }
+    : null,
+  battery: raw.battery
+    ? {
+        percent: raw.battery.percent ?? 0,
+        plugged: raw.battery.plugged === true,
+        secsLeft: raw.battery.secsleft ?? null,
       }
     : null,
   disks: (raw.disks ?? []).map((disk: Wire) => ({

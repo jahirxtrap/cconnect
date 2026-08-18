@@ -181,7 +181,8 @@
 
   $effect(() => {
     void kind;
-    if (kind === "memories" && memoriesProject === null) memoriesProject = chat.projectKey;
+    if (kind === "memories" && memoriesProject === null)
+      memoriesProject = chat.defaultProjectKey(chat.historyProjects) ?? chat.projectKey;
     void load();
   });
 
@@ -488,7 +489,7 @@
   {@const market = catalogMarket}
   <CompactDialog title={market} padded={false} onDismiss={() => (catalogMarket = null)}>
     {#snippet titleTrailing()}
-      <TooltipIconButton label={t("MARKETPLACES")} onclick={() => (catalogMarket = null)}>
+      <TooltipIconButton label={t("MARKETPLACES")} onclick={() => (catalogMarket = null)} class="[&_svg]:size-5">
         <Store size={20} />
       </TooltipIconButton>
     {/snippet}
@@ -674,13 +675,13 @@
     {/snippet}
     <div class="flex flex-col gap-2.5">
       <InputField value={mcpName} oninput={(value) => (mcpName = value)} label={t("NAME")} singleLine />
-      <InputField value={mcpTarget} oninput={(value) => (mcpTarget = value)} label={t("MCP_TARGET")} singleLine />
       <SelectField
         label={t("MCP_TRANSPORT")}
         selected={mcpTransport}
         options={TRANSPORTS.map((value) => ({ value, label: value }))}
         onSelect={(value) => (mcpTransport = value)}
       />
+      <InputField value={mcpTarget} oninput={(value) => (mcpTarget = value)} label={t("MCP_TARGET")} singleLine />
     </div>
   </CompactDialog>
 {/if}

@@ -2,6 +2,7 @@ import { APP_VERSION, SUPPORTED_SERVER } from "./build";
 import { satisfies } from "./compat";
 import { backend } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
+import { latestRelease, type Release } from "$lib/services/githubApi";
 
 const POLL_MS = 30_000;
 
@@ -11,6 +12,10 @@ class ServerStatus {
   online = $state(false);
   checking = $state(true);
   version = $state<VersionInfo | null>(null);
+  release = $state<Release | null>(null);
+  releaseChecked = $state(false);
+
+  #releaseRequested = false;
 
   readonly appOutdated = $derived(!satisfies(APP_VERSION, this.version?.supportedApp));
   readonly serverOutdated = $derived(!satisfies(this.version?.serverVersion, SUPPORTED_SERVER));
@@ -28,6 +33,7 @@ class ServerStatus {
   });
 
   start() {
+    void this.checkRelease();
     $effect(() => {
       void backend.baseUrl;
       this.checking = true;
@@ -35,6 +41,14 @@ class ServerStatus {
       const timer = setInterval(() => void this.refresh(), POLL_MS);
       return () => clearInterval(timer);
     });
+  }
+
+  async checkRelease(force = false) {
+    if (this.#releaseRequested && !force) return;
+    this.#releaseRequested = true;
+    const found = await latestRelease();
+    this.release = found && found.tag.replace(/^v/, "") !== APP_VERSION ? found : null;
+    this.releaseChecked = true;
   }
 
   async refresh() {

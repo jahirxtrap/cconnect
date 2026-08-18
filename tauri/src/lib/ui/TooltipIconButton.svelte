@@ -38,7 +38,7 @@
   const compact = $derived(/(^|\s)size-8(\s|$)/.test(className));
 
   const TRIGGER_CLASS = $derived(
-    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-5"} ${className}`,
+    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-6"} ${className}`,
   );
 
   let open = $state(false);
@@ -163,7 +163,7 @@
       </Tooltip.Trigger>
       {#if open}
         <Tooltip.Portal>
-          <Tooltip.Content sideOffset={4} class="z-50 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
+          <Tooltip.Content sideOffset={4} class="z-75 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
             {label}
           </Tooltip.Content>
         </Tooltip.Portal>

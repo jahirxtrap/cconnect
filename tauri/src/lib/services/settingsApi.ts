@@ -1,4 +1,5 @@
 import { http, type HttpClient } from "./http";
+import { serverDefaults } from "$lib/data/serverDefaults.svelte";
 
 export interface SettingsSnapshot {
   account: string;
@@ -56,11 +57,13 @@ export const createSettingsApi = (http: HttpClient) => ({
 
   async update(patch: SettingsPatch): Promise<SettingsSnapshot | null> {
     const data = await http.post<Wire>("/settings", patch);
+    if (data) serverDefaults.bump();
     return data && parse(data);
   },
 
   async reset(): Promise<SettingsSnapshot | null> {
     const data = await http.post<Wire>("/settings/reset");
+    if (data) serverDefaults.bump();
     return data && parse(data);
   },
 });

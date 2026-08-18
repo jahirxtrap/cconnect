@@ -1818,8 +1818,8 @@ private fun ChangelogSheet(onDismiss: () -> Unit) {
     ) {
         val items = notes
         when {
-            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth())
-            items == null -> CenteredProgress(Modifier.fillMaxWidth())
+            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth().padding(vertical = 24.dp))
+            items == null -> CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 24.dp))
             else -> LazyColumn(
                 modifier = Modifier.heightIn(max = 420.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

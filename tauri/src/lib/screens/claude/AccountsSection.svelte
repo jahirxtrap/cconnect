@@ -1,6 +1,7 @@
 <script lang="ts">
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import { t } from "$lib/i18n/index.svelte";
+  import { downloadShared } from "$lib/services/sharedFiles";
   import { accountsApi, type Account, type AccountsSnapshot } from "$lib/services/accountsApi";
   import { settingsApi } from "$lib/services/settingsApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -30,6 +31,24 @@
   let login = $state<{ id: string; url: string } | null>(null);
   let loginError = $state<string | null>(null);
   let code = $state("");
+  let newLabel = $state("");
+  let importing = $state(false);
+  let importFailed = $state(false);
+  let bundlePicker = $state<HTMLInputElement | null>(null);
+
+  const importBundle = async (event: Event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    importing = true;
+    const ok = await accountsApi.importBundle(file, newLabel.trim());
+    importing = false;
+    importFailed = !ok;
+    if (!ok) return;
+    adding = false;
+    await refresh();
+  };
 
   const accounts = $derived(snapshot?.accounts ?? []);
   const defaultId = $derived(snapshot?.default ?? "");
@@ -103,7 +122,16 @@
     </PreferenceRow>
   {/each}
   <div class="px-4 py-3">
-    <ActionButton text={t("ACCOUNT_ADD")} {enabled} onclick={() => (adding = true)} class="w-full" />
+    <ActionButton
+      text={t("ACCOUNT_ADD")}
+      {enabled}
+      onclick={() => {
+        importFailed = false;
+        newLabel = "";
+        adding = true;
+      }}
+      class="w-full"
+    />
   </div>
 </SettingsGroup>
 
@@ -114,16 +142,14 @@
       <Button onclick={() => (actions = null)} variant="outlined">{t("CLOSE")}</Button>
     {/snippet}
     <div class="flex flex-col gap-1.5">
-      {#if !account.loggedIn}
-        <ActionButton
-          text={t("ACCOUNT_LOGIN")}
-          onclick={() => {
-            actions = null;
-            void beginLogin(account);
-          }}
-          class="w-full"
-        />
-      {/if}
+      <ActionButton
+        text={account.loggedIn ? t("ACCOUNT_RELOGIN") : t("ACCOUNT_LOGIN")}
+        onclick={() => {
+          actions = null;
+          void beginLogin(account);
+        }}
+        class="w-full"
+      />
       {#if account.loggedIn && account.id !== defaultId}
         <ActionButton
           text={t("ACCOUNT_SET_DEFAULT")}
@@ -142,6 +168,16 @@
         }}
         class="w-full"
       />
+      {#if account.loggedIn}
+        <ActionButton
+          text={t("ACCOUNT_EXPORT")}
+          onclick={() => {
+            actions = null;
+            void downloadShared(accountsApi.exportUrl(account.id), `${account.id}.zip`);
+          }}
+          class="w-full"
+        />
+      {/if}
       {#if !account.primary}
         <ActionButton
           text={t("ACCOUNT_SYNC_MCP")}
@@ -165,15 +201,43 @@
 {/if}
 
 {#if adding}
-  <RenameDialog
-    initial=""
-    title={t("ACCOUNT_ADD")}
-    confirmLabel={t("ACCOUNT_ADD")}
-    onConfirm={(label) => {
-      adding = false;
-      void accountsApi.create(label).then(refresh);
-    }}
-    onDismiss={() => (adding = false)}
+  <CompactDialog title={t("ACCOUNT_ADD")} onDismiss={() => (adding = false)}>
+    {#snippet buttons()}
+      <Button onclick={() => (adding = false)} variant="outlined">{t("CANCEL")}</Button>
+      <Button
+        enabled={!!newLabel.trim() && !importing}
+        onclick={() => {
+          const label = newLabel;
+          adding = false;
+          void accountsApi.create(label).then(refresh);
+        }}>{t("ACCOUNT_ADD")}</Button
+      >
+    {/snippet}
+    <InputField
+      value={newLabel}
+      oninput={(value) => (newLabel = value)}
+      label={t("ACCOUNT_NAME")}
+      singleLine
+    />
+    <ActionButton
+      text={t("ACCOUNT_IMPORT")}
+      enabled={!importing}
+      onclick={() => bundlePicker?.click()}
+      class="mt-3 w-full"
+    />
+    {#if importing}
+      <LoadingIndicator size={20} class="mt-3" />
+    {/if}
+    {#if importFailed}
+      <p class="mt-2 text-body-sm text-red">{t("ACCOUNT_IMPORT_FAILED")}</p>
+    {/if}
+  </CompactDialog>
+  <input
+    bind:this={bundlePicker}
+    type="file"
+    accept=".zip"
+    onchange={importBundle}
+    class="hidden"
   />
 {/if}
 
@@ -206,11 +270,14 @@
 
 {#if login}
   {@const current = login}
-  <CompactDialog title={t("ACCOUNT_LOGIN")} onDismiss={cancelLogin}>
+  {@const loginLabel = accounts.find((item) => item.id === current.id)?.loggedIn
+    ? t("ACCOUNT_RELOGIN")
+    : t("ACCOUNT_LOGIN")}
+  <CompactDialog title={loginLabel} onDismiss={cancelLogin}>
     {#snippet buttons()}
       <Button onclick={cancelLogin} variant="outlined">{t("CANCEL")}</Button>
       <Button onclick={() => void submitCode()} enabled={!!code.trim()}>
-        {t("ACCOUNT_LOGIN")}
+        {loginLabel}
       </Button>
     {/snippet}
     <p class="text-body-md">{t("ACCOUNT_LOGIN_HINT")}</p>

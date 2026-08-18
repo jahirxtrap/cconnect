@@ -42,8 +42,7 @@
     value={text}
     oninput={(value) => (text = value)}
     {secret}
-    singleLine={secret}
-    minLines={secret ? 1 : 2}
+    singleLine
     autofocus
   >
     {#snippet trailing()}

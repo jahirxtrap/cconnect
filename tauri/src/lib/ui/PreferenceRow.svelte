@@ -27,7 +27,7 @@
 <Pressable {onclick} {enabled} class="flex w-full items-center gap-3 px-4 py-3 {enabled ? '' : 'opacity-40'}">
   <IconComponent size={18} class="shrink-0 text-on-surface-variant" />
   <div class="min-w-0 flex-1">
-    <p class="truncate text-body-md font-medium">{title}</p>
+    <p class="truncate text-body-md">{title}</p>
     {#if summary}
       <p class="truncate text-body-sm text-on-surface-variant">{summary}</p>
     {/if}
@@ -36,6 +36,6 @@
     {/if}
   </div>
   {#if trailing}
-    <div class="flex shrink-0 items-center gap-1">{@render trailing()}</div>
+    <div class="flex shrink-0 items-center">{@render trailing()}</div>
   {/if}
 </Pressable>

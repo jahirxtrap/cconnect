@@ -19,6 +19,7 @@
   import { chatListFor } from "$lib/data/chatList.svelte";
   import type { ProjectInfo } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
+  import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import { accountsApi, type AccountsSnapshot } from "$lib/services/accountsApi";
@@ -169,7 +170,7 @@
             <CircleUser size={20} />
           </TooltipIconButton>
         {/if}
-        <TooltipIconButton label={t("ENVIRONMENT")} onclick={() => (envOpen = true)}>
+        <TooltipIconButton label={t("ENVIRONMENT")} enabled={!settings.environmentLocked} onclick={() => (envOpen = true)}>
           <Server size={20} />
         </TooltipIconButton>
         {#if !isTouch}
@@ -213,7 +214,7 @@
             onclick={() => (detail = "status")}
           >
             {#snippet trailing()}
-              <ChevronRight size={20} class="text-on-surface-variant" />
+              <ChevronRight size={24} class="text-on-surface-variant" />
             {/snippet}
           </PreferenceRow>
         </SettingsGroup>
@@ -289,7 +290,12 @@
           {@render link(Wand, t("SKILLS"), skills ? String(skills.length) : "—", "skills")}
           {@render link(Unplug, t("MCP_SERVERS"), mcpServers ? String(mcpServers.length) : "—", "mcp")}
           {@render link(Store, t("MARKETPLACES"), extensions ? String(extensions.marketplaces.length) : "—", "marketplaces")}
-          {@render link(Brain, t("MEMORIES"), chat.projectKey ?? "—", "memories")}
+          {@render link(
+            Brain,
+            t("MEMORIES"),
+            chat.defaultProjectKey(projects) ?? chat.projectKey ?? "—",
+            "memories",
+          )}
         </SettingsGroup>
       </div>
       {/if}
@@ -300,7 +306,7 @@
 {#snippet link(icon: typeof Blocks, title: string, summary: string, kind: ClaudeKind)}
   <PreferenceRow {icon} {title} {summary} enabled={serverReady} onclick={() => (detail = kind)}>
     {#snippet trailing()}
-      <ChevronRight size={20} class="text-on-surface-variant" />
+      <ChevronRight size={24} class="text-on-surface-variant" />
     {/snippet}
   </PreferenceRow>
 {/snippet}
@@ -348,9 +354,10 @@
 {/if}
 
 {#if projectPromptOpen && projects.length}
+  {@const options = chat.withDefaultProject(projects)}
   <ProjectPromptDialog
-    {projects}
-    initialProject={chat.projectKey ?? projects[0].projectKey}
+    projects={options}
+    initialProject={chat.defaultProjectKey(projects) ?? chat.projectKey ?? options[0].projectKey}
     onSave={(project, text) => {
       projectPromptOpen = false;
       void claudeApi.setProjectPrompt(project, text);

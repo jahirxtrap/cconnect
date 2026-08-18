@@ -15,6 +15,7 @@ body,
 [class*="overflow-x-auto"]:not([class*="overflow-y-"]) {
   overflow-y: hidden;
   overscroll-behavior-x: contain;
+  touch-action: pan-x;
 }
 
 :focus {
@@ -144,6 +145,25 @@ html[data-theme="dark"] {
   field-sizing: content;
 }
 
+.ripple {
+  position: relative;
+}
+
+.ripple::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 150ms;
+  pointer-events: none;
+}
+
+.ripple:hover:not(:disabled)::after {
+  opacity: 0.08;
+}
+
 .scrollbar-thin {
   scrollbar-width: thin;
 }
@@ -200,9 +220,14 @@ textarea::selection {
 }
 
 .markdown {
-  font-size: var(--text-body-md);
-  line-height: var(--text-body-md--line-height);
+  --md-scale: 1;
+  font-size: calc(var(--text-body-md) * var(--md-scale));
+  line-height: calc(var(--text-body-md--line-height) * var(--md-scale));
   overflow-wrap: anywhere;
+}
+
+.markdown-dense {
+  --md-scale: calc(13 / 14);
 }
 
 .markdown > *:first-child {
@@ -233,15 +258,15 @@ textarea::selection {
 }
 
 .markdown h1 {
-  font-size: var(--text-headline);
+  font-size: calc(var(--text-headline) * var(--md-scale));
 }
 
 .markdown h2 {
-  font-size: var(--text-title-lg);
+  font-size: calc(var(--text-title-lg) * var(--md-scale));
 }
 
 .markdown h3 {
-  font-size: var(--text-title-md);
+  font-size: calc(var(--text-title-md) * var(--md-scale));
 }
 
 .markdown ul,
@@ -307,10 +332,9 @@ a > .md-link-icon:last-child {
 
 .markdown code {
   font-family: var(--font-mono);
-  font-size: var(--text-body-sm);
   background: var(--c-surface-variant);
-  border-radius: var(--radius-panel);
-  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+  padding: 1px 3px;
 }
 
 .markdown pre code {
@@ -325,12 +349,49 @@ a > .md-link-icon:last-child {
   background: var(--c-surface-variant);
   border-radius: var(--radius-panel);
   padding: 0.5rem 0.625rem;
+  font-size: calc(var(--text-body-sm) * var(--md-scale));
 }
 
 .markdown blockquote {
-  border-inline-start: 2px solid var(--c-outline-variant);
-  padding-inline-start: 0.75rem;
-  color: var(--c-on-surface-variant);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-inline-start: 3px solid color-mix(in srgb, var(--c-accent) 60%, transparent);
+  padding-inline-start: 10px;
+}
+
+.markdown blockquote.md-alert {
+  border-inline-start-color: var(--md-alert);
+}
+
+.markdown .md-alert-note {
+  --md-alert: var(--c-blue);
+}
+
+.markdown .md-alert-tip {
+  --md-alert: var(--c-green);
+}
+
+.markdown .md-alert-important {
+  --md-alert: var(--c-purple);
+}
+
+.markdown .md-alert-warning {
+  --md-alert: var(--c-yellow);
+}
+
+.markdown .md-alert-caution {
+  --md-alert: var(--c-red);
+}
+
+.markdown .md-alert-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--md-alert);
+  font-size: var(--text-label-lg);
+  line-height: var(--text-label-lg--line-height);
+  font-weight: var(--text-label-lg--font-weight);
 }
 
 .markdown hr {
@@ -352,7 +413,7 @@ a > .md-link-icon:last-child {
   min-width: 140px;
   padding: 0.375rem;
   text-align: start;
-  font-size: var(--text-body-sm);
+  font-size: calc(var(--text-body-sm) * var(--md-scale));
 }
 
 .markdown th {

@@ -67,6 +67,6 @@
     {/if}
   </button>
   {#if isExpanded && hasSummary}
-    <div class="pt-1"><MarkdownText text={compact.summary} /></div>
+    <MarkdownText text={compact.summary} dense />
   {/if}
 </div>

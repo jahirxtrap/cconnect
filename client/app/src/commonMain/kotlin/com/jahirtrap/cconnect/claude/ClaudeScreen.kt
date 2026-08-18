@@ -619,8 +619,8 @@ fun ClaudeChangelogSheet(cliVersion: String?, onDismiss: () -> Unit) {
     ) {
         val items = notes
         when {
-            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth().padding(vertical = 32.dp))
-            items == null -> CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 32.dp))
+            failed -> EmptyState(stringResource(Res.string.connection_error), Modifier.fillMaxWidth().padding(vertical = 24.dp))
+            items == null -> CenteredProgress(Modifier.fillMaxWidth().padding(vertical = 24.dp))
             else -> Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 items.forEach { release ->
                     Column {
