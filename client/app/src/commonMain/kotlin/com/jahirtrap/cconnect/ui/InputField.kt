@@ -58,7 +58,7 @@ fun InputField(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .border(1.dp, borderColor, shape)
+                .border(2.dp, borderColor, shape)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

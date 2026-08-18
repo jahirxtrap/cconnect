@@ -63,7 +63,7 @@ fun SettingsGroup(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.group))
-                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.group))
+                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.group))
                 .background(MaterialTheme.colorScheme.surface),
             divider = MaterialTheme.colorScheme.outlineVariant,
             content = content,

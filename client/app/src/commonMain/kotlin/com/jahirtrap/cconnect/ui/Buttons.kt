@@ -49,7 +49,7 @@ fun Button(
         ),
         elevation = null,
         border = if (variant == ButtonVariant.Outlined) {
-            BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = if (enabled) 1f else DisabledAlpha))
+            BorderStroke(2.dp, scheme.outlineVariant.copy(alpha = if (enabled) 1f else DisabledAlpha))
         } else {
             null
         },

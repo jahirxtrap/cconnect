@@ -155,7 +155,7 @@ fun SelectField(
                     .fillMaxWidth()
                     .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
                     .clip(shape)
-                    .border(1.dp, if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
+                    .border(2.dp, if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
                     .clickable(enabled = enabled) { if (onClick != null) onClick() else open = true }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

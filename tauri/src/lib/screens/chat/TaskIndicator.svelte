@@ -14,22 +14,28 @@
 
   const { todos }: Props = $props();
 
-  const PIE = 20;
-  const QUARTER_TURN = -90;
+  const PIE = 24;
   const FULL_TURN = 360;
-
-  // A stroke as thick as the radius fills the disc, so dasharray sweeps whole slices.
-  const RADIUS = PIE / 4;
-  const SLICE = PIE / 2;
-  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  const HALF_TURN = 180;
+  const QUARTER_TURN = 90;
+  const CENTER = PIE / 2;
+  const RADIUS = PIE / 2;
 
   let open = $state(false);
 
   const done = $derived(todos.filter((todo) => todo.status === "completed").length);
   const running = $derived(todos.filter((todo) => todo.status === "in_progress").length);
-  const doneRatio = $derived(todos.length ? done / todos.length : 0);
-  const runningRatio = $derived(todos.length ? running / todos.length : 0);
+  const doneSweep = $derived(todos.length ? (FULL_TURN * done) / todos.length : 0);
+  const runningSweep = $derived(todos.length ? (FULL_TURN * running) / todos.length : 0);
   const complete = $derived(todos.length > 0 && done === todos.length);
+
+  const edge = (angle: number) => {
+    const radians = ((angle - QUARTER_TURN) * Math.PI) / HALF_TURN;
+    return `${CENTER + RADIUS * Math.cos(radians)} ${CENTER + RADIUS * Math.sin(radians)}`;
+  };
+
+  const sector = (start: number, sweep: number) =>
+    `M ${CENTER} ${CENTER} L ${edge(start)} A ${RADIUS} ${RADIUS} 0 ${sweep > HALF_TURN ? 1 : 0} 1 ${edge(start + sweep)} Z`;
 </script>
 
 {#if todos.length}
@@ -41,47 +47,18 @@
     >
       <span class="relative inline-flex items-center justify-center">
         <svg width={PIE} height={PIE} viewBox="0 0 {PIE} {PIE}" class="shrink-0" aria-hidden="true">
-          <circle cx={PIE / 2} cy={PIE / 2} r={PIE / 2} class="fill-on-surface/12" />
-          {#if runningRatio > 0}
-            <circle
-              cx={PIE / 2}
-              cy={PIE / 2}
-              r={RADIUS}
-              fill="none"
-              stroke="currentColor"
-              stroke-width={SLICE}
-              stroke-dasharray={CIRCUMFERENCE}
-              stroke-dashoffset={CIRCUMFERENCE * (1 - runningRatio)}
-              transform="rotate({QUARTER_TURN + FULL_TURN * doneRatio} {PIE / 2} {PIE / 2})"
-              class="text-on-surface-variant"
-            />
+          <circle cx={CENTER} cy={CENTER} r={RADIUS} class="fill-on-surface/15" />
+          {#if doneSweep >= FULL_TURN}
+            <circle cx={CENTER} cy={CENTER} r={RADIUS} class="fill-accent" />
+          {:else if doneSweep > 0}
+            <path d={sector(0, doneSweep)} class="fill-accent" />
           {/if}
-          {#if doneRatio > 0}
-            <circle
-              cx={PIE / 2}
-              cy={PIE / 2}
-              r={RADIUS}
-              fill="none"
-              stroke="currentColor"
-              stroke-width={SLICE}
-              stroke-dasharray={CIRCUMFERENCE}
-              stroke-dashoffset={CIRCUMFERENCE * (1 - doneRatio)}
-              transform="rotate({QUARTER_TURN} {PIE / 2} {PIE / 2})"
-              class="text-accent"
-            />
+          {#if runningSweep > 0 && doneSweep < FULL_TURN}
+            <path d={sector(doneSweep, runningSweep)} class="fill-on-surface-variant" />
           {/if}
-          <circle
-            cx={PIE / 2}
-            cy={PIE / 2}
-            r={(PIE - 1) / 2}
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1"
-            class="text-on-surface/20"
-          />
         </svg>
         {#if complete}
-          <Check size={12} class="absolute text-on-accent" />
+          <Check size={16} class="absolute text-on-accent" />
         {/if}
       </span>
     </DropdownMenu.Trigger>
@@ -89,7 +66,7 @@
       <DropdownMenu.Content
         align="end"
         sideOffset={6}
-        class="menu-surface scrollbar-thin z-70 max-h-96 w-80 overflow-y-auto rounded-md border border-outline-variant bg-surface-variant p-1 shadow-lg"
+        class="menu-surface scrollbar-thin z-70 max-h-96 w-80 overflow-y-auto rounded-md border-2 border-outline-variant bg-surface-variant p-1 shadow-lg"
       >
         <p class="px-3.5 pb-2 text-label-lg font-bold text-on-surface-variant">
           {t("TASKS")} ({done}/{todos.length})

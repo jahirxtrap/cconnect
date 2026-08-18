@@ -1047,7 +1047,7 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
                     color = if (failureText != null) palette.red else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, if (failureText != null) palette.red else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .border(2.dp, if (failureText != null) palette.red else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                 )
             }

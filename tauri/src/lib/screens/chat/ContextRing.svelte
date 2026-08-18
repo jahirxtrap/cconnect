@@ -2,6 +2,7 @@
   import { Tooltip } from "bits-ui";
   import { isTouch } from "$lib/platform";
   import { t } from "$lib/i18n/index.svelte";
+  import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import TouchTip from "$lib/ui/TouchTip.svelte";
 
   interface Props {
@@ -29,9 +30,6 @@
     hideTimer = setTimeout(() => (touchTip = null), TOUCH_HIDE_MS);
   };
 
-  const radius = (SIZE - STROKE) / 2;
-  const circumference = 2 * Math.PI * radius;
-
   const progress = $derived(Math.min(1, Math.max(0, tokens / limit)));
   const percent = $derived(Math.round(progress * 100));
 
@@ -45,29 +43,13 @@
 </script>
 
 {#snippet ring()}
-  <svg width={SIZE} height={SIZE} viewBox="0 0 {SIZE} {SIZE}" class="-rotate-90">
-    <circle
-      cx={SIZE / 2}
-      cy={SIZE / 2}
-      r={radius}
-      fill="none"
-      stroke="currentColor"
-      stroke-width={STROKE}
-      class="text-outline-variant"
-    />
-    <circle
-      cx={SIZE / 2}
-      cy={SIZE / 2}
-      r={radius}
-      fill="none"
-      stroke="currentColor"
-      stroke-width={STROKE}
-      stroke-linecap="round"
-      stroke-dasharray={circumference}
-      stroke-dashoffset={circumference * (1 - progress)}
-      class={percent >= ALERT_PERCENT ? "text-red" : "text-accent"}
-    />
-  </svg>
+  <ProgressRing
+    value={progress}
+    size={SIZE}
+    stroke={STROKE}
+    trackClass="text-outline-variant"
+    class={percent >= ALERT_PERCENT ? "text-red" : "text-accent"}
+  />
 {/snippet}
 
 {#if isTouch}

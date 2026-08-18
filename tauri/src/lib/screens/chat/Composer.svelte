@@ -141,7 +141,7 @@
   <div
     onclick={focusField}
     style={accent ? `border-color: ${accent}` : undefined}
-    class="cursor-text rounded-lg border bg-surface {accent ? '' : 'border-outline-variant'}"
+    class="cursor-text rounded-lg border-2 bg-surface {accent ? '' : 'border-outline-variant'}"
   >
     {#if queue.length}
       <div

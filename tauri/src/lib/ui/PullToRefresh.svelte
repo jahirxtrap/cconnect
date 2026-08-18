@@ -15,7 +15,7 @@
   const RESISTANCE = 0.5;
   const CONTAINER = 40;
   const SPINNER = 18;
-  const SPINNER_STROKE = 2;
+  const SPINNER_STROKE = 2.5;
   const STIFFNESS = 1500;
 
   let scroller = $state<HTMLDivElement | null>(null);

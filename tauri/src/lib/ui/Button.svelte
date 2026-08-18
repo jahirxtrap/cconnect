@@ -15,7 +15,7 @@
 
   const VARIANTS: Record<Variant, string> = {
     filled: "bg-accent text-on-accent enabled:hover:opacity-90",
-    outlined: "border border-outline-variant enabled:hover:bg-on-surface/8",
+    outlined: "border-2 border-outline-variant enabled:hover:bg-on-surface/8",
     ghost: "enabled:hover:bg-on-surface/8",
     text: "text-on-surface-variant enabled:hover:text-on-surface",
     accent: "text-accent enabled:hover:bg-accent/10",
