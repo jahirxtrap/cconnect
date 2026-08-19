@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private val ButtonHeight = 36.dp
 private val ButtonPadding = PaddingValues(horizontal = 16.dp)
@@ -49,7 +50,7 @@ fun Button(
         ),
         elevation = null,
         border = if (variant == ButtonVariant.Outlined) {
-            BorderStroke(2.dp, scheme.outlineVariant.copy(alpha = if (enabled) 1f else DisabledAlpha))
+            BorderStroke(snapDp(2.dp), scheme.outlineVariant.copy(alpha = if (enabled) 1f else DisabledAlpha))
         } else {
             null
         },

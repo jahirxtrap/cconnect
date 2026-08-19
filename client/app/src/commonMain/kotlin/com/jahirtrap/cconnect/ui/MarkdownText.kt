@@ -112,6 +112,7 @@ import org.jetbrains.compose.resources.stringResource
 import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
 import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.theme.palette
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private val flavour = GFMFlavourDescriptor()
 
@@ -699,7 +700,7 @@ private fun MarkdownImage(url: String, alt: String, width: Dp) {
             .width(width)
             .aspectRatio(IMAGE_TILE_RATIO)
             .clip(shape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape),
+            .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape),
         contentAlignment = Alignment.Center,
     ) {
         when (state) {

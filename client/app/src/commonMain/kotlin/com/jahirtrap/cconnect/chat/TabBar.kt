@@ -57,6 +57,7 @@ import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import androidx.compose.ui.draw.drawWithContent
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
+import com.jahirtrap.cconnect.ui.theme.bottomEdge
 import kotlin.math.abs
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -84,6 +85,7 @@ import com.jahirtrap.cconnect.data.ChatListStore
 import com.jahirtrap.cconnect.data.Settings
 import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.toBackendConfig
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -156,12 +158,7 @@ fun TabStrip() {
             .background(MaterialTheme.colorScheme.surface)
             .drawWithContent {
                 drawContent()
-                drawLine(
-                    edge,
-                    androidx.compose.ui.geometry.Offset(0f, size.height),
-                    androidx.compose.ui.geometry.Offset(size.width, size.height),
-                    1.dp.toPx(),
-                )
+                bottomEdge(edge)
             }
             .statusBarsPadding()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
@@ -338,7 +335,7 @@ fun TabSwitcher() {
             modifier = Modifier
                 .size(22.dp)
                 .clip(RoundedCornerShape(6.dp))
-                .border(1.5.dp, LocalContentColor.current, RoundedCornerShape(6.dp)),
+                .border(snapDp(1.5.dp), LocalContentColor.current, RoundedCornerShape(6.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text("${tabs.size}", style = MaterialTheme.typography.labelMedium, color = LocalContentColor.current)

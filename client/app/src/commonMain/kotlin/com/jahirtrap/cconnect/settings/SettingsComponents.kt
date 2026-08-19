@@ -31,7 +31,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.jahirtrap.cconnect.ui.clickable
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.horizontalEdge
 import com.jahirtrap.cconnect.ui.theme.palette
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 @Composable
 fun SettingsGroup(
@@ -63,7 +65,7 @@ fun SettingsGroup(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(Radius.group))
-                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.group))
+                .border(snapDp(2.dp), MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(Radius.group))
                 .background(MaterialTheme.colorScheme.surface),
             divider = MaterialTheme.colorScheme.outlineVariant,
             content = content,
@@ -78,14 +80,11 @@ private fun DividedColumn(
     content: @Composable () -> Unit,
 ) {
     val breaks = remember { mutableListOf<Int>() }
-    val thickness = with(LocalDensity.current) { 1.dp.toPx() }
     Layout(
         content = content,
         modifier = modifier.drawWithContent {
             drawContent()
-            breaks.forEach { y ->
-                drawLine(divider, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), thickness)
-            }
+            breaks.forEach { y -> horizontalEdge(divider, y.toFloat()) }
         },
     ) { measurables, constraints ->
         val placeables = measurables.map { it.measure(constraints.copy(minHeight = 0)) }

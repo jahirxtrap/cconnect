@@ -68,6 +68,8 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
+import com.jahirtrap.cconnect.ui.theme.shadowXl
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 // Compact replacement for Material3 AlertDialog, whose built-in paddings look too airy
 // and whose 560dp cap keeps dialogs narrower than the design calls for.
@@ -86,13 +88,15 @@ fun CompactDialog(
     val windowWidth = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
     val available = (windowWidth - 32.dp).coerceAtLeast(0.dp)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        val shape = MaterialTheme.shapes.large
         Surface(
-            modifier = Modifier.widthIn(min = 384.dp.coerceAtMost(available), max = 672.dp.coerceAtMost(available)),
-            shape = MaterialTheme.shapes.large,
+            modifier = Modifier
+                .shadowXl(shape)
+                .widthIn(min = 384.dp.coerceAtMost(available), max = 672.dp.coerceAtMost(available)),
+            shape = shape,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp,
-            shadowElevation = 16.dp,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(snapDp(2.dp), MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(modifier = Modifier.heightIn(max = 640.dp).padding(vertical = 20.dp)) {
                 Row(
@@ -377,7 +381,7 @@ fun SelectionDot(selected: Boolean, modifier: Modifier = Modifier) {
     val ring = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     val dotScale by animateFloatAsState(if (selected) 1f else 0f, label = "select-dot")
     Box(
-        modifier = modifier.size(20.dp).clip(CircleShape).border(2.dp, ring, CircleShape),
+        modifier = modifier.size(20.dp).clip(CircleShape).border(snapDp(2.dp), ring, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Box(Modifier.size(10.dp).scale(dotScale).clip(CircleShape).background(MaterialTheme.colorScheme.primary))

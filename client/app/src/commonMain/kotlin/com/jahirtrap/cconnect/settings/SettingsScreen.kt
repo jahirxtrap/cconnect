@@ -196,6 +196,7 @@ import com.jahirtrap.cconnect.ui.theme.accentNameAt
 import com.jahirtrap.cconnect.ui.theme.dynamicAccent
 import com.jahirtrap.cconnect.ui.theme.systemAccent
 import kotlin.uuid.Uuid
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private const val KOFI_URL = "https://ko-fi.com/jahirtrap"
 
@@ -1051,7 +1052,7 @@ private fun LocalServerDialog(settings: Settings, probePort: Int, reachable: Boo
                     color = if (failureText != null) palette.red else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(2.dp, if (failureText != null) palette.red else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
+                        .border(snapDp(2.dp), if (failureText != null) palette.red else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 8.dp),
                 )
             }

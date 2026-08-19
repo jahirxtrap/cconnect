@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 @Composable
 fun OutlinedPanel(
@@ -23,7 +24,7 @@ fun OutlinedPanel(
     Column(
         modifier = modifier
             .clip(shape)
-            .border(2.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .border(snapDp(2.dp), MaterialTheme.colorScheme.outlineVariant, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         content = content,

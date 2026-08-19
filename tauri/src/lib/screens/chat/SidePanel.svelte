@@ -89,6 +89,9 @@
   );
 
   const AT_BOTTOM_PX = 4;
+  const SETTLE_MS = 120;
+  const OWN_TOP_PX = 1;
+  const SCROLL_END = "onscrollend" in window;
   const HALF = 2;
   const SCROLL_BUTTON_GAP = 12;
 
@@ -97,41 +100,59 @@
   let viewport = $state(0);
   let horizontalScrollbar = $state(0);
   let verticalScrollbar = $state(0);
-  let lastTop = 0;
-  let programmatic = false;
+  let ownTop = -1;
+  let smooth = false;
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const distanceToBottom = () => (list ? list.scrollHeight - list.scrollTop - list.clientHeight : 0);
 
   const scrollToEnd = () => {
     if (!list) return;
-    programmatic = true;
     list.scrollTop = list.scrollHeight;
-    lastTop = list.scrollTop;
+    ownTop = list.scrollTop;
+  };
+
+  const smoothToEnd = () => {
+    if (!list) return;
+    smooth = true;
+    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+  };
+
+  const settle = () => {
+    settleTimer = null;
+    smooth = false;
+    if (distanceToBottom() <= AT_BOTTOM_PX) follow = true;
   };
 
   const onscroll = () => {
     if (!list) return;
     const top = list.scrollTop;
-    const manual = !programmatic;
-    programmatic = false;
-    if (manual && top < lastTop) follow = false;
-    lastTop = top;
-    belowFold = list.scrollHeight - top - list.clientHeight;
+    belowFold = distanceToBottom();
     viewport = list.clientHeight;
     verticalScrollbar = list.offsetWidth - list.clientWidth;
     horizontalScrollbar = list.offsetHeight - list.clientHeight;
-    if (belowFold <= AT_BOTTOM_PX) follow = true;
+    const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
+    ownTop = -1;
+    if (!ours && belowFold > AT_BOTTOM_PX) follow = false;
+    if (!SCROLL_END) {
+      if (settleTimer !== null) clearTimeout(settleTimer);
+      settleTimer = setTimeout(settle, SETTLE_MS);
+    }
   };
 
   const toBottom = () => {
-    if (!list) return;
     follow = true;
-    programmatic = true;
-    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+    smoothToEnd();
   };
 
   $effect(() => {
     void messages.at(-1)?.text;
     void messages.length;
     if (follow) scrollToEnd();
+  });
+
+  $effect(() => () => {
+    if (settleTimer !== null) clearTimeout(settleTimer);
   });
 
   const PANEL_MS = 350;
@@ -178,7 +199,7 @@
   <div class="h-px shrink-0 bg-outline-variant"></div>
 
   <div class="relative min-h-0 flex-1">
-    <div bind:this={list} {onscroll} class="selectable h-full overflow-x-hidden overflow-y-auto">
+    <div bind:this={list} {onscroll} onscrollend={settle} class="selectable h-full overflow-x-hidden overflow-y-auto">
       {#each messages as item, index (item.id)}
         <MessageItem
           message={item}

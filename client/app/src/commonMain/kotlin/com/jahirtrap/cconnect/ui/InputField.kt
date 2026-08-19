@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 @Composable
 fun InputField(
@@ -58,7 +59,7 @@ fun InputField(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .border(2.dp, borderColor, shape)
+                .border(snapDp(2.dp), borderColor, shape)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

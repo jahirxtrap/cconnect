@@ -143,6 +143,7 @@ import com.jahirtrap.cconnect.data.remote.SharedApi
 import com.jahirtrap.cconnect.data.remote.SharedWatchSocket
 import com.jahirtrap.cconnect.ui.AbovePopupMenu
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.topEdge
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.draw.drawBehind
 import com.jahirtrap.cconnect.ui.AppTopBar
@@ -173,6 +174,7 @@ import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private enum class TransferKind { Move, Copy, Extract }
 
@@ -731,7 +733,7 @@ fun FileExplorerScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()
                 .fileDropTarget(enabled = archive == null, onDragChange = { dropOver = it }) { pendingUploads = it }
-                .then(if (dropOver) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier)
+                .then(if (dropOver) Modifier.border(snapDp(2.dp), MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier)
                 .focusRequester(screenFocus).focusable()
                 .onPreviewKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown) false
@@ -1229,7 +1231,7 @@ private fun SelectionBar(content: @Composable RowScope.() -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .drawBehind { drawLine(edge, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .drawBehind { topEdge(edge) }
             .navigationBarsPadding()
             .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.End),

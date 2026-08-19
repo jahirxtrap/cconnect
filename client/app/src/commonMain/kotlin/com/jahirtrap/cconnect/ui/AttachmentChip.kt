@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.File
 import com.composables.icons.lucide.Lucide
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 @Composable
 fun AttachmentChip(
@@ -36,7 +37,7 @@ fun AttachmentChip(
         modifier = modifier
             .widthIn(max = 240.dp)
             .clip(shape)
-            .border(2.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .border(snapDp(2.dp), MaterialTheme.colorScheme.outlineVariant, shape)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

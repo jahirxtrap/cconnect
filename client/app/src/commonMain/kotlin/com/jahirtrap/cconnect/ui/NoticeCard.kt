@@ -13,6 +13,7 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.jahirtrap.cconnect.ui.theme.shadowLg
 import androidx.compose.ui.unit.dp
 import androidx.compose.material3.Icon
 import org.jetbrains.compose.resources.stringResource
@@ -37,12 +38,12 @@ fun NoticeCard(
         },
     )
     SwipeToDismissBox(state = dismissState, backgroundContent = {}) {
+        val shape = MaterialTheme.shapes.large
         Surface(
-            shape = MaterialTheme.shapes.large,
+            shape = shape,
             color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 0.dp,
-            shadowElevation = 4.dp,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.shadowLg(shape).fillMaxWidth(),
         ) {
             Row(
                 modifier = Modifier.padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),

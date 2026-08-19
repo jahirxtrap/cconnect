@@ -48,6 +48,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
+import com.jahirtrap.cconnect.ui.theme.shadowSm
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
@@ -115,6 +117,13 @@ import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.launch
+import com.jahirtrap.cconnect.ui.theme.snapDp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.PlaceholderVerticalAlign
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.foundation.text.appendInlineContent
+import androidx.compose.foundation.text.InlineTextContent
 
 private val BIG = 16.dp
 private val SMALL = 6.dp
@@ -329,7 +338,7 @@ fun StickyCollapsibleHeader(message: ChatMessage, onCollapse: () -> Unit, modifi
         else -> Triple(null, "", variant)
     }
     val (icon, label, tint) = spec
-    Surface(color = MaterialTheme.colorScheme.background, shadowElevation = 2.dp, modifier = modifier) {
+    Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.shadowSm(RectangleShape)) {
         Row(
             modifier = Modifier.fillMaxWidth().clickable { onCollapse() }.padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -470,11 +479,12 @@ private fun AgentBlock(message: ChatMessage, running: Boolean = false, expanded:
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(color = nameColor)) { append(name) }
                     if (!isExpanded && preview.isNotEmpty()) {
-                        append("  ")
+                        appendLabelGap()
                         withStyle(SpanStyle(color = previewColor)) { append(preview) }
                     }
                 },
                 style = MaterialTheme.typography.labelLarge,
+                inlineContent = labelGap(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -514,7 +524,7 @@ private fun PlanBlock(markdown: String, expanded: Boolean? = null, onToggle: (()
     val header = buildAnnotatedString {
         withStyle(SpanStyle(color = nameColor)) { append(planLabel) }
         if (!isExpanded && preview.isNotEmpty()) {
-            append("  ")
+            appendLabelGap()
             withStyle(SpanStyle(color = previewColor)) { append(preview) }
         }
     }
@@ -532,6 +542,7 @@ private fun PlanBlock(markdown: String, expanded: Boolean? = null, onToggle: (()
             Spacer(Modifier.size(6.dp))
             Text(
                 text = header,
+                inlineContent = labelGap(),
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -572,7 +583,7 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
     val header = buildAnnotatedString {
         withStyle(SpanStyle(color = nameColor)) { append(name.orEmpty()) }
         if (!isExpanded && preview.isNotEmpty()) {
-            append("  ")
+            appendLabelGap()
             withStyle(SpanStyle(color = previewColor)) { append(preview) }
         }
     }
@@ -594,6 +605,7 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
             Spacer(Modifier.size(6.dp))
             Text(
                 text = header,
+                inlineContent = labelGap(),
                 style = MaterialTheme.typography.labelLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -636,7 +648,7 @@ private fun NotificationBlock(summary: String) {
     val header = buildAnnotatedString {
         withStyle(SpanStyle(color = accent)) { append(label) }
         if (summary.isNotBlank()) {
-            append("  ")
+            appendLabelGap()
             withStyle(SpanStyle(color = muted)) { append(summary) }
         }
     }
@@ -648,6 +660,7 @@ private fun NotificationBlock(summary: String) {
         Spacer(Modifier.size(6.dp))
         Text(
             text = header,
+            inlineContent = labelGap(),
             style = MaterialTheme.typography.labelLarge,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -822,11 +835,12 @@ private fun InteractionBlock(
                 text = buildAnnotatedString {
                     withStyle(SpanStyle(color = titleColor)) { append(title) }
                     if (isPlan && !planExpanded && planPreview.isNotEmpty()) {
-                        append("  ")
+                        appendLabelGap()
                         withStyle(SpanStyle(color = previewColor)) { append(planPreview) }
                     }
                 },
                 style = MaterialTheme.typography.labelLarge,
+                inlineContent = labelGap(),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
@@ -1114,7 +1128,7 @@ private fun OptionRow(opt: InteractionOption, selected: Boolean, multi: Boolean,
             modifier = Modifier
                 .size(20.dp)
                 .clip(shape)
-                .border(2.dp, if (selected) accent else MaterialTheme.colorScheme.outline, shape),
+                .border(snapDp(2.dp), if (selected) accent else MaterialTheme.colorScheme.outline, shape),
             contentAlignment = Alignment.Center,
         ) {
             if (multi) {
@@ -1188,7 +1202,7 @@ private fun DraftInput(value: String, onValueChange: (String) -> Unit, placehold
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+            .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape)
             .padding(start = 10.dp, end = if (onClear != null) 4.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1211,5 +1225,17 @@ private fun DraftInput(value: String, onValueChange: (String) -> Unit, placehold
                 Icon(Lucide.X, contentDescription = stringResource(Res.string.cancel), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
             }
         }
+    }
+}
+
+private const val LabelGapTag = "labelGap"
+
+private fun AnnotatedString.Builder.appendLabelGap() = appendInlineContent(LabelGapTag, " ")
+
+@Composable
+private fun labelGap(): Map<String, InlineTextContent> {
+    val width = with(LocalDensity.current) { 6.dp.toSp() }
+    return remember(width) {
+        mapOf(LabelGapTag to InlineTextContent(Placeholder(width, 1.sp, PlaceholderVerticalAlign.Center)) {})
     }
 }

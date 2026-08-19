@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import com.jahirtrap.cconnect.ui.theme.bottomEdge
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,9 +57,7 @@ fun AppTopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
-            .drawBehind {
-                drawLine(line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
-            }
+            .drawBehind { bottomEdge(line) }
             .windowInsetsPadding(WindowInsets.systemBars.union(WindowInsets.displayCutout).only(barSides))
             .height(56.dp)
             .padding(horizontal = 4.dp),

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lucide
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private val SwatchSize = 40.dp
 
@@ -51,7 +52,7 @@ fun ColorSwatch(
                 if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outlineVariant,
                 CircleShape,
             )
-            .then(if (hovered) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+            .then(if (hovered) Modifier.border(snapDp(2.dp), Color.White, CircleShape) else Modifier)
             .hoverable(interaction)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

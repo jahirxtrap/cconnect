@@ -34,9 +34,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.shadowLg
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private val MenuMinWidth = 160.dp
 private val SubMenuMinWidth = 192.dp
@@ -70,18 +72,20 @@ private fun MenuPopup(
         val alpha by transition.animateFloat(
             transitionSpec = { MaterialTheme.motionScheme.fastEffectsSpec() },
         ) { if (it) 1f else 0f }
+        val shape = RoundedCornerShape(Radius.md)
         Surface(
-            modifier = modifier.graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                this.alpha = alpha
-                transformOrigin = origin
-            },
-            shape = RoundedCornerShape(Radius.md),
+            modifier = modifier
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    this.alpha = alpha
+                    transformOrigin = origin
+                }
+                .shadowLg(shape),
+            shape = shape,
             color = MaterialTheme.colorScheme.surfaceVariant,
             tonalElevation = 0.dp,
-            shadowElevation = MenuDefaults.ShadowElevation,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            border = BorderStroke(snapDp(2.dp), MaterialTheme.colorScheme.outlineVariant),
         ) {
             Column(
                 modifier = Modifier

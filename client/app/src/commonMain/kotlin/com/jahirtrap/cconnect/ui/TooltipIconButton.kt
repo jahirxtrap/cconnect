@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
 import com.jahirtrap.cconnect.isAndroidPlatform
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.shadowLg
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -142,12 +143,13 @@ fun TooltipTap(label: String, content: @Composable () -> Unit) {
 
 @Composable
 fun AppTooltip(label: String) {
+    val shape = RoundedCornerShape(Radius.sm)
     Surface(
-        shape = RoundedCornerShape(Radius.sm),
+        modifier = Modifier.shadowLg(shape),
+        shape = shape,
         color = MaterialTheme.colorScheme.surfaceVariant,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 0.dp,
-        shadowElevation = 8.dp,
     ) {
         Text(
             label,

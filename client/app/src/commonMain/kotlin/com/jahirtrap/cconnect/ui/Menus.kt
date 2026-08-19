@@ -43,6 +43,7 @@ import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.Lucide
 import kotlinx.coroutines.delay
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 private const val SUBMENU_CLOSE_MS = 160L
 
@@ -155,7 +156,7 @@ fun SelectField(
                     .fillMaxWidth()
                     .onSizeChanged { fieldWidth = with(density) { it.width.toDp() } }
                     .clip(shape)
-                    .border(2.dp, if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
+                    .border(snapDp(2.dp), if (open) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, shape)
                     .clickable(enabled = enabled) { if (onClick != null) onClick() else open = true }
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,

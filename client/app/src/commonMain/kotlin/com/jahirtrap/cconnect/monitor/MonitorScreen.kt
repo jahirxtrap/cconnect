@@ -74,7 +74,9 @@ import com.jahirtrap.cconnect.ui.handCursor
 import com.jahirtrap.cconnect.settings.SettingsGroup
 import com.jahirtrap.cconnect.ui.MetricBar
 import com.jahirtrap.cconnect.ui.MetricHeader
+import androidx.compose.foundation.BorderStroke
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.snapDp
 import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.theme.palette
@@ -218,7 +220,9 @@ fun MonitorScreen(onClose: () -> Unit) {
                     if (hasNetwork) stringResource(Res.string.network) else null,
                     stringResource(Res.string.server_logs),
                 )
+                val segmentBorder = snapDp(2.dp)
                 SingleChoiceSegmentedButtonRow(
+                    space = segmentBorder,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 6.dp),
@@ -234,6 +238,7 @@ fun MonitorScreen(onClose: () -> Unit) {
                             ),
                             modifier = Modifier.handCursor(),
                             icon = {},
+                            border = BorderStroke(segmentBorder, MaterialTheme.colorScheme.outlineVariant),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             colors = SegmentedButtonDefaults.colors(
                                 activeContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),

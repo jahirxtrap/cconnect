@@ -116,6 +116,9 @@ import com.jahirtrap.cconnect.ui.StatusSpinner
 import com.jahirtrap.cconnect.ui.Stop
 import com.jahirtrap.cconnect.ui.theme.palette
 import com.jahirtrap.cconnect.ui.theme.Radius
+import com.jahirtrap.cconnect.ui.theme.endEdge
+import com.jahirtrap.cconnect.ui.theme.topEdge
+import com.jahirtrap.cconnect.ui.theme.shadowMd
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
@@ -265,6 +268,7 @@ import com.jahirtrap.cconnect.ui.dayIndex
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
+import com.jahirtrap.cconnect.ui.theme.snapDp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -423,12 +427,7 @@ fun ChatScreen(
                     drawerContainerColor = MaterialTheme.colorScheme.surface,
                     modifier = Modifier.drawWithContent {
                         drawContent()
-                        drawLine(
-                            drawerEdge,
-                            Offset(size.width, 0f),
-                            Offset(size.width, size.height),
-                            1.dp.toPx(),
-                        )
+                        endEdge(drawerEdge)
                     },
                 ) {
                     if (mobile) ChatPanelContent(
@@ -467,12 +466,7 @@ fun ChatScreen(
                                 .width(sidebarWidth + sidebarStart)
                                 .drawWithContent {
                                     drawContent()
-                                    drawLine(
-                                        edge,
-                                        Offset(size.width, 0f),
-                                        Offset(size.width, size.height),
-                                        1.dp.toPx(),
-                                    )
+                                    endEdge(edge)
                                 },
                         ) {
                             Column(
@@ -652,7 +646,7 @@ fun ChatScreen(
                             Column(
                                 modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)).imePadding()
                                 .fileDropTarget(enabled = !sideActive, onDragChange = { dropOver = it }) { vm.addAttachments(it) }
-                                .then(if (dropOver) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
+                                .then(if (dropOver) Modifier.border(snapDp(2.dp), MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
                             ) {
                                 BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
                                     val boxHeightPx = constraints.maxHeight.toFloat()
@@ -758,8 +752,7 @@ fun ChatScreen(
                                                 },
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.onBackground,
-                                                shadowElevation = 4.dp,
-                                                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(32.dp).pointerHoverIcon(PointerIcon.Hand),
+                                                modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).shadowMd(CircleShape).size(32.dp).pointerHoverIcon(PointerIcon.Hand),
                                             ) {
                                                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                     Icon(
@@ -1269,8 +1262,7 @@ private fun SidePanel(
                         },
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.onBackground,
-                        shadowElevation = 4.dp,
-                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).size(32.dp),
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp).shadowMd(CircleShape).size(32.dp),
                     ) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Icon(
@@ -1366,7 +1358,7 @@ private fun ColumnScope.ChatPanelContent(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .drawBehind { drawLine(edge, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .drawBehind { topEdge(edge) }
             .padding(horizontal = 8.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1885,7 +1877,7 @@ private fun Composer(
             .padding(12.dp)
             .clip(shape)
             .background(MaterialTheme.colorScheme.surface)
-            .border(1.dp, accent ?: MaterialTheme.colorScheme.outlineVariant, shape)
+            .border(snapDp(2.dp), accent ?: MaterialTheme.colorScheme.outlineVariant, shape)
             .pointerHoverIcon(PointerIcon.Text)
             .foundationClickable(
                 interactionSource = remember { MutableInteractionSource() },

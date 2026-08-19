@@ -66,7 +66,10 @@
       : !!item.toolUseId && pendingToolIds.includes(item.toolUseId);
 
   const AT_BOTTOM_PX = 4;
+  const SETTLE_MS = 120;
+  const OWN_TOP_PX = 1;
   const LOAD_OLDER_PX = 200;
+  const SCROLL_END = "onscrollend" in window;
   const SCROLL_BUTTON_GAP = 12;
   const STICKY_FALLBACK = 40;
   const HALF = 2;
@@ -80,6 +83,10 @@
   let belowFold = $state(0);
   let viewport = $state(0);
   let anchorHeight: number | null = null;
+  let ownTop = -1;
+  let smooth = false;
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastId: number | null = null;
 
   const distanceToBottom = () =>
     container ? container.scrollHeight - container.scrollTop - container.clientHeight : 0;
@@ -87,6 +94,19 @@
   const scrollTo = (top: number) => {
     if (!container) return;
     container.scrollTop = top;
+    ownTop = container.scrollTop;
+  };
+
+  const smoothToEnd = () => {
+    if (!container) return;
+    smooth = true;
+    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+  };
+
+  const settle = () => {
+    settleTimer = null;
+    smooth = false;
+    if (distanceToBottom() <= AT_BOTTOM_PX) follow = true;
   };
 
   const expandedState = $state<Record<number, boolean>>({});
@@ -158,7 +178,13 @@
     const top = container.scrollTop;
     belowFold = distanceToBottom();
     viewport = container.clientHeight;
-    if (belowFold <= AT_BOTTOM_PX) follow = true;
+    const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
+    ownTop = -1;
+    if (!ours && belowFold > AT_BOTTOM_PX) follow = false;
+    if (!SCROLL_END) {
+      if (settleTimer !== null) clearTimeout(settleTimer);
+      settleTimer = setTimeout(settle, SETTLE_MS);
+    }
     updateSticky();
     if (top < LOAD_OLDER_PX) {
       anchorHeight = container.scrollHeight;
@@ -200,9 +226,8 @@
   };
 
   const toBottom = () => {
-    if (!container) return;
     follow = true;
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    smoothToEnd();
   };
 
   $effect(() => {
@@ -236,9 +261,12 @@
 
   $effect(() => {
     const last = messages.at(-1);
+    const id = last?.id ?? null;
+    if (id === lastId) return;
+    lastId = id;
     if (!last || last.role !== "interaction" || !last.interaction || !isPending(last.interaction)) return;
     follow = true;
-    container?.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    smoothToEnd();
   });
 
   $effect(() => {
@@ -248,6 +276,10 @@
   });
 
   $effect(() => onFollowChange(follow));
+
+  $effect(() => () => {
+    if (settleTimer !== null) clearTimeout(settleTimer);
+  });
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -258,6 +290,7 @@
     bind:this={container}
     {onscroll}
     {onwheel}
+    onscrollend={settle}
     ontouchmove={stopFollowing}
     class="selectable h-full overflow-x-hidden overflow-y-auto"
   >
