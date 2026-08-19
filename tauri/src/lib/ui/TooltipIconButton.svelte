@@ -33,12 +33,16 @@
   const HALF = 2;
 
   const SIZE_CLASS = /(^|\s)size-\S+/;
+  const ICON_SIZE_CLASS = /\[&_svg\]:size-/;
   const DEFAULT_SIZE = "size-9";
 
   const compact = $derived(/(^|\s)size-8(\s|$)/.test(className));
+  const iconSize = $derived(
+    ICON_SIZE_CLASS.test(className) ? "" : compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-6",
+  );
 
   const TRIGGER_CLASS = $derived(
-    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-6"} ${className}`,
+    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
   );
 
   let open = $state(false);

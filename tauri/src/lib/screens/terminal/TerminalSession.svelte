@@ -161,29 +161,36 @@
   });
 </script>
 
+{#snippet sessionStatus()}
+  {#if status === "connecting"}
+    <LoadingIndicator size={8} fill />
+  {:else}
+    <StatusDot class={status === "connected" ? "bg-green" : "bg-red"} box={8} />
+  {/if}
+{/snippet}
+
+{#snippet sessionActions()}
+  <TooltipIconButton
+    label={t("SSH_DISCONNECT")}
+    onclick={() => {
+      disconnect?.();
+      onClose();
+    }}
+  >
+    <X size={20} />
+  </TooltipIconButton>
+{/snippet}
+
 <div class="flex h-full flex-col">
-  <AppTopBar title={profile.name || profile.host} subtitle={statusLabel}>
+  <AppTopBar
+    title={profile.name || profile.host}
+    subtitle={isTauri ? statusLabel : null}
+    subtitleLeading={isTauri ? sessionStatus : undefined}
+    actions={isTauri ? sessionActions : undefined}
+  >
     {#snippet navigationIcon()}
       <TooltipIconButton label={t("BACK")} onclick={onClose}>
         <ArrowLeft size={20} />
-      </TooltipIconButton>
-    {/snippet}
-    {#snippet subtitleLeading()}
-      {#if status === "connecting"}
-        <LoadingIndicator size={14} />
-      {:else}
-        <StatusDot class={status === "connected" ? "bg-green" : "bg-red"} box={8} />
-      {/if}
-    {/snippet}
-    {#snippet actions()}
-      <TooltipIconButton
-        label={t("SSH_DISCONNECT")}
-        onclick={() => {
-          disconnect?.();
-          onClose();
-        }}
-      >
-        <X size={20} />
       </TooltipIconButton>
     {/snippet}
   </AppTopBar>

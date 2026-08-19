@@ -193,6 +193,10 @@
   });
 </script>
 
+{#snippet stateDot(enabled: boolean)}
+  <StatusDot class={enabled ? "bg-green" : "bg-outline-variant"} box={16} dot={10} />
+{/snippet}
+
 <div class="flex h-full flex-col">
   <AppTopBar
     {title}
@@ -292,18 +296,24 @@
           <ListRow
             title={plugin.name}
             subtitle={[plugin.marketplace, plugin.version, plugin.scope].filter(Boolean).join(" • ")}
-            dim={!plugin.enabled}
             onclick={() => (pluginMenu = plugin)}
-          />
+          >
+            {#snippet trailing()}
+              {@render stateDot(plugin.enabled)}
+            {/snippet}
+          </ListRow>
         {/each}
       {:else if kind === "skills"}
         {#each filteredSkills as skill (`${skill.plugin}/${skill.id}`)}
           <ListRow
             title={skill.name}
             subtitle={skill.description ?? skill.pluginName}
-            dim={!skill.enabled}
             onclick={() => (skillSheet = skill)}
-          />
+          >
+            {#snippet trailing()}
+              {@render stateDot(skill.enabled)}
+            {/snippet}
+          </ListRow>
         {/each}
       {:else if kind === "mcp"}
         {#each mcpServers ?? [] as server (server.name)}
@@ -313,11 +323,19 @@
               .filter(Boolean)
               .join(" • ")}
             onclick={() => (mcpMenu = server)}
-          />
+          >
+            {#snippet trailing()}
+              {@render stateDot(true)}
+            {/snippet}
+          </ListRow>
         {/each}
       {:else if kind === "marketplaces"}
         {#each extensions?.marketplaces ?? [] as market (market.name)}
-          <ListRow title={market.name} subtitle={market.repo} onclick={() => (marketMenu = market)} />
+          <ListRow title={market.name} subtitle={market.repo} onclick={() => (marketMenu = market)}>
+            {#snippet trailing()}
+              {@render stateDot(true)}
+            {/snippet}
+          </ListRow>
         {/each}
       {:else if kind === "memories"}
         {#if !memoryList.length}
@@ -328,7 +346,11 @@
             title={memory.name}
             subtitle={memory.description ?? scopeLabel(memory.scope)}
             onclick={() => openMemory(memory.scope, memory.name)}
-          />
+          >
+            {#snippet trailing()}
+              {@render stateDot(true)}
+            {/snippet}
+          </ListRow>
         {/each}
       {:else if kind === "changelog"}
         {#if notesFailed}
