@@ -413,6 +413,9 @@ async def chat_ws(ws: WebSocket):
                     "has_more": start > 0,
                 })
 
+            elif mtype == "ping":
+                await send({"type": "pong"})
+
             else:
                 await send({"type": "error", "message": f"unknown message type: {mtype}"})
 

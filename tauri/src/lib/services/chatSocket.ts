@@ -97,6 +97,8 @@ type Wire = Record<string, unknown>;
 const MAX_BACKOFF_MS = 15_000;
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
+const PING_MS = 20_000;
+const STALE_MS = 45_000;
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
@@ -118,6 +120,8 @@ export class ChatSocket {
   #timer: ReturnType<typeof setTimeout> | null = null;
 
   #buffered: string[] = [];
+  #heartbeat: ReturnType<typeof setInterval> | null = null;
+  #lastSeen = 0;
   #channel: string | null = null;
   #lastSeq = 0;
   #sideChannel: string | null = null;
@@ -134,10 +138,42 @@ export class ChatSocket {
     this.#attempts = 0;
     this.#clearTimer();
     this.#open();
+    document.addEventListener("visibilitychange", this.#onVisible);
+  }
+
+  #onVisible = () => {
+    if (this.#closed || document.visibilityState !== "visible") return;
+    this.#lastSeen = Date.now();
+    if (this.#socket?.readyState === WebSocket.OPEN) return;
+    this.#attempts = 0;
+    this.#clearTimer();
+    this.#open();
+  };
+
+  #startHeartbeat() {
+    this.#stopHeartbeat();
+    this.#lastSeen = Date.now();
+    this.#heartbeat = setInterval(() => {
+      const socket = this.#socket;
+      if (socket?.readyState !== WebSocket.OPEN) return;
+      const idle = Date.now() - this.#lastSeen;
+      if (idle > STALE_MS) {
+        socket.close();
+        return;
+      }
+      if (idle >= PING_MS) this.#send({ type: "ping" });
+    }, PING_MS);
+  }
+
+  #stopHeartbeat() {
+    if (this.#heartbeat !== null) clearInterval(this.#heartbeat);
+    this.#heartbeat = null;
   }
 
   close() {
     this.#closed = true;
+    this.#stopHeartbeat();
+    document.removeEventListener("visibilitychange", this.#onVisible);
     this.#clearTimer();
     this.#generation++;
     this.#socket?.close(1000);
@@ -239,7 +275,11 @@ export class ChatSocket {
       socket.send(frame);
       return true;
     }
-    if (socket?.readyState === WebSocket.CONNECTING) this.#buffered.push(frame);
+    this.#buffered.push(frame);
+    if (!this.#closed && socket?.readyState !== WebSocket.CONNECTING && this.#timer === null) {
+      this.#clearTimer();
+      this.#open();
+    }
     return false;
   }
 
@@ -253,7 +293,6 @@ export class ChatSocket {
     if (!url) return;
     const generation = ++this.#generation;
     this.#socket?.close();
-    this.#buffered = [];
     this.onEvent(false, null, { type: "connecting" });
     const socket = new WebSocket(url);
     this.#socket = socket;
@@ -261,6 +300,7 @@ export class ChatSocket {
     socket.onopen = () => {
       if (generation !== this.#generation) return;
       this.#attempts = 0;
+      this.#startHeartbeat();
       const buffered = this.#buffered;
       this.#buffered = [];
       buffered.forEach((frame) => socket.send(frame));
@@ -268,6 +308,7 @@ export class ChatSocket {
     };
     socket.onmessage = (event) => {
       if (generation !== this.#generation) return;
+      this.#lastSeen = Date.now();
       this.#parse(event.data as string);
     };
     socket.onclose = (event) => {
@@ -279,7 +320,7 @@ export class ChatSocket {
   }
 
   #drop(reason: string) {
-    this.#buffered = [];
+    this.#stopHeartbeat();
     this.onEvent(false, null, { type: "closed", reason });
     if (this.#closed || this.#timer !== null) return;
     const backoff = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS << Math.min(this.#attempts, MAX_BACKOFF_SHIFT));
@@ -299,6 +340,7 @@ export class ChatSocket {
     }
 
     const kind = text(wire, "type");
+    if (kind === "pong") return;
     if (kind === "ready") {
       const channel = text(wire, "channel");
       if (channel && channel !== this.#channel) {

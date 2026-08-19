@@ -6,6 +6,7 @@ import {
   type ChatMessage,
   type ConnectionState,
   type InteractionData,
+  type InteractionOption,
   type QueuedMessage,
   type QuestionDraft,
   type Role,
@@ -36,6 +37,14 @@ const COMPACT_COMMAND = "/compact";
 const PROJECT_KEY_SEPARATOR = /[^A-Za-z0-9]/g;
 const PREVIEW_LENGTH = 120;
 const NOTIFICATION_BODY_LENGTH = 120;
+
+const optionNotificationLabel = (option: InteractionOption): string | null => {
+  if (option.label) return option.label;
+  if (option.id === "allow") return t("PERMISSION_ALLOW");
+  if (option.id === "allow_always") return t("PERMISSION_ALLOW_ALWAYS");
+  if (option.id === "deny") return t("PERMISSION_DENY");
+  return null;
+};
 const MESSAGE_TAIL_CAP = 500;
 const MESSAGE_INITIAL_CAP = 100;
 const MILLIS_PER_SECOND = 1000;
@@ -1448,6 +1457,12 @@ export class ChatState {
               t(question ? "NOTIF_QUESTION" : "NOTIF_PERMISSION"),
               this.#notificationBody(question, event.questions[0]?.question, event.toolName, event.input),
               this.tabId,
+              event.options
+                .map((option) => {
+                  const label = optionNotificationLabel(option);
+                  return label === null ? null : { label, requestId: event.requestId, optionId: option.id };
+                })
+                .filter((action) => action !== null),
             );
           }
         }

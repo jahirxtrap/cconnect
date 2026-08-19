@@ -1,13 +1,24 @@
-import { isTauri } from "$lib/platform";
+import { isMobile, isTauri } from "$lib/platform";
+import { http } from "./http";
 
 export type NotificationKind = "task_done" | "interaction";
+
+export interface NotificationAction {
+  label: string;
+  requestId: string;
+  optionId: string;
+}
+
+const ACTION_TYPE = "interaction";
+const MAX_ACTIONS = 3;
 
 class Notifier {
   granted = $state(false);
 
   #foreground = true;
   #pendingTab: string | null = null;
-  #activate: ((tabId: string | null) => void) | null = null;
+  #activate: ((tabId: string | null) => void) | null = null;
+  #actions: NotificationAction[] = [];
 
   start(onActivate: (tabId: string | null) => void) {
     this.#activate = onActivate;
@@ -23,12 +34,31 @@ class Notifier {
     void this.#listenForTaps();
   }
 
-  async notify(title: string, body: string | null, targetTab: string | null = null) {
+  async notify(
+    title: string,
+    body: string | null,
+    targetTab: string | null = null,
+    actions: NotificationAction[] = [],
+  ) {
     if (this.#foreground || !this.granted) return;
     this.#pendingTab = targetTab;
     if (isTauri) {
-      const { sendNotification } = await import("@tauri-apps/plugin-notification");
-      sendNotification({ title, body: body ?? undefined });
+      const { registerActionTypes, sendNotification } = await import("@tauri-apps/plugin-notification");
+      this.#actions = actions.slice(0, MAX_ACTIONS);
+      if (isMobile && this.#actions.length) {
+        await registerActionTypes([
+          {
+            id: ACTION_TYPE,
+            actions: this.#actions.map((action, index) => ({ id: String(index), title: action.label })),
+          },
+        ]).catch(() => undefined);
+      }
+      sendNotification({
+        title,
+        body: body ?? undefined,
+        ...(isMobile ? { icon: "ic_notification" } : {}),
+        ...(isMobile && this.#actions.length ? { actionTypeId: ACTION_TYPE } : {}),
+      });
       return;
     }
     const notification = new Notification(title, { body: body ?? undefined });
@@ -70,7 +100,13 @@ class Notifier {
     if (!isTauri) return;
     const { onAction } = await import("@tauri-apps/plugin-notification");
     try {
-      await onAction(() => {
+      await onAction((notification) => {
+        const actionId = (notification as { actionId?: string }).actionId;
+        const chosen = actionId === undefined ? undefined : this.#actions[Number(actionId)];
+        if (chosen) {
+          this.#actions = [];
+          void http.post("/chat/interaction", { id: chosen.requestId, option_id: chosen.optionId });
+        }
         void this.#focusWindow();
         this.#open();
       });
