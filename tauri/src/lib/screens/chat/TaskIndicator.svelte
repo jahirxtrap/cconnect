@@ -64,6 +64,8 @@
     </DropdownMenu.Trigger>
     <DropdownMenu.Portal>
       <DropdownMenu.Content
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
         align="end"
         sideOffset={6}
         class="menu-surface scrollbar-thin z-70 max-h-96 w-80 overflow-y-auto rounded-md border-2 border-outline-variant bg-surface-variant p-1 shadow-lg"

@@ -75,21 +75,18 @@
   let verticalScrollbar = $state(0);
 
   let container = $state<HTMLDivElement | null>(null);
+  let content = $state<HTMLDivElement | null>(null);
   let follow = $state(true);
   let belowFold = $state(0);
   let viewport = $state(0);
   let anchorHeight: number | null = null;
-  let lastTop = 0;
-  let programmatic = false;
 
   const distanceToBottom = () =>
     container ? container.scrollHeight - container.scrollTop - container.clientHeight : 0;
 
   const scrollTo = (top: number) => {
     if (!container) return;
-    programmatic = true;
     container.scrollTop = top;
-    lastTop = container.scrollTop;
   };
 
   const expandedState = $state<Record<number, boolean>>({});
@@ -98,8 +95,8 @@
   let sticky = $state<{ message: ChatMessage; gap: number; push: number } | null>(null);
 
   const firstVisible = (): HTMLElement | null => {
-    if (!container) return null;
-    const items = container.children;
+    if (!container || !content) return null;
+    const items = content.children;
     let low = 0;
     let high = items.length - 1;
     let found: HTMLElement | null = null;
@@ -159,10 +156,6 @@
     if (!container) return;
     measureScrollbar();
     const top = container.scrollTop;
-    const manual = !programmatic;
-    programmatic = false;
-    if (manual && top < lastTop) follow = false;
-    lastTop = top;
     belowFold = distanceToBottom();
     viewport = container.clientHeight;
     if (belowFold <= AT_BOTTOM_PX) follow = true;
@@ -198,22 +191,33 @@
     selection.addRange(range);
   };
 
+  const stopFollowing = () => {
+    follow = false;
+  };
+
+  const onwheel = (event: WheelEvent) => {
+    if (event.deltaY < 0) stopFollowing();
+  };
+
   const toBottom = () => {
     if (!container) return;
     follow = true;
-    programmatic = true;
     container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   };
 
   $effect(() => {
     const element = container;
-    if (!element) return;
+    const inner = content;
+    if (!element || !inner) return;
     measureScrollbar();
     const observer = new ResizeObserver(() => {
       measureScrollbar();
       if (follow) scrollTo(element.scrollHeight);
+      belowFold = distanceToBottom();
+      viewport = element.clientHeight;
     });
     observer.observe(element);
+    observer.observe(inner);
     return () => observer.disconnect();
   });
 
@@ -234,7 +238,6 @@
     const last = messages.at(-1);
     if (!last || last.role !== "interaction" || !last.interaction || !isPending(last.interaction)) return;
     follow = true;
-    programmatic = true;
     container?.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
   });
 
@@ -250,7 +253,15 @@
 <svelte:window onkeydown={onKeydown} />
 
 <div class="relative h-full">
-  <div bind:this={container} {onscroll} class="selectable h-full overflow-y-auto">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div
+    bind:this={container}
+    {onscroll}
+    {onwheel}
+    ontouchmove={stopFollowing}
+    class="selectable h-full overflow-x-hidden overflow-y-auto"
+  >
+    <div bind:this={content}>
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
       <div data-mid={item.id}>
@@ -275,9 +286,10 @@
     {#if streamStatus && !(compacting && streamStatus === "slow")}
       <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
     {/if}
-    {#if compacting}
-      <StatusProgress kind="compacting" />
-    {/if}
+      {#if compacting}
+        <StatusProgress kind="compacting" />
+      {/if}
+    </div>
   </div>
 
   {#if sticky}

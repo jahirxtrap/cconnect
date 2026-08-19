@@ -148,7 +148,7 @@
   >
     {@render children()}
   </button>
-  <TouchTip text={label} anchor={touchTip} />
+  <TouchTip text={label} anchor={touchTip} onDismiss={hideTouchTip} />
 {:else}
   <Tooltip.Provider>
     <Tooltip.Root {open} onOpenChange={(value) => !value && hide()}>

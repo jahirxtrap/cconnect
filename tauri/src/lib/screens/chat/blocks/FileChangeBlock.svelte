@@ -44,7 +44,7 @@
     class="no-scrollbar w-full overflow-x-auto rounded-sm bg-surface-variant py-1 font-mono text-body-sm leading-snug"
   >
     {#each diffLines as line, index (index)}
-      <div class="px-2.5 py-px whitespace-pre {LINE_CLASS[line.kind]}">{!line.text &&
+      <div class="w-max px-2.5 py-px whitespace-pre {LINE_CLASS[line.kind]}">{!line.text &&
         !PREFIX[line.kind]
           ? " "
           : `${PREFIX[line.kind]}${line.text}`}</div>

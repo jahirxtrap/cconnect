@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Dialog } from "bits-ui";
   import type { Snippet } from "svelte";
+  import { pushDismiss } from "$lib/app/dismissStack";
 
   interface Props {
     title: string;
@@ -13,6 +14,8 @@
   }
 
   const { title, onDismiss, description, padded = true, titleTrailing, buttons, children }: Props = $props();
+
+  $effect(() => pushDismiss(() => onDismiss()));
 </script>
 
 <Dialog.Root open onOpenChange={(open) => !open && onDismiss()}>

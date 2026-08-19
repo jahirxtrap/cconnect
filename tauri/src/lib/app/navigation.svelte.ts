@@ -1,4 +1,5 @@
 import { backend } from "$lib/services/backend.svelte";
+import { dismissTop } from "$lib/app/dismissStack";
 
 export const ROUTES = ["/settings", "/claude", "/monitor", "/files", "/terminal", "/markdown"] as const;
 
@@ -28,6 +29,7 @@ class Navigation {
     }
 
     (window as unknown as { __cconnectBack?: () => boolean }).__cconnectBack = () => {
+      if (dismissTop()) return true;
       if (this.#layers > 0 || this.preview) {
         window.history.back();
         return true;
@@ -41,6 +43,10 @@ class Navigation {
 
     $effect(() => {
       const onPopState = () => {
+        if (dismissTop()) {
+          window.history.pushState(null, "", window.location.href);
+          return;
+        }
         if (this.preview) {
           this.preview = null;
           return;

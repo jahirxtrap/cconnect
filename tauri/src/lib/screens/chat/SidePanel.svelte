@@ -178,7 +178,7 @@
   <div class="h-px shrink-0 bg-outline-variant"></div>
 
   <div class="relative min-h-0 flex-1">
-    <div bind:this={list} {onscroll} class="selectable h-full overflow-y-auto">
+    <div bind:this={list} {onscroll} class="selectable h-full overflow-x-hidden overflow-y-auto">
       {#each messages as item, index (item.id)}
         <MessageItem
           message={item}

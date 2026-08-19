@@ -4,10 +4,22 @@
 
   interface Props {
     text: string;
-    anchor: { x: number; top: number; bottom: number } | null;
+    anchor: { x: number; top: number; bottom: number } | null;
+    onDismiss?: (() => void) | null;
   }
 
-  const { text, anchor }: Props = $props();
+  const { text, anchor, onDismiss = null }: Props = $props();
+
+  $effect(() => {
+    if (anchor === null || !onDismiss) return;
+    const close = () => onDismiss();
+    window.addEventListener("resize", close);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("resize", close);
+      window.removeEventListener("scroll", close, true);
+    };
+  });
 
   const GAP = 4;
   const EDGE = 8;

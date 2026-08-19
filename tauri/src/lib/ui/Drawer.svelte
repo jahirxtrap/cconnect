@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { isTouch } from "$lib/platform";
+  import { layout } from "$lib/platform/layout.svelte";
   import { dismissMenus, menusOpen } from "./MenuScrim.svelte";
+  import { pushDismiss } from "$lib/app/dismissStack";
 
   interface Props {
     open: boolean;
@@ -11,7 +13,9 @@
     children: Snippet;
   }
 
-  const { open, onDismiss, onOpen = null, width = 300, children }: Props = $props();
+  const MAX_WIDTH = 360;
+
+  const { open, onDismiss, onOpen = null, width = MAX_WIDTH, children }: Props = $props();
 
   const SLOP = 6;
   const HALF = 2;
@@ -41,7 +45,7 @@
   };
 
   const onStart = (event: TouchEvent) => {
-    if (menusOpen()) return;
+    if (menusOpen() || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     const touch = event.touches[0];
     if (!open && !onOpen) return;
     if (scrollsHorizontally(event.target)) return;
@@ -53,7 +57,7 @@
     lastX = touch.clientX;
     lastAt = event.timeStamp;
     speed = 0;
-    offset = open ? width : 0;
+    offset = open ? sheetWidth : 0;
   };
 
   const onMove = (event: TouchEvent) => {
@@ -74,7 +78,7 @@
     if (elapsed > 0) speed = ((touch.clientX - lastX) / elapsed) * 1000;
     lastX = touch.clientX;
     lastAt = event.timeStamp;
-    offset = Math.min(width, Math.max(0, (open ? width : 0) + dx));
+    offset = Math.min(sheetWidth, Math.max(0, (open ? sheetWidth : 0) + dx));
     event.preventDefault();
   };
 
@@ -84,7 +88,7 @@
     if (!dragging) return;
     dragging = false;
     const flung = Math.abs(speed) > FLING_SPEED;
-    const opening = flung ? speed > 0 : offset > width / HALF;
+    const opening = flung ? speed > 0 : offset > sheetWidth / HALF;
     if (opening) onOpen?.();
     else onDismiss();
   };
@@ -105,16 +109,23 @@
     };
   });
 
-  const shade = $derived(dragging ? offset / width : open ? 1 : 0);
+  const sheetWidth = $derived(Math.min(width, layout.width));
+
+  const shade = $derived(dragging ? offset / sheetWidth : open ? 1 : 0);
 
   $effect(() => {
     if (!open) dismissMenus();
+  });
+
+  $effect(() => {
+    if (!open) return;
+    return pushDismiss(onDismiss);
   });
 </script>
 
 {#if open || dragging}
   <div
-    class="fixed inset-0 z-40 bg-black/40 {dragging ? '' : 'transition-opacity duration-200'}"
+    class="fixed inset-0 z-40 bg-black/32 {dragging ? '' : 'transition-opacity duration-200'}"
     style="opacity: {shade}"
     role="presentation"
     onclick={onDismiss}
@@ -125,11 +136,11 @@
   class="fixed inset-y-0 left-0 z-40 border-r border-outline-variant bg-surface {dragging
     ? ''
     : 'transition-transform duration-200'}"
-  style="width: {width}px; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); transform: translateX({dragging
-    ? offset - width
+  style="width: {sheetWidth}px; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); transform: translateX({dragging
+    ? offset - sheetWidth
     : open
       ? 0
-      : -width}px)"
+      : -sheetWidth}px)"
 >
   {@render children()}
 </aside>

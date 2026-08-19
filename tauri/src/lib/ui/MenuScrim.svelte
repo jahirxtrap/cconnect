@@ -10,6 +10,7 @@
 
 <script lang="ts">
   import { Portal } from "bits-ui";
+  import { pushDismiss } from "$lib/app/dismissStack";
 
   interface Props {
     open: boolean;
@@ -22,9 +23,11 @@
     if (!open) return;
     openCount += 1;
     const close = () => onDismiss();
+    const release = pushDismiss(close);
     window.addEventListener(DISMISS_MENUS, close);
     return () => {
       openCount -= 1;
+      release();
       window.removeEventListener(DISMISS_MENUS, close);
     };
   });

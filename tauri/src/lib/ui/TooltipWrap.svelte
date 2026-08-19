@@ -80,4 +80,4 @@
     {@render children()}
   </span>
 {/if}
-<TouchTip text={label} anchor={tip} />
+<TouchTip text={label} anchor={tip} onDismiss={() => (tip = null)} />

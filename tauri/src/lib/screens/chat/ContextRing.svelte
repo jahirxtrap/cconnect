@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import TouchTip from "$lib/ui/TouchTip.svelte";
+  import { holdFocus, keepFocus } from "$lib/ui/keepFocus";
 
   interface Props {
     tokens: number;
@@ -55,17 +56,18 @@
 {#if isTouch}
   <button
     type="button"
+    use:keepFocus
     onclick={reveal}
     aria-label={t("CONTEXT_USAGE")}
     class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full"
   >
     {@render ring()}
   </button>
-  <TouchTip text={summary} anchor={touchTip} />
+  <TouchTip text={summary} anchor={touchTip} onDismiss={() => (touchTip = null)} />
 {:else}
   <Tooltip.Provider>
     <Tooltip.Root delayDuration={0}>
-      <Tooltip.Trigger class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full">
+      <Tooltip.Trigger onmousedown={holdFocus} class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full">
         {@render ring()}
       </Tooltip.Trigger>
       <Tooltip.Portal>

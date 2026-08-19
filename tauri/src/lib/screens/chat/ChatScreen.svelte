@@ -50,6 +50,7 @@
   import TabSwitcher from "./TabSwitcher.svelte";
   import TaskIndicator from "./TaskIndicator.svelte";
   import { tabs } from "./tabs.svelte";
+  import { drawer } from "./drawer.svelte";
   import { pastedName } from "$lib/data/pastedFile";
 
   const chat = $derived(tabs.state);
@@ -64,7 +65,6 @@
     cli_outdated: "COMPAT_CLI_OUTDATED",
   };
 
-  let drawer = $state(false);
   let expanded = $state(settings.sidebarExpanded);
   let renameTarget = $state<SessionInfo | null>(null);
   let deleteTarget = $state<SessionInfo | null>(null);
@@ -90,7 +90,7 @@
       queuedId !== null ||
       sharedLink !== null ||
       navigation.preview !== null ||
-      (layout.mobile && drawer),
+      (layout.mobile && drawer.open),
   );
 
   const onPaste = (event: ClipboardEvent) => {
@@ -158,7 +158,7 @@
   };
 
   $effect(() => {
-    if (!layout.mobile) drawer = false;
+    if (!layout.mobile) drawer.open = false;
   });
 
   $effect(() =>
@@ -167,8 +167,8 @@
         chat.closeSideChat();
         return true;
       }
-      if (drawer) {
-        drawer = false;
+      if (drawer.open) {
+        drawer.open = false;
         return true;
       }
       return false;
@@ -367,7 +367,7 @@
 </div>
 
 {#snippet menuButton()}
-  <TooltipIconButton label={t("MENU")} onclick={() => (drawer = true)}>
+  <TooltipIconButton label={t("MENU")} onclick={() => (drawer.open = true)}>
     <Menu size={20} />
   </TooltipIconButton>
 {/snippet}
@@ -480,15 +480,14 @@
 
 {#if layout.mobile}
   <Drawer
-    open={drawer}
-    width={PANEL_WIDTH}
-    onDismiss={() => (drawer = false)}
-    onOpen={() => (drawer = true)}
+    open={drawer.open}
+    onDismiss={() => (drawer.open = false)}
+    onOpen={() => (drawer.open = true)}
   >
     <ChatPanel
       drawerMode
-      onClose={layout.touch ? null : () => (drawer = false)}
-      onAfterSelect={() => (drawer = false)}
+      onClose={layout.touch ? null : () => (drawer.open = false)}
+      onAfterSelect={() => (drawer.open = false)}
       onRename={(session) => (renameTarget = session)}
       onColor={(session) => (colorTarget = session)}
       onDelete={(session) => (deleteTarget = session)}

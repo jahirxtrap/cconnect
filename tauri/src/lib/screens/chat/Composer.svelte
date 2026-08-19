@@ -12,6 +12,7 @@
   import { isArchive } from "$lib/data/format";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTouch } from "$lib/platform";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -22,6 +23,7 @@
   import type { Attachment } from "./state.svelte";
   import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
   import { pastedName } from "$lib/data/pastedFile";
+  import { holdFocus, keepFocus } from "$lib/ui/keepFocus";
 
   interface Props {
     streaming: boolean;
@@ -117,7 +119,7 @@
   };
 
   const onkeydown = (event: KeyboardEvent) => {
-    if (event.key !== "Enter") return;
+    if (event.key !== "Enter" || isTouch) return;
     event.preventDefault();
     if (event.shiftKey || event.ctrlKey || event.metaKey) insertNewline();
     else submit();
@@ -197,6 +199,7 @@
       {#if onCloseSide}
         <button
           type="button"
+          use:keepFocus
           onclick={onCloseSide}
           aria-label={t("CLOSE")}
           title={t("CLOSE")}
@@ -208,6 +211,7 @@
         <button
           type="button"
           disabled={uploading}
+          use:keepFocus
           onclick={() => picker?.click()}
           aria-label={t("ATTACH_FILES")}
           title={t("ATTACH_FILES")}
@@ -218,6 +222,7 @@
         <MenuScrim open={menu} onDismiss={() => (menu = false)} />
         <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
           <DropdownMenu.Trigger
+            onmousedown={holdFocus}
             disabled={!commandsReady}
             aria-label={t("COMMANDS")}
             title={t("COMMANDS")}
@@ -227,6 +232,8 @@
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
+              onOpenAutoFocus={(event) => event.preventDefault()}
+              onCloseAutoFocus={(event) => event.preventDefault()}
               side="top"
               align="start"
               sideOffset={6}
@@ -253,6 +260,7 @@
       {#if busy}
         <button
           type="button"
+          use:keepFocus
           onclick={onInterrupt}
           aria-label={t("STOP")}
           title={t("STOP")}
@@ -264,6 +272,7 @@
       <button
         type="button"
         disabled={!canSubmit}
+        use:keepFocus
         onclick={submit}
         aria-label={t("SEND")}
         title={t("SEND")}

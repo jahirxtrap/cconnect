@@ -1514,10 +1514,9 @@ private fun ChatToolbar(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         TooltipWrap(stringResource(Res.string.quick_chat)) {
-            Box(modifier = Modifier.fillMaxHeight().padding(start = 2.dp)) {
+            Box(modifier = Modifier.padding(start = 2.dp)) {
                 Row(
                     modifier = Modifier
-                        .fillMaxHeight()
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onQuickChat)
@@ -1644,7 +1643,6 @@ private fun StreamToggle(streaming: Boolean, onClick: () -> Unit) {
     val color = if (streaming) palette.green else MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier
-            .fillMaxHeight()
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
             .clickable(onClick = onClick)

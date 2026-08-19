@@ -12,6 +12,7 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipWrap from "$lib/ui/TooltipWrap.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
+  import { keepFocus } from "$lib/ui/keepFocus";
   import ContextRing from "./ContextRing.svelte";
   import { permissionStyle } from "./permissionStyle";
 
@@ -70,7 +71,7 @@
   const STATE_CLASS =
     "flex shrink-0 cursor-default items-center gap-1 rounded-md bg-surface-variant px-2.5 py-1 text-label-md";
   const TOGGLE_CLASS =
-    "flex h-full shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-2 py-1 ripple";
+    "flex shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-2 py-1 ripple";
 
   let openMenu = $state<"model" | "effort" | "permission" | "account" | null>(null);
 
@@ -104,8 +105,8 @@
 </script>
 
 <div class="flex h-full min-w-0 flex-1 items-center">
-<TooltipWrap label={t("QUICK_CHAT")} class="relative flex h-full shrink-0 items-stretch pl-0.5">
-  <button type="button" onclick={onQuickChat} aria-label={t("QUICK_CHAT")} class={TOGGLE_CLASS}>
+<TooltipWrap label={t("QUICK_CHAT")} class="relative flex shrink-0 items-center pl-0.5">
+  <button type="button" use:keepFocus onclick={onQuickChat} aria-label={t("QUICK_CHAT")} class={TOGGLE_CLASS}>
     <MessagesSquare size={16} class="text-accent" />
   </button>
   {#if quickChatActive}
@@ -227,8 +228,8 @@
       </PopupMenu>
     {/if}
 
-    <TooltipWrap label={t("STREAMING")} class="flex h-full shrink-0 items-stretch">
-      <button type="button" onclick={onStreamTokens} aria-label={t("STREAMING")} class={TOGGLE_CLASS}>
+    <TooltipWrap label={t("STREAMING")} class="flex shrink-0 items-center">
+      <button type="button" use:keepFocus onclick={onStreamTokens} aria-label={t("STREAMING")} class={TOGGLE_CLASS}>
         <Radio size={16} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
       </button>
     </TooltipWrap>

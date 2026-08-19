@@ -1,5 +1,6 @@
 <script lang="ts">
   import { DropdownMenu } from "bits-ui";
+  import { holdFocus } from "./keepFocus";
   import type { Snippet } from "svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import MenuScrim from "./MenuScrim.svelte";
@@ -33,11 +34,13 @@
 <MenuScrim {open} onDismiss={() => onOpenChange(false)} />
 
 <DropdownMenu.Root {open} {onOpenChange}>
-  <DropdownMenu.Trigger class={triggerClass} aria-label={label}>
+  <DropdownMenu.Trigger onmousedown={holdFocus} class={triggerClass} aria-label={label}>
     {@render trigger()}
   </DropdownMenu.Trigger>
   <DropdownMenu.Portal>
     <DropdownMenu.Content
+      onOpenAutoFocus={(event) => event.preventDefault()}
+      onCloseAutoFocus={(event) => event.preventDefault()}
       {side}
       {align}
       sideOffset={4}

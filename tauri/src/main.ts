@@ -1,4 +1,5 @@
 import { mount } from "svelte";
+import { clearFocusOnKeyboardHide } from "$lib/platform/keyboard";
 import { SECURE_KEYS, secureStore } from "$lib/platform/secureStorage";
 import "./app.css";
 
@@ -10,6 +11,16 @@ const allowsSelection = (target: EventTarget | null) =>
 document.addEventListener("contextmenu", (event) => {
   if (!allowsSelection(event.target)) event.preventDefault();
 });
+
+document.addEventListener("selectionchange", () => {
+  const selection = document.getSelection();
+  if (!selection || selection.isCollapsed) return;
+  const node = selection.anchorNode;
+  const host = node instanceof Element ? node : node?.parentElement;
+  if (!allowsSelection(host ?? null)) selection.removeAllRanges();
+});
+
+clearFocusOnKeyboardHide();
 
 await secureStore.load(SECURE_KEYS);
 const { default: App } = await import("./App.svelte");
