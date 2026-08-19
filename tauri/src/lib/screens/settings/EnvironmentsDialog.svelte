@@ -8,7 +8,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import { parseQrPayload } from "$lib/data/qrPayload";
-  import { nativeScanAvailable, qrScanAvailable, scanNative } from "$lib/services/qrScanner";
+  import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
   import { address, backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -16,7 +16,6 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import QrScanDialog from "$lib/ui/QrScanDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import EnvironmentDialog from "./EnvironmentDialog.svelte";
 
@@ -28,21 +27,14 @@
 
   const qrAvailable = qrScanAvailable();
 
-  let scanning = $state(false);
-
   const startScan = async () => {
-    if (!nativeScanAvailable()) {
-      scanning = true;
-      return;
-    }
-    const raw = await scanNative();
+    const raw = await scanQr();
     if (raw) applyQr(raw);
   };
 
   const applyQr = (raw: string) => {
     const payload = parseQrPayload(raw);
     if (!payload) return;
-    scanning = false;
     editing = { ...blank(), host: payload.url, authKind: "bearer", authToken: payload.token };
     isNew = true;
   };
@@ -174,8 +166,4 @@
     onConfirm={() => remove(profile)}
     onDismiss={() => (deleting = null)}
   />
-{/if}
-
-{#if scanning}
-  <QrScanDialog onScan={applyQr} onDismiss={() => (scanning = false)} />
 {/if}

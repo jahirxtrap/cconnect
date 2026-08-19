@@ -83,6 +83,17 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(SystemBars(), "AndroidSystemBars")
     webView.addJavascriptInterface(downloads, "AndroidDownloads")
     webView.addJavascriptInterface(Background(), "AndroidBackground")
+    webView.addJavascriptInterface(CodeScanner(), "AndroidQrScan")
+  }
+
+  inner class CodeScanner {
+    private val scanner by lazy { QrScan(this@MainActivity) { content } }
+
+    @JavascriptInterface
+    fun isAvailable(): Boolean = scanner.available()
+
+    @JavascriptInterface
+    fun scan() = scanner.scan()
   }
 
   inner class Background {

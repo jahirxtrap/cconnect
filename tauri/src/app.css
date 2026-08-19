@@ -175,6 +175,19 @@ html[data-theme="dark"] {
   field-sizing: content;
 }
 
+html.scanning,
+html.scanning body {
+  background: transparent;
+}
+
+html.scanning #app {
+  visibility: hidden;
+}
+
+html.scanning .qr-overlay {
+  visibility: visible;
+}
+
 .ripple {
   position: relative;
 }

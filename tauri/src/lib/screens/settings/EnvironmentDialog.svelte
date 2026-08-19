@@ -9,12 +9,11 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import type { AuthKind, EnvironmentProfile } from "$lib/services/backend.svelte";
-  import { nativeScanAvailable, qrScanAvailable, scanNative } from "$lib/services/qrScanner";
+  import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
   import Button from "$lib/ui/Button.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
-  import QrScanDialog from "$lib/ui/QrScanDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
@@ -78,16 +77,10 @@
   let authToken = $state(initial.authToken);
   let authUser = $state(initial.authUser);
   let authPassword = $state(initial.authPassword);
-  let scanning = $state(false);
-
   const qrAvailable = qrScanAvailable();
 
   const startScan = async () => {
-    if (!nativeScanAvailable()) {
-      scanning = true;
-      return;
-    }
-    const raw = await scanNative();
+    const raw = await scanQr();
     if (raw) applyQr(raw);
   };
 
@@ -96,7 +89,6 @@
     if (!payload) return;
     const parsed = parseHostInput(payload.url);
     if (!parsed) return;
-    scanning = false;
     kind = parsed.kind;
     host = parsed.host;
     port = parsed.kind === "https" ? "" : parsed.port;
@@ -245,10 +237,6 @@
     </SelectField>
   </div>
 </CompactDialog>
-
-{#if scanning}
-  <QrScanDialog onScan={applyQr} onDismiss={() => (scanning = false)} />
-{/if}
 
 {#if picking}
   <AccentDialog

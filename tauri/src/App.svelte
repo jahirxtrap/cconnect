@@ -17,6 +17,7 @@
   import SettingsScreen from "$lib/screens/settings/SettingsScreen.svelte";
   import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
+  import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
 
   theme.start();
   layout.start();
@@ -90,6 +91,8 @@
 </div>
 
 <TransfersPanel />
+
+<QrCameraOverlay />
 
 {#if navigation.preview}
   {@const request = navigation.preview}
