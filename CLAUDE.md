@@ -29,6 +29,9 @@ Changes to API contracts, event shapes, or schemas have to be reflected in both.
   **desktop** app (Windows/Linux/macOS), a **web** app (WebAssembly, hosted on
   Cloudflare Pages) and a native **Android** app, all over the same WebSocket/REST
   contract.
+- **Tauri**: a second app line (Svelte + Tauri) covering the same platforms and
+  the same contract, published alongside the client from the same release. Assets
+  and its web build are named `cconnect-tauri`.
 
 See `backend/CLAUDE.md` and `client/CLAUDE.md` for module-specific rules.
 

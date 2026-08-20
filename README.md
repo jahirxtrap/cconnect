@@ -14,12 +14,18 @@ any browser, locally over Tailscale or publicly over a Tailscale Funnel.
 ```
 cconnect/
 ├── backend/   # FastAPI bridge (Python) — see backend/CLAUDE.md
-└── client/    # Desktop, web and Android app (Compose Multiplatform) — Windows, Linux, macOS, the browser and Android — see client/CLAUDE.md
+├── client/    # Desktop, web and Android app (Compose Multiplatform) — Windows, Linux, macOS, the browser and Android — see client/CLAUDE.md
+└── tauri/     # The same app built with Svelte + Tauri, published as an alternative line
 ```
 
 The desktop and web apps are one Compose Multiplatform codebase: the desktop
 build is a native installer per OS, and the web build is the same UI compiled to
 WebAssembly and hosted as a static site (see [Web app](#web-app)).
+
+Every release carries both lines. The Tauri assets are named `cconnect-tauri`
+and its web build lives at https://cconnect-tauri.pages.dev/; either app can
+switch to the other from Settings. They share the backend, so only the interface
+changes.
 
 ## Run modes
 
@@ -147,7 +153,9 @@ over **HTTPS/WSS** — so the web app pairs with the public mode: run
 `python run.py --expose tailscale` and add the server with its
 `https://<hostname>.<tailnet>.ts.net` URL and token. (For that reason the
 environment form on web offers only HTTPS; the native apps keep plain HTTP for
-local backends.) Updating is just a reload.
+local backends.) Updating is just a reload. It is hosted at
+https://cconnect.pages.dev/, with the Tauri line at
+https://cconnect-tauri.pages.dev/.
 
 ## In the chat
 
@@ -172,8 +180,10 @@ choose whether to roll back the conversation alone or code and conversation
 together.
 
 Model, effort, permission mode, how much of each turn you see, and which Claude
-CLI the backend drives are all set from the app and shared across every client
-that connects.
+CLI the backend drives are all set from the app. The server holds the defaults
+and every client follows them, but each device can decide for itself how much of
+a turn it receives — including a **simple mode** that folds thinking and tool
+detail into a single working block, the way the quick chat already reads.
 
 ## Tabs
 
@@ -321,7 +331,9 @@ The app and the backend declare which versions of each other — and of the
 Claude CLI — they support. When something falls behind, a notice in the chat
 takes you straight to the right place: the app's own update (with its
 changelog), the server requirement, or the CLI update button. Release notes
-for both CConnect and Claude Code are readable in the app.
+for both CConnect and Claude Code are readable in the app. Next to the update
+button, Settings → About also switches you to the other app line, offering your
+settings to copy first — the chats themselves stay on the server.
 
 ## SSH client
 
