@@ -49,7 +49,7 @@ export type ServerEvent =
   | { type: "task"; id: string; content: string | null; status: string | null }
   | { type: "result"; sessionId: string | null; contextTokens: number | null }
   | { type: "context"; contextTokens: number | null }
-  | { type: "done" }
+  | { type: "done"; replay: boolean }
   | { type: "interrupted" }
   | { type: "error"; message: string }
   | { type: "api_error"; message: string }
@@ -65,6 +65,7 @@ export type ServerEvent =
     }
   | {
       type: "interaction_request";
+      replay: boolean;
       requestId: string;
       kind: string;
       toolName: string | null;
@@ -475,7 +476,7 @@ export class ChatSocket {
       case "context":
         return { type: "context", contextTokens: int(wire, "context_tokens") };
       case "done":
-        return { type: "done" };
+        return { type: "done", replay: wire.replay === true };
       case "interrupted":
         return { type: "interrupted" };
       case "error":
@@ -493,6 +494,7 @@ export class ChatSocket {
       case "interaction_request":
         return {
           type: "interaction_request",
+          replay: wire.replay === true,
           requestId: text(wire, "id") ?? "",
           kind: text(wire, "kind") ?? "permission",
           toolName: text(wire, "tool_name"),

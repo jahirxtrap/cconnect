@@ -1457,7 +1457,7 @@ export class ChatState {
         break;
       }
       case "done":
-        if (this.streaming && settings.notifyTaskDone) {
+        if (this.streaming && settings.notifyTaskDone && !event.replay) {
           void notifier.notify(
             t("NOTIF_TASK_DONE"),
             this.messages
@@ -1527,7 +1527,7 @@ export class ChatState {
               interaction: data,
             }),
           ];
-          if (settings.notifyInteraction) {
+          if (settings.notifyInteraction && !event.replay) {
             const question = event.kind === "questions";
             void notifier.notify(
               t(question ? "NOTIF_QUESTION" : "NOTIF_PERMISSION"),

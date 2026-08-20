@@ -1296,7 +1296,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         val cleaned = if (tuid != null) st.messages.filterNot { it.role == Role.TOOL && it.toolUseId == tuid } else st.messages
                         st.copy(messages = cleaned + ChatMessage(nextId++, Role.INTERACTION, event.input.orEmpty(), event.toolName, tuid, data, timestamp = nowMillis()))
                     }
-                    if (settings.notifyInteraction) {
+                    if (settings.notifyInteraction && !event.replay) {
                         val question = event.kind == "questions"
                         val isPlan = event.toolName == "ExitPlanMode"
                         val actions = if (question) emptyList() else event.options

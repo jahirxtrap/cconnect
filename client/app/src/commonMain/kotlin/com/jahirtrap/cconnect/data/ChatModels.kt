@@ -171,6 +171,7 @@ sealed interface ServerEvent {
         val title: String?,
         val options: List<InteractionOption>,
         val questions: List<InteractionQuestion> = emptyList(),
+        val replay: Boolean = false,
     ) : ServerEvent
     data class InteractionResolved(val requestId: String, val optionId: String?) : ServerEvent
 }

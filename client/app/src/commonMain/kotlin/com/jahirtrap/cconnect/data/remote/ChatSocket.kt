@@ -375,6 +375,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                         options = q["options"]?.jsonArray?.map { it.jsonObject.toOption() } ?: emptyList(),
                     )
                 } ?: emptyList(),
+                replay = flag("replay"),
             )
             "interaction_resolved" -> ServerEvent.InteractionResolved(
                 requestId = str("id").orEmpty(),

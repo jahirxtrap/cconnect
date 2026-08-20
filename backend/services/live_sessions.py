@@ -63,11 +63,11 @@ class LiveSession:
             floor = max(last_seq, self._committed_seq) if since_committed else last_seq
             for stamped in list(self._outbox):
                 if stamped["seq"] > floor:
-                    await self._send_one(sink, stamped)
+                    await self._send_one(sink, {**stamped, "replay": True})
             for entry in list(self._pending.values()):
                 event = entry.get("event")
                 if event is not None and event["seq"] <= last_seq:
-                    await self._send_one(sink, event)
+                    await self._send_one(sink, {**event, "replay": True})
 
     async def detach(self, sink):
         """Drop one socket. The worker keeps running — it is not cancelled,
