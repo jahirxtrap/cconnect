@@ -96,7 +96,7 @@
     {/if}
   {/snippet}
   {#snippet buttons()}
-    <Button onclick={onDismiss} variant="outlined">{t("BACK")}</Button>
+    <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
   {/snippet}
 
   {#if backend.environments.length}

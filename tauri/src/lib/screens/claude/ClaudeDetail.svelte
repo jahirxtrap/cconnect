@@ -165,7 +165,8 @@
 
   const memoryList = $derived([...(memories?.global ?? []), ...(memories?.project ?? [])]);
 
-  const scopeLabel = (scope: string) => (scope === "global" ? t("MEMORY_SCOPE_GLOBAL") : t("MEMORY_SCOPE_PROJECT"));
+  const scopeLabel = (scope: string) =>
+    scope === "global" ? t("MEMORY_GLOBAL") : scope === "repo" ? "CLAUDE.md" : t("MEMORIES");
 
   const openMemory = (scope: string, name: string) => {
     const project = scope === "global" ? null : memoriesProject;
@@ -424,7 +425,7 @@
   {@const skill = skillSheet}
   <CompactDialog title={skill.name} onDismiss={() => (skillSheet = null)}>
     {#snippet buttons()}
-      <Button onclick={() => (skillSheet = null)} variant="outlined">{t("CLOSE")}</Button>
+      <Button onclick={() => (skillSheet = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#if !skillFiles}
       <CenteredProgress class="py-6" />
@@ -465,7 +466,7 @@
       />
     {/snippet}
     {#snippet buttons()}
-      <Button onclick={() => (pluginMenu = null)} variant="outlined" enabled={!busy}>{t("CLOSE")}</Button>
+      <Button onclick={() => (pluginMenu = null)} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
     {/snippet}
     {#if plugin.description || plugin.version}
       <OutlinedPanel class="mb-3">
@@ -517,7 +518,7 @@
       </TooltipIconButton>
     {/snippet}
     {#snippet buttons()}
-      <Button onclick={() => (catalogMarket = null)} variant="outlined">{t("CLOSE")}</Button>
+      <Button onclick={() => (catalogMarket = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     <div class="px-5 pb-2">
       <InputField value={catalogQuery} oninput={(value) => (catalogQuery = value)} label={t("SEARCH")} singleLine />
@@ -573,7 +574,7 @@
   {@const market = marketMenu}
   <CompactDialog title={market.name} onDismiss={() => !busy && (marketMenu = null)}>
     {#snippet buttons()}
-      <Button onclick={() => (marketMenu = null)} variant="outlined" enabled={!busy}>{t("CLOSE")}</Button>
+      <Button onclick={() => (marketMenu = null)} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
     {/snippet}
     {#if market.repo}
       <OutlinedPanel class="mb-3">
@@ -645,7 +646,7 @@
       />
     {/snippet}
     {#snippet buttons()}
-      <Button onclick={() => (mcpMenu = null)} variant="outlined" enabled={!busy}>{t("CLOSE")}</Button>
+      <Button onclick={() => (mcpMenu = null)} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
     {/snippet}
     {#if server.detail || server.type}
       <OutlinedPanel class="mb-3">
@@ -699,12 +700,12 @@
     <div class="flex flex-col gap-2.5">
       <InputField value={mcpName} oninput={(value) => (mcpName = value)} label={t("NAME")} singleLine />
       <SelectField
-        label={t("MCP_TRANSPORT")}
+        label={t("TRANSPORT")}
         selected={mcpTransport}
         options={TRANSPORTS.map((value) => ({ value, label: value }))}
         onSelect={(value) => (mcpTransport = value)}
       />
-      <InputField value={mcpTarget} oninput={(value) => (mcpTarget = value)} label={t("MCP_TARGET")} singleLine />
+      <InputField value={mcpTarget} oninput={(value) => (mcpTarget = value)} label={t("COMMAND_OR_URL")} singleLine />
     </div>
   </CompactDialog>
 {/if}

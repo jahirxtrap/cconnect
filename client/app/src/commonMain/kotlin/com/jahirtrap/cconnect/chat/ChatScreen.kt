@@ -906,7 +906,7 @@ fun ChatScreen(
                     title = stringResource(Res.string.queued_message),
                     buttons = {
                         Button(onClick = { queuePreview = null }, variant = ButtonVariant.Outlined) {
-                            Text(stringResource(Res.string.close))
+                            Text(stringResource(Res.string.cancel))
                         }
                     },
                 ) {
@@ -1039,7 +1039,7 @@ private fun RewindSheet(
         title = stringResource(Res.string.rewind),
         contentPadding = PaddingValues(0.dp),
         buttons = {
-            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
         },
     ) {
         when {

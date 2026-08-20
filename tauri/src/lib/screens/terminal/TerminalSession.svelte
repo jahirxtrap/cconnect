@@ -198,7 +198,7 @@
   {#if !isTauri}
     <EmptyState text={t("WEB_UNAVAILABLE")} class="flex-1" />
   {:else if error}
-    <EmptyState text={t("SSH_FAILED", error)} class="flex-1" />
+    <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
   {:else}
     <div class="min-h-0 flex-1" style="background: {TERMINAL_BACKGROUND}">
       {#if emulator}

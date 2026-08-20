@@ -48,7 +48,6 @@
     <string name="ssh_connecting">Conectando</string>
     <string name="ssh_connected">Conectado</string>
     <string name="ssh_closed">Desconectado</string>
-    <string name="ssh_failed">Falló: %1$s</string>
     <string name="connection_error">Error de conexión</string>
     <string name="file_unavailable">Archivo no disponible</string>
     <string name="notification">Notificación</string>
@@ -137,8 +136,6 @@
     <string name="memory_global">Global</string>
     <string name="install">Instalar</string>
     <string name="uninstall">Desinstalar</string>
-    <string name="enable">Habilitar</string>
-    <string name="disable">Deshabilitar</string>
     <string name="add">Agregar</string>
     <string name="transport">Transporte</string>
     <string name="command_or_url">Comando o URL</string>
@@ -161,8 +158,6 @@
     <string name="notify_task_done_summary">Notificar al terminar de trabajar en segundo plano</string>
     <string name="notify_interaction">Permisos y preguntas</string>
     <string name="notify_interaction_summary">Notificar cuando Claude espere una respuesta en segundo plano</string>
-    <string name="channel_task_done">Tareas terminadas</string>
-    <string name="channel_interaction">Permisos y preguntas</string>
     <string name="notif_task_done">Claude terminó la tarea</string>
     <string name="notif_question">Claude tiene una pregunta</string>
     <string name="notif_permission">Claude solicita permiso</string>
@@ -204,7 +199,6 @@
     <string name="network_signal">Señal %1$s</string>
     <string name="network_testing">Midiendo</string>
     <string name="network_connect">Conectar</string>
-    <string name="network_password">Contraseña</string>
     <string name="network_speed_test">Prueba de velocidad</string>
     <string name="network_run_test">Iniciar prueba</string>
     <string name="network_speedtest_missing">Speedtest CLI no está instalado en el servidor</string>
@@ -324,7 +318,6 @@
     <string name="queued_message">Mensaje en cola</string>
     <string name="clear">Limpiar</string>
     <string name="compacting">Compactando</string>
-    <string name="status_retrying">Reintentando</string>
     <string name="status_failed">Fallo temporal</string>
     <string name="status_slow">La respuesta está tardando más de lo normal</string>
     <string name="interrupted">Interrumpido</string>
@@ -400,7 +393,6 @@
     <string name="mode_tailscale">Tailscale</string>
     <string name="mode_caddy">Proxy inverso (Caddy)</string>
     <string name="public_host">Nombre de host público (vacío: derivado de la IP pública)</string>
-    <string name="status_label">Estado</string>
     <string name="server_stopped">Detenido</string>
     <string name="server_starting">Iniciando</string>
     <string name="server_running">Corriendo</string>

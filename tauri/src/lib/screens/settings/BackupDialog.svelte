@@ -26,7 +26,7 @@
 <CompactDialog title={t(TITLES[mode])} {onDismiss}>
   {#snippet buttons()}
     {#if mode === "export"}
-      <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
+      <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button onclick={() => void navigator.clipboard.writeText(payload)}>{t("COPY")}</Button>
     {:else if mode === "switch"}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>

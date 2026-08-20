@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
@@ -66,12 +67,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
@@ -478,20 +481,56 @@ private fun TableView(table: ASTNode, ctx: MdContext) {
 
 @Composable
 private fun ListBlock(list: ASTNode, ordered: Boolean, ctx: MdContext, depth: Int) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column {
         var index = orderedStart(list, ctx.src)
         list.children.filter { it.type == MarkdownElementTypes.LIST_ITEM }.forEach { item ->
             val marker = taskMarker(item, ctx.src)
             val bullet = when {
-                marker != null -> if (marker) "☑  " else "☐  "
-                ordered -> "$index. "
-                else -> "${unorderedBullet(depth)}  "
+                marker != null -> if (marker) "☑" else "☐"
+                ordered -> "$index."
+                else -> unorderedBullet(depth)
             }
-            Row {
-                Text(text = bullet, style = MaterialTheme.typography.bodyMedium)
-                Column { Blocks(item, ctx, depth + 1) }
-            }
+            ListItemBlock(item, bullet, ctx, depth)
             index++
+        }
+    }
+}
+
+private val LIST_INDENT = 20.dp
+private val LIST_MARKER_GAP = 6.dp
+private val LIST_TEXT_INDENT = 20.sp
+
+@Composable
+private fun ListItemBlock(item: ASTNode, bullet: String, ctx: MdContext, depth: Int) {
+    val at = item.children.indexOfFirst { it.type == MarkdownElementTypes.PARAGRAPH }
+    val paragraph = item.children.getOrNull(at)?.takeIf { node -> node.children.none { isImage(it) } }
+    val head = paragraph?.let { inline(it, ctx) }?.takeIf { it.text.isNotBlank() }
+    if (head == null) {
+        Row {
+            DisableSelection {
+                Text(
+                    text = bullet,
+                    style = MaterialTheme.typography.bodyMedium,
+                    textAlign = TextAlign.End,
+                    modifier = Modifier.widthIn(min = LIST_INDENT).padding(end = LIST_MARKER_GAP),
+                )
+            }
+            Column { Blocks(item, ctx, depth + 1) }
+        }
+        return
+    }
+    val rest = item.children.drop(at + 1)
+    Column {
+        MdText(
+            text = buildAnnotatedString { append("$bullet "); append(head) },
+            codeBg = ctx.codeBg,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyMedium.copy(textIndent = TextIndent(restLine = LIST_TEXT_INDENT)),
+        )
+        if (rest.isNotEmpty()) {
+            Column(modifier = Modifier.padding(start = LIST_INDENT)) {
+                rest.forEach { RenderNode(it, ctx, depth + 1) }
+            }
         }
     }
 }

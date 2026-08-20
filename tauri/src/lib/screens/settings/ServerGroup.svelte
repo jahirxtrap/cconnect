@@ -168,7 +168,7 @@
   />
 {:else if dialog === "permissions" && snapshot}
   <SelectDialog
-    title={t("PERMISSIONS")}
+    title={t("PERMISSION_MODE")}
     options={(capabilities?.permissionModes ?? []).map((item) => ({ value: item.id, label: item.label }))}
     selected={snapshot.permissionMode}
     onSelect={(value) => void apply({ permission_mode: value })}

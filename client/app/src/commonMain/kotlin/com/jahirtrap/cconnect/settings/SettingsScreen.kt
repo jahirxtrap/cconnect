@@ -713,7 +713,7 @@ fun SettingsScreen(
                 contentPadding = PaddingValues(0.dp),
                 buttons = {
                     Button(onClick = { dialog = null }, variant = ButtonVariant.Outlined) {
-                        Text(stringResource(Res.string.close))
+                        Text(stringResource(Res.string.cancel))
                     }
                 },
             ) {
@@ -979,7 +979,7 @@ private fun BackupDialog(
         title = title,
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) {
-                Text(stringResource(if (onValueChange == null) Res.string.close else Res.string.cancel))
+                Text(stringResource(Res.string.cancel))
             }
             if (secondaryLabel != null && onSecondary != null) {
                 Button(onClick = onSecondary, variant = ButtonVariant.Outlined) { Text(secondaryLabel) }
@@ -1361,7 +1361,7 @@ private fun AccentDialog(
     CompactDialog(
         onDismiss = onDismiss,
         title = title,
-        buttons = { ActionButton(text = stringResource(Res.string.close), onClick = onDismiss) },
+        buttons = { ActionButton(text = stringResource(Res.string.cancel), onClick = onDismiss) },
     ) {
         SwitchRow(
             title = stringResource(Res.string.accent_dynamic),
@@ -1440,7 +1440,7 @@ private fun EnvironmentsDialog(
         title = stringResource(Res.string.environments),
         contentPadding = PaddingValues(0.dp),
         buttons = {
-            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.back)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
         },
         titleTrailing = if (qrAvailable) ({
             IconButton(
@@ -1961,7 +1961,7 @@ private fun ChangelogSheet(onDismiss: () -> Unit) {
         title = stringResource(Res.string.changelog),
         contentPadding = PaddingValues(horizontal = 20.dp),
         buttons = {
-            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
         },
     ) {
         val items = notes

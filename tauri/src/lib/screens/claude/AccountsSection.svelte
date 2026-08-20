@@ -140,7 +140,7 @@
   {@const account = actions}
   <CompactDialog title={account.label} onDismiss={() => (actions = null)}>
     {#snippet buttons()}
-      <Button onclick={() => (actions = null)} variant="outlined">{t("CLOSE")}</Button>
+      <Button onclick={() => (actions = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     <div class="flex flex-col gap-1.5">
       <ActionButton

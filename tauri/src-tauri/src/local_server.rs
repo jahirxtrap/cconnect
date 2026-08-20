@@ -1,5 +1,7 @@
 use std::collections::VecDeque;
 use std::io::{BufRead, BufReader};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -12,6 +14,8 @@ use tauri::{AppHandle, Emitter, State};
 const PROBE_TIMEOUT_MS: u64 = 400;
 const READY_ATTEMPTS: u32 = 60;
 const READY_DELAY_MS: u64 = 500;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const TAIL_LINES: usize = 20;
 const TAIL_REPORTED: usize = 12;
 const STATUS_EVENT: &str = "local-server://status";
@@ -157,8 +161,11 @@ pub fn local_server_start(
         .arg("run.py")
         .current_dir(&dir)
         .env("PYTHONUNBUFFERED", "1")
+        .env("PYTHONIOENCODING", "utf-8")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
     if config.mode != "local" {
         command.arg("--expose").arg(&config.mode);
         if config.mode == "caddy" && !config.public_host.trim().is_empty() {

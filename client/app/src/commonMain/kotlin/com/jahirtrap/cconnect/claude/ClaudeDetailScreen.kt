@@ -454,7 +454,7 @@ fun ClaudeDetailScreen(
             },
             buttons = {
                 Button(onClick = { catalogMarket = null }, variant = ButtonVariant.Outlined) {
-                    Text(stringResource(Res.string.close))
+                    Text(stringResource(Res.string.cancel))
                 }
             },
             header = {
@@ -513,7 +513,7 @@ fun ClaudeDetailScreen(
             title = skill.name,
             buttons = {
                 Button(onClick = { skillSheet = null }, variant = ButtonVariant.Outlined) {
-                    Text(stringResource(Res.string.close))
+                    Text(stringResource(Res.string.cancel))
                 }
             },
         ) {
@@ -577,7 +577,7 @@ fun ClaudeDetailScreen(
             },
             buttons = {
                 Button(onClick = { pluginMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
-                    Text(stringResource(Res.string.close))
+                    Text(stringResource(Res.string.cancel))
                 }
             },
         ) {
@@ -679,7 +679,7 @@ fun ClaudeDetailScreen(
             title = market.name,
             buttons = {
                 Button(onClick = { marketMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
-                    Text(stringResource(Res.string.close))
+                    Text(stringResource(Res.string.cancel))
                 }
             },
         ) {
@@ -749,7 +749,7 @@ fun ClaudeDetailScreen(
             },
             buttons = {
                 Button(onClick = { mcpMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
-                    Text(stringResource(Res.string.close))
+                    Text(stringResource(Res.string.cancel))
                 }
             },
         ) {

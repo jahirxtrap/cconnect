@@ -79,7 +79,8 @@
   const STATE_CLASS =
     "flex shrink-0 cursor-default items-center gap-1 rounded-md bg-surface-variant px-2.5 py-1 text-label-md";
   const TOGGLE_CLASS =
-    "flex shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-2 py-1 ripple";
+    "flex h-full shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface-variant px-2 ripple";
+  const TOGGLE_SLOT = "flex shrink-0 items-center self-stretch py-[3px]";
 
   let openMenu = $state<"model" | "effort" | "permission" | "account" | "streaming" | null>(null);
 
@@ -117,8 +118,8 @@
   const permission = $derived(permissionStyle(permissionMode));
 </script>
 
-<div class="flex h-full min-w-0 flex-1 items-center">
-<TooltipWrap label={t("QUICK_CHAT")} class="relative flex shrink-0 items-center pl-0.5">
+<div class="flex h-full min-w-0 flex-1 items-stretch">
+<TooltipWrap label={t("QUICK_CHAT")} class="relative {TOGGLE_SLOT} pl-0.5">
   <button type="button" use:keepFocus onclick={onQuickChat} aria-label={t("QUICK_CHAT")} class={TOGGLE_CLASS}>
     <MessagesSquare size={16} class="text-accent" />
   </button>
@@ -244,6 +245,7 @@
     <PopupMenu
       open={openMenu === "streaming"}
       side="top"
+      triggerClass={TOGGLE_SLOT}
       onOpenChange={(open) => (openMenu = open ? "streaming" : null)}
     >
       {#snippet trigger()}
@@ -265,7 +267,7 @@
       {/each}
     </PopupMenu>
 
-    <TooltipWrap label={t("VISIBILITY")} class="flex shrink-0 items-center">
+    <TooltipWrap label={t("VISIBILITY")} class={TOGGLE_SLOT}>
       <button type="button" use:keepFocus onclick={onVisibility} aria-label={t("VISIBILITY")} class={TOGGLE_CLASS}>
         {#if simpleMode}
           <EyeOff size={16} class="text-accent" />

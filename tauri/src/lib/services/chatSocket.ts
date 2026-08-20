@@ -122,7 +122,6 @@ export class ChatSocket {
   #attempts = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
 
-  #buffered: string[] = [];
   #heartbeat: ReturnType<typeof setInterval> | null = null;
   #lastSeen = 0;
   #channel: string | null = null;
@@ -181,7 +180,6 @@ export class ChatSocket {
     this.#generation++;
     this.#socket?.close(1000);
     this.#socket = null;
-    this.#buffered = [];
     this.resetResume();
   }
 
@@ -283,7 +281,6 @@ export class ChatSocket {
       socket.send(frame);
       return true;
     }
-    this.#buffered.push(frame);
     if (!this.#closed && socket?.readyState !== WebSocket.CONNECTING && this.#timer === null) {
       this.#clearTimer();
       this.#open();
@@ -309,9 +306,6 @@ export class ChatSocket {
       if (generation !== this.#generation) return;
       this.#attempts = 0;
       this.#startHeartbeat();
-      const buffered = this.#buffered;
-      this.#buffered = [];
-      buffered.forEach((frame) => socket.send(frame));
       this.onEvent(false, null, { type: "open" });
     };
     socket.onmessage = (event) => {

@@ -123,7 +123,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
             title = account.label,
             buttons = {
                 Button(onClick = { actions = null }, variant = ButtonVariant.Outlined) {
-                    Text(stringResource(Res.string.close))
+                    Text(stringResource(Res.string.cancel))
                 }
             },
         ) {

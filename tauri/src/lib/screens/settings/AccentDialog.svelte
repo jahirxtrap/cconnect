@@ -51,7 +51,7 @@
 
 <CompactDialog {title} {onDismiss}>
   {#snippet buttons()}
-    <ActionButton text={t("CLOSE")} onclick={onDismiss} />
+    <ActionButton text={t("CANCEL")} onclick={onDismiss} />
   {/snippet}
 
   <SwitchRow

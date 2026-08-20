@@ -79,7 +79,7 @@
 {:else}
   <CompactDialog title={t("REWIND")} {onDismiss} padded={false}>
     {#snippet buttons()}
-      <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
+      <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
 
     {#if loading}

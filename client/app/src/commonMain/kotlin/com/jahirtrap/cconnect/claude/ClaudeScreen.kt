@@ -614,7 +614,7 @@ fun ClaudeChangelogSheet(cliVersion: String?, onDismiss: () -> Unit) {
         onDismiss = onDismiss,
         title = stringResource(Res.string.changelog),
         buttons = {
-            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) }
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
         },
     ) {
         val items = notes

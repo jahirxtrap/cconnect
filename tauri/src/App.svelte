@@ -7,6 +7,7 @@
   import { desktop } from "$lib/platform/desktop.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import { notifier } from "$lib/services/notifier.svelte";
+  import { updater } from "$lib/services/updater.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
   import FilePreview from "$lib/screens/files/FilePreview.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -24,6 +25,7 @@
   navigation.start();
   tabs.start();
   serverStatus.start();
+  void updater.consumeIfInstalled();
   notifier.start((tabId) => {
     if (tabId) tabs.select(tabId);
   });

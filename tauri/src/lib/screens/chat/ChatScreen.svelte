@@ -491,7 +491,7 @@
   {#if item}
     <CompactDialog title={t("QUEUED_MESSAGE")} onDismiss={() => (queuedId = null)}>
       {#snippet buttons()}
-        <Button onclick={() => (queuedId = null)} variant="outlined">{t("CLOSE")}</Button>
+        <Button onclick={() => (queuedId = null)} variant="outlined">{t("CANCEL")}</Button>
       {/snippet}
       {#if item.text.trim()}
         <OutlinedPanel>
@@ -577,7 +577,7 @@
   {@const target = deleteTarget}
   <ConfirmDialog
     title={t("DELETE")}
-    text={target.title ?? target.preview ?? target.sessionId}
+    text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? target.preview ?? target.sessionId)}
     confirmLabel={t("DELETE")}
     onConfirm={() => {
       void chat.remove(target);

@@ -54,6 +54,43 @@ md.core.ruler.push("github_alerts", (state) => {
   return true;
 });
 
+const BULLETS = ["•", "◦", "▪"];
+let bulletDepth = 0;
+const counters: number[] = [];
+
+md.renderer.rules.ordered_list_open = (tokens, index, options, _env, self) => {
+  counters.push(Number(tokens[index].attrGet("start") ?? 1));
+  return self.renderToken(tokens, index, options);
+};
+
+md.renderer.rules.ordered_list_close = (tokens, index, options, _env, self) => {
+  counters.pop();
+  return self.renderToken(tokens, index, options);
+};
+
+md.renderer.rules.bullet_list_open = (tokens, index, options, _env, self) => {
+  bulletDepth++;
+  return self.renderToken(tokens, index, options);
+};
+
+md.renderer.rules.bullet_list_close = (tokens, index, options, _env, self) => {
+  bulletDepth--;
+  return self.renderToken(tokens, index, options);
+};
+
+md.renderer.rules.list_item_open = (tokens, index, options, _env, self) => {
+  const token = tokens[index];
+  const classes = String(token.attrGet("class") ?? "");
+  const marker = classes.includes("task-done")
+    ? "☑"
+    : classes.includes("task")
+      ? "☐"
+      : token.markup === "." || token.markup === ")"
+        ? `${counters.length ? counters[counters.length - 1]++ : 1}.`
+        : BULLETS[Math.min(Math.max(bulletDepth, 1) - 1, BULLETS.length - 1)];
+  return `${self.renderToken(tokens, index, options)}<span class="li-marker">${marker}&nbsp;</span>`;
+};
+
 export const renderInline = (markdown: string): string => md.renderInline(markdown);
 
 const renderRun = (run: Token[]): string => md.renderer.renderInline(run, md.options, {}).trim();

@@ -471,7 +471,7 @@ fun FileExplorerScreen(
             Crossfade(targetState = selecting, label = "files-topbar") { inSelection ->
                 if (inSelection) {
                     AppTopBar(
-                        title = shownCount.toString(),
+                        title = pluralStringResource(Res.plurals.item_count, shownCount, shownCount),
                         navigationIcon = {
                             TooltipIconButton(
                                 label = stringResource(Res.string.select_all),

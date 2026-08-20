@@ -23,12 +23,14 @@ class Installer(private val activity: Activity) {
     @Volatile private var total = 0L
     @Volatile private var state = "idle"
     @Volatile private var target: File? = null
+    @Volatile private var cancelled = false
 
     @JavascriptInterface
     fun start(url: String) {
         bytes = 0
         total = 0
         target = null
+        cancelled = false
         state = "active"
         workers.execute {
             val file = runCatching { fetch(url) }.getOrNull()
@@ -40,6 +42,11 @@ class Installer(private val activity: Activity) {
     @JavascriptInterface
     fun status(): String =
         JSONObject().put("status", state).put("bytes", bytes).put("total", total).toString()
+
+    @JavascriptInterface
+    fun cancel() {
+        cancelled = true
+    }
 
     @JavascriptInterface
     fun canInstall(): Boolean =
@@ -57,7 +64,7 @@ class Installer(private val activity: Activity) {
 
     @JavascriptInterface
     fun install(): Boolean {
-        val file = target ?: return false
+        val file = target ?: downloaded() ?: return false
         if (!canInstall()) {
             requestPermission()
             return false
@@ -74,6 +81,9 @@ class Installer(private val activity: Activity) {
         }.getOrDefault(false)
     }
 
+    private fun downloaded(): File? =
+        File(activity.cacheDir, "updates").listFiles()?.firstOrNull { it.isFile && it.length() > 0 }
+
     private fun fetch(url: String): File {
         val dir = File(activity.cacheDir, "updates").apply { deleteRecursively(); mkdirs() }
         val file = File(dir, url.substringAfterLast('/').ifBlank { "cconnect.apk" })
@@ -88,6 +98,7 @@ class Installer(private val activity: Activity) {
             file.outputStream().use { out ->
                 val buffer = ByteArray(BUFFER_SIZE)
                 while (true) {
+                    if (cancelled) throw InterruptedException()
                     val read = stream.read(buffer)
                     if (read < 0) break
                     out.write(buffer, 0, read)

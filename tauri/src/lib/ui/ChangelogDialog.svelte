@@ -28,7 +28,7 @@
 
 <CompactDialog title={t("CHANGELOG")} {onDismiss}>
   {#snippet buttons()}
-    <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
+    <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
   {/snippet}
   {#if failed}
     <EmptyState text={t("CONNECTION_ERROR")} class="py-6" />

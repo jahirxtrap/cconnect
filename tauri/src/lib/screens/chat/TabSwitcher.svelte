@@ -236,7 +236,11 @@
             <button
               type="button"
               onpointerdown={(event) => event.stopPropagation()}
-              onclick={() => tabs.close(tab.id)}
+              onclick={() => {
+                const wasActive = tab.id === tabs.activeId;
+                tabs.close(tab.id);
+                if (wasActive) open = false;
+              }}
               aria-label={t("CLOSE_TAB")}
               class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
             >

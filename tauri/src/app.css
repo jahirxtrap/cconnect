@@ -32,30 +32,32 @@ html[data-theme="dark"] {
   color-scheme: dark;
 }
 
-* {
-  scrollbar-color: var(--c-scrollbar) transparent;
-}
+@media (pointer: fine) {
+  * {
+    scrollbar-color: var(--c-scrollbar) transparent;
+  }
 
-::-webkit-scrollbar {
-  width: 14px;
-  height: 14px;
-}
+  ::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+  }
 
-::-webkit-scrollbar-track,
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: var(--c-scrollbar);
-  background-clip: content-box;
-  border: 4px solid transparent;
-  border-radius: 999px;
-}
+  ::-webkit-scrollbar-thumb {
+    background: var(--c-scrollbar);
+    background-clip: content-box;
+    border: 4px solid transparent;
+    border-radius: 999px;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--c-scrollbar-hover);
-  background-clip: content-box;
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--c-scrollbar-hover);
+    background-clip: content-box;
+  }
 }
 
 .menu-surface {
@@ -298,53 +300,35 @@ textarea::selection {
 .markdown h5,
 .markdown h6 {
   margin: 0;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.3;
 }
 
 .markdown h1 {
-  font-size: calc(var(--text-headline) * var(--md-scale));
-}
-
-.markdown h2 {
   font-size: calc(var(--text-title-lg) * var(--md-scale));
 }
 
-.markdown h3 {
+.markdown h2 {
   font-size: calc(var(--text-title-md) * var(--md-scale));
+}
+
+.markdown h3 {
+  font-size: calc(var(--text-body-md) * var(--md-scale));
 }
 
 .markdown ul,
 .markdown ol {
-  padding-inline-start: 1.5rem;
+  padding-inline-start: 20px;
+  list-style: none;
 }
 
-.markdown ul {
-  list-style: "•  ";
+.markdown li > p:first-of-type {
+  display: inline;
 }
 
-.markdown ul ul {
-  list-style: "◦  ";
-}
-
-.markdown ul ul ul {
-  list-style: "▪  ";
-}
-
-.markdown ol {
-  list-style: decimal;
-}
-
-.markdown li.task {
-  list-style: "☐  ";
-}
-
-.markdown li.task-done {
-  list-style: "☑  ";
-}
-
-.markdown li::marker {
-  color: var(--c-on-surface-variant);
+.markdown .li-marker {
+  margin-inline-start: -20px;
+  font-variant-numeric: tabular-nums;
 }
 
 .markdown a {

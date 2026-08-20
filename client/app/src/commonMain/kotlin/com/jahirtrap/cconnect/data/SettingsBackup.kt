@@ -24,6 +24,9 @@ object SettingsBackup {
     private const val APP = "cconnect"
     private const val FORMAT = 1
 
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    private val pretty = Json { prettyPrint = true; prettyPrintIndent = "  " }
+
     fun export(): String {
         val settings = Settings()
         val ssh = SshStore()
@@ -93,7 +96,7 @@ object SettingsBackup {
                     }
                 }
             }
-        }.toString()
+        }.let { pretty.encodeToString(JsonObject.serializer(), it) }
     }
 
     fun import(raw: String): Boolean {

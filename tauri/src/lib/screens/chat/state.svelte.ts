@@ -207,6 +207,7 @@ export class ChatState {
   #assistantId: number | null = null;
   #thinkingId: number | null = null;
   #outgoing = 0;
+  #outgoingTag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   #attachmentId = 0;
   #sent = new Set<string>();
   #silent = new Set<string>();
@@ -402,7 +403,7 @@ export class ChatState {
     }
 
     const silent = !this.streaming && !this.queue.length && !this.#sent.size;
-    const id = `q${this.#outgoing++}`;
+    const id = `q${this.#outgoingTag}-${this.#outgoing++}`;
     if (silent) this.#silent.add(id);
     this.queue = [...this.queue, { id, text: body, attachments, uploading: false }];
 
@@ -1288,6 +1289,7 @@ export class ChatState {
           const lastUser = kept.findLastIndex((item) => item.role === "user");
           this.messages = lastUser >= 0 ? kept.slice(0, lastUser + 1) : kept;
         }
+        void this.refreshServerInfo();
         this.#pumpQueue();
         break;
       }

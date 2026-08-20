@@ -50,7 +50,7 @@ interface ProfileWire {
 
 const fetchJson = async <T>(url: string): Promise<T | null> => {
   try {
-    const response = await fetch(url, { headers: { Accept: "application/vnd.github+json" } });
+    const response = await fetch(url, { headers: { Accept: "application/vnd.github+json" }, cache: "no-store" });
     return response.ok ? ((await response.json()) as T) : null;
   } catch {
     return null;

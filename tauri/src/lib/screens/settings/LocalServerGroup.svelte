@@ -35,18 +35,15 @@
       : phase === "failed"
         ? "bg-red"
         : phase === "starting"
-          ? "bg-orange"
+          ? "bg-accent"
           : "bg-outline-variant",
   );
 
   const summary = $derived.by(() => {
-    if (info.error === "bad_dir") return t("LOCAL_SERVER_BAD_DIR");
-    if (info.error === "no_python") return t("LOCAL_SERVER_NO_PYTHON");
-    if (info.error === "launch_failed") return t("LOCAL_SERVER_LAUNCH_FAILED");
-    if (info.error === "crashed") return info.errorDetail ?? t("LOCAL_SERVER_STOPPED");
-    if (phase === "running") return t("SSH_CONNECTED");
-    if (phase === "starting") return t("CONNECTING");
-    if (phase === "external") return t("LOCAL_SERVER_EXTERNAL");
+    if (phase === "starting") return t("SERVER_STARTING");
+    if (phase === "running") return t("SERVER_RUNNING");
+    if (phase === "external") return t("SERVER_RUNNING_EXTERNAL");
+    if (phase === "failed") return t("SERVER_FAILED");
     return null;
   });
 

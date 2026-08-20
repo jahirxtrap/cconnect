@@ -23,14 +23,32 @@ const compare = (a: string, b: string) => {
 class Updater {
   progress = $state<number | null>(null);
   pending = $state<Pending | null>(store.get<Pending | null>(PENDING_KEY, null));
+  cancelled = $state(false);
 
-  consumeIfInstalled() {
+  #abort: AbortController | null = null;
+
+  async consumeIfInstalled() {
     const current = this.pending;
-    if (current && compare(APP_VERSION, current.version) >= 0) this.#clear();
+    if (!current) return;
+    if (compare(APP_VERSION, current.version) >= 0) {
+      this.#clear();
+      return;
+    }
+    if (!isTauri || isMobile) return;
+    const { exists } = await import("@tauri-apps/plugin-fs");
+    const there = await exists(current.path).catch(() => false);
+    if (!there) this.#clear();
+  }
+
+  cancel() {
+    this.cancelled = true;
+    this.#abort?.abort();
+    androidInstaller()?.cancel();
   }
 
   async download(url: string, version: string): Promise<boolean> {
     if (!isTauri) return false;
+    this.cancelled = false;
     if (isMobile) {
       const bridge = androidInstaller();
       if (!bridge) {
@@ -64,7 +82,9 @@ class Updater {
       await fs.mkdir(directory, { recursive: true });
       const target = await join(directory, name);
 
-      const response = await fetch(url);
+      const controller = new AbortController();
+      this.#abort = controller;
+      const response = await fetch(url, { signal: controller.signal });
       if (!response.ok || !response.body) throw new Error(String(response.status));
       const total = Number(response.headers.get("content-length") ?? 0);
 
@@ -94,6 +114,8 @@ class Updater {
     } catch {
       this.#clear();
       return false;
+    } finally {
+      this.#abort = null;
     }
   }
 

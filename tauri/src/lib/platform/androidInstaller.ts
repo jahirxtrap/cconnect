@@ -1,6 +1,7 @@
 interface AndroidInstallerBridge {
   start(url: string): void;
   status(): string;
+  cancel(): void;
   canInstall(): boolean;
   requestPermission(): void;
   install(): boolean;

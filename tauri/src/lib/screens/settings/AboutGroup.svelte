@@ -52,14 +52,18 @@
     checking = false;
   };
 
+  const downloadingUpdate = $derived(updater.progress !== null && !switchDownloading);
+
   const updateLabel = $derived(
-    updater.pending && !pendingIsSwitch
-      ? t("INSTALL_UPDATE")
-      : updateAvailable
-        ? t("UPDATE_ACTION")
-        : checking
-          ? t("CHECKING_UPDATES")
-          : t("CHECK_UPDATES"),
+    downloadingUpdate
+      ? t("CANCEL")
+      : updater.pending && !pendingIsSwitch
+        ? t("INSTALL")
+        : updateAvailable
+          ? t("UPDATE_ACTION")
+          : checking
+            ? t("CHECKING_UPDATES")
+            : t("CHECK_UPDATES"),
   );
 
   const startUpdate = async (target: Release) => {
@@ -68,14 +72,14 @@
       open(target.url);
       return;
     }
-    if (!(await updater.download(target.installerUrl, version))) open(target.url);
+    if (!(await updater.download(target.installerUrl, version)) && !updater.cancelled) open(target.url);
   };
 
   const startSwitch = async (url: string, target: Release) => {
     switchDownloading = true;
     const done = await updater.download(url, target.tag.replace(/^v/, ""));
     switchDownloading = false;
-    if (!done) open(target.url);
+    if (!done && !updater.cancelled) open(target.url);
   };
 
   const openSwitch = async () => {
@@ -131,35 +135,38 @@
       </div>
   </Pressable>
 
-  <div class="px-4 py-3">
-    {#if updater.progress !== null}
+  {#if updater.progress !== null}
+    <div class="px-4 py-3">
       <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-variant">
         <div class="h-full bg-accent transition-[width]" style="width: {Math.round(updater.progress * 100)}%"></div>
       </div>
-    {:else}
-      <div class="flex gap-2">
+    </div>
+  {/if}
+
+  <div class="px-4 py-3">
+    <div class="flex gap-2">
+      <ActionButton
+        class="min-w-0 flex-1"
+        text={updateLabel}
+        enabled={!checking && !switchBusy}
+        onclick={() => {
+          if (downloadingUpdate) updater.cancel();
+          else if (updater.pending && !pendingIsSwitch) void updater.install();
+          else if (updateAvailable && release) void startUpdate(release);
+          else void check();
+        }}
+      />
+      {#if pendingIsSwitch}
+        <ActionButton class="min-w-0 flex-1" text={t("INSTALL")} onclick={() => void updater.install()} />
+      {:else}
         <ActionButton
           class="min-w-0 flex-1"
-          text={updateLabel}
-          enabled={!checking && !switchBusy}
-          onclick={() => {
-            if (updater.pending && !pendingIsSwitch) void updater.install();
-            else if (updateAvailable && release) void startUpdate(release);
-            else void check();
-          }}
+          text={switchDownloading ? t("CANCEL") : switchChecking ? t("CHECKING_UPDATES") : t("SWITCH_BUILD")}
+          enabled={!switchChecking}
+          onclick={() => (switchDownloading ? updater.cancel() : void openSwitch())}
         />
-        {#if pendingIsSwitch}
-          <ActionButton class="min-w-0 flex-1" text={t("INSTALL_UPDATE")} onclick={() => void updater.install()} />
-        {:else}
-          <ActionButton
-            class="min-w-0 flex-1"
-            text={switchChecking ? t("CHECKING_UPDATES") : t("SWITCH_BUILD")}
-            enabled={!switchChecking}
-            onclick={() => void openSwitch()}
-          />
-        {/if}
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
 
   {@render profileRow(owner, t("CREATOR"))}

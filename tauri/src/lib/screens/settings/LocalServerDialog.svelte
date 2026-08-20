@@ -3,6 +3,8 @@
   import { t } from "$lib/i18n/index.svelte";
   import Folder from "@lucide/svelte/icons/folder";
   import { isTauri } from "$lib/platform";
+  import { backend } from "$lib/services/backend.svelte";
+  import { localServer } from "$lib/services/localServer.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
@@ -41,6 +43,27 @@
     if (directory) dir = selected;
     else pythonPath = selected;
   };
+
+  const info = $derived(localServer.info);
+
+  const failure = $derived.by(() => {
+    if (info.error === "bad_dir") return t("LOCAL_SERVER_BAD_DIR");
+    if (info.error === "no_python") return t("LOCAL_SERVER_NO_PYTHON");
+    if (info.error === "launch_failed") return t("LOCAL_SERVER_LAUNCH_FAILED");
+    if (info.error === "crashed") return info.errorDetail ?? t("LOCAL_SERVER_STOPPED");
+    return null;
+  });
+
+  const panel = $derived.by(() => {
+    if (failure) return failure;
+    if (localServer.state === "external") return null;
+    const lines = [`${t("LOCAL_URL")}: http://localhost:${backend.active?.port ?? 8723}`];
+    if (mode !== "local") {
+      if (info.publicUrl) lines.push(`${t("PUBLIC_URL")}: ${info.publicUrl}`);
+      if (info.token) lines.push(`${t("TOKEN")}: ${info.token}`);
+    }
+    return lines.join("\n");
+  });
 
   const save = () => {
     settings.localServerDir = dir.trim();
@@ -97,6 +120,14 @@
         label={t("PUBLIC_HOST")}
         singleLine
       />
+    {/if}
+
+    {#if panel}
+      <p
+        class="mt-1 rounded-md border-2 px-2.5 py-2 font-mono text-body-sm whitespace-pre-wrap {failure
+          ? 'border-red text-red'
+          : 'border-outline-variant text-on-surface'}"
+      >{panel}</p>
     {/if}
   </div>
 </CompactDialog>
