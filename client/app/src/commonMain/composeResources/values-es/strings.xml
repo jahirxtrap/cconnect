@@ -328,6 +328,10 @@
     <string name="loading">Cargando</string>
     <string name="confirm">Confirmar</string>
     <string name="visibility">Visibilidad del chat</string>
+    <string name="simple_mode">Modo simple</string>
+    <string name="simple_mode_summary">Muestra un solo bloque Trabajando en lugar del detalle de pensamiento y herramientas</string>
+    <string name="quick_chat_working">Trabajando (chat rápido)</string>
+    <string name="visibility_local">Visibilidad en este dispositivo</string>
     <string name="visibility_summary">Qué se muestra en el chat</string>
     <string name="show_full">Completo</string>
     <string name="show_label">Solo etiqueta</string>

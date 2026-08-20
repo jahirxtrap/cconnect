@@ -17,11 +17,11 @@ from pydantic import BaseModel, ValidationError
 from core.config import DEFAULT_CWD, permission_modes
 from core.responses import api_response
 from middleware.public_auth import ws_bearer_ok
-from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, StartMessage
+from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
 from services import accounts
 from services import rewind as rewind_service
 from services import sessions as sessions_service
-from services import settings_store
+from services import settings_store, visibility
 from services import todos as todos_store
 from services.claude_runtime import run_prompt
 from services.live_sessions import registry
@@ -50,13 +50,6 @@ def _resolve_model(model: str | None) -> str | None:
     return None if model in (None, "", "default") else model
 
 
-def _compact_visibility(data: dict) -> dict:
-    """Drop the summary when compact visibility is 'label' (block shows stats only)."""
-    if settings_store.visibility_mode("compact") == "label":
-        return {**data, "summary": ""}
-    return data
-
-
 class _Session:
     def __init__(self):
         self.cwd: str = DEFAULT_CWD
@@ -70,7 +63,7 @@ class _Session:
         self.partial: bool = False
 
 
-def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None):
+def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
@@ -114,6 +107,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     emit=emit,
                     drain=drain(),
                     seed_id=seed_id,
+                    wanted=wanted,
                 ):
                     if event.get("type") == "session_started":
                         state.session_id = event["session_id"]
@@ -139,13 +133,13 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     if after > boundaries_before:
                         data = sessions_service.latest_compact(state.cwd, state.session_id)
                         if data:
-                            yield {"type": "compact", **_compact_visibility(data)}
+                            yield {"type": "compact", **data}
                             if data.get("post_tokens"):
                                 yield {"type": "context", "context_tokens": data["post_tokens"]}
                 elif compacted:
                     data = sessions_service.latest_compact(state.cwd, state.session_id)
                     if data:
-                        yield {"type": "compact_summary", **_compact_visibility(data)}
+                        yield {"type": "compact_summary", **data}
                         if data.get("post_tokens"):
                             yield {"type": "context", "context_tokens": data["post_tokens"]}
                 elif is_local_cmd and sessions_service.local_command_count(state.cwd, state.session_id) > local_cmds_before:
@@ -158,15 +152,15 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
     return factory
 
 
-async def _start_turn(session, mid, text, attachments):
+async def _start_turn(session, mid, text, attachments, prefs=None):
     turn_start = 0
     if session.state.session_id and session.state.cwd:
         try:
             turn_start = len(sessions_service.get_session_messages(
-                sessions_service.project_key_for(session.state.cwd), session.state.session_id))
+                sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs))
         except Exception:
             turn_start = 0
-    if not session.start(_build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid), seed_id=mid):
+    if not session.start(_build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted())), seed_id=mid):
         return False
     session.turn_start_index = turn_start
     if mid:
@@ -223,6 +217,9 @@ async def chat_ws(ws: WebSocket):
         async with send_lock:
             await ws.send_json(payload)
 
+    seen = {"prefs": visibility.defaults()}
+    sink = visibility.sink_for(send, seen)
+
     def spawn(coro):
         task = asyncio.create_task(coro)
         bg_tasks.add(task)
@@ -243,6 +240,7 @@ async def chat_ws(ws: WebSocket):
                 except ValidationError as exc:
                     await send({"type": "error", "message": exc.errors()})
                     continue
+                seen["prefs"] = visibility.resolve(msg.visibility.model_dump() if msg.visibility else None)
                 existing = registry.get(msg.channel) if msg.channel else None
                 by_session = None
                 if existing is None and msg.resume:
@@ -272,7 +270,7 @@ async def chat_ws(ws: WebSocket):
                     state.partial = msg.partial if msg.partial is not None else settings_store.get("streaming")
                     session = registry.create(state)
                 if previous is not None and previous is not session:
-                    await previous.detach(send)
+                    await previous.detach(sink)
                 await send({
                     "type": "ready",
                     "session_id": session.state.session_id,
@@ -282,7 +280,7 @@ async def chat_ws(ws: WebSocket):
                     "resumed": bool(by_session),
                     "committed_count": session.turn_start_index,
                 })
-                await session.attach(send, last_seq=msg.last_seq, since_committed=bool(by_session))
+                await session.attach(sink, last_seq=msg.last_seq, since_committed=bool(by_session), prefs=seen)
                 if not session.running and session.state.session_id:
                     tasks = sessions_service.session_tasks(
                         session.state.session_id,
@@ -317,7 +315,7 @@ async def chat_ws(ws: WebSocket):
                     await session.enqueue(msg.id, msg.text, msg.attachments)
                 elif msg.id and session.already_consumed(msg.id):
                     await session.consumed(msg.id)
-                elif not await _start_turn(session, msg.id, msg.text, msg.attachments):
+                elif not await _start_turn(session, msg.id, msg.text, msg.attachments, seen["prefs"]):
                     await session.enqueue(msg.id, msg.text, msg.attachments)
 
             elif mtype == "set_generation":
@@ -351,6 +349,14 @@ async def chat_ws(ws: WebSocket):
                     session.state.permission_mode = msg.mode
                 await send({"type": "permission_mode", "mode": msg.mode})
 
+            elif mtype == "set_visibility":
+                try:
+                    msg = SetVisibilityMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                seen["prefs"] = visibility.resolve(msg.model_dump(exclude={"type"}))
+
             elif mtype == "ask":
                 question = (raw.get("text") or "").strip()
                 if question and session is not None:
@@ -374,7 +380,7 @@ async def chat_ws(ws: WebSocket):
                     if target is session:
                         item = session.peek_queued()
                         if item is not None:
-                            await _start_turn(session, item["id"], item["text"], item["attachments"])
+                            await _start_turn(session, item["id"], item["text"], item["attachments"], seen["prefs"])
 
             elif mtype == "interaction_response":
                 rid = raw.get("id")
@@ -397,7 +403,7 @@ async def chat_ws(ws: WebSocket):
                     await send({"type": "error", "message": "invalid limit"})
                     continue
                 try:
-                    items = sessions_service.get_session_messages(project, sid)
+                    items = sessions_service.get_session_messages(project, sid, seen["prefs"])
                 except ValueError as exc:
                     await send({"type": "error", "message": str(exc)})
                     continue
@@ -426,6 +432,6 @@ async def chat_ws(ws: WebSocket):
     finally:
         # Detach only — the workers keep running so a reconnect can re-attach.
         if session is not None:
-            await session.detach(send)
+            await session.detach(sink)
         if side_session is not None:
             await side_session.detach(send)

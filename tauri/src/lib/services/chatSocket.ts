@@ -7,6 +7,7 @@ import {
   type TodoItem,
 } from "$lib/data/chatModels";
 import { backend, baseUrlOf, socketUrlOf, type Profile } from "./backend.svelte";
+import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
 export type ServerEvent =
   | { type: "connecting" }
@@ -22,6 +23,7 @@ export type ServerEvent =
     }
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
+  | { type: "working" }
   | { type: "tool_use"; id: string | null; name: string | null; input: string | null; result: string | null }
   | { type: "tool_result"; toolUseId: string | null; content: string | null }
   | { type: "file_change"; id: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
@@ -82,6 +84,7 @@ export interface StartOptions {
   effort: string;
   partial: boolean;
   account: string;
+  visibility: VisibilityPrefs;
 }
 
 export interface GenerationPatch {
@@ -201,6 +204,7 @@ export class ChatSocket {
       model: options.model,
       effort: options.effort,
       partial: options.partial,
+      visibility: options.visibility,
       base_url: baseUrlOf(this.profile()),
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,
@@ -224,6 +228,10 @@ export class ChatSocket {
 
   sendSetGeneration(patch: GenerationPatch) {
     this.#send({ type: "set_generation", ...patch });
+  }
+
+  sendVisibility(prefs: VisibilityPrefs) {
+    this.#send({ type: "set_visibility", ...prefs });
   }
 
   sendInterrupt(lane: string | null = null) {
@@ -388,6 +396,8 @@ export class ChatSocket {
         return { type: "assistant_text", text: text(wire, "text") ?? "" };
       case "thinking":
         return { type: "thinking", text: text(wire, "text") ?? "", labelOnly: flag(wire, "label") };
+      case "working":
+        return { type: "working" };
       case "tool_use":
         return {
           type: "tool_use",

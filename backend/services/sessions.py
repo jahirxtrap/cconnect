@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from core.config import AI_WORKDIR, CLAUDE_PROJECTS_DIR
-from services import settings_store
+from services import settings_store, visibility
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SESSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -737,6 +737,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
                 path = inp.get("file_path") or inp.get("notebook_path")
                 if isinstance(path, str) and path:
                     if vis["file_change"] == "off":
+                        _working(messages, vis)
                         continue
                     if vis["file_change"] == "label":
                         out.append({"type": "file_change", "path": path, "id": bid, "label": True, "parent": parent_id})
@@ -744,6 +745,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
                     out.append({"type": "file_change", "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id})
                     continue
             if vis["tool_use"] == "off":
+                _working(messages, vis)
                 continue
             ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id}
             if vis["tool_use"] == "full":
@@ -765,7 +767,16 @@ def _notification_item(text: str) -> dict | None:
     return {"type": "notification", "text": _tag("summary") or "", "result": _tag("status")}
 
 
-def get_session_messages(project_key: str, session_id: str) -> list[dict]:
+def _working(messages, vis) -> None:
+    """One ``working`` marker per run of hidden blocks, matching the live turn."""
+    if not vis.get("simple"):
+        return
+    if messages and messages[-1].get("type") == "working":
+        return
+    messages.append({"type": "working"})
+
+
+def get_session_messages(project_key: str, session_id: str, prefs: dict | None = None) -> list[dict]:
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return []
@@ -826,8 +837,7 @@ def get_session_messages(project_key: str, session_id: str) -> list[dict]:
          if e.get("type") == "system" and e.get("subtype") == "compact_boundary"),
         default=-1,
     )
-    # Per-type visibility (full / label / off).
-    vis = {t: settings_store.visibility_mode(t) for t in ("thinking", "tool_use", "file_change", "compact")}
+    vis = visibility.resolve(prefs)
     messages = _StampedList()
     hidden_ids: set[str] = set()
     compact_block: dict | None = None
@@ -925,6 +935,7 @@ def get_session_messages(project_key: str, session_id: str) -> list[dict]:
                     messages.append(item)
             elif btype == "thinking":
                 if vis["thinking"] == "off":
+                    _working(messages, vis)
                     continue
                 if vis["thinking"] == "label":
                     messages.append({"type": "thinking", "label": True})
@@ -1023,6 +1034,7 @@ def get_session_messages(project_key: str, session_id: str) -> list[dict]:
                         if isinstance(bid, str):
                             hidden_ids.add(bid)
                         if vis["file_change"] == "off":
+                            _working(messages, vis)
                             continue
                         if vis["file_change"] == "label":
                             messages.append({"type": "file_change", "path": path, "id": bid, "label": True})
@@ -1035,6 +1047,7 @@ def get_session_messages(project_key: str, session_id: str) -> list[dict]:
                         })
                         continue
                 if vis["tool_use"] == "off":
+                    _working(messages, vis)
                     continue
                 ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid}
                 if vis["tool_use"] == "full":

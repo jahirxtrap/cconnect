@@ -34,6 +34,7 @@ const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw
 
 const ROLES: Record<string, Role> = {
   thinking: "thinking",
+  working: "working",
   notification: "notification",
   tool_use: "tool",
   tool_result: "tool_result",

@@ -1,5 +1,13 @@
 import { store } from "$lib/platform/storage";
 
+export interface VisibilityPrefs {
+  simple: boolean | null;
+  thinking: string | null;
+  tool_use: string | null;
+  file_change: string | null;
+  compact: string | null;
+}
+
 const DEFAULTS = {
   notify_task_done: false,
   notify_interaction: true,
@@ -21,6 +29,11 @@ const DEFAULTS = {
   dynamic_color: false,
   environment_locked: false,
   project_locked: false,
+  visibility_simple: "",
+  visibility_thinking: "",
+  visibility_tool_use: "",
+  visibility_file_change: "",
+  visibility_compact: "",
 };
 
 type Key = keyof typeof DEFAULTS;
@@ -37,6 +50,25 @@ class Settings {
   #write<K extends Key>(key: K, value: (typeof DEFAULTS)[K]) {
     this.#values[key] = value;
     store.set(key, value);
+  }
+
+  get visibility(): VisibilityPrefs {
+    const simple = this.#read("visibility_simple");
+    return {
+      simple: simple === "" ? null : simple === "on",
+      thinking: this.#read("visibility_thinking") || null,
+      tool_use: this.#read("visibility_tool_use") || null,
+      file_change: this.#read("visibility_file_change") || null,
+      compact: this.#read("visibility_compact") || null,
+    };
+  }
+
+  set visibility(value: VisibilityPrefs) {
+    this.#write("visibility_simple", value.simple === null ? "" : value.simple ? "on" : "off");
+    this.#write("visibility_thinking", value.thinking ?? "");
+    this.#write("visibility_tool_use", value.tool_use ?? "");
+    this.#write("visibility_file_change", value.file_change ?? "");
+    this.#write("visibility_compact", value.compact ?? "");
   }
 
   get notifyTaskDone() {

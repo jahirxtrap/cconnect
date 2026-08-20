@@ -38,6 +38,7 @@ import com.jahirtrap.cconnect.data.ServerEvent
 import com.jahirtrap.cconnect.data.SessionInfo
 import com.jahirtrap.cconnect.data.SessionMessage
 import com.jahirtrap.cconnect.data.Settings
+import com.jahirtrap.cconnect.data.VisibilityPrefs
 import com.jahirtrap.cconnect.data.remote.GitHubApi
 import com.jahirtrap.cconnect.data.TodoItem
 import com.jahirtrap.cconnect.data.remote.CapabilitiesApi
@@ -111,6 +112,14 @@ data class ChatUiState(
     val sideChatOpen: Boolean = false,               // whether the side panel is currently shown
     val sideFullscreen: Boolean = false,
     val showWorking: String = "label",               // quick-chat working indicator visibility (label/off)
+    val visibility: VisibilityPrefs = VisibilityPrefs(),
+    val serverVisibility: VisibilityPrefs = VisibilityPrefs(
+        simple = false,
+        thinking = "full",
+        toolUse = "label",
+        fileChange = "full",
+        compact = "full",
+    ),
     val pendingToolIds: Set<String> = emptySet(),    // tools still running (tool_use seen, no result yet)
     val contextTokens: Int? = null,                  // approx context-window tokens used on the last turn
     val rewindPoints: List<SessionsApi.RewindPoint> = emptyList(),
@@ -363,7 +372,21 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         refreshCompat()
         SettingsApi.get()?.let { s ->
             _state.update {
-                it.copy(model = s.model, effort = s.effort, permissionMode = s.permissionMode, streamTokens = s.streaming, showWorking = s.showWorking)
+                it.copy(
+                    visibility = localVisibility(),
+                    model = s.model,
+                    effort = s.effort,
+                    permissionMode = s.permissionMode,
+                    streamTokens = s.streaming,
+                    showWorking = s.showWorking,
+                    serverVisibility = VisibilityPrefs(
+                        simple = s.simpleMode,
+                        thinking = s.showThinking,
+                        toolUse = s.showToolUse,
+                        fileChange = s.showFileChange,
+                        compact = s.showCompact,
+                    ),
+                )
             }
         }
     }
@@ -383,7 +406,26 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             s.effortOverride.ifEmpty { s.effort },
             s.streamingOverride ?: s.streamTokens,
             s.accountOverride,
+            localVisibility(),
         )
+    }
+
+    private fun localVisibility() = VisibilityPrefs(
+        simple = settings.visibilitySimple.takeIf { it.isNotEmpty() }?.let { it == "on" },
+        thinking = settings.visibilityThinking.takeIf { it.isNotEmpty() },
+        toolUse = settings.visibilityToolUse.takeIf { it.isNotEmpty() },
+        fileChange = settings.visibilityFileChange.takeIf { it.isNotEmpty() },
+        compact = settings.visibilityCompact.takeIf { it.isNotEmpty() },
+    )
+
+    fun applyVisibility(prefs: VisibilityPrefs) {
+        settings.visibilitySimple = prefs.simple?.let { if (it) "on" else "off" }.orEmpty()
+        settings.visibilityThinking = prefs.thinking.orEmpty()
+        settings.visibilityToolUse = prefs.toolUse.orEmpty()
+        settings.visibilityFileChange = prefs.fileChange.orEmpty()
+        settings.visibilityCompact = prefs.compact.orEmpty()
+        _state.update { it.copy(visibility = prefs) }
+        client.sendVisibility(prefs)
     }
 
     fun sendPrompt(text: String) {
@@ -812,7 +854,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     private suspend fun loadSessionInto(session: SessionInfo): Boolean {
         val projectKey = session.projectKey ?: return false
-        val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100) ?: return false
+        val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100, visibility = localVisibility()) ?: return false
         val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, session.sessionId, projectKey), timestamp = m.timestamp) to m.parent
@@ -908,7 +950,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val s = _state.value
         val sid = s.sessionId ?: return
         val proj = currentProjectKey() ?: return
-        val page = SessionsApi.sessionMessages(sid, proj, limit = 100) ?: return
+        val page = SessionsApi.sessionMessages(sid, proj, limit = 100, visibility = localVisibility()) ?: return
         val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, sid, proj), timestamp = m.timestamp) to m.parent
@@ -991,6 +1033,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private fun SessionMessage.toRole(): Role = when (type) {
         "text" -> if (role == "assistant") Role.ASSISTANT else Role.USER
         "thinking" -> Role.THINKING
+        "working" -> Role.WORKING
         "notification" -> Role.NOTIFICATION
         "tool_use" -> Role.TOOL
         "tool_result" -> Role.TOOL_RESULT
@@ -1076,6 +1119,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     currentAssistantId = null
                     currentThinkingId = append(currentThinkingId, Role.THINKING, event.text)
                 }
+            }
+            is ServerEvent.Working -> {
+                currentAssistantId = null
+                currentThinkingId = null
+                addMessage(Role.WORKING, "")
             }
             is ServerEvent.Plan -> {
                 currentAssistantId = null

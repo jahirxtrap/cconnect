@@ -14,7 +14,15 @@ import {
 } from "$lib/data/chatModels";
 import type { ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
-import { settings } from "$lib/data/settings.svelte";
+import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
+
+interface Effective {
+  simple: boolean;
+  thinking: string;
+  tool_use: string;
+  file_change: string;
+  compact: string;
+}
 import { t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
@@ -92,10 +100,44 @@ export class ChatState {
   account = $state(DEFAULTS.account);
   streamTokens = $state(true);
   showWorking = $state("label");
-  showThinking = $state("full");
-  showToolUse = $state("label");
-  showFileChange = $state("full");
-  showCompact = $state("full");
+  serverVisibility = $state<Effective>({
+    simple: false,
+    thinking: "full",
+    tool_use: "label",
+    file_change: "full",
+    compact: "full",
+  });
+
+  get effectiveVisibility(): Effective {
+    const local = settings.visibility;
+    const server = this.serverVisibility;
+    const simple = local.simple ?? server.simple;
+    const merged = {
+      simple,
+      thinking: local.thinking ?? server.thinking,
+      tool_use: local.tool_use ?? server.tool_use,
+      file_change: local.file_change ?? server.file_change,
+      compact: local.compact ?? server.compact,
+    };
+    return simple ? { ...merged, thinking: "off", tool_use: "off" } : merged;
+  }
+
+  get showThinking() {
+    return this.effectiveVisibility.thinking;
+  }
+
+  get showToolUse() {
+    return this.effectiveVisibility.tool_use;
+  }
+
+  get showFileChange() {
+    return this.effectiveVisibility.file_change;
+  }
+
+  get showCompact() {
+    return this.effectiveVisibility.compact;
+  }
+
 
   permissionOverride = $state("");
   modelOverride = $state("");
@@ -825,10 +867,13 @@ export class ChatState {
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
       this.showWorking = snapshot.showWorking;
-      this.showThinking = snapshot.showThinking;
-      this.showToolUse = snapshot.showToolUse;
-      this.showFileChange = snapshot.showFileChange;
-      this.showCompact = snapshot.showCompact;
+      this.serverVisibility = {
+        simple: snapshot.simpleMode,
+        thinking: snapshot.showThinking,
+        tool_use: snapshot.showToolUse,
+        file_change: snapshot.showFileChange,
+        compact: snapshot.showCompact,
+      };
     }
     this.capabilitiesReady = true;
   }
@@ -842,7 +887,13 @@ export class ChatState {
       effort: this.effectiveEffort,
       partial: this.effectiveStreamTokens,
       account: this.effectiveAccount,
+      visibility: settings.visibility,
     });
+  }
+
+  applyVisibility(prefs: VisibilityPrefs) {
+    settings.visibility = prefs;
+    this.#socket.sendVisibility(prefs);
   }
 
   #append(item: ChatMessage) {
@@ -885,7 +936,7 @@ export class ChatState {
   async #loadSessionInto(session: SessionInfo): Promise<boolean> {
     const project = session.projectKey;
     if (!project) return false;
-    const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE);
+    const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE, null, settings.visibility);
     if (!page) return false;
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(
@@ -922,7 +973,7 @@ export class ChatState {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     if (!sessionId || !project) return;
-    const page = await this.#sessions.messages(sessionId, project, HISTORY_PAGE);
+    const page = await this.#sessions.messages(sessionId, project, HISTORY_PAGE, null, settings.visibility);
     if (!page) return;
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
@@ -1239,6 +1290,11 @@ export class ChatState {
           this.#assistantId = null;
           this.#thinkingId = this.#stream(this.#thinkingId, "thinking", event.text);
         }
+        break;
+      case "working":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(newMessage(this.#nextId++, "working"));
         break;
       case "plan":
         this.#assistantId = null;

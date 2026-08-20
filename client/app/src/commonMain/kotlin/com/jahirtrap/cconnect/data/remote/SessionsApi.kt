@@ -21,6 +21,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
+import com.jahirtrap.cconnect.data.VisibilityPrefs
 
 object SessionsApi {
 
@@ -55,9 +56,15 @@ object SessionsApi {
         project: String,
         limit: Int = 200,
         beforeIndex: Int? = null,
+        visibility: VisibilityPrefs = VisibilityPrefs(),
     ): MessagesPage? {
         val query = mutableMapOf("project" to project, "limit" to limit.toString())
         if (beforeIndex != null) query["before_index"] = beforeIndex.toString()
+        visibility.simple?.let { query["simple"] = it.toString() }
+        visibility.thinking?.let { query["thinking"] = it }
+        visibility.toolUse?.let { query["tool_use"] = it }
+        visibility.fileChange?.let { query["file_change"] = it }
+        visibility.compact?.let { query["compact"] = it }
         val data = Http.get("/sessions/$sessionId/messages", query)?.jsonObject ?: return null
         val items = data["items"]?.jsonArray?.map(::parseSessionMessage) ?: emptyList()
         return MessagesPage(

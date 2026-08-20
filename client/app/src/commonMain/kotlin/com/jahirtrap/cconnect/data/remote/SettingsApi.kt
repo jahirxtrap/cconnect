@@ -25,6 +25,7 @@ object SettingsApi {
         val showFileChange: String,
         val showCompact: String,
         val showWorking: String,
+        val simpleMode: Boolean,
     )
 
     private fun effectiveStr(o: JsonObject, key: String, fallback: String): String =
@@ -45,6 +46,7 @@ object SettingsApi {
         showFileChange = effectiveStr(o, "show_file_change", "full"),
         showCompact = effectiveStr(o, "show_compact", "full"),
         showWorking = effectiveStr(o, "show_working", "label"),
+        simpleMode = effectiveBool(o, "simple_mode", false),
     )
 
     suspend fun get(): Snapshot? = Http.get("/settings")?.jsonObject?.let(::parse)
@@ -61,6 +63,7 @@ object SettingsApi {
         showFileChange: String? = null,
         showCompact: String? = null,
         showWorking: String? = null,
+        simpleMode: Boolean? = null,
     ): Snapshot? = Http.post("/settings", buildJsonObject {
         if (account != null) put("account", account)
         if (model != null) put("model", model)
@@ -73,6 +76,7 @@ object SettingsApi {
         if (showFileChange != null) put("show_file_change", showFileChange)
         if (showCompact != null) put("show_compact", showCompact)
         if (showWorking != null) put("show_working", showWorking)
+        if (simpleMode != null) put("simple_mode", simpleMode)
     })?.jsonObject?.let(::parse)?.also { ServerDefaults.bump() }
 
     suspend fun reset(): Snapshot? =

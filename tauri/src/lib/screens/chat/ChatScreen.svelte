@@ -44,6 +44,7 @@
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
   import QuestionsBlock from "./blocks/QuestionsBlock.svelte";
+  import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import RewindDialog from "./RewindDialog.svelte";
   import SidePanel from "./SidePanel.svelte";
   import TabStrip from "./TabStrip.svelte";
@@ -74,6 +75,7 @@
   let rewindOpen = $state(false);
   let queuedId = $state<string | null>(null);
   let sharedLink = $state<{ url: string; filename: string } | null>(null);
+  let visibilityOpen = $state(false);
   let sideHeight = $state(58);
   let sideDragging = $state(false);
   let dropOver = $state(false);
@@ -89,6 +91,7 @@
       rewindOpen ||
       queuedId !== null ||
       sharedLink !== null ||
+      visibilityOpen ||
       navigation.preview !== null ||
       (layout.mobile && drawer.open),
   );
@@ -393,6 +396,8 @@
     onEffort={(value) => chat.setEffort(value)}
     onPermissionMode={(value) => chat.setPermissionMode(value)}
     onStreamTokens={() => chat.toggleStreamTokens()}
+    simpleMode={chat.effectiveVisibility.simple}
+    onVisibility={() => (visibilityOpen = true)}
     onQuickChat={() => (chat.sideOpen ? chat.closeSideChat() : chat.openSideChat())}
     quickChatActive={chat.sideMessages.length > 0}
   />
@@ -427,6 +432,31 @@
       chat.dismissRewind();
       rewindOpen = false;
     }}
+  />
+{/if}
+
+{#if visibilityOpen}
+  {@const current = chat.effectiveVisibility}
+  <VisibilityDialog
+    title={t("VISIBILITY_LOCAL")}
+    quickChat={false}
+    simple={current.simple}
+    thinking={current.thinking}
+    toolUse={current.tool_use}
+    fileChange={current.file_change}
+    compact={current.compact}
+    working=""
+    onConfirm={(values) => {
+      chat.applyVisibility({
+        simple: values.simple,
+        thinking: values.thinking,
+        tool_use: values.toolUse,
+        file_change: values.fileChange,
+        compact: values.compact,
+      });
+      visibilityOpen = false;
+    }}
+    onDismiss={() => (visibilityOpen = false)}
   />
 {/if}
 

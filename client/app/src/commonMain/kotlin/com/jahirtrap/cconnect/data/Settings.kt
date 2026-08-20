@@ -54,6 +54,26 @@ class Settings {
         get() = prefs.getBoolean("markdown_preview_formatted", true)
         set(value) = prefs.edit { putBoolean("markdown_preview_formatted", value) }
 
+    var visibilitySimple: String
+        get() = prefs.getString("visibility_simple", "").orEmpty()
+        set(value) = prefs.edit { putString("visibility_simple", value) }
+
+    var visibilityThinking: String
+        get() = prefs.getString("visibility_thinking", "").orEmpty()
+        set(value) = prefs.edit { putString("visibility_thinking", value) }
+
+    var visibilityToolUse: String
+        get() = prefs.getString("visibility_tool_use", "").orEmpty()
+        set(value) = prefs.edit { putString("visibility_tool_use", value) }
+
+    var visibilityFileChange: String
+        get() = prefs.getString("visibility_file_change", "").orEmpty()
+        set(value) = prefs.edit { putString("visibility_file_change", value) }
+
+    var visibilityCompact: String
+        get() = prefs.getString("visibility_compact", "").orEmpty()
+        set(value) = prefs.edit { putString("visibility_compact", value) }
+
     var showTimestamps: Boolean
         get() = prefs.getBoolean("show_timestamps", false)
         set(value) = prefs.edit { putBoolean("show_timestamps", value) }

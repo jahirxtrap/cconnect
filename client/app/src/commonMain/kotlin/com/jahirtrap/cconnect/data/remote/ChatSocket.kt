@@ -115,9 +115,11 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         effort: String,
         partial: Boolean,
         account: String = "",
+        visibility: VisibilityPrefs = VisibilityPrefs(),
     ) {
         send(buildJsonObject {
             put("type", "start")
+            put("visibility", visibility.toJson())
             put("cwd", cwd)
             put("permission_mode", permissionMode)
             if (resume != null) put("resume", resume) else put("resume", JsonNull)
@@ -132,6 +134,17 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             sideChannel?.let { put("side_channel", it) }
             sideResume?.let { put("side_resume", it) }
             if (sideChannel != null) put("side_last_seq", sideLastSeq)
+        })
+    }
+
+    fun sendVisibility(visibility: VisibilityPrefs) {
+        send(buildJsonObject {
+            put("type", "set_visibility")
+            visibility.simple?.let { put("simple", it) }
+            visibility.thinking?.let { put("thinking", it) }
+            visibility.toolUse?.let { put("tool_use", it) }
+            visibility.fileChange?.let { put("file_change", it) }
+            visibility.compact?.let { put("compact", it) }
         })
     }
 
@@ -274,6 +287,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         val event = when (type) {
             "assistant_text" -> ServerEvent.AssistantText(str("text").orEmpty())
             "thinking" -> ServerEvent.Thinking(str("text").orEmpty(), labelOnly = flag("label"))
+            "working" -> ServerEvent.Working
             "tool_use" -> ServerEvent.ToolUse(str("id"), str("name"), str("input"), result = str("result"))
             "tool_result" -> ServerEvent.ToolResult(str("tool_use_id"), str("content"))
             "file_change" -> ServerEvent.FileChange(

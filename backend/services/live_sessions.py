@@ -26,7 +26,7 @@ class LiveSession:
     def __init__(self, channel, state):
         self.channel = channel
         self.state = state
-        self._sinks = set()
+        self._sinks = {}
         self._worker = None
         self._pending = {}  # rid -> {"future": Future, "event": stamped dict | None}
         self._seq = 0
@@ -48,13 +48,18 @@ class LiveSession:
     def attached(self):
         return len(self._sinks) > 0
 
-    async def attach(self, sink, last_seq=0, since_committed=False):
+    def wanted(self):
+        """What the attached sockets asked to see, so a turn never produces detail
+        nobody wants (nor buffers it for replay)."""
+        return [holder["prefs"] for holder in self._sinks.values() if holder]
+
+    async def attach(self, sink, last_seq=0, since_committed=False, prefs=None):
         """Bind the socket and replay what it missed, then re-emit any still-pending
         permission prompt the client had already passed. ``since_committed`` is for a
         fresh client re-attaching by session id: it already loaded the committed
         transcript, so it only needs the in-progress turn (events after the last done)."""
         async with self._lock:
-            self._sinks.add(sink)
+            self._sinks[sink] = prefs
             floor = max(last_seq, self._committed_seq) if since_committed else last_seq
             for stamped in list(self._outbox):
                 if stamped["seq"] > floor:
@@ -69,7 +74,7 @@ class LiveSession:
         and pending permission waits are left intact. Other attached sockets keep
         receiving."""
         async with self._lock:
-            self._sinks.discard(sink)
+            self._sinks.pop(sink, None)
 
     async def _emit(self, event):
         async with self._lock:
@@ -92,7 +97,7 @@ class LiveSession:
         try:
             await sink(stamped)
         except Exception:
-            self._sinks.discard(sink)
+            self._sinks.pop(sink, None)
 
     async def _ask(self, payload):
         """Bridge the SDK's permission/question callback to the client and wait

@@ -2,6 +2,7 @@
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import Gauge from "@lucide/svelte/icons/gauge";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
+  import Eye from "@lucide/svelte/icons/eye";
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import { t } from "$lib/i18n/index.svelte";
@@ -31,12 +32,14 @@
     accountSelected: string;
     onAccount: (value: string) => void;
     streamTokens: boolean;
+    simpleMode: boolean;
     contextTokens: number | null;
     quickChatActive: boolean;
     onModel: (value: string) => void;
     onEffort: (value: string) => void;
     onPermissionMode: (value: string) => void;
     onStreamTokens: () => void;
+    onVisibility: () => void;
     onQuickChat: () => void;
   }
 
@@ -55,12 +58,14 @@
     accountSelected,
     onAccount,
     streamTokens,
+    simpleMode,
     contextTokens,
     quickChatActive,
     onModel,
     onEffort,
     onPermissionMode,
     onStreamTokens,
+    onVisibility,
     onQuickChat,
   }: Props = $props();
 
@@ -231,6 +236,12 @@
     <TooltipWrap label={t("STREAMING")} class="flex shrink-0 items-center">
       <button type="button" use:keepFocus onclick={onStreamTokens} aria-label={t("STREAMING")} class={TOGGLE_CLASS}>
         <Radio size={16} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
+      </button>
+    </TooltipWrap>
+
+    <TooltipWrap label={t("VISIBILITY_LOCAL")} class="flex shrink-0 items-center">
+      <button type="button" use:keepFocus onclick={onVisibility} aria-label={t("VISIBILITY_LOCAL")} class={TOGGLE_CLASS}>
+        <Eye size={16} class={simpleMode ? "text-accent" : "text-on-surface-variant"} />
       </button>
     </TooltipWrap>
   {/if}

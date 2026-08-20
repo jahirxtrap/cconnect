@@ -13,6 +13,7 @@ export interface SettingsSnapshot {
   showFileChange: string;
   showCompact: string;
   showWorking: string;
+  simpleMode: boolean;
 }
 
 export interface SettingsPatch {
@@ -27,6 +28,7 @@ export interface SettingsPatch {
   show_file_change?: string;
   show_compact?: string;
   show_working?: string;
+  simple_mode?: boolean;
 }
 
 type Field = { effective?: unknown };
@@ -50,6 +52,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   showFileChange: effectiveStr(wire, "show_file_change", "full"),
   showCompact: effectiveStr(wire, "show_compact", "full"),
   showWorking: effectiveStr(wire, "show_working", "label"),
+  simpleMode: effectiveBool(wire, "simple_mode", false),
 });
 
 export const createSettingsApi = (http: HttpClient) => ({

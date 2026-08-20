@@ -1,5 +1,6 @@
 import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { http, type HttpClient } from "./http";
+import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
 export interface MessagesPage {
   items: SessionMessage[];
@@ -45,6 +46,7 @@ export const createSessionsApi = (http: HttpClient) => ({
     project: string,
     limit = 200,
     beforeIndex: number | null = null,
+    prefs: VisibilityPrefs | null = null,
   ): Promise<MessagesPage | null> {
     const data = await http.get<{
       items?: Record<string, unknown>[];
@@ -55,6 +57,11 @@ export const createSessionsApi = (http: HttpClient) => ({
       project,
       limit,
       ...(beforeIndex === null ? {} : { before_index: beforeIndex }),
+      ...(prefs?.simple === null || prefs === null ? {} : { simple: prefs.simple }),
+      ...(prefs?.thinking ? { thinking: prefs.thinking } : {}),
+      ...(prefs?.tool_use ? { tool_use: prefs.tool_use } : {}),
+      ...(prefs?.file_change ? { file_change: prefs.file_change } : {}),
+      ...(prefs?.compact ? { compact: prefs.compact } : {}),
     });
     if (!data) return null;
     return {

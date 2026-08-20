@@ -61,7 +61,7 @@
   const visible = $derived(messages.filter((item) => modeFor(item.role) !== "off"));
 
   const runningAt = (item: ChatMessage, index: number) =>
-    item.role === "thinking"
+    item.role === "thinking" || item.role === "working"
       ? index === visible.length - 1 && streaming
       : !!item.toolUseId && pendingToolIds.includes(item.toolUseId);
 

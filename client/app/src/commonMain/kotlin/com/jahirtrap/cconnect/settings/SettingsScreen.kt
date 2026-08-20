@@ -233,6 +233,7 @@ fun SettingsScreen(
     var showFileChange by remember { mutableStateOf("full") }
     var showCompact by remember { mutableStateOf("full") }
     var showWorking by remember { mutableStateOf("label") }
+    var simpleMode by remember { mutableStateOf(false) }
     var cliInfo by remember { mutableStateOf<CliApi.CliInfo?>(null) }
     var serverReady by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(Backend.isConfigured) }
@@ -250,6 +251,7 @@ fun SettingsScreen(
             model = s.model; effort = s.effort; permissionMode = s.permissionMode; streaming = s.streaming
             todoTools = s.todoTools
             account = s.account.ifEmpty { caps.defaults.account }
+            simpleMode = s.simpleMode
             showThinking = s.showThinking; showToolUse = s.showToolUse
             showFileChange = s.showFileChange; showCompact = s.showCompact; showWorking = s.showWorking
         }
@@ -793,14 +795,16 @@ fun SettingsScreen(
         )
 
         SettingsDialog.Visibility -> VisibilityDialog(
+            simple = simpleMode,
             thinking = showThinking,
             toolUse = showToolUse,
             fileChange = showFileChange,
             compact = showCompact,
             working = showWorking,
-            onConfirm = { th, tu, fc, cp, wk ->
+            onConfirm = { sm, th, tu, fc, cp, wk ->
+                simpleMode = sm
                 showThinking = th; showToolUse = tu; showFileChange = fc; showCompact = cp; showWorking = wk
-                scope.launch { SettingsApi.update(showThinking = th, showToolUse = tu, showFileChange = fc, showCompact = cp, showWorking = wk) }
+                scope.launch { SettingsApi.update(simpleMode = sm, showThinking = th, showToolUse = tu, showFileChange = fc, showCompact = cp, showWorking = wk) }
                 dialog = null
             },
             onDismiss = { dialog = null },
@@ -825,6 +829,7 @@ fun SettingsScreen(
                     SettingsApi.reset()?.let {
                         model = it.model; effort = it.effort; permissionMode = it.permissionMode; streaming = it.streaming
                         todoTools = it.todoTools
+                        simpleMode = it.simpleMode
                         showThinking = it.showThinking; showToolUse = it.showToolUse
                         showFileChange = it.showFileChange; showCompact = it.showCompact; showWorking = it.showWorking
                     }
@@ -1651,15 +1656,19 @@ private fun GenerationDialog(
 }
 
 @Composable
-private fun VisibilityDialog(
+fun VisibilityDialog(
+    simple: Boolean,
     thinking: String,
     toolUse: String,
     fileChange: String,
     compact: String,
     working: String,
-    onConfirm: (String, String, String, String, String) -> Unit,
+    title: String = stringResource(Res.string.visibility),
+    quickChat: Boolean = true,
+    onConfirm: (Boolean, String, String, String, String, String) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var sm by remember { mutableStateOf(simple) }
     var th by remember { mutableStateOf(thinking) }
     var tu by remember { mutableStateOf(toolUse) }
     var fc by remember { mutableStateOf(fileChange) }
@@ -1680,21 +1689,36 @@ private fun VisibilityDialog(
     )
     CompactDialog(
         onDismiss = onDismiss,
-        title = stringResource(Res.string.visibility),
+        title = title,
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
-            Button(onClick = { onConfirm(th, tu, fc, cp, wk) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = { onConfirm(sm, th, tu, fc, cp, wk) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
-        SelectField(stringResource(Res.string.thinking), th, three) { th = it }
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(Res.string.simple_mode), style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    stringResource(Res.string.simple_mode_summary),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            CompactSwitch(checked = sm) { sm = it }
+        }
         Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.tools), tu, three) { tu = it }
+        SelectField(stringResource(Res.string.thinking), if (sm) "off" else th, three, enabled = !sm) { th = it }
+        Spacer(Modifier.height(14.dp))
+        SelectField(stringResource(Res.string.tools), if (sm) "off" else tu, three, enabled = !sm) { tu = it }
         Spacer(Modifier.height(14.dp))
         SelectField(stringResource(Res.string.file_changes), fc, three) { fc = it }
         Spacer(Modifier.height(14.dp))
         SelectField(stringResource(Res.string.compacted), cp, two) { cp = it }
-        Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.working), wk, labelOff) { wk = it }
+        if (quickChat) {
+            Spacer(Modifier.height(14.dp))
+            SelectField(stringResource(Res.string.quick_chat_working), wk, labelOff) { wk = it }
+        }
     }
 }
 

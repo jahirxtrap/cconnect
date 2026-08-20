@@ -85,6 +85,7 @@ import com.composables.icons.lucide.FolderArchive
 import com.composables.icons.lucide.FolderOpen
 import com.composables.icons.lucide.Gauge
 import com.composables.icons.lucide.Hourglass
+import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.MessagesSquare
@@ -269,6 +270,8 @@ import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import com.jahirtrap.cconnect.ui.theme.snapDp
+import com.jahirtrap.cconnect.settings.VisibilityDialog
+import com.jahirtrap.cconnect.data.VisibilityPrefs
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -302,6 +305,7 @@ fun ChatScreen(
     var queuePreview by remember { mutableStateOf<QueuedMessage?>(null) }
     var queueFilePreview by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showRewindSheet by remember { mutableStateOf(false) }
+    var showVisibility by remember { mutableStateOf(false) }
     LaunchedEffect(expanded) {
         if (expanded) {
             focusManager.clearFocus()
@@ -678,7 +682,7 @@ fun ChatScreen(
                                                     }
                                                     val running = when (message.role) {
                                                         Role.TOOL, Role.AGENT -> message.toolUseId != null && message.toolUseId in state.pendingToolIds
-                                                        Role.THINKING -> index == state.messages.lastIndex && state.streaming
+                                                        Role.THINKING, Role.WORKING -> index == state.messages.lastIndex && state.streaming
                                                         else -> false
                                                     }
                                                     ChatMessageItem(
@@ -854,6 +858,8 @@ fun ChatScreen(
                                             onPermissionMode = vm::setPermissionMode,
                                             streaming = state.streamingOverride ?: state.streamTokens,
                                             onStreaming = vm::toggleStreaming,
+                                            simpleMode = state.visibility.simple == true,
+                                            onVisibility = { showVisibility = true },
                                             onQuickChat = vm::openSideChat,
                                             quickChatActive = sc != null && sc.messages.isNotEmpty(),
                                             contextTokens = state.contextTokens,
@@ -990,6 +996,24 @@ fun ChatScreen(
             loading = state.rewindLoading,
             onSelect = { showRewindSheet = false; vm.selectRewindPoint(it) },
             onDismiss = { showRewindSheet = false },
+        )
+    }
+    if (showVisibility) {
+        val current = state.visibility
+        VisibilityDialog(
+            simple = current.simple ?: false,
+            thinking = current.thinking ?: state.serverVisibility.thinking,
+            toolUse = current.toolUse ?: state.serverVisibility.toolUse,
+            fileChange = current.fileChange ?: state.serverVisibility.fileChange,
+            compact = current.compact ?: state.serverVisibility.compact,
+            working = "",
+            title = stringResource(Res.string.visibility_local),
+            quickChat = false,
+            onConfirm = { sm, th, tu, fc, cp, _ ->
+                vm.applyVisibility(VisibilityPrefs(simple = sm, thinking = th, toolUse = tu, fileChange = fc, compact = cp))
+                showVisibility = false
+            },
+            onDismiss = { showVisibility = false },
         )
     }
     state.rewindTarget?.let { target ->
@@ -1493,7 +1517,9 @@ private fun ChatToolbar(
     permissionModes: List<PermissionMode>,
     onPermissionMode: (String) -> Unit,
     streaming: Boolean,
+    simpleMode: Boolean,
     onStreaming: () -> Unit,
+    onVisibility: () -> Unit,
     onQuickChat: () -> Unit = {},
     quickChatActive: Boolean = false,
     contextTokens: Int? = null,
@@ -1599,6 +1625,9 @@ private fun ChatToolbar(
             TooltipWrap(stringResource(Res.string.streaming)) {
                 StreamToggle(streaming = streaming, onClick = onStreaming)
             }
+            TooltipWrap(stringResource(Res.string.visibility_local)) {
+                VisibilityToggle(simple = simpleMode, onClick = onVisibility)
+            }
         }
         if (ready && !disconnected && !connecting && contextTokens != null && contextTokens > 0) {
             ContextRing(tokens = contextTokens, limit = if (model.contains("1m")) 1_000_000 else 200_000)
@@ -1629,6 +1658,21 @@ private fun fmtTokens(n: Int): String =
         val m = n / 1_000_000.0
         if (m % 1.0 == 0.0) "${m.toInt()}M" else "${(m * 10).toInt() / 10.0}M"
     } else "${n / 1000}K"
+
+@Composable
+private fun VisibilityToggle(simple: Boolean, onClick: () -> Unit) {
+    val color = if (simple) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Lucide.Eye, contentDescription = stringResource(Res.string.visibility_local), tint = color, modifier = Modifier.size(16.dp))
+    }
+}
 
 @Composable
 private fun StreamToggle(streaming: Boolean, onClick: () -> Unit) {

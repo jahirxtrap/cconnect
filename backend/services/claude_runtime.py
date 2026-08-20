@@ -12,7 +12,7 @@ from loguru import logger
 from core import cli_manager
 from core.config import AI_WORKDIR, PORT, SHARED_DIR
 from mcps import build_cconnect_server
-from services import settings_store
+from services import settings_store, visibility
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
@@ -236,11 +236,12 @@ def _file_change_event(block: Any, raw_input: Any, hidden: set[str]) -> dict | N
     return {"type": "file_change", "id": bid, "path": path, "diff_lines": diff_lines}
 
 
-def _blocks_to_events(content: Any, skip_streamed: bool = False, hidden_tool_ids: set[str] | None = None) -> list[dict]:
+def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidden_tool_ids: set[str] | None = None) -> list[dict]:
     """Convert message blocks to events. When ``skip_streamed`` is set,
     text and thinking are omitted because they already arrived as deltas.
     ``hidden_tool_ids`` collects tool_use ids that should be suppressed
-    (used to hide AskUserQuestion's tool_use AND its matching tool_result)."""
+    (used to hide AskUserQuestion's tool_use AND its matching tool_result).
+    ``vis`` is the most detail any attached socket asked for."""
     events: list[dict] = []
     hidden = hidden_tool_ids if hidden_tool_ids is not None else set()
     for block in content or []:
@@ -250,7 +251,7 @@ def _blocks_to_events(content: Any, skip_streamed: bool = False, hidden_tool_ids
                 continue
             events.append({"type": "assistant_text", "text": getattr(block, "text", "").strip()})
         elif kind == "ThinkingBlock":
-            mode = settings_store.visibility_mode("thinking")
+            mode = vis["thinking"]
             if mode == "off":
                 continue
             if mode == "label":
@@ -274,7 +275,7 @@ def _blocks_to_events(content: Any, skip_streamed: bool = False, hidden_tool_ids
                     hidden.add(bid)
                 continue
             if name in ("Agent", "Task") and isinstance(raw_input, dict):
-                mode = settings_store.visibility_mode("tool_use")
+                mode = vis["tool_use"]
                 if mode != "off":
                     events.append({
                         "type": "agent",
@@ -295,13 +296,13 @@ def _blocks_to_events(content: Any, skip_streamed: bool = False, hidden_tool_ids
                 })
             elif name in _FILE_EDIT_TOOLS:
                 event = _file_change_event(block, raw_input, hidden)  # also marks the edit's result hidden
-                mode = settings_store.visibility_mode("file_change")
+                mode = vis["file_change"]
                 if event is not None and mode != "off":
                     if mode == "label":
                         event = {"type": "file_change", "id": event.get("id"), "path": event.get("path"), "label": True}
                     events.append(event)
             elif not name.startswith("Task"):
-                if settings_store.visibility_mode("tool_use") == "off":
+                if vis["tool_use"] == "off":
                     continue
                 events.append({
                     "type": "tool_use",
@@ -313,7 +314,7 @@ def _blocks_to_events(content: Any, skip_streamed: bool = False, hidden_tool_ids
             tuid = getattr(block, "tool_use_id", None)
             if tuid and tuid in hidden:
                 continue
-            mode = settings_store.visibility_mode("tool_use")
+            mode = vis["tool_use"]
             if mode == "off":
                 continue
             ev = {"type": "tool_result", "tool_use_id": tuid}
@@ -439,6 +440,7 @@ async def run_prompt(
     emit: Optional[Callable[[dict], Awaitable[None]]] = None,
     drain: Optional[AsyncIterator[dict]] = None,
     seed_id: Optional[str] = None,
+    wanted: Optional[Callable[[], dict]] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk import (
         query,
@@ -453,6 +455,7 @@ async def run_prompt(
         HookMatcher,
     )
 
+    vis = wanted or visibility.defaults
     ultracode = effort == "ultracode"
     effort_level = "xhigh" if ultracode else (None if effort in (None, "", "default") else effort)
     extra_args = {"name": name} if name else {}
@@ -637,7 +640,7 @@ async def run_prompt(
                     yield {"type": "session_started", "session_id": _msid}
                 current_sid = _msid
             parent = getattr(message, "parent_tool_use_id", None)
-            agent_mode = settings_store.visibility_mode("tool_use") if parent else None
+            agent_mode = vis()["tool_use"] if parent else None
             if parent and agent_mode == "off":
                 continue
             if isinstance(message, StreamEvent):
@@ -649,7 +652,7 @@ async def run_prompt(
                     if not parent:
                         for ev in _flush_users(current_sid):
                             yield ev
-                stream_thinking = settings_store.visibility_mode("thinking") == "full"
+                stream_thinking = vis()["thinking"] == "full"
                 for event in _stream_event_to_events(raw):
                     if event.get("type") == "thinking" and not stream_thinking:
                         continue
@@ -677,7 +680,7 @@ async def run_prompt(
                                 _bid = getattr(_b, "id", None)
                                 if _bid:
                                     status_state["pending"].add(_bid)
-                    for event in _blocks_to_events(message.content, skip_streamed=partial, hidden_tool_ids=hidden_tool_ids):
+                    for event in _blocks_to_events(message.content, vis(), skip_streamed=partial, hidden_tool_ids=hidden_tool_ids):
                         if parent:
                             event["parent"] = parent
                         yield event
@@ -694,7 +697,7 @@ async def run_prompt(
                     for _b in getattr(message, "content", None) or []:
                         if type(_b).__name__ == "ToolResultBlock":
                             status_state["pending"].discard(getattr(_b, "tool_use_id", None))
-                tu_mode = settings_store.visibility_mode("tool_use")
+                tu_mode = vis()["tool_use"]
                 if tu_mode != "off":
                     for block in getattr(message, "content", None) or []:
                         if type(block).__name__ != "ToolResultBlock":

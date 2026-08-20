@@ -137,11 +137,22 @@ def get_session_messages(
     project: str,
     limit: int = 200,
     before_index: int | None = None,
+    simple: bool | None = None,
+    thinking: str | None = None,
+    tool_use: str | None = None,
+    file_change: str | None = None,
+    compact: str | None = None,
 ):
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="invalid limit")
     try:
-        items = sessions_service.get_session_messages(project, session_id)
+        items = sessions_service.get_session_messages(project, session_id, {
+            "simple": simple,
+            "thinking": thinking,
+            "tool_use": tool_use,
+            "file_change": file_change,
+            "compact": compact,
+        })
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     total = len(items)

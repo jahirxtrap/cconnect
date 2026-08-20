@@ -1,5 +1,9 @@
 package com.jahirtrap.cconnect.data
 
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+
 enum class Role { USER, ASSISTANT, THINKING, WORKING, TOOL, TOOL_RESULT, SUMMARY, INTERACTION, FILE_CHANGE, COMPACT, SYSTEM, API_ERROR, INTERRUPTED, PLAN, AGENT, NOTIFICATION }
 
 enum class SendStatus { SENT, ERROR }
@@ -133,6 +137,7 @@ sealed interface ServerEvent {
     data class Compact(val trigger: String?, val preTokens: Int?, val postTokens: Int?, val summary: String) : ServerEvent
     data class CompactSummary(val trigger: String?, val preTokens: Int?, val postTokens: Int?, val summary: String) : ServerEvent
     data class AskText(val text: String) : ServerEvent
+    data object Working : ServerEvent
     data object AskWorking : ServerEvent
     data class AskSession(val sessionId: String) : ServerEvent
     data object AskDone : ServerEvent
@@ -168,4 +173,20 @@ sealed interface ServerEvent {
         val questions: List<InteractionQuestion> = emptyList(),
     ) : ServerEvent
     data class InteractionResolved(val requestId: String, val optionId: String?) : ServerEvent
+}
+
+data class VisibilityPrefs(
+    val simple: Boolean? = null,
+    val thinking: String? = null,
+    val toolUse: String? = null,
+    val fileChange: String? = null,
+    val compact: String? = null,
+) {
+    fun toJson(): JsonObject = buildJsonObject {
+        simple?.let { put("simple", it) }
+        thinking?.let { put("thinking", it) }
+        toolUse?.let { put("tool_use", it) }
+        fileChange?.let { put("file_change", it) }
+        compact?.let { put("compact", it) }
+    }
 }

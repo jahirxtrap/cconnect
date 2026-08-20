@@ -5,8 +5,21 @@ from typing import Literal, Optional
 from pydantic import BaseModel
 
 
+class VisibilityPrefs(BaseModel):
+    simple: Optional[bool] = None
+    thinking: Optional[str] = None
+    tool_use: Optional[str] = None
+    file_change: Optional[str] = None
+    compact: Optional[str] = None
+
+
+class SetVisibilityMessage(VisibilityPrefs):
+    type: Literal["set_visibility"]
+
+
 class StartMessage(BaseModel):
     type: Literal["start"]
+    visibility: Optional[VisibilityPrefs] = None
     cwd: str
     permission_mode: Optional[str] = None
     resume: Optional[str] = None
