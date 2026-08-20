@@ -11,6 +11,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
+  import { openExternal } from "$lib/platform";
   import {
     claudeApi,
     type CatalogPlugin,
@@ -239,7 +240,7 @@
       {:else if kind === "status"}
         <TooltipIconButton
           label={t("STATUS_OPEN_PAGE")}
-          onclick={() => window.open(STATUS_PAGE, "_blank", "noopener")}
+          onclick={() => openExternal(STATUS_PAGE)}
         >
           <ExternalLink size={20} />
         </TooltipIconButton>
@@ -390,7 +391,7 @@
             <button
               type="button"
               disabled={!incident.shortlink}
-              onclick={() => incident.shortlink && window.open(incident.shortlink, "_blank", "noopener")}
+              onclick={() => incident.shortlink && openExternal(incident.shortlink)}
               class="block w-full px-4 py-2 text-left {incident.shortlink ? 'cursor-pointer' : 'cursor-default'}"
             >
               <div class="flex items-center gap-2">

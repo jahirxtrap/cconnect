@@ -11,6 +11,8 @@ actual object AppUpdater {
 
     actual fun pendingVersion(): String? = null
 
+    actual fun pendingName(): String? = null
+
     actual fun install(): Boolean = false
 
     actual fun consumeIfInstalled(currentVersion: String) {}

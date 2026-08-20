@@ -1,5 +1,5 @@
 import { transfers } from "$lib/data/transfers.svelte";
-import { isTauri } from "$lib/platform";
+import { isTauri, openExternal } from "$lib/platform";
 import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDownloads";
 import { authHeadersOf, backend, type Profile } from "./backend.svelte";
 
@@ -205,5 +205,5 @@ export const openSharedExternally = async (url: string, filename: string) => {
       return;
     }
   }
-  window.open(url, "_blank", "noopener");
+  openExternal(url);
 };

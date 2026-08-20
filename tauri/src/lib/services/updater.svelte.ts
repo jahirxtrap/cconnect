@@ -1,5 +1,6 @@
 import { APP_VERSION } from "$lib/data/build";
-import { isTauri } from "$lib/platform";
+import { isMobile, isTauri } from "$lib/platform";
+import { androidInstaller, trackAndroidInstall } from "$lib/platform/androidInstaller";
 import { store } from "$lib/platform/storage";
 
 interface Pending {
@@ -30,12 +31,34 @@ class Updater {
 
   async download(url: string, version: string): Promise<boolean> {
     if (!isTauri) return false;
+    if (isMobile) {
+      const bridge = androidInstaller();
+      if (!bridge) {
+        const { openUrl } = await import("@tauri-apps/plugin-opener");
+        return openUrl(url).then(
+          () => true,
+          () => false,
+        );
+      }
+      this.progress = 0;
+      bridge.start(url);
+      const done = await trackAndroidInstall(bridge, (value) => (this.progress = value));
+      this.progress = null;
+      if (!done) {
+        this.#clear();
+        return false;
+      }
+      this.pending = { version, path: url };
+      store.set(PENDING_KEY, this.pending);
+      return true;
+    }
     const name = url.split("/").pop() || "CConnect-update";
     this.progress = 0;
     try {
-      const [{ appDataDir, join }, fs] = await Promise.all([
+      const [{ appDataDir, join }, fs, { fetch }] = await Promise.all([
         import("@tauri-apps/api/path"),
         import("@tauri-apps/plugin-fs"),
+        import("@tauri-apps/plugin-http"),
       ]);
       const directory = await join(await appDataDir(), "updates");
       await fs.mkdir(directory, { recursive: true });
@@ -77,6 +100,8 @@ class Updater {
   async install(): Promise<boolean> {
     const current = this.pending;
     if (!current || !isTauri) return false;
+    const bridge = androidInstaller();
+    if (bridge) return bridge.install();
     const { invoke } = await import("@tauri-apps/api/core");
     return invoke("install_update", { path: current.path })
       .then(() => true)

@@ -7,12 +7,14 @@ const REPO = "cconnect";
 
 export const REPO_URL = `https://github.com/${OWNER}/${REPO}`;
 export const RELEASES_URL = `${REPO_URL}/releases`;
+export const ALT_WEB_URL = "https://cconnect.pages.dev/";
 export const KOFI_URL = "https://ko-fi.com/jahirtrap";
 
 export interface Release {
   tag: string;
   url: string;
   installerUrl: string | null;
+  altInstallerUrl: string | null;
 }
 
 export interface Profile {
@@ -25,14 +27,17 @@ export interface Profile {
 interface ReleaseWire {
   tag_name?: string;
   html_url?: string;
-  assets?: Array<{ browser_download_url?: string }>;
+  assets?: Array<{ name?: string; browser_download_url?: string }>;
 }
+
+export const ALT_MARK = "-tauri";
 
 const installerExtensions = (): string[] => {
   const name = platformName();
   if (name === "windows") return [".msi", ".exe"];
   if (name === "macos") return [".dmg"];
   if (name === "linux") return [".deb", ".rpm", ".AppImage"];
+  if (name === "android") return [".apk"];
   return [];
 };
 
@@ -52,15 +57,26 @@ const fetchJson = async <T>(url: string): Promise<T | null> => {
   }
 };
 
+const installerFor = (assets: ReleaseWire["assets"], alt: boolean): string | null => {
+  const listed = (assets ?? []).filter((asset) => !!asset.browser_download_url);
+  for (const extension of installerExtensions()) {
+    const match = listed.find(
+      (asset) => asset.browser_download_url!.endsWith(extension) && (asset.name ?? "").includes(ALT_MARK) === alt,
+    );
+    if (match) return match.browser_download_url!;
+  }
+  return null;
+};
+
 export const latestRelease = async (): Promise<Release | null> => {
   const data = await fetchJson<ReleaseWire>(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`);
   if (!data?.tag_name) return null;
-  const urls = (data.assets ?? []).map((asset) => asset.browser_download_url).filter((url): url is string => !!url);
-  const installerUrl =
-    installerExtensions()
-      .map((extension) => urls.find((url) => url.endsWith(extension)))
-      .find((url) => !!url) ?? null;
-  return { tag: data.tag_name, url: data.html_url ?? RELEASES_URL, installerUrl };
+  return {
+    tag: data.tag_name,
+    url: data.html_url ?? RELEASES_URL,
+    installerUrl: installerFor(data.assets, true),
+    altInstallerUrl: installerFor(data.assets, false),
+  };
 };
 
 const profile = async (login: string, cacheKey: string): Promise<Profile | null> => {

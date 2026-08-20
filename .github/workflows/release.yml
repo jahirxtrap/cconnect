@@ -37,6 +37,15 @@ jobs:
           chmod +x ./gradlew
           ./gradlew :app:packageDistributionForCurrentOS --no-configuration-cache
 
+      - name: Normalize asset names
+        run: |
+          version="${GITHUB_REF_NAME}"
+          cd app/build/compose/binaries/main
+          for file in msi/*.msi exe/*.exe deb/*.deb rpm/*.rpm dmg/*.dmg; do
+            [ -e "$file" ] || continue
+            mv "$file" "$(dirname "$file")/cconnect-$version.${file##*.}"
+          done
+
       - uses: actions/upload-artifact@v4
         with:
           name: cconnect-desktop-${{ matrix.os }}
@@ -90,6 +99,14 @@ jobs:
           chmod +x ./gradlew
           ./gradlew :androidApp:assembleRelease
 
+      - name: Normalize asset name
+        run: |
+          cd androidApp/build/outputs/apk/release
+          for file in *.apk; do
+            [ -e "$file" ] || continue
+            mv "$file" "cconnect-${GITHUB_REF_NAME}.apk"
+          done
+
       - uses: actions/upload-artifact@v4
         with:
           name: cconnect-android
@@ -124,3 +141,135 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy client/app/build/dist/wasmJs/productionExecutable --project-name=cconnect --branch=main --commit-dirty=true
+
+  tauri-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-22.04, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tauri/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Build installers
+        run: |
+          npm ci
+          npm run tauri build
+
+      - name: Normalize asset names
+        run: |
+          version="${GITHUB_REF_NAME}"
+          cd src-tauri/target/release/bundle
+          for file in nsis/*.exe msi/*.msi deb/*.deb rpm/*.rpm appimage/*.AppImage dmg/*.dmg; do
+            [ -e "$file" ] || continue
+            mv "$file" "$(dirname "$file")/cconnect-tauri-$version.${file##*.}"
+          done
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body_path: CHANGELOG.md
+          files: |
+            tauri/src-tauri/target/release/bundle/nsis/*.exe
+            tauri/src-tauri/target/release/bundle/msi/*.msi
+            tauri/src-tauri/target/release/bundle/deb/*.deb
+            tauri/src-tauri/target/release/bundle/rpm/*.rpm
+            tauri/src-tauri/target/release/bundle/appimage/*.AppImage
+            tauri/src-tauri/target/release/bundle/dmg/*.dmg
+
+  tauri-android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: tauri
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tauri/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager --install "ndk;27.2.12479018"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Build APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: |
+          npm ci
+          npm run tauri android build -- --apk --target aarch64
+
+      - name: Sign with the release keystore
+        run: |
+          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          build_tools=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          unsigned=$(ls src-tauri/gen/android/app/build/outputs/apk/universal/release/*.apk | head -1)
+          "$build_tools/zipalign" -p -f 4 "$unsigned" aligned.apk
+          "$build_tools/apksigner" sign \
+            --ks keystore.jks \
+            --ks-pass "pass:${{ secrets.SIGNING_STORE_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.SIGNING_KEY_ALIAS }}" \
+            --key-pass "pass:${{ secrets.SIGNING_KEY_PASSWORD }}" \
+            --out "cconnect-tauri-${GITHUB_REF_NAME}.apk" aligned.apk
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          body_path: CHANGELOG.md
+          files: tauri/cconnect-tauri-*.apk
+
+  tauri-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: tauri/package-lock.json
+
+      - name: Build web bundle
+        working-directory: tauri
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy tauri/dist --project-name=cconnect-tauri --branch=main --commit-dirty=true

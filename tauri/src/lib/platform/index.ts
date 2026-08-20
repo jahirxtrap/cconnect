@@ -12,6 +12,15 @@ export const platformName = (): "windows" | "macos" | "linux" | "android" | "ios
   return "linux";
 };
 
+export const openExternal = (url: string) => {
+  const fallback = () => void window.open(url, "_blank", "noopener");
+  if (!isTauri) {
+    fallback();
+    return;
+  }
+  void import("@tauri-apps/plugin-opener").then(({ openUrl }) => openUrl(url).catch(fallback), fallback);
+};
+
 export const isMobile = platformName() === "android" || platformName() === "ios";
 
 export const isDesktop = isTauri && !isMobile;

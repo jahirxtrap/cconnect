@@ -1,6 +1,7 @@
 <script lang="ts">
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import { t } from "$lib/i18n/index.svelte";
+  import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
   import { accountsApi, type Account, type AccountsSnapshot } from "$lib/services/accountsApi";
   import { settingsApi } from "$lib/services/settingsApi";
@@ -290,7 +291,7 @@
       />
       <ActionButton
         text={t("OPEN")}
-        onclick={() => window.open(current.url, "_blank", "noopener")}
+        onclick={() => openExternal(current.url)}
         class="w-full"
       />
     </div>

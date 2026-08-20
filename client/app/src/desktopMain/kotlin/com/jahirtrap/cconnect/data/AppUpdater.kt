@@ -79,6 +79,11 @@ actual object AppUpdater {
         if (File(updateDir, name).isFile) version else { clear(); null }
     }.getOrNull()
 
+    actual fun pendingName(): String? = runCatching {
+        if (!marker.isFile) return null
+        marker.readLines().getOrNull(1)?.takeIf { it.isNotBlank() }
+    }.getOrNull()
+
     actual fun install(): Boolean = runCatching {
         val name = marker.readLines().getOrNull(1)?.takeIf { it.isNotBlank() } ?: return false
         val file = File(updateDir, name)

@@ -276,6 +276,28 @@ fun SettingsScreen(
 
     var dialog by remember { mutableStateOf<SettingsDialog?>(null) }
     var backup by remember { mutableStateOf("") }
+    var pendingUpdate by remember { mutableStateOf(AppUpdater.pendingVersion()) }
+    var pendingIsSwitch by remember { mutableStateOf(AppUpdater.pendingName()?.contains(GitHubApi.ALT_MARK) == true) }
+    var updateProgress by remember { mutableStateOf<Float?>(null) }
+    var downloadingSwitch by remember { mutableStateOf(false) }
+    var downloadJob by remember { mutableStateOf<Job?>(null) }
+
+    fun startDownload(url: String, tag: String, forSwitch: Boolean) {
+        updateProgress = 0f
+        downloadingSwitch = forSwitch
+        downloadJob = scope.launch {
+            try {
+                if (AppUpdater.download(url, tag) { updateProgress = it }) {
+                    pendingUpdate = AppUpdater.pendingVersion()
+                    pendingIsSwitch = forSwitch
+                }
+            } finally {
+                updateProgress = null
+                downloadingSwitch = false
+                downloadJob = null
+            }
+        }
+    }
     var pendingImport by remember { mutableStateOf("") }
     var importFailed by remember { mutableStateOf(false) }
     var notifyTaskDone by remember { mutableStateOf(settings.notifyTaskDone) }
@@ -559,13 +581,13 @@ fun SettingsScreen(
                                     stringResource(Res.string.compat_server_outdated),
                                     style = MaterialTheme.typography.bodySmall, color = palette.red,
                                 )
-                                chatState.latestRelease?.let { release ->
+                                if (chatState.updateAvailable) chatState.latestRelease?.let { release ->
                                     Text(
                                         stringResource(Res.string.update_available, release.tag),
                                         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
                                     )
                                 }
-                                if (!chatState.appOutdated && !chatState.serverOutdated && chatState.latestRelease == null) Text(
+                                if (!chatState.appOutdated && !chatState.serverOutdated && !chatState.updateAvailable) Text(
                                     stringResource(Res.string.up_to_date),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -576,63 +598,83 @@ fun SettingsScreen(
                             }
                         }
                         val release = chatState.latestRelease
-                        var pending by remember { mutableStateOf(AppUpdater.pendingVersion()) }
-                        var progress by remember { mutableStateOf<Float?>(null) }
-                        var downloadJob by remember { mutableStateOf<Job?>(null) }
-                        if (progress != null) {
+                        if (updateProgress != null) {
                             LinearProgressIndicator(
-                                progress = { progress ?: 0f },
+                                progress = { updateProgress ?: 0f },
                                 drawStopIndicator = {},
                                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                             )
                         }
-                        when {
-                            pending != null -> ActionButton(
-                                text = stringResource(Res.string.install),
-                                onClick = { AppUpdater.install() },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                            release?.installerUrl != null -> {
-                                val installerUrl = release.installerUrl
-                                val tag = release.tag
-                                ActionButton(
-                                    text = stringResource(if (progress != null) Res.string.cancel else Res.string.update_action),
-                                    onClick = {
-                                        if (progress != null) {
-                                            downloadJob?.cancel()
-                                        } else {
-                                            progress = 0f
-                                            downloadJob = scope.launch {
-                                                try {
-                                                    if (AppUpdater.download(installerUrl, tag) { progress = it }) pending = AppUpdater.pendingVersion()
-                                                } finally {
-                                                    progress = null
-                                                    downloadJob = null
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            var switchChecking by remember { mutableStateOf(false) }
+                            val switchBusy = switchChecking || downloadingSwitch
+                            Box(modifier = Modifier.weight(1f)) {
+                                when {
+                                    pendingUpdate != null && !pendingIsSwitch -> ActionButton(
+                                        text = stringResource(Res.string.install),
+                                        onClick = { AppUpdater.install() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    chatState.updateAvailable && release?.installerUrl != null -> {
+                                        val installerUrl = release.installerUrl
+                                        val tag = release.tag
+                                        val downloadingUpdate = updateProgress != null && !downloadingSwitch
+                                        ActionButton(
+                                            text = stringResource(if (downloadingUpdate) Res.string.cancel else Res.string.update_action),
+                                            enabled = !switchBusy,
+                                            onClick = {
+                                                if (downloadingUpdate) downloadJob?.cancel() else startDownload(installerUrl, tag, forSwitch = false)
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                    chatState.updateAvailable && isWebPlatform -> ActionButton(
+                                        text = stringResource(Res.string.update_action),
+                                        onClick = { AppUpdater.reload() },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    )
+                                    else -> {
+                                        var checking by remember { mutableStateOf(false) }
+                                        ActionButton(
+                                            text = stringResource(if (checking) Res.string.checking_updates else Res.string.check_updates),
+                                            enabled = !checking && !switchBusy,
+                                            onClick = {
+                                                scope.launch {
+                                                    checking = true
+                                                    chatVm.checkForUpdates()
+                                                    checking = false
                                                 }
-                                            }
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                                )
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                }
                             }
-                            release != null && isWebPlatform -> ActionButton(
-                                text = stringResource(Res.string.update_action),
-                                onClick = { AppUpdater.reload() },
-                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                            else -> {
-                                var checking by remember { mutableStateOf(false) }
+                            if (pendingUpdate != null && pendingIsSwitch) {
                                 ActionButton(
-                                    text = stringResource(if (checking) Res.string.checking_updates else Res.string.check_updates),
-                                    enabled = !checking,
+                                    text = stringResource(Res.string.install),
+                                    onClick = { AppUpdater.install() },
+                                    modifier = Modifier.weight(1f),
+                                )
+                            } else {
+                                ActionButton(
+                                    text = stringResource(if (switchChecking) Res.string.checking_updates else Res.string.switch_build),
+                                    enabled = updateProgress == null && !switchChecking,
                                     onClick = {
                                         scope.launch {
-                                            checking = true
-                                            chatVm.checkForUpdates()
-                                            checking = false
+                                            if (!isWebPlatform) {
+                                                switchChecking = true
+                                                chatVm.checkForUpdates()
+                                                switchChecking = false
+                                            }
+                                            backup = SettingsBackup.export()
+                                            dialog = SettingsDialog.Switch
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                                    modifier = Modifier.weight(1f),
                                 )
                             }
                         }
@@ -861,6 +903,31 @@ fun SettingsScreen(
             )
         }
 
+        SettingsDialog.Switch -> {
+            val clipboard = LocalClipboardManager.current
+            val links = LocalUriHandler.current
+            val altRelease = chatState.latestRelease
+            val altUrl = altRelease?.altInstallerUrl
+            BackupDialog(
+                title = stringResource(Res.string.switch_build),
+                hint = stringResource(Res.string.switch_build_hint),
+                value = backup,
+                onValueChange = null,
+                error = false,
+                secondaryLabel = stringResource(Res.string.copy),
+                onSecondary = { clipboard.setText(AnnotatedString(backup)) },
+                confirmLabel = stringResource(Res.string.switch_build_continue),
+                confirmEnabled = altUrl != null || isWebPlatform,
+                onConfirm = {
+                    clipboard.setText(AnnotatedString(backup))
+                    dialog = null
+                    if (isWebPlatform) links.openUri(GitHubApi.ALT_WEB_URL)
+                    else if (altUrl != null) startDownload(altUrl, altRelease?.tag.orEmpty(), forSwitch = true)
+                },
+                onDismiss = { dialog = null },
+            )
+        }
+
         SettingsDialog.Import -> BackupDialog(
             title = stringResource(Res.string.import_settings),
             hint = stringResource(Res.string.import_settings_hint),
@@ -891,7 +958,7 @@ fun SettingsScreen(
     }
 }
 
-private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer, Account, Export, Import }
+private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer, Account, Export, Import, Switch }
 
 @Composable
 private fun BackupDialog(
@@ -904,6 +971,8 @@ private fun BackupDialog(
     confirmEnabled: Boolean,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    secondaryLabel: String? = null,
+    onSecondary: (() -> Unit)? = null,
 ) {
     CompactDialog(
         onDismiss = onDismiss,
@@ -911,6 +980,9 @@ private fun BackupDialog(
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) {
                 Text(stringResource(if (onValueChange == null) Res.string.close else Res.string.cancel))
+            }
+            if (secondaryLabel != null && onSecondary != null) {
+                Button(onClick = onSecondary, variant = ButtonVariant.Outlined) { Text(secondaryLabel) }
             }
             Button(onClick = onConfirm, enabled = confirmEnabled) { Text(confirmLabel) }
         },

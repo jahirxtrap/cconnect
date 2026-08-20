@@ -22,6 +22,7 @@ class MainActivity : TauriActivity() {
   override val handleBackNavigation = false
 
   private lateinit var downloads: Downloads
+  private val installer by lazy { Installer(this) }
   private var pendingSave: Triple<String, String, String>? = null
   private var content: WebView? = null
 
@@ -84,6 +85,7 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(downloads, "AndroidDownloads")
     webView.addJavascriptInterface(Background(), "AndroidBackground")
     webView.addJavascriptInterface(CodeScanner(), "AndroidQrScan")
+    webView.addJavascriptInterface(installer, "AndroidInstaller")
   }
 
   inner class CodeScanner {

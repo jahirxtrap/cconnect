@@ -129,7 +129,8 @@ data class ChatUiState(
     val rewindPreview: SessionsApi.RewindPreview? = null,
     val rewindBusy: Boolean = false,
     val pendingInput: String? = null,                // rewound prompt to restore into the composer
-    val latestRelease: GitHubApi.Release? = null,    // newer app release on GitHub, if any
+    val latestRelease: GitHubApi.Release? = null,    // latest app release on GitHub, newer or not
+    val updateAvailable: Boolean = false,            // that release is newer than this build
     val appOutdated: Boolean = false,                // server doesn't support this app version
     val serverOutdated: Boolean = false,             // this app doesn't support the server version
     val cliOutdated: Boolean = false,                // Claude Code on the server is older than required
@@ -314,7 +315,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         _state.update {
             var notices = it.versionNotices
             notices = if (newer) pushNotice(notices, CompatStatus.UpdateAvailable) else notices - CompatStatus.UpdateAvailable
-            it.copy(latestRelease = if (newer) release else null, versionNotices = notices)
+            it.copy(latestRelease = release ?: it.latestRelease, updateAvailable = newer, versionNotices = notices)
         }
     }
 

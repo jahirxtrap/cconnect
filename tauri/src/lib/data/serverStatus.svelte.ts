@@ -1,5 +1,5 @@
 import { APP_VERSION, SUPPORTED_SERVER } from "./build";
-import { satisfies } from "./compat";
+import { compareVersions, satisfies } from "./compat";
 import { backend } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
 import { latestRelease, type Release } from "$lib/services/githubApi";
@@ -13,6 +13,7 @@ class ServerStatus {
   checking = $state(true);
   version = $state<VersionInfo | null>(null);
   release = $state<Release | null>(null);
+  updateAvailable = $state(false);
   releaseChecked = $state(false);
 
   #releaseRequested = false;
@@ -46,8 +47,9 @@ class ServerStatus {
   async checkRelease(force = false) {
     if (this.#releaseRequested && !force) return;
     this.#releaseRequested = true;
-    const found = await latestRelease();
-    this.release = found && found.tag.replace(/^v/, "") !== APP_VERSION ? found : null;
+    const found = (await latestRelease()) ?? this.release;
+    this.release = found;
+    this.updateAvailable = !!found && compareVersions(found.tag.replace(/^v/, ""), APP_VERSION) > 0;
     this.releaseChecked = true;
   }
 

@@ -25,8 +25,10 @@ object GitHubApi {
     private const val REPO = "cconnect"
     const val REPO_URL = "https://github.com/$OWNER/$REPO"
     const val RELEASES_URL = "$REPO_URL/releases"
+    const val ALT_WEB_URL = "https://cconnect-tauri.pages.dev/"
+    const val ALT_MARK = "-tauri"
 
-    data class Release(val tag: String, val url: String, val installerUrl: String?)
+    data class Release(val tag: String, val url: String, val installerUrl: String?, val altInstallerUrl: String? = null)
     data class ReleaseNotes(val tag: String, val body: String)
     data class Profile(val login: String, val name: String?, val avatarUrl: String, val url: String)
 
@@ -38,18 +40,23 @@ object GitHubApi {
 
     private suspend fun writeCache(name: String, value: JsonElement) = githubWriteCache(name, value.toString())
 
+    private fun installerFor(assets: List<JsonElement>, alt: Boolean): String? =
+        installerExtensions.firstNotNullOfOrNull { ext ->
+            assets.firstNotNullOfOrNull { asset ->
+                val url = asset.jsonObject["browser_download_url"]?.jsonPrimitive?.contentOrNull
+                val name = asset.jsonObject["name"]?.jsonPrimitive?.contentOrNull.orEmpty()
+                url?.takeIf { it.endsWith(ext) && name.contains(ALT_MARK) == alt }
+            }
+        }
+
     suspend fun latestRelease(): Release? {
         val o = fetch("https://api.github.com/repos/$OWNER/$REPO/releases/latest")?.jsonObject ?: return null
         val assets = o["assets"]?.jsonArray.orEmpty()
-        val installer = installerExtensions.firstNotNullOfOrNull { ext ->
-            assets.firstNotNullOfOrNull { asset ->
-                asset.jsonObject["browser_download_url"]?.jsonPrimitive?.contentOrNull?.takeIf { it.endsWith(ext) }
-            }
-        }
         return Release(
             tag = o["tag_name"]?.jsonPrimitive?.contentOrNull ?: return null,
             url = o["html_url"]?.jsonPrimitive?.contentOrNull ?: REPO_URL,
-            installerUrl = installer,
+            installerUrl = installerFor(assets, alt = false),
+            altInstallerUrl = installerFor(assets, alt = true),
         )
     }
 

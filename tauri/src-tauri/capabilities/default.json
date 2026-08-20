@@ -18,6 +18,10 @@
     "core:window:allow-set-fullscreen",
     "core:window:allow-set-focus",
     "opener:default",
+    {
+      "identifier": "http:default",
+      "allow": [{ "url": "https://github.com/*" }, { "url": "https://*.githubusercontent.com/*" }]
+    },
     "dialog:default",
     "fs:default",
     "fs:allow-mkdir",
