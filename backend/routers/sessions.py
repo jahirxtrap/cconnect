@@ -142,6 +142,7 @@ def get_session_messages(
     tool_use: str | None = None,
     file_change: str | None = None,
     compact: str | None = None,
+    working: str | None = None,
 ):
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="invalid limit")
@@ -152,6 +153,7 @@ def get_session_messages(
             "tool_use": tool_use,
             "file_change": file_change,
             "compact": compact,
+            "working": working,
         })
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -311,7 +311,7 @@
         </div>
         {#if chat.sideOpen}
           <SidePanel
-            messages={chat.sideMessages}
+            messages={chat.showWorking === "label" ? chat.sideMessages : chat.sideMessages.filter((item) => item.role !== "working")}
             height={sideHeight}
             onHeight={(value) => (sideHeight = value)}
             onDragging={(value) => (sideDragging = value)}
@@ -395,7 +395,8 @@
     onModel={(value) => chat.setModel(value)}
     onEffort={(value) => chat.setEffort(value)}
     onPermissionMode={(value) => chat.setPermissionMode(value)}
-    onStreamTokens={() => chat.toggleStreamTokens()}
+    onStreamTokens={(value) => chat.setStreamTokens(value)}
+    streamingSelected={chat.streamingOverride === null ? "" : chat.streamingOverride ? "on" : "off"}
     simpleMode={chat.effectiveVisibility.simple}
     onVisibility={() => (visibilityOpen = true)}
     onQuickChat={() => (chat.sideOpen ? chat.closeSideChat() : chat.openSideChat())}
@@ -436,23 +437,31 @@
 {/if}
 
 {#if visibilityOpen}
-  {@const current = chat.effectiveVisibility}
+  {@const local = settings.visibility}
+  {@const remote = chat.serverVisibility}
   <VisibilityDialog
-    title={t("VISIBILITY_LOCAL")}
-    quickChat={false}
-    simple={current.simple}
-    thinking={current.thinking}
-    toolUse={current.tool_use}
-    fileChange={current.file_change}
-    compact={current.compact}
-    working=""
+    server={{
+      simple: remote.simple ? "on" : "off",
+      thinking: remote.thinking,
+      toolUse: remote.tool_use,
+      fileChange: remote.file_change,
+      compact: remote.compact,
+      working: remote.working,
+    }}
+    simple={local.simple === null ? "" : local.simple ? "on" : "off"}
+    thinking={local.thinking ?? ""}
+    toolUse={local.tool_use ?? ""}
+    fileChange={local.file_change ?? ""}
+    compact={local.compact ?? ""}
+    working={local.working ?? ""}
     onConfirm={(values) => {
       chat.applyVisibility({
-        simple: values.simple,
-        thinking: values.thinking,
-        tool_use: values.toolUse,
-        file_change: values.fileChange,
-        compact: values.compact,
+        simple: values.simple === "" ? null : values.simple === "on",
+        thinking: values.thinking || null,
+        tool_use: values.toolUse || null,
+        file_change: values.fileChange || null,
+        compact: values.compact || null,
+        working: values.working || null,
       });
       visibilityOpen = false;
     }}
@@ -486,7 +495,7 @@
       {/snippet}
       {#if item.text.trim()}
         <OutlinedPanel>
-          <p class="selectable text-body-md whitespace-pre-wrap">{item.text}</p>
+          <p class="selectable text-body-md wrap-anywhere whitespace-pre-wrap">{item.text}</p>
         </OutlinedPanel>
       {/if}
       {#if item.attachments.length}

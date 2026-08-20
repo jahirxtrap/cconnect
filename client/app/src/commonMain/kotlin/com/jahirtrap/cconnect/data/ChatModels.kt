@@ -176,17 +176,19 @@ sealed interface ServerEvent {
 }
 
 data class VisibilityPrefs(
-    val simple: Boolean? = null,
+    val simple: String? = null,
     val thinking: String? = null,
     val toolUse: String? = null,
     val fileChange: String? = null,
     val compact: String? = null,
+    val working: String? = null,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
-        simple?.let { put("simple", it) }
+        simple?.let { put("simple", it == "on") }
         thinking?.let { put("thinking", it) }
         toolUse?.let { put("tool_use", it) }
         fileChange?.let { put("file_change", it) }
         compact?.let { put("compact", it) }
+        working?.let { put("working", it) }
     }
 }

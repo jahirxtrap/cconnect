@@ -54,7 +54,7 @@
     {:else}
       <Shield size={16} class="shrink-0 text-accent" />
     {/if}
-    <span class="min-w-0 flex-1 truncate text-label-lg text-accent">
+    <span class="min-w-0 flex-1 truncate text-label-lg text-accent select-none">
       {title}
       {#if isPlan && !isExpanded && preview}
         <span class="text-on-surface-variant">&nbsp;&nbsp;{preview}</span>
@@ -89,7 +89,7 @@
         </OutlinedPanel>
       {/if}
     {:else}
-      <p class="mt-1 font-mono text-body-sm whitespace-pre-wrap text-on-surface-variant">{input}</p>
+      <p class="mt-1 font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface-variant">{input}</p>
     {/if}
   {/if}
 

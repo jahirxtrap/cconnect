@@ -347,7 +347,11 @@ fun StickyCollapsibleHeader(message: ChatMessage, onCollapse: () -> Unit, modifi
                 Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.size(6.dp))
             }
-            Text(label, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(label, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             Icon(Lucide.ChevronDown, contentDescription = null, tint = variant, modifier = Modifier.size(18.dp))
         }
     }
@@ -435,12 +439,15 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
                 )
                 Spacer(Modifier.size(6.dp))
             }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             if (running) {
                 LoadingIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary)
                 if (!labelOnly) Spacer(Modifier.size(2.dp))
@@ -475,20 +482,23 @@ private fun AgentBlock(message: ChatMessage, running: Boolean = false, expanded:
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).clickable { toggle() }, verticalAlignment = Alignment.CenterVertically) {
             Icon(Lucide.Bot, contentDescription = null, tint = nameColor, modifier = Modifier.size(16.dp))
             Spacer(Modifier.size(6.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = nameColor)) { append(name) }
-                    if (!isExpanded && preview.isNotEmpty()) {
-                        appendLabelGap()
-                        withStyle(SpanStyle(color = previewColor)) { append(preview) }
-                    }
-                },
-                style = MaterialTheme.typography.labelLarge,
-                inlineContent = labelGap(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(color = nameColor)) { append(name) }
+                            if (!isExpanded && preview.isNotEmpty()) {
+                                appendLabelGap()
+                                withStyle(SpanStyle(color = previewColor)) { append(preview) }
+                            }
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        inlineContent = labelGap(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (running) {
                 LoadingIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.size(2.dp))
@@ -540,14 +550,17 @@ private fun PlanBlock(markdown: String, expanded: Boolean? = null, onToggle: (()
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.size(6.dp))
-            Text(
-                text = header,
-                inlineContent = labelGap(),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(
+                        text = header,
+                        inlineContent = labelGap(),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             Icon(
                 imageVector = if (isExpanded) Lucide.ChevronDown else Lucide.ChevronRight,
                 contentDescription = null,
@@ -603,14 +616,17 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.size(6.dp))
-            Text(
-                text = header,
-                inlineContent = labelGap(),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(
+                        text = header,
+                        inlineContent = labelGap(),
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (running) {
                 LoadingIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.size(2.dp))
@@ -658,14 +674,17 @@ private fun NotificationBlock(summary: String) {
     ) {
         Icon(Lucide.Bell, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
         Spacer(Modifier.size(6.dp))
-        Text(
-            text = header,
-            inlineContent = labelGap(),
-            style = MaterialTheme.typography.labelLarge,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        Box(modifier = Modifier.weight(1f)) {
+            DisableSelection {
+                Text(
+                    text = header,
+                    inlineContent = labelGap(),
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 
@@ -686,14 +705,17 @@ private fun FileChangeBlock(path: String, diffLines: List<DiffLine>, labelOnly: 
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.size(6.dp))
-            Text(
-                text = path,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(
+                        text = path,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (!labelOnly) {
                 Icon(
                     imageVector = if (isExpanded) Lucide.ChevronDown else Lucide.ChevronRight,
@@ -831,20 +853,23 @@ private fun InteractionBlock(
                 modifier = Modifier.size(16.dp),
             )
             Spacer(Modifier.size(8.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = titleColor)) { append(title) }
-                    if (isPlan && !planExpanded && planPreview.isNotEmpty()) {
-                        appendLabelGap()
-                        withStyle(SpanStyle(color = previewColor)) { append(planPreview) }
-                    }
-                },
-                style = MaterialTheme.typography.labelLarge,
-                inlineContent = labelGap(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                DisableSelection {
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(color = titleColor)) { append(title) }
+                            if (isPlan && !planExpanded && planPreview.isNotEmpty()) {
+                                appendLabelGap()
+                                withStyle(SpanStyle(color = previewColor)) { append(planPreview) }
+                            }
+                        },
+                        style = MaterialTheme.typography.labelLarge,
+                        inlineContent = labelGap(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
             if (isPlan) {
                 Icon(
                     if (planExpanded) Lucide.ChevronDown else Lucide.ChevronRight,
@@ -927,7 +952,9 @@ private fun QuestionsBlock(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Lucide.CircleQuestionMark, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.size(6.dp))
-            Text(stringResource(Res.string.questions_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            DisableSelection {
+                Text(stringResource(Res.string.questions_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
         }
         if (data.submitted) {
             ResolvedQuestions(data)
@@ -1015,14 +1042,16 @@ private fun QuestionTabs(questions: List<InteractionQuestion>, pagerState: Pager
                     .clickable { scope.launch { pagerState.animateScrollToPage(i) } }
                     .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true),
             ) {
-                Text(
-                    label,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                )
+                DisableSelection {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    )
+                }
             }
         }
     }
@@ -1075,16 +1104,18 @@ private fun QuestionContent(
                 clearAlways = true,
             )
         } else {
-            Text(
-                stringResource(Res.string.add_notes),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { showNotes = true }
-                    .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true)
-                    .padding(top = 4.dp),
-            )
+            DisableSelection {
+                Text(
+                    stringResource(Res.string.add_notes),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showNotes = true }
+                        .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true)
+                        .padding(top = 4.dp),
+                )
+            }
         }
     }
 }
@@ -1101,12 +1132,14 @@ private fun SummaryLine(icon: ImageVector, iconSize: Dp, text: String, indent: D
 @Composable
 private fun HeaderChip(text: String) {
     Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), shape = RoundedCornerShape(6.dp)) {
-        Text(
-            text,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-        )
+        DisableSelection {
+            Text(
+                text,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+            )
+        }
     }
 }
 

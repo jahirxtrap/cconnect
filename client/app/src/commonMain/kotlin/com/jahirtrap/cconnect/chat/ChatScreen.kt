@@ -86,6 +86,7 @@ import com.composables.icons.lucide.FolderOpen
 import com.composables.icons.lucide.Gauge
 import com.composables.icons.lucide.Hourglass
 import com.composables.icons.lucide.Eye
+import com.composables.icons.lucide.EyeOff
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.MessagesSquare
@@ -792,6 +793,7 @@ fun ChatScreen(
                                         val dockT = ((expansion.value - peek) / (1f - peek)).coerceIn(0f, 1f)
                                         SidePanel(
                                             sideChat = sc,
+                                            showWorking = state.visibility.working ?: state.serverVisibility.working ?: state.showWorking,
                                             headerModifier = dragModifier,
                                             onClear = vm::clearSideChat,
                                             onAnswer = vm::answerInteraction,
@@ -857,8 +859,10 @@ fun ChatScreen(
                                             permissionModes = state.capabilities.permissionModes,
                                             onPermissionMode = vm::setPermissionMode,
                                             streaming = state.streamingOverride ?: state.streamTokens,
-                                            onStreaming = vm::toggleStreaming,
-                                            simpleMode = state.visibility.simple == true,
+                                            streamingSelected = state.streamingOverride?.let { if (it) "on" else "off" } ?: "",
+                                            serverStreaming = state.streamTokens,
+                                            onStreaming = vm::setStreaming,
+                                            simpleMode = (state.visibility.simple ?: state.serverVisibility.simple) == "on",
                                             onVisibility = { showVisibility = true },
                                             onQuickChat = vm::openSideChat,
                                             quickChatActive = sc != null && sc.messages.isNotEmpty(),
@@ -999,18 +1003,11 @@ fun ChatScreen(
         )
     }
     if (showVisibility) {
-        val current = state.visibility
         VisibilityDialog(
-            simple = current.simple ?: false,
-            thinking = current.thinking ?: state.serverVisibility.thinking,
-            toolUse = current.toolUse ?: state.serverVisibility.toolUse,
-            fileChange = current.fileChange ?: state.serverVisibility.fileChange,
-            compact = current.compact ?: state.serverVisibility.compact,
-            working = "",
-            title = stringResource(Res.string.visibility_local),
-            quickChat = false,
-            onConfirm = { sm, th, tu, fc, cp, _ ->
-                vm.applyVisibility(VisibilityPrefs(simple = sm, thinking = th, toolUse = tu, fileChange = fc, compact = cp))
+            current = state.visibility,
+            server = state.serverVisibility,
+            onConfirm = { values ->
+                vm.applyVisibility(values)
                 showVisibility = false
             },
             onDismiss = { showVisibility = false },
@@ -1144,6 +1141,7 @@ private fun RewindDialog(
 @Composable
 private fun SidePanel(
     sideChat: SideChatState,
+    showWorking: String = "label",
     headerModifier: Modifier = Modifier,
     onClear: () -> Unit = {},
     onAnswer: ((String, String, String?) -> Unit)? = null,
@@ -1258,14 +1256,16 @@ private fun SidePanel(
                     }
                 }
             }
+            val sideVisible = if (showWorking == "label") sideChat.messages
+            else sideChat.messages.filter { it.role != Role.WORKING }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 SelectionContainer(modifier = Modifier.fillMaxSize().selectionTextCursor()) {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                        itemsIndexed(sideChat.messages, key = { _, it -> it.id }) { index, message ->
+                        itemsIndexed(sideVisible, key = { _, it -> it.id }) { index, message ->
                             ChatMessageItem(
                                 message,
-                                prevRole = sideChat.messages.getOrNull(index - 1)?.role,
-                                nextRole = sideChat.messages.getOrNull(index + 1)?.role,
+                                prevRole = sideVisible.getOrNull(index - 1)?.role,
+                                nextRole = sideVisible.getOrNull(index + 1)?.role,
                                 running = message.role == Role.WORKING && index == sideChat.messages.lastIndex && sideChat.streaming,
                                 onAnswer = onAnswer,
                                 onToggleOption = onToggleOption,
@@ -1517,8 +1517,10 @@ private fun ChatToolbar(
     permissionModes: List<PermissionMode>,
     onPermissionMode: (String) -> Unit,
     streaming: Boolean,
+    streamingSelected: String,
+    serverStreaming: Boolean,
     simpleMode: Boolean,
-    onStreaming: () -> Unit,
+    onStreaming: (String) -> Unit,
     onVisibility: () -> Unit,
     onQuickChat: () -> Unit = {},
     quickChatActive: Boolean = false,
@@ -1623,9 +1625,9 @@ private fun ChatToolbar(
                 }
             }
             TooltipWrap(stringResource(Res.string.streaming)) {
-                StreamToggle(streaming = streaming, onClick = onStreaming)
+                StreamToggle(streaming = streaming, selected = streamingSelected, serverOn = serverStreaming, onSelect = onStreaming)
             }
-            TooltipWrap(stringResource(Res.string.visibility_local)) {
+            TooltipWrap(stringResource(Res.string.visibility)) {
                 VisibilityToggle(simple = simpleMode, onClick = onVisibility)
             }
         }
@@ -1661,7 +1663,7 @@ private fun fmtTokens(n: Int): String =
 
 @Composable
 private fun VisibilityToggle(simple: Boolean, onClick: () -> Unit) {
-    val color = if (simple) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+    val color = MaterialTheme.colorScheme.primary
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
@@ -1670,22 +1672,47 @@ private fun VisibilityToggle(simple: Boolean, onClick: () -> Unit) {
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(Lucide.Eye, contentDescription = stringResource(Res.string.visibility_local), tint = color, modifier = Modifier.size(16.dp))
+        Icon(if (simple) Lucide.EyeOff else Lucide.Eye, contentDescription = stringResource(Res.string.visibility), tint = color, modifier = Modifier.size(16.dp))
     }
 }
 
 @Composable
-private fun StreamToggle(streaming: Boolean, onClick: () -> Unit) {
+private fun StreamToggle(streaming: Boolean, selected: String, serverOn: Boolean, onSelect: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
     val color = if (streaming) palette.green else MaterialTheme.colorScheme.onSurfaceVariant
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Lucide.Radio, contentDescription = stringResource(Res.string.streaming), tint = color, modifier = Modifier.size(16.dp))
+    val onText = stringResource(Res.string.option_on)
+    val offText = stringResource(Res.string.option_off)
+    val options = listOf(
+        "" to "${stringResource(Res.string.server_default)} (${if (serverOn) onText else offText})",
+        "on" to onText,
+        "off" to offText,
+    )
+    Box {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .clickable { open = true }
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Lucide.Radio, contentDescription = stringResource(Res.string.streaming), tint = color, modifier = Modifier.size(16.dp))
+        }
+        if (open) DropdownScrim { open = false }
+        if (open) Dismissable { open = false }
+        AppDropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            properties = PopupProperties(focusable = !LocalIsTouch.current),
+        ) {
+            options.forEach { (value, display) ->
+                CompactDropdownItem(
+                    text = display,
+                    selected = value == selected,
+                    onClick = { onSelect(value); open = false },
+                )
+            }
+        }
     }
 }
 

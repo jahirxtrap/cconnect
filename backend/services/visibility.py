@@ -8,26 +8,33 @@ TYPES = ("thinking", "tool_use", "file_change", "compact")
 
 _RANK = {"off": 0, "label": 1, "full": 2}
 
-_SIMPLE = {"thinking": "off", "tool_use": "off"}
+_SIMPLE = {"thinking": "off", "tool_use": "off", "compact": "label"}
 
 _STAMPS = ("seq", "channel", "parent")
 
 _FILE_CHANGE_KEEP = ("type", "id", "path")
 
+_CLOSERS = frozenset({
+    "assistant_text", "user", "interaction_request", "plan", "command", "notification",
+    "summary", "compact", "compact_summary", "api_error", "done", "interrupted",
+})
+
 
 def defaults() -> dict:
-    prefs = {name: settings_store.visibility_mode(name) for name in TYPES}
-    prefs["simple"] = bool(settings_store.get("simple_mode"))
-    return _applied(prefs)
+    return resolve(None)
 
 
 def resolve(prefs: dict | None) -> dict:
     out = {name: settings_store.visibility_mode(name) for name in TYPES}
     out["simple"] = bool(settings_store.get("simple_mode"))
+    out["working"] = settings_store.get("show_working")
     for key, value in (prefs or {}).items():
         if key == "simple":
             if value is not None:
                 out["simple"] = bool(value)
+        elif key == "working":
+            if value in ("label", "off"):
+                out["working"] = value
         elif key in TYPES and value in _RANK:
             out[key] = value
     return _applied(out)
@@ -60,6 +67,13 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
     """Cut one event down to what this socket wants, or drop it entirely.
     In simple mode a dropped event becomes a single ``working`` marker per batch."""
     kind = event.get("type")
+
+    if kind == "working":
+        if not prefs.get("simple") or carry["working"]:
+            return None
+        carry["working"] = True
+        carry["thinking"] = False
+        return event
 
     if kind == "thinking":
         mode = prefs["thinking"]
@@ -98,7 +112,8 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
         _reset(carry)
         return {**event, "summary": ""}
 
-    _reset(carry)
+    if kind in _CLOSERS:
+        _reset(carry)
     return event
 
 

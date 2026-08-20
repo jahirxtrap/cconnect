@@ -2,6 +2,8 @@ package com.jahirtrap.cconnect.ui
 
 import androidx.compose.foundation.border
 import com.jahirtrap.cconnect.ui.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -49,14 +51,17 @@ fun AttachmentChip(
             modifier = Modifier.size(14.dp),
         )
         Spacer(Modifier.width(6.dp))
-        Text(
-            name,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false),
-        )
+        Box(modifier = Modifier.weight(1f, fill = false)) {
+            DisableSelection {
+                Text(
+                    name,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
         if (trailing != null) {
             Spacer(Modifier.width(6.dp))
             trailing()

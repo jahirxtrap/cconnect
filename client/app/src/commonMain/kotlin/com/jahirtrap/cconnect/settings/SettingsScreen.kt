@@ -197,6 +197,7 @@ import com.jahirtrap.cconnect.ui.theme.dynamicAccent
 import com.jahirtrap.cconnect.ui.theme.systemAccent
 import kotlin.uuid.Uuid
 import com.jahirtrap.cconnect.ui.theme.snapDp
+import com.jahirtrap.cconnect.data.VisibilityPrefs
 
 private const val KOFI_URL = "https://ko-fi.com/jahirtrap"
 
@@ -795,16 +796,22 @@ fun SettingsScreen(
         )
 
         SettingsDialog.Visibility -> VisibilityDialog(
-            simple = simpleMode,
-            thinking = showThinking,
-            toolUse = showToolUse,
-            fileChange = showFileChange,
-            compact = showCompact,
-            working = showWorking,
-            onConfirm = { sm, th, tu, fc, cp, wk ->
-                simpleMode = sm
-                showThinking = th; showToolUse = tu; showFileChange = fc; showCompact = cp; showWorking = wk
-                scope.launch { SettingsApi.update(simpleMode = sm, showThinking = th, showToolUse = tu, showFileChange = fc, showCompact = cp, showWorking = wk) }
+            current = VisibilityPrefs(if (simpleMode) "on" else "off", showThinking, showToolUse, showFileChange, showCompact, showWorking),
+            onConfirm = { values ->
+                simpleMode = values.simple == "on"
+                showThinking = values.thinking.orEmpty(); showToolUse = values.toolUse.orEmpty()
+                showFileChange = values.fileChange.orEmpty(); showCompact = values.compact.orEmpty()
+                showWorking = values.working.orEmpty()
+                scope.launch {
+                    SettingsApi.update(
+                        simpleMode = simpleMode,
+                        showThinking = showThinking,
+                        showToolUse = showToolUse,
+                        showFileChange = showFileChange,
+                        showCompact = showCompact,
+                        showWorking = showWorking,
+                    )
+                }
                 dialog = null
             },
             onDismiss = { dialog = null },
@@ -1657,67 +1664,100 @@ private fun GenerationDialog(
 
 @Composable
 fun VisibilityDialog(
-    simple: Boolean,
-    thinking: String,
-    toolUse: String,
-    fileChange: String,
-    compact: String,
-    working: String,
+    current: VisibilityPrefs,
+    server: VisibilityPrefs? = null,
     title: String = stringResource(Res.string.visibility),
     quickChat: Boolean = true,
-    onConfirm: (Boolean, String, String, String, String, String) -> Unit,
+    onConfirm: (VisibilityPrefs) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var sm by remember { mutableStateOf(simple) }
-    var th by remember { mutableStateOf(thinking) }
-    var tu by remember { mutableStateOf(toolUse) }
-    var fc by remember { mutableStateOf(fileChange) }
-    var cp by remember { mutableStateOf(compact) }
-    var wk by remember { mutableStateOf(working) }
-    val three = listOf(
+    var values by remember { mutableStateOf(current) }
+    val serverOption = if (server != null) listOf("" to stringResource(Res.string.server_default)) else emptyList()
+    val three = serverOption + listOf(
         "full" to stringResource(Res.string.show_full),
         "label" to stringResource(Res.string.show_label),
         "off" to stringResource(Res.string.show_off),
     )
-    val two = listOf(
+    val two = serverOption + listOf(
         "full" to stringResource(Res.string.show_full),
         "label" to stringResource(Res.string.show_label),
     )
-    val labelOff = listOf(
+    val labelOff = serverOption + listOf(
         "label" to stringResource(Res.string.show_label),
         "off" to stringResource(Res.string.show_off),
     )
+    val onOff = serverOption + listOf(
+        "on" to stringResource(Res.string.option_on),
+        "off" to stringResource(Res.string.option_off),
+    )
+    val simple = (values.simple ?: server?.simple) == "on"
+
+    fun inherited(options: List<Pair<String, String>>, value: String?, fallback: String?): String? =
+        if (value.isNullOrEmpty() && server != null) {
+            options.firstOrNull { it.first == fallback }?.second ?: fallback
+        } else null
+
     CompactDialog(
         onDismiss = onDismiss,
         title = title,
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
-            Button(onClick = { onConfirm(sm, th, tu, fc, cp, wk) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = { onConfirm(values) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(stringResource(Res.string.simple_mode), style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    stringResource(Res.string.simple_mode_summary),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            CompactSwitch(checked = sm) { sm = it }
+        if (server != null) {
+            SelectField(
+                stringResource(Res.string.simple_mode),
+                values.simple.orEmpty(),
+                onOff,
+                shown = inherited(onOff, values.simple, server.simple),
+            ) { values = values.copy(simple = it) }
+        } else {
+            SwitchRow(
+                title = stringResource(Res.string.simple_mode),
+                summary = stringResource(Res.string.simple_mode_summary),
+                checked = simple,
+            ) { values = values.copy(simple = if (it) "on" else "off") }
         }
         Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.thinking), if (sm) "off" else th, three, enabled = !sm) { th = it }
+        SelectField(
+            stringResource(Res.string.thinking),
+            if (simple) "off" else values.thinking.orEmpty(),
+            three,
+            enabled = !simple,
+            shown = if (simple) null else inherited(three, values.thinking, server?.thinking),
+        ) { values = values.copy(thinking = it) }
         Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.tools), if (sm) "off" else tu, three, enabled = !sm) { tu = it }
+        SelectField(
+            stringResource(Res.string.tools),
+            if (simple) "off" else values.toolUse.orEmpty(),
+            three,
+            enabled = !simple,
+            shown = if (simple) null else inherited(three, values.toolUse, server?.toolUse),
+        ) { values = values.copy(toolUse = it) }
         Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.file_changes), fc, three) { fc = it }
+        SelectField(
+            stringResource(Res.string.file_changes),
+            values.fileChange.orEmpty(),
+            three,
+            shown = inherited(three, values.fileChange, server?.fileChange),
+        ) { values = values.copy(fileChange = it) }
         Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.compacted), cp, two) { cp = it }
+        SelectField(
+            stringResource(Res.string.compacted),
+            if (simple) "label" else values.compact.orEmpty(),
+            two,
+            enabled = !simple,
+            shown = if (simple) null else inherited(two, values.compact, server?.compact),
+        ) { values = values.copy(compact = it) }
         if (quickChat) {
             Spacer(Modifier.height(14.dp))
-            SelectField(stringResource(Res.string.quick_chat_working), wk, labelOff) { wk = it }
+            SelectField(
+                stringResource(Res.string.quick_chat_working),
+                values.working.orEmpty(),
+                labelOff,
+                shown = inherited(labelOff, values.working, server?.working),
+            ) { values = values.copy(working = it) }
         }
     }
 }

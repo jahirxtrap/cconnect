@@ -145,4 +145,5 @@ export const isVisible = (item: SessionMessage): boolean =>
   item.compact !== null ||
   item.labelOnly ||
   !!item.images?.length ||
+  item.role === "working" ||
   item.role === "interrupted";

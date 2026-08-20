@@ -50,7 +50,7 @@
 
 <div class="w-full overflow-hidden rounded-panel bg-surface-variant">
   <div class="flex items-center pt-0.5 pr-0.5 pl-2.5">
-    <span class="flex-1 text-label-md text-on-surface-variant">{lang || "code"}</span>
+    <span class="flex-1 text-label-md text-on-surface-variant select-none">{lang || "code"}</span>
     <button
       type="button"
       onclick={copy}

@@ -60,11 +60,12 @@ object SessionsApi {
     ): MessagesPage? {
         val query = mutableMapOf("project" to project, "limit" to limit.toString())
         if (beforeIndex != null) query["before_index"] = beforeIndex.toString()
-        visibility.simple?.let { query["simple"] = it.toString() }
+        visibility.simple?.let { query["simple"] = (it == "on").toString() }
         visibility.thinking?.let { query["thinking"] = it }
         visibility.toolUse?.let { query["tool_use"] = it }
         visibility.fileChange?.let { query["file_change"] = it }
         visibility.compact?.let { query["compact"] = it }
+        visibility.working?.let { query["working"] = it }
         val data = Http.get("/sessions/$sessionId/messages", query)?.jsonObject ?: return null
         val items = data["items"]?.jsonArray?.map(::parseSessionMessage) ?: emptyList()
         return MessagesPage(

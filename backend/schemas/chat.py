@@ -11,6 +11,7 @@ class VisibilityPrefs(BaseModel):
     tool_use: Optional[str] = None
     file_change: Optional[str] = None
     compact: Optional[str] = None
+    working: Optional[str] = None
 
 
 class SetVisibilityMessage(VisibilityPrefs):

@@ -27,6 +27,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import com.jahirtrap.cconnect.data.VisibilityPrefs
 class ChatSocket(private val scope: CoroutineScope, private val config: () -> BackendConfig) {
     private var ws: WsConnection? = null
 
@@ -140,11 +141,12 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
     fun sendVisibility(visibility: VisibilityPrefs) {
         send(buildJsonObject {
             put("type", "set_visibility")
-            visibility.simple?.let { put("simple", it) }
+            visibility.simple?.let { put("simple", it == "on") }
             visibility.thinking?.let { put("thinking", it) }
             visibility.toolUse?.let { put("tool_use", it) }
             visibility.fileChange?.let { put("file_change", it) }
             visibility.compact?.let { put("compact", it) }
+            visibility.working?.let { put("working", it) }
         })
     }
 

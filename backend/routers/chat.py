@@ -182,6 +182,7 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
                 partial=settings_store.get("streaming"),
                 ask_user=ask_user,
                 account=main_state.account,
+                permission_mode=main_state.permission_mode,
             ):
                 if ev.get("type") == "ask_session" and ev.get("session_id"):
                     side_state.session_id = ev["session_id"]

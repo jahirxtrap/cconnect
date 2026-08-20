@@ -22,6 +22,7 @@ interface Effective {
   tool_use: string;
   file_change: string;
   compact: string;
+  working: string;
 }
 import { t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
@@ -99,13 +100,13 @@ export class ChatState {
   effort = $state(DEFAULTS.effort);
   account = $state(DEFAULTS.account);
   streamTokens = $state(true);
-  showWorking = $state("label");
   serverVisibility = $state<Effective>({
     simple: false,
     thinking: "full",
     tool_use: "label",
     file_change: "full",
     compact: "full",
+    working: "label",
   });
 
   get effectiveVisibility(): Effective {
@@ -118,6 +119,7 @@ export class ChatState {
       tool_use: local.tool_use ?? server.tool_use,
       file_change: local.file_change ?? server.file_change,
       compact: local.compact ?? server.compact,
+      working: local.working ?? server.working,
     };
     return simple ? { ...merged, thinking: "off", tool_use: "off" } : merged;
   }
@@ -136,6 +138,10 @@ export class ChatState {
 
   get showCompact() {
     return this.effectiveVisibility.compact;
+  }
+
+  get showWorking() {
+    return this.effectiveVisibility.working;
   }
 
 
@@ -489,7 +495,7 @@ export class ChatState {
   #onSideEvent(event: ServerEvent) {
     switch (event.type) {
       case "ask_working":
-        if (this.showWorking === "label") {
+        if (this.sideMessages.at(-1)?.role !== "working") {
           this.#sideAssistantId = null;
           this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "working")];
         }
@@ -777,11 +783,11 @@ export class ChatState {
     this.#pushGeneration({ account: account || this.account });
   }
 
-  toggleStreamTokens() {
-    const next = !this.effectiveStreamTokens;
+  setStreamTokens(value: string) {
+    const next = value === "" ? null : value === "on";
     this.#updateEnvironment({ streaming: next });
     this.streamingOverride = next;
-    this.#pushGeneration({ partial: next });
+    this.#pushGeneration({ partial: next ?? this.streamTokens });
   }
 
   runCommand(command: CommandOption) {
@@ -866,13 +872,13 @@ export class ChatState {
       this.effort = snapshot.effort;
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
-      this.showWorking = snapshot.showWorking;
       this.serverVisibility = {
         simple: snapshot.simpleMode,
         thinking: snapshot.showThinking,
         tool_use: snapshot.showToolUse,
         file_change: snapshot.showFileChange,
         compact: snapshot.showCompact,
+        working: snapshot.showWorking,
       };
     }
     this.capabilitiesReady = true;
@@ -894,6 +900,8 @@ export class ChatState {
   applyVisibility(prefs: VisibilityPrefs) {
     settings.visibility = prefs;
     this.#socket.sendVisibility(prefs);
+    this.#reloadOnDone = this.streaming;
+    void this.#reloadConversation({ keepLive: this.streaming });
   }
 
   #append(item: ChatMessage) {
@@ -969,23 +977,29 @@ export class ChatState {
     return true;
   }
 
-  async #reloadConversation() {
+  #reloadOnDone = false;
+
+  async #reloadConversation({ keepLive = false } = {}) {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     if (!sessionId || !project) return;
     const page = await this.#sessions.messages(sessionId, project, HISTORY_PAGE, null, settings.visibility);
     if (!page) return;
+    const live = keepLive ? this.messages.filter((item) => item.sourceIndex < 0) : [];
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
     this.#nextId = visible.length;
-    this.#assistantId = null;
-    this.#thinkingId = null;
+    if (!keepLive) {
+      this.#assistantId = null;
+      this.#thinkingId = null;
+    }
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
     this.#sent.clear();
     this.#silent.clear();
     this.#interrupting = false;
-    this.messages = loaded;
+    this.messages = live.length ? [...loaded, ...live] : loaded;
+    this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
     this.queue = [];
     this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
@@ -1294,7 +1308,7 @@ export class ChatState {
       case "working":
         this.#assistantId = null;
         this.#thinkingId = null;
-        this.#append(newMessage(this.#nextId++, "working"));
+        if (this.messages.at(-1)?.role !== "working") this.#append(newMessage(this.#nextId++, "working"));
         break;
       case "plan":
         this.#assistantId = null;
@@ -1456,6 +1470,10 @@ export class ChatState {
         this.#resetStreaming();
         this.#interrupting = false;
         this.#pumpQueue();
+        if (this.#reloadOnDone && !this.streaming) {
+          this.#reloadOnDone = false;
+          void this.#reloadConversation();
+        }
         break;
       case "interrupted":
         this.#interrupting = false;

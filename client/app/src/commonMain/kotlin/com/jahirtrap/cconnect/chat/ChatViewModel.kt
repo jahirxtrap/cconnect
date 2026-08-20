@@ -114,11 +114,12 @@ data class ChatUiState(
     val showWorking: String = "label",               // quick-chat working indicator visibility (label/off)
     val visibility: VisibilityPrefs = VisibilityPrefs(),
     val serverVisibility: VisibilityPrefs = VisibilityPrefs(
-        simple = false,
+        simple = "off",
         thinking = "full",
         toolUse = "label",
         fileChange = "full",
         compact = "full",
+        working = "label",
     ),
     val pendingToolIds: Set<String> = emptySet(),    // tools still running (tool_use seen, no result yet)
     val contextTokens: Int? = null,                  // approx context-window tokens used on the last turn
@@ -380,11 +381,12 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     streamTokens = s.streaming,
                     showWorking = s.showWorking,
                     serverVisibility = VisibilityPrefs(
-                        simple = s.simpleMode,
+                        simple = if (s.simpleMode) "on" else "off",
                         thinking = s.showThinking,
                         toolUse = s.showToolUse,
                         fileChange = s.showFileChange,
                         compact = s.showCompact,
+                        working = s.showWorking,
                     ),
                 )
             }
@@ -410,23 +412,35 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         )
     }
 
+    private fun effectiveWorking(): String {
+        val s = _state.value
+        return s.visibility.working ?: s.serverVisibility.working ?: s.showWorking
+    }
+
     private fun localVisibility() = VisibilityPrefs(
-        simple = settings.visibilitySimple.takeIf { it.isNotEmpty() }?.let { it == "on" },
+        simple = settings.visibilitySimple.takeIf { it.isNotEmpty() },
         thinking = settings.visibilityThinking.takeIf { it.isNotEmpty() },
         toolUse = settings.visibilityToolUse.takeIf { it.isNotEmpty() },
         fileChange = settings.visibilityFileChange.takeIf { it.isNotEmpty() },
         compact = settings.visibilityCompact.takeIf { it.isNotEmpty() },
+        working = settings.visibilityWorking.takeIf { it.isNotEmpty() },
     )
 
     fun applyVisibility(prefs: VisibilityPrefs) {
-        settings.visibilitySimple = prefs.simple?.let { if (it) "on" else "off" }.orEmpty()
+        settings.visibilitySimple = prefs.simple.orEmpty()
         settings.visibilityThinking = prefs.thinking.orEmpty()
         settings.visibilityToolUse = prefs.toolUse.orEmpty()
         settings.visibilityFileChange = prefs.fileChange.orEmpty()
         settings.visibilityCompact = prefs.compact.orEmpty()
+        settings.visibilityWorking = prefs.working.orEmpty()
         _state.update { it.copy(visibility = prefs) }
         client.sendVisibility(prefs)
+        val running = _state.value.streaming
+        reloadOnDone = running
+        viewModelScope.launch { reloadConversation(keepLive = running) }
     }
+
+    private var reloadOnDone = false
 
     fun sendPrompt(text: String) {
         val trimmed = text.trim()
@@ -678,13 +692,12 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         pushGeneration(effort = effort.ifEmpty { _state.value.effort })
     }
 
-    fun toggleStreaming() {
-        val s = _state.value
-        val next = !(s.streamingOverride ?: s.streamTokens)
+    fun setStreaming(value: String) {
+        val next = if (value.isEmpty()) null else value == "on"
         settings.updateEnvironment(ctx.environmentId) { it.copy(streaming = next) }
         EnvOverrides.bump()
         _state.update { it.copy(streamingOverride = next) }
-        pushGeneration(partial = next)
+        pushGeneration(partial = next ?: _state.value.streamTokens)
     }
 
     fun newSession() {
@@ -855,7 +868,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun loadSessionInto(session: SessionInfo): Boolean {
         val projectKey = session.projectKey ?: return false
         val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100, visibility = localVisibility()) ?: return false
-        val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
+        val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.WORKING || it.toRole() == Role.INTERRUPTED }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, session.sessionId, projectKey), timestamp = m.timestamp) to m.parent
         })
@@ -946,25 +959,28 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         _state.update { it.copy(pendingInput = null) }
     }
 
-    private suspend fun reloadConversation() {
+    private suspend fun reloadConversation(keepLive: Boolean = false) {
         val s = _state.value
         val sid = s.sessionId ?: return
         val proj = currentProjectKey() ?: return
         val page = SessionsApi.sessionMessages(sid, proj, limit = 100, visibility = localVisibility()) ?: return
-        val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
+        val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.WORKING || it.toRole() == Role.INTERRUPTED }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, sid, proj), timestamp = m.timestamp) to m.parent
         })
-        nextId = visible.size.toLong()
-        currentAssistantId = null
-        currentThinkingId = null
+        val live = if (keepLive) s.messages.filter { it.sourceIndex < 0 } else emptyList()
+        nextId = maxOf(visible.size.toLong(), live.maxOfOrNull { it.id + 1 } ?: 0L)
+        if (!keepLive) {
+            currentAssistantId = null
+            currentThinkingId = null
+        }
         optimisticChipId = null
         optimisticMsgId = null
         sentIds.clear()
         interrupting = false
         _state.update {
             it.copy(
-                messages = loaded,
+                messages = if (live.isEmpty()) loaded else loaded + live,
                 todos = emptyList(),
                 queue = emptyList(),
                 oldestLoadedIndex = page.startIndex.takeIf { page.items.isNotEmpty() },
@@ -1123,7 +1139,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             is ServerEvent.Working -> {
                 currentAssistantId = null
                 currentThinkingId = null
-                addMessage(Role.WORKING, "")
+                if (_state.value.messages.lastOrNull()?.role != Role.WORKING) addMessage(Role.WORKING, "")
             }
             is ServerEvent.Plan -> {
                 currentAssistantId = null
@@ -1234,6 +1250,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 interrupting = false
                 turnFirstResponseId = null
                 pumpQueue()
+                if (reloadOnDone && !_state.value.streaming) {
+                    reloadOnDone = false
+                    viewModelScope.launch { reloadConversation() }
+                }
             }
             is ServerEvent.Interrupted -> {
                 interrupting = false
@@ -1355,7 +1375,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun onSideEvent(event: ServerEvent) {
         when (event) {
             is ServerEvent.AskWorking -> {
-                if (_state.value.showWorking == "label") {
+                if (_state.value.sideChat?.messages?.lastOrNull()?.role != Role.WORKING) {
                     currentSideAssistantId = null
                     _state.update { st ->
                         val sc = st.sideChat ?: return@update st
@@ -1421,7 +1441,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             return
         }
         val older = event.items
-            .filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.INTERRUPTED }
+            .filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.WORKING || it.toRole() == Role.INTERRUPTED }
         _state.update { st ->
             val prepended = older.mapIndexed { i, m ->
                 ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, event.sessionId, st.activeProjectKey), timestamp = m.timestamp)

@@ -6,6 +6,7 @@ export interface VisibilityPrefs {
   tool_use: string | null;
   file_change: string | null;
   compact: string | null;
+  working: string | null;
 }
 
 const DEFAULTS = {
@@ -34,6 +35,7 @@ const DEFAULTS = {
   visibility_tool_use: "",
   visibility_file_change: "",
   visibility_compact: "",
+  visibility_working: "",
 };
 
 type Key = keyof typeof DEFAULTS;
@@ -60,6 +62,7 @@ class Settings {
       tool_use: this.#read("visibility_tool_use") || null,
       file_change: this.#read("visibility_file_change") || null,
       compact: this.#read("visibility_compact") || null,
+      working: this.#read("visibility_working") || null,
     };
   }
 
@@ -69,6 +72,7 @@ class Settings {
     this.#write("visibility_tool_use", value.tool_use ?? "");
     this.#write("visibility_file_change", value.file_change ?? "");
     this.#write("visibility_compact", value.compact ?? "");
+    this.#write("visibility_working", value.working ?? "");
   }
 
   get notifyTaskDone() {

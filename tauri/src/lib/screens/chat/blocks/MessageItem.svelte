@@ -178,7 +178,7 @@
   {:else if message.role === "api_error"}
     <div class="flex w-full items-start gap-2 bg-orange/15 px-4 py-3">
       <TriangleAlert size={18} class="mt-px shrink-0 text-orange" />
-      <p class="min-w-0 flex-1 text-body-md whitespace-pre-wrap text-orange">{message.text}</p>
+      <p class="min-w-0 flex-1 text-body-md wrap-anywhere whitespace-pre-wrap text-orange">{message.text}</p>
     </div>
   {:else if message.role === "interrupted"}
     <div class="flex w-full items-center gap-2 bg-orange/15 px-4 py-3">

@@ -176,7 +176,7 @@
   />
 {:else if dialog === "visibility" && snapshot}
   <VisibilityDialog
-    simple={snapshot.simpleMode}
+    simple={snapshot.simpleMode ? "on" : "off"}
     thinking={snapshot.showThinking}
     toolUse={snapshot.showToolUse}
     fileChange={snapshot.showFileChange}
@@ -184,7 +184,7 @@
     working={snapshot.showWorking}
     onConfirm={(values) =>
       void apply({
-        simple_mode: values.simple,
+        simple_mode: values.simple === "on",
         show_thinking: values.thinking,
         show_tool_use: values.toolUse,
         show_file_change: values.fileChange,

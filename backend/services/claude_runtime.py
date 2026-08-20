@@ -236,6 +236,15 @@ def _file_change_event(block: Any, raw_input: Any, hidden: set[str]) -> dict | N
     return {"type": "file_change", "id": bid, "path": path, "diff_lines": diff_lines}
 
 
+def _mark_working(events: list[dict], vis: dict) -> None:
+    """In simple mode a hidden block still says "working", once per run."""
+    if not vis.get("simple"):
+        return
+    if events and events[-1].get("type") == "working":
+        return
+    events.append({"type": "working"})
+
+
 def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidden_tool_ids: set[str] | None = None) -> list[dict]:
     """Convert message blocks to events. When ``skip_streamed`` is set,
     text and thinking are omitted because they already arrived as deltas.
@@ -253,6 +262,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
         elif kind == "ThinkingBlock":
             mode = vis["thinking"]
             if mode == "off":
+                _mark_working(events, vis)
                 continue
             if mode == "label":
                 events.append({"type": "thinking", "label": True})
@@ -276,6 +286,8 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 continue
             if name in ("Agent", "Task") and isinstance(raw_input, dict):
                 mode = vis["tool_use"]
+                if mode == "off":
+                    _mark_working(events, vis)
                 if mode != "off":
                     events.append({
                         "type": "agent",
@@ -297,12 +309,15 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
             elif name in _FILE_EDIT_TOOLS:
                 event = _file_change_event(block, raw_input, hidden)  # also marks the edit's result hidden
                 mode = vis["file_change"]
+                if event is not None and mode == "off":
+                    _mark_working(events, vis)
                 if event is not None and mode != "off":
                     if mode == "label":
                         event = {"type": "file_change", "id": event.get("id"), "path": event.get("path"), "label": True}
                     events.append(event)
             elif not name.startswith("Task"):
                 if vis["tool_use"] == "off":
+                    _mark_working(events, vis)
                     continue
                 events.append({
                     "type": "tool_use",
@@ -316,6 +331,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 continue
             mode = vis["tool_use"]
             if mode == "off":
+                _mark_working(events, vis)
                 continue
             ev = {"type": "tool_result", "tool_use_id": tuid}
             if mode == "full":
@@ -645,6 +661,8 @@ async def run_prompt(
                 continue
             if isinstance(message, StreamEvent):
                 raw = message.event
+                if vis()["simple"] and _stream_event_is_working(raw):
+                    yield {"type": "working"}
                 idx = raw.get("index") if isinstance(raw, dict) else None
                 if isinstance(raw, dict) and raw.get("type") == "content_block_start":
                     if isinstance(idx, int):
@@ -812,6 +830,7 @@ async def ask_side_question(
     partial: bool = False,
     ask_user: Optional[Callable[[dict], Awaitable[dict]]] = None,
     account: Optional[str] = None,
+    permission_mode: str = "default",
 ) -> AsyncIterator[dict]:
     """Quick side question in an isolated, resumable session. ``context`` seeds the first turn,
     ``resume_id`` continues it for memory, ``ask_user`` surfaces permission prompts."""
@@ -828,7 +847,7 @@ async def ask_side_question(
     prompt = f"<session_context>\n{context}\n</session_context>\n\n{question}" if (context and not resume_id) else question
     options_kwargs: dict[str, Any] = dict(
         cwd=AI_WORKDIR,
-        permission_mode="default",
+        permission_mode=permission_mode,
         model="sonnet",
         system_prompt=None if resume_id else system,
         setting_sources=[],

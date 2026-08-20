@@ -12,7 +12,7 @@
   const { name, icon: IconComponent, onclick, trailing }: Props = $props();
 
   const BASE_CLASS =
-    "flex max-w-60 shrink-0 items-center gap-1.5 rounded-panel border-2 border-outline-variant px-2 py-1";
+    "flex max-w-60 shrink-0 items-center gap-1.5 rounded-panel border-2 border-outline-variant px-2 py-1 select-none";
 </script>
 
 {#snippet body()}

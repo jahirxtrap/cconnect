@@ -10,6 +10,7 @@
     selected: string;
     options?: SelectOption[];
     enabled?: boolean;
+    shown?: string | null;
     onSelect?: (value: string) => void;
     onclick?: (() => void) | null;
     class?: string;
@@ -21,6 +22,7 @@
     selected,
     options = [],
     enabled = true,
+    shown = null,
     onSelect,
     onclick = null,
     class: className = "",
@@ -28,7 +30,7 @@
   }: Props = $props();
 
   let open = $state(false);
-  const display = $derived(options.find((option) => option.value === selected)?.label ?? selected);
+  const display = $derived(shown ?? options.find((option) => option.value === selected)?.label ?? selected);
 
   const FIELD_CLASS = "flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors";
 </script>

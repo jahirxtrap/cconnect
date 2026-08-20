@@ -3,6 +3,7 @@
   import Gauge from "@lucide/svelte/icons/gauge";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Eye from "@lucide/svelte/icons/eye";
+  import EyeOff from "@lucide/svelte/icons/eye-off";
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import { t } from "$lib/i18n/index.svelte";
@@ -32,13 +33,14 @@
     accountSelected: string;
     onAccount: (value: string) => void;
     streamTokens: boolean;
+    streamingSelected: string;
     simpleMode: boolean;
     contextTokens: number | null;
     quickChatActive: boolean;
     onModel: (value: string) => void;
     onEffort: (value: string) => void;
     onPermissionMode: (value: string) => void;
-    onStreamTokens: () => void;
+    onStreamTokens: (value: string) => void;
     onVisibility: () => void;
     onQuickChat: () => void;
   }
@@ -58,6 +60,7 @@
     accountSelected,
     onAccount,
     streamTokens,
+    streamingSelected,
     simpleMode,
     contextTokens,
     quickChatActive,
@@ -78,7 +81,7 @@
   const TOGGLE_CLASS =
     "flex shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-2 py-1 ripple";
 
-  let openMenu = $state<"model" | "effort" | "permission" | "account" | null>(null);
+  let openMenu = $state<"model" | "effort" | "permission" | "account" | "streaming" | null>(null);
 
   const serverOption = { value: "", label: t("SERVER_DEFAULT") };
 
@@ -93,6 +96,11 @@
   const permissionOptions = $derived([
     serverOption,
     ...(capabilities?.permissionModes ?? []).map((item) => ({ value: item.id, label: item.label })),
+  ]);
+  const streamingOptions = $derived([
+    { value: "", label: t("SERVER_DEFAULT") },
+    { value: "on", label: t("OPTION_ON") },
+    { value: "off", label: t("OPTION_OFF") },
   ]);
   const accountOptions = $derived([
     serverOption,
@@ -233,15 +241,37 @@
       </PopupMenu>
     {/if}
 
-    <TooltipWrap label={t("STREAMING")} class="flex shrink-0 items-center">
-      <button type="button" use:keepFocus onclick={onStreamTokens} aria-label={t("STREAMING")} class={TOGGLE_CLASS}>
-        <Radio size={16} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
-      </button>
-    </TooltipWrap>
+    <PopupMenu
+      open={openMenu === "streaming"}
+      side="top"
+      onOpenChange={(open) => (openMenu = open ? "streaming" : null)}
+    >
+      {#snippet trigger()}
+        <TooltipWrap label={t("STREAMING")}>
+          <span class={TOGGLE_CLASS}>
+            <Radio size={16} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
+          </span>
+        </TooltipWrap>
+      {/snippet}
+      {#each streamingOptions as option (option.value)}
+        <MenuItem
+          text={option.label}
+          selected={option.value === streamingSelected}
+          onclick={() => {
+            onStreamTokens(option.value);
+            openMenu = null;
+          }}
+        />
+      {/each}
+    </PopupMenu>
 
-    <TooltipWrap label={t("VISIBILITY_LOCAL")} class="flex shrink-0 items-center">
-      <button type="button" use:keepFocus onclick={onVisibility} aria-label={t("VISIBILITY_LOCAL")} class={TOGGLE_CLASS}>
-        <Eye size={16} class={simpleMode ? "text-accent" : "text-on-surface-variant"} />
+    <TooltipWrap label={t("VISIBILITY")} class="flex shrink-0 items-center">
+      <button type="button" use:keepFocus onclick={onVisibility} aria-label={t("VISIBILITY")} class={TOGGLE_CLASS}>
+        {#if simpleMode}
+          <EyeOff size={16} class="text-accent" />
+        {:else}
+          <Eye size={16} class="text-accent" />
+        {/if}
       </button>
     </TooltipWrap>
   {/if}

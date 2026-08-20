@@ -62,6 +62,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       ...(prefs?.tool_use ? { tool_use: prefs.tool_use } : {}),
       ...(prefs?.file_change ? { file_change: prefs.file_change } : {}),
       ...(prefs?.compact ? { compact: prefs.compact } : {}),
+      ...(prefs?.working ? { working: prefs.working } : {}),
     });
     if (!data) return null;
     return {

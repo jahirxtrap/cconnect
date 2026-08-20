@@ -1,6 +1,8 @@
 package com.jahirtrap.cconnect.ui
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -41,6 +43,7 @@ internal fun CodeBlock(code: String, bg: Color, lang: String) {
                 text = code.trimEnd('\n'),
                 fontFamily = LocalMonoFontFamily.current,
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .horizontalScrollbar(scroll)
                     .horizontalScroll(scroll)
@@ -66,12 +69,15 @@ private fun CodeBlockHeader(lang: String, code: String) {
             .padding(start = 10.dp, end = 2.dp, top = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = lang.ifBlank { "code" },
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
+        Box(modifier = Modifier.weight(1f)) {
+            DisableSelection {
+                Text(
+                    text = lang.ifBlank { "code" },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         IconButton(
             onClick = {
                 clipboard.setText(AnnotatedString(code.trimEnd('\n')))

@@ -138,6 +138,7 @@ fun SelectField(
     selected: String,
     options: List<Pair<String, String>> = emptyList(),
     enabled: Boolean = true,
+    shown: String? = null,
     trailing: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
     onSelect: (String) -> Unit = {},
@@ -145,7 +146,7 @@ fun SelectField(
     var open by remember { mutableStateOf(false) }
     var fieldWidth by remember { mutableStateOf(0.dp) }
     val density = LocalDensity.current
-    val display = options.firstOrNull { it.first == selected }?.second ?: selected
+    val display = shown ?: options.firstOrNull { it.first == selected }?.second ?: selected
     val shape = RoundedCornerShape(Radius.md)
     Column {
         Text(label, style = MaterialTheme.typography.labelLarge)

@@ -54,7 +54,7 @@
 <div class="w-full px-4">
   <div class="flex items-center gap-1.5">
     <CircleQuestionMark size={16} class="shrink-0 text-accent" />
-    <span class="text-label-lg text-accent">{t("QUESTIONS_TITLE")}</span>
+    <span class="text-label-lg text-accent select-none">{t("QUESTIONS_TITLE")}</span>
   </div>
 
   {#if data.declined}
@@ -95,7 +95,7 @@
           <button
             type="button"
             onclick={() => goto(index)}
-            class="shrink-0 cursor-pointer rounded-md px-2.5 py-[5px] text-label-md transition-colors {index === page
+            class="shrink-0 cursor-pointer rounded-md px-2.5 py-[5px] text-label-md transition-colors select-none {index === page
               ? 'bg-accent/18 text-accent'
               : 'bg-surface-variant text-on-surface-variant'}"
           >
@@ -179,7 +179,7 @@
           <button
             type="button"
             onclick={() => (showNotes = true)}
-            class="mt-1 cursor-pointer text-label-md text-accent"
+            class="mt-1 cursor-pointer text-label-md text-accent select-none"
           >
             {t("ADD_NOTES")}
           </button>
