@@ -1,11 +1,7 @@
-"""Let the model compact its own conversation when asked to."""
-
 from claude_agent_sdk import tool
 
 
 def make_tools(context: dict) -> list:
-    """The SDK has no on-demand compaction and a turn can't compact itself mid-stream,
-    so the tool only flags the request and the turn compacts once it closes."""
     request = context.get("request_compact")
     if request is None:
         return []

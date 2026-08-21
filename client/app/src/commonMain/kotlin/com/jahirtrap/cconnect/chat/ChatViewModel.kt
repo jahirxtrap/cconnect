@@ -977,8 +977,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
         optimisticChipId = null
         optimisticMsgId = null
-        // Reloading redraws the transcript, and what is queued isn't part of it — the
-        // server still holds those, so dropping them here only hides them.
         sentIds.retainAll(_state.value.queue.mapTo(mutableSetOf()) { it.id })
         interrupting = false
         _state.update {
@@ -1119,8 +1117,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         streaming = event.running,
                         sideChat = it.sideChat.promote(sid),
                         messages = msgs,
-                        // The server owns what is pending; only attachments still uploading
-                        // are ours, because those never reached it.
                         queue = event.queued + it.queue.filter { q -> q.uploading },
                     )
                 }

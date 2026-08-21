@@ -97,8 +97,6 @@ def invalidate_version_cache() -> None:
 
 
 def _settled_version(path: str, before: Optional[str], deadline: float = 5.0) -> Optional[str]:
-    """`claude update` returns before the new binary is in place, so asking once
-    right after still reports the old version. Wait briefly for it to change."""
     end = time.monotonic() + deadline
     version = cli_version(path)
     while version == before and time.monotonic() < end:

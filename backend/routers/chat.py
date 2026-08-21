@@ -149,10 +149,6 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                         yield {"type": "command", "markdown": md}
 
         async def gen():
-            """The `compact` tool only raises a flag; the compaction runs as a second prompt
-            once the first is done. It goes without a drain (the queue closed with the turn,
-            so asking for another would wait forever) and without the flag, so the tool is
-            absent from that run and can't chain."""
             pending = {"compact": False}
 
             def request_compact():

@@ -439,6 +439,24 @@ async def _keep_stream_open(input_data, tool_use_id, context):
     return {"continue_": True}
 
 
+_NO_BACKGROUND = (
+    "Background work is not available here: the CLI process ends with the turn, so anything "
+    "left running is killed and its output is lost. Run it in the foreground and wait."
+)
+
+
+async def _block_background(input_data, tool_use_id, context):
+    if ((input_data or {}).get("tool_input") or {}).get("run_in_background"):
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": _NO_BACKGROUND,
+            }
+        }
+    return {}
+
+
 async def run_prompt(
     prompt: str,
     cwd: str,
@@ -513,7 +531,7 @@ async def run_prompt(
     if ultracode:
         options_kwargs["settings"] = json.dumps({"ultracode": True})
     status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}
-    hooks_map: dict[str, Any] = {}
+    hooks_map: dict[str, Any] = {"PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background])]}
     loop = asyncio.get_running_loop() if emit is not None else None
     if ask_user is not None:
         base_can_use_tool = _build_can_use_tool(ask_user)
@@ -534,7 +552,7 @@ async def run_prompt(
             options_kwargs["can_use_tool"] = _can_use_tool_status
         else:
             options_kwargs["can_use_tool"] = base_can_use_tool
-        hooks_map["PreToolUse"] = [HookMatcher(matcher=None, hooks=[_keep_stream_open])]
+        hooks_map["PreToolUse"].append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))
     if emit is not None:
         async def _pre_compact(input_data, tool_use_id, context):
             status_state["compacting"] = True
@@ -860,9 +878,11 @@ async def ask_side_question(
         env=accounts.env_for(accounts.resolve(account)),
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )
+    hooks = [HookMatcher(matcher=None, hooks=[_block_background])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
-        options_kwargs["hooks"] = {"PreToolUse": [HookMatcher(matcher=None, hooks=[_keep_stream_open])]}
+        hooks.append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))
+    options_kwargs["hooks"] = {"PreToolUse": hooks}
     options = ClaudeAgentOptions(**options_kwargs)
 
     async def _prompt_stream():
