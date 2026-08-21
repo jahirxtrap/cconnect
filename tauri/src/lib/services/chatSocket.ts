@@ -4,6 +4,7 @@ import {
   type InteractionOption,
   type InteractionQuestion,
   type QuestionDraft,
+  type QueuedMessage,
   type TodoItem,
 } from "$lib/data/chatModels";
 import { backend, baseUrlOf, socketUrlOf, type Profile } from "./backend.svelte";
@@ -20,6 +21,7 @@ export type ServerEvent =
       running: boolean;
       resumed: boolean;
       committedCount: number | null;
+      queued: QueuedMessage[];
     }
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
@@ -108,6 +110,18 @@ const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "st
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
 const flag = (raw: Wire, key: string): boolean => raw[key] === true;
 const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
+const strings = (raw: Wire, key: string): string[] =>
+  Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
+
+const queuedItems = (raw: Wire): QueuedMessage[] =>
+  list(raw, "queued")
+    .map((item) => ({
+      id: text(item, "id") ?? "",
+      text: text(item, "text") ?? "",
+      attachments: strings(item, "attachments"),
+      uploading: false,
+    }))
+    .filter((item) => item.id !== "");
 
 const toOption = (raw: Wire): InteractionOption => ({
   id: text(raw, "id") ?? "",
@@ -358,6 +372,7 @@ export class ChatSocket {
         running: flag(wire, "running"),
         resumed: flag(wire, "resumed"),
         committedCount: int(wire, "committed_count"),
+        queued: queuedItems(wire),
       });
       return;
     }

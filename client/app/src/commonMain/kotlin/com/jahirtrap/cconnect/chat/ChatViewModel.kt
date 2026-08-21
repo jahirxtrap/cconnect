@@ -977,13 +977,14 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
         optimisticChipId = null
         optimisticMsgId = null
-        sentIds.clear()
+        // Reloading redraws the transcript, and what is queued isn't part of it — the
+        // server still holds those, so dropping them here only hides them.
+        sentIds.retainAll(_state.value.queue.mapTo(mutableSetOf()) { it.id })
         interrupting = false
         _state.update {
             it.copy(
                 messages = if (live.isEmpty()) loaded else loaded + live,
                 todos = emptyList(),
-                queue = emptyList(),
                 oldestLoadedIndex = page.startIndex.takeIf { page.items.isNotEmpty() },
                 transcriptLoading = false,
                 transcriptExhausted = !page.hasMore,
@@ -1118,8 +1119,12 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         streaming = event.running,
                         sideChat = it.sideChat.promote(sid),
                         messages = msgs,
+                        // The server owns what is pending; only attachments still uploading
+                        // are ours, because those never reached it.
+                        queue = event.queued + it.queue.filter { q -> q.uploading },
                     )
                 }
+                sentIds.addAll(event.queued.map { q -> q.id })
                 viewModelScope.launch { refreshServerInfo() }
                 drainQueue()
             }

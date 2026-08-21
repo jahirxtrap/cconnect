@@ -151,6 +151,13 @@ class LiveSession:
     def peek_queued(self):
         return self._queued[0] if self._queued else None
 
+    def queued_items(self):
+        """The pending messages as they stand, sent with ``ready`` so a client that just
+        loaded — or reloaded — draws the queue from here instead of from its own memory.
+        In-flight ones count: the turn took them, but until their ``dequeued`` arrives the
+        user has seen nothing of them, so they are still waiting on screen."""
+        return [dict(item) for item in self._inflight + self._queued]
+
     async def consumed(self, mid):
         if mid:
             self._seen_ids.add(mid)

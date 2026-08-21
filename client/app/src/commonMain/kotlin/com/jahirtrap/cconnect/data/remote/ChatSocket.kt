@@ -4,6 +4,7 @@ import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionOption
 import com.jahirtrap.cconnect.data.InteractionQuestion
 import com.jahirtrap.cconnect.data.QuestionDraft
+import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.ServerEvent
 import com.jahirtrap.cconnect.data.TodoItem
 import com.jahirtrap.cconnect.data.diffKindOf
@@ -272,7 +273,16 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 channel = newChannel
                 lastSeq = 0
             }
-            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull))
+            val queued = obj["queued"]?.jsonArray?.mapNotNull { entry ->
+                val item = entry as? JsonObject ?: return@mapNotNull null
+                val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                QueuedMessage(
+                    id = id,
+                    text = item["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    attachments = item["attachments"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList(),
+                )
+            } ?: emptyList()
+            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queued))
         }
         val ch = str("channel")
         val side = ch != null && channel != null && ch != channel

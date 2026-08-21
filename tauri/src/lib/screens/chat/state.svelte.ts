@@ -996,13 +996,15 @@ export class ChatState {
     }
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
-    this.#sent.clear();
+    // Reloading redraws the transcript, and what is queued isn't part of it — the server
+    // still holds those, so dropping them here only hides them.
+    const pending = new Set(this.queue.map((item) => item.id));
+    for (const id of [...this.#sent]) if (!pending.has(id)) this.#sent.delete(id);
     this.#silent.clear();
     this.#interrupting = false;
     this.messages = live.length ? [...loaded, ...live] : loaded;
     this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
-    this.queue = [];
     this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
     this.transcriptLoading = false;
     this.transcriptExhausted = !page.hasMore;
@@ -1289,6 +1291,10 @@ export class ChatState {
           const lastUser = kept.findLastIndex((item) => item.role === "user");
           this.messages = lastUser >= 0 ? kept.slice(0, lastUser + 1) : kept;
         }
+        // The server owns what is pending; only attachments still uploading are ours,
+        // because those never reached it.
+        this.queue = [...event.queued, ...this.queue.filter((item) => item.uploading)];
+        for (const item of event.queued) this.#sent.add(item.id);
         void this.refreshServerInfo();
         this.#pumpQueue();
         break;

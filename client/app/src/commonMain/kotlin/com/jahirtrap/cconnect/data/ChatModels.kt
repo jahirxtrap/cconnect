@@ -126,7 +126,7 @@ data class CapabilitiesDefaults(
 sealed interface ServerEvent {
     data object Connecting : ServerEvent
     data object Open : ServerEvent
-    data class Ready(val sessionId: String?, val project: String? = null, val channel: String? = null, val running: Boolean = false, val resumed: Boolean = false, val committedCount: Int? = null) : ServerEvent
+    data class Ready(val sessionId: String?, val project: String? = null, val channel: String? = null, val running: Boolean = false, val resumed: Boolean = false, val committedCount: Int? = null, val queued: List<QueuedMessage> = emptyList()) : ServerEvent
     data class AssistantText(val text: String) : ServerEvent
     data class Thinking(val text: String, val labelOnly: Boolean = false) : ServerEvent
     data class ToolUse(val id: String?, val name: String?, val input: String?, val result: String? = null) : ServerEvent

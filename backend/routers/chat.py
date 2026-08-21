@@ -297,6 +297,7 @@ async def chat_ws(ws: WebSocket):
                     "running": session.running,
                     "resumed": bool(by_session),
                     "committed_count": session.turn_start_index,
+                    "queued": session.queued_items(),
                 })
                 await session.attach(sink, last_seq=msg.last_seq, since_committed=bool(by_session), prefs=seen)
                 if not session.running and session.state.session_id:
