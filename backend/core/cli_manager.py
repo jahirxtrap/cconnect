@@ -96,13 +96,29 @@ def invalidate_version_cache() -> None:
     _version_cache = None
 
 
-def _settled_version(path: str, before: Optional[str], deadline: float = 5.0) -> Optional[str]:
+def _reported_version(output: Optional[str]) -> Optional[str]:
+    found = re.findall(r"\d+(?:\.\d+)+", output or "")
+    return found[-1] if found else None
+
+
+def _settled_version(
+    path: str,
+    before: Optional[str],
+    target: Optional[str] = None,
+    deadline: float = 30.0,
+) -> Optional[str]:
     end = time.monotonic() + deadline
     version = cli_version(path)
-    while version == before and time.monotonic() < end:
+    while True:
+        if target is not None:
+            if version and target in version:
+                return version
+        elif version != before:
+            return version
+        if time.monotonic() >= end:
+            return version
         time.sleep(0.5)
         version = cli_version(path)
-    return version
 
 
 def update_cli(source: Optional[str] = None, custom_path: Optional[str] = None) -> dict:
@@ -120,9 +136,12 @@ def update_cli(source: Optional[str] = None, custom_path: Optional[str] = None) 
         result = subprocess.run([path, "update"], capture_output=True, text=True, timeout=180)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "message": str(exc)}
-    version = _settled_version(path, before) if result.returncode == 0 else cli_version(path)
-    invalidate_version_cache()
     output = (result.stdout + result.stderr).strip()
+    if result.returncode == 0:
+        version = _settled_version(path, before, _reported_version(output))
+    else:
+        version = cli_version(path)
+    invalidate_version_cache()
     return {"ok": result.returncode == 0, "message": output, "version": version}
 
 
