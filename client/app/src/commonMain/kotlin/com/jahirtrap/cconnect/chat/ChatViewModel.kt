@@ -552,6 +552,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun removeQueued(id: String) {
+        if (id in sentIds) client.sendUnqueue(id)
         _state.update { it.copy(queue = it.queue.filterNot { q -> q.id == id }) }
         sentIds.remove(id)
     }
@@ -1338,7 +1339,13 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     )
                 }
             }
-            is ServerEvent.Queued -> {}
+            is ServerEvent.Queued -> {
+                val id = event.id
+                if (id != null && id !in sentIds && _state.value.queue.none { it.id == id }) {
+                    sentIds.add(id)
+                    _state.update { it.copy(queue = it.queue + QueuedMessage(id, event.text)) }
+                }
+            }
             is ServerEvent.Dequeued -> {
                 val text = event.text.orEmpty()
                 val ids = event.ids.toSet()

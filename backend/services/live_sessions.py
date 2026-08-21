@@ -37,7 +37,9 @@ class LiveSession:
         self._queued = []
         self._inflight = []
         self._seen_ids = set()
+        self._cancelled = set()
         self._unconsumed = 0
+        self._result_seen = False
         self.turn_start_index = 0
 
     @property
@@ -137,6 +139,9 @@ class LiveSession:
             item = await self._inbox.get()
             if item is _CLOSE:
                 return
+            if item.get("id") and item["id"] in self._cancelled:
+                self._cancelled.discard(item["id"])
+                continue
             try:
                 self._queued.remove(item)
             except ValueError:
@@ -144,6 +149,18 @@ class LiveSession:
             self._unconsumed += 1
             self._inflight.append(item)
             yield item
+
+    async def cancel_queued(self, mid):
+        item = next((it for it in self._queued if it["id"] == mid), None)
+        if item is None:
+            return False
+        self._queued.remove(item)
+        self._cancelled.add(mid)
+        self._seen_ids.add(mid)
+        await self._emit({"type": "dequeued", "ids": [mid], "text": "", "consumed": 0})
+        if self._result_seen and not self._queued and self._unconsumed <= 0:
+            self._inbox.put_nowait(_CLOSE)
+        return True
 
     def already_consumed(self, mid):
         return bool(mid) and mid in self._seen_ids
@@ -182,6 +199,8 @@ class LiveSession:
         self._queued = list(carried)
         self._inflight = []
         self._unconsumed = 0
+        self._cancelled.clear()
+        self._result_seen = False
         self._worker = asyncio.create_task(self._run(runner_factory))
         for item in carried:
             self._inbox.put_nowait(item)
@@ -229,8 +248,10 @@ class LiveSession:
                         done = set(ids)
                         self._inflight = [it for it in self._inflight if it.get("id") not in done]
                 await self._emit(event)
-                if event.get("type") == "result" and not self._queued and self._unconsumed <= 0:
-                    self._inbox.put_nowait(_CLOSE)
+                if event.get("type") == "result":
+                    self._result_seen = True
+                    if not self._queued and self._unconsumed <= 0:
+                        self._inbox.put_nowait(_CLOSE)
         except asyncio.CancelledError:
             raise  # interrupt(): stop without a trailing `done`
         except Exception as exc:

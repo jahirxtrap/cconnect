@@ -160,6 +160,13 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         })
     }
 
+    fun sendUnqueue(id: String) {
+        send(buildJsonObject {
+            put("type", "unqueue")
+            put("id", id)
+        })
+    }
+
     fun sendSetPermissionMode(mode: String) {
         send(buildJsonObject {
             put("type", "set_permission_mode")

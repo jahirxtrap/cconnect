@@ -235,6 +235,10 @@ export class ChatSocket {
     });
   }
 
+  sendUnqueue(id: string) {
+    return this.#send({ type: "unqueue", id });
+  }
+
   sendSetPermissionMode(mode: string) {
     this.#send({ type: "set_permission_mode", mode });
   }

@@ -438,6 +438,7 @@ export class ChatState {
   }
 
   removeQueued(id: string) {
+    if (this.#sent.has(id)) this.#socket.sendUnqueue(id);
     this.queue = this.queue.filter((item) => item.id !== id);
     this.#sent.delete(id);
     this.#silent.delete(id);
@@ -1421,6 +1422,12 @@ export class ChatState {
         break;
       case "task":
         this.#upsertTodo(event.id, event.content, event.status);
+        break;
+      case "queued":
+        if (event.id && !this.#sent.has(event.id) && !this.queue.some((item) => item.id === event.id)) {
+          this.#sent.add(event.id);
+          this.queue = [...this.queue, { id: event.id, text: event.text, attachments: [], uploading: false }];
+        }
         break;
       case "dequeued":
         this.#onDequeued(event.ids, event.text);

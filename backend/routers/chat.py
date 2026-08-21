@@ -333,6 +333,11 @@ async def chat_ws(ws: WebSocket):
                 elif not await _start_turn(session, msg.id, msg.text, msg.attachments, seen["prefs"]):
                     await session.enqueue(msg.id, msg.text, msg.attachments)
 
+            elif mtype == "unqueue":
+                mid = raw.get("id")
+                if session is not None and isinstance(mid, str):
+                    await session.cancel_queued(mid)
+
             elif mtype == "set_generation":
                 try:
                     msg = SetGenerationMessage(**raw)
