@@ -3,7 +3,6 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
   import type { CconnectBlock } from "$lib/markdown/cconnectBlock";
-  import { isMobile } from "$lib/platform";
   import { mediaSrc } from "$lib/services/mediaSource";
   import PdfView from "$lib/screens/files/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
@@ -12,18 +11,19 @@
   interface Props {
     data: CconnectBlock;
     onOpen: (url: string, filename: string) => void;
+    compact?: boolean;
   }
 
-  const { data, onOpen }: Props = $props();
+  const { data, onOpen, compact = false }: Props = $props();
 
   const VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
-  const MEDIA_HEIGHT = "h-96";
-  const DOC_HEIGHT = "32rem";
+  const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
+  const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
   const ARROW_CLASS =
     "pointer-events-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface transition-opacity disabled:cursor-default disabled:opacity-50";
-  const IMAGE_WIDTH = "23.333rem";
+  const IMAGE_WIDTH = $derived(compact ? "13.333rem" : "23.333rem");
   const PEEK = "2.5rem";
-  const RAIL_WIDTH = `min(100%, calc(${IMAGE_WIDTH} + ${PEEK} * 2))`;
+  const RAIL_WIDTH = $derived(`min(100%, calc(${IMAGE_WIDTH} + ${PEEK} * 2))`);
 
   const fileName = (url: string) => {
     const clean = url.split(/[?#]/)[0];
@@ -70,7 +70,7 @@
 {#snippet media(item: { url: string; alt?: string; poster?: string })}
   {#if VIDEO_RE.test(item.url)}
     <div
-      class="flex aspect-4/3 h-70 max-w-full items-center justify-center overflow-hidden rounded-panel border border-outline-variant bg-black"
+      class="flex aspect-4/3 max-w-full {compact ? 'h-40' : 'h-70'} items-center justify-center overflow-hidden rounded-panel border border-outline-variant bg-black"
     >
       <!-- svelte-ignore a11y_media_has_caption -->
       <video
@@ -81,15 +81,15 @@
       ></video>
     </div>
   {:else}
-    <MarkdownImage url={item.url} alt={item.alt ?? ""} {onOpen} />
+    <MarkdownImage url={item.url} alt={item.alt ?? ""} {onOpen} {compact} />
   {/if}
 {/snippet}
 
 {#if data.type === "gallery"}
   {#if data.items.length === 1}
-    <div class="flex w-full justify-center">{@render media(data.items[0])}</div>
+    <div class="flex w-full justify-center select-none">{@render media(data.items[0])}</div>
   {:else}
-    <div class="flex w-full flex-col items-center gap-2">
+    <div class="flex w-full flex-col items-center gap-2 select-none">
       <div class="relative flex items-center" style="width: {RAIL_WIDTH}">
         <div
           bind:this={track}
@@ -154,27 +154,18 @@
       {data.title ?? fileName(data.url)}
     </a>
   {:else}
-    <div class="relative w-full">
-      {#if isMobile}
-        <div
-          class="w-full overflow-hidden rounded-panel border-2 border-outline-variant"
-          style="height: {DOC_HEIGHT}"
-        >
-          <PdfView url={data.url} onerror={() => (pdfFailed = true)} />
-        </div>
-      {:else}
-        <iframe
-          use:mediaSrc={{ url: data.url, onerror: () => (pdfFailed = true) }}
-          title={data.title ?? fileName(data.url)}
-          class="w-full rounded-panel border-2 border-outline-variant"
-          style="height: {DOC_HEIGHT}"
-        ></iframe>
-      {/if}
+    <div class="relative w-full select-none">
+      <div
+        class="flex w-full overflow-hidden rounded-panel border-2 border-outline-variant"
+        style="height: {DOC_HEIGHT}"
+      >
+        <PdfView url={data.url} onerror={() => (pdfFailed = true)} />
+      </div>
       {@render expand(data.url)}
     </div>
   {/if}
 {:else}
-  <div class="relative w-full">
+  <div class="relative w-full select-none">
     <iframe
       use:mediaSrc={{ url: data.url }}
       title={data.title ?? fileName(data.url)}

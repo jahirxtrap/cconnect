@@ -1,6 +1,8 @@
+import { toElement } from "$lib/services/chatSocket";
 import {
   diffKindOf,
   emptyInteraction,
+  VALUE_SEPARATOR,
   type CompactData,
   type DiffLine,
   type InteractionData,
@@ -63,6 +65,21 @@ const toOption = (raw: Wire): InteractionOption => ({
 
 const parseInteraction = (raw: Wire): InteractionData => {
   const kind = text(raw, "kind") ?? "questions";
+  if (kind === "component") {
+    const raw_values = (raw.values ?? {}) as Record<string, unknown>;
+    const values: Record<string, string> = {};
+    for (const [key, value] of Object.entries(raw_values)) {
+      values[key] = Array.isArray(value) ? value.map(String).join(VALUE_SEPARATOR) : String(value);
+    }
+    return {
+      ...emptyInteraction("resumed", kind),
+      title: text(raw, "title"),
+      submitLabel: text(raw, "submit"),
+      blocks: list(raw, "blocks").flatMap(toElement),
+      values,
+      submitted: true,
+    };
+  }
   if (kind !== "questions") {
     const resolved = text(raw, "resolved") ?? "allow";
     return {

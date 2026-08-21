@@ -1,5 +1,7 @@
 import {
   diffKindOf,
+  VALUE_SEPARATOR,
+  type ComponentElement,
   type DiffLine,
   type InteractionOption,
   type InteractionQuestion,
@@ -76,8 +78,16 @@ export type ServerEvent =
       title: string | null;
       options: InteractionOption[];
       questions: InteractionQuestion[];
+      blocks: ComponentElement[];
+      submitLabel: string | null;
     }
-  | { type: "interaction_resolved"; requestId: string; optionId: string | null };
+  | {
+      type: "interaction_resolved";
+      requestId: string;
+      optionId: string | null;
+      values: Record<string, string> | null;
+      dismissed: boolean;
+    };
 
 export interface StartOptions {
   cwd: string;
@@ -105,7 +115,7 @@ const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
 const PING_MS = 20_000;
 const STALE_MS = 45_000;
-const CLIENT_CAPABILITIES = ["media.blocks", "media.rich"];
+const CLIENT_CAPABILITIES = ["media.blocks", "media.rich", "components"];
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
@@ -130,6 +140,45 @@ const toOption = (raw: Wire): InteractionOption => ({
   description: text(raw, "description"),
   preview: text(raw, "preview"),
 });
+
+const toValues = (raw: unknown): Record<string, string> | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    out[key] = Array.isArray(value) ? value.map(String).join(VALUE_SEPARATOR) : String(value);
+  }
+  return out;
+};
+
+const COMPONENT_TYPES = ["text", "select", "input", "toggle", "buttons", "preview"] as const;
+
+export const toElement = (raw: Wire): ComponentElement[] => {
+  const type = text(raw, "type") as ComponentElement["type"] | null;
+  if (!type || !COMPONENT_TYPES.includes(type)) return [];
+  const value = raw.value;
+  return [
+    {
+      type,
+      id: text(raw, "id"),
+      label: text(raw, "label"),
+      text: type === "text" && typeof value === "string" ? value : null,
+      placeholder: text(raw, "placeholder"),
+      value: type === "input" && typeof value === "string" ? value : null,
+      checked: value === true,
+      multiline: flag(raw, "multiline"),
+      multiple: flag(raw, "multiple"),
+      required: flag(raw, "required"),
+      options: list(raw, "options").map((option) => ({
+        value: text(option, "value") ?? "",
+        label: text(option, "label") ?? "",
+        description: text(option, "description"),
+        preview: text(option, "preview"),
+        style: text(option, "style"),
+      })),
+      block: raw.block && typeof raw.block === "object" ? JSON.stringify(raw.block) : null,
+    },
+  ];
+};
 
 export class ChatSocket {
   #socket: WebSocket | null = null;
@@ -289,6 +338,17 @@ export class ChatSocket {
         ...(draft.notes.trim() ? { notes: draft.notes } : {}),
       })),
     });
+  }
+
+  sendComponentResponse(requestId: string, values: Record<string, string>) {
+    const payload: Record<string, string | boolean | string[]> = {};
+    for (const [key, value] of Object.entries(values)) {
+      const parts = value.split(VALUE_SEPARATOR).filter(Boolean);
+      if (parts.length > 1) payload[key] = parts;
+      else if (value === "true" || value === "false") payload[key] = value === "true";
+      else payload[key] = value;
+    }
+    this.#send({ type: "interaction_response", id: requestId, values: payload });
   }
 
   sendQuestionsChat(requestId: string) {
@@ -529,9 +589,17 @@ export class ChatSocket {
             multiSelect: flag(question, "multi_select"),
             options: list(question, "options").map(toOption),
           })),
+          blocks: list(wire, "blocks").flatMap(toElement),
+          submitLabel: text(wire, "submit"),
         };
       case "interaction_resolved":
-        return { type: "interaction_resolved", requestId: text(wire, "id") ?? "", optionId: text(wire, "option_id") };
+        return {
+          type: "interaction_resolved",
+          requestId: text(wire, "id") ?? "",
+          optionId: text(wire, "option_id"),
+          values: toValues(wire.values),
+          dismissed: flag(wire, "dismissed"),
+        };
       default:
         return null;
     }

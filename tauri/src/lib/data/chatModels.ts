@@ -54,6 +54,31 @@ export interface QuestionDraft {
   notes: string;
 }
 
+export const VALUE_SEPARATOR = "\u001F";
+
+export interface ComponentOption {
+  value: string;
+  label: string;
+  description: string | null;
+  preview: string | null;
+  style: string | null;
+}
+
+export interface ComponentElement {
+  type: "text" | "select" | "input" | "toggle" | "buttons" | "preview";
+  id: string | null;
+  label: string | null;
+  text: string | null;
+  placeholder: string | null;
+  value: string | null;
+  checked: boolean;
+  multiline: boolean;
+  multiple: boolean;
+  required: boolean;
+  options: ComponentOption[];
+  block: string | null;
+}
+
 export interface InteractionData {
   requestId: string;
   kind: string;
@@ -67,6 +92,9 @@ export interface InteractionData {
   summary: string[];
   notes: string[];
   activeQuestion: number;
+  blocks: ComponentElement[];
+  submitLabel: string | null;
+  values: Record<string, string>;
 }
 
 export interface ChatMessage {
@@ -108,7 +136,9 @@ export const diffKindOf = (value: string | null | undefined): DiffKind =>
   value === "header" || value === "hunk" || value === "add" || value === "del" ? value : "ctx";
 
 export const isPending = (data: InteractionData): boolean =>
-  data.kind === "questions" ? !(data.submitted || data.declined) : data.resolved === null;
+  data.kind === "questions" || data.kind === "component"
+    ? !(data.submitted || data.declined)
+    : data.resolved === null;
 
 export const emptyInteraction = (requestId: string, kind: string): InteractionData => ({
   requestId,
@@ -123,6 +153,9 @@ export const emptyInteraction = (requestId: string, kind: string): InteractionDa
   summary: [],
   notes: [],
   activeQuestion: 0,
+  blocks: [],
+  submitLabel: null,
+  values: {},
 });
 
 export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}): ChatMessage => ({

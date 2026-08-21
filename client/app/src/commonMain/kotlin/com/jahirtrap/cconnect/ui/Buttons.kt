@@ -11,6 +11,7 @@ import androidx.compose.material3.IconButton as MaterialIconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.snapDp
@@ -39,21 +40,20 @@ fun Button(
     }
     MaterialButton(
         onClick = onClick,
-        modifier = modifier.height(ButtonHeight).handCursor(enabled),
+        modifier = modifier
+            .height(ButtonHeight)
+            .alpha(if (enabled) 1f else DisabledAlpha)
+            .actionCursor(enabled),
         enabled = enabled,
         shape = CircleShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = container,
             contentColor = label,
-            disabledContainerColor = container.copy(alpha = container.alpha * DisabledAlpha),
-            disabledContentColor = label.copy(alpha = DisabledAlpha),
+            disabledContainerColor = container,
+            disabledContentColor = label,
         ),
         elevation = null,
-        border = if (variant == ButtonVariant.Outlined) {
-            BorderStroke(snapDp(2.dp), scheme.outlineVariant.copy(alpha = if (enabled) 1f else DisabledAlpha))
-        } else {
-            null
-        },
+        border = if (variant == ButtonVariant.Outlined) BorderStroke(snapDp(2.dp), scheme.outlineVariant) else null,
         contentPadding = ButtonPadding,
         content = content,
     )
@@ -65,4 +65,4 @@ fun IconButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     content: @Composable () -> Unit,
-) = MaterialIconButton(onClick = onClick, modifier = modifier.handCursor(enabled), enabled = enabled, content = content)
+) = MaterialIconButton(onClick = onClick, modifier = modifier.actionCursor(enabled), enabled = enabled, content = content)

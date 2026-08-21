@@ -43,6 +43,7 @@
   import ChatToolbar from "./ChatToolbar.svelte";
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
+  import ComponentBlock from "./blocks/ComponentBlock.svelte";
   import QuestionsBlock from "./blocks/QuestionsBlock.svelte";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import RewindDialog from "./RewindDialog.svelte";
@@ -307,6 +308,7 @@
         onFollowChange={(following) => (chat.followBottom = following)}
         onSharedLink={(url, filename) => (sharedLink = { url, filename })}
         {questions}
+        {component}
       />
         </div>
         {#if chat.sideOpen}
@@ -413,6 +415,17 @@
     onPage={(index) => chat.setActiveQuestion(data.requestId, index)}
     onSubmit={() => chat.submitQuestions(data.requestId)}
     onChat={() => chat.declineQuestions(data.requestId)}
+  />
+{/snippet}
+
+{#snippet component(data: InteractionData)}
+  <ComponentBlock
+    {data}
+    onValue={(id, value) => chat.setComponentValue(data.requestId, id, value)}
+    onPick={(id, value, multiple) => chat.toggleComponentOption(data.requestId, id, value, multiple)}
+    onSubmit={(action) => chat.submitComponent(data.requestId, action)}
+    onDismiss={() => chat.declineQuestions(data.requestId)}
+    onPreviewOpen={(url, filename) => (sharedLink = { url, filename })}
   />
 {/snippet}
 

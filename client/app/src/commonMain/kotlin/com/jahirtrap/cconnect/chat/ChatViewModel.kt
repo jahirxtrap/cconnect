@@ -11,6 +11,7 @@ import com.jahirtrap.cconnect.resources.connection_error
 import com.jahirtrap.cconnect.resources.notif_task_done
 import com.jahirtrap.cconnect.resources.notif_question
 import com.jahirtrap.cconnect.resources.notif_permission
+import com.jahirtrap.cconnect.resources.notif_component
 import com.jahirtrap.cconnect.resources.permission_allow
 import com.jahirtrap.cconnect.resources.permission_allow_always
 import com.jahirtrap.cconnect.resources.permission_deny
@@ -32,6 +33,7 @@ import com.jahirtrap.cconnect.data.InteractionData
 import com.jahirtrap.cconnect.data.InteractionOption
 import com.jahirtrap.cconnect.data.pending
 import com.jahirtrap.cconnect.data.QuestionDraft
+import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.ServerEvent
@@ -1300,18 +1302,25 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     }
                     if (settings.notifyInteraction && !event.replay) {
                         val question = event.kind == "questions"
+                        val component = event.kind == "component"
                         val isPlan = event.toolName == "ExitPlanMode"
-                        val actions = if (question) emptyList() else event.options
+                        val actions = if (question || component) emptyList() else event.options
                             .filter { it.id != "different" }
                             .mapNotNull { opt -> notificationOptionLabel(opt)?.let { Notifier.Action(it, event.requestId, opt.id) } }
                         val body = when {
                             question -> event.questions.firstOrNull()?.question?.take(120)
+                            component -> data.title?.take(120)
                             isPlan -> event.input.orEmpty().lineSequence().firstOrNull { it.isNotBlank() }?.trimStart('#', ' ')?.trim()?.take(120)?.ifBlank { null } ?: getString(Res.string.plan)
                             else -> event.toolName
                         }
+                        val title = when {
+                            question -> Res.string.notif_question
+                            component -> Res.string.notif_component
+                            else -> Res.string.notif_permission
+                        }
                         Notifier.notify(
                             Notifier.Kind.Interaction,
-                            getString(if (question) Res.string.notif_question else Res.string.notif_permission),
+                            getString(title),
                             body,
                             actions,
                             targetTab = currentTabId(),
@@ -1322,6 +1331,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             is ServerEvent.InteractionResolved -> updateInteraction(event.requestId) {
                 when {
                     it.kind == "questions" -> if (it.submitted || it.declined) it else it.copy(submitted = true)
+                    it.kind == "component" -> if (it.submitted || it.declined) it else it.copy(
+                        submitted = true,
+                        declined = event.dismissed,
+                        values = event.values ?: it.values,
+                    )
                     it.resolved == null -> it.copy(resolved = event.optionId ?: "")
                     else -> it
                 }
@@ -1511,7 +1525,44 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         title = event.title,
         questions = event.questions,
         drafts = if (event.kind == "questions") List(event.questions.size) { QuestionDraft() } else emptyList(),
+        blocks = event.blocks,
+        submitLabel = event.submitLabel,
+        values = event.blocks.mapNotNull { el ->
+            val id = el.id ?: return@mapNotNull null
+            when (el.type) {
+                "input" -> id to el.value.orEmpty()
+                "toggle" -> id to el.checked.toString()
+                else -> null
+            }
+        }.toMap(),
     )
+
+    fun setComponentValue(requestId: String, id: String, value: String) {
+        updateInteraction(requestId) { it.copy(values = it.values + (id to value)) }
+    }
+
+    fun toggleComponentOption(requestId: String, id: String, value: String, multiple: Boolean) {
+        updateInteraction(requestId) { data ->
+            val current = data.values[id].orEmpty()
+            val next = if (!multiple) {
+                if (current == value) "" else value
+            } else {
+                val picked = current.split(VALUE_SEPARATOR).filter { it.isNotEmpty() }.toMutableSet()
+                if (!picked.add(value)) picked.remove(value)
+                picked.joinToString(VALUE_SEPARATOR)
+            }
+            data.copy(values = data.values + (id to next))
+        }
+    }
+
+    fun submitComponent(requestId: String, action: String? = null) {
+        val data = findInteraction(requestId) ?: return
+        if (data.submitted) return
+        val values = data.values.toMutableMap()
+        action?.let { (data.blocks.firstOrNull { el -> el.type == "buttons" }?.id)?.let { id -> values[id] = it } }
+        client.sendComponentResponse(requestId, values.filterValues { it.isNotEmpty() })
+        updateInteraction(requestId) { it.copy(submitted = true, values = values) }
+    }
 
     private fun append(currentId: Long?, role: Role, delta: String): Long {
         if (currentId == null) {

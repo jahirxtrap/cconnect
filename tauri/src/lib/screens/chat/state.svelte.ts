@@ -3,7 +3,9 @@ import {
   emptyInteraction,
   isPending,
   message as newMessage,
+  VALUE_SEPARATOR,
   type ChatMessage,
+  type ComponentElement,
   type ConnectionState,
   type InteractionData,
   type InteractionOption,
@@ -15,6 +17,16 @@ import {
 import type { ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
+
+const componentDefaults = (blocks: ComponentElement[]): Record<string, string> =>
+  Object.fromEntries(
+    blocks.flatMap((element) => {
+      if (!element.id) return [];
+      if (element.type === "input") return [[element.id, element.value ?? ""]];
+      if (element.type === "toggle") return [[element.id, String(element.checked)]];
+      return [];
+    }),
+  );
 
 interface Effective {
   simple: boolean;
@@ -535,6 +547,9 @@ export class ChatState {
                 title: event.title,
                 questions: event.questions,
                 drafts: event.questions.map(() => ({ selected: [], freeText: "", notes: "" })),
+                blocks: event.blocks,
+                submitLabel: event.submitLabel,
+                values: componentDefaults(event.blocks),
               },
             }),
           ];
@@ -640,6 +655,36 @@ export class ChatState {
     this.#updateInteraction(requestId, (data) =>
       data.submitted || data.activeQuestion === index ? data : { ...data, activeQuestion: index },
     );
+  }
+
+  setComponentValue(requestId: string, id: string, value: string) {
+    this.#updateInteraction(requestId, (current) => ({ ...current, values: { ...current.values, [id]: value } }));
+  }
+
+  toggleComponentOption(requestId: string, id: string, value: string, multiple: boolean) {
+    this.#updateInteraction(requestId, (current) => {
+      const picked = (current.values[id] ?? "").split(VALUE_SEPARATOR).filter(Boolean);
+      let next: string;
+      if (!multiple) {
+        next = picked[0] === value ? "" : value;
+      } else {
+        next = (picked.includes(value) ? picked.filter((item) => item !== value) : [...picked, value]).join(
+          VALUE_SEPARATOR,
+        );
+      }
+      return { ...current, values: { ...current.values, [id]: next } };
+    });
+  }
+
+  submitComponent(requestId: string, action: string | null = null) {
+    const data = this.#findInteraction(requestId);
+    if (!data || data.submitted) return;
+    const values = { ...data.values };
+    const actionId = data.blocks.find((element) => element.type === "buttons")?.id;
+    if (action && actionId) values[actionId] = action;
+    const filled = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
+    this.#socket.sendComponentResponse(requestId, filled);
+    this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, values }));
   }
 
   submitQuestions(requestId: string) {
@@ -1233,12 +1278,14 @@ export class ChatState {
   }
 
   #notificationBody(
-    question: boolean,
+    kind: string,
     firstQuestion: string | null | undefined,
     toolName: string | null,
     input: string | null,
+    title: string | null,
   ): string | null {
-    if (question) return firstQuestion?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
+    if (kind === "questions") return firstQuestion?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
+    if (kind === "component") return title?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
     if (toolName !== "ExitPlanMode") return toolName?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
     const heading = (input ?? "")
       .split("\n")
@@ -1525,6 +1572,9 @@ export class ChatState {
             title: event.title,
             questions: event.questions,
             drafts: event.questions.map(() => ({ selected: [], freeText: "", notes: "" })),
+            blocks: event.blocks,
+            submitLabel: event.submitLabel,
+            values: componentDefaults(event.blocks),
           };
           const toolUseId = event.toolUseId;
           this.messages = [
@@ -1537,17 +1587,26 @@ export class ChatState {
             }),
           ];
           if (settings.notifyInteraction && !event.replay) {
-            const question = event.kind === "questions";
+            const kind = event.kind;
+            const silentActions = kind === "questions" || kind === "component";
             void notifier.notify(
-              t(question ? "NOTIF_QUESTION" : "NOTIF_PERMISSION"),
-              this.#notificationBody(question, event.questions[0]?.question, event.toolName, event.input),
+              t(kind === "questions" ? "NOTIF_QUESTION" : kind === "component" ? "NOTIF_COMPONENT" : "NOTIF_PERMISSION"),
+              this.#notificationBody(
+                kind,
+                event.questions[0]?.question,
+                event.toolName,
+                event.input,
+                data.title,
+              ),
               this.tabId,
-              event.options
-                .map((option) => {
-                  const label = optionNotificationLabel(option);
-                  return label === null ? null : { label, requestId: event.requestId, optionId: option.id };
-                })
-                .filter((action) => action !== null),
+              silentActions
+                ? []
+                : event.options
+                    .map((option) => {
+                      const label = optionNotificationLabel(option);
+                      return label === null ? null : { label, requestId: event.requestId, optionId: option.id };
+                    })
+                    .filter((action) => action !== null),
             );
           }
         }
@@ -1555,6 +1614,15 @@ export class ChatState {
       case "interaction_resolved":
         this.#updateInteraction(event.requestId, (data) => {
           if (data.kind === "questions") return data.submitted || data.declined ? data : { ...data, submitted: true };
+          if (data.kind === "component") {
+            if (data.submitted || data.declined) return data;
+            return {
+              ...data,
+              submitted: true,
+              declined: event.dismissed,
+              values: event.values ?? data.values,
+            };
+          }
           return data.resolved === null ? { ...data, resolved: event.optionId ?? "" } : data;
         });
         break;

@@ -43,6 +43,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import com.jahirtrap.cconnect.ui.theme.Radius
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -97,12 +99,19 @@ import com.jahirtrap.cconnect.data.QuestionDraft
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.ui.ActionButton
+import com.jahirtrap.cconnect.data.ComponentElement
+import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
+import com.jahirtrap.cconnect.ui.IconButton
+import com.composables.icons.lucide.X
+import com.jahirtrap.cconnect.ui.CconnectBlockView
+import com.jahirtrap.cconnect.ui.parseCconnectBlock
 import com.jahirtrap.cconnect.ui.CodeBlock
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.OptionRow
 import com.jahirtrap.cconnect.ui.OutlinedPanel
 import com.jahirtrap.cconnect.ui.SelectChip
+import com.jahirtrap.cconnect.ui.SwitchRow
 import com.jahirtrap.cconnect.ui.formatClock
 import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
@@ -178,6 +187,10 @@ fun ChatMessageItem(
     onSubmitQuestions: ((String) -> Unit)? = null,
     onChatQuestions: ((String) -> Unit)? = null,
     onQuestionPage: ((String, Int) -> Unit)? = null,
+    onComponentValue: ((String, String, String) -> Unit)? = null,
+    onComponentPick: ((String, String, String, Boolean) -> Unit)? = null,
+    onSubmitComponent: ((String, String?) -> Unit)? = null,
+    onDiscardComponent: ((String, Boolean) -> Unit)? = null,
     onSharedLink: ((String, String) -> Unit)? = null,
     gluedTop: Boolean = false,
     showTime: Boolean = true,
@@ -254,7 +267,16 @@ fun ChatMessageItem(
             Role.SUMMARY -> Collapsible(label = stringResource(Res.string.summary), text = message.text, expanded = expanded, onToggle = onToggle)
 
             Role.INTERACTION -> message.interaction?.let {
-                if (it.kind == "questions") {
+                if (it.kind == "component") {
+                    ComponentBlock(
+                        data = it,
+                        onValue = { id, value -> onComponentValue?.invoke(it.requestId, id, value) },
+                        onPick = { id, value, multiple -> onComponentPick?.invoke(it.requestId, id, value, multiple) },
+                        onSubmit = { action -> onSubmitComponent?.invoke(it.requestId, action) },
+                        onDismiss = { dirty -> onDiscardComponent?.invoke(it.requestId, dirty) },
+                        onSharedLink = onSharedLink,
+                    )
+                } else if (it.kind == "questions") {
                     QuestionsBlock(
                         data = it,
                         onToggleOption = { qi, optId -> onToggleOption?.invoke(it.requestId, qi, optId) },
@@ -809,6 +831,166 @@ private fun diffStyleFor(kind: DiffKind, defaultFg: Color): Triple<Color, Color,
         DiffKind.ADD -> Triple(p.green, p.greenBg, "+")
         DiffKind.DEL -> Triple(p.red, p.redBg, "-")
         DiffKind.CTX -> Triple(defaultFg, Color.Transparent, " ")
+    }
+}
+
+private fun componentSummary(data: InteractionData, yes: String, no: String): List<Pair<String, String>> =
+    data.blocks.mapNotNull { element ->
+        val id = element.id ?: return@mapNotNull null
+        val raw = data.values[id].orEmpty()
+        if (raw.isEmpty()) return@mapNotNull null
+        val label = element.label.orEmpty()
+        val value = when (element.type) {
+            "select", "buttons" -> raw.split(VALUE_SEPARATOR)
+                .filter { it.isNotEmpty() }
+                .map { picked -> element.options.firstOrNull { it.value == picked }?.label ?: picked }
+                .joinToString(", ")
+            "toggle" -> if (raw == "true") yes else no
+            else -> raw
+        }
+        if (value.isBlank()) null else label to value
+    }
+
+private fun componentMissing(data: InteractionData): Boolean =
+    data.blocks.any { it.required && it.type != "buttons" && data.values[it.id.orEmpty()].isNullOrEmpty() }
+
+private fun componentLabel(element: ComponentElement): String =
+    element.label.orEmpty() + if (element.required) " *" else ""
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ComponentBlock(
+    data: InteractionData,
+    onSharedLink: ((String, String) -> Unit)?,
+    onValue: (String, String) -> Unit,
+    onPick: (String, String, Boolean) -> Unit,
+    onSubmit: (String?) -> Unit,
+    onDismiss: (Boolean) -> Unit,
+) {
+    val actions = data.blocks.firstOrNull { it.type == "buttons" }
+    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+            Icon(Lucide.CircleQuestionMark, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.size(6.dp))
+            DisableSelection {
+                Text(
+                    data.title.orEmpty(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (!data.submitted) {
+                val dirty = data.values.values.any { it.isNotEmpty() }
+                IconButton(onClick = { onDismiss(dirty) }, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        Lucide.X,
+                        contentDescription = stringResource(Res.string.cancel),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+        }
+        Spacer(Modifier.height(4.dp))
+        if (data.declined) {
+            SummaryLine(Lucide.X, 10.dp, stringResource(Res.string.cancel))
+            return@OutlinedPanel
+        }
+        if (data.submitted) {
+            componentSummary(data, stringResource(Res.string.yes), stringResource(Res.string.no)).forEach { (label, value) ->
+                Spacer(Modifier.height(2.dp))
+                if (label.isNotBlank()) {
+                    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                }
+                SummaryLine(CustomIcons.PlayFilled, 10.dp, value.ifBlank { "—" })
+            }
+            return@OutlinedPanel
+        }
+        data.blocks.forEach { element ->
+            when (element.type) {
+                "text" -> MarkdownText(element.text.orEmpty(), modifier = Modifier.fillMaxWidth(), selectable = false)
+
+                "preview" -> element.block?.let { raw ->
+                    parseCconnectBlock(raw)?.let { block ->
+                        Spacer(Modifier.height(4.dp))
+                        CconnectBlockView(block, MaterialTheme.colorScheme.primary, compact = true, onSharedLink = onSharedLink)
+                    }
+                }
+
+                "select" -> {
+                    val id = element.id.orEmpty()
+                    val picked = data.values[id].orEmpty().split(VALUE_SEPARATOR).filter { part -> part.isNotEmpty() }.toSet()
+                    if (!element.label.isNullOrBlank()) {
+                        Text(componentLabel(element), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    element.options.forEach { option ->
+                        val selected = option.value in picked
+                        OptionRow(
+                            label = option.label,
+                            onClick = { if (!data.submitted) onPick(id, option.value, element.multiple) },
+                            description = option.description,
+                            selected = selected,
+                            multi = element.multiple,
+                        )
+                        if (selected && !option.preview.isNullOrBlank()) PreviewBox(option.preview)
+                    }
+                }
+
+                "input" -> {
+                    val id = element.id.orEmpty()
+                    Spacer(Modifier.height(4.dp))
+                    InputField(
+                        value = data.values[id].orEmpty(),
+                        onValueChange = { if (!data.submitted) onValue(id, it) },
+                        label = element.label?.takeIf { it.isNotBlank() }?.let { { Text(componentLabel(element)) } },
+                        placeholder = element.placeholder,
+                        singleLine = !element.multiline,
+                        maxLines = if (element.multiline) 6 else 1,
+                    )
+                }
+
+                "toggle" -> {
+                    val id = element.id.orEmpty()
+                    SwitchRow(
+                        title = componentLabel(element),
+                        checked = data.values[id] == "true",
+                        enabled = !data.submitted,
+                        onChange = { next -> onValue(id, next.toString()) },
+                    )
+                }
+
+                "buttons" -> Unit
+
+                else -> Unit
+            }
+        }
+        if (data.submitted) return@OutlinedPanel
+        Spacer(Modifier.height(8.dp))
+        val ready = !componentMissing(data)
+        if (actions != null) {
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                actions.options.forEach { option ->
+                    Button(
+                        onClick = { onSubmit(option.value) },
+                        modifier = Modifier.height(32.dp),
+                        variant = if (option.style == "primary") ButtonVariant.Filled else ButtonVariant.Outlined,
+                        enabled = ready,
+                    ) {
+                        Text(option.label, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        } else {
+            ActionButton(
+                text = data.submitLabel?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.send),
+                onClick = { onSubmit(null) },
+                enabled = ready,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
     }
 }
 

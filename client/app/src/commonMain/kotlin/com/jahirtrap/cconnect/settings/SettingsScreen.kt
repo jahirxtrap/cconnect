@@ -176,6 +176,7 @@ import com.jahirtrap.cconnect.ui.SecretTextField
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.SelectDialog
 import com.jahirtrap.cconnect.ui.StatusDot
+import com.jahirtrap.cconnect.ui.SwitchRow
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.LocalIsTouch
@@ -1240,48 +1241,6 @@ private fun FontSelectDialog(
 @Composable
 private fun permissionLabel(caps: Capabilities, mode: String): String =
     caps.permissionModes.firstOrNull { it.id == mode }?.label ?: mode
-
-@Composable
-private fun SwitchRow(
-    title: String,
-    checked: Boolean,
-    modifier: Modifier = Modifier,
-    summary: String? = null,
-    enabled: Boolean = true,
-    leading: (@Composable () -> Unit)? = null,
-    onChange: (Boolean) -> Unit,
-) {
-    val alpha = if (enabled) 1f else 0.38f
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(DialogItemShape)
-            .clickable(enabled = enabled) { onChange(!checked) }
-            .padding(horizontal = DialogItemPaddingH, vertical = DialogItemPaddingV),
-    ) {
-        if (leading != null) {
-            leading()
-            Spacer(Modifier.width(12.dp))
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha),
-            )
-            if (summary != null) {
-                Text(
-                    summary,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-                )
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        CompactSwitch(checked, enabled = enabled, onCheckedChange = onChange)
-    }
-}
 
 @Composable
 private fun ProfileRow(profile: GitHubApi.Profile?, role: String, onOpen: (String) -> Unit) {

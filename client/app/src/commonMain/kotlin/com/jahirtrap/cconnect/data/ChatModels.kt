@@ -70,6 +70,31 @@ data class QuestionDraft(
     val notes: String = "",
 )
 
+const val VALUE_SEPARATOR = "\u001F"
+
+data class ComponentOption(
+    val value: String,
+    val label: String,
+    val description: String? = null,
+    val preview: String? = null,
+    val style: String? = null,
+)
+
+data class ComponentElement(
+    val type: String,
+    val id: String? = null,
+    val label: String? = null,
+    val text: String? = null,
+    val placeholder: String? = null,
+    val value: String? = null,
+    val checked: Boolean = false,
+    val multiline: Boolean = false,
+    val multiple: Boolean = false,
+    val required: Boolean = false,
+    val options: List<ComponentOption> = emptyList(),
+    val block: String? = null,
+)
+
 data class InteractionData(
     val requestId: String,
     val kind: String,
@@ -84,10 +109,16 @@ data class InteractionData(
     val summary: List<String> = emptyList(),                 // per-question answer text after submit
     val notes: List<String> = emptyList(),                   // per-question note text after submit
     val activeQuestion: Int = 0,
+    val blocks: List<ComponentElement> = emptyList(),        // kind == "component"
+    val submitLabel: String? = null,
+    val values: Map<String, String> = emptyMap(),            // component draft, id -> value
 )
 
 val InteractionData.pending: Boolean
-    get() = if (kind == "questions") !(submitted || declined) else resolved == null
+    get() = when (kind) {
+        "questions", "component" -> !(submitted || declined)
+        else -> resolved == null
+    }
 
 data class ModelOption(val id: String, val label: String)
 
@@ -171,9 +202,11 @@ sealed interface ServerEvent {
         val title: String?,
         val options: List<InteractionOption>,
         val questions: List<InteractionQuestion> = emptyList(),
+        val blocks: List<ComponentElement> = emptyList(),
+        val submitLabel: String? = null,
         val replay: Boolean = false,
     ) : ServerEvent
-    data class InteractionResolved(val requestId: String, val optionId: String?) : ServerEvent
+    data class InteractionResolved(val requestId: String, val optionId: String?, val values: Map<String, String>? = null, val dismissed: Boolean = false) : ServerEvent
 }
 
 data class VisibilityPrefs(

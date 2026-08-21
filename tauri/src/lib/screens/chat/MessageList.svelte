@@ -31,6 +31,7 @@
     onFollowChange: (following: boolean) => void;
     onSharedLink: (url: string, filename: string) => void;
     questions: import("svelte").Snippet<[InteractionData]>;
+    component: import("svelte").Snippet<[InteractionData]>;
   }
 
   const {
@@ -45,6 +46,7 @@
     onFollowChange,
     onSharedLink,
     questions,
+    component,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -313,6 +315,7 @@
           {onAnswer}
           {onSharedLink}
           {questions}
+          {component}
         />
       </div>
     {/each}

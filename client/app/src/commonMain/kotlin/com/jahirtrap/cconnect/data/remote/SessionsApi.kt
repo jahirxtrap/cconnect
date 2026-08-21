@@ -9,6 +9,8 @@ import com.jahirtrap.cconnect.data.diffKindOf
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.SessionInfo
 import com.jahirtrap.cconnect.data.SessionMessage
+import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -127,6 +129,21 @@ object SessionsApi {
 
     private fun parseInteraction(o: kotlinx.serialization.json.JsonObject): InteractionData {
         val kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: "questions"
+        if (kind == "component") {
+            val values = o["values"]?.jsonObject?.mapValues { (_, value) ->
+                if (value is JsonArray) value.joinToString(VALUE_SEPARATOR) { it.jsonPrimitive.content }
+                else value.jsonPrimitive.content
+            } ?: emptyMap()
+            return InteractionData(
+                requestId = "resumed",
+                kind = kind,
+                title = o["title"]?.jsonPrimitive?.contentOrNull,
+                submitLabel = o["submit"]?.jsonPrimitive?.contentOrNull,
+                blocks = o["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
+                values = values,
+                submitted = true,
+            )
+        }
         if (kind != "questions") {
             val res = o["resolved"]?.jsonPrimitive?.contentOrNull ?: "allow"
             return InteractionData(requestId = "resumed", kind = kind, resolved = res, options = listOf(InteractionOption(id = res)))

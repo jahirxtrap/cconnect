@@ -161,6 +161,7 @@
     <string name="notif_task_done">Claude terminó la tarea</string>
     <string name="notif_question">Claude tiene una pregunta</string>
     <string name="notif_permission">Claude solicita permiso</string>
+    <string name="notif_component">Claude solicita datos</string>
     <string name="battery_optimization">Desactivar optimizaciones de batería</string>
     <string name="battery_optimization_summary">Mejora el funcionamiento en segundo plano y las notificaciones</string>
     <string name="information">Información</string>
@@ -309,6 +310,8 @@
     <string name="color_none">Ninguno</string>
     <string name="delete">Eliminar</string>
     <string name="cancel">Cancelar</string>
+    <string name="discard">Descartar</string>
+    <string name="component_discard_confirm">¿Descartar este componente y continuar en el chat?</string>
     <string name="delete_conversation_confirm">¿Eliminar la conversación «%1$s»?</string>
     <string name="type_message">Escribe un mensaje…</string>
     <string name="commands">Comandos</string>
@@ -336,6 +339,8 @@
     <string name="tools">Herramientas</string>
     <string name="file_changes">Cambios de archivo</string>
     <string name="send">Enviar</string>
+    <string name="yes">Sí</string>
+    <string name="no">No</string>
     <string name="stop">Detener</string>
     <string name="thinking">Pensando</string>
     <string name="result">Resultado</string>

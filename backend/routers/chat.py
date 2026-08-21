@@ -408,10 +408,21 @@ async def chat_ws(ws: WebSocket):
             elif mtype == "interaction_response":
                 rid = raw.get("id")
                 if isinstance(rid, str):
-                    payload = {"option_id": raw.get("option_id"), "free_text": raw.get("free_text"), "answers": raw.get("answers"), "chat": raw.get("chat")}
+                    payload = {
+                        "option_id": raw.get("option_id"),
+                        "free_text": raw.get("free_text"),
+                        "answers": raw.get("answers"),
+                        "values": raw.get("values"),
+                        "chat": raw.get("chat"),
+                    }
                     for s in (session, side_session):
                         if s is not None and s.resolve(rid, payload):
-                            await s.announce_resolved(rid, raw.get("option_id"))
+                            await s.announce_resolved(
+                                rid,
+                                raw.get("option_id"),
+                                values=payload.get("values"),
+                                dismissed=bool(raw.get("chat")),
+                            )
                             break
 
             elif mtype == "load_history":

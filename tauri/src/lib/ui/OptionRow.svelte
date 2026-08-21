@@ -15,7 +15,7 @@
 <button
   type="button"
   {onclick}
-  class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-left"
+  class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-on-surface/8"
 >
   <span
     class="flex size-5 shrink-0 items-center justify-center border-2 transition-colors {multi

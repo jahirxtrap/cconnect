@@ -122,8 +122,14 @@ class LiveSession:
         entry["future"].set_result(response)
         return True
 
-    async def announce_resolved(self, rid, option_id):
-        await self._emit({"type": "interaction_resolved", "id": rid, "option_id": option_id})
+    async def announce_resolved(self, rid, option_id, values=None, dismissed=False):
+        await self._emit({
+            "type": "interaction_resolved",
+            "id": rid,
+            "option_id": option_id,
+            "values": values,
+            "dismissed": dismissed,
+        })
 
     async def enqueue(self, mid, text, attachments=None):
         if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued)):

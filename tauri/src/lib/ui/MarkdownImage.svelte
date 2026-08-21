@@ -8,9 +8,10 @@
     url: string;
     alt: string;
     onOpen: (url: string, filename: string) => void;
+    compact?: boolean;
   }
 
-  const { url, alt, onOpen }: Props = $props();
+  const { url, alt, onOpen, compact = false }: Props = $props();
 
   const API_SUFFIX = "/api";
 
@@ -35,7 +36,9 @@
 </script>
 
 <div
-  class="flex aspect-4/3 h-70 max-w-full shrink items-center justify-center overflow-hidden rounded-panel border border-outline-variant select-none"
+  class="flex aspect-4/3 max-w-full shrink items-center justify-center overflow-hidden rounded-panel border border-outline-variant select-none {compact
+    ? 'h-40'
+    : 'h-70'}"
 >
   {#if state === "error"}
     <button

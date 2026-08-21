@@ -303,6 +303,7 @@ fun ChatScreen(
     var colorTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var confirmCommand by remember { mutableStateOf<CommandOption?>(null) }
     var sharedLinkAction by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var discardComponent by remember { mutableStateOf<String?>(null) }
     var queuePreview by remember { mutableStateOf<QueuedMessage?>(null) }
     var queueFilePreview by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showRewindSheet by remember { mutableStateOf(false) }
@@ -635,7 +636,7 @@ fun ChatScreen(
                             BackInterceptor(enabled = sideActive) { dismissSide(); true }
                             ClearFocusOnImeHide()
                             val dialogOpen = renameTarget != null || deleteTarget != null || colorTarget != null ||
-                                confirmCommand != null || sharedLinkAction != null || showRewindSheet
+                                confirmCommand != null || sharedLinkAction != null || discardComponent != null || showRewindSheet
                             val shortcutsEnabled = !dialogOpen && !PreviewOverlay.open && !(mobile && drawerState.targetValue == DrawerValue.Open)
                             ClipboardPasteEffect(enabled = shortcutsEnabled && !sideActive) { vm.addAttachments(it) }
                             ClipboardShortcutHandler(enabled = shortcutsEnabled) { key ->
@@ -700,6 +701,12 @@ fun ChatScreen(
                                                         onSubmitQuestions = vm::submitQuestions,
                                                         onChatQuestions = vm::chatQuestions,
                                                         onQuestionPage = vm::setActiveQuestion,
+                                                        onComponentValue = vm::setComponentValue,
+                                                        onComponentPick = vm::toggleComponentOption,
+                                                        onSubmitComponent = vm::submitComponent,
+                                                        onDiscardComponent = { requestId, dirty ->
+                                                            if (dirty) discardComponent = requestId else vm.chatQuestions(requestId)
+                                                        },
                                                         onSharedLink = { url, filename -> sharedLinkAction = url to filename },
                                                         gluedTop = separated,
                                                         showTime = showTime,
@@ -966,6 +973,15 @@ fun ChatScreen(
             selected = s.color,
             onSelect = { vm.setSessionColor(s, it) },
             onDismiss = { colorTarget = null },
+        )
+    }
+    discardComponent?.let { requestId ->
+        ConfirmDialog(
+            title = stringResource(Res.string.cancel),
+            text = stringResource(Res.string.component_discard_confirm),
+            confirmLabel = stringResource(Res.string.discard),
+            onConfirm = { vm.chatQuestions(requestId); discardComponent = null },
+            onDismiss = { discardComponent = null },
         )
     }
     confirmCommand?.let { cmd ->

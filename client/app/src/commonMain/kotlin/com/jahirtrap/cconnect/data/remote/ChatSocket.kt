@@ -1,5 +1,8 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.ComponentElement
+import com.jahirtrap.cconnect.data.ComponentOption
+import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionOption
 import com.jahirtrap.cconnect.data.InteractionQuestion
@@ -15,6 +18,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -28,8 +32,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import com.jahirtrap.cconnect.data.VisibilityPrefs
-private val CLIENT_CAPABILITIES = listOf("media.blocks")
+
+private val CLIENT_CAPABILITIES = listOf("media.blocks", "components")
 
 class ChatSocket(private val scope: CoroutineScope, private val config: () -> BackendConfig) {
     private var ws: WsConnection? = null
@@ -249,6 +255,23 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         })
     }
 
+    fun sendComponentResponse(requestId: String, values: Map<String, String>) {
+        send(buildJsonObject {
+            put("type", "interaction_response")
+            put("id", requestId)
+            putJsonObject("values") {
+                values.forEach { (key, value) ->
+                    val parts = value.split(VALUE_SEPARATOR).filter { it.isNotEmpty() }
+                    when {
+                        parts.size > 1 -> putJsonArray(key) { parts.forEach { add(it) } }
+                        value == "true" || value == "false" -> put(key, value == "true")
+                        else -> put(key, value)
+                    }
+                }
+            }
+        })
+    }
+
     fun sendQuestionsChat(requestId: String) {
         send(buildJsonObject {
             put("type", "interaction_response")
@@ -395,17 +418,55 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                         options = q["options"]?.jsonArray?.map { it.jsonObject.toOption() } ?: emptyList(),
                     )
                 } ?: emptyList(),
+                blocks = obj["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
+                submitLabel = str("submit"),
                 replay = flag("replay"),
             )
             "interaction_resolved" -> ServerEvent.InteractionResolved(
                 requestId = str("id").orEmpty(),
                 optionId = str("option_id"),
+                values = (obj["values"] as? JsonObject)?.mapValues { (_, value) ->
+                    if (value is JsonArray) value.joinToString(VALUE_SEPARATOR) { part -> part.jsonPrimitive.content }
+                    else value.jsonPrimitive.content
+                },
+                dismissed = flag("dismissed"),
             )
             else -> null
         }
         if (event is ServerEvent.AskSession) sideResume = event.sessionId
         return event?.let { Triple(side, parent, it) }
     }
+}
+
+private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview")
+
+internal fun JsonObject.toElement(): ComponentElement? {
+    val type = this["type"]?.jsonPrimitive?.contentOrNull ?: return null
+    if (type !in COMPONENT_TYPES) return null
+    val raw = this["value"]?.jsonPrimitive
+    return ComponentElement(
+        type = type,
+        id = this["id"]?.jsonPrimitive?.contentOrNull,
+        label = this["label"]?.jsonPrimitive?.contentOrNull,
+        text = this["value"]?.jsonPrimitive?.contentOrNull.takeIf { type == "text" },
+        placeholder = this["placeholder"]?.jsonPrimitive?.contentOrNull,
+        value = raw?.contentOrNull.takeIf { type == "input" },
+        checked = raw?.booleanOrNull == true,
+        multiline = this["multiline"]?.jsonPrimitive?.booleanOrNull == true,
+        multiple = this["multiple"]?.jsonPrimitive?.booleanOrNull == true,
+        required = this["required"]?.jsonPrimitive?.booleanOrNull == true,
+        options = this["options"]?.jsonArray?.map { el ->
+            val o = el.jsonObject
+            ComponentOption(
+                value = o["value"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                label = o["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                description = o["description"]?.jsonPrimitive?.contentOrNull,
+                preview = o["preview"]?.jsonPrimitive?.contentOrNull,
+                style = o["style"]?.jsonPrimitive?.contentOrNull,
+            )
+        } ?: emptyList(),
+        block = this["block"]?.jsonObject?.toString(),
+    )
 }
 
 private fun JsonObject.toOption() = InteractionOption(

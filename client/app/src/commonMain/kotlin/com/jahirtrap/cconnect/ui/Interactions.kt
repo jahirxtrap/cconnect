@@ -24,6 +24,9 @@ import androidx.compose.ui.text.TextLayoutResult
 internal fun Modifier.handCursor(enabled: Boolean = true, overrideDescendants: Boolean = true): Modifier =
     if (enabled) this.pointerHoverIcon(PointerIcon.Hand, overrideDescendants = overrideDescendants) else this
 
+internal fun Modifier.actionCursor(enabled: Boolean): Modifier =
+    pointerHoverIcon(if (enabled) PointerIcon.Hand else PointerIcon.Default, overrideDescendants = true)
+
 fun Modifier.textHoverCursor(
     layout: () -> TextLayoutResult?,
     isLink: ((Int) -> Boolean)? = null,

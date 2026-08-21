@@ -367,6 +367,21 @@ def _parse_ask_result(content: object, qtexts: list[str]) -> dict[str, tuple[str
     return out
 
 
+def _parse_component_result(content: object) -> Optional[dict]:
+    """The answered values of an ask_component tool_result, or None when it never got answered."""
+    if content is None:
+        return None
+    from services.claude_runtime import _flatten_result_content
+    try:
+        payload = json.loads(_flatten_result_content(content))
+    except ValueError:
+        return None
+    if not isinstance(payload, dict) or not payload.get("submitted"):
+        return {}
+    values = payload.get("values")
+    return values if isinstance(values, dict) else {}
+
+
 def _compact_summary_text(entry: dict) -> str:
     """The recap text from an isCompactSummary user entry (string or text blocks)."""
     content = entry.get("message", {}).get("content")
@@ -979,6 +994,22 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                             "note": note,
                         })
                     messages.append({"type": "interaction", "kind": "questions", "questions": out_questions})
+                    continue
+                if name.endswith("ask_component") and isinstance(inp, dict):
+                    if isinstance(bid, str):
+                        hidden_ids.add(bid)
+                    answered = _parse_component_result(tool_result_by_id.get(bid or ""))
+                    if answered is None:
+                        continue
+                    messages.append({
+                        "type": "interaction",
+                        "kind": "component",
+                        "title": inp.get("title"),
+                        "submit": inp.get("submit"),
+                        "blocks": [b for b in (inp.get("blocks") or []) if isinstance(b, dict)],
+                        "values": answered,
+                        "submitted": True,
+                    })
                     continue
                 if name == "ExitPlanMode" and isinstance(inp, dict):
                     if isinstance(bid, str):

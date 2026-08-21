@@ -212,7 +212,7 @@ private fun Typography.scaled(factor: Float): Typography {
     )
 }
 
-private class MdContext(val src: String, val linkColor: Color, val codeBg: Color, val monoFamily: FontFamily)
+private class MdContext(val src: String, val linkColor: Color, val codeBg: Color, val monoFamily: FontFamily, val onSharedLink: ((url: String, filename: String) -> Unit)? = null)
 
 private fun fileNameOf(url: String): String =
     url.substringBefore('?').substringBefore('#').substringAfterLast('/').ifBlank { url }
@@ -278,9 +278,9 @@ private fun GalleryItemView(item: GalleryItem, width: Dp) {
 }
 
 @Composable
-private fun GalleryCarousel(items: List<GalleryItem>) {
+private fun GalleryCarousel(items: List<GalleryItem>, tile: Dp = IMAGE_TILE_HEIGHT) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        val full = minOf(IMAGE_TILE_HEIGHT * IMAGE_TILE_RATIO, maxWidth)
+        val full = minOf(tile * IMAGE_TILE_RATIO, maxWidth)
         if (items.size == 1) {
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 GalleryItemView(items[0], full)
@@ -357,14 +357,24 @@ private fun CarouselArrow(icon: ImageVector, modifier: Modifier, enabled: Boolea
 }
 
 @Composable
-private fun CconnectBlockView(block: CconnectBlock, ctx: MdContext) {
+internal fun CconnectBlockView(block: CconnectBlock, linkColor: Color, compact: Boolean = false, onSharedLink: ((url: String, filename: String) -> Unit)? = null) {
     when (block) {
-        is CconnectBlock.Gallery -> GalleryCarousel(block.items)
-        is CconnectBlock.Playlist -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            block.items.forEach { BlockLink(it.title ?: fileNameOf(it.url), it.url, ctx.linkColor) }
-        }
-        is CconnectBlock.Pdf -> BlockLink(block.title ?: fileNameOf(block.url), block.url, ctx.linkColor)
-        is CconnectBlock.Html -> BlockLink(block.title ?: fileNameOf(block.url), block.url, ctx.linkColor)
+        is CconnectBlock.Gallery -> GalleryCarousel(block.items, if (compact) COMPACT_TILE else IMAGE_TILE_HEIGHT)
+        is CconnectBlock.Playlist -> MarkdownText(
+            block.items.joinToString("\n") { "- [${it.title ?: fileNameOf(it.url)}](${it.url})" },
+            selectable = false,
+            onSharedLink = onSharedLink,
+        )
+        is CconnectBlock.Pdf -> MarkdownText(
+            "[${block.title ?: fileNameOf(block.url)}](${block.url})",
+            selectable = false,
+            onSharedLink = onSharedLink,
+        )
+        is CconnectBlock.Html -> MarkdownText(
+            "[${block.title ?: fileNameOf(block.url)}](${block.url})",
+            selectable = false,
+            onSharedLink = onSharedLink,
+        )
     }
 }
 
@@ -437,7 +447,7 @@ private fun RenderNode(node: ASTNode, ctx: MdContext, depth: Int) {
             val lang = codeFenceLang(node, ctx.src)
             val content = codeFenceContent(node, ctx.src)
             val block = if (lang == CCONNECT_LANG) parseCconnectBlock(content) else null
-            if (block != null) CconnectBlockView(block, ctx) else CodeBlock(content, ctx.codeBg, lang)
+            if (block != null) CconnectBlockView(block, ctx.linkColor, onSharedLink = ctx.onSharedLink) else CodeBlock(content, ctx.codeBg, lang)
         }
         MarkdownElementTypes.CODE_BLOCK -> CodeBlock(node.text(ctx.src).trimEnd('\n'), ctx.codeBg, "")
         MarkdownElementTypes.UNORDERED_LIST -> ListBlock(node, ordered = false, ctx = ctx, depth = depth)
@@ -883,6 +893,7 @@ private const val SHARED_ARCHIVE_TAG = "shared_archive"
 private val IMAGE_TILE_HEIGHT = 280.dp
 private const val IMAGE_TILE_RATIO = 4f / 3f
 private val IMAGE_TILE_GAP = 6.dp
+private val COMPACT_TILE = 150.dp
 private val CAROUSEL_ARROW = 32.dp
 private val CAROUSEL_PEEK = 40.dp
 private val CAROUSEL_DOT = 6.dp
