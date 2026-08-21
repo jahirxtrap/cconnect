@@ -69,7 +69,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
     appends the trailing ``done`` event itself."""
 
     def factory(ask_user, emit):
-        async def gen():
+        async def one(text, attachments, seed_id, drain, request_compact):
             name = text.strip()[:80] if state.session_id is None else None
             compacted = False
             is_compact_cmd = text.strip() == "/compact" or text.strip().startswith("/compact ")
@@ -105,9 +105,10 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     ask_user=ask_user,
                     base_url=state.base_url,
                     emit=emit,
-                    drain=drain(),
+                    drain=drain() if drain else None,
                     seed_id=seed_id,
                     wanted=wanted,
+                    request_compact=request_compact,
                 ):
                     if event.get("type") == "session_started":
                         state.session_id = event["session_id"]
@@ -146,6 +147,22 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     md = sessions_service.latest_local_command(state.cwd, state.session_id)
                     if md:
                         yield {"type": "command", "markdown": md}
+
+        async def gen():
+            """The `compact` tool only raises a flag; the compaction runs as a second prompt
+            once the first is done. It goes without a drain (the queue closed with the turn,
+            so asking for another would wait forever) and without the flag, so the tool is
+            absent from that run and can't chain."""
+            pending = {"compact": False}
+
+            def request_compact():
+                pending["compact"] = True
+
+            async for event in one(text, attachments, seed_id, drain, request_compact):
+                yield event
+            if pending["compact"]:
+                async for event in one("/compact", None, None, None, None):
+                    yield event
 
         return gen()
 

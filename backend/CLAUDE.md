@@ -459,11 +459,22 @@ and are applied the same way on the live stream (`claude_runtime`) and on resume
 single-file drop:
 
 - Each `.py` in `backend/mcps/` exposes a module-level `tools = [<fn>, ...]`.
-- `mcps/__init__.build_cconnect_server()` walks the package on startup and
-  hands the collected list to `claude_agent_sdk.create_sdk_mcp_server`.
+- `mcps/__init__.build_cconnect_server(context)` walks the package and hands the
+  collected list to `claude_agent_sdk.create_sdk_mcp_server`.
 - `services/claude_runtime.run_prompt` wires it into the SDK via
-  `ClaudeAgentOptions(mcp_servers={"cconnect": build_cconnect_server()})`.
+  `ClaudeAgentOptions(mcp_servers={"cconnect": build_cconnect_server(...)})`.
+  It runs per turn, so the server is rebuilt for every prompt.
 - Tools surface to Claude as `mcp__cconnect__<tool_name>`.
+
+### Tools that need the running turn
+
+A module can expose `make_tools(context)` instead of `tools`. It is called on
+every turn with what that turn passed in, so the handler can be a closure over
+turn-scoped things (`request_compact` today; the interaction callback later).
+Returning `[]` removes the tool from that turn entirely — which is also the
+safest gate: a tool the model can't see is a tool it can't call. `mcps/compact.py`
+uses both halves — it only exists when the turn can honour it, and it is absent
+from the compaction turn it triggers, so it can't chain.
 
 ### Adding a tool
 
@@ -471,7 +482,8 @@ single-file drop:
 2. Decorate the handler with `@tool("name", "description", {"arg": type})`
    from `claude_agent_sdk`. Return
    `{"content": [{"type": "text", "text": "..."}]}` from the handler.
-3. Expose `tools = [your_handler]` at module level.
+3. Expose `tools = [your_handler]` at module level, or `make_tools(context)`
+   when the tool needs the running turn.
 4. Restart the backend — it's picked up automatically.
 5. Recommended: add a section to `prompts/CCONNECT.md` telling Claude when to
    call it. Without that guidance the SDK often won't reach for it.

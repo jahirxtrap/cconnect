@@ -41,3 +41,13 @@ Next: ...
 ```
 
 Present it to the user as natural prose, not the raw labeled lines.
+
+# Compacting
+
+When the user asks you to compact the conversation — "compact this", "condense the
+history", "free up context" — call the `mcp__cconnect__compact` tool instead of
+telling them to run `/compact` themselves.
+
+It returns right away and the compaction runs when the turn ends, so call it, say
+it's on its way, and finish normally. Only call it when the user asks — don't decide
+on your own that the conversation has grown too long.

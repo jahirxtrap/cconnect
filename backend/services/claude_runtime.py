@@ -458,6 +458,7 @@ async def run_prompt(
     drain: Optional[AsyncIterator[dict]] = None,
     seed_id: Optional[str] = None,
     wanted: Optional[Callable[[], dict]] = None,
+    request_compact: Optional[Callable[[], None]] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk import (
         query,
@@ -498,7 +499,7 @@ async def run_prompt(
         thinking={"type": "adaptive", "display": "summarized"},
         include_partial_messages=partial,
         extra_args=extra_args,
-        mcp_servers={"cconnect": build_cconnect_server()},
+        mcp_servers={"cconnect": build_cconnect_server({"request_compact": request_compact})},
         cli_path=cli_manager.resolve_cli_path(),
         enable_file_checkpointing=True,
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
