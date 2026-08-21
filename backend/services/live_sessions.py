@@ -236,6 +236,15 @@ class LiveSession:
                     self._inbox.put_nowait(it)
             await self._emit({"type": "interrupted"})
 
+    async def _flush_inflight(self):
+        stuck = [item["id"] for item in self._inflight if item.get("id")]
+        self._inflight = []
+        self._unconsumed = 0
+        if not stuck:
+            return
+        self._seen_ids.update(stuck)
+        await self._emit({"type": "dequeued", "ids": stuck, "text": "", "consumed": 0})
+
     async def _run(self, runner_factory):
         try:
             async for event in runner_factory(self._ask, self._emit):
@@ -257,8 +266,10 @@ class LiveSession:
         except Exception as exc:
             logger.error(f"live session worker failed: {type(exc).__name__}: {exc}")
             await self._emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+            await self._flush_inflight()
             await self._emit({"type": "done"})
         else:
+            await self._flush_inflight()
             await self._emit({"type": "done"})
 
 

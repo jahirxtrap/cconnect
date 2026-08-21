@@ -9,7 +9,9 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
+  import OptionRow from "$lib/ui/OptionRow.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import SelectChip from "$lib/ui/SelectChip.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import { swipePage } from "$lib/ui/swipe";
 
@@ -52,6 +54,7 @@
 </script>
 
 <div class="w-full px-4">
+  <OutlinedPanel>
   <div class="flex items-center gap-1.5">
     <CircleQuestionMark size={16} class="shrink-0 text-accent" />
     <span class="text-label-lg text-accent select-none">{t("QUESTIONS_TITLE")}</span>
@@ -66,9 +69,7 @@
     {#each data.questions as item, index (index)}
       <div class="mt-1">
         {#if item.header?.trim()}
-          <span class="inline-block rounded-sm bg-accent/14 px-2 py-0.5 text-label-md text-accent">
-            {item.header}
-          </span>
+          <SelectChip label={item.header} selected />
         {/if}
         {#if item.question?.trim()}
           <p class="mt-0.5 text-body-md">{item.question}</p>
@@ -92,15 +93,7 @@
         class="no-scrollbar mt-1 flex gap-2 overflow-x-auto"
       >
         {#each data.questions as _item, index (index)}
-          <button
-            type="button"
-            onclick={() => goto(index)}
-            class="shrink-0 cursor-pointer rounded-md px-2.5 py-[5px] text-label-md transition-colors select-none {index === page
-              ? 'bg-accent/18 text-accent'
-              : 'bg-surface-variant text-on-surface-variant'}"
-          >
-            {tabLabel(index)}
-          </button>
+          <SelectChip label={tabLabel(index)} selected={index === page} onclick={() => goto(index)} />
         {/each}
       </div>
     {/if}
@@ -114,9 +107,7 @@
         }}
       >
         {#if !many && question.header?.trim()}
-          <span class="inline-block rounded-sm bg-accent/14 px-2 py-0.5 text-label-md text-accent">
-            {question.header}
-          </span>
+          <SelectChip label={question.header} selected />
         {/if}
         {#if question.question?.trim()}
           <p class="mt-1 text-body-md">{question.question}</p>
@@ -125,27 +116,13 @@
         <div class="mt-1.5 flex flex-col">
           {#each question.options as option (option.id)}
             {@const selected = draft.selected.includes(option.id)}
-            <button
-              type="button"
+            <OptionRow
+              label={option.label ?? option.id}
               onclick={() => onToggleOption(page, option.id)}
-              class="flex w-full cursor-pointer items-start gap-2.5 py-1.5 text-left"
-            >
-              <span
-                class="mt-0.5 flex size-4 shrink-0 items-center justify-center border-2 transition-colors {question.multiSelect
-                  ? 'rounded-sm'
-                  : 'rounded-full'} {selected ? 'border-accent bg-accent' : 'border-outline'}"
-              >
-                {#if selected}
-                  <span class="size-1.5 rounded-full bg-on-accent"></span>
-                {/if}
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block text-body-md {selected ? 'text-accent' : ''}">{option.label ?? option.id}</span>
-                {#if option.description?.trim()}
-                  <span class="block text-body-sm text-on-surface-variant">{option.description}</span>
-                {/if}
-              </span>
-            </button>
+              description={option.description}
+              {selected}
+              multi={question.multiSelect}
+            />
             {#if selected && option.preview?.trim()}
               <OutlinedPanel class="mb-1.5 ml-6">
                 <MarkdownText text={option.preview} />
@@ -195,4 +172,5 @@
     />
     <ActionButton class="mt-2 w-full" text={t("CHAT_ABOUT_THIS")} icon={MessageSquare} onclick={onChat} />
   {/if}
+  </OutlinedPanel>
 </div>

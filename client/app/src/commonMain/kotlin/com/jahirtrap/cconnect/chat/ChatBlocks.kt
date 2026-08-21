@@ -1,9 +1,7 @@
 package com.jahirtrap.cconnect.chat
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import com.jahirtrap.cconnect.ui.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyRow
@@ -17,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.text.selection.DisableSelection
@@ -25,16 +22,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Icon
-import com.jahirtrap.cconnect.ui.IconButton
 import com.jahirtrap.cconnect.ui.textHoverCursor
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import com.jahirtrap.cconnect.ui.Button
+import com.jahirtrap.cconnect.ui.ButtonVariant
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -49,13 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -88,14 +78,12 @@ import com.composables.icons.lucide.FolderArchive
 import com.composables.icons.lucide.Bell
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.Calendar
-import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.Lightbulb
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.MessageSquare
 import com.composables.icons.lucide.Shield
 import com.composables.icons.lucide.SquareTerminal
 import com.composables.icons.lucide.TriangleAlert
-import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.ui.CustomIcons
 import com.jahirtrap.cconnect.ui.PlayFilled
 import com.jahirtrap.cconnect.data.ChatMessage
@@ -110,14 +98,16 @@ import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.ui.ActionButton
 import com.jahirtrap.cconnect.ui.CodeBlock
+import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
+import com.jahirtrap.cconnect.ui.OptionRow
 import com.jahirtrap.cconnect.ui.OutlinedPanel
+import com.jahirtrap.cconnect.ui.SelectChip
 import com.jahirtrap.cconnect.ui.formatClock
 import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.launch
-import com.jahirtrap.cconnect.ui.theme.snapDp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.Placeholder
@@ -386,6 +376,7 @@ internal fun gapAbove(prev: Role?, cur: Role): Dp {
     val a = group(prev)
     val b = group(cur)
     if (a != 0 && b != 0) return BIG
+    if (cur == Role.INTERACTION) return SMALL
     return if (a == 1 || b == 1) 0.dp else SMALL
 }
 
@@ -841,7 +832,7 @@ private fun InteractionBlock(
     val planPreview = if (isPlan) input.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.trimStart('#', ' ')?.trim().orEmpty() else ""
     val titleColor = MaterialTheme.colorScheme.primary
     val previewColor = MaterialTheme.colorScheme.onSurfaceVariant
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = if (isPlan) Modifier.fillMaxWidth().clickable { togglePlan() } else Modifier,
@@ -882,9 +873,7 @@ private fun InteractionBlock(
         if (input.isNotBlank()) {
             if (isPlan) {
                 if (planExpanded) {
-                    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
-                        MarkdownText(input, modifier = Modifier.fillMaxWidth(), selectable = false)
-                    }
+                    MarkdownText(input, modifier = Modifier.fillMaxWidth().padding(top = 6.dp), selectable = false)
                 }
             } else {
                 Text(
@@ -900,10 +889,10 @@ private fun InteractionBlock(
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 data.options.forEach { opt ->
-                    OutlinedButton(
+                    Button(
                         onClick = { onAnswer?.invoke(data.requestId, opt.id, null) },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = Modifier.pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true),
+                        modifier = Modifier.height(32.dp),
+                        variant = ButtonVariant.Outlined,
                     ) {
                         Text(optionLabel(opt), style = MaterialTheme.typography.bodyMedium)
                     }
@@ -948,7 +937,7 @@ private fun QuestionsBlock(
     onChat: () -> Unit,
     onActivePage: (Int) -> Unit,
 ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Lucide.CircleQuestionMark, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.size(6.dp))
@@ -1033,26 +1022,12 @@ private fun QuestionTabs(questions: List<InteractionQuestion>, pagerState: Pager
     val scope = rememberCoroutineScope()
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         itemsIndexed(questions) { i, q ->
-            val active = i == pagerState.currentPage
             val label = q.header?.ifBlank { null } ?: q.question?.take(18)?.ifBlank { null } ?: "${i + 1}"
-            Surface(
-                color = if (active) MaterialTheme.colorScheme.primary.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant,
-                shape = RoundedCornerShape(8.dp),
-                modifier = Modifier
-                    .clickable { scope.launch { pagerState.animateScrollToPage(i) } }
-                    .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true),
-            ) {
-                DisableSelection {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                    )
-                }
-            }
+            SelectChip(
+                label = label,
+                selected = i == pagerState.currentPage,
+                onClick = { scope.launch { pagerState.animateScrollToPage(i) } },
+            )
         }
     }
 }
@@ -1080,7 +1055,13 @@ private fun QuestionContent(
         }
         q.options.forEach { opt ->
             val selected = opt.id in draft.selected
-            OptionRow(opt, selected, q.multiSelect) { onToggleOption(qi, opt.id) }
+            OptionRow(
+                label = opt.label.orEmpty(),
+                onClick = { onToggleOption(qi, opt.id) },
+                description = opt.description,
+                selected = selected,
+                multi = q.multiSelect,
+            )
             if (selected && !opt.preview.isNullOrBlank()) PreviewBox(opt.preview)
         }
         if (!hasPreview) {
@@ -1112,7 +1093,6 @@ private fun QuestionContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { showNotes = true }
-                        .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true)
                         .padding(top = 4.dp),
                 )
             }
@@ -1130,59 +1110,8 @@ private fun SummaryLine(icon: ImageVector, iconSize: Dp, text: String, indent: D
 }
 
 @Composable
-private fun HeaderChip(text: String) {
-    Surface(color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f), shape = RoundedCornerShape(6.dp)) {
-        DisableSelection {
-            Text(
-                text,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-        }
-    }
-}
+private fun HeaderChip(text: String) = SelectChip(text, selected = true)
 
-@Composable
-private fun OptionRow(opt: InteractionOption, selected: Boolean, multi: Boolean, onClick: () -> Unit) {
-    val accent = MaterialTheme.colorScheme.primary
-    val shape = if (multi) RoundedCornerShape(6.dp) else CircleShape
-    val markScale by animateFloatAsState(if (selected) 1f else 0f, label = "option-mark")
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(shape)
-                .border(snapDp(2.dp), if (selected) accent else MaterialTheme.colorScheme.outline, shape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (multi) {
-                Icon(Lucide.Check, contentDescription = null, tint = accent, modifier = Modifier.size(13.dp).scale(markScale))
-            } else {
-                Box(Modifier.size(10.dp).scale(markScale).clip(CircleShape).background(accent))
-            }
-        }
-        Spacer(Modifier.size(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(
-                opt.label.orEmpty(),
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (selected) accent else MaterialTheme.colorScheme.onSurface,
-            )
-            if (!opt.description.isNullOrBlank()) {
-                Text(opt.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
 
 @Composable
 fun ChatDateSeparator(millis: Long) {
@@ -1211,54 +1140,28 @@ fun ChatDateSeparator(millis: Long) {
 @Composable
 private fun PreviewBox(preview: String) {
     val scroll = rememberScrollState()
-    Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shape = RoundedCornerShape(6.dp),
-        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
-    ) {
+    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp)) {
         Text(
             preview.trimEnd('\n'),
             fontFamily = LocalMonoFontFamily.current,
             style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp),
             color = MaterialTheme.colorScheme.onSurface,
             softWrap = false,
-            modifier = Modifier.horizontalScrollbar(scroll, touchIndicator = false).horizontalScroll(scroll).padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.horizontalScrollbar(scroll, touchIndicator = false).horizontalScroll(scroll),
         )
     }
 }
 
 @Composable
 private fun DraftInput(value: String, onValueChange: (String) -> Unit, placeholder: String, onClear: (() -> Unit)? = null, clearAlways: Boolean = false) {
-    val shape = RoundedCornerShape(8.dp)
-    val showClear = onClear != null && (clearAlways || value.isNotEmpty())
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape)
-            .padding(start = 10.dp, end = if (onClear != null) 4.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            maxLines = 3,
-            modifier = Modifier.weight(1f).padding(vertical = 8.dp),
-            decorationBox = { inner ->
-                if (value.isEmpty()) {
-                    Text(placeholder, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                inner()
-            },
-        )
-        if (showClear) {
-            IconButton(onClick = onClear!!, modifier = Modifier.size(28.dp)) {
-                Icon(Lucide.X, contentDescription = stringResource(Res.string.cancel), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
-            }
-        }
-    }
+    InputField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = placeholder,
+        maxLines = 3,
+        onClear = onClear,
+        clearAlways = clearAlways,
+    )
 }
 
 private const val LabelGapTag = "labelGap"

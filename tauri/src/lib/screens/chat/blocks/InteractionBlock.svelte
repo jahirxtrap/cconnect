@@ -6,6 +6,7 @@
   import Shield from "@lucide/svelte/icons/shield";
   import type { InteractionData, InteractionOption } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
+  import Button from "$lib/ui/Button.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
 
@@ -69,6 +70,7 @@
     {/if}
   {/snippet}
 
+  <OutlinedPanel>
   {#if isPlan}
     <button
       type="button"
@@ -84,9 +86,9 @@
   {#if input.trim()}
     {#if isPlan}
       {#if isExpanded}
-        <OutlinedPanel class="mt-1.5">
+        <div class="mt-1.5">
           <MarkdownText text={input} />
-        </OutlinedPanel>
+        </div>
       {/if}
     {:else}
       <p class="mt-1 font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface-variant">{input}</p>
@@ -96,13 +98,13 @@
   {#if data.resolved === null}
     <div class="mt-2 flex flex-wrap gap-2">
       {#each data.options as option (option.id)}
-        <button
-          type="button"
+        <Button
+          variant="outlined"
+          class="h-8 text-body-md"
           onclick={() => onAnswer(data.requestId, option.id)}
-          class="cursor-pointer rounded-full border border-outline px-3 py-1 text-body-md text-accent transition-colors hover:bg-accent/8"
         >
           {optionLabel(option)}
-        </button>
+        </Button>
       {/each}
     </div>
   {:else}
@@ -113,4 +115,5 @@
       </p>
     </div>
   {/if}
+  </OutlinedPanel>
 </div>
