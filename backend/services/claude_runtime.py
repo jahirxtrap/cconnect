@@ -18,6 +18,7 @@ _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 
 _TRANSIENT_API_STATUS = frozenset({500, 502, 503, 504, 529})
+_MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
 _TRANSIENT_PATTERNS = (
     "no response from api", "overloaded", "connection error", "connection reset",
     "econnreset", "etimedout", "timed out", "timeout", "socket hang up",
@@ -500,6 +501,7 @@ async def run_prompt(
         mcp_servers={"cconnect": build_cconnect_server()},
         cli_path=cli_manager.resolve_cli_path(),
         enable_file_checkpointing=True,
+        max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )
     from services import accounts
     session_env = dict(accounts.env_for(account))
@@ -855,6 +857,7 @@ async def ask_side_question(
         cli_path=cli_manager.resolve_cli_path(),
         resume=resume_id,
         env=accounts.env_for(accounts.resolve(account)),
+        max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
