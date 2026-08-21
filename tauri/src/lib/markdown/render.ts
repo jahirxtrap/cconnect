@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import { CCONNECT_LANG, parseCconnectBlock, type CconnectBlock } from "./cconnectBlock";
 
 type Token = ReturnType<InstanceType<typeof MarkdownIt>["parse"]>[number];
 
@@ -11,6 +12,7 @@ export type Segment =
   | { kind: "html"; html: string }
   | { kind: "code"; code: string; lang: string | null }
   | { kind: "images"; items: MarkdownImage[] }
+  | { kind: "block"; data: CconnectBlock }
   | { kind: "details"; summary: string; children: Segment[] };
 
 const DETAILS_RE = /<details\b[^>]*>([\s\S]*?)<\/details>/i;
@@ -142,7 +144,9 @@ const fromTokens = (tokens: Token[]): Segment[] => {
     const token = tokens[index];
     if (token.type === "fence" && token.level === 0) {
       flush();
-      result.push({ kind: "code", code: token.content, lang: token.info.trim().split(/\s+/)[0] || null });
+      const lang = token.info.trim().split(/\s+/)[0] || null;
+      const block = lang === CCONNECT_LANG ? parseCconnectBlock(token.content) : null;
+      result.push(block ? { kind: "block", data: block } : { kind: "code", code: token.content, lang });
       continue;
     }
     const inline = token.type === "paragraph_open" && token.level === 0 ? tokens[index + 1] : undefined;

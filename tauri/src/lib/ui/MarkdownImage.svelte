@@ -35,7 +35,7 @@
 </script>
 
 <div
-  class="flex aspect-4/3 h-70 max-w-full shrink items-center justify-center overflow-hidden rounded-panel border border-outline-variant"
+  class="flex aspect-4/3 h-70 max-w-full shrink items-center justify-center overflow-hidden rounded-panel border border-outline-variant select-none"
 >
   {#if state === "error"}
     <button
@@ -62,6 +62,7 @@
         onerror: () => (state = "error"),
       }}
       alt={alt || ""}
+      draggable="false"
       class="max-h-full max-w-full object-contain"
     />
   </button>

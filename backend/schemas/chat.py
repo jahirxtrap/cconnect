@@ -32,6 +32,7 @@ class StartMessage(BaseModel):
     base_url: Optional[str] = None
     channel: Optional[str] = None
     last_seq: int = 0
+    capabilities: list[str] = []
 
 
 class PromptMessage(BaseModel):

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -75,6 +76,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PageSize
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.composables.icons.lucide.ChevronLeft
+import com.composables.icons.lucide.ChevronRight
+import kotlinx.coroutines.launch
 import coil3.compose.AsyncImagePainter
 import coil3.compose.LocalPlatformContext
 import coil3.compose.rememberAsyncImagePainter
@@ -204,6 +214,160 @@ private fun Typography.scaled(factor: Float): Typography {
 
 private class MdContext(val src: String, val linkColor: Color, val codeBg: Color, val monoFamily: FontFamily)
 
+private fun fileNameOf(url: String): String =
+    url.substringBefore('?').substringBefore('#').substringAfterLast('/').ifBlank { url }
+
+@Composable
+private fun BlockLink(label: String, url: String, color: Color) {
+    val handler = LocalUriHandler.current
+    Text(
+        label,
+        style = MaterialTheme.typography.bodyMedium,
+        color = color,
+        modifier = Modifier.clickable { handler.openUri(url) },
+    )
+}
+
+private val VIDEO_EXT = Regex("""\.(mp4|webm|mov|m4v|ogv)($|[?#])""", RegexOption.IGNORE_CASE)
+
+@Composable
+private fun GalleryItemView(item: GalleryItem, width: Dp) {
+    if (!VIDEO_EXT.containsMatchIn(item.url)) {
+        MarkdownImage(item.url, item.alt.orEmpty(), width)
+        return
+    }
+    val handler = LocalUriHandler.current
+    val shape = RoundedCornerShape(Radius.panel)
+    DisableSelection {
+        Box(
+            modifier = Modifier
+                .width(width)
+                .aspectRatio(IMAGE_TILE_RATIO)
+                .clip(shape)
+                .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape)
+                .clickable { handler.openUri(item.url) },
+            contentAlignment = Alignment.Center,
+        ) {
+            item.poster?.let { poster ->
+                val context = LocalPlatformContext.current
+                val loader = remember { AppImageLoader.get(context) }
+                val painter = rememberAsyncImagePainter(model = ImageRequest.Builder(context).data(poster).build(), imageLoader = loader)
+                Image(
+                    painter = painter,
+                    contentDescription = item.alt,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(CAROUSEL_ARROW)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    CustomIcons.PlayFilled,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(14.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun GalleryCarousel(items: List<GalleryItem>) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val full = minOf(IMAGE_TILE_HEIGHT * IMAGE_TILE_RATIO, maxWidth)
+        if (items.size == 1) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                GalleryItemView(items[0], full)
+            }
+        } else {
+            val peek = minOf(CAROUSEL_PEEK, maxWidth / 5)
+            val width = minOf(full, (maxWidth - peek * 2).coerceAtLeast(1.dp))
+            val pagerState = rememberPagerState(pageCount = { items.size })
+            val scope = rememberCoroutineScope()
+            val go = { page: Int -> scope.launch { pagerState.animateScrollToPage(page) }; Unit }
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(modifier = Modifier.width(width + peek * 2), contentAlignment = Alignment.Center) {
+                    HorizontalPager(
+                        state = pagerState,
+                        pageSize = PageSize.Fixed(width),
+                        contentPadding = PaddingValues(horizontal = peek),
+                        pageSpacing = IMAGE_TILE_GAP,
+                    ) { page ->
+                        GalleryItemView(items[page], width)
+                    }
+                    CarouselArrow(
+                        Lucide.ChevronLeft,
+                        Modifier.align(Alignment.CenterStart),
+                        enabled = pagerState.currentPage > 0,
+                    ) { go(pagerState.currentPage - 1) }
+                    CarouselArrow(
+                        Lucide.ChevronRight,
+                        Modifier.align(Alignment.CenterEnd),
+                        enabled = pagerState.currentPage < items.lastIndex,
+                    ) { go(pagerState.currentPage + 1) }
+                }
+                Spacer(Modifier.height(8.dp))
+                DisableSelection {
+                    Box(modifier = Modifier.height(CAROUSEL_DOT_ACTIVE), contentAlignment = Alignment.Center) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(CAROUSEL_DOT_GAP), verticalAlignment = Alignment.CenterVertically) {
+                            items.indices.forEach { index ->
+                                val active = index == pagerState.currentPage
+                                Box(
+                                    modifier = Modifier
+                                        .size(if (active) CAROUSEL_DOT_ACTIVE else CAROUSEL_DOT)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (active) MaterialTheme.colorScheme.primary
+                                            else MaterialTheme.colorScheme.primary.copy(alpha = CAROUSEL_DOT_ALPHA)
+                                        )
+                                        .clickable { go(index) },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CarouselArrow(icon: ImageVector, modifier: Modifier, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .size(CAROUSEL_ARROW)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (enabled) 1f else 0.5f))
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.35f),
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
+
+@Composable
+private fun CconnectBlockView(block: CconnectBlock, ctx: MdContext) {
+    when (block) {
+        is CconnectBlock.Gallery -> GalleryCarousel(block.items)
+        is CconnectBlock.Playlist -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            block.items.forEach { BlockLink(it.title ?: fileNameOf(it.url), it.url, ctx.linkColor) }
+        }
+        is CconnectBlock.Pdf -> BlockLink(block.title ?: fileNameOf(block.url), block.url, ctx.linkColor)
+        is CconnectBlock.Html -> BlockLink(block.title ?: fileNameOf(block.url), block.url, ctx.linkColor)
+    }
+}
+
 private fun ASTNode.text(src: String): String = getTextInNode(src).toString()
 private fun ASTNode.child(type: IElementType): ASTNode? = children.firstOrNull { it.type == type }
 
@@ -269,7 +433,12 @@ private fun RenderNode(node: ASTNode, ctx: MdContext, depth: Int) {
             HeadingText(node, ctx, MaterialTheme.typography.titleSmall)
 
         MarkdownElementTypes.PARAGRAPH -> ParagraphBlock(node, ctx)
-        MarkdownElementTypes.CODE_FENCE -> CodeBlock(codeFenceContent(node, ctx.src), ctx.codeBg, codeFenceLang(node, ctx.src))
+        MarkdownElementTypes.CODE_FENCE -> {
+            val lang = codeFenceLang(node, ctx.src)
+            val content = codeFenceContent(node, ctx.src)
+            val block = if (lang == CCONNECT_LANG) parseCconnectBlock(content) else null
+            if (block != null) CconnectBlockView(block, ctx) else CodeBlock(content, ctx.codeBg, lang)
+        }
         MarkdownElementTypes.CODE_BLOCK -> CodeBlock(node.text(ctx.src).trimEnd('\n'), ctx.codeBg, "")
         MarkdownElementTypes.UNORDERED_LIST -> ListBlock(node, ordered = false, ctx = ctx, depth = depth)
         MarkdownElementTypes.ORDERED_LIST -> ListBlock(node, ordered = true, ctx = ctx, depth = depth)
@@ -714,6 +883,12 @@ private const val SHARED_ARCHIVE_TAG = "shared_archive"
 private val IMAGE_TILE_HEIGHT = 280.dp
 private const val IMAGE_TILE_RATIO = 4f / 3f
 private val IMAGE_TILE_GAP = 6.dp
+private val CAROUSEL_ARROW = 32.dp
+private val CAROUSEL_PEEK = 40.dp
+private val CAROUSEL_DOT = 6.dp
+private val CAROUSEL_DOT_ACTIVE = 8.dp
+private val CAROUSEL_DOT_GAP = 6.dp
+private const val CAROUSEL_DOT_ALPHA = 0.3f
 
 internal val LocalImageDownload = staticCompositionLocalOf<((url: String, filename: String) -> Unit)?> { null }
 
@@ -734,44 +909,46 @@ private fun MarkdownImage(url: String, alt: String, width: Dp) {
     val painter = rememberAsyncImagePainter(model = ImageRequest.Builder(context).data(resolved).build(), imageLoader = loader)
     val state by painter.state.collectAsState()
     val shape = RoundedCornerShape(Radius.panel)
-    Box(
-        modifier = Modifier
-            .width(width)
-            .aspectRatio(IMAGE_TILE_RATIO)
-            .clip(shape)
-            .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape),
-        contentAlignment = Alignment.Center,
-    ) {
-        when (state) {
-            is AsyncImagePainter.State.Success -> {
-                val sz = painter.intrinsicSize
-                val aspect = if (sz.isSpecified && sz.height > 0f) sz.width / sz.height else 1f
-                val fit = if (aspect >= 1f) Modifier.fillMaxWidth() else Modifier.fillMaxHeight()
-                Image(
-                    painter = painter,
-                    contentDescription = alt.ifBlank { null },
-                    contentScale = ContentScale.Fit,
-                    modifier = fit.aspectRatio(aspect).clickable(onClick = onTap),
-                )
+    DisableSelection {
+        Box(
+            modifier = Modifier
+                .width(width)
+                .aspectRatio(IMAGE_TILE_RATIO)
+                .clip(shape)
+                .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape),
+            contentAlignment = Alignment.Center,
+        ) {
+            when (state) {
+                is AsyncImagePainter.State.Success -> {
+                    val sz = painter.intrinsicSize
+                    val aspect = if (sz.isSpecified && sz.height > 0f) sz.width / sz.height else 1f
+                    val fit = if (aspect >= 1f) Modifier.fillMaxWidth() else Modifier.fillMaxHeight()
+                    Image(
+                        painter = painter,
+                        contentDescription = alt.ifBlank { null },
+                        contentScale = ContentScale.Fit,
+                        modifier = fit.aspectRatio(aspect).clickable(onClick = onTap),
+                    )
+                }
+                is AsyncImagePainter.State.Error -> Column(
+                    modifier = Modifier.fillMaxSize().clickable(onClick = onTap).padding(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(Lucide.ImageOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = alt.ifBlank { resolved },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                else -> CenteredProgress(Modifier.fillMaxSize(), size = 24.dp)
             }
-            is AsyncImagePainter.State.Error -> Column(
-                modifier = Modifier.fillMaxSize().clickable(onClick = onTap).padding(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(Lucide.ImageOff, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    text = alt.ifBlank { resolved },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            else -> CenteredProgress(Modifier.fillMaxSize(), size = 24.dp)
-        }
+    }
     }
 }
 

@@ -29,6 +29,8 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import com.jahirtrap.cconnect.data.VisibilityPrefs
+private val CLIENT_CAPABILITIES = listOf("media.blocks")
+
 class ChatSocket(private val scope: CoroutineScope, private val config: () -> BackendConfig) {
     private var ws: WsConnection? = null
 
@@ -133,6 +135,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             put("base_url", config().baseUrl)
             channel?.let { put("channel", it) }
             put("last_seq", lastSeq)
+            putJsonArray("capabilities") { CLIENT_CAPABILITIES.forEach { add(it) } }
             sideChannel?.let { put("side_channel", it) }
             sideResume?.let { put("side_resume", it) }
             if (sideChannel != null) put("side_last_seq", sideLastSeq)

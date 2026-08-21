@@ -19,6 +19,7 @@ from core.responses import api_response
 from middleware.public_auth import ws_bearer_ok
 from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
 from services import accounts
+from services import blocks
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services import settings_store, visibility
@@ -63,7 +64,7 @@ class _Session:
         self.partial: bool = False
 
 
-def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None):
+def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
@@ -109,6 +110,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     seed_id=seed_id,
                     wanted=wanted,
                     request_compact=request_compact,
+                    capabilities=capabilities,
                 ):
                     if event.get("type") == "session_started":
                         state.session_id = event["session_id"]
@@ -165,7 +167,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
     return factory
 
 
-async def _start_turn(session, mid, text, attachments, prefs=None):
+async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=None):
     turn_start = 0
     if session.state.session_id and session.state.cwd:
         try:
@@ -173,7 +175,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None):
                 sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs))
         except Exception:
             turn_start = 0
-    if not session.start(_build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted())), seed_id=mid):
+    if not session.start(_build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities), seed_id=mid):
         return False
     session.turn_start_index = turn_start
     if mid:
@@ -231,7 +233,7 @@ async def chat_ws(ws: WebSocket):
         async with send_lock:
             await ws.send_json(payload)
 
-    seen = {"prefs": visibility.defaults()}
+    seen = {"prefs": visibility.defaults(), "capabilities": []}
     sink = visibility.sink_for(send, seen)
 
     def spawn(coro):
@@ -255,6 +257,7 @@ async def chat_ws(ws: WebSocket):
                     await send({"type": "error", "message": exc.errors()})
                     continue
                 seen["prefs"] = visibility.resolve(msg.visibility.model_dump() if msg.visibility else None)
+                seen["capabilities"] = list(msg.capabilities)
                 existing = registry.get(msg.channel) if msg.channel else None
                 by_session = None
                 if existing is None and msg.resume:
@@ -330,7 +333,7 @@ async def chat_ws(ws: WebSocket):
                     await session.enqueue(msg.id, msg.text, msg.attachments)
                 elif msg.id and session.already_consumed(msg.id):
                     await session.consumed(msg.id)
-                elif not await _start_turn(session, msg.id, msg.text, msg.attachments, seen["prefs"]):
+                elif not await _start_turn(session, msg.id, msg.text, msg.attachments, seen["prefs"], seen["capabilities"]):
                     await session.enqueue(msg.id, msg.text, msg.attachments)
 
             elif mtype == "unqueue":
@@ -400,7 +403,7 @@ async def chat_ws(ws: WebSocket):
                     if target is session:
                         item = session.peek_queued()
                         if item is not None:
-                            await _start_turn(session, item["id"], item["text"], item["attachments"], seen["prefs"])
+                            await _start_turn(session, item["id"], item["text"], item["attachments"], seen["prefs"], seen["capabilities"])
 
             elif mtype == "interaction_response":
                 rid = raw.get("id")
@@ -427,6 +430,8 @@ async def chat_ws(ws: WebSocket):
                 except ValueError as exc:
                     await send({"type": "error", "message": str(exc)})
                     continue
+                if blocks.MEDIA_CAPABILITY not in seen["capabilities"]:
+                    items = blocks.degrade_items(items)
                 total = len(items)
                 end = total if before_index is None else max(0, min(before_index, total))
                 start = max(0, end - limit)

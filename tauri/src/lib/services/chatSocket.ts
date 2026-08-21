@@ -105,6 +105,7 @@ const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
 const PING_MS = 20_000;
 const STALE_MS = 45_000;
+const CLIENT_CAPABILITIES = ["media.blocks", "media.rich"];
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
@@ -221,6 +222,7 @@ export class ChatSocket {
       base_url: baseUrlOf(this.profile()),
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,
+      capabilities: CLIENT_CAPABILITIES,
       ...(this.#sideChannel ? { side_channel: this.#sideChannel, side_last_seq: this.#sideLastSeq } : {}),
       ...(this.#sideResume ? { side_resume: this.#sideResume } : {}),
     });

@@ -41,12 +41,31 @@ def _clean_error_text(text: str | None) -> str:
     return (text or "").strip() or "Unknown error"
 
 
-def _system_append(base_url: Optional[str], cwd: Optional[str] = None) -> str:
+RICH_MEDIA_NOTE = (
+    " This client also renders `playlist` (audio items, each with `title` and `duration`), `pdf`"
+    " and `html` (both take `url` and `title`), and video inside a gallery."
+)
+
+
+def _blocks_guide(capabilities: list[str]) -> str:
+    if "media.blocks" not in capabilities:
+        return ""
+    try:
+        guide = (_PROMPTS_DIR / "BLOCKS.md").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+    return guide.replace("{{RICH_MEDIA}}", RICH_MEDIA_NOTE if "media.rich" in capabilities else "")
+
+
+def _system_append(base_url: Optional[str], cwd: Optional[str] = None, capabilities: Optional[list[str]] = None) -> str:
     """Read on every call so the markdown can be edited without restarting the server."""
     try:
         text = (_PROMPTS_DIR / "CCONNECT.md").read_text(encoding="utf-8")
     except OSError:
         text = ""
+    guide = _blocks_guide(list(capabilities or ()))
+    if guide:
+        text = f"{text.strip()}\n\n{guide.strip()}" if text.strip() else guide
     try:
         user = (_PROMPTS_DIR / "USER.md").read_text(encoding="utf-8").strip()
     except OSError:
@@ -477,6 +496,7 @@ async def run_prompt(
     seed_id: Optional[str] = None,
     wanted: Optional[Callable[[], dict]] = None,
     request_compact: Optional[Callable[[], None]] = None,
+    capabilities: Optional[list[str]] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk import (
         query,
@@ -501,7 +521,7 @@ async def run_prompt(
         extra_args["replay-user-messages"] = None
 
     system_prompt: dict = {"type": "preset", "preset": "claude_code"}
-    append = _system_append(base_url, cwd)
+    append = _system_append(base_url, cwd, capabilities)
     if append:
         system_prompt["append"] = append
 
@@ -517,7 +537,11 @@ async def run_prompt(
         thinking={"type": "adaptive", "display": "summarized"},
         include_partial_messages=partial,
         extra_args=extra_args,
-        mcp_servers={"cconnect": build_cconnect_server({"request_compact": request_compact})},
+        mcp_servers={"cconnect": build_cconnect_server({
+            "request_compact": request_compact,
+            "ask_user": ask_user,
+            "capabilities": list(capabilities or ()),
+        })},
         cli_path=cli_manager.resolve_cli_path(),
         enable_file_checkpointing=True,
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,

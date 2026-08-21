@@ -59,21 +59,26 @@
     return encoded ? decodeURIComponent(encoded) : null;
   });
 
+  const WIDTH_CHANNEL = "cconnect:width";
   const FIT_TAGS =
     `<meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<style>img,video,canvas,svg,table{max-width:100%;height:auto}</style>`;
-
-  const measureDocument = () => {
-    const inner = frame?.contentDocument;
-    if (!inner) return;
-    documentWidth = Math.max(inner.documentElement.scrollWidth, inner.body?.scrollWidth ?? 0, frameWidth);
-  };
+    `<style>img,video,canvas,svg,table{max-width:100%;height:auto}</style>` +
+    `<script>(function(){var report=function(){try{parent.postMessage({channel:"${WIDTH_CHANNEL}",` +
+    `width:Math.max(document.documentElement.scrollWidth,document.body?document.body.scrollWidth:0)},"*")}catch(e){}};` +
+    `addEventListener("load",report);addEventListener("resize",report);setInterval(report,1000);report()})()</` +
+    `script>`;
 
   const htmlScale = $derived(documentWidth > frameWidth && frameWidth > 0 ? frameWidth / documentWidth : 1);
 
   $effect(() => {
-    if (kind !== "html" || frameWidth <= 0) return;
-    measureDocument();
+    const onMessage = (event: MessageEvent) => {
+      if (!frame || event.source !== frame.contentWindow) return;
+      const payload = event.data as { channel?: string; width?: number } | null;
+      if (!payload || payload.channel !== WIDTH_CHANNEL || typeof payload.width !== "number") return;
+      documentWidth = Math.max(payload.width, frameWidth);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   });
 
   const document_ = $derived.by(() => {
@@ -254,8 +259,7 @@
           bind:this={frame}
           srcdoc={document_}
           title={filename}
-          onload={measureDocument}
-          sandbox="allow-same-origin"
+          sandbox="allow-scripts"
           style="width: {documentWidth || frameWidth}px; height: {frameHeight / htmlScale}px; transform: scale({htmlScale}); transform-origin: top left"
           class="border-0 bg-white"
         ></iframe>

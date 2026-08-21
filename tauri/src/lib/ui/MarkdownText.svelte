@@ -13,6 +13,7 @@
   import { openExternal } from "$lib/platform";
   import { segments, type Segment } from "$lib/markdown/render";
   import { backend } from "$lib/services/backend.svelte";
+  import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
@@ -130,6 +131,8 @@
           <MarkdownImage url={image.url} alt={image.alt} onOpen={open} />
         {/each}
       </div>
+    {:else if part.kind === "block"}
+      <CconnectBlockView data={part.data} onOpen={open} />
     {:else if part.kind === "details"}
       <details class="w-full">
         <summary
