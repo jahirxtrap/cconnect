@@ -8,6 +8,7 @@ import platform
 import shutil
 import re
 import subprocess
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -95,6 +96,17 @@ def invalidate_version_cache() -> None:
     _version_cache = None
 
 
+def _settled_version(path: str, before: Optional[str], deadline: float = 5.0) -> Optional[str]:
+    """`claude update` returns before the new binary is in place, so asking once
+    right after still reports the old version. Wait briefly for it to change."""
+    end = time.monotonic() + deadline
+    version = cli_version(path)
+    while version == before and time.monotonic() < end:
+        time.sleep(0.5)
+        version = cli_version(path)
+    return version
+
+
 def update_cli(source: Optional[str] = None, custom_path: Optional[str] = None) -> dict:
     """Self-update the resolved CLI in place (`claude update`). Bundled can't update.
 
@@ -105,13 +117,15 @@ def update_cli(source: Optional[str] = None, custom_path: Optional[str] = None) 
     path = resolve_cli_path(source, custom_path)
     if not path:
         return {"ok": False, "message": "No CLI resolved for the current source."}
+    before = cli_version(path)
     try:
         result = subprocess.run([path, "update"], capture_output=True, text=True, timeout=180)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "message": str(exc)}
+    version = _settled_version(path, before) if result.returncode == 0 else cli_version(path)
     invalidate_version_cache()
     output = (result.stdout + result.stderr).strip()
-    return {"ok": result.returncode == 0, "message": output, "version": cli_version(path)}
+    return {"ok": result.returncode == 0, "message": output, "version": version}
 
 
 def set_source(source: str, custom_path: Optional[str] = None) -> None:
