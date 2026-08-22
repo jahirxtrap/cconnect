@@ -30,7 +30,6 @@
     onLoadOlder: () => void;
     onFollowChange: (following: boolean) => void;
     onSharedLink: (url: string, filename: string) => void;
-    questions: import("svelte").Snippet<[InteractionData]>;
     component: import("svelte").Snippet<[InteractionData]>;
   }
 
@@ -45,7 +44,6 @@
     onLoadOlder,
     onFollowChange,
     onSharedLink,
-    questions,
     component,
   }: Props = $props();
 
@@ -314,7 +312,6 @@
           onToggle={() => (expandedState[item.id] = !expandedState[item.id])}
           {onAnswer}
           {onSharedLink}
-          {questions}
           {component}
         />
       </div>

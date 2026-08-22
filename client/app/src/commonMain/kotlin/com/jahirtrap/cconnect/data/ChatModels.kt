@@ -57,18 +57,6 @@ data class InteractionOption(
     val preview: String? = null,
 )
 
-data class InteractionQuestion(
-    val header: String? = null,
-    val question: String? = null,
-    val multiSelect: Boolean = false,
-    val options: List<InteractionOption> = emptyList(),
-)
-
-data class QuestionDraft(
-    val selected: Set<String> = emptySet(),
-    val freeText: String = "",
-    val notes: String = "",
-)
 
 const val VALUE_SEPARATOR = "\u001F"
 
@@ -78,6 +66,8 @@ data class ComponentOption(
     val description: String? = null,
     val preview: String? = null,
     val style: String? = null,
+    val icon: String? = null,
+    val labelKey: String? = null,
 )
 
 data class ComponentElement(
@@ -86,6 +76,7 @@ data class ComponentElement(
     val label: String? = null,
     val text: String? = null,
     val placeholder: String? = null,
+    val placeholderKey: String? = null,
     val value: String? = null,
     val checked: Boolean = false,
     val multiline: Boolean = false,
@@ -93,6 +84,7 @@ data class ComponentElement(
     val required: Boolean = false,
     val options: List<ComponentOption> = emptyList(),
     val block: String? = null,
+    val blocks: List<ComponentElement> = emptyList(),
 )
 
 data class InteractionData(
@@ -100,17 +92,16 @@ data class InteractionData(
     val kind: String,
     val options: List<InteractionOption> = emptyList(),   // permission chips
     val title: String? = null,
+    val titleKey: String? = null,
     val resolved: String? = null,
     val resolvedText: String? = null,
-    val questions: List<InteractionQuestion> = emptyList(),  // kind == "questions"
-    val drafts: List<QuestionDraft> = emptyList(),           // parallel to questions, pre-submit
     val submitted: Boolean = false,
     val declined: Boolean = false,                           // "Chat about this" — questions dismissed
-    val summary: List<String> = emptyList(),                 // per-question answer text after submit
-    val notes: List<String> = emptyList(),                   // per-question note text after submit
-    val activeQuestion: Int = 0,
+    val activePage: Int = 0,
     val blocks: List<ComponentElement> = emptyList(),        // kind == "component"
     val submitLabel: String? = null,
+    val submitKey: String? = null,
+    val dismiss: ComponentOption? = null,
     val values: Map<String, String> = emptyMap(),            // component draft, id -> value
 )
 
@@ -200,10 +191,12 @@ sealed interface ServerEvent {
         val toolUseId: String?,
         val input: String?,
         val title: String?,
+        val titleKey: String? = null,
         val options: List<InteractionOption>,
-        val questions: List<InteractionQuestion> = emptyList(),
         val blocks: List<ComponentElement> = emptyList(),
         val submitLabel: String? = null,
+        val submitKey: String? = null,
+        val dismiss: ComponentOption? = null,
         val replay: Boolean = false,
     ) : ServerEvent
     data class InteractionResolved(val requestId: String, val optionId: String?, val values: Map<String, String>? = null, val dismissed: Boolean = false) : ServerEvent

@@ -38,7 +38,7 @@ class InteractionAnswer(BaseModel):
 
 @router.post("/chat/interaction")
 async def answer_interaction(body: InteractionAnswer):
-    payload = {"option_id": body.option_id, "free_text": body.free_text, "answers": None, "chat": None}
+    payload = {"option_id": body.option_id, "free_text": body.free_text, "chat": None}
     session = registry.resolve_interaction(body.id, payload)
     if session is None:
         raise HTTPException(status_code=404, detail="interaction not pending")
@@ -411,7 +411,6 @@ async def chat_ws(ws: WebSocket):
                     payload = {
                         "option_id": raw.get("option_id"),
                         "free_text": raw.get("free_text"),
-                        "answers": raw.get("answers"),
                         "values": raw.get("values"),
                         "chat": raw.get("chat"),
                     }

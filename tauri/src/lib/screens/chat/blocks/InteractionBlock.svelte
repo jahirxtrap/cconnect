@@ -9,6 +9,7 @@
   import Button from "$lib/ui/Button.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import SummaryLine from "$lib/ui/SummaryLine.svelte";
 
   interface Props {
     data: InteractionData;
@@ -75,12 +76,12 @@
     <button
       type="button"
       onclick={toggle}
-      class="flex w-full cursor-pointer items-center gap-2 text-left"
+      class="flex w-full cursor-pointer items-center gap-1.5 text-left"
     >
       {@render header()}
     </button>
   {:else}
-    <div class="flex w-full items-center gap-2">{@render header()}</div>
+    <div class="flex w-full items-center gap-1.5">{@render header()}</div>
   {/if}
 
   {#if input.trim()}
@@ -108,12 +109,7 @@
       {/each}
     </div>
   {:else}
-    <div class="mt-1 flex items-center gap-1.5">
-      <Play size={10} class="shrink-0 fill-current text-on-surface-variant" />
-      <p class="min-w-0 flex-1 text-body-sm text-on-surface-variant">
-        {chosen ? optionLabel(chosen) : data.resolved}
-      </p>
-    </div>
+    <SummaryLine icon={Play} fill text={chosen ? optionLabel(chosen) : (data.resolved ?? "")} class="mt-1" />
   {/if}
   </OutlinedPanel>
 </div>

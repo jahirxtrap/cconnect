@@ -12,11 +12,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun SwitchRow(
     title: String,
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+    summary: String? = null,
+    enabled: Boolean = true,
+    leading: (@Composable () -> Unit)? = null,
+    onChange: (Boolean) -> Unit,
+) = SwitchRow(AnnotatedString(title), checked, modifier, summary, enabled, leading, onChange)
+
+@Composable
+fun SwitchRow(
+    title: AnnotatedString,
     checked: Boolean,
     modifier: Modifier = Modifier,
     summary: String? = null,

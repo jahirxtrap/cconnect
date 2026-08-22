@@ -9,6 +9,7 @@
     value: string;
     oninput: (value: string) => void;
     label?: string;
+    required?: boolean;
     placeholder?: string;
     secret?: boolean;
     singleLine?: boolean;
@@ -26,6 +27,7 @@
     value,
     oninput,
     label,
+    required = false,
     placeholder,
     secret = false,
     singleLine = false,
@@ -58,7 +60,9 @@
 
 <div class={className}>
   {#if label}
-    <p class="mb-1.5 text-label-lg">{label}</p>
+    <p class="mb-1.5 text-label-lg">
+      {label}{#if required}<span class="text-error"> *</span>{/if}
+    </p>
   {/if}
   <div
     class="flex w-full items-center gap-2 rounded-md border-2 border-outline-variant px-3 py-2 transition-colors focus-within:border-accent"

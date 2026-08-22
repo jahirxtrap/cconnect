@@ -44,7 +44,6 @@
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
-  import QuestionsBlock from "./blocks/QuestionsBlock.svelte";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import RewindDialog from "./RewindDialog.svelte";
   import SidePanel from "./SidePanel.svelte";
@@ -307,7 +306,6 @@
         onLoadOlder={() => chat.loadOlder()}
         onFollowChange={(following) => (chat.followBottom = following)}
         onSharedLink={(url, filename) => (sharedLink = { url, filename })}
-        {questions}
         {component}
       />
         </div>
@@ -321,7 +319,7 @@
             streaming={chat.sideStreaming}
             onClose={() => chat.closeSideChat()}
             onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
-            {questions}
+            {component}
           />
         {/if}
     </div>
@@ -406,18 +404,6 @@
   />
 {/snippet}
 
-{#snippet questions(data: InteractionData)}
-  <QuestionsBlock
-    {data}
-    onToggleOption={(index, optionId) => chat.toggleQuestionOption(data.requestId, index, optionId)}
-    onFreeText={(index, value) => chat.setQuestionText(data.requestId, index, value)}
-    onNotes={(index, value) => chat.setQuestionNotes(data.requestId, index, value)}
-    onPage={(index) => chat.setActiveQuestion(data.requestId, index)}
-    onSubmit={() => chat.submitQuestions(data.requestId)}
-    onChat={() => chat.declineQuestions(data.requestId)}
-  />
-{/snippet}
-
 {#snippet component(data: InteractionData)}
   <ComponentBlock
     {data}
@@ -425,6 +411,7 @@
     onPick={(id, value, multiple) => chat.toggleComponentOption(data.requestId, id, value, multiple)}
     onSubmit={(action) => chat.submitComponent(data.requestId, action)}
     onDismiss={() => chat.declineQuestions(data.requestId)}
+    onPage={(index) => chat.setActivePage(data.requestId, index)}
     onPreviewOpen={(url, filename) => (sharedLink = { url, filename })}
   />
 {/snippet}

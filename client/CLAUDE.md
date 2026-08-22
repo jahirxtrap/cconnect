@@ -251,7 +251,7 @@ each into a `ChatMessage` or state mutation. Notable:
 | `assistant_text` / `thinking` | streamed into the current ASSISTANT / THINKING message |
 | `tool_use` / `tool_result` | TOOL block (input + folded result), running spinner until the result |
 | `file_change` | FILE_CHANGE diff block (backend pre-classifies each line) |
-| `interaction_request` | INTERACTION block (permission buttons or question form) |
+| `interaction_request` | INTERACTION block: permission buttons, or `ComponentBlock` when `kind == "component"` — one renderer for the `ask_component` form and for `AskUserQuestion`, which the backend translates into the same blocks |
 | `todos` / `task` | top-bar todos / task indicator |
 | `command` / `usage` | local-command markdown / ephemeral plan-usage markdown |
 | **`compacting`** | sets `state.compacting=true` → an inline "Compactando" progress band (`CompactProgress`, same band style as `status`); fired by the backend's PreCompact hook, so it shows on **auto**-compaction too, not just manual `/compact` |

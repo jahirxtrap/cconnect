@@ -21,12 +21,22 @@ Elements, in the order you list them:
 - select: options with label, and optional description and preview. Set multiple for checkboxes.
 - input: a text field. Set multiline for a text area, value to prefill it.
 - toggle: an on/off switch.
-- buttons: a row of actions. It is terminal: picking one submits the whole form.
+- notes: an optional free comment, folded behind a link until the user opens it.
+- buttons: a row of actions, each with an optional icon. It is terminal: picking one submits the
+  whole form.
 - preview: {PREVIEW}
+- page: puts its own blocks on a tab. With several pages the user moves between them and answers
+  everything before sending once.
 
 Every element that carries a value needs an id unique within the form; the answer comes back keyed
 by those ids. Reuse the same block_id to replace a form you already sent instead of stacking a new
 one. Never describe styling: the app owns the look."""
+
+ICONS = [
+    "message-square", "check", "x", "plus", "pencil", "trash", "download",
+    "external-link", "refresh", "search", "settings", "info", "alert",
+    "lightbulb", "shield", "file", "folder",
+]
 
 OPTION = {
     "type": "object",
@@ -36,14 +46,26 @@ OPTION = {
         "description": {"type": "string", "description": "Secondary line under the label."},
         "preview": {"type": "string", "description": "Markdown shown when this option is picked."},
         "style": {"type": "string", "enum": ["primary", "danger", "plain"], "description": "Buttons only."},
+        "icon": {"type": "string", "enum": ICONS, "description": "Buttons only."},
     },
     "required": ["value", "label"],
 }
 
-ELEMENT = {
+DISMISS = {
     "type": "object",
     "properties": {
-        "type": {"type": "string", "enum": ["text", "select", "input", "toggle", "buttons", "preview"]},
+        "label": {"type": "string", "description": "What the user reads."},
+        "icon": {"type": "string", "enum": ICONS},
+    },
+    "required": ["label"],
+}
+
+TYPES = ["text", "select", "input", "toggle", "notes", "buttons", "preview", "page"]
+
+LEAF = {
+    "type": "object",
+    "properties": {
+        "type": {"type": "string", "enum": TYPES},
         "id": {"type": "string", "description": "Required for every element that carries a value."},
         "label": {"type": "string"},
         "value": {"description": "Prefilled value: string for input, boolean for toggle."},
@@ -57,12 +79,26 @@ ELEMENT = {
     "required": ["type"],
 }
 
+ELEMENT = {
+    "type": "object",
+    "properties": {
+        **LEAF["properties"],
+        "blocks": {"type": "array", "items": LEAF, "description": "page: the elements it holds."},
+    },
+    "required": ["type"],
+}
+
 SCHEMA = {
     "type": "object",
     "properties": {
         "blocks": {"type": "array", "items": ELEMENT, "description": "The elements, in order."},
         "title": {"type": "string", "description": "Heading of the form."},
         "submit": {"type": "string", "description": "Label of the send button. Ignored if a buttons element is present."},
+        "dismiss": {
+            **DISMISS,
+            "description": "Way out of the form without answering, as a button under the others."
+            " Without it the form shows a plain close icon instead.",
+        },
         "block_id": {"type": "string", "description": "Reuse it to replace an earlier form instead of stacking."},
     },
     "required": ["blocks"],
@@ -85,6 +121,7 @@ def make_tools(context: dict) -> list:
             "block_id": args.get("block_id"),
             "title": args.get("title"),
             "submit": args.get("submit"),
+            "dismiss": args.get("dismiss"),
             "blocks": args.get("blocks") or [],
         })
         if response.get("chat"):

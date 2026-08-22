@@ -41,18 +41,6 @@ export interface InteractionOption {
   preview: string | null;
 }
 
-export interface InteractionQuestion {
-  header: string | null;
-  question: string | null;
-  multiSelect: boolean;
-  options: InteractionOption[];
-}
-
-export interface QuestionDraft {
-  selected: string[];
-  freeText: string;
-  notes: string;
-}
 
 export const VALUE_SEPARATOR = "\u001F";
 
@@ -62,14 +50,17 @@ export interface ComponentOption {
   description: string | null;
   preview: string | null;
   style: string | null;
+  icon: string | null;
+  labelKey: string | null;
 }
 
 export interface ComponentElement {
-  type: "text" | "select" | "input" | "toggle" | "buttons" | "preview";
+  type: "text" | "select" | "input" | "toggle" | "buttons" | "preview" | "page" | "notes";
   id: string | null;
   label: string | null;
   text: string | null;
   placeholder: string | null;
+  placeholderKey: string | null;
   value: string | null;
   checked: boolean;
   multiline: boolean;
@@ -77,6 +68,7 @@ export interface ComponentElement {
   required: boolean;
   options: ComponentOption[];
   block: string | null;
+  blocks: ComponentElement[];
 }
 
 export interface InteractionData {
@@ -84,16 +76,15 @@ export interface InteractionData {
   kind: string;
   options: InteractionOption[];
   title: string | null;
+  titleKey: string | null;
   resolved: string | null;
-  questions: InteractionQuestion[];
-  drafts: QuestionDraft[];
   submitted: boolean;
   declined: boolean;
-  summary: string[];
-  notes: string[];
-  activeQuestion: number;
+  activePage: number;
   blocks: ComponentElement[];
   submitLabel: string | null;
+  submitKey: string | null;
+  dismiss: ComponentOption | null;
   values: Record<string, string>;
 }
 
@@ -145,16 +136,15 @@ export const emptyInteraction = (requestId: string, kind: string): InteractionDa
   kind,
   options: [],
   title: null,
+  titleKey: null,
   resolved: null,
-  questions: [],
-  drafts: [],
   submitted: false,
   declined: false,
-  summary: [],
-  notes: [],
-  activeQuestion: 0,
+  activePage: 0,
   blocks: [],
   submitLabel: null,
+  submitKey: null,
+  dismiss: null,
   values: {},
 });
 

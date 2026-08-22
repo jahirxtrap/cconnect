@@ -2,10 +2,9 @@ import {
   diffKindOf,
   VALUE_SEPARATOR,
   type ComponentElement,
+  type ComponentOption,
   type DiffLine,
   type InteractionOption,
-  type InteractionQuestion,
-  type QuestionDraft,
   type QueuedMessage,
   type TodoItem,
 } from "$lib/data/chatModels";
@@ -76,10 +75,12 @@ export type ServerEvent =
       toolUseId: string | null;
       input: string | null;
       title: string | null;
+      titleKey: string | null;
       options: InteractionOption[];
-      questions: InteractionQuestion[];
       blocks: ComponentElement[];
       submitLabel: string | null;
+      submitKey: string | null;
+      dismiss: ComponentOption | null;
     }
   | {
       type: "interaction_resolved";
@@ -150,7 +151,30 @@ const toValues = (raw: unknown): Record<string, string> | null => {
   return out;
 };
 
-const COMPONENT_TYPES = ["text", "select", "input", "toggle", "buttons", "preview"] as const;
+const COMPONENT_TYPES = [
+  "text",
+  "select",
+  "input",
+  "toggle",
+  "buttons",
+  "preview",
+  "page",
+  "notes",
+] as const;
+
+export const toDismiss = (raw: unknown): ComponentOption | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const wire = raw as Wire;
+  return {
+    value: "",
+    label: text(wire, "label") ?? "",
+    description: null,
+    preview: null,
+    style: null,
+    icon: text(wire, "icon"),
+    labelKey: text(wire, "label_key"),
+  };
+};
 
 export const toElement = (raw: Wire): ComponentElement[] => {
   const type = text(raw, "type") as ComponentElement["type"] | null;
@@ -163,6 +187,7 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       label: text(raw, "label"),
       text: type === "text" && typeof value === "string" ? value : null,
       placeholder: text(raw, "placeholder"),
+      placeholderKey: text(raw, "placeholder_key"),
       value: type === "input" && typeof value === "string" ? value : null,
       checked: value === true,
       multiline: flag(raw, "multiline"),
@@ -174,8 +199,11 @@ export const toElement = (raw: Wire): ComponentElement[] => {
         description: text(option, "description"),
         preview: text(option, "preview"),
         style: text(option, "style"),
+        icon: text(option, "icon"),
+        labelKey: text(option, "label_key"),
       })),
       block: raw.block && typeof raw.block === "object" ? JSON.stringify(raw.block) : null,
+      blocks: list(raw, "blocks").flatMap(toElement),
     },
   ];
 };
@@ -325,18 +353,6 @@ export class ChatSocket {
       id: requestId,
       option_id: optionId,
       ...(freeText?.trim() ? { free_text: freeText } : {}),
-    });
-  }
-
-  sendQuestionsResponse(requestId: string, answers: QuestionDraft[]) {
-    this.#send({
-      type: "interaction_response",
-      id: requestId,
-      answers: answers.map((draft) => ({
-        selected: draft.selected,
-        ...(draft.freeText.trim() ? { free_text: draft.freeText } : {}),
-        ...(draft.notes.trim() ? { notes: draft.notes } : {}),
-      })),
     });
   }
 
@@ -582,15 +598,12 @@ export class ChatSocket {
           toolUseId: text(wire, "tool_use_id"),
           input: text(wire, "input"),
           title: text(wire, "title"),
+          titleKey: text(wire, "title_key"),
           options: list(wire, "options").map(toOption),
-          questions: list(wire, "questions").map((question) => ({
-            header: text(question, "header"),
-            question: text(question, "question"),
-            multiSelect: flag(question, "multi_select"),
-            options: list(question, "options").map(toOption),
-          })),
           blocks: list(wire, "blocks").flatMap(toElement),
           submitLabel: text(wire, "submit"),
+          submitKey: text(wire, "submit_key"),
+          dismiss: toDismiss(wire.dismiss),
         };
       case "interaction_resolved":
         return {

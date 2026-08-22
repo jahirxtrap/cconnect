@@ -35,7 +35,6 @@
     onToggle?: (() => void) | null;
     onAnswer?: (requestId: string, optionId: string) => void;
     onSharedLink?: (url: string, filename: string) => void;
-    questions?: Snippet<[InteractionData]>;
     component?: Snippet<[InteractionData]>;
   }
 
@@ -50,7 +49,6 @@
     onToggle = null,
     onAnswer,
     onSharedLink,
-    questions,
     component,
   }: Props = $props();
 
@@ -142,8 +140,6 @@
     {#if message.interaction}
       {#if message.interaction.kind === "component" && component}
         {@render component(message.interaction)}
-      {:else if message.interaction.kind === "questions" && questions}
-        {@render questions(message.interaction)}
       {:else}
         <InteractionBlock
           data={message.interaction}

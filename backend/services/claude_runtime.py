@@ -13,6 +13,7 @@ from core import cli_manager
 from core.config import AI_WORKDIR, PORT, SHARED_DIR
 from mcps import build_cconnect_server
 from services import settings_store, visibility
+from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
@@ -368,47 +369,16 @@ def _build_can_use_tool(ask_user: Callable[[dict], Awaitable[dict]]):
     async def _can_use_tool(tool_name: str, tool_input: dict, ctx) -> Any:
         if tool_name == "AskUserQuestion" and isinstance(tool_input, dict):
             qs = [q for q in (tool_input.get("questions") or []) if isinstance(q, dict)]
-            payload_questions = [
-                {
-                    "header": q.get("header"),
-                    "question": q.get("question"),
-                    "multi_select": bool(q.get("multiSelect")),
-                    "options": [
-                        {
-                            "id": f"{qi}_{oi}",
-                            "label": str(opt.get("label", "")),
-                            "description": opt.get("description"),
-                            "preview": opt.get("preview"),
-                        }
-                        for oi, opt in enumerate(q.get("options", []))
-                        if isinstance(opt, dict)
-                    ],
-                }
-                for qi, q in enumerate(qs)
-            ]
-            response = await ask_user({"kind": "questions", "questions": payload_questions})
+            response = await ask_user({
+                "kind": "component",
+                "title_key": "questions",
+                "submit_key": SUBMIT_KEY,
+                "dismiss": DISMISS,
+                "blocks": questions_to_blocks(qs),
+            })
             if response.get("chat"):
-                return PermissionResultDeny(
-                    message="The user declined the questions and wants to discuss this instead. Ask them how they'd like to proceed."
-                )
-            raw_answers = response.get("answers") or []
-            answers: dict[str, Any] = {}
-            annotations: dict[str, Any] = {}
-            for qi, q in enumerate(qs):
-                ans = raw_answers[qi] if qi < len(raw_answers) and isinstance(raw_answers[qi], dict) else {}
-                opts = payload_questions[qi]["options"]
-                selected = ans.get("selected") or []
-                labels = [o["label"] for o in opts if o["id"] in selected]
-                free_text = (ans.get("free_text") or "").strip()
-                if free_text:
-                    labels.append(free_text)
-                notes = (ans.get("notes") or "").strip()
-                if not labels and not notes:
-                    continue
-                qkey = str(q.get("question", ""))
-                answers[qkey] = labels if q.get("multiSelect") else (labels[0] if labels else "")
-                if notes:
-                    annotations[qkey] = {"notes": notes}
+                return PermissionResultDeny(message=DECLINE_MESSAGE)
+            answers, annotations = answers_from_values(qs, response.get("values") or {})
             updated: dict[str, Any] = {"questions": qs, "answers": answers}
             if annotations:
                 updated["annotations"] = annotations

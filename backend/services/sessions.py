@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from core.config import AI_WORKDIR, CLAUDE_PROJECTS_DIR
 from services import settings_store, visibility
+from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SESSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -376,10 +377,13 @@ def _parse_component_result(content: object) -> Optional[dict]:
         payload = json.loads(_flatten_result_content(content))
     except ValueError:
         return None
-    if not isinstance(payload, dict) or not payload.get("submitted"):
-        return {}
+    if not isinstance(payload, dict):
+        return None
     values = payload.get("values")
-    return values if isinstance(values, dict) else {}
+    return {
+        "dismissed": not payload.get("submitted"),
+        "values": values if isinstance(values, dict) and payload.get("submitted") else {},
+    }
 
 
 def _compact_summary_text(entry: dict) -> str:
@@ -959,7 +963,7 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                 if text:
                     messages.append({"type": "thinking", "text": text})
             elif btype == "tool_use":
-                from services.claude_runtime import _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input, _display_tool_name
+                from services.claude_runtime import _FILE_EDIT_TOOLS, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
@@ -971,29 +975,23 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                         continue
                     qs = [q for q in (inp.get("questions") or []) if isinstance(q, dict)]
                     qtexts = [q.get("question") or q.get("header") or "" for q in qs]
-                    parsed = _parse_ask_result(result_content, qtexts)
-                    out_questions = []
-                    for qi, q in enumerate(qs):
-                        qtext = q.get("question") or q.get("header") or ""
-                        answer, note = parsed.get(qtext, ("", ""))
-                        out_questions.append({
-                            "header": q.get("header"),
-                            "question": q.get("question"),
-                            "multi_select": bool(q.get("multiSelect")),
-                            "options": [
-                                {
-                                    "id": f"{qi}_{oi}",
-                                    "label": str(opt.get("label", "")),
-                                    "description": opt.get("description"),
-                                    "preview": opt.get("preview"),
-                                }
-                                for oi, opt in enumerate(q.get("options", []))
-                                if isinstance(opt, dict)
-                            ],
-                            "answer": answer,
-                            "note": note,
-                        })
-                    messages.append({"type": "interaction", "kind": "questions", "questions": out_questions})
+                    declined = DECLINE_MARK in _flatten_result_content(result_content)
+                    parsed = {} if declined else _parse_ask_result(result_content, qtexts)
+                    answered = {
+                        str(q.get("question", "")): parsed.get(q.get("question") or q.get("header") or "", ("", ""))
+                        for q in qs
+                    }
+                    messages.append({
+                        "type": "interaction",
+                        "kind": "component",
+                        "title_key": "questions",
+                        "submit_key": SUBMIT_KEY,
+                        "dismiss": DISMISS,
+                        "blocks": questions_to_blocks(qs),
+                        "values": values_from_answers(qs, answered),
+                        "submitted": True,
+                        "declined": declined,
+                    })
                     continue
                 if name.endswith("ask_component") and isinstance(inp, dict):
                     if isinstance(bid, str):
@@ -1006,9 +1004,11 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                         "kind": "component",
                         "title": inp.get("title"),
                         "submit": inp.get("submit"),
+                        "dismiss": inp.get("dismiss"),
                         "blocks": [b for b in (inp.get("blocks") or []) if isinstance(b, dict)],
-                        "values": answered,
+                        "values": answered["values"],
                         "submitted": True,
+                        "declined": answered["dismissed"],
                     })
                     continue
                 if name == "ExitPlanMode" and isinstance(inp, dict):

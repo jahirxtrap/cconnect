@@ -39,6 +39,7 @@ export const gapAbove = (prev: Role | null, current: Role): number => {
   const a = group(prev);
   const b = group(current);
   if (a !== 0 && b !== 0) return BIG;
+  if (current === "interaction") return SMALL;
   return a === 1 || b === 1 ? 0 : SMALL;
 };
 

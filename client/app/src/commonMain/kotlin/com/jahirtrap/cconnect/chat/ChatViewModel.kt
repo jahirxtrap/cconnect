@@ -28,11 +28,11 @@ import com.jahirtrap.cconnect.data.ServerDefaults
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.CommandOption
 import com.jahirtrap.cconnect.data.CompactData
+import com.jahirtrap.cconnect.data.ComponentElement
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionData
 import com.jahirtrap.cconnect.data.InteractionOption
 import com.jahirtrap.cconnect.data.pending
-import com.jahirtrap.cconnect.data.QuestionDraft
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.Role
@@ -1301,15 +1301,14 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         st.copy(messages = cleaned + ChatMessage(nextId++, Role.INTERACTION, event.input.orEmpty(), event.toolName, tuid, data, timestamp = nowMillis()))
                     }
                     if (settings.notifyInteraction && !event.replay) {
-                        val question = event.kind == "questions"
                         val component = event.kind == "component"
+                        val question = component && event.titleKey == "questions"
                         val isPlan = event.toolName == "ExitPlanMode"
-                        val actions = if (question || component) emptyList() else event.options
+                        val actions = if (component) emptyList() else event.options
                             .filter { it.id != "different" }
                             .mapNotNull { opt -> notificationOptionLabel(opt)?.let { Notifier.Action(it, event.requestId, opt.id) } }
                         val body = when {
-                            question -> event.questions.firstOrNull()?.question?.take(120)
-                            component -> data.title?.take(120)
+                            component -> (data.title ?: componentHeadline(event.blocks))?.take(120)
                             isPlan -> event.input.orEmpty().lineSequence().firstOrNull { it.isNotBlank() }?.trimStart('#', ' ')?.trim()?.take(120)?.ifBlank { null } ?: getString(Res.string.plan)
                             else -> event.toolName
                         }
@@ -1523,19 +1522,33 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         kind = event.kind,
         options = event.options,
         title = event.title,
-        questions = event.questions,
-        drafts = if (event.kind == "questions") List(event.questions.size) { QuestionDraft() } else emptyList(),
+        titleKey = event.titleKey,
         blocks = event.blocks,
         submitLabel = event.submitLabel,
-        values = event.blocks.mapNotNull { el ->
-            val id = el.id ?: return@mapNotNull null
-            when (el.type) {
-                "input" -> id to el.value.orEmpty()
-                "toggle" -> id to el.checked.toString()
-                else -> null
-            }
-        }.toMap(),
+        submitKey = event.submitKey,
+        dismiss = event.dismiss,
+        values = componentValues(event.blocks),
     )
+
+    private fun componentHeadline(blocks: List<ComponentElement>): String? = blocks.firstNotNullOfOrNull { element ->
+        if (element.type == "page") componentHeadline(element.blocks) else element.text?.takeIf { element.type == "text" }
+    }
+
+    private fun componentValues(blocks: List<ComponentElement>): Map<String, String> {
+        val out = mutableMapOf<String, String>()
+        for (element in blocks) {
+            if (element.type == "page") {
+                out += componentValues(element.blocks)
+                continue
+            }
+            val id = element.id ?: continue
+            when (element.type) {
+                "input", "notes" -> out[id] = element.value.orEmpty()
+                "toggle" -> out[id] = element.checked.toString()
+            }
+        }
+        return out
+    }
 
     fun setComponentValue(requestId: String, id: String, value: String) {
         updateInteraction(requestId) { it.copy(values = it.values + (id to value)) }
@@ -1662,55 +1675,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             .firstNotNullOfOrNull { m -> m.interaction?.takeIf { it.requestId == requestId } }
     }
 
-    private fun editDraft(requestId: String, qIndex: Int, edit: (QuestionDraft) -> QuestionDraft) =
-        updateInteraction(requestId) { data ->
-            if (data.submitted || qIndex !in data.drafts.indices) return@updateInteraction data
-            data.copy(drafts = data.drafts.toMutableList().also { it[qIndex] = edit(it[qIndex]) })
-        }
-
-    fun toggleQuestionOption(requestId: String, qIndex: Int, optionId: String) =
-        updateInteraction(requestId) { data ->
-            if (data.submitted || qIndex !in data.questions.indices || qIndex !in data.drafts.indices) return@updateInteraction data
-            val multi = data.questions[qIndex].multiSelect
-            val draft = data.drafts[qIndex]
-            val selected = when {
-                multi -> if (optionId in draft.selected) draft.selected - optionId else draft.selected + optionId
-                optionId in draft.selected -> emptySet()
-                else -> setOf(optionId)
-            }
-            val freeText = if (!multi && selected.isNotEmpty()) "" else draft.freeText
-            data.copy(drafts = data.drafts.toMutableList().also { it[qIndex] = draft.copy(selected = selected, freeText = freeText) })
-        }
-
-    fun setQuestionFreeText(requestId: String, qIndex: Int, text: String) =
-        updateInteraction(requestId) { data ->
-            if (data.submitted || qIndex !in data.drafts.indices) return@updateInteraction data
-            val single = qIndex in data.questions.indices && !data.questions[qIndex].multiSelect
-            data.copy(drafts = data.drafts.toMutableList().also {
-                val d = it[qIndex]
-                it[qIndex] = d.copy(freeText = text, selected = if (single && text.isNotBlank()) emptySet() else d.selected)
-            })
-        }
-
-    fun setQuestionNotes(requestId: String, qIndex: Int, text: String) =
-        editDraft(requestId, qIndex) { it.copy(notes = text) }
-
-    fun setActiveQuestion(requestId: String, index: Int) =
-        updateInteraction(requestId) { if (it.submitted || it.activeQuestion == index) it else it.copy(activeQuestion = index) }
-
-    fun submitQuestions(requestId: String) {
-        val data = findInteraction(requestId) ?: return
-        if (data.submitted) return
-        val drafts = data.drafts.map { it.copy(freeText = it.freeText.trim(), notes = it.notes.trim()) }
-        client.sendQuestionsResponse(requestId, drafts)
-        val summary = data.questions.mapIndexed { i, q ->
-            val draft = drafts.getOrElse(i) { QuestionDraft() }
-            val labels = q.options.filter { it.id in draft.selected }.mapNotNull { it.label }
-            (labels + listOfNotNull(draft.freeText.ifBlank { null })).joinToString(", ")
-        }
-        val notes = data.questions.indices.map { drafts.getOrElse(it) { QuestionDraft() }.notes }
-        updateInteraction(requestId) { it.copy(submitted = true, summary = summary, notes = notes) }
-    }
+    fun setActivePage(requestId: String, index: Int) =
+        updateInteraction(requestId) { if (it.submitted || it.activePage == index) it else it.copy(activePage = index) }
 
     fun chatQuestions(requestId: String) {
         val data = findInteraction(requestId) ?: return

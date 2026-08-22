@@ -5,8 +5,6 @@ import com.jahirtrap.cconnect.data.ComponentOption
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionOption
-import com.jahirtrap.cconnect.data.InteractionQuestion
-import com.jahirtrap.cconnect.data.QuestionDraft
 import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.ServerEvent
 import com.jahirtrap.cconnect.data.TodoItem
@@ -239,22 +237,6 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         })
     }
 
-    fun sendQuestionsResponse(requestId: String, answers: List<QuestionDraft>) {
-        send(buildJsonObject {
-            put("type", "interaction_response")
-            put("id", requestId)
-            putJsonArray("answers") {
-                answers.forEach { d ->
-                    addJsonObject {
-                        putJsonArray("selected") { d.selected.forEach { add(it) } }
-                        if (d.freeText.isNotBlank()) put("free_text", d.freeText)
-                        if (d.notes.isNotBlank()) put("notes", d.notes)
-                    }
-                }
-            }
-        })
-    }
-
     fun sendComponentResponse(requestId: String, values: Map<String, String>) {
         send(buildJsonObject {
             put("type", "interaction_response")
@@ -408,18 +390,12 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 toolUseId = str("tool_use_id"),
                 input = str("input"),
                 title = str("title"),
+                titleKey = str("title_key"),
                 options = obj["options"]?.jsonArray?.map { it.jsonObject.toOption() } ?: emptyList(),
-                questions = obj["questions"]?.jsonArray?.map { el ->
-                    val q = el.jsonObject
-                    InteractionQuestion(
-                        header = q["header"]?.jsonPrimitive?.contentOrNull,
-                        question = q["question"]?.jsonPrimitive?.contentOrNull,
-                        multiSelect = q["multi_select"]?.jsonPrimitive?.booleanOrNull == true,
-                        options = q["options"]?.jsonArray?.map { it.jsonObject.toOption() } ?: emptyList(),
-                    )
-                } ?: emptyList(),
                 blocks = obj["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
                 submitLabel = str("submit"),
+                submitKey = str("submit_key"),
+                dismiss = (obj["dismiss"] as? JsonObject)?.toDismiss(),
                 replay = flag("replay"),
             )
             "interaction_resolved" -> ServerEvent.InteractionResolved(
@@ -438,7 +414,14 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
     }
 }
 
-private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview")
+private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview", "page", "notes")
+
+internal fun JsonObject.toDismiss(): ComponentOption = ComponentOption(
+    value = "",
+    label = this["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+    labelKey = this["label_key"]?.jsonPrimitive?.contentOrNull,
+    icon = this["icon"]?.jsonPrimitive?.contentOrNull,
+)
 
 internal fun JsonObject.toElement(): ComponentElement? {
     val type = this["type"]?.jsonPrimitive?.contentOrNull ?: return null
@@ -450,6 +433,7 @@ internal fun JsonObject.toElement(): ComponentElement? {
         label = this["label"]?.jsonPrimitive?.contentOrNull,
         text = this["value"]?.jsonPrimitive?.contentOrNull.takeIf { type == "text" },
         placeholder = this["placeholder"]?.jsonPrimitive?.contentOrNull,
+        placeholderKey = this["placeholder_key"]?.jsonPrimitive?.contentOrNull,
         value = raw?.contentOrNull.takeIf { type == "input" },
         checked = raw?.booleanOrNull == true,
         multiline = this["multiline"]?.jsonPrimitive?.booleanOrNull == true,
@@ -463,9 +447,12 @@ internal fun JsonObject.toElement(): ComponentElement? {
                 description = o["description"]?.jsonPrimitive?.contentOrNull,
                 preview = o["preview"]?.jsonPrimitive?.contentOrNull,
                 style = o["style"]?.jsonPrimitive?.contentOrNull,
+                icon = o["icon"]?.jsonPrimitive?.contentOrNull,
+                labelKey = o["label_key"]?.jsonPrimitive?.contentOrNull,
             )
         } ?: emptyList(),
         block = this["block"]?.jsonObject?.toString(),
+        blocks = this["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
     )
 }
 

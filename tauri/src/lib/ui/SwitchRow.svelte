@@ -4,6 +4,7 @@
 
   interface Props {
     title: string;
+    required?: boolean;
     checked: boolean;
     onChange: (checked: boolean) => void;
     summary?: string | null;
@@ -14,6 +15,7 @@
 
   const {
     title,
+    required = false,
     checked,
     onChange,
     summary = null,
@@ -33,7 +35,9 @@
     <span class="mr-3 flex shrink-0 items-center">{@render leading()}</span>
   {/if}
   <span class="min-w-0 flex-1">
-    <span class="block truncate text-body-md">{title}</span>
+    <span class="block truncate text-body-md"
+      >{title}{#if required}<span class="text-error"> *</span>{/if}</span
+    >
     {#if summary}
       <span class="block text-body-sm text-on-surface-variant">{summary}</span>
     {/if}

@@ -17,7 +17,7 @@
     onClear: () => void;
     onClose: () => void;
     onAnswer: (requestId: string, optionId: string) => void;
-    questions?: import("svelte").Snippet<[InteractionData]>;
+    component?: import("svelte").Snippet<[InteractionData]>;
   }
 
   const {
@@ -29,7 +29,7 @@
     onClear,
     onClose,
     onAnswer,
-    questions,
+    component,
   }: Props = $props();
 
   const PEEK = 58;
@@ -207,7 +207,7 @@
           nextRole={messages[index + 1]?.role ?? null}
           running={item.role === "working" && index === messages.length - 1 && streaming}
           {onAnswer}
-          {questions}
+          {component}
         />
       {/each}
     </div>

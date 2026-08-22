@@ -4,7 +4,6 @@ import com.jahirtrap.cconnect.data.CompactData
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionData
 import com.jahirtrap.cconnect.data.InteractionOption
-import com.jahirtrap.cconnect.data.InteractionQuestion
 import com.jahirtrap.cconnect.data.diffKindOf
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.SessionInfo
@@ -138,29 +137,18 @@ object SessionsApi {
                 requestId = "resumed",
                 kind = kind,
                 title = o["title"]?.jsonPrimitive?.contentOrNull,
+                titleKey = o["title_key"]?.jsonPrimitive?.contentOrNull,
                 submitLabel = o["submit"]?.jsonPrimitive?.contentOrNull,
+                submitKey = o["submit_key"]?.jsonPrimitive?.contentOrNull,
+                dismiss = (o["dismiss"] as? JsonObject)?.toDismiss(),
                 blocks = o["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
                 values = values,
                 submitted = true,
+                declined = o["declined"]?.jsonPrimitive?.booleanOrNull == true,
             )
         }
-        if (kind != "questions") {
-            val res = o["resolved"]?.jsonPrimitive?.contentOrNull ?: "allow"
-            return InteractionData(requestId = "resumed", kind = kind, resolved = res, options = listOf(InteractionOption(id = res)))
-        }
-        val qArray = o["questions"]?.jsonArray
-        val questions = qArray?.map { qel ->
-            val q = qel.jsonObject
-            InteractionQuestion(
-                header = q["header"]?.jsonPrimitive?.contentOrNull,
-                question = q["question"]?.jsonPrimitive?.contentOrNull,
-                multiSelect = q["multi_select"]?.jsonPrimitive?.booleanOrNull == true,
-                options = q["options"]?.jsonArray?.mapNotNull(::parseOption) ?: emptyList(),
-            )
-        } ?: emptyList()
-        val summary = qArray?.map { it.jsonObject["answer"]?.jsonPrimitive?.contentOrNull.orEmpty() } ?: emptyList()
-        val notes = qArray?.map { it.jsonObject["note"]?.jsonPrimitive?.contentOrNull.orEmpty() } ?: emptyList()
-        return InteractionData(requestId = "resumed", kind = "questions", questions = questions, submitted = true, summary = summary, notes = notes)
+        val res = o["resolved"]?.jsonPrimitive?.contentOrNull ?: "allow"
+        return InteractionData(requestId = "resumed", kind = kind, resolved = res, options = listOf(InteractionOption(id = res)))
     }
 
     private fun parseOption(el: JsonElement): InteractionOption? {

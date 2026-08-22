@@ -82,6 +82,7 @@ backend/
     ├── live_sessions.py     # In-memory LiveSession + SessionRegistry — turns decoupled from the WS connection; reattach by channel, idle reaper, seq'd outbox replay; message queue (enqueue/drain, carry-over)
     ├── claude_runtime.py    # SDK query() -> normalized event stream; system-prompt append; side-question + usage helpers; title generation; streaming-input drain injects queued messages (`dequeued`); PreCompact hook emits `compacting`; idle watchdog + stderr callback + result/exception classification emit `status` (`slow`/retry, suppressed during compact/tool/await) vs clean `error` (usage limits/auth)
     ├── sessions.py          # Read transcripts from ~/.claude/projects (path-traversal safe); checkpoints; image extraction
+    ├── questions.py         # AskUserQuestion <-> component blocks: questions_to_blocks() for the form, answers_from_values() for the CLI's answer, values_from_answers() to rebuild it on resume
     ├── rewind.py            # Rewind preview/execute via SDK control requests; pending rewind id in rewind_pending.json
     ├── attachments.py       # compose_prompt(): native image blocks + @-mentions for chat attachments
     ├── claude_assets.py     # Read-only views of ~/.claude: plugins, marketplaces + catalogs, skills, MCP servers, memories, USER.md
@@ -244,7 +245,7 @@ Client → server (JSON):
 - `{"type":"prompt","text":"...","attachments":["uploads/a.png", ...]}` — `attachments` are relpaths under `shared/` previously uploaded via `PUT /api/shared/...`; the server composes them into the prompt (see Attachments below). A prompt sent while a turn is running is **enqueued** rather than rejected and injected when reached (see **Message queue**).
 - `{"type":"set_permission_mode","mode":"..."}`
 - `{"type":"interrupt"}` — optional `"lane":"side"` interrupts the quick chat instead of the main turn.
-- `{"type":"interaction_response","id":"...","option_id":"...","free_text":"...","answers":[...],"chat":false}`
+- `{"type":"interaction_response","id":"...","option_id":"...","free_text":"...","values":{...},"chat":false}` — `option_id`/`free_text` answer a permission, `values` answers a component (id → string / bool / array), `chat` dismisses it.
 - `{"type":"load_history","session_id":"...","project":"...","before_index":N,"limit":100}` — pull the slice immediately before `before_index`. Used after the initial HTTP fetch when the user scrolls towards the top.
 - `{"type":"ask","text":"...","resume":"..."}` — quick-chat side question. Runs as a concurrent, isolated subquery (own workspace + model) and never touches the main turn.
 - `{"type":"usage"}` — request the ephemeral plan-usage report (`services/usage`); not part of any session.
@@ -301,9 +302,16 @@ Control/ephemeral messages (`ready`, `permission_mode`, `history_chunk`,
   classified backend-side so mobile only renders. The matching `tool_result`
   is suppressed.
 - `interaction_request` (id, kind, options, free_text, title, tool_name, input,
-  tool_use_id; question kind carries `questions`) — for `AskUserQuestion` and
-  per-tool permission prompts. Paired by id with the client's
-  `interaction_response`.
+  tool_use_id; `kind: "component"` carries `blocks` plus `submit` / `submit_key`
+  / `title_key` / `dismiss`) — per-tool permission prompts and anything answered
+  with a form. The form's `dismiss` (label + icon) is drawn as a wide button
+  under the send one; without it the block shows a close icon instead.
+  `AskUserQuestion` is translated into component blocks by
+  `services/questions.py` (one `page` per question, its `select`, the free-text
+  field and its `notes`), so the client keeps a single renderer. Control labels
+  travel as keys (`title_key`, `label_key`, `placeholder_key`) for the client to
+  translate, never as ready-made text. Paired by id with the client's
+  `interaction_response` (`option_id` / `values` / `chat`).
 - `system`, `result` (carries `session_id`), `done`, `interrupted`, `error`.
 - `queued` (id, text) / `dequeued` (id) — message-queue lifecycle: `queued`
   acknowledges a prompt accepted into the queue while a turn was running;
@@ -470,7 +478,7 @@ single-file drop:
 
 A module can expose `make_tools(context)` instead of `tools`. It is called on
 every turn with what that turn passed in, so the handler can be a closure over
-turn-scoped things (`request_compact` today; the interaction callback later).
+turn-scoped things (`request_compact`, `ask_user`, the client's `capabilities`).
 Returning `[]` removes the tool from that turn entirely — which is also the
 safest gate: a tool the model can't see is a tool it can't call. `mcps/compact.py`
 uses both halves — it only exists when the turn can honour it, and it is absent
@@ -510,6 +518,8 @@ read fresh on every turn:
 | Tool | Purpose |
 |---|---|
 | `check_progress` | Summarizes the latest session of another project into Done / Pending / Files touched / Next step. Runs an isolated SDK subquery in `AI_WORKDIR` with `haiku`. |
+| `compact` | Asks for compaction; it starts when the turn ends. Absent from the turn it triggers, so it can't chain. |
+| `ask_component` | Shows a form in the chat and waits for it. Elements: `text`, `select`, `input`, `toggle`, `notes`, `buttons`, `preview`, `page`; plus `dismiss` for a way out of the form, which replaces the close icon. Gated on the client's `components` capability, and `preview` only mentions rich media when the client also has `media.rich`. |
 
 ## Session transcript transformation
 
@@ -527,9 +537,12 @@ normalizes blocks so resume == live:
     The matching `tool_result` is dropped.
   - `TodoWrite` and any `Task*` tool → dropped entirely (live shows them as
     transient state, no equivalent in history).
-  - `AskUserQuestion` → expanded into one `interaction` message per question,
-    with the chosen answer reconstructed by parsing the matching tool_result
-    content (Claude Code stores it as `"Q"="A", "Q2"="A2"`).
+  - `AskUserQuestion` → one `interaction` message of kind `component`, built with
+    the same `services/questions.py` used live, so resume looks identical. The
+    chosen answer comes from parsing the matching tool_result content (Claude
+    Code stores it as `"Q"="A", "Q2"="A2"`) back into `values`.
+  - `mcp__cconnect__ask_component` → an `interaction` message carrying the tool's
+    own `blocks` and the answered `values`.
 - `tool_result` — emitted with `_flatten_result_content(...)` (same as live).
 - Rewind forks are honored: only the active branch (via parent links) is
   emitted.

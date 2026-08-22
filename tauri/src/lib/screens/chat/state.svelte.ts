@@ -10,7 +10,6 @@ import {
   type InteractionData,
   type InteractionOption,
   type QueuedMessage,
-  type QuestionDraft,
   type Role,
   type TodoItem,
 } from "$lib/data/chatModels";
@@ -20,9 +19,10 @@ import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 
 const componentDefaults = (blocks: ComponentElement[]): Record<string, string> =>
   Object.fromEntries(
-    blocks.flatMap((element) => {
+    blocks.flatMap((element): [string, string][] => {
+      if (element.type === "page") return Object.entries(componentDefaults(element.blocks));
       if (!element.id) return [];
-      if (element.type === "input") return [[element.id, element.value ?? ""]];
+      if (element.type === "input" || element.type === "notes") return [[element.id, element.value ?? ""]];
       if (element.type === "toggle") return [[element.id, String(element.checked)]];
       return [];
     }),
@@ -545,8 +545,7 @@ export class ChatState {
                 ...emptyInteraction(event.requestId, event.kind),
                 options: event.options,
                 title: event.title,
-                questions: event.questions,
-                drafts: event.questions.map(() => ({ selected: [], freeText: "", notes: "" })),
+                titleKey: event.titleKey,
                 blocks: event.blocks,
                 submitLabel: event.submitLabel,
                 values: componentDefaults(event.blocks),
@@ -619,41 +618,9 @@ export class ChatState {
     this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE);
   }
 
-  toggleQuestionOption(requestId: string, questionIndex: number, optionId: string) {
-    this.#updateInteraction(requestId, (data) => {
-      if (data.submitted || !data.questions[questionIndex] || !data.drafts[questionIndex]) return data;
-      const multi = data.questions[questionIndex].multiSelect;
-      const draft = data.drafts[questionIndex];
-      const selected = multi
-        ? draft.selected.includes(optionId)
-          ? draft.selected.filter((id) => id !== optionId)
-          : [...draft.selected, optionId]
-        : draft.selected.includes(optionId)
-          ? []
-          : [optionId];
-      const freeText = !multi && selected.length ? "" : draft.freeText;
-      return {
-        ...data,
-        drafts: data.drafts.map((item, index) => (index === questionIndex ? { ...draft, selected, freeText } : item)),
-      };
-    });
-  }
-
-  setQuestionText(requestId: string, questionIndex: number, value: string) {
-    this.#editDraft(requestId, questionIndex, (draft, question) => ({
-      ...draft,
-      freeText: value,
-      selected: question && !question.multiSelect && value.trim() ? [] : draft.selected,
-    }));
-  }
-
-  setQuestionNotes(requestId: string, questionIndex: number, value: string) {
-    this.#editDraft(requestId, questionIndex, (draft) => ({ ...draft, notes: value }));
-  }
-
-  setActiveQuestion(requestId: string, index: number) {
+  setActivePage(requestId: string, index: number) {
     this.#updateInteraction(requestId, (data) =>
-      data.submitted || data.activeQuestion === index ? data : { ...data, activeQuestion: index },
+      data.submitted || data.activePage === index ? data : { ...data, activePage: index },
     );
   }
 
@@ -685,27 +652,6 @@ export class ChatState {
     const filled = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
     this.#socket.sendComponentResponse(requestId, filled);
     this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, values }));
-  }
-
-  submitQuestions(requestId: string) {
-    const data = this.#findInteraction(requestId);
-    if (!data || data.submitted) return;
-    const drafts = data.drafts.map((draft) => ({
-      ...draft,
-      freeText: draft.freeText.trim(),
-      notes: draft.notes.trim(),
-    }));
-    this.#socket.sendQuestionsResponse(requestId, drafts);
-    const summary = data.questions.map((question, index) => {
-      const draft = drafts[index] ?? { selected: [], freeText: "", notes: "" };
-      const labels = question.options
-        .filter((option) => draft.selected.includes(option.id))
-        .map((option) => option.label)
-        .filter((label): label is string => !!label);
-      return [...labels, ...(draft.freeText ? [draft.freeText] : [])].join(", ");
-    });
-    const notes = data.questions.map((_question, index) => drafts[index]?.notes ?? "");
-    this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, summary, notes }));
   }
 
   declineQuestions(requestId: string) {
@@ -1112,22 +1058,6 @@ export class ChatState {
     }
   }
 
-  #editDraft(
-    requestId: string,
-    questionIndex: number,
-    transform: (draft: QuestionDraft, question: InteractionData["questions"][number] | undefined) => QuestionDraft,
-  ) {
-    this.#updateInteraction(requestId, (data) => {
-      if (data.submitted || !data.drafts[questionIndex]) return data;
-      return {
-        ...data,
-        drafts: data.drafts.map((draft, index) =>
-          index === questionIndex ? transform(draft, data.questions[index]) : draft,
-        ),
-      };
-    });
-  }
-
   #findInteraction(requestId: string): InteractionData | null {
     return (
       [...this.messages, ...this.sideMessages].find((item) => item.interaction?.requestId === requestId)
@@ -1277,15 +1207,27 @@ export class ChatState {
     this.sideMessages = apply(this.sideMessages);
   }
 
+  #componentHeadline(blocks: ComponentElement[]): string | null {
+    for (const element of blocks) {
+      if (element.type === "page") {
+        const nested = this.#componentHeadline(element.blocks);
+        if (nested) return nested;
+      }
+      if (element.type === "text" && element.text) return element.text;
+    }
+    return null;
+  }
+
   #notificationBody(
     kind: string,
-    firstQuestion: string | null | undefined,
+    blocks: ComponentElement[],
     toolName: string | null,
     input: string | null,
     title: string | null,
   ): string | null {
-    if (kind === "questions") return firstQuestion?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
-    if (kind === "component") return title?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
+    if (kind === "component") {
+      return (title ?? this.#componentHeadline(blocks))?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
+    }
     if (toolName !== "ExitPlanMode") return toolName?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
     const heading = (input ?? "")
       .split("\n")
@@ -1570,10 +1512,11 @@ export class ChatState {
             ...emptyInteraction(event.requestId, event.kind),
             options: event.options,
             title: event.title,
-            questions: event.questions,
-            drafts: event.questions.map(() => ({ selected: [], freeText: "", notes: "" })),
+            titleKey: event.titleKey,
             blocks: event.blocks,
             submitLabel: event.submitLabel,
+            submitKey: event.submitKey,
+            dismiss: event.dismiss,
             values: componentDefaults(event.blocks),
           };
           const toolUseId = event.toolUseId;
@@ -1588,16 +1531,16 @@ export class ChatState {
           ];
           if (settings.notifyInteraction && !event.replay) {
             const kind = event.kind;
-            const silentActions = kind === "questions" || kind === "component";
+            const silentActions = kind === "component";
             void notifier.notify(
-              t(kind === "questions" ? "NOTIF_QUESTION" : kind === "component" ? "NOTIF_COMPONENT" : "NOTIF_PERMISSION"),
-              this.#notificationBody(
-                kind,
-                event.questions[0]?.question,
-                event.toolName,
-                event.input,
-                data.title,
+              t(
+                kind !== "component"
+                  ? "NOTIF_PERMISSION"
+                  : data.titleKey === "questions"
+                    ? "NOTIF_QUESTION"
+                    : "NOTIF_COMPONENT",
               ),
+              this.#notificationBody(kind, event.blocks, event.toolName, event.input, data.title),
               this.tabId,
               silentActions
                 ? []
@@ -1613,7 +1556,6 @@ export class ChatState {
         break;
       case "interaction_resolved":
         this.#updateInteraction(event.requestId, (data) => {
-          if (data.kind === "questions") return data.submitted || data.declined ? data : { ...data, submitted: true };
           if (data.kind === "component") {
             if (data.submitted || data.declined) return data;
             return {

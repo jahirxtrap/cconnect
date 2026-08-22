@@ -1,7 +1,9 @@
 <script lang="ts">
   import CircleQuestionMark from "@lucide/svelte/icons/circle-question-mark";
+  import CornerDownRight from "@lucide/svelte/icons/corner-down-right";
   import Play from "@lucide/svelte/icons/play";
   import X from "@lucide/svelte/icons/x";
+  import { untrack } from "svelte";
   import { VALUE_SEPARATOR, type ComponentElement, type InteractionData } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
@@ -13,7 +15,12 @@
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import OptionRow from "$lib/ui/OptionRow.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import SelectChip from "$lib/ui/SelectChip.svelte";
+  import SummaryLine from "$lib/ui/SummaryLine.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
+  import { componentIcon } from "$lib/ui/componentIcons";
+  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { swipePage } from "$lib/ui/swipe";
 
   interface Props {
     data: InteractionData;
@@ -21,28 +28,79 @@
     onPick: (id: string, value: string, multiple: boolean) => void;
     onSubmit: (action: string | null) => void;
     onDismiss: () => void;
+    onPage: (index: number) => void;
     onPreviewOpen: (url: string, filename: string) => void;
   }
 
-  const { data, onValue, onPick, onSubmit, onDismiss, onPreviewOpen }: Props = $props();
+  const { data, onValue, onPick, onSubmit, onDismiss, onPage, onPreviewOpen }: Props = $props();
 
-  const labelOf = (element: ComponentElement) => (element.label ?? "") + (element.required ? " *" : "");
-  const ready = $derived(
-    !data.blocks.some(
-      (element) => element.required && element.type !== "buttons" && !data.values[element.id ?? ""],
-    ),
-  );
+  const flatten = (blocks: ComponentElement[]): ComponentElement[] =>
+    blocks.flatMap((element) => (element.type === "page" ? flatten(element.blocks) : [element]));
 
+  const valueOf = (element: ComponentElement) => data.values[element.id ?? ""] ?? "";
+
+  const pages = $derived(data.blocks.filter((element) => element.type === "page"));
   const actions = $derived(data.blocks.find((element) => element.type === "buttons"));
+
+  const missing = (element: ComponentElement): boolean => {
+    if (element.type === "page") {
+      const answerable = flatten(element.blocks).filter((item) => item.type !== "notes");
+      return (
+        (element.required && !answerable.some((item) => valueOf(item))) ||
+        element.blocks.some(missing)
+      );
+    }
+    if (element.type === "buttons") return false;
+    return element.required && !valueOf(element);
+  };
+  const ready = $derived(!data.blocks.some(missing));
+
+  const keyed = (key: string | null, many = false) => {
+    switch (key) {
+      case "questions":
+        return t("QUESTIONS_TITLE");
+      case "submit":
+        return many ? t("SUBMIT_ANSWERS") : t("SEND");
+      case "chat":
+        return t("CHAT_ABOUT_THIS");
+      case "other":
+        return t("INTERACTION_OTHER_HINT");
+      case "notes":
+        return t("INTERACTION_NOTES_HINT");
+      case "add_notes":
+        return t("ADD_NOTES");
+      default:
+        return null;
+    }
+  };
+
+  let page = $state(untrack(() => Math.max(data.activePage, 0)));
+  const current = $derived(pages.length ? Math.min(page, pages.length - 1) : 0);
+  const shown = $derived(pages.length ? (pages[current]?.blocks ?? []) : data.blocks);
+
+  const goto = (index: number) => {
+    page = Math.min(Math.max(index, 0), pages.length - 1);
+    onPage(page);
+  };
+
+  const openNotes = $state<Record<string, boolean>>({});
+  const notesShown = (element: ComponentElement) =>
+    openNotes[element.id ?? ""] ?? valueOf(element) !== "";
+
   const picked = (id: string | null) =>
     (data.values[id ?? ""] ?? "").split(VALUE_SEPARATOR).filter(Boolean);
 
   const dirty = $derived(Object.values(data.values).some((value) => value !== ""));
   let confirmingDismiss = $state(false);
 
+  const pending = $derived(pages.length > 1 && current < pages.length - 1);
+  const shownActions = $derived(
+    (actions?.options ?? []).filter((option) => !pending || option.style === "plain"),
+  );
+
   const summary = $derived(
-    data.blocks.flatMap((element) => {
-      const raw = data.values[element.id ?? ""] ?? "";
+    flatten(data.blocks).flatMap((element) => {
+      const raw = valueOf(element);
       if (!element.id || !raw) return [];
       let value: string;
       if (element.type === "select" || element.type === "buttons") {
@@ -56,7 +114,7 @@
       } else {
         value = raw;
       }
-      return value ? [{ label: element.label ?? "", value }] : [];
+      return value ? [{ label: element.label ?? "", value, note: element.type === "notes" }] : [];
     }),
   );
 </script>
@@ -74,12 +132,96 @@
   />
 {/if}
 
+{#snippet elements(list: ComponentElement[])}
+  {#each list as element, index (index)}
+    {#if element.type === "text"}
+      <MarkdownText text={element.text ?? ""} />
+    {:else if element.type === "preview" && element.block}
+      {@const parsed = parseCconnectBlock(element.block)}
+      {#if parsed}
+        <div class="mt-1 w-full">
+          <CconnectBlockView data={parsed} onOpen={onPreviewOpen} compact />
+        </div>
+      {/if}
+    {:else if element.type === "select"}
+      {#if element.label?.trim()}
+        <p class="text-body-md">
+          {element.label}{#if element.required}<span class="text-error"> *</span>{/if}
+        </p>
+      {/if}
+      {#each element.options as option (option.value)}
+        {@const selected = picked(element.id).includes(option.value)}
+        <OptionRow
+          label={option.label}
+          onclick={() => !data.submitted && onPick(element.id ?? "", option.value, element.multiple)}
+          description={option.description}
+          {selected}
+          multi={element.multiple}
+        />
+        {#if selected && option.preview?.trim()}
+          <OutlinedPanel class="my-1 w-full">
+            <pre
+              class="overflow-x-auto font-mono text-body-sm leading-snug whitespace-pre">{option.preview.replace(
+                /\n+$/,
+                "",
+              )}</pre>
+          </OutlinedPanel>
+        {/if}
+      {/each}
+    {:else if element.type === "input"}
+      <InputField
+        class="mt-1"
+        label={element.label ?? undefined}
+        required={element.required}
+        value={valueOf(element)}
+        oninput={(value) => !data.submitted && onValue(element.id ?? "", value)}
+        placeholder={element.placeholder ?? keyed(element.placeholderKey) ?? undefined}
+        singleLine={!element.multiline}
+        maxLines={element.multiline ? 6 : 1}
+      />
+    {:else if element.type === "toggle"}
+      <SwitchRow
+        title={element.label ?? ""}
+        required={element.required}
+        checked={valueOf(element) === "true"}
+        enabled={!data.submitted}
+        onChange={(next) => onValue(element.id ?? "", String(next))}
+      />
+    {:else if element.type === "notes"}
+      {#if notesShown(element)}
+        <InputField
+          class="mt-1.5"
+          value={valueOf(element)}
+          oninput={(value) => !data.submitted && onValue(element.id ?? "", value)}
+          placeholder={element.placeholder ?? keyed(element.placeholderKey) ?? undefined}
+          maxLines={3}
+          clearAlways
+          onClear={() =>
+            valueOf(element).trim()
+              ? onValue(element.id ?? "", "")
+              : (openNotes[element.id ?? ""] = false)}
+        />
+      {:else}
+        <button
+          type="button"
+          onclick={() => (openNotes[element.id ?? ""] = true)}
+          class="mt-1 cursor-pointer text-left text-label-md text-accent select-none"
+        >
+          {element.label?.trim() || t("ADD_NOTES")}
+        </button>
+      {/if}
+    {/if}
+  {/each}
+{/snippet}
+
 <div class="w-full px-4">
   <OutlinedPanel>
     <div class="flex items-center gap-1.5">
       <CircleQuestionMark size={16} class="shrink-0 text-accent" />
-      <span class="min-w-0 flex-1 truncate text-label-lg text-accent select-none">{data.title ?? ""}</span>
-      {#if !data.submitted}
+      <span class="min-w-0 flex-1 truncate text-label-lg text-accent select-none">
+        {keyed(data.titleKey) ?? data.title ?? ""}
+      </span>
+      {#if !data.submitted && !data.dismiss}
         <button
           type="button"
           onclick={() => (dirty ? (confirmingDismiss = true) : onDismiss())}
@@ -93,98 +235,88 @@
     <div class="h-1"></div>
 
     {#if data.declined}
-      <div class="flex items-center gap-1.5">
-        <X size={10} class="shrink-0 text-on-surface-variant" />
-        <span class="text-body-sm text-on-surface-variant">{t("CANCEL")}</span>
-      </div>
+      {@const icon = componentIcon(data.dismiss?.icon ?? null)}
+      <SummaryLine
+        icon={icon ?? X}
+        text={data.dismiss ? (data.dismiss.label || (keyed(data.dismiss.labelKey) ?? "")) : t("CANCEL")}
+      />
     {:else if data.submitted}
       {#each summary as row, index (index)}
-        <div class="mt-0.5">
-          {#if row.label}
-            <p class="text-body-md">{row.label}</p>
-          {/if}
-          <div class="flex items-center gap-1.5">
-            <Play size={10} class="shrink-0 fill-current text-on-surface-variant" />
-            <span class="text-body-sm text-on-surface-variant">{row.value}</span>
-          </div>
-        </div>
-      {/each}
-    {:else}
-      {#each data.blocks as element, index (index)}
-        {#if element.type === "text"}
-          <MarkdownText text={element.text ?? ""} />
-        {:else if element.type === "preview" && element.block}
-          {@const parsed = parseCconnectBlock(element.block)}
-          {#if parsed}
-            <div class="mt-1 w-full">
-              <CconnectBlockView data={parsed} onOpen={onPreviewOpen} compact />
-            </div>
-          {/if}
-        {:else if element.type === "select"}
-          {#if element.label?.trim()}
-            <p class="text-body-md">{labelOf(element)}</p>
-          {/if}
-          {#each element.options as option (option.value)}
-            {@const selected = picked(element.id).includes(option.value)}
-            <OptionRow
-              label={option.label}
-              onclick={() => !data.submitted && onPick(element.id ?? "", option.value, element.multiple)}
-              description={option.description}
-              {selected}
-              multi={element.multiple}
-            />
-            {#if selected && option.preview?.trim()}
-              <OutlinedPanel class="my-1 w-full">
-                <pre
-                  class="overflow-x-auto font-mono text-body-sm leading-snug whitespace-pre">{option.preview.replace(
-                    /\n+$/,
-                    "",
-                  )}</pre>
-              </OutlinedPanel>
+        {#if row.note}
+          <SummaryLine icon={CornerDownRight} size={12} text={row.value} class="mt-0.5 ml-4" />
+        {:else}
+          <div class="mt-0.5">
+            {#if row.label}
+              <p class="text-body-md">{row.label}</p>
             {/if}
-          {/each}
-        {:else if element.type === "input"}
-          <InputField
-            class="mt-1"
-            label={element.label ? labelOf(element) : undefined}
-            value={data.values[element.id ?? ""] ?? ""}
-            oninput={(value) => !data.submitted && onValue(element.id ?? "", value)}
-            placeholder={element.placeholder ?? undefined}
-            singleLine={!element.multiline}
-            maxLines={element.multiline ? 6 : 1}
-          />
-        {:else if element.type === "toggle"}
-          <SwitchRow
-            title={labelOf(element)}
-            checked={data.values[element.id ?? ""] === "true"}
-            enabled={!data.submitted}
-            onChange={(next) => onValue(element.id ?? "", String(next))}
-          />
+            <SummaryLine icon={Play} fill text={row.value} />
+          </div>
         {/if}
       {/each}
+    {:else}
+      {#if pages.length > 1}
+        <div use:hscrollbar={{ touchIndicator: false }} class="no-scrollbar flex gap-2 overflow-x-auto">
+          {#each pages as item, index (index)}
+            <SelectChip
+              label={item.label?.trim() || String(index + 1)}
+              selected={index === current}
+              onclick={() => goto(index)}
+            />
+          {/each}
+        </div>
+        <div
+          class="mt-2.5"
+          use:swipePage={{ onPrevious: () => goto(current - 1), onNext: () => goto(current + 1) }}
+        >
+          {@render elements(shown)}
+        </div>
+      {:else}
+        {#if pages.length === 1 && pages[0].label?.trim()}
+          <SelectChip label={pages[0].label} selected />
+          <div class="h-1"></div>
+        {/if}
+        {@render elements(shown)}
+      {/if}
     {/if}
 
     {#if !data.submitted && !data.declined}
       <div class="h-2"></div>
-      {#if actions}
-        <div class="flex flex-wrap gap-x-2 gap-y-1">
-          {#each actions.options as option (option.value)}
+      {#if pending}
+        <ActionButton class="w-full" text={t("NEXT")} onclick={() => goto(current + 1)} />
+      {/if}
+      {#if shownActions.length}
+        <div class="flex flex-wrap gap-x-2 gap-y-1 {pending ? 'mt-2' : ''}">
+          {#each shownActions as option (option.value)}
+            {@const Icon = componentIcon(option.icon)}
             <Button
               variant={option.style === "primary" ? "filled" : "outlined"}
               class="h-8 text-body-md"
-              enabled={ready}
+              enabled={ready || option.style === "plain"}
               onclick={() => onSubmit(option.value)}
             >
-              {option.label}
+              {#if Icon}
+                <Icon size={16} class="shrink-0" />
+              {/if}
+              {option.label || (keyed(option.labelKey, pages.length > 1) ?? "")}
             </Button>
           {/each}
         </div>
-      {:else}
+      {:else if !actions && !pending}
         <ActionButton
           class="w-full"
-          text={data.submitLabel?.trim() ? data.submitLabel : t("SEND")}
+          text={data.submitLabel?.trim() ||
+            keyed(data.submitKey, pages.length > 1) ||
+            t("SEND")}
           enabled={ready}
           onclick={() => onSubmit(null)}
+        />
+      {/if}
+      {#if data.dismiss}
+        <ActionButton
+          class="mt-2 w-full"
+          text={data.dismiss.label || (keyed(data.dismiss.labelKey) ?? "")}
+          icon={componentIcon(data.dismiss.icon) ?? undefined}
+          onclick={() => (dirty ? (confirmingDismiss = true) : onDismiss())}
         />
       {/if}
     {/if}

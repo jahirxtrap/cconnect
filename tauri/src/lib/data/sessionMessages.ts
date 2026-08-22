@@ -1,4 +1,4 @@
-import { toElement } from "$lib/services/chatSocket";
+import { toDismiss, toElement } from "$lib/services/chatSocket";
 import {
   diffKindOf,
   emptyInteraction,
@@ -6,7 +6,6 @@ import {
   type CompactData,
   type DiffLine,
   type InteractionData,
-  type InteractionOption,
   type Role,
 } from "./chatModels";
 
@@ -56,15 +55,8 @@ const roleOf = (raw: Wire): Role => {
   return (type !== null ? ROLES[type] : undefined) ?? "system";
 };
 
-const toOption = (raw: Wire): InteractionOption => ({
-  id: text(raw, "id") ?? "",
-  label: text(raw, "label"),
-  description: text(raw, "description"),
-  preview: text(raw, "preview"),
-});
-
 const parseInteraction = (raw: Wire): InteractionData => {
-  const kind = text(raw, "kind") ?? "questions";
+  const kind = text(raw, "kind") ?? "permission";
   if (kind === "component") {
     const raw_values = (raw.values ?? {}) as Record<string, unknown>;
     const values: Record<string, string> = {};
@@ -74,32 +66,21 @@ const parseInteraction = (raw: Wire): InteractionData => {
     return {
       ...emptyInteraction("resumed", kind),
       title: text(raw, "title"),
+      titleKey: text(raw, "title_key"),
       submitLabel: text(raw, "submit"),
+      submitKey: text(raw, "submit_key"),
+      dismiss: toDismiss(raw.dismiss),
       blocks: list(raw, "blocks").flatMap(toElement),
       values,
       submitted: true,
+      declined: raw.declined === true,
     };
   }
-  if (kind !== "questions") {
-    const resolved = text(raw, "resolved") ?? "allow";
-    return {
-      ...emptyInteraction("resumed", kind),
-      resolved,
-      options: [{ id: resolved, label: null, description: null, preview: null }],
-    };
-  }
-  const questions = list(raw, "questions");
+  const resolved = text(raw, "resolved") ?? "allow";
   return {
-    ...emptyInteraction("resumed", "questions"),
-    questions: questions.map((question) => ({
-      header: text(question, "header"),
-      question: text(question, "question"),
-      multiSelect: question.multi_select === true,
-      options: list(question, "options").map(toOption),
-    })),
-    submitted: true,
-    summary: questions.map((question) => text(question, "answer") ?? ""),
-    notes: questions.map((question) => text(question, "note") ?? ""),
+    ...emptyInteraction("resumed", kind),
+    resolved,
+    options: [{ id: resolved, label: null, description: null, preview: null }],
   };
 };
 

@@ -94,8 +94,6 @@ import com.jahirtrap.cconnect.data.DiffKind
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionData
 import com.jahirtrap.cconnect.data.InteractionOption
-import com.jahirtrap.cconnect.data.InteractionQuestion
-import com.jahirtrap.cconnect.data.QuestionDraft
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.ui.ActionButton
@@ -106,6 +104,7 @@ import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.ui.CconnectBlockView
 import com.jahirtrap.cconnect.ui.parseCconnectBlock
 import com.jahirtrap.cconnect.ui.CodeBlock
+import com.jahirtrap.cconnect.ui.componentIcon
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.OptionRow
@@ -181,12 +180,7 @@ fun ChatMessageItem(
     expanded: Boolean? = null,
     onToggle: (() -> Unit)? = null,
     onAnswer: ((String, String, String?) -> Unit)? = null,
-    onToggleOption: ((String, Int, String) -> Unit)? = null,
-    onQuestionText: ((String, Int, String) -> Unit)? = null,
-    onQuestionNotes: ((String, Int, String) -> Unit)? = null,
-    onSubmitQuestions: ((String) -> Unit)? = null,
-    onChatQuestions: ((String) -> Unit)? = null,
-    onQuestionPage: ((String, Int) -> Unit)? = null,
+    onComponentPage: ((String, Int) -> Unit)? = null,
     onComponentValue: ((String, String, String) -> Unit)? = null,
     onComponentPick: ((String, String, String, Boolean) -> Unit)? = null,
     onSubmitComponent: ((String, String?) -> Unit)? = null,
@@ -274,17 +268,8 @@ fun ChatMessageItem(
                         onPick = { id, value, multiple -> onComponentPick?.invoke(it.requestId, id, value, multiple) },
                         onSubmit = { action -> onSubmitComponent?.invoke(it.requestId, action) },
                         onDismiss = { dirty -> onDiscardComponent?.invoke(it.requestId, dirty) },
+                        onPage = { page -> onComponentPage?.invoke(it.requestId, page) },
                         onSharedLink = onSharedLink,
-                    )
-                } else if (it.kind == "questions") {
-                    QuestionsBlock(
-                        data = it,
-                        onToggleOption = { qi, optId -> onToggleOption?.invoke(it.requestId, qi, optId) },
-                        onFreeText = { qi, text -> onQuestionText?.invoke(it.requestId, qi, text) },
-                        onNotes = { qi, text -> onQuestionNotes?.invoke(it.requestId, qi, text) },
-                        onSubmit = { onSubmitQuestions?.invoke(it.requestId) },
-                        onChat = { onChatQuestions?.invoke(it.requestId) },
-                        onActivePage = { page -> onQuestionPage?.invoke(it.requestId, page) },
                     )
                 } else {
                     InteractionBlock(data = it, toolName = message.toolName, input = message.text, expanded = expanded, onToggle = onToggle, onAnswer = onAnswer)
@@ -834,12 +819,16 @@ private fun diffStyleFor(kind: DiffKind, defaultFg: Color): Triple<Color, Color,
     }
 }
 
-private fun componentSummary(data: InteractionData, yes: String, no: String): List<Pair<String, String>> =
-    data.blocks.mapNotNull { element ->
+private data class ComponentRow(val label: String, val value: String, val note: Boolean)
+
+private fun componentElements(blocks: List<ComponentElement>): List<ComponentElement> =
+    blocks.flatMap { if (it.type == "page") componentElements(it.blocks) else listOf(it) }
+
+private fun componentSummary(data: InteractionData, yes: String, no: String): List<ComponentRow> =
+    componentElements(data.blocks).mapNotNull { element ->
         val id = element.id ?: return@mapNotNull null
         val raw = data.values[id].orEmpty()
         if (raw.isEmpty()) return@mapNotNull null
-        val label = element.label.orEmpty()
         val value = when (element.type) {
             "select", "buttons" -> raw.split(VALUE_SEPARATOR)
                 .filter { it.isNotEmpty() }
@@ -848,14 +837,39 @@ private fun componentSummary(data: InteractionData, yes: String, no: String): Li
             "toggle" -> if (raw == "true") yes else no
             else -> raw
         }
-        if (value.isBlank()) null else label to value
+        if (value.isBlank()) null else ComponentRow(element.label.orEmpty(), value, element.type == "notes")
     }
 
-private fun componentMissing(data: InteractionData): Boolean =
-    data.blocks.any { it.required && it.type != "buttons" && data.values[it.id.orEmpty()].isNullOrEmpty() }
+private fun componentMissing(data: InteractionData): Boolean = data.blocks.any { componentMissing(it, data.values) }
 
-private fun componentLabel(element: ComponentElement): String =
-    element.label.orEmpty() + if (element.required) " *" else ""
+private fun componentMissing(element: ComponentElement, values: Map<String, String>): Boolean = when (element.type) {
+    "page" -> {
+        val answerable = componentElements(element.blocks).filter { it.type != "notes" }
+        (element.required && answerable.none { !values[it.id.orEmpty()].isNullOrEmpty() }) ||
+            element.blocks.any { componentMissing(it, values) }
+    }
+    "buttons" -> false
+    else -> element.required && values[element.id.orEmpty()].isNullOrEmpty()
+}
+
+@Composable
+private fun componentLabel(element: ComponentElement): AnnotatedString = buildAnnotatedString {
+    append(element.label.orEmpty())
+    if (element.required) {
+        withStyle(SpanStyle(color = MaterialTheme.colorScheme.error)) { append(" *") }
+    }
+}
+
+@Composable
+private fun componentText(key: String?, many: Boolean = false): String? = when (key) {
+    "questions" -> stringResource(Res.string.questions_title)
+    "submit" -> stringResource(if (many) Res.string.submit_answers else Res.string.send)
+    "chat" -> stringResource(Res.string.chat_about_this)
+    "other" -> stringResource(Res.string.interaction_other_hint)
+    "notes" -> stringResource(Res.string.interaction_notes_hint)
+    "add_notes" -> stringResource(Res.string.add_notes)
+    else -> null
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -866,15 +880,18 @@ private fun ComponentBlock(
     onPick: (String, String, Boolean) -> Unit,
     onSubmit: (String?) -> Unit,
     onDismiss: (Boolean) -> Unit,
+    onPage: (Int) -> Unit,
 ) {
     val actions = data.blocks.firstOrNull { it.type == "buttons" }
+    val pages = data.blocks.filter { it.type == "page" }
+    val dismissOption = data.dismiss
     OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Icon(Lucide.CircleQuestionMark, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.size(6.dp))
             DisableSelection {
                 Text(
-                    data.title.orEmpty(),
+                    componentText(data.titleKey) ?: data.title.orEmpty(),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,
@@ -882,7 +899,7 @@ private fun ComponentBlock(
                     modifier = Modifier.weight(1f),
                 )
             }
-            if (!data.submitted) {
+            if (!data.submitted && dismissOption == null) {
                 val dirty = data.values.values.any { it.isNotEmpty() }
                 IconButton(onClick = { onDismiss(dirty) }, modifier = Modifier.size(24.dp)) {
                     Icon(
@@ -896,21 +913,129 @@ private fun ComponentBlock(
         }
         Spacer(Modifier.height(4.dp))
         if (data.declined) {
-            SummaryLine(Lucide.X, 10.dp, stringResource(Res.string.cancel))
+            SummaryLine(
+                componentIcon(dismissOption?.icon) ?: Lucide.X,
+                10.dp,
+                dismissOption?.let { it.label.ifBlank { componentText(it.labelKey).orEmpty() } }
+                    ?: stringResource(Res.string.cancel),
+            )
             return@OutlinedPanel
         }
         if (data.submitted) {
-            componentSummary(data, stringResource(Res.string.yes), stringResource(Res.string.no)).forEach { (label, value) ->
-                Spacer(Modifier.height(2.dp))
-                if (label.isNotBlank()) {
-                    Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            componentSummary(data, stringResource(Res.string.yes), stringResource(Res.string.no)).forEach { row ->
+                if (row.note) {
+                    SummaryLine(Lucide.CornerDownRight, 12.dp, row.value, indent = 16.dp, top = 2.dp)
+                    return@forEach
                 }
-                SummaryLine(CustomIcons.PlayFilled, 10.dp, value.ifBlank { "—" })
+                Spacer(Modifier.height(2.dp))
+                if (row.label.isNotBlank()) {
+                    Text(row.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                }
+                SummaryLine(CustomIcons.PlayFilled, 10.dp, row.value.ifBlank { "—" })
             }
             return@OutlinedPanel
         }
-        data.blocks.forEach { element ->
-            when (element.type) {
+        val scope = rememberCoroutineScope()
+        val pagerState = rememberPagerState(
+            initialPage = data.activePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
+            pageCount = { pages.size.coerceAtLeast(1) },
+        )
+        if (pages.size > 1) {
+            LaunchedEffect(pagerState.currentPage) { onPage(pagerState.currentPage) }
+            ComponentTabs(pages, pagerState)
+            Spacer(Modifier.height(10.dp))
+            HorizontalPager(state = pagerState, verticalAlignment = Alignment.Top, modifier = Modifier.animateContentSize()) { page ->
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    ComponentElements(pages[page].blocks, data, onSharedLink, onValue, onPick)
+                }
+            }
+        } else if (pages.size == 1) {
+            pages[0].label?.takeIf { it.isNotBlank() }?.let {
+                HeaderChip(it)
+                Spacer(Modifier.height(3.dp))
+            }
+            ComponentElements(pages[0].blocks, data, onSharedLink, onValue, onPick)
+        } else {
+            ComponentElements(data.blocks, data, onSharedLink, onValue, onPick)
+        }
+        Spacer(Modifier.height(8.dp))
+        val ready = !componentMissing(data)
+        val pending = pages.size > 1 && pagerState.currentPage < pages.lastIndex
+        if (pending) {
+            ActionButton(
+                text = stringResource(Res.string.next),
+                onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        val shown = actions?.options.orEmpty().filter { !pending || it.style == "plain" }
+        if (shown.isNotEmpty()) {
+            if (pending) Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                shown.forEach { option ->
+                    Button(
+                        onClick = { onSubmit(option.value) },
+                        modifier = Modifier.height(32.dp),
+                        variant = if (option.style == "primary") ButtonVariant.Filled else ButtonVariant.Outlined,
+                        enabled = ready || option.style == "plain",
+                    ) {
+                        componentIcon(option.icon)?.let { icon ->
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(8.dp))
+                        }
+                        Text(
+                            option.label.ifBlank { componentText(option.labelKey, pages.size > 1).orEmpty() },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
+        } else if (actions == null && !pending) {
+            ActionButton(
+                text = data.submitLabel?.takeIf { it.isNotBlank() }
+                    ?: componentText(data.submitKey, pages.size > 1)
+                    ?: stringResource(Res.string.send),
+                onClick = { onSubmit(null) },
+                enabled = ready,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        if (dismissOption != null) {
+            Spacer(Modifier.height(8.dp))
+            ActionButton(
+                text = dismissOption.label.ifBlank { componentText(dismissOption.labelKey).orEmpty() },
+                onClick = { onDismiss(data.values.values.any { it.isNotEmpty() }) },
+                icon = componentIcon(dismissOption.icon),
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState) {
+    val scope = rememberCoroutineScope()
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        itemsIndexed(pages) { index, page ->
+            SelectChip(
+                label = page.label?.ifBlank { null } ?: "${index + 1}",
+                selected = index == pagerState.currentPage,
+                onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ComponentElements(
+    elements: List<ComponentElement>,
+    data: InteractionData,
+    onSharedLink: ((String, String) -> Unit)?,
+    onValue: (String, String) -> Unit,
+    onPick: (String, String, Boolean) -> Unit,
+) {
+    elements.forEach { element ->
+        when (element.type) {
                 "text" -> MarkdownText(element.text.orEmpty(), modifier = Modifier.fillMaxWidth(), selectable = false)
 
                 "preview" -> element.block?.let { raw ->
@@ -946,7 +1071,7 @@ private fun ComponentBlock(
                         value = data.values[id].orEmpty(),
                         onValueChange = { if (!data.submitted) onValue(id, it) },
                         label = element.label?.takeIf { it.isNotBlank() }?.let { { Text(componentLabel(element)) } },
-                        placeholder = element.placeholder,
+                        placeholder = element.placeholder ?: componentText(element.placeholderKey),
                         singleLine = !element.multiline,
                         maxLines = if (element.multiline) 6 else 1,
                     )
@@ -962,34 +1087,36 @@ private fun ComponentBlock(
                     )
                 }
 
-                "buttons" -> Unit
-
-                else -> Unit
-            }
-        }
-        if (data.submitted) return@OutlinedPanel
-        Spacer(Modifier.height(8.dp))
-        val ready = !componentMissing(data)
-        if (actions != null) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                actions.options.forEach { option ->
-                    Button(
-                        onClick = { onSubmit(option.value) },
-                        modifier = Modifier.height(32.dp),
-                        variant = if (option.style == "primary") ButtonVariant.Filled else ButtonVariant.Outlined,
-                        enabled = ready,
-                    ) {
-                        Text(option.label, style = MaterialTheme.typography.bodyMedium)
+                "notes" -> {
+                    val id = element.id.orEmpty()
+                    val note = data.values[id].orEmpty()
+                    var showNotes by rememberSaveable(data.requestId, id) { mutableStateOf(note.isNotBlank()) }
+                    Spacer(Modifier.height(if (showNotes) 6.dp else 2.dp))
+                    if (showNotes) {
+                        InputField(
+                            value = note,
+                            onValueChange = { if (!data.submitted) onValue(id, it) },
+                            placeholder = element.placeholder ?: componentText(element.placeholderKey),
+                            maxLines = 3,
+                            onClear = { if (note.isNotBlank()) onValue(id, "") else showNotes = false },
+                            clearAlways = true,
+                        )
+                    } else {
+                        DisableSelection {
+                            Text(
+                                element.label?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.add_notes),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showNotes = true }
+                                    .padding(top = 4.dp),
+                            )
+                        }
                     }
                 }
-            }
-        } else {
-            ActionButton(
-                text = data.submitLabel?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.send),
-                onClick = { onSubmit(null) },
-                enabled = ready,
-                modifier = Modifier.fillMaxWidth(),
-            )
+
+                else -> Unit
         }
     }
 }
@@ -1025,7 +1152,7 @@ private fun InteractionBlock(
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(16.dp),
             )
-            Spacer(Modifier.size(8.dp))
+            Spacer(Modifier.size(6.dp))
             Box(modifier = Modifier.weight(1f)) {
                 DisableSelection {
                     Text(
@@ -1085,11 +1212,7 @@ private fun InteractionBlock(
             val label = chosen?.let { optionLabel(it) }.orEmpty()
             val display = label.ifBlank { data.resolvedText.orEmpty() }
             val extra = if (label.isNotBlank()) data.resolvedText else null
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                Icon(CustomIcons.PlayFilled, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(10.dp))
-                Spacer(Modifier.size(6.dp))
-                Text(display, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+            SummaryLine(CustomIcons.PlayFilled, 10.dp, display, top = 4.dp)
             if (!extra.isNullOrBlank()) {
                 Text(extra, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1109,178 +1232,6 @@ private fun optionLabel(opt: InteractionOption): String {
     }
 }
 
-@Composable
-private fun QuestionsBlock(
-    data: InteractionData,
-    onToggleOption: (Int, String) -> Unit,
-    onFreeText: (Int, String) -> Unit,
-    onNotes: (Int, String) -> Unit,
-    onSubmit: () -> Unit,
-    onChat: () -> Unit,
-    onActivePage: (Int) -> Unit,
-) {
-    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(Lucide.CircleQuestionMark, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.size(6.dp))
-            DisableSelection {
-                Text(stringResource(Res.string.questions_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-        if (data.submitted) {
-            ResolvedQuestions(data)
-        } else {
-            val many = data.questions.size > 1
-            val pagerState = rememberPagerState(initialPage = data.activeQuestion.coerceIn(0, (data.questions.size - 1).coerceAtLeast(0)), pageCount = { data.questions.size })
-            val scope = rememberCoroutineScope()
-            LaunchedEffect(pagerState.currentPage) { onActivePage(pagerState.currentPage) }
-            if (many) {
-                Spacer(Modifier.height(4.dp))
-                QuestionTabs(data.questions, pagerState)
-                Spacer(Modifier.height(10.dp))
-                HorizontalPager(state = pagerState, verticalAlignment = Alignment.Top, modifier = Modifier.animateContentSize()) { page ->
-                    QuestionContent(data, page, onToggleOption, onFreeText, onNotes, showChip = false)
-                }
-            } else {
-                Spacer(Modifier.height(4.dp))
-                Box(Modifier.animateContentSize()) {
-                    QuestionContent(data, 0, onToggleOption, onFreeText, onNotes, showChip = true)
-                }
-            }
-            Spacer(Modifier.height(6.dp))
-            val isLast = pagerState.currentPage >= data.questions.lastIndex
-            val canSend = many || data.drafts.getOrElse(0) { QuestionDraft() }.let { it.selected.isNotEmpty() || it.freeText.isNotBlank() }
-            ActionButton(
-                text = stringResource(
-                    when {
-                        !isLast -> Res.string.next
-                        many -> Res.string.submit_answers
-                        else -> Res.string.send
-                    }
-                ),
-                onClick = {
-                    if (!isLast) scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
-                    else onSubmit()
-                },
-                enabled = !isLast || canSend,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(8.dp))
-            ActionButton(
-                text = stringResource(Res.string.chat_about_this),
-                onClick = onChat,
-                icon = Lucide.MessageSquare,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ResolvedQuestions(data: InteractionData) {
-    if (data.declined) {
-        Spacer(Modifier.height(2.dp))
-        SummaryLine(Lucide.MessageSquare, 10.dp, stringResource(Res.string.chat_about_this))
-        return
-    }
-    data.questions.forEachIndexed { qi, q ->
-        Spacer(Modifier.height(4.dp))
-        if (!q.header.isNullOrBlank()) {
-            HeaderChip(q.header)
-            Spacer(Modifier.height(2.dp))
-        }
-        if (!q.question.isNullOrBlank()) {
-            Text(q.question, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            Spacer(Modifier.height(2.dp))
-        }
-        SummaryLine(CustomIcons.PlayFilled, 10.dp, data.summary.getOrElse(qi) { "" }.ifBlank { "—" })
-        val note = data.notes.getOrElse(qi) { "" }
-        if (note.isNotBlank()) SummaryLine(Lucide.CornerDownRight, 12.dp, note, indent = 16.dp, top = 2.dp)
-    }
-}
-
-@Composable
-private fun QuestionTabs(questions: List<InteractionQuestion>, pagerState: PagerState) {
-    val scope = rememberCoroutineScope()
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        itemsIndexed(questions) { i, q ->
-            val label = q.header?.ifBlank { null } ?: q.question?.take(18)?.ifBlank { null } ?: "${i + 1}"
-            SelectChip(
-                label = label,
-                selected = i == pagerState.currentPage,
-                onClick = { scope.launch { pagerState.animateScrollToPage(i) } },
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuestionContent(
-    data: InteractionData,
-    qi: Int,
-    onToggleOption: (Int, String) -> Unit,
-    onFreeText: (Int, String) -> Unit,
-    onNotes: (Int, String) -> Unit,
-    showChip: Boolean,
-) {
-    val q = data.questions[qi]
-    val draft = data.drafts.getOrElse(qi) { QuestionDraft() }
-    val hasPreview = q.options.any { !it.preview.isNullOrBlank() }
-    Column(modifier = Modifier.fillMaxWidth()) {
-        if (showChip && !q.header.isNullOrBlank()) {
-            HeaderChip(q.header)
-            Spacer(Modifier.height(3.dp))
-        }
-        if (!q.question.isNullOrBlank()) {
-            Text(q.question, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-            Spacer(Modifier.height(6.dp))
-        }
-        q.options.forEach { opt ->
-            val selected = opt.id in draft.selected
-            OptionRow(
-                label = opt.label.orEmpty(),
-                onClick = { onToggleOption(qi, opt.id) },
-                description = opt.description,
-                selected = selected,
-                multi = q.multiSelect,
-            )
-            if (selected && !opt.preview.isNullOrBlank()) PreviewBox(opt.preview)
-        }
-        if (!hasPreview) {
-            Spacer(Modifier.height(6.dp))
-            DraftInput(
-                draft.freeText,
-                { onFreeText(qi, it) },
-                stringResource(Res.string.interaction_other_hint),
-                onClear = if (q.multiSelect) ({ onFreeText(qi, "") }) else null,
-            )
-        }
-        var showNotes by rememberSaveable(data.requestId, qi) { mutableStateOf(draft.notes.isNotBlank()) }
-        Spacer(Modifier.height(if (showNotes) 6.dp else 2.dp))
-        if (showNotes) {
-            DraftInput(
-                draft.notes,
-                { onNotes(qi, it) },
-                stringResource(Res.string.interaction_notes_hint),
-                // First press clears the text; pressing it while empty removes the note field.
-                onClear = { if (draft.notes.isNotBlank()) onNotes(qi, "") else showNotes = false },
-                clearAlways = true,
-            )
-        } else {
-            DisableSelection {
-                Text(
-                    stringResource(Res.string.add_notes),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showNotes = true }
-                        .padding(top = 4.dp),
-                )
-            }
-        }
-    }
-}
 
 @Composable
 private fun SummaryLine(icon: ImageVector, iconSize: Dp, text: String, indent: Dp = 0.dp, top: Dp = 0.dp) {
