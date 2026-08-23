@@ -136,6 +136,8 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
   };
 };
 
+const VISIBLE_ROLES: Role[] = ["tool", "working", "interrupted"];
+
 export const isVisible = (item: SessionMessage): boolean =>
   !!item.text.trim() ||
   item.interaction !== null ||
@@ -143,5 +145,4 @@ export const isVisible = (item: SessionMessage): boolean =>
   item.compact !== null ||
   item.labelOnly ||
   !!item.images?.length ||
-  item.role === "working" ||
-  item.role === "interrupted";
+  VISIBLE_ROLES.includes(item.role);

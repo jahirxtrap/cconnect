@@ -55,7 +55,7 @@ export interface ComponentOption {
 }
 
 export interface ComponentElement {
-  type: "text" | "select" | "input" | "toggle" | "buttons" | "preview" | "page" | "notes";
+  type: "text" | "select" | "input" | "toggle" | "buttons" | "preview" | "page" | "notes" | "bar";
   id: string | null;
   label: string | null;
   text: string | null;
@@ -66,6 +66,9 @@ export interface ComponentElement {
   multiline: boolean;
   multiple: boolean;
   required: boolean;
+  color: string | null;
+  alertAbove: number | null;
+  alertBelow: number | null;
   options: ComponentOption[];
   block: string | null;
   blocks: ComponentElement[];
@@ -77,6 +80,7 @@ export interface InteractionData {
   options: InteractionOption[];
   title: string | null;
   titleKey: string | null;
+  icon: string | null;
   resolved: string | null;
   submitted: boolean;
   declined: boolean;
@@ -126,9 +130,14 @@ export interface QueuedMessage {
 export const diffKindOf = (value: string | null | undefined): DiffKind =>
   value === "header" || value === "hunk" || value === "add" || value === "del" ? value : "ctx";
 
+export const componentAnswerable = (blocks: ComponentElement[]): boolean =>
+  blocks.some((element) =>
+    element.type === "page" ? componentAnswerable(element.blocks) : element.type === "buttons" || !!element.id,
+  );
+
 export const isPending = (data: InteractionData): boolean =>
-  data.kind === "questions" || data.kind === "component"
-    ? !(data.submitted || data.declined)
+  data.kind === "component"
+    ? componentAnswerable(data.blocks) && !(data.submitted || data.declined)
     : data.resolved === null;
 
 export const emptyInteraction = (requestId: string, kind: string): InteractionData => ({
@@ -137,6 +146,7 @@ export const emptyInteraction = (requestId: string, kind: string): InteractionDa
   options: [],
   title: null,
   titleKey: null,
+  icon: null,
   resolved: null,
   submitted: false,
   declined: false,

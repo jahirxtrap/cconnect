@@ -27,15 +27,33 @@ Elements, in the order you list them:
 - preview: {PREVIEW}
 - page: puts its own blocks on a tab. With several pages the user moves between them and answers
   everything before sending once.
+- bar: read-only progress bar for a 0-100 value, with its label and an optional line under it.
+  It turns into the alert colour past alert_above or under alert_below.
 
 Every element that carries a value needs an id unique within the form; the answer comes back keyed
 by those ids. Reuse the same block_id to replace a form you already sent instead of stacking a new
 one. Never describe styling: the app owns the look."""
 
+SHOW_DESCRIPTION = """Draw a block in the chat: bars, text and media laid out together. It asks nothing
+and returns right away, so keep talking after calling it.
+
+Use it to show a state worth seeing rather than describing: progress, a comparison, a small report.
+For plain prose or a single image, write markdown instead.
+
+Elements, in the order you list them:
+- text: a markdown paragraph.
+- bar: read-only progress bar for a 0-100 value, with its label and an optional line under it.
+  It turns into the alert colour past alert_above or under alert_below.
+- preview: {PREVIEW}
+- page: puts its own blocks on a tab, so the user moves between them.
+
+Reuse the same block_id to replace a block you already drew instead of stacking a new one.
+Never describe styling: the app owns the look."""
+
 ICONS = [
-    "message-square", "check", "x", "plus", "pencil", "trash", "download",
+    "question", "message-square", "check", "x", "plus", "pencil", "trash", "download",
     "external-link", "refresh", "search", "settings", "info", "alert",
-    "lightbulb", "shield", "file", "folder",
+    "lightbulb", "shield", "file", "folder", "clock", "sparkles",
 ]
 
 OPTION = {
@@ -60,7 +78,9 @@ DISMISS = {
     "required": ["label"],
 }
 
-TYPES = ["text", "select", "input", "toggle", "notes", "buttons", "preview", "page"]
+TYPES = ["text", "select", "input", "toggle", "notes", "buttons", "preview", "page", "bar"]
+
+COLORS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
 
 LEAF = {
     "type": "object",
@@ -68,7 +88,11 @@ LEAF = {
         "type": {"type": "string", "enum": TYPES},
         "id": {"type": "string", "description": "Required for every element that carries a value."},
         "label": {"type": "string"},
-        "value": {"description": "Prefilled value: string for input, boolean for toggle."},
+        "value": {"description": "Prefilled value: string for input, boolean for toggle, 0-100 for bar."},
+        "text": {"type": "string", "description": "bar: the line under it."},
+        "color": {"type": "string", "enum": COLORS, "description": "bar: its colour. Accent by default."},
+        "alert_above": {"type": "number", "description": "bar: alert colour from this value up."},
+        "alert_below": {"type": "number", "description": "bar: alert colour from this value down."},
         "placeholder": {"type": "string"},
         "multiline": {"type": "boolean"},
         "multiple": {"type": "boolean", "description": "select: checkboxes instead of radio."},
@@ -88,11 +112,23 @@ ELEMENT = {
     "required": ["type"],
 }
 
+SHOW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "blocks": {"type": "array", "items": ELEMENT, "description": "The elements, in order."},
+        "title": {"type": "string", "description": "Heading of the block. Without it there is no heading at all."},
+        "icon": {"type": "string", "enum": ICONS, "description": "Icon next to the title."},
+        "block_id": {"type": "string", "description": "Reuse it to replace an earlier block instead of stacking."},
+    },
+    "required": ["blocks"],
+}
+
 SCHEMA = {
     "type": "object",
     "properties": {
         "blocks": {"type": "array", "items": ELEMENT, "description": "The elements, in order."},
-        "title": {"type": "string", "description": "Heading of the form."},
+        "title": {"type": "string", "description": "Heading of the form. Without it there is no heading at all."},
+        "icon": {"type": "string", "enum": ICONS, "description": "Icon next to the title. A question mark by default."},
         "submit": {"type": "string", "description": "Label of the send button. Ignored if a buttons element is present."},
         "dismiss": {
             **DISMISS,
@@ -107,12 +143,31 @@ SCHEMA = {
 
 def make_tools(context: dict) -> list:
     ask_user = context.get("ask_user")
+    emit = context.get("emit")
     capabilities = context.get("capabilities") or ()
-    if ask_user is None or CAPABILITY not in capabilities:
+    if CAPABILITY not in capabilities:
         return []
     description = DESCRIPTION.replace(
         "{PREVIEW}", PREVIEW_RICH if RICH_MEDIA in capabilities else PREVIEW_BASIC
     )
+    tools = []
+
+    if emit is not None:
+        @tool("show_component", SHOW_DESCRIPTION.replace("{PREVIEW}", PREVIEW_RICH if RICH_MEDIA in capabilities else PREVIEW_BASIC), SHOW_SCHEMA)
+        async def show(args):
+            await emit({
+                "type": "component",
+                "block_id": args.get("block_id"),
+                "title": args.get("title"),
+                "icon": args.get("icon"),
+                "blocks": args.get("blocks") or [],
+            })
+            return {"content": [{"type": "text", "text": "Shown in the chat."}]}
+
+        tools.append(show)
+
+    if ask_user is None:
+        return tools
 
     @tool("ask_component", description, SCHEMA)
     async def ui(args):
@@ -120,6 +175,7 @@ def make_tools(context: dict) -> list:
             "kind": "component",
             "block_id": args.get("block_id"),
             "title": args.get("title"),
+            "icon": args.get("icon"),
             "submit": args.get("submit"),
             "dismiss": args.get("dismiss"),
             "blocks": args.get("blocks") or [],
@@ -130,4 +186,5 @@ def make_tools(context: dict) -> list:
             answer = {"submitted": True, "values": response.get("values") or {}}
         return {"content": [{"type": "text", "text": json.dumps(answer, ensure_ascii=False)}]}
 
-    return [ui]
+    tools.append(ui)
+    return tools

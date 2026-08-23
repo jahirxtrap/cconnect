@@ -98,6 +98,7 @@ import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.ui.ActionButton
 import com.jahirtrap.cconnect.data.ComponentElement
+import com.jahirtrap.cconnect.data.componentAnswerable
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
 import com.jahirtrap.cconnect.ui.IconButton
 import com.composables.icons.lucide.X
@@ -107,6 +108,8 @@ import com.jahirtrap.cconnect.ui.CodeBlock
 import com.jahirtrap.cconnect.ui.componentIcon
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
+import com.jahirtrap.cconnect.ui.MetricBar
+import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import com.jahirtrap.cconnect.ui.OptionRow
 import com.jahirtrap.cconnect.ui.OutlinedPanel
 import com.jahirtrap.cconnect.ui.SelectChip
@@ -885,33 +888,44 @@ private fun ComponentBlock(
     val actions = data.blocks.firstOrNull { it.type == "buttons" }
     val pages = data.blocks.filter { it.type == "page" }
     val dismissOption = data.dismiss
+    val answerable = componentAnswerable(data.blocks)
+    val heading = componentText(data.titleKey) ?: data.title.orEmpty()
     OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-            Icon(Lucide.CircleQuestionMark, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
-            Spacer(Modifier.size(6.dp))
-            DisableSelection {
-                Text(
-                    componentText(data.titleKey) ?: data.title.orEmpty(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            if (!data.submitted && dismissOption == null) {
-                val dirty = data.values.values.any { it.isNotEmpty() }
-                IconButton(onClick = { onDismiss(dirty) }, modifier = Modifier.size(24.dp)) {
-                    Icon(
-                        Lucide.X,
-                        contentDescription = stringResource(Res.string.cancel),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
+        val closable = !data.submitted && answerable && dismissOption == null
+        if (heading.isNotBlank() || closable) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                if (heading.isNotBlank()) {
+                    (componentIcon(data.icon) ?: Lucide.CircleQuestionMark.takeIf { answerable })?.let { icon ->
+                        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.size(6.dp))
+                    }
+                    DisableSelection {
+                        Text(
+                            heading,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                if (closable) {
+                    val dirty = data.values.values.any { it.isNotEmpty() }
+                    IconButton(onClick = { onDismiss(dirty) }, modifier = Modifier.size(24.dp)) {
+                        Icon(
+                            Lucide.X,
+                            contentDescription = stringResource(Res.string.cancel),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
             }
+            Spacer(Modifier.height(4.dp))
         }
-        Spacer(Modifier.height(4.dp))
         if (data.declined) {
             SummaryLine(
                 componentIcon(dismissOption?.icon) ?: Lucide.X,
@@ -990,7 +1004,7 @@ private fun ComponentBlock(
                     }
                 }
             }
-        } else if (actions == null && !pending) {
+        } else if (actions == null && !pending && answerable) {
             ActionButton(
                 text = data.submitLabel?.takeIf { it.isNotBlank() }
                     ?: componentText(data.submitKey, pages.size > 1)
@@ -1084,6 +1098,19 @@ private fun ComponentElements(
                         checked = data.values[id] == "true",
                         enabled = !data.submitted,
                         onChange = { next -> onValue(id, next.toString()) },
+                    )
+                }
+
+                "bar" -> {
+                    val percent = element.value?.toFloatOrNull() ?: 0f
+                    val alerting = element.alertAbove?.let { percent >= it } == true ||
+                        element.alertBelow?.let { percent <= it } == true
+                    Spacer(Modifier.height(6.dp))
+                    MetricBar(
+                        title = element.label.orEmpty(),
+                        subtitle = element.text.orEmpty(),
+                        percent = percent,
+                        color = if (alerting) palette.red else sessionColorOf(element.color) ?: MaterialTheme.colorScheme.primary,
                     )
                 }
 

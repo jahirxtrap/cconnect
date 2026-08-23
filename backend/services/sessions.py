@@ -993,6 +993,16 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                         "declined": declined,
                     })
                     continue
+                if name.endswith("show_component") and isinstance(inp, dict):
+                    if isinstance(bid, str):
+                        hidden_ids.add(bid)
+                    messages.append({
+                        "type": "interaction",
+                        "kind": "component",
+                        "title": inp.get("title"),
+                        "blocks": [b for b in (inp.get("blocks") or []) if isinstance(b, dict)],
+                    })
+                    continue
                 if name.endswith("ask_component") and isinstance(inp, dict):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)

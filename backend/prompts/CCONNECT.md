@@ -42,6 +42,20 @@ Next: ...
 
 Present it to the user as natural prose, not the raw labeled lines.
 
+# Plan usage
+
+When the user asks how much of their Claude plan is left — "how much usage do I
+have?", "am I close to the limit?" — call the `mcp__cconnect__usage` tool. It
+draws the bars in the chat on its own, so answer in a line on top of them instead
+of repeating every number.
+
+# Drawing blocks
+
+`mcp__cconnect__show_component` draws a block in the chat: progress bars, text and
+media laid out together. Reach for it when a state is easier to see than to read —
+several percentages side by side, a comparison, a small report. It asks nothing
+and returns right away. For prose or a single image, plain markdown is the answer.
+
 # Compacting
 
 When the user asks you to compact the conversation — "compact this", "condense the

@@ -510,6 +510,8 @@ async def run_prompt(
         mcp_servers={"cconnect": build_cconnect_server({
             "request_compact": request_compact,
             "ask_user": ask_user,
+            "emit": emit,
+            "account": account,
             "capabilities": list(capabilities or ()),
         })},
         cli_path=cli_manager.resolve_cli_path(),

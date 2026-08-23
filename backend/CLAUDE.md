@@ -480,9 +480,10 @@ A module can expose `make_tools(context)` instead of `tools`. It is called on
 every turn with what that turn passed in, so the handler can be a closure over
 turn-scoped things (`request_compact`, `ask_user`, the client's `capabilities`).
 Returning `[]` removes the tool from that turn entirely — which is also the
-safest gate: a tool the model can't see is a tool it can't call. `mcps/compact.py`
-uses both halves — it only exists when the turn can honour it, and it is absent
-from the compaction turn it triggers, so it can't chain.
+safest gate: a tool the model can't see is a tool it can't call. `mcps/session.py`
+(what the user can ask about the running session: `compact`, `usage`) uses both
+halves — `compact` only exists when the turn can honour it, and it is absent from
+the compaction turn it triggers, so it can't chain.
 
 ### Adding a tool
 
@@ -519,6 +520,8 @@ read fresh on every turn:
 |---|---|
 | `check_progress` | Summarizes the latest session of another project into Done / Pending / Files touched / Next step. Runs an isolated SDK subquery in `AI_WORKDIR` with `haiku`. |
 | `compact` | Asks for compaction; it starts when the turn ends. Absent from the turn it triggers, so it can't chain. |
+| `usage` | Plan usage for the turn's account: returns the per-window percentages to the model and pushes the `usage` event so the chat draws the bars. |
+| `show_component` | Draws a read-only block in the chat (bars, text, media) through the turn's `emit` and returns at once — nothing to answer, so it never marks the chat as awaiting the user. Same elements as the form, minus the ones that carry a value. |
 | `ask_component` | Shows a form in the chat and waits for it. Elements: `text`, `select`, `input`, `toggle`, `notes`, `buttons`, `preview`, `page`; plus `dismiss` for a way out of the form, which replaces the close icon. Gated on the client's `components` capability, and `preview` only mentions rich media when the client also has `media.rich`. |
 
 ## Session transcript transformation

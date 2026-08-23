@@ -79,8 +79,8 @@
   const STATE_CLASS =
     "flex shrink-0 cursor-default items-center gap-1 rounded-md bg-surface-variant px-2.5 py-1 text-label-md";
   const TOGGLE_CLASS =
-    "flex h-full shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface-variant px-2 ripple";
-  const TOGGLE_SLOT = "flex shrink-0 items-center self-stretch py-[3px]";
+    "flex shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface-variant px-2 py-1 ripple";
+  const SLOT = "flex shrink-0 items-center";
 
   let openMenu = $state<"model" | "effort" | "permission" | "account" | "streaming" | null>(null);
 
@@ -119,7 +119,7 @@
 </script>
 
 <div class="flex h-full min-w-0 flex-1 items-stretch">
-<TooltipWrap label={t("QUICK_CHAT")} class="relative {TOGGLE_SLOT} pl-0.5">
+<TooltipWrap label={t("QUICK_CHAT")} class="relative {SLOT} pl-0.5">
   <button type="button" use:keepFocus onclick={onQuickChat} aria-label={t("QUICK_CHAT")} class={TOGGLE_CLASS}>
     <MessagesSquare size={16} class="text-accent" />
   </button>
@@ -143,9 +143,14 @@
       <span class="whitespace-nowrap">{connecting ? t("CONNECTING") : t("LOADING")}</span>
     </span>
   {:else}
-    <PopupMenu open={openMenu === "model"} side="top" onOpenChange={(open) => (openMenu = open ? "model" : null)}>
+    <PopupMenu
+      open={openMenu === "model"}
+      side="top"
+      triggerClass={SLOT}
+      onOpenChange={(open) => (openMenu = open ? "model" : null)}
+    >
       {#snippet trigger()}
-        <TooltipWrap label={t("MODEL")}>
+        <TooltipWrap label={t("MODEL")} class={SLOT}>
           <span class={ITEM_CLASS}>
             <Sparkles size={16} class="shrink-0 text-accent" />
             <span class="whitespace-nowrap">{modelLabel}</span>
@@ -164,9 +169,14 @@
       {/each}
     </PopupMenu>
 
-    <PopupMenu open={openMenu === "effort"} side="top" onOpenChange={(open) => (openMenu = open ? "effort" : null)}>
+    <PopupMenu
+      open={openMenu === "effort"}
+      side="top"
+      triggerClass={SLOT}
+      onOpenChange={(open) => (openMenu = open ? "effort" : null)}
+    >
       {#snippet trigger()}
-        <TooltipWrap label={t("EFFORT")}>
+        <TooltipWrap label={t("EFFORT")} class={SLOT}>
           <span class={ITEM_CLASS}>
             <Gauge size={16} class="shrink-0 text-accent" />
             <span class="whitespace-nowrap">{effort}</span>
@@ -188,10 +198,11 @@
     <PopupMenu
       open={openMenu === "permission"}
       side="top"
+      triggerClass={SLOT}
       onOpenChange={(open) => (openMenu = open ? "permission" : null)}
     >
       {#snippet trigger()}
-        <TooltipWrap label={t("PERMISSIONS")}>
+        <TooltipWrap label={t("PERMISSIONS")} class={SLOT}>
           <span class={ITEM_CLASS}>
             <permission.icon size={16} class="shrink-0 {permission.tone}" />
             <span class="whitespace-nowrap">{permissionLabel}</span>
@@ -219,10 +230,11 @@
       <PopupMenu
         open={openMenu === "account"}
         side="top"
+        triggerClass={SLOT}
         onOpenChange={(open) => (openMenu = open ? "account" : null)}
       >
         {#snippet trigger()}
-          <TooltipWrap label={t("ACCOUNT")}>
+          <TooltipWrap label={t("ACCOUNT")} class={SLOT}>
             <span class={ITEM_CLASS}>
               <CircleUser size={16} class="shrink-0 text-accent" />
               <span class="whitespace-nowrap">{accountLabel}</span>
@@ -245,11 +257,11 @@
     <PopupMenu
       open={openMenu === "streaming"}
       side="top"
-      triggerClass={TOGGLE_SLOT}
+      triggerClass={SLOT}
       onOpenChange={(open) => (openMenu = open ? "streaming" : null)}
     >
       {#snippet trigger()}
-        <TooltipWrap label={t("STREAMING")}>
+        <TooltipWrap label={t("STREAMING")} class={SLOT}>
           <span class={TOGGLE_CLASS}>
             <Radio size={16} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
           </span>
@@ -267,7 +279,7 @@
       {/each}
     </PopupMenu>
 
-    <TooltipWrap label={t("VISIBILITY")} class={TOGGLE_SLOT}>
+    <TooltipWrap label={t("VISIBILITY")} class={SLOT}>
       <button type="button" use:keepFocus onclick={onVisibility} aria-label={t("VISIBILITY")} class={TOGGLE_CLASS}>
         {#if simpleMode}
           <EyeOff size={16} class="text-accent" />

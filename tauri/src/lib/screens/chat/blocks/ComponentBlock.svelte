@@ -4,7 +4,12 @@
   import Play from "@lucide/svelte/icons/play";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
-  import { VALUE_SEPARATOR, type ComponentElement, type InteractionData } from "$lib/data/chatModels";
+  import {
+    componentAnswerable,
+    VALUE_SEPARATOR,
+    type ComponentElement,
+    type InteractionData,
+  } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -13,6 +18,8 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
+  import MetricBar from "$lib/ui/MetricBar.svelte";
+  import { sessionColorOf } from "$lib/design/sessionColors";
   import OptionRow from "$lib/ui/OptionRow.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import SelectChip from "$lib/ui/SelectChip.svelte";
@@ -41,6 +48,7 @@
 
   const pages = $derived(data.blocks.filter((element) => element.type === "page"));
   const actions = $derived(data.blocks.find((element) => element.type === "buttons"));
+  const answerable = $derived(componentAnswerable(data.blocks));
 
   const missing = (element: ComponentElement): boolean => {
     if (element.type === "page") {
@@ -73,6 +81,9 @@
         return null;
     }
   };
+
+  const heading = $derived(keyed(data.titleKey) ?? data.title ?? "");
+  const closable = $derived(!data.submitted && answerable && !data.dismiss);
 
   let page = $state(untrack(() => Math.max(data.activePage, 0)));
   const current = $derived(pages.length ? Math.min(page, pages.length - 1) : 0);
@@ -187,6 +198,17 @@
         enabled={!data.submitted}
         onChange={(next) => onValue(element.id ?? "", String(next))}
       />
+    {:else if element.type === "bar"}
+      {@const percent = Number(element.value ?? 0)}
+      <MetricBar
+        class="mt-1.5"
+        title={element.label ?? ""}
+        subtitle={element.text ?? ""}
+        {percent}
+        alert={(element.alertAbove !== null && percent >= element.alertAbove) ||
+          (element.alertBelow !== null && percent <= element.alertBelow)}
+        color={sessionColorOf(element.color)}
+      />
     {:else if element.type === "notes"}
       {#if notesShown(element)}
         <InputField
@@ -216,23 +238,30 @@
 
 <div class="w-full px-4">
   <OutlinedPanel>
-    <div class="flex items-center gap-1.5">
-      <CircleQuestionMark size={16} class="shrink-0 text-accent" />
-      <span class="min-w-0 flex-1 truncate text-label-lg text-accent select-none">
-        {keyed(data.titleKey) ?? data.title ?? ""}
-      </span>
-      {#if !data.submitted && !data.dismiss}
-        <button
-          type="button"
-          onclick={() => (dirty ? (confirmingDismiss = true) : onDismiss())}
-          aria-label={t("CANCEL")}
-          class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
-        >
-          <X size={16} />
-        </button>
-      {/if}
-    </div>
-    <div class="h-1"></div>
+    {#if heading || closable}
+      {@const Icon = componentIcon(data.icon) ?? (answerable ? CircleQuestionMark : null)}
+      <div class="flex items-center gap-1.5">
+        {#if heading}
+          {#if Icon}
+            <Icon size={16} class="shrink-0 text-accent" />
+          {/if}
+          <span class="min-w-0 flex-1 truncate text-label-lg text-accent select-none">{heading}</span>
+        {:else}
+          <span class="flex-1"></span>
+        {/if}
+        {#if closable}
+          <button
+            type="button"
+            onclick={() => (dirty ? (confirmingDismiss = true) : onDismiss())}
+            aria-label={t("CANCEL")}
+            class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+          >
+            <X size={16} />
+          </button>
+        {/if}
+      </div>
+      <div class="h-1"></div>
+    {/if}
 
     {#if data.declined}
       {@const icon = componentIcon(data.dismiss?.icon ?? null)}
@@ -301,7 +330,7 @@
             </Button>
           {/each}
         </div>
-      {:else if !actions && !pending}
+      {:else if !actions && !pending && answerable}
         <ActionButton
           class="w-full"
           text={data.submitLabel?.trim() ||

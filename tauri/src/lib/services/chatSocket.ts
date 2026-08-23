@@ -45,6 +45,13 @@ export type ServerEvent =
   | { type: "ask_session"; sessionId: string }
   | { type: "ask_done" }
   | { type: "command"; markdown: string }
+  | {
+      type: "component";
+      title: string | null;
+      titleKey: string | null;
+      icon: string | null;
+      blocks: ComponentElement[];
+    }
   | { type: "plan"; markdown: string }
   | { type: "agent"; id: string | null; subagentType: string | null; description: string | null; labelOnly: boolean }
   | { type: "notification"; summary: string; status: string | null }
@@ -76,6 +83,7 @@ export type ServerEvent =
       input: string | null;
       title: string | null;
       titleKey: string | null;
+      icon: string | null;
       options: InteractionOption[];
       blocks: ComponentElement[];
       submitLabel: string | null;
@@ -121,6 +129,8 @@ const CLIENT_CAPABILITIES = ["media.blocks", "media.rich", "components"];
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
 const flag = (raw: Wire, key: string): boolean => raw[key] === true;
+const number = (raw: Wire, key: string): number | null =>
+  typeof raw[key] === "number" ? (raw[key] as number) : null;
 const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
 const strings = (raw: Wire, key: string): string[] =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
@@ -160,6 +170,7 @@ const COMPONENT_TYPES = [
   "preview",
   "page",
   "notes",
+  "bar",
 ] as const;
 
 export const toDismiss = (raw: unknown): ComponentOption | null => {
@@ -185,10 +196,18 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       type,
       id: text(raw, "id"),
       label: text(raw, "label"),
-      text: type === "text" && typeof value === "string" ? value : null,
+      text: type === "bar" ? text(raw, "text") : type === "text" && typeof value === "string" ? value : null,
       placeholder: text(raw, "placeholder"),
       placeholderKey: text(raw, "placeholder_key"),
-      value: type === "input" && typeof value === "string" ? value : null,
+      value:
+        type === "bar"
+          ? String(value ?? 0)
+          : type === "input" && typeof value === "string"
+            ? value
+            : null,
+      color: text(raw, "color"),
+      alertAbove: number(raw, "alert_above"),
+      alertBelow: number(raw, "alert_below"),
       checked: value === true,
       multiline: flag(raw, "multiline"),
       multiple: flag(raw, "multiple"),
@@ -534,6 +553,14 @@ export class ChatSocket {
         return { type: "ask_done" };
       case "command":
         return { type: "command", markdown: text(wire, "markdown") ?? "" };
+      case "component":
+        return {
+          type: "component",
+          title: text(wire, "title"),
+          titleKey: text(wire, "title_key"),
+          icon: text(wire, "icon"),
+          blocks: list(wire, "blocks").flatMap(toElement),
+        };
       case "plan":
         return { type: "plan", markdown: text(wire, "markdown") ?? "" };
       case "notification":
@@ -599,6 +626,7 @@ export class ChatSocket {
           input: text(wire, "input"),
           title: text(wire, "title"),
           titleKey: text(wire, "title_key"),
+          icon: text(wire, "icon"),
           options: list(wire, "options").map(toOption),
           blocks: list(wire, "blocks").flatMap(toElement),
           submitLabel: text(wire, "submit"),

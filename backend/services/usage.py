@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 _BAR_WIDTH = 20
+_ALERT_PERCENT = 90
 
 
 def _oauth(field: str, account: str | None = None) -> str | None:
@@ -88,7 +89,7 @@ async def usage_data(account: str | None = None) -> dict:
     return {"plan": _plan_label(account), "windows": _windows(data)}
 
 
-def _label(wid: str) -> str:
+def window_label(wid: str) -> str:
     if wid == "session":
         return "Current session"
     if wid == "weekly_all":
@@ -127,11 +128,30 @@ def _resets_hint(value) -> str:
 
 def _window_md(win: dict) -> str:
     pct = win["percent"]
-    lines = [f"**{_label(win['id'])}** • {round(pct)}%", f"`{_bar(pct)}`"]
+    lines = [f"**{window_label(win['id'])}** • {round(pct)}%", f"`{_bar(pct)}`"]
     hint = _resets_hint(win.get("resets_at"))
     if hint:
         lines.append(hint)
     return "  \n".join(lines)
+
+
+async def usage_blocks(account: str | None = None) -> list[dict]:
+    data = await _fetch(account)
+    if "error" in data:
+        return [{"type": "text", "value": f"_{data['error']}._"}]
+    windows = _windows(data)
+    if not windows:
+        return [{"type": "text", "value": "_The server returned no usage data._"}]
+    return [
+        {
+            "type": "bar",
+            "label": window_label(win["id"]),
+            "text": _resets_hint(win.get("resets_at")),
+            "value": round(win["percent"]),
+            "alert_above": _ALERT_PERCENT,
+        }
+        for win in windows
+    ]
 
 
 async def usage_markdown(account: str | None = None) -> str:

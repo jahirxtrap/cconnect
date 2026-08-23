@@ -24,6 +24,7 @@ import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -342,6 +343,12 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             "ask_session" -> ServerEvent.AskSession(str("session_id").orEmpty())
             "ask_done" -> ServerEvent.AskDone
             "command" -> ServerEvent.Command(str("markdown").orEmpty())
+            "component" -> ServerEvent.Component(
+                title = str("title"),
+                titleKey = str("title_key"),
+                icon = str("icon"),
+                blocks = obj["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
+            )
             "plan" -> ServerEvent.Plan(str("markdown").orEmpty())
             "notification" -> ServerEvent.Notification(str("text").orEmpty(), str("result"))
             "queued" -> ServerEvent.Queued(str("id"), str("text").orEmpty())
@@ -391,6 +398,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 input = str("input"),
                 title = str("title"),
                 titleKey = str("title_key"),
+                icon = str("icon"),
                 options = obj["options"]?.jsonArray?.map { it.jsonObject.toOption() } ?: emptyList(),
                 blocks = obj["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
                 submitLabel = str("submit"),
@@ -414,7 +422,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
     }
 }
 
-private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview", "page", "notes")
+private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview", "page", "notes", "bar")
 
 internal fun JsonObject.toDismiss(): ComponentOption = ComponentOption(
     value = "",
@@ -431,11 +439,14 @@ internal fun JsonObject.toElement(): ComponentElement? {
         type = type,
         id = this["id"]?.jsonPrimitive?.contentOrNull,
         label = this["label"]?.jsonPrimitive?.contentOrNull,
-        text = this["value"]?.jsonPrimitive?.contentOrNull.takeIf { type == "text" },
+        text = (this["text"] ?: this["value"])?.jsonPrimitive?.contentOrNull.takeIf { type == "text" || type == "bar" },
         placeholder = this["placeholder"]?.jsonPrimitive?.contentOrNull,
         placeholderKey = this["placeholder_key"]?.jsonPrimitive?.contentOrNull,
-        value = raw?.contentOrNull.takeIf { type == "input" },
+        value = raw?.contentOrNull.takeIf { type == "input" || type == "bar" },
         checked = raw?.booleanOrNull == true,
+        color = this["color"]?.jsonPrimitive?.contentOrNull,
+        alertAbove = this["alert_above"]?.jsonPrimitive?.floatOrNull,
+        alertBelow = this["alert_below"]?.jsonPrimitive?.floatOrNull,
         multiline = this["multiline"]?.jsonPrimitive?.booleanOrNull == true,
         multiple = this["multiple"]?.jsonPrimitive?.booleanOrNull == true,
         required = this["required"]?.jsonPrimitive?.booleanOrNull == true,

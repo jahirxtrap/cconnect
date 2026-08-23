@@ -6,10 +6,11 @@
     subtitle: string;
     percent: number;
     alert?: boolean | null;
+    color?: string | null;
     class?: string;
   }
 
-  const { title, subtitle, percent, alert = null, class: className = "" }: Props = $props();
+  const { title, subtitle, percent, alert = null, color = null, class: className = "" }: Props = $props();
 
   const ALERT_PERCENT = 90;
   const clamped = $derived(Math.min(100, Math.max(0, percent)));
@@ -26,8 +27,8 @@
   </div>
   <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-outline-variant">
     <div
-      class="h-full rounded-full transition-[width] {alerting ? 'bg-red' : 'bg-accent'}"
-      style="width: {clamped}%"
+      class="h-full rounded-full transition-[width] {alerting ? 'bg-red' : color ? '' : 'bg-accent'}"
+      style="width: {clamped}%{!alerting && color ? `; background: ${color}` : ''}"
     ></div>
   </div>
 </div>

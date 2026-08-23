@@ -2,6 +2,8 @@ package com.jahirtrap.cconnect.ui
 
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.composables.icons.lucide.Check
+import com.composables.icons.lucide.CircleQuestionMark
+import com.composables.icons.lucide.Clock
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.File
@@ -16,11 +18,15 @@ import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Search
 import com.composables.icons.lucide.Settings
 import com.composables.icons.lucide.Shield
+import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.TriangleAlert
 import com.composables.icons.lucide.X
 
 fun componentIcon(name: String?): ImageVector? = when (name) {
+    "question" -> Lucide.CircleQuestionMark
+    "clock" -> Lucide.Clock
+    "sparkles" -> Lucide.Sparkles
     "message-square" -> Lucide.MessageSquare
     "check" -> Lucide.Check
     "x" -> Lucide.X

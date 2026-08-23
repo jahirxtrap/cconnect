@@ -37,6 +37,34 @@ data class SessionMessage(
     val toolUseId: String? = null,
 )
 
+private val VISIBLE_ROLES = setOf(Role.TOOL, Role.WORKING, Role.INTERRUPTED)
+
+fun SessionMessage.toRole(): Role = when (type) {
+    "text" -> if (role == "assistant") Role.ASSISTANT else Role.USER
+    "thinking" -> Role.THINKING
+    "working" -> Role.WORKING
+    "notification" -> Role.NOTIFICATION
+    "tool_use" -> Role.TOOL
+    "tool_result" -> Role.TOOL_RESULT
+    "file_change" -> Role.FILE_CHANGE
+    "interaction" -> Role.INTERACTION
+    "compact" -> Role.COMPACT
+    "summary" -> Role.SUMMARY
+    "agent" -> Role.AGENT
+    "plan" -> Role.PLAN
+    "api_error" -> Role.API_ERROR
+    "interrupted" -> Role.INTERRUPTED
+    else -> Role.SYSTEM
+}
+
+fun SessionMessage.visible(): Boolean = text.isNotBlank() ||
+    interaction != null ||
+    !diffLines.isNullOrEmpty() ||
+    compact != null ||
+    labelOnly ||
+    !images.isNullOrEmpty() ||
+    toRole() in VISIBLE_ROLES
+
 data class SharedEntry(
     val name: String,
     val isDir: Boolean,

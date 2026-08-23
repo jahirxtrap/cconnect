@@ -82,6 +82,9 @@ data class ComponentElement(
     val multiline: Boolean = false,
     val multiple: Boolean = false,
     val required: Boolean = false,
+    val color: String? = null,
+    val alertAbove: Float? = null,
+    val alertBelow: Float? = null,
     val options: List<ComponentOption> = emptyList(),
     val block: String? = null,
     val blocks: List<ComponentElement> = emptyList(),
@@ -93,6 +96,7 @@ data class InteractionData(
     val options: List<InteractionOption> = emptyList(),   // permission chips
     val title: String? = null,
     val titleKey: String? = null,
+    val icon: String? = null,
     val resolved: String? = null,
     val resolvedText: String? = null,
     val submitted: Boolean = false,
@@ -105,9 +109,13 @@ data class InteractionData(
     val values: Map<String, String> = emptyMap(),            // component draft, id -> value
 )
 
+fun componentAnswerable(blocks: List<ComponentElement>): Boolean = blocks.any {
+    if (it.type == "page") componentAnswerable(it.blocks) else it.type == "buttons" || it.id != null
+}
+
 val InteractionData.pending: Boolean
     get() = when (kind) {
-        "questions", "component" -> !(submitted || declined)
+        "component" -> componentAnswerable(blocks) && !(submitted || declined)
         else -> resolved == null
     }
 
@@ -164,6 +172,7 @@ sealed interface ServerEvent {
     data class AskSession(val sessionId: String) : ServerEvent
     data object AskDone : ServerEvent
     data class Command(val markdown: String) : ServerEvent
+    data class Component(val title: String?, val titleKey: String?, val icon: String?, val blocks: List<ComponentElement>) : ServerEvent
     data class Plan(val markdown: String) : ServerEvent
     data class Agent(val id: String?, val subagentType: String?, val description: String?, val labelOnly: Boolean) : ServerEvent
     data class Notification(val summary: String, val status: String?) : ServerEvent
@@ -192,6 +201,7 @@ sealed interface ServerEvent {
         val input: String?,
         val title: String?,
         val titleKey: String? = null,
+        val icon: String? = null,
         val options: List<InteractionOption>,
         val blocks: List<ComponentElement> = emptyList(),
         val submitLabel: String? = null,

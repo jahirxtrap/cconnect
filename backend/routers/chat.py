@@ -206,13 +206,16 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
     return factory
 
 
-async def _run_usage(send, account: str | None = None):
-    """Send the plan-usage report as a one-off markdown message."""
-    from services.usage import usage_markdown
+async def _run_usage(send, account: str | None = None, capabilities=None):
+    """Send the plan-usage report as a one-off component message, or markdown for clients without them."""
+    from mcps.components import CAPABILITY as COMPONENTS
+    from services.usage import usage_blocks, usage_markdown
 
     try:
-        md = await usage_markdown(account)
-        await send({"type": "command", "markdown": md})
+        if COMPONENTS in (capabilities or ()):
+            await send({"type": "component", "blocks": await usage_blocks(account)})
+        else:
+            await send({"type": "command", "markdown": await usage_markdown(account)})
     except Exception as exc:
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
 
@@ -394,7 +397,7 @@ async def chat_ws(ws: WebSocket):
                         await send({"type": "error", "message": "busy: a side question is already running", "channel": side_session.channel})
 
             elif mtype == "usage":
-                spawn(_run_usage(send, accounts.resolve(session.state.account if session else None)))
+                spawn(_run_usage(send, accounts.resolve(session.state.account if session else None), seen["capabilities"]))
 
             elif mtype == "interrupt":
                 target = side_session if raw.get("lane") == "side" else session

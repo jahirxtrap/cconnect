@@ -1,4 +1,7 @@
 import Check from "@lucide/svelte/icons/check";
+import CircleQuestionMark from "@lucide/svelte/icons/circle-question-mark";
+import Clock from "@lucide/svelte/icons/clock";
+import Sparkles from "@lucide/svelte/icons/sparkles";
 import Download from "@lucide/svelte/icons/download";
 import ExternalLink from "@lucide/svelte/icons/external-link";
 import File from "@lucide/svelte/icons/file";
@@ -18,6 +21,9 @@ import X from "@lucide/svelte/icons/x";
 import type { IconSource } from "./icons";
 
 const ICONS: Record<string, IconSource> = {
+  question: CircleQuestionMark,
+  clock: Clock,
+  sparkles: Sparkles,
   "message-square": MessageSquare,
   check: Check,
   x: X,

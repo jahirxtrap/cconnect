@@ -39,6 +39,8 @@ import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.ServerEvent
 import com.jahirtrap.cconnect.data.SessionInfo
 import com.jahirtrap.cconnect.data.SessionMessage
+import com.jahirtrap.cconnect.data.toRole
+import com.jahirtrap.cconnect.data.visible
 import com.jahirtrap.cconnect.data.Settings
 import com.jahirtrap.cconnect.data.VisibilityPrefs
 import com.jahirtrap.cconnect.data.remote.GitHubApi
@@ -872,7 +874,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun loadSessionInto(session: SessionInfo): Boolean {
         val projectKey = session.projectKey ?: return false
         val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100, visibility = localVisibility()) ?: return false
-        val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.WORKING || it.toRole() == Role.INTERRUPTED }
+        val visible = page.items.filter { it.visible() }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, session.sessionId, projectKey), timestamp = m.timestamp) to m.parent
         })
@@ -968,7 +970,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val sid = s.sessionId ?: return
         val proj = currentProjectKey() ?: return
         val page = SessionsApi.sessionMessages(sid, proj, limit = 100, visibility = localVisibility()) ?: return
-        val visible = page.items.filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.WORKING || it.toRole() == Role.INTERRUPTED }
+        val visible = page.items.filter { it.visible() }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
             ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, sid, proj), timestamp = m.timestamp) to m.parent
         })
@@ -1048,24 +1050,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         m.images?.map { ref ->
             "${baseUrl()}/sessions/$sessionId/images/$ref?project=${UrlCodec.encode(projectKey.orEmpty())}"
         }
-
-    private fun SessionMessage.toRole(): Role = when (type) {
-        "text" -> if (role == "assistant") Role.ASSISTANT else Role.USER
-        "thinking" -> Role.THINKING
-        "working" -> Role.WORKING
-        "notification" -> Role.NOTIFICATION
-        "tool_use" -> Role.TOOL
-        "tool_result" -> Role.TOOL_RESULT
-        "file_change" -> Role.FILE_CHANGE
-        "interaction" -> Role.INTERACTION
-        "compact" -> Role.COMPACT
-        "summary" -> Role.SUMMARY
-        "agent" -> Role.AGENT
-        "plan" -> Role.PLAN
-        "api_error" -> Role.API_ERROR
-        "interrupted" -> Role.INTERRUPTED
-        else -> Role.SYSTEM
-    }
 
     private fun onAgentChild(parent: String, event: ServerEvent) {
         val child: ChatMessage? = when (event) {
@@ -1213,6 +1197,21 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 currentAssistantId = null
                 currentThinkingId = null
                 addMessage(Role.ASSISTANT, event.markdown, ephemeral = true)
+            }
+            is ServerEvent.Component -> {
+                currentAssistantId = null
+                currentThinkingId = null
+                val data = InteractionData(
+                    requestId = "shown",
+                    kind = "component",
+                    title = event.title,
+                    titleKey = event.titleKey,
+                    icon = event.icon,
+                    blocks = event.blocks,
+                )
+                _state.update { st ->
+                    st.copy(messages = st.messages + ChatMessage(nextId++, Role.INTERACTION, "", interaction = data, ephemeral = true))
+                }
             }
             is ServerEvent.Todos -> _state.update { it.copy(todos = event.items) }
             is ServerEvent.Context -> _state.update { it.copy(contextTokens = event.contextTokens ?: it.contextTokens) }
@@ -1463,7 +1462,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             return
         }
         val older = event.items
-            .filter { it.text.isNotBlank() || it.interaction != null || !it.diffLines.isNullOrEmpty() || it.compact != null || it.labelOnly || !it.images.isNullOrEmpty() || it.toRole() == Role.WORKING || it.toRole() == Role.INTERRUPTED }
+            .filter { it.visible() }
         _state.update { st ->
             val prepended = older.mapIndexed { i, m ->
                 ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, event.sessionId, st.activeProjectKey), timestamp = m.timestamp)
@@ -1523,6 +1522,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         options = event.options,
         title = event.title,
         titleKey = event.titleKey,
+        icon = event.icon,
         blocks = event.blocks,
         submitLabel = event.submitLabel,
         submitKey = event.submitKey,

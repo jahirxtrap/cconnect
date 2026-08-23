@@ -546,6 +546,7 @@ export class ChatState {
                 options: event.options,
                 title: event.title,
                 titleKey: event.titleKey,
+                icon: event.icon,
                 blocks: event.blocks,
                 submitLabel: event.submitLabel,
                 values: componentDefaults(event.blocks),
@@ -1314,6 +1315,22 @@ export class ChatState {
         this.#thinkingId = null;
         this.#append(newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true }));
         break;
+      case "component":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(
+          newMessage(this.#nextId++, "interaction", {
+            ephemeral: true,
+            interaction: {
+              ...emptyInteraction("shown", "component"),
+              title: event.title,
+              titleKey: event.titleKey,
+              icon: event.icon,
+              blocks: event.blocks,
+            },
+          }),
+        );
+        break;
       case "notification":
         this.#assistantId = null;
         this.#thinkingId = null;
@@ -1513,6 +1530,7 @@ export class ChatState {
             options: event.options,
             title: event.title,
             titleKey: event.titleKey,
+            icon: event.icon,
             blocks: event.blocks,
             submitLabel: event.submitLabel,
             submitKey: event.submitKey,
