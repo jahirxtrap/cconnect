@@ -3,6 +3,7 @@ package com.jahirtrap.cconnect.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button as MaterialButton
@@ -55,7 +56,10 @@ fun Button(
         elevation = null,
         border = if (variant == ButtonVariant.Outlined) BorderStroke(snapDp(2.dp), scheme.outlineVariant) else null,
         contentPadding = ButtonPadding,
-        content = content,
+        content = {
+            val scope = this
+            DisableSelection { scope.content() }
+        },
     )
 }
 

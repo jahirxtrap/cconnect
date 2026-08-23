@@ -2307,12 +2307,12 @@ private fun ConversationRow(
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 8.dp),
         )
         when (activity) {
-            "waiting" -> StatusDot(palette.orange, box = 16.dp, dot = 10.dp)
+            "waiting" -> StatusDot(palette.orange, box = 16.dp, dot = 9.dp)
             "renaming" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                StatusSpinner(size = 10.dp, color = palette.purple)
+                StatusSpinner(size = 9.dp, color = palette.purple)
             }
             "working" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
-                StatusSpinner(size = 10.dp)
+                StatusSpinner(size = 9.dp)
             }
         }
         Box {

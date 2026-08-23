@@ -310,6 +310,8 @@
     <string name="color_none">None</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
+    <string name="show">Show</string>
+    <string name="hide">Hide</string>
     <string name="discard">Discard</string>
     <string name="component_discard_confirm">Discard this component and continue in the chat?</string>
     <string name="delete_conversation_confirm">Delete the conversation \"%1$s\"?</string>

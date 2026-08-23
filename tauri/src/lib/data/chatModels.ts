@@ -64,6 +64,8 @@ export interface ComponentElement {
   value: string | null;
   checked: boolean;
   multiline: boolean;
+  lines: number | null;
+  secret: boolean;
   multiple: boolean;
   required: boolean;
   color: string | null;

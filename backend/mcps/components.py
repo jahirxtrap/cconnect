@@ -19,9 +19,12 @@ form than as prose. For a single yes/no or a quick question, just ask in text.
 Elements, in the order you list them:
 - text: a markdown paragraph to explain. No id.
 - select: options with label, and optional description and preview. Set multiple for checkboxes.
-- input: a text field. Set multiline for a text area, value to prefill it.
+- input: a text field. Set multiline for a text area, lines for a fixed-height one, secret to
+  mask what is typed behind a reveal toggle, value to prefill it.
 - toggle: an on/off switch.
-- notes: an optional free comment, folded behind a link until the user opens it.
+- notes: an optional free comment, folded behind a link until the user opens it. It comes back
+  under "notes" rather than "values": treat it as an extra instruction from the user, not as a
+  field of the form.
 - buttons: a row of actions, each with an optional icon. It is terminal: picking one submits the
   whole form.
 - preview: {PREVIEW}
@@ -31,7 +34,7 @@ Elements, in the order you list them:
   It turns into the alert colour past alert_above or under alert_below.
 
 Every element that carries a value needs an id unique within the form; the answer comes back keyed
-by those ids. Reuse the same block_id to replace a form you already sent instead of stacking a new
+by those ids, with any notes split into their own "notes" map. Reuse the same block_id to replace a form you already sent instead of stacking a new
 one. Never describe styling: the app owns the look."""
 
 SHOW_DESCRIPTION = """Draw a block in the chat: bars, text and media laid out together. It asks nothing
@@ -95,6 +98,8 @@ LEAF = {
         "alert_below": {"type": "number", "description": "bar: alert colour from this value down."},
         "placeholder": {"type": "string"},
         "multiline": {"type": "boolean"},
+        "lines": {"type": "integer", "description": "input: fixed height in lines. Implies multiline."},
+        "secret": {"type": "boolean", "description": "input: mask the text behind a reveal toggle."},
         "multiple": {"type": "boolean", "description": "select: checkboxes instead of radio."},
         "required": {"type": "boolean"},
         "options": {"type": "array", "items": OPTION},
@@ -141,6 +146,18 @@ SCHEMA = {
 }
 
 
+def _note_ids(blocks: list) -> set[str]:
+    ids: set[str] = set()
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        if block.get("type") == "page":
+            ids |= _note_ids(block.get("blocks") or [])
+        elif block.get("type") == "notes" and block.get("id"):
+            ids.add(block["id"])
+    return ids
+
+
 def make_tools(context: dict) -> list:
     ask_user = context.get("ask_user")
     emit = context.get("emit")
@@ -183,7 +200,12 @@ def make_tools(context: dict) -> list:
         if response.get("chat"):
             answer = {"submitted": False, "dismissed": True}
         else:
-            answer = {"submitted": True, "values": response.get("values") or {}}
+            values = response.get("values") or {}
+            note_ids = _note_ids(args.get("blocks") or [])
+            answer = {"submitted": True, "values": {k: v for k, v in values.items() if k not in note_ids}}
+            notes = {k: v for k, v in values.items() if k in note_ids and v}
+            if notes:
+                answer["notes"] = notes
         return {"content": [{"type": "text", "text": json.dumps(answer, ensure_ascii=False)}]}
 
     tools.append(ui)

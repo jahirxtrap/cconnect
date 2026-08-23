@@ -20,6 +20,7 @@ fun SelectChip(
     label: String,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    required: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -33,7 +34,7 @@ fun SelectChip(
     ) {
         DisableSelection {
             Text(
-                label,
+                if (required) "$label *" else label,
                 style = MaterialTheme.typography.labelMedium,
                 color = if (selected) scheme.primary else scheme.onSurfaceVariant,
                 maxLines = 1,

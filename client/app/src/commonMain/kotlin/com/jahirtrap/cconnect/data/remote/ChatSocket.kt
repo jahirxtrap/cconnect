@@ -448,6 +448,8 @@ internal fun JsonObject.toElement(): ComponentElement? {
         alertAbove = this["alert_above"]?.jsonPrimitive?.floatOrNull,
         alertBelow = this["alert_below"]?.jsonPrimitive?.floatOrNull,
         multiline = this["multiline"]?.jsonPrimitive?.booleanOrNull == true,
+        lines = this["lines"]?.jsonPrimitive?.intOrNull,
+        secret = this["secret"]?.jsonPrimitive?.booleanOrNull == true,
         multiple = this["multiple"]?.jsonPrimitive?.booleanOrNull == true,
         required = this["required"]?.jsonPrimitive?.booleanOrNull == true,
         options = this["options"]?.jsonArray?.map { el ->

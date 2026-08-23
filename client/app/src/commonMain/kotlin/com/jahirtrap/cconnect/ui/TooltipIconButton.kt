@@ -49,8 +49,13 @@ fun TooltipIconButton(
     enabled: Boolean = true,
     size: Dp = 36.dp,
     showLabel: Boolean = false,
+    tooltip: Boolean = true,
     icon: @Composable () -> Unit,
 ) {
+    if (!tooltip && !showLabel) {
+        IconAction(onClick = onClick, modifier = modifier, enabled = enabled, size = size, icon = icon)
+        return
+    }
     if (showLabel) {
         Row(
             modifier = modifier
@@ -95,14 +100,25 @@ fun TooltipIconButton(
                 content = { icon() },
             )
         } else {
-            IconButton(
-                onClick = onClick,
-                enabled = enabled,
-                modifier = modifier.size(size).then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
-                content = { icon() },
-            )
+            IconAction(onClick = onClick, modifier = modifier, enabled = enabled, size = size, icon = icon)
         }
     }
+}
+
+@Composable
+private fun IconAction(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    size: Dp = 36.dp,
+    icon: @Composable () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.size(size).then(if (enabled) Modifier.pointerHoverIcon(PointerIcon.Hand) else Modifier),
+        content = { icon() },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

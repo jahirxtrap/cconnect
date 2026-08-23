@@ -2,6 +2,7 @@
   import Eye from "@lucide/svelte/icons/eye";
   import EyeOff from "@lucide/svelte/icons/eye-off";
   import X from "@lucide/svelte/icons/x";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import type { Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
 
@@ -92,28 +93,28 @@
       ></textarea>
     {/if}
     {#if showClear}
-      <button
-        type="button"
+      <TooltipIconButton
+        label={t("CANCEL")}
+        tooltip={false}
         onclick={() => onClear?.()}
-        aria-label={t("CANCEL")}
-        class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+        class="size-6 [&_svg]:size-[18px]"
       >
-        <X size={16} />
-      </button>
+        <X size={18} class="text-on-surface-variant" />
+      </TooltipIconButton>
     {/if}
     {#if secret}
-      <button
-        type="button"
+      <TooltipIconButton
+        label={t(revealed ? "HIDE" : "SHOW")}
+        tooltip={false}
         onclick={() => (revealed = !revealed)}
-        aria-label={t(revealed ? "HIDE" : "SHOW")}
-        class="shrink-0 cursor-pointer text-on-surface-variant transition-colors hover:text-on-surface"
+        class="size-6 [&_svg]:size-[18px]"
       >
         {#if revealed}
-          <EyeOff size={24} />
+          <EyeOff size={18} class="text-on-surface-variant" />
         {:else}
-          <Eye size={24} />
+          <Eye size={18} class="text-on-surface-variant" />
         {/if}
-      </button>
+      </TooltipIconButton>
     {/if}
     {@render trailing?.()}
   </div>

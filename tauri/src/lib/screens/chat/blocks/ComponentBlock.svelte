@@ -2,6 +2,7 @@
   import CircleQuestionMark from "@lucide/svelte/icons/circle-question-mark";
   import CornerDownRight from "@lucide/svelte/icons/corner-down-right";
   import Play from "@lucide/svelte/icons/play";
+  import NotepadText from "@lucide/svelte/icons/notepad-text";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
   import { cubicOut } from "svelte/easing";
@@ -194,8 +195,10 @@
         value={valueOf(element)}
         oninput={(value) => !data.submitted && onValue(element.id ?? "", value)}
         placeholder={element.placeholder ?? keyed(element.placeholderKey) ?? undefined}
-        singleLine={!element.multiline}
-        maxLines={element.multiline ? 6 : 1}
+        singleLine={element.lines === null && !element.multiline}
+        minLines={element.lines ?? 1}
+        maxLines={element.lines ?? (element.multiline ? 6 : 1)}
+        secret={element.secret}
       />
     {:else if element.type === "toggle"}
       <SwitchRow
@@ -234,9 +237,10 @@
         <button
           type="button"
           onclick={() => (openNotes[element.id ?? ""] = true)}
-          class="mt-1 cursor-pointer text-left text-label-md text-accent select-none"
+          class="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-item px-2 py-1.5 text-left text-label-lg text-accent transition-colors select-none hover:bg-on-surface/8"
         >
-          {element.label?.trim() || t("ADD_NOTES")}
+          <NotepadText size={18} class="shrink-0" />
+          <span class="truncate">{element.label?.trim() || t("ADD_NOTES")}</span>
         </button>
       {/if}
     {/if}
@@ -296,6 +300,7 @@
             <SelectChip
               label={item.label?.trim() || String(index + 1)}
               selected={index === current}
+              required={item.required}
               onclick={() => goto(index)}
             />
           {/each}

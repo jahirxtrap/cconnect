@@ -70,6 +70,7 @@ import com.jahirtrap.cconnect.files.isArchive
 import com.jahirtrap.cconnect.files.previewKindOf
 import com.jahirtrap.cconnect.ui.AttachmentChip
 import com.composables.icons.lucide.Archive
+import com.composables.icons.lucide.NotepadText
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.CircleQuestionMark
@@ -1041,6 +1042,7 @@ private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState)
             SelectChip(
                 label = page.label?.ifBlank { null } ?: "${index + 1}",
                 selected = index == pagerState.currentPage,
+                required = page.required,
                 onClick = {
                     scope.launch {
                         if (abs(index - pagerState.currentPage) > 1) pagerState.scrollToPage(index)
@@ -1098,8 +1100,10 @@ private fun ComponentElements(
                         onValueChange = { if (!data.submitted) onValue(id, it) },
                         label = element.label?.takeIf { it.isNotBlank() }?.let { { Text(componentLabel(element)) } },
                         placeholder = element.placeholder ?: componentText(element.placeholderKey),
-                        singleLine = !element.multiline,
-                        maxLines = if (element.multiline) 6 else 1,
+                        singleLine = element.lines == null && !element.multiline,
+                        minLines = element.lines ?: 1,
+                        maxLines = element.lines ?: if (element.multiline) 6 else 1,
+                        secret = element.secret,
                     )
                 }
 
@@ -1142,15 +1146,29 @@ private fun ComponentElements(
                         )
                     } else {
                         DisableSelection {
-                            Text(
-                                element.label?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.add_notes),
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.primary,
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clip(RoundedCornerShape(Radius.item))
                                     .clickable { showNotes = true }
-                                    .padding(top = 4.dp),
-                            )
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Icon(
+                                    Lucide.NotepadText,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Text(
+                                    element.label?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.add_notes),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }

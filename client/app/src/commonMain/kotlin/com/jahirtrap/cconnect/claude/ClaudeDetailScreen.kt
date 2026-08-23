@@ -382,7 +382,7 @@ fun ClaudeDetailScreen(
                                                 .padding(horizontal = 16.dp, vertical = 8.dp),
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                StatusDot(color, box = 14.dp, dot = 9.dp)
+                                                StatusDot(color, box = 16.dp, dot = 10.dp)
                                                 Spacer(Modifier.width(8.dp))
                                                 Text(
                                                     incident.name,

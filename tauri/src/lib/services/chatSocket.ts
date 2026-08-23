@@ -210,6 +210,8 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       alertBelow: number(raw, "alert_below"),
       checked: value === true,
       multiline: flag(raw, "multiline"),
+      lines: number(raw, "lines"),
+      secret: flag(raw, "secret"),
       multiple: flag(raw, "multiple"),
       required: flag(raw, "required"),
       options: list(raw, "options").map((option) => ({

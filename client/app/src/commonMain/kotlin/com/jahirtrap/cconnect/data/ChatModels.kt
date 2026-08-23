@@ -80,6 +80,8 @@ data class ComponentElement(
     val value: String? = null,
     val checked: Boolean = false,
     val multiline: Boolean = false,
+    val lines: Int? = null,
+    val secret: Boolean = false,
     val multiple: Boolean = false,
     val required: Boolean = false,
     val color: String? = null,

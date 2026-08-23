@@ -17,10 +17,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
+import com.composables.icons.lucide.Eye
+import com.composables.icons.lucide.EyeOff
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.cancel
+import com.jahirtrap.cconnect.resources.hide
+import com.jahirtrap.cconnect.resources.show
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +39,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.Radius
@@ -52,12 +57,14 @@ fun InputField(
     maxLines: Int = if (singleLine) 1 else Int.MAX_VALUE,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
+    secret: Boolean = false,
     trailingIcon: @Composable (() -> Unit)? = null,
     onClear: (() -> Unit)? = null,
     clearAlways: Boolean = false,
     focusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var revealed by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(Radius.md)
     val borderColor = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
     val lineHeightDp = with(LocalDensity.current) { MaterialTheme.typography.bodyMedium.lineHeight.toDp() }
@@ -86,7 +93,7 @@ fun InputField(
                 minLines = minLines,
                 maxLines = maxLines,
                 keyboardOptions = keyboardOptions,
-                visualTransformation = visualTransformation,
+                visualTransformation = if (secret && !revealed) PasswordVisualTransformation() else visualTransformation,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 decorationBox = { inner ->
@@ -102,12 +109,33 @@ fun InputField(
             )
             if (onClear != null && (clearAlways || value.isNotEmpty())) {
                 Spacer(Modifier.width(4.dp))
-                IconButton(onClick = onClear, modifier = Modifier.size(28.dp)) {
+                TooltipIconButton(
+                    label = stringResource(Res.string.cancel),
+                    onClick = onClear,
+                    size = 24.dp,
+                    tooltip = false,
+                ) {
                     Icon(
                         Lucide.X,
                         contentDescription = stringResource(Res.string.cancel),
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+            if (secret) {
+                Spacer(Modifier.width(4.dp))
+                TooltipIconButton(
+                    label = stringResource(if (revealed) Res.string.hide else Res.string.show),
+                    onClick = { revealed = !revealed },
+                    size = 24.dp,
+                    tooltip = false,
+                ) {
+                    Icon(
+                        if (revealed) Lucide.EyeOff else Lucide.Eye,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp),
                     )
                 }
             }

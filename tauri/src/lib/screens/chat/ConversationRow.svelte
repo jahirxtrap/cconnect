@@ -58,14 +58,14 @@
     {title}
   </Pressable>
   {#if activity === "waiting"}
-    <span class="flex shrink-0 items-center"><StatusDot class="bg-orange" box={16} dot={10} /></span>
+    <span class="flex shrink-0 items-center"><StatusDot class="bg-orange" box={16} dot={9} /></span>
   {:else if activity === "renaming"}
     <span class="inline-flex size-4 shrink-0 items-center justify-center">
-      <LoadingIndicator size={10} fill class="text-purple" />
+      <LoadingIndicator size={9} fill class="text-purple" />
     </span>
   {:else if activity === "working"}
     <span class="inline-flex size-4 shrink-0 items-center justify-center">
-      <LoadingIndicator size={10} fill />
+      <LoadingIndicator size={9} fill />
     </span>
   {/if}
   <div>

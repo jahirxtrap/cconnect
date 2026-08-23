@@ -46,7 +46,6 @@ def questions_to_blocks(questions: list[dict]) -> list[dict]:
         pages.append({
             "type": "page",
             "label": question.get("header"),
-            "required": True,
             "blocks": elements,
         })
     return pages
