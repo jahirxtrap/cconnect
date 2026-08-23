@@ -241,6 +241,19 @@ def _spawn_detached(child_args: list[str]) -> int:
     return process.pid
 
 
+def _terminate_tree(pid: int) -> None:
+    with suppress(psutil.Error):
+        parent = psutil.Process(pid)
+        targets = parent.children(recursive=True) + [parent]
+        for target in targets:
+            with suppress(psutil.Error):
+                target.terminate()
+        _, alive = psutil.wait_procs(targets, timeout=10)
+        for target in alive:
+            with suppress(psutil.Error):
+                target.kill()
+
+
 def _stop_detached() -> None:
     pid = _running_pid()
     if pid is None:
@@ -319,14 +332,26 @@ def main():
 
     RESTART_FLAG.unlink(missing_ok=True)
     while True:
+        process = subprocess.Popen(cmd, cwd=Path(__file__).resolve().parent)
+        asked = False
         try:
-            code = subprocess.run(cmd, cwd=Path(__file__).resolve().parent).returncode
+            while True:
+                try:
+                    process.wait(timeout=0.5)
+                    break
+                except subprocess.TimeoutExpired:
+                    if RESTART_FLAG.exists():
+                        asked = True
+                        _terminate_tree(process.pid)
+                        process.wait()
+                        break
         except KeyboardInterrupt:
+            _terminate_tree(process.pid)
             break
-        if RESTART_FLAG.exists():
+        if asked or RESTART_FLAG.exists():
             RESTART_FLAG.unlink(missing_ok=True)
             continue
-        if code != RESTART_EXIT_CODE:
+        if process.returncode != RESTART_EXIT_CODE:
             break
 
 

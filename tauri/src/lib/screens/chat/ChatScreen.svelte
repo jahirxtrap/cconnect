@@ -10,7 +10,6 @@
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
-  import { tick, untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { type InteractionData } from "$lib/data/chatModels";
@@ -89,8 +88,7 @@
       opening = true;
       return;
     }
-    if (!untrack(() => opening)) return;
-    void tick().then(() => requestAnimationFrame(() => (opening = false)));
+    opening = false;
   });
 
   const canAttach = $derived(!chat.sideOpen);

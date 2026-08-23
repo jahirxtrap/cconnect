@@ -118,9 +118,19 @@
     loaded = true;
   };
 
+  let actionRun = 0;
+
+  const cancelAction = () => {
+    actionRun += 1;
+    busy = false;
+    void load();
+  };
+
   const runAction = async (action: () => Promise<{ ok: boolean; message: string }>) => {
+    const run = ++actionRun;
     busy = true;
     const result = await action();
+    if (run !== actionRun) return;
     if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
     await load();
     if (catalogMarket) catalog = await claudeApi.catalog(catalogMarket);
@@ -456,7 +466,7 @@
 
 {#if pluginMenu}
   {@const plugin = pluginMenu}
-  <CompactDialog title={plugin.name} onDismiss={() => !busy && (pluginMenu = null)}>
+  <CompactDialog title={plugin.name} onDismiss={() => { cancelAction(); pluginMenu = null; }}>
     {#snippet titleTrailing()}
       <CompactSwitch
         checked={plugin.enabled}
@@ -466,7 +476,7 @@
       />
     {/snippet}
     {#snippet buttons()}
-      <Button onclick={() => (pluginMenu = null)} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
+      <Button onclick={() => { cancelAction(); pluginMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#if plugin.description || plugin.version}
       <OutlinedPanel class="mb-3">
@@ -572,9 +582,9 @@
 
 {#if marketMenu}
   {@const market = marketMenu}
-  <CompactDialog title={market.name} onDismiss={() => !busy && (marketMenu = null)}>
+  <CompactDialog title={market.name} onDismiss={() => { cancelAction(); marketMenu = null; }}>
     {#snippet buttons()}
-      <Button onclick={() => (marketMenu = null)} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
+      <Button onclick={() => { cancelAction(); marketMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#if market.repo}
       <OutlinedPanel class="mb-3">
@@ -637,7 +647,7 @@
 
 {#if mcpMenu}
   {@const server = mcpMenu}
-  <CompactDialog title={server.name} onDismiss={() => !busy && (mcpMenu = null)}>
+  <CompactDialog title={server.name} onDismiss={() => { cancelAction(); mcpMenu = null; }}>
     {#snippet titleTrailing()}
       <CompactSwitch
         checked={server.enabled}
@@ -646,7 +656,7 @@
       />
     {/snippet}
     {#snippet buttons()}
-      <Button onclick={() => (mcpMenu = null)} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
+      <Button onclick={() => { cancelAction(); mcpMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#if server.detail || server.type}
       <OutlinedPanel class="mb-3">

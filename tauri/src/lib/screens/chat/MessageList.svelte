@@ -89,27 +89,44 @@
   let restoredTab: string | null = null;
   let belowFold = $state(0);
   let viewport = $state(0);
-  let anchorHeight: number | null = null;
   let ownTop = -1;
   let lastTop = 0;
   let smooth = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   let lastId: number | null = null;
 
-  const distanceToBottom = () =>
-    container ? container.scrollHeight - container.scrollTop - container.clientHeight : 0;
+  let scrollSign = -1;
+
+  const detectScrollSign = () => {
+    if (!container) return;
+    const previous = container.scrollTop;
+    container.scrollTop = -1;
+    scrollSign = container.scrollTop < 0 ? -1 : 1;
+    container.scrollTop = previous;
+  };
+
+  const distanceToBottom = () => (container ? Math.abs(container.scrollTop) : 0);
+
+  const distanceToTop = () =>
+    container ? container.scrollHeight - container.clientHeight - Math.abs(container.scrollTop) : 0;
 
   const scrollTo = (top: number) => {
     if (!container) return;
-    container.scrollTop = top;
+    container.scrollTop = scrollSign * Math.abs(top);
     ownTop = container.scrollTop;
     lastTop = container.scrollTop;
+  };
+
+  const scrollFromTop = (fromTop: number) => {
+    if (!container) return;
+    const max = container.scrollHeight - container.clientHeight;
+    scrollTo(Math.max(0, max - fromTop));
   };
 
   const smoothToEnd = () => {
     if (!container) return;
     smooth = true;
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    container.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const settle = () => {
@@ -132,7 +149,7 @@
     while (low <= high) {
       const middle = (low + high) >> 1;
       const node = items[middle] as HTMLElement;
-      if (node.offsetTop + node.offsetHeight > container.scrollTop) {
+      if (node.offsetTop + node.offsetHeight > distanceToTop()) {
         found = node;
         high = middle - 1;
       } else {
@@ -156,7 +173,7 @@
       return;
     }
     const gap = gapAbove(visible[index - 1]?.role ?? null, message.role);
-    const top = node.offsetTop - container.scrollTop;
+    const top = node.offsetTop - distanceToTop();
     if (top + gap >= 0) {
       sticky = null;
       return;
@@ -169,10 +186,10 @@
     const current = sticky;
     if (!current || !container) return;
     const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
-    const top = node ? node.offsetTop + current.gap : container.scrollTop;
+    const top = node ? node.offsetTop + current.gap : distanceToTop();
     expandedState[current.message.id] = false;
     await tick();
-    scrollTo(top);
+    scrollFromTop(top);
   };
 
   const measureScrollbar = () => {
@@ -185,7 +202,7 @@
     if (!container) return;
     measureScrollbar();
     const top = container.scrollTop;
-    const movedUp = top < lastTop - OWN_TOP_PX;
+    const movedUp = Math.abs(top) > Math.abs(lastTop) + OWN_TOP_PX;
     lastTop = top;
     onScrollTop(top, follow);
     belowFold = distanceToBottom();
@@ -198,10 +215,7 @@
       settleTimer = setTimeout(settle, SETTLE_MS);
     }
     updateSticky();
-    if (top < LOAD_OLDER_PX) {
-      anchorHeight = container.scrollHeight;
-      onLoadOlder();
-    }
+    if (distanceToTop() < LOAD_OLDER_PX) onLoadOlder();
   };
 
   const separatorAt = (index: number) => {
@@ -249,7 +263,7 @@
     measureScrollbar();
     const observer = new ResizeObserver(() => {
       measureScrollbar();
-      if (follow) scrollTo(element.scrollHeight);
+      if (follow) scrollTo(0);
       belowFold = distanceToBottom();
       viewport = element.clientHeight;
     });
@@ -263,12 +277,7 @@
     void messages.length;
     if (!container) return;
     measureScrollbar();
-    if (anchorHeight !== null && container.scrollHeight > anchorHeight) {
-      scrollTo(container.scrollTop + container.scrollHeight - anchorHeight);
-      anchorHeight = null;
-      return;
-    }
-    if (follow) scrollTo(container.scrollHeight);
+    if (follow) scrollTo(0);
   });
 
   $effect(() => {
@@ -297,8 +306,8 @@
     follow = target.follow;
     void tick().then(() => {
       if (!container) return;
-      container.scrollTop = target.follow ? container.scrollHeight : target.top;
-      ownTop = container.scrollTop;
+      detectScrollSign();
+      scrollTo(target.follow ? 0 : target.top);
     });
   });
 
@@ -317,9 +326,9 @@
     {onwheel}
     onscrollend={settle}
     ontouchmove={stopFollowing}
-    class="selectable h-full overflow-x-hidden overflow-y-auto"
+    class="selectable flex h-full flex-col-reverse overflow-x-hidden overflow-y-auto"
   >
-    <div bind:this={content}>
+    <div bind:this={content} class="shrink-0">
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
       <div data-mid={item.id}>

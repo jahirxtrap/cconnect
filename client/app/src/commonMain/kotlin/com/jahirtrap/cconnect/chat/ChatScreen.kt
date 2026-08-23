@@ -60,6 +60,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
@@ -296,7 +297,15 @@ fun ChatScreen(
     val isTouch = LocalIsTouch.current
     val scope = rememberCoroutineScope()
     val tabId = TabsController.active.id
-    val listState = TabsController.messageScroll(tabId)
+    val listState = remember(tabId) {
+        val awaiting = vm.state.value.view.lastOrNull()?.interaction?.pending == true
+        val (index, offset) = if (awaiting) 0 to 0 else TabsController.messageScroll(tabId)
+        LazyListState(index, offset)
+    }
+    LaunchedEffect(tabId) {
+        snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
+            .collect { (index, offset) -> TabsController.saveMessageScroll(tabId, index, offset) }
+    }
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
     val expandedState = TabsController.expandedBlocks(tabId)
@@ -328,9 +337,7 @@ fun ChatScreen(
 
     val isAtBottom by remember {
         derivedStateOf {
-            val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf true
-            last.index == info.totalItemsCount - 1 && last.offset + last.size <= info.viewportEndOffset + 4
+            listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 4
         }
     }
 
@@ -343,11 +350,8 @@ fun ChatScreen(
         if (state.transcriptLoading) opening = true
     }
 
-    LaunchedEffect(opening, state.transcriptLoading, state.view.size) {
-        if (!opening || state.transcriptLoading) return@LaunchedEffect
-        if (state.view.isNotEmpty()) listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
-        withFrameNanos { }
-        opening = false
+    LaunchedEffect(opening, state.transcriptLoading) {
+        if (opening && !state.transcriptLoading) opening = false
     }
 
     // Hidden while following; otherwise shown once scrolled more than half the chat viewport above the bottom.
@@ -357,9 +361,8 @@ fun ChatScreen(
             val info = listState.layoutInfo
             val viewportH = info.viewportEndOffset - info.viewportStartOffset
             if (viewportH == 0) return@derivedStateOf false
-            val last = info.visibleItemsInfo.lastOrNull() ?: return@derivedStateOf false
-            val belowFold = if (last.index < info.totalItemsCount - 1) viewportH
-            else (last.offset + last.size) - info.viewportEndOffset
+            val belowFold = if (listState.firstVisibleItemIndex > 0) viewportH
+            else listState.firstVisibleItemScrollOffset
             belowFold > viewportH / 2
         }
     }
@@ -403,8 +406,11 @@ fun ChatScreen(
     }
     LaunchedEffect(followBottom) { vm.setFollowBottom(followBottom) }
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { idx -> if (idx < 10 && !followBottom) vm.loadMoreHistory() }
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0 }
+            .collect { idx ->
+                val total = listState.layoutInfo.totalItemsCount
+                if (total > 0 && idx >= total - 10) vm.loadMoreHistory()
+            }
     }
     LaunchedEffect(
         state.view.size,
@@ -415,25 +421,22 @@ fun ChatScreen(
         state.view.lastOrNull()?.children?.lastOrNull()?.result,
     ) {
         if (state.view.isNotEmpty() && followBottom) {
-            listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
+            listState.scrollToItem(0)
         }
     }
     LaunchedEffect(listState) {
         snapshotFlow {
             val info = listState.layoutInfo
-            val last = info.visibleItemsInfo.lastOrNull()
-            Triple(last?.index, last?.size, info.viewportEndOffset)
+            val first = info.visibleItemsInfo.firstOrNull()
+            Triple(first?.index, first?.size, info.viewportEndOffset)
         }.collect { (index, _, _) ->
-            val lastIdx = listState.layoutInfo.totalItemsCount - 1
-            if (followBottom && index != null && lastIdx >= 0 && index == lastIdx) {
-                listState.scrollToItem(lastIdx, Int.MAX_VALUE)
-            }
+            if (followBottom && index == 0) listState.scrollToItem(0)
         }
     }
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.viewportSize }.collect {
             if (followBottom && state.view.isNotEmpty()) {
-                listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
+                listState.scrollToItem(0)
             }
         }
     }
@@ -441,7 +444,7 @@ fun ChatScreen(
         val last = state.view.lastOrNull() ?: return@LaunchedEffect
         if (last.role == Role.INTERACTION && last.interaction?.pending == true) {
             followBottom = true
-            listState.animateScrollToItem(state.view.lastIndex, Int.MAX_VALUE)
+            listState.animateScrollToItem(0)
         }
     }
     BackInterceptor(enabled = drawerState.targetValue == DrawerValue.Open) { scope.launch { drawerState.close() }; true }
@@ -648,7 +651,7 @@ fun ChatScreen(
                             }
                             LaunchedEffect(expansion.value) {
                                 if (sideActive && followBottom && state.view.isNotEmpty()) {
-                                    listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
+                                    listState.scrollToItem(0)
                                 }
                             }
                             val dismissSide: () -> Unit = {
@@ -689,6 +692,7 @@ fun ChatScreen(
                                         SelectionContainer(modifier = Modifier.fillMaxSize().alpha(if (opening) 0f else 1f).selectionTextCursor()) {
                                             LazyColumn(
                                                 state = listState,
+                                                reverseLayout = true,
                                                 modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                                                     awaitPointerEventScope {
                                                         while (true) {
@@ -698,21 +702,27 @@ fun ChatScreen(
                                                     }
                                                 },
                                             ) {
-                                                itemsIndexed(state.view, key = { _, it -> it.id }) { index, message ->
+                                                if (state.compacting) {
+                                                    item(key = "compacting") { CompactProgress() }
+                                                }
+                                                val status = state.streamStatus
+                                                if (status != null && !(state.compacting && status == "slow")) {
+                                                    item(key = "stream-status") { StatusProgress(status) }
+                                                }
+                                                itemsIndexed(state.view.asReversed(), key = { _, it -> it.id }) { reversed, message ->
+                                                    val index = state.view.lastIndex - reversed
                                                     val ts = message.timestamp
-                                                    var separated = false
-                                                    if (ts != null && showTime) {
+                                                    val separated = if (ts != null && showTime) {
                                                         val prevTs = (index - 1 downTo 0).firstNotNullOfOrNull { state.view[it].timestamp }
-                                                        if (prevTs == null || dayIndex(prevTs) != dayIndex(ts)) {
-                                                            ChatDateSeparator(ts)
-                                                            separated = true
-                                                        }
-                                                    }
+                                                        prevTs == null || dayIndex(prevTs) != dayIndex(ts)
+                                                    } else false
                                                     val running = when (message.role) {
                                                         Role.TOOL, Role.AGENT -> message.toolUseId != null && message.toolUseId in state.pendingToolIds
                                                         Role.THINKING, Role.WORKING, Role.ASSISTANT -> index == state.view.lastIndex && state.streaming
                                                         else -> false
                                                     }
+                                                    Column {
+                                                    if (separated && ts != null) ChatDateSeparator(ts)
                                                     ChatMessageItem(
                                                         message,
                                                         prevRole = state.view.getOrNull(index - 1)?.role,
@@ -732,13 +742,7 @@ fun ChatScreen(
                                                         gluedTop = separated,
                                                         showTime = showTime,
                                                     )
-                                                }
-                                                val status = state.streamStatus
-                                                if (status != null && !(state.compacting && status == "slow")) {
-                                                    item(key = "stream-status") { StatusProgress(status) }
-                                                }
-                                                if (state.compacting) {
-                                                    item(key = "compacting") { CompactProgress() }
+                                                    }
                                                 }
                                             }
                                         }
@@ -766,7 +770,7 @@ fun ChatScreen(
                                                         message = msg,
                                                         onCollapse = {
                                                             expandedState[id] = false
-                                                            scope.launch { listState.scrollToItem(idx, gapPx) }
+                                                            scope.launch { listState.scrollToItem(state.view.lastIndex - idx, gapPx) }
                                                         },
                                                         modifier = Modifier
                                                         .align(Alignment.TopCenter)
@@ -781,7 +785,7 @@ fun ChatScreen(
                                             Surface(
                                                 onClick = {
                                                     followBottom = true
-                                                    scope.launch { listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE) }
+                                                    scope.launch { listState.scrollToItem(0) }
                                                 },
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.onBackground,

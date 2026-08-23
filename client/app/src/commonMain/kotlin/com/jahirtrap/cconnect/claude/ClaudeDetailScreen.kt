@@ -78,6 +78,7 @@ import com.jahirtrap.cconnect.ui.SelectField
 import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.theme.palette
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 enum class ClaudeKind { Plugins, Skills, Mcp, Marketplaces, Memories, Status }
@@ -116,6 +117,7 @@ fun ClaudeDetailScreen(
     var confirmMarketRemove by remember { mutableStateOf<ClaudeApi.Marketplace?>(null) }
     var addingMarket by remember { mutableStateOf(false) }
     var dialogBusy by remember { mutableStateOf<String?>(null) }
+    var actionJob by remember { mutableStateOf<Job?>(null) }
     var catalogMarket by remember { mutableStateOf<String?>(null) }
     var catalog by remember { mutableStateOf<List<ClaudeApi.CatalogPlugin>?>(null) }
     var installCandidate by remember { mutableStateOf<ClaudeApi.CatalogPlugin?>(null) }
@@ -148,8 +150,16 @@ fun ClaudeDetailScreen(
         skillSheet?.let { skillFiles = ClaudeApi.skillFiles(it.plugin, it.id) }
     }
 
+    fun cancelAction() {
+        actionJob?.cancel()
+        actionJob = null
+        dialogBusy = null
+        busy = false
+        scope.launch { load() }
+    }
+
     fun runAction(block: suspend () -> ClaudeApi.ActionResult?) {
-        scope.launch {
+        actionJob = scope.launch {
             busy = true
             val result = block()
             if (result != null && !result.ok) actionError = result.message.ifBlank { "Error" }
@@ -567,7 +577,7 @@ fun ClaudeDetailScreen(
     pluginMenu?.let { plugin ->
         val key = "${plugin.name}@${plugin.marketplace}"
         CompactDialog(
-            onDismiss = { if (dialogBusy == null) pluginMenu = null },
+            onDismiss = { cancelAction(); pluginMenu = null },
             title = plugin.name,
             titleTrailing = {
                 CompactSwitch(plugin.enabled, enabled = dialogBusy == null) {
@@ -576,7 +586,7 @@ fun ClaudeDetailScreen(
                 }
             },
             buttons = {
-                Button(onClick = { pluginMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
+                Button(onClick = { cancelAction(); pluginMenu = null }, variant = ButtonVariant.Outlined) {
                     Text(stringResource(Res.string.cancel))
                 }
             },
@@ -675,10 +685,10 @@ fun ClaudeDetailScreen(
 
     marketMenu?.let { market ->
         CompactDialog(
-            onDismiss = { if (dialogBusy == null) marketMenu = null },
+            onDismiss = { cancelAction(); marketMenu = null },
             title = market.name,
             buttons = {
-                Button(onClick = { marketMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
+                Button(onClick = { cancelAction(); marketMenu = null }, variant = ButtonVariant.Outlined) {
                     Text(stringResource(Res.string.cancel))
                 }
             },
@@ -739,7 +749,7 @@ fun ClaudeDetailScreen(
 
     mcpMenu?.let { server ->
         CompactDialog(
-            onDismiss = { if (dialogBusy == null) mcpMenu = null },
+            onDismiss = { cancelAction(); mcpMenu = null },
             title = server.name,
             titleTrailing = {
                 CompactSwitch(server.enabled, enabled = dialogBusy == null) { enabled ->
@@ -748,7 +758,7 @@ fun ClaudeDetailScreen(
                 }
             },
             buttons = {
-                Button(onClick = { mcpMenu = null }, variant = ButtonVariant.Outlined, enabled = dialogBusy == null) {
+                Button(onClick = { cancelAction(); mcpMenu = null }, variant = ButtonVariant.Outlined) {
                     Text(stringResource(Res.string.cancel))
                 }
             },

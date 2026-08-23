@@ -1,7 +1,6 @@
 package com.jahirtrap.cconnect.chat
 
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -89,11 +88,15 @@ object TabsController {
 
     var lastToolbarHeightPx by mutableStateOf(0)
 
-    private val messageScrolls = mutableMapOf<String, LazyListState>()
+    private val messageScrolls = mutableMapOf<String, Pair<Int, Int>>()
     private val expandedBlocks = mutableMapOf<String, SnapshotStateMap<Long, Boolean>>()
     private val followBottoms = mutableMapOf<String, MutableState<Boolean>>()
 
-    fun messageScroll(tabId: String): LazyListState = messageScrolls.getOrPut(tabId) { LazyListState() }
+    fun messageScroll(tabId: String): Pair<Int, Int> = messageScrolls[tabId] ?: (0 to 0)
+
+    fun saveMessageScroll(tabId: String, index: Int, offset: Int) {
+        messageScrolls[tabId] = index to offset
+    }
 
     fun expandedBlocks(tabId: String): SnapshotStateMap<Long, Boolean> =
         expandedBlocks.getOrPut(tabId) { mutableStateMapOf() }
