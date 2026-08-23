@@ -4,6 +4,7 @@ import asyncio
 import difflib
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
@@ -120,6 +121,18 @@ def _display_tool_name(name: str) -> str:
         if sep and tool:
             return f"{server}: {tool}"
     return name
+
+
+_FENCE_LINE = re.compile(r"^```", re.MULTILINE)
+
+
+def _settled_len(text: str) -> int:
+    fences = list(_FENCE_LINE.finditer(text))
+    cut = fences[-1].start() if len(fences) % 2 else len(text)
+    link = text.rfind("[", 0, cut)
+    if link >= 0 and ")" not in text[link:cut]:
+        cut = link - 1 if link > 0 and text[link - 1] == "!" else link
+    return max(cut, 0)
 
 
 def _stream_event_to_events(event: Any) -> list[dict]:
@@ -655,6 +668,8 @@ async def run_prompt(
 
     hidden_tool_ids: set[str] = set()
     first_chunk_pending: set[int] = set()
+    streamed_text: dict[int, str] = {}
+    streamed_sent: dict[int, int] = {}
 
     watchdog_task = None
     try:
@@ -689,6 +704,13 @@ async def run_prompt(
                     if not parent:
                         for ev in _flush_users(current_sid):
                             yield ev
+                if isinstance(raw, dict) and raw.get("type") == "content_block_stop" and isinstance(idx, int):
+                    held = streamed_text.pop(idx, "")[streamed_sent.pop(idx, 0):]
+                    if held:
+                        tail = {"type": "assistant_text", "text": held}
+                        if parent:
+                            tail["parent"] = parent
+                        yield tail
                 stream_thinking = vis()["thinking"] == "full"
                 for event in _stream_event_to_events(raw):
                     if event.get("type") == "thinking" and not stream_thinking:
@@ -696,6 +718,14 @@ async def run_prompt(
                     if isinstance(idx, int) and idx in first_chunk_pending and event.get("text"):
                         event["text"] = event["text"].lstrip()
                         first_chunk_pending.discard(idx)
+                    if event.get("type") == "assistant_text" and isinstance(idx, int):
+                        streamed_text[idx] = streamed_text.get(idx, "") + event.get("text", "")
+                        sent = streamed_sent.get(idx, 0)
+                        safe = _settled_len(streamed_text[idx])
+                        if safe <= sent:
+                            continue
+                        event["text"] = streamed_text[idx][sent:safe]
+                        streamed_sent[idx] = safe
                     if parent:
                         event["parent"] = parent
                     yield event
@@ -888,16 +918,26 @@ async def ask_side_question(
     prompt_arg = _prompt_stream() if ask_user is not None else prompt
 
     worked = False
+    held, sent = "", 0
     try:
         async for message in query(prompt=prompt_arg, options=options):
             if isinstance(message, StreamEvent):
                 if not worked and _stream_event_is_working(message.event):
                     worked = True
                     yield {"type": "ask_working"}
+                raw = message.event
+                if isinstance(raw, dict) and raw.get("type") == "content_block_stop" and held[sent:]:
+                    yield {"type": "ask_text", "text": held[sent:]}
+                    held, sent = "", 0
                 if partial:
                     for ev in _stream_event_to_events(message.event):
                         if ev.get("type") == "assistant_text" and ev.get("text"):
-                            yield {"type": "ask_text", "text": ev["text"]}
+                            held += ev["text"]
+                            safe = _settled_len(held)
+                            if safe <= sent:
+                                continue
+                            yield {"type": "ask_text", "text": held[sent:safe]}
+                            sent = safe
             elif isinstance(message, AssistantMessage):
                 if not worked and any(type(b).__name__ in ("ThinkingBlock", "ToolUseBlock") for b in message.content):
                     worked = True

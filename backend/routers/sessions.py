@@ -8,6 +8,7 @@ from core.config import COLORS
 from core.responses import api_response
 from services import rewind as rewind_service
 from services import sessions as sessions_service
+from services.live_sessions import registry
 
 router = APIRouter(tags=["Sessions"])
 
@@ -157,6 +158,9 @@ def get_session_messages(
         })
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    cut = registry.committed_cut(session_id)
+    if cut is not None:
+        items = items[:cut]
     total = len(items)
     end = total if before_index is None else max(0, min(before_index, total))
     start = max(0, end - limit)

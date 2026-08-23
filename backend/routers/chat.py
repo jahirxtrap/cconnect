@@ -320,6 +320,7 @@ async def chat_ws(ws: WebSocket):
                     remembered = todos_store.load(session.state.session_id)
                     if not tasks and remembered:
                         await send({"type": "todos", "items": remembered})
+                await send({"type": "attached"})
                 side_channel = raw.get("side_channel")
                 side_resume = raw.get("side_resume")
                 existing_side = registry.get(side_channel) if side_channel else None

@@ -378,6 +378,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             "context" -> ServerEvent.Context(obj["context_tokens"]?.jsonPrimitive?.intOrNull)
             "done" -> ServerEvent.Done
             "interrupted" -> ServerEvent.Interrupted
+            "attached" -> ServerEvent.Attached
             "error" -> ServerEvent.Err(
                 obj["message"]?.jsonPrimitive?.contentOrNull
                     ?: obj["message"]?.toString()

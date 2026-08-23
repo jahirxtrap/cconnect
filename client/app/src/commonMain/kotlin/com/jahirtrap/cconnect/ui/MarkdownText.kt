@@ -55,7 +55,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -216,18 +218,6 @@ private class MdContext(val src: String, val linkColor: Color, val codeBg: Color
 
 private fun fileNameOf(url: String): String =
     url.substringBefore('?').substringBefore('#').substringAfterLast('/').ifBlank { url }
-
-private val FENCE_LINE = Regex("^```", RegexOption.MULTILINE)
-
-fun settledMarkdown(text: String): String {
-    val fences = FENCE_LINE.findAll(text).toList()
-    var cut = if (fences.size % 2 == 1) fences.last().range.first else text.length
-    val link = text.lastIndexOf('[', cut - 1)
-    if (link >= 0 && !text.substring(link, cut).contains(')')) {
-        cut = if (link > 0 && text[link - 1] == '!') link - 1 else link
-    }
-    return if (cut >= text.length) text else text.substring(0, cut).trimEnd()
-}
 
 @Composable
 private fun BlockLink(label: String, url: String, color: Color) {
@@ -689,7 +679,6 @@ private fun ListBlock(list: ASTNode, ordered: Boolean, ctx: MdContext, depth: In
 
 private val LIST_INDENT = 20.dp
 private val LIST_MARKER_GAP = 6.dp
-private val LIST_TEXT_INDENT = 20.sp
 
 @Composable
 private fun ListItemBlock(item: ASTNode, bullet: String, ctx: MdContext, depth: Int) {
@@ -711,12 +700,17 @@ private fun ListItemBlock(item: ASTNode, bullet: String, ctx: MdContext, depth: 
         return
     }
     val rest = item.children.drop(at + 1)
+    val style = MaterialTheme.typography.bodyMedium
+    val measurer = rememberTextMeasurer()
+    val markerIndent = with(LocalDensity.current) {
+        measurer.measure(AnnotatedString("$bullet "), style).size.width.toSp()
+    }
     Column {
         MdText(
             text = buildAnnotatedString { append("$bullet "); append(head) },
             codeBg = ctx.codeBg,
             modifier = Modifier.fillMaxWidth(),
-            style = MaterialTheme.typography.bodyMedium.copy(textIndent = TextIndent(restLine = LIST_TEXT_INDENT)),
+            style = style.copy(textIndent = TextIndent(restLine = markerIndent)),
         )
         if (rest.isNotEmpty()) {
             Column(modifier = Modifier.padding(start = LIST_INDENT)) {

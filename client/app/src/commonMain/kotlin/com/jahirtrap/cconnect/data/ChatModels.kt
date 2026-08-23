@@ -184,6 +184,7 @@ sealed interface ServerEvent {
     data class Context(val contextTokens: Int?) : ServerEvent
     data object Done : ServerEvent
     data object Interrupted : ServerEvent
+    data object Attached : ServerEvent
     data class Err(val message: String) : ServerEvent
     data class ApiError(val message: String) : ServerEvent
     data class Closed(val reason: String) : ServerEvent

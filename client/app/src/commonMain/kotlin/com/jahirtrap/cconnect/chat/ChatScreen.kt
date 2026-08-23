@@ -338,14 +338,14 @@ fun ChatScreen(
     var followBottom by TabsController.followBottom(tabId)
     var dropOver by remember { mutableStateOf(false) }
 
-    var opening by remember { mutableStateOf(false) }
-    var settled by remember { mutableStateOf(!state.transcriptLoading) }
+    var opening by remember { mutableStateOf(state.transcriptLoading) }
     LaunchedEffect(state.transcriptLoading) {
-        if (!state.transcriptLoading) settled = true else if (settled) opening = true
+        if (state.transcriptLoading) opening = true
     }
-    LaunchedEffect(opening, state.messages.size) {
+
+    LaunchedEffect(opening, state.transcriptLoading, state.view.size) {
         if (!opening || state.transcriptLoading) return@LaunchedEffect
-        if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+        if (state.view.isNotEmpty()) listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
         withFrameNanos { }
         opening = false
     }
@@ -369,10 +369,11 @@ fun ChatScreen(
         if (state.connection == ConnectionState.Connected) vm.ensureHistoryLoaded()
     }
     val activeSession = state.allSessions.firstOrNull { it.sessionId == state.sessionId }
+    val busy = state.streaming || activeSession?.activity == "waiting" || activeSession?.activity == "working"
     val tabLabel: String? = activeSession?.let { it.title ?: it.preview ?: state.sessionId?.take(8) }
     val tabColor: String? = if (activeSession != null) state.sessionColor else null
-    LaunchedEffect(tabLabel, tabColor, state.streaming, state.sessionId, state.activeProjectKey) {
-        TabsController.updateActive(tabLabel, tabColor, state.streaming, state.sessionId, state.activeProjectKey)
+    LaunchedEffect(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey) {
+        TabsController.updateActive(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey)
     }
     val tabIndex = remember { TabsController.tabs.indexOfFirst { it.id == TabsController.activeId } }
     val chatLoc = remember { readChatLocation() }
@@ -403,18 +404,18 @@ fun ChatScreen(
     LaunchedEffect(followBottom) { vm.setFollowBottom(followBottom) }
     LaunchedEffect(listState) {
         snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { idx -> if (idx < 10) vm.loadMoreHistory() }
+            .collect { idx -> if (idx < 10 && !followBottom) vm.loadMoreHistory() }
     }
     LaunchedEffect(
-        state.messages.size,
-        state.messages.sumOf { it.text.length },
-        state.messages.lastOrNull()?.id,
-        state.messages.lastOrNull()?.text,
-        state.messages.lastOrNull()?.children?.size,
-        state.messages.lastOrNull()?.children?.lastOrNull()?.result,
+        state.view.size,
+        state.view.sumOf { it.text.length },
+        state.view.lastOrNull()?.id,
+        state.view.lastOrNull()?.text,
+        state.view.lastOrNull()?.children?.size,
+        state.view.lastOrNull()?.children?.lastOrNull()?.result,
     ) {
-        if (state.messages.isNotEmpty() && followBottom) {
-            listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+        if (state.view.isNotEmpty() && followBottom) {
+            listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
         }
     }
     LaunchedEffect(listState) {
@@ -431,16 +432,16 @@ fun ChatScreen(
     }
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.viewportSize }.collect {
-            if (followBottom && state.messages.isNotEmpty()) {
-                listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+            if (followBottom && state.view.isNotEmpty()) {
+                listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
             }
         }
     }
-    LaunchedEffect(state.messages.lastOrNull()?.id) {
-        val last = state.messages.lastOrNull() ?: return@LaunchedEffect
+    LaunchedEffect(state.view.lastOrNull()?.id) {
+        val last = state.view.lastOrNull() ?: return@LaunchedEffect
         if (last.role == Role.INTERACTION && last.interaction?.pending == true) {
             followBottom = true
-            listState.animateScrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+            listState.animateScrollToItem(state.view.lastIndex, Int.MAX_VALUE)
         }
     }
     BackInterceptor(enabled = drawerState.targetValue == DrawerValue.Open) { scope.launch { drawerState.close() }; true }
@@ -610,7 +611,7 @@ fun ChatScreen(
                                         }
                                     }) else null,
                                     actions = {
-                                        if (state.sessionId != null && !state.streaming) {
+                                        if (state.sessionId != null && !busy) {
                                             TooltipIconButton(
                                                 label = stringResource(Res.string.rewind),
                                                 onClick = { vm.loadRewindPoints(); showRewindSheet = true },
@@ -646,8 +647,8 @@ fun ChatScreen(
                                 }
                             }
                             LaunchedEffect(expansion.value) {
-                                if (sideActive && followBottom && state.messages.isNotEmpty()) {
-                                    listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+                                if (sideActive && followBottom && state.view.isNotEmpty()) {
+                                    listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE)
                                 }
                             }
                             val dismissSide: () -> Unit = {
@@ -697,11 +698,11 @@ fun ChatScreen(
                                                     }
                                                 },
                                             ) {
-                                                itemsIndexed(state.messages, key = { _, it -> it.id }) { index, message ->
+                                                itemsIndexed(state.view, key = { _, it -> it.id }) { index, message ->
                                                     val ts = message.timestamp
                                                     var separated = false
                                                     if (ts != null && showTime) {
-                                                        val prevTs = (index - 1 downTo 0).firstNotNullOfOrNull { state.messages[it].timestamp }
+                                                        val prevTs = (index - 1 downTo 0).firstNotNullOfOrNull { state.view[it].timestamp }
                                                         if (prevTs == null || dayIndex(prevTs) != dayIndex(ts)) {
                                                             ChatDateSeparator(ts)
                                                             separated = true
@@ -709,13 +710,13 @@ fun ChatScreen(
                                                     }
                                                     val running = when (message.role) {
                                                         Role.TOOL, Role.AGENT -> message.toolUseId != null && message.toolUseId in state.pendingToolIds
-                                                        Role.THINKING, Role.WORKING, Role.ASSISTANT -> index == state.messages.lastIndex && state.streaming
+                                                        Role.THINKING, Role.WORKING, Role.ASSISTANT -> index == state.view.lastIndex && state.streaming
                                                         else -> false
                                                     }
                                                     ChatMessageItem(
                                                         message,
-                                                        prevRole = state.messages.getOrNull(index - 1)?.role,
-                                                        nextRole = state.messages.getOrNull(index + 1)?.role,
+                                                        prevRole = state.view.getOrNull(index - 1)?.role,
+                                                        nextRole = state.view.getOrNull(index + 1)?.role,
                                                         running = running,
                                                         expanded = expandedState[message.id] ?: false,
                                                         onToggle = { expandedState[message.id] = !(expandedState[message.id] ?: false) },
@@ -754,10 +755,10 @@ fun ChatScreen(
                                             }
                                         }
                                         sticky?.let { (id, topRel, bottomRel) ->
-                                            val idx = state.messages.indexOfFirst { it.id == id }
-                                            val msg = state.messages.getOrNull(idx)
+                                            val idx = state.view.indexOfFirst { it.id == id }
+                                            val msg = state.view.getOrNull(idx)
                                             if (msg != null && hasCollapsibleContent(msg)) {
-                                                val gapPx = with(density) { gapAbove(state.messages.getOrNull(idx - 1)?.role, msg.role).roundToPx() }
+                                                val gapPx = with(density) { gapAbove(state.view.getOrNull(idx - 1)?.role, msg.role).roundToPx() }
                                                 if (topRel + gapPx < 0) {
                                                     val h = if (stickyHeaderHeight > 0) stickyHeaderHeight else with(density) { 40.dp.roundToPx() }
                                                     val pushY = minOf(0, bottomRel - h)
@@ -776,11 +777,11 @@ fun ChatScreen(
                                                 }
                                             }
                                         }
-                                        if (showScrollButton && state.messages.isNotEmpty()) {
+                                        if (showScrollButton && state.view.isNotEmpty()) {
                                             Surface(
                                                 onClick = {
                                                     followBottom = true
-                                                    scope.launch { listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE) }
+                                                    scope.launch { listState.scrollToItem(state.view.lastIndex, Int.MAX_VALUE) }
                                                 },
                                                 shape = CircleShape,
                                                 color = MaterialTheme.colorScheme.onBackground,
@@ -902,14 +903,14 @@ fun ChatScreen(
                                         Composer(
                                             value = if (sideActive) vm.sideDraft else vm.draft,
                                             onValueChange = { if (sideActive) vm.sideDraft = it else vm.draft = it },
-                                            streaming = if (sideActive) (sc?.streaming ?: false) else state.streaming,
+                                            streaming = if (sideActive) (sc?.streaming ?: false) else busy,
                                             sessionColor = state.sessionColor,
                                             commands = state.capabilities.commands,
                                             onCommand = { cmd -> if (cmd.requireConfirmation) confirmCommand = cmd else vm.runCommand(cmd) },
                                             onSend = { if (sideActive) vm.sendSideQuestion(it) else vm.submit(it) },
                                             onStop = { if (sideActive) vm.stopSide() else vm.stop() },
                                             canSend = state.connection == ConnectionState.Connected,
-                                            commandsEnabled = state.sessionId != null && state.connection == ConnectionState.Connected,
+                                            commandsEnabled = state.sessionId != null && state.connection == ConnectionState.Connected && !busy,
                                             focusRequester = composerFocus,
                                             onCloseSide = if (sideActive) dismissSide else null,
                                             attachments = if (sideActive) emptyList() else state.attachments,

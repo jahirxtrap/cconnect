@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { settledMarkdown } from "$lib/markdown/render";
   import Bell from "@lucide/svelte/icons/bell";
   import Bot from "@lucide/svelte/icons/bot";
   import FileIcon from "@lucide/svelte/icons/file";
@@ -96,7 +95,7 @@
     </div>
   {:else if message.role === "assistant"}
     <div class="w-full px-4">
-      <MarkdownText text={running ? settledMarkdown(message.text) : message.text} {onSharedLink} />
+      <MarkdownText text={message.text} {onSharedLink} />
     </div>
   {:else if message.role === "thinking"}
     <Collapsible

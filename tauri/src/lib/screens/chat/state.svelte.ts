@@ -228,6 +228,8 @@ export class ChatState {
   #optimisticChipId: string | null = null;
   #optimisticMessageId: number | null = null;
   #interrupting = false;
+  #pendingTrim: ((list: ChatMessage[]) => ChatMessage[]) | null = null;
+  #frozen = $state<ChatMessage[] | null>(null);
   #uploadAbort: AbortController | null = null;
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
@@ -252,6 +254,7 @@ export class ChatState {
             activity: null,
           }
         : null;
+    this.transcriptLoading = this.#initial !== null;
     this.#loadEnvOverrides();
     this.#applyDefaultProject();
     this.#connect();
@@ -590,7 +593,16 @@ export class ChatState {
     void this.#openSession(session);
   }
 
+  get view(): ChatMessage[] {
+    return this.#frozen ?? this.messages;
+  }
+
+  #freeze() {
+    if (this.#frozen === null && this.messages.length) this.#frozen = this.messages;
+  }
+
   async #openSession(session: SessionInfo) {
+    this.#freeze();
     if (session.sessionId !== this.sessionId) {
       this.sessionId = session.sessionId;
       this.projectKey = session.projectKey ?? this.projectKey;
@@ -600,7 +612,11 @@ export class ChatState {
       this.transcriptLoading = this.messages.length === 0;
       this.transcriptPaging = false;
     }
-    if (!(await this.#loadSessionInto(session))) return;
+    if (!(await this.#loadSessionInto(session))) {
+      this.#frozen = null;
+      this.transcriptLoading = false;
+      return;
+    }
     this.#socket.resetResume();
     this.#startSession(session.sessionId);
   }
@@ -893,6 +909,8 @@ export class ChatState {
   }
 
   #startSession(resume: string | null) {
+    this.#freeze();
+    if (this.#frozen === null && resume) this.transcriptLoading = true;
     this.#socket.sendStart({
       cwd: this.cwd,
       permissionMode: this.effectivePermissionMode,
@@ -948,6 +966,8 @@ export class ChatState {
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
     this.#interrupting = false;
+    this.#pendingTrim = null;
+    this.#frozen = null;
   }
 
   async #loadSessionInto(session: SessionInfo): Promise<boolean> {
@@ -967,6 +987,7 @@ export class ChatState {
     this.#sent.clear();
     this.#silent.clear();
     this.#interrupting = false;
+    this.#pendingTrim = null;
     if (session.path && session.path !== this.cwd) {
       this.cwd = session.path;
       this.onContextChange?.();
@@ -976,10 +997,8 @@ export class ChatState {
     this.projectKey = project;
     this.sessionColor = session.color;
     this.todos = [];
-    this.streaming = false;
     this.queue = [];
     this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
-    this.transcriptLoading = false;
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
@@ -1009,6 +1028,7 @@ export class ChatState {
     for (const id of [...this.#sent]) if (!pending.has(id)) this.#sent.delete(id);
     this.#silent.clear();
     this.#interrupting = false;
+    this.#pendingTrim = null;
     this.messages = live.length ? [...loaded, ...live] : loaded;
     this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
@@ -1276,6 +1296,11 @@ export class ChatState {
       this.#onAgentChild(parent, event);
       return;
     }
+    if (this.#pendingTrim !== null && event.type !== "ready") {
+      const trim = this.#pendingTrim;
+      this.#pendingTrim = null;
+      this.messages = trim(this.messages);
+    }
     switch (event.type) {
       case "connecting":
         if (this.connection !== "connected") this.connection = "connecting";
@@ -1289,15 +1314,21 @@ export class ChatState {
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         this.streaming = event.running;
-        const kept = this.messages.filter((item) => !item.ephemeral);
         const committed = event.committedCount;
         if (!event.resumed || !event.running) {
-          this.messages = kept;
-        } else if (committed !== null) {
-          this.messages = kept.filter((item) => item.sourceIndex >= 0 && item.sourceIndex < committed);
+          this.messages = this.messages.filter((item) => !item.ephemeral);
+          this.#pendingTrim = null;
         } else {
-          const lastUser = kept.findLastIndex((item) => item.role === "user");
-          this.messages = lastUser >= 0 ? kept.slice(0, lastUser + 1) : kept;
+          this.#pendingTrim = (list) => {
+            const kept = list.filter((item) => !item.ephemeral);
+            const awaiting = (item: ChatMessage) => !!item.interaction && isPending(item.interaction);
+            if (committed !== null) {
+              return kept.filter((item) => awaiting(item) || (item.sourceIndex >= 0 && item.sourceIndex < committed));
+            }
+            const lastUser = kept.findLastIndex((item) => item.role === "user");
+            if (lastUser < 0) return kept;
+            return [...kept.slice(0, lastUser + 1), ...kept.slice(lastUser + 1).filter(awaiting)];
+          };
         }
         this.queue = [...event.queued, ...this.queue.filter((item) => item.uploading)];
         for (const item of event.queued) this.#sent.add(item.id);
@@ -1512,6 +1543,10 @@ export class ChatState {
           void this.#reloadConversation();
         }
         break;
+      case "attached":
+        this.#frozen = null;
+        this.transcriptLoading = false;
+        break;
       case "interrupted":
         this.#interrupting = false;
         this.#assistantId = null;
@@ -1607,6 +1642,8 @@ export class ChatState {
         });
         break;
       case "closed":
+        this.#frozen = null;
+        this.transcriptLoading = false;
         this.#assistantId = null;
         this.#thinkingId = null;
         this.#sideAssistantId = null;

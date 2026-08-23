@@ -51,6 +51,10 @@ class LiveSession:
         return len(self._sinks) > 0
 
     @property
+    def has_replay(self):
+        return any(stamped["seq"] > self._committed_seq for stamped in self._outbox)
+
+    @property
     def activity(self):
         if self._pending:
             return "waiting"
@@ -332,6 +336,12 @@ class SessionRegistry:
             if session.state.session_id == session_id:
                 return session
         return None
+
+    def committed_cut(self, session_id):
+        session = self.get_by_session(session_id)
+        if session is None or not session.has_replay:
+            return None
+        return session.turn_start_index
 
     def resolve_interaction(self, rid, response):
         for session in self._sessions.values():

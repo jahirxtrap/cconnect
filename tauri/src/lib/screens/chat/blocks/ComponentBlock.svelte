@@ -94,6 +94,11 @@
 
   let direction = $state(1);
   let pageHeight = $state<number | null>(null);
+  let appeared = $state(false);
+
+  $effect(() => {
+    if (pageHeight !== null) appeared = true;
+  });
 
   const goto = (index: number) => {
     const next = Math.min(Math.max(index, 0), pages.length - 1);
@@ -310,7 +315,9 @@
           use:swipePage={{ onPrevious: () => goto(current - 1), onNext: () => goto(current + 1) }}
         >
           <div
-            class="overflow-hidden transition-[height] duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]"
+            class="overflow-hidden {appeared
+              ? 'transition-[height] duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]'
+              : ''}"
             style={pageHeight === null ? "" : `height: ${pageHeight}px`}
           >
             <div bind:clientHeight={pageHeight}>

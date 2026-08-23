@@ -82,6 +82,7 @@ data class SideChatState(
 data class ChatUiState(
     val connection: ConnectionState = ConnectionState.Connecting,
     val messages: List<ChatMessage> = emptyList(),
+    val frozen: List<ChatMessage>? = null,
     val streaming: Boolean = false,
     val permissionMode: String = "bypassPermissions",
     val model: String = "opus[1m]",
@@ -144,7 +145,9 @@ data class ChatUiState(
     val attachments: List<Attachment> = emptyList(), // files queued in the composer, uploaded on send
     val uploadingAttachments: Boolean = false,
     val queue: List<QueuedMessage> = emptyList(),
-)
+) {
+    val view: List<ChatMessage> get() = frozen ?: messages
+}
 
 data class Attachment(
     val id: Long,
@@ -199,6 +202,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private var historyLoaded = false
     private var defaultProjectApplied = false
     private var initialConsumed = false
+    private var pendingTrim: ((List<ChatMessage>) -> List<ChatMessage>)? = null
 
     init {
         if (ctx.cwd.isBlank()) ctx.cwd = activeEnv()?.directory.orEmpty()
@@ -208,6 +212,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     sessionId = sid,
                     activeProjectKey = ctx.initialProjectKey,
                     sessionColor = ctx.initialColor,
+                    transcriptLoading = true,
                 )
             }
         }
@@ -406,6 +411,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     private fun startSession(resume: String?) {
+        freezeView()
+        if (_state.value.frozen == null && resume != null) _state.update { it.copy(transcriptLoading = true) }
         val s = _state.value
         client.sendStart(
             ctx.cwd,
@@ -715,9 +722,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         optimisticMsgId = null
         sentIds.clear()
         interrupting = false
+        pendingTrim = null
         _state.update {
             it.copy(
                 messages = emptyList(),
+                frozen = null,
                 sessionId = null,
                 sessionColor = null,
                 todos = emptyList(),
@@ -754,6 +763,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 connection = ConnectionState.Disconnected,
                 capabilitiesReady = false,
                 messages = emptyList(),
+                frozen = null,
                 sessionId = null,
                 activeProjectKey = null,
                 sessionColor = null,
@@ -847,8 +857,13 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         openSession(sessionInfoFor(sessionId, projectKey))
     }
 
+    private fun freezeView() {
+        _state.update { if (it.frozen == null && it.messages.isNotEmpty()) it.copy(frozen = it.messages) else it }
+    }
+
     fun openSession(session: SessionInfo) {
         viewModelScope.launch {
+            freezeView()
             if (session.sessionId != _state.value.sessionId) {
                 _state.update {
                     it.copy(
@@ -862,7 +877,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     )
                 }
             }
-            if (!loadSessionInto(session)) return@launch
+            if (!loadSessionInto(session)) {
+                _state.update { it.copy(frozen = null, transcriptLoading = false) }
+                return@launch
+            }
             client.resetResume()
             startSession(resume = session.sessionId)
         }
@@ -903,6 +921,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         optimisticMsgId = null
         sentIds.clear()
         interrupting = false
+        pendingTrim = null
         session.path?.let { ctx.cwd = it }
         _state.update {
             it.copy(
@@ -911,10 +930,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 activeProjectKey = projectKey,
                 sessionColor = session.color,
                 todos = emptyList(),
-                streaming = false,
                 queue = emptyList(),
                 oldestLoadedIndex = page.startIndex.takeIf { page.items.isNotEmpty() },
-                transcriptLoading = false,
                 transcriptPaging = false,
                 transcriptExhausted = !page.hasMore,
                 sideChat = it.sideChat.promote(session.sessionId),
@@ -1003,6 +1020,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         optimisticMsgId = null
         sentIds.retainAll(_state.value.queue.mapTo(mutableSetOf()) { it.id })
         interrupting = false
+        pendingTrim = null
         _state.update {
             it.copy(
                 messages = if (live.isEmpty()) loaded else loaded + live,
@@ -1097,6 +1115,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             onAgentChild(parent, event)
             return
         }
+        val trim = pendingTrim
+        if (trim != null && event !is ServerEvent.Ready) {
+            pendingTrim = null
+            _state.update { it.copy(messages = trim(it.messages)) }
+        }
         when (event) {
             is ServerEvent.Connecting -> _state.update {
                 if (it.connection == ConnectionState.Connected) it
@@ -1106,24 +1129,28 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             is ServerEvent.Ready -> {
                 if (!initialConsumed) consumeInitialSession(event.project)
                 historyLoaded = false
-                _state.update {
-                    val sid = event.sessionId ?: it.sessionId
-                    val kept = it.messages.filterNot { m -> m.ephemeral }
-                    val msgs = if (event.resumed && event.running) {
-                        val n = event.committedCount
-                        if (n != null) kept.filter { m -> m.sourceIndex in 0 until n }
+                val n = event.committedCount
+                pendingTrim = if (event.resumed && event.running) {
+                    { list ->
+                        val kept = list.filterNot { m -> m.ephemeral }
+                        val awaiting = { m: ChatMessage -> m.interaction?.pending == true }
+                        if (n != null) kept.filter { m -> awaiting(m) || m.sourceIndex in 0 until n }
                         else {
                             val lastUser = kept.indexOfLast { m -> m.role == Role.USER }
-                            if (lastUser >= 0) kept.subList(0, lastUser + 1).toList() else kept
+                            if (lastUser >= 0) kept.subList(0, lastUser + 1) + kept.drop(lastUser + 1).filter(awaiting)
+                            else kept
                         }
-                    } else kept
+                    }
+                } else null
+                _state.update {
+                    val sid = event.sessionId ?: it.sessionId
                     it.copy(
                         connection = ConnectionState.Connected,
                         sessionId = sid,
                         activeProjectKey = event.project ?: it.activeProjectKey,
                         streaming = event.running,
                         sideChat = it.sideChat.promote(sid),
-                        messages = msgs,
+                        messages = if (pendingTrim == null) it.messages.filterNot { m -> m.ephemeral } else it.messages,
                         queue = event.queued + it.queue.filter { q -> q.uploading },
                     )
                 }
@@ -1279,6 +1306,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     viewModelScope.launch { reloadConversation() }
                 }
             }
+            is ServerEvent.Attached -> _state.update { it.copy(frozen = null, transcriptLoading = false) }
             is ServerEvent.Interrupted -> {
                 interrupting = false
                 currentAssistantId = null
@@ -1366,6 +1394,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     it.copy(
                         connection = ConnectionState.Disconnected,
                         streaming = false,
+                        frozen = null,
+                        transcriptLoading = false,
                         error = event.reason,
                         sideChat = it.sideChat?.copy(streaming = false),
                     )

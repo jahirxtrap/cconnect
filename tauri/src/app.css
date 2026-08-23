@@ -327,6 +327,8 @@ textarea::selection {
 }
 
 .markdown .li-marker {
+  display: inline-block;
+  min-width: 20px;
   margin-inline-start: -20px;
   font-variant-numeric: tabular-nums;
 }

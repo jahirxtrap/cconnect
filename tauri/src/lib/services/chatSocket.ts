@@ -61,6 +61,7 @@ export type ServerEvent =
   | { type: "context"; contextTokens: number | null }
   | { type: "done"; replay: boolean }
   | { type: "interrupted" }
+  | { type: "attached" }
   | { type: "error"; message: string }
   | { type: "api_error"; message: string }
   | { type: "closed"; reason: string }
@@ -605,6 +606,8 @@ export class ChatSocket {
         return { type: "done", replay: wire.replay === true };
       case "interrupted":
         return { type: "interrupted" };
+      case "attached":
+        return { type: "attached" };
       case "error":
         return { type: "error", message: text(wire, "message") ?? "error" };
       case "api_error":

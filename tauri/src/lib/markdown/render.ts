@@ -163,18 +163,6 @@ const fromTokens = (tokens: Token[]): Segment[] => {
   return merged(result);
 };
 
-const FENCE_LINE = /^```/gm;
-
-export const settledMarkdown = (text: string): string => {
-  const fences = [...text.matchAll(FENCE_LINE)];
-  let cut = fences.length % 2 === 1 ? (fences.at(-1)?.index ?? text.length) : text.length;
-  const link = text.lastIndexOf("[", cut - 1);
-  if (link >= 0 && !text.slice(link, cut).includes(")")) {
-    cut = link > 0 && text[link - 1] === "!" ? link - 1 : link;
-  }
-  return cut >= text.length ? text : text.slice(0, cut).trimEnd();
-};
-
 export const segments = (markdown: string): Segment[] => {
   const match = DETAILS_RE.exec(markdown);
   if (!match) return fromTokens(md.parse(markdown, {}));

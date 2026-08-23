@@ -110,7 +110,6 @@ import com.jahirtrap.cconnect.ui.componentIcon
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.MetricBar
-import com.jahirtrap.cconnect.ui.settledMarkdown
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import com.jahirtrap.cconnect.ui.OptionRow
 import com.jahirtrap.cconnect.ui.OutlinedPanel
@@ -254,7 +253,7 @@ fun ChatMessageItem(
 
             Role.ASSISTANT -> Plain {
                 MarkdownText(
-                    if (running) settledMarkdown(message.text) else message.text,
+                    message.text,
                     modifier = Modifier.fillMaxWidth(),
                     selectable = false,
                     onSharedLink = onSharedLink,
@@ -966,7 +965,13 @@ private fun ComponentBlock(
             LaunchedEffect(pagerState.currentPage) { onPage(pagerState.currentPage) }
             ComponentTabs(pages, pagerState)
             Spacer(Modifier.height(10.dp))
-            HorizontalPager(state = pagerState, verticalAlignment = Alignment.Top, modifier = Modifier.animateContentSize()) { page ->
+            var appeared by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { appeared = true }
+            HorizontalPager(
+                state = pagerState,
+                verticalAlignment = Alignment.Top,
+                modifier = if (appeared) Modifier.animateContentSize() else Modifier,
+            ) { page ->
                 Column(modifier = Modifier.fillMaxWidth()) {
                     ComponentElements(pages[page].blocks, data, onSharedLink, onValue, onPick)
                 }

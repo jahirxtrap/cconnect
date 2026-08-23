@@ -142,15 +142,6 @@
     }
   });
 
-  $effect(() => {
-    tabs.updateActive({
-      sessionId: chat.sessionId,
-      projectKey: chat.projectKey,
-      running: chat.streaming,
-    });
-    tabs.syncUrl();
-  });
-
   const activity = $derived(
     chatListFor(backend.find(chat.environmentId))?.sessions.find(
       (session) => session.sessionId === chat.sessionId,
@@ -158,6 +149,16 @@
   );
   const waitingUser = $derived(activity === "waiting");
   const working = $derived(activity === "working");
+  const busy = $derived(chat.streaming || waitingUser || working);
+
+  $effect(() => {
+    tabs.updateActive({
+      sessionId: chat.sessionId,
+      projectKey: chat.projectKey,
+      running: busy,
+    });
+    tabs.syncUrl();
+  });
 
   const status = $derived.by(() => {
     if (chat.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
@@ -265,7 +266,7 @@
         {/if}
       {/snippet}
       {#snippet actions()}
-        {#if chat.sessionId !== null && !chat.streaming}
+        {#if chat.sessionId !== null && !busy}
           <TooltipIconButton
             label={t("REWIND")}
             onclick={() => {
@@ -310,7 +311,7 @@
           style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
         >
         <MessageList
-        messages={chat.messages}
+        messages={chat.view}
         pendingToolIds={chat.pendingToolIds}
         streaming={chat.streaming}
         compacting={chat.compacting}
@@ -367,14 +368,14 @@
 
     <div class="shrink-0" bind:clientHeight={composerHeight}>
     <Composer
-      streaming={chat.sideOpen ? chat.sideStreaming : chat.streaming}
+      streaming={chat.sideOpen ? chat.sideStreaming : busy}
       draft={chat.sideOpen ? chat.sideDraft : chat.draft}
       onDraft={(value) => (chat.sideOpen ? (chat.sideDraft = value) : (chat.draft = value))}
       attachments={chat.sideOpen ? [] : chat.attachments}
       uploading={!chat.sideOpen && chat.uploading}
       queue={chat.sideOpen ? [] : chat.visibleQueue}
       onOpenQueued={(item) => (queuedId = item.id)}
-      commands={chat.sessionId !== null && chat.connected && !chat.streaming
+      commands={chat.sessionId !== null && chat.connected && !busy
         ? (chat.capabilities?.commands ?? [])
         : []}
       pendingInput={chat.pendingInput}
