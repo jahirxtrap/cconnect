@@ -56,6 +56,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -293,10 +295,11 @@ fun ChatScreen(
     val mobile = LocalMobileLayout.current
     val isTouch = LocalIsTouch.current
     val scope = rememberCoroutineScope()
-    val listState = rememberLazyListState()
+    val tabId = TabsController.active.id
+    val listState = TabsController.messageScroll(tabId)
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
-    val expandedState = remember { mutableStateMapOf<Long, Boolean>() }
+    val expandedState = TabsController.expandedBlocks(tabId)
 
     var renameTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var deleteTarget by remember { mutableStateOf<SessionInfo?>(null) }
@@ -332,8 +335,20 @@ fun ChatScreen(
     }
 
     // Only manual scrolling changes this, so incoming content can't flip it before we react.
-    var followBottom by remember { mutableStateOf(true) }
+    var followBottom by TabsController.followBottom(tabId)
     var dropOver by remember { mutableStateOf(false) }
+
+    var opening by remember { mutableStateOf(false) }
+    var settled by remember { mutableStateOf(!state.transcriptLoading) }
+    LaunchedEffect(state.transcriptLoading) {
+        if (!state.transcriptLoading) settled = true else if (settled) opening = true
+    }
+    LaunchedEffect(opening, state.messages.size) {
+        if (!opening || state.transcriptLoading) return@LaunchedEffect
+        if (state.messages.isNotEmpty()) listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
+        withFrameNanos { }
+        opening = false
+    }
 
     // Hidden while following; otherwise shown once scrolled more than half the chat viewport above the bottom.
     val showScrollButton by remember {
@@ -353,7 +368,7 @@ fun ChatScreen(
     LaunchedEffect(state.connection) {
         if (state.connection == ConnectionState.Connected) vm.ensureHistoryLoaded()
     }
-    val activeSession = state.historySessions.firstOrNull { it.sessionId == state.sessionId }
+    val activeSession = state.allSessions.firstOrNull { it.sessionId == state.sessionId }
     val tabLabel: String? = activeSession?.let { it.title ?: it.preview ?: state.sessionId?.take(8) }
     val tabColor: String? = if (activeSession != null) state.sessionColor else null
     LaunchedEffect(tabLabel, tabColor, state.streaming, state.sessionId, state.activeProjectKey) {
@@ -411,6 +426,13 @@ fun ChatScreen(
             val lastIdx = listState.layoutInfo.totalItemsCount - 1
             if (followBottom && index != null && lastIdx >= 0 && index == lastIdx) {
                 listState.scrollToItem(lastIdx, Int.MAX_VALUE)
+            }
+        }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.layoutInfo.viewportSize }.collect {
+            if (followBottom && state.messages.isNotEmpty()) {
+                listState.scrollToItem(state.messages.lastIndex, Int.MAX_VALUE)
             }
         }
     }
@@ -557,19 +579,21 @@ fun ChatScreen(
                                 }
                             },
                             topBar = {
-                                val waitingUser = state.messages.any { it.role == Role.INTERACTION && it.interaction?.pending == true }
+                                val activity = activeSession?.activity
+                                val waitingUser = activity == "waiting"
+                                val working = activity == "working"
                                 val statusLeading: (@Composable () -> Unit) = when {
                                     state.connection == ConnectionState.Disconnected -> ({ StatusDot(palette.red, box = 8.dp) })
                                     state.connection == ConnectionState.Connecting -> ({ StatusSpinner() })
                                     waitingUser -> ({ StatusDot(palette.orange, box = 8.dp) })
-                                    state.streaming -> ({ StatusSpinner() })
+                                    working -> ({ StatusSpinner() })
                                     else -> ({ StatusDot(palette.green, box = 8.dp) })
                                 }
                                 val statusText = when {
                                     state.connection == ConnectionState.Disconnected -> stringResource(Res.string.server_unavailable)
                                     state.connection == ConnectionState.Connecting -> stringResource(Res.string.connecting)
                                     waitingUser -> stringResource(Res.string.waiting_user)
-                                    state.streaming -> stringResource(Res.string.working)
+                                    working -> stringResource(Res.string.working)
                                     else -> state.sessionId?.take(8) ?: stringResource(Res.string.new_chat)
                                 }
                                 Column {
@@ -660,7 +684,8 @@ fun ChatScreen(
                                     val panelH = expansion.value.coerceAtLeast(peek)
                                     val showTime = vm.showTimestamps
                                     Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight((1f - panelH * (1f - toolbarReveal)).coerceIn(0.0001f, 1f)).clipToBounds()) {
-                                        SelectionContainer(modifier = Modifier.fillMaxSize().selectionTextCursor()) {
+                                        if (opening) CenteredProgress(Modifier.fillMaxSize())
+                                        SelectionContainer(modifier = Modifier.fillMaxSize().alpha(if (opening) 0f else 1f).selectionTextCursor()) {
                                             LazyColumn(
                                                 state = listState,
                                                 modifier = Modifier.fillMaxSize().pointerInput(Unit) {
@@ -684,7 +709,7 @@ fun ChatScreen(
                                                     }
                                                     val running = when (message.role) {
                                                         Role.TOOL, Role.AGENT -> message.toolUseId != null && message.toolUseId in state.pendingToolIds
-                                                        Role.THINKING, Role.WORKING -> index == state.messages.lastIndex && state.streaming
+                                                        Role.THINKING, Role.WORKING, Role.ASSISTANT -> index == state.messages.lastIndex && state.streaming
                                                         else -> false
                                                     }
                                                     ChatMessageItem(
@@ -1384,6 +1409,7 @@ private fun ColumnScope.ChatPanelContent(
                     onColor = { onColor(s) },
                     onOpenNewTab = { s.projectKey?.let { pk -> TabsController.openSessionTab(TabsController.active.ctx.environmentId, s.path.orEmpty(), s.sessionId, pk, s.title ?: s.preview, s.color); onAfterSelect() } },
                     onDelete = { onDelete(s) },
+                    activity = s.activity,
                 )
             }
 
@@ -2258,6 +2284,7 @@ private fun ConversationRow(
     onOpenNewTab: () -> Unit,
     onDelete: () -> Unit,
     selected: Boolean = false,
+    activity: String? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -2279,6 +2306,15 @@ private fun ConversationRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp, vertical = 8.dp),
         )
+        when (activity) {
+            "waiting" -> StatusDot(palette.orange, box = 16.dp, dot = 10.dp)
+            "renaming" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                StatusSpinner(size = 10.dp, color = palette.purple)
+            }
+            "working" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                StatusSpinner(size = 10.dp)
+            }
+        }
         Box {
             IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
                 Icon(Lucide.EllipsisVertical, contentDescription = null, modifier = Modifier.size(16.dp))

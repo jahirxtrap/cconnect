@@ -274,7 +274,11 @@
       {#if kind === "markdown" && formatted}
         <MarkdownText {text} />
       {:else}
-        <pre class="font-mono text-body-sm whitespace-pre-wrap">{text}</pre>
+        <textarea
+          readonly
+          value={text}
+          class="field-auto no-scrollbar w-full resize-none bg-transparent font-mono text-body-sm whitespace-pre-wrap caret-accent outline-none"
+        ></textarea>
       {/if}
     </div>
   {/if}

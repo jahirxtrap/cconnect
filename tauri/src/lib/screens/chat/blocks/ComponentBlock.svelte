@@ -4,6 +4,8 @@
   import Play from "@lucide/svelte/icons/play";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
+  import { cubicOut } from "svelte/easing";
+  import { fly } from "svelte/transition";
   import {
     componentAnswerable,
     VALUE_SEPARATOR,
@@ -89,8 +91,13 @@
   const current = $derived(pages.length ? Math.min(page, pages.length - 1) : 0);
   const shown = $derived(pages.length ? (pages[current]?.blocks ?? []) : data.blocks);
 
+  let direction = $state(1);
+  let pageHeight = $state<number | null>(null);
+
   const goto = (index: number) => {
-    page = Math.min(Math.max(index, 0), pages.length - 1);
+    const next = Math.min(Math.max(index, 0), pages.length - 1);
+    direction = next < page ? -1 : 1;
+    page = next;
     onPage(page);
   };
 
@@ -297,7 +304,18 @@
           class="mt-2.5"
           use:swipePage={{ onPrevious: () => goto(current - 1), onNext: () => goto(current + 1) }}
         >
-          {@render elements(shown)}
+          <div
+            class="overflow-hidden transition-[height] duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]"
+            style={pageHeight === null ? "" : `height: ${pageHeight}px`}
+          >
+            <div bind:clientHeight={pageHeight}>
+              {#key current}
+                <div in:fly={{ x: direction * 24, duration: 200, easing: cubicOut }}>
+                  {@render elements(shown)}
+                </div>
+              {/key}
+            </div>
+          </div>
         </div>
       {:else}
         {#if pages.length === 1 && pages[0].label?.trim()}

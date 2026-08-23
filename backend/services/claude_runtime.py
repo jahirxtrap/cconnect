@@ -467,6 +467,7 @@ async def run_prompt(
     wanted: Optional[Callable[[], dict]] = None,
     request_compact: Optional[Callable[[], None]] = None,
     capabilities: Optional[list[str]] = None,
+    session_info: Optional[Callable[[], dict]] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk import (
         query,
@@ -512,6 +513,7 @@ async def run_prompt(
             "ask_user": ask_user,
             "emit": emit,
             "account": account,
+            "session_info": session_info,
             "capabilities": list(capabilities or ()),
         })},
         cli_path=cli_manager.resolve_cli_path(),

@@ -102,12 +102,14 @@ data class ChatUiState(
     val error: String? = null,
     val historyProjects: List<ProjectInfo> = emptyList(),
     val historySessions: List<SessionInfo> = emptyList(),
+    val allSessions: List<SessionInfo> = emptyList(),
     val historyProjectKey: String? = null,
     val historyLoading: Boolean = true,
     val environments: List<EnvironmentProfile> = emptyList(),
     val activeEnvironmentId: String? = null,
     val oldestLoadedIndex: Int? = null,
     val transcriptLoading: Boolean = false,
+    val transcriptPaging: Boolean = false,
     val transcriptExhausted: Boolean = false,
     val followBottom: Boolean = true,
     val compacting: Boolean = false,
@@ -724,6 +726,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 queue = emptyList(),
                 oldestLoadedIndex = null,
                 transcriptLoading = false,
+                transcriptPaging = false,
                 transcriptExhausted = false,
                 pendingToolIds = emptySet(),
             )
@@ -763,6 +766,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 historyLoading = true,
                 oldestLoadedIndex = null,
                 transcriptLoading = false,
+                transcriptPaging = false,
                 transcriptExhausted = false,
             )
         }
@@ -786,6 +790,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         it.copy(
                             historyProjects = withDefaultProject(p),
                             historySessions = if (key == null) s else s.filter { x -> x.projectKey == key },
+                            allSessions = s,
                             historyLoading = l,
                         )
                     }
@@ -844,6 +849,19 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun openSession(session: SessionInfo) {
         viewModelScope.launch {
+            if (session.sessionId != _state.value.sessionId) {
+                _state.update {
+                    it.copy(
+                        sessionId = session.sessionId,
+                        activeProjectKey = session.projectKey ?: it.activeProjectKey,
+                        sessionColor = session.color,
+                        todos = emptyList(),
+                        queue = emptyList(),
+                        transcriptLoading = it.messages.isEmpty(),
+                        transcriptPaging = false,
+                    )
+                }
+            }
             if (!loadSessionInto(session)) return@launch
             client.resetResume()
             startSession(resume = session.sessionId)
@@ -897,6 +915,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 queue = emptyList(),
                 oldestLoadedIndex = page.startIndex.takeIf { page.items.isNotEmpty() },
                 transcriptLoading = false,
+                transcriptPaging = false,
                 transcriptExhausted = !page.hasMore,
                 sideChat = it.sideChat.promote(session.sessionId),
                 pendingToolIds = emptySet(),
@@ -910,9 +929,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val s = _state.value
         val sid = s.sessionId ?: return
         val before = s.oldestLoadedIndex ?: return
-        if (s.transcriptLoading || s.transcriptExhausted) return
+        if (s.transcriptLoading || s.transcriptPaging || s.transcriptExhausted) return
         val proj = s.activeProjectKey ?: return
-        _state.update { it.copy(transcriptLoading = true) }
+        _state.update { it.copy(transcriptPaging = true) }
         client.sendLoadHistory(sid, proj, beforeIndex = before)
     }
 
@@ -990,6 +1009,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 todos = emptyList(),
                 oldestLoadedIndex = page.startIndex.takeIf { page.items.isNotEmpty() },
                 transcriptLoading = false,
+                transcriptPaging = false,
                 transcriptExhausted = !page.hasMore,
                 pendingToolIds = emptySet(),
             )
@@ -1458,7 +1478,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     private fun onHistoryChunk(event: ServerEvent.HistoryChunk) {
         if (event.sessionId != _state.value.sessionId) {
-            _state.update { it.copy(transcriptLoading = false) }
+            _state.update { it.copy(transcriptLoading = false, transcriptPaging = false) }
             return
         }
         val older = event.items
@@ -1472,6 +1492,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 messages = prepended + st.messages,
                 oldestLoadedIndex = event.startIndex,
                 transcriptLoading = false,
+                transcriptPaging = false,
                 transcriptExhausted = !event.hasMore,
             )
         }

@@ -93,6 +93,7 @@
             onAfterSelect();
           }}
           onDelete={() => onDelete(session)}
+          activity={session.activity}
         />
       {/each}
     {:else if chat.historyLoading}

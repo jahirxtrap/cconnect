@@ -217,6 +217,18 @@ private class MdContext(val src: String, val linkColor: Color, val codeBg: Color
 private fun fileNameOf(url: String): String =
     url.substringBefore('?').substringBefore('#').substringAfterLast('/').ifBlank { url }
 
+private val FENCE_LINE = Regex("^```", RegexOption.MULTILINE)
+
+fun settledMarkdown(text: String): String {
+    val fences = FENCE_LINE.findAll(text).toList()
+    var cut = if (fences.size % 2 == 1) fences.last().range.first else text.length
+    val link = text.lastIndexOf('[', cut - 1)
+    if (link >= 0 && !text.substring(link, cut).contains(')')) {
+        cut = if (link > 0 && text[link - 1] == '!') link - 1 else link
+    }
+    return if (cut >= text.length) text else text.substring(0, cut).trimEnd()
+}
+
 @Composable
 private fun BlockLink(label: String, url: String, color: Color) {
     val handler = LocalUriHandler.current
@@ -806,7 +818,7 @@ private fun AnnotatedString.Builder.appendNode(n: ASTNode, ctx: MdContext) {
             val url = n.text(ctx.src)
             appendUrl(url, ctx) { append(url) }
         }
-        MarkdownTokenTypes.EOL -> append(" ")
+        MarkdownTokenTypes.EOL -> append("\n")
         MarkdownTokenTypes.HARD_LINE_BREAK -> append("\n")
         MarkdownTokenTypes.ESCAPED_BACKTICKS -> append(n.text(ctx.src))
         MarkdownTokenTypes.EMPH -> Unit

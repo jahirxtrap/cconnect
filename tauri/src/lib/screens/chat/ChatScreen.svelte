@@ -10,9 +10,10 @@
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
+  import { tick, untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { isPending, type InteractionData } from "$lib/data/chatModels";
+  import { type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import type { SessionInfo } from "$lib/data/models";
@@ -25,6 +26,7 @@
   import { downloadUrl, relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
+  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import Chip from "$lib/ui/Chip.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import ColorDialog from "$lib/ui/ColorDialog.svelte";
@@ -80,6 +82,16 @@
   let sideDragging = $state(false);
   let dropOver = $state(false);
   let composerHeight = $state(0);
+  let opening = $state(false);
+
+  $effect(() => {
+    if (chat.transcriptLoading) {
+      opening = true;
+      return;
+    }
+    if (!untrack(() => opening)) return;
+    void tick().then(() => requestAnimationFrame(() => (opening = false)));
+  });
 
   const canAttach = $derived(!chat.sideOpen);
 
@@ -139,15 +151,19 @@
     tabs.syncUrl();
   });
 
-  const waitingUser = $derived(
-    chat.messages.some((item) => item.interaction !== null && isPending(item.interaction)),
+  const activity = $derived(
+    chatListFor(backend.find(chat.environmentId))?.sessions.find(
+      (session) => session.sessionId === chat.sessionId,
+    )?.activity ?? null,
   );
+  const waitingUser = $derived(activity === "waiting");
+  const working = $derived(activity === "working");
 
   const status = $derived.by(() => {
     if (chat.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
     if (chat.connection === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
     if (waitingUser) return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
-    if (chat.streaming) return { dot: "bg-gray", spinner: true, text: t("WORKING") };
+    if (working) return { dot: "bg-gray", spinner: true, text: t("WORKING") };
     return {
       dot: "bg-green",
       spinner: false,
@@ -284,8 +300,11 @@
     >
       <DropOverlay visible={dropOver} />
       <div class="relative min-h-0 flex-1">
+        {#if opening}
+          <CenteredProgress class="absolute inset-0 z-10" />
+        {/if}
         <div
-          class="overflow-hidden {sideDragging
+          class="overflow-hidden {opening ? 'opacity-0' : ''} {sideDragging
             ? ''
             : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
           style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
@@ -306,6 +325,12 @@
         onLoadOlder={() => chat.loadOlder()}
         onFollowChange={(following) => (chat.followBottom = following)}
         onSharedLink={(url, filename) => (sharedLink = { url, filename })}
+        tabId={tabs.activeId}
+        savedScroll={{ top: chat.scrollTop, follow: chat.followBottom }}
+        onScrollTop={(top, following) => {
+          chat.scrollTop = top;
+          chat.followBottom = following;
+        }}
         {component}
       />
         </div>

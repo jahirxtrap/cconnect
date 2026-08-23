@@ -15,6 +15,7 @@ export interface SessionInfo {
   preview: string | null;
   title: string | null;
   color: string | null;
+  activity: string | null;
 }
 
 export interface SharedEntry {
@@ -47,6 +48,7 @@ export const parseSession = (raw: Wire): SessionInfo => ({
   preview: text(raw.preview),
   title: text(raw.title),
   color: text(raw.color),
+  activity: text(raw.activity),
 });
 
 export const parseSharedEntry = (raw: Wire): SharedEntry => ({

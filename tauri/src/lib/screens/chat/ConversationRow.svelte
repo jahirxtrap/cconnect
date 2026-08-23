@@ -1,13 +1,16 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import { t } from "$lib/i18n/index.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
 
   interface Props {
     title: string;
     selected: boolean;
+    activity?: string | null;
     onOpen: () => void;
     onRename: () => void;
     onAutoRename: () => void;
@@ -16,8 +19,17 @@
     onDelete: () => void;
   }
 
-  const { title, selected, onOpen, onRename, onAutoRename, onColor, onOpenNewTab, onDelete }: Props =
-    $props();
+  const {
+    title,
+    selected,
+    activity = null,
+    onOpen,
+    onRename,
+    onAutoRename,
+    onColor,
+    onOpenNewTab,
+    onDelete,
+  }: Props = $props();
 
   let menu = $state(false);
 
@@ -45,6 +57,17 @@
   >
     {title}
   </Pressable>
+  {#if activity === "waiting"}
+    <span class="flex shrink-0 items-center"><StatusDot class="bg-orange" box={16} dot={10} /></span>
+  {:else if activity === "renaming"}
+    <span class="inline-flex size-4 shrink-0 items-center justify-center">
+      <LoadingIndicator size={10} fill class="text-purple" />
+    </span>
+  {:else if activity === "working"}
+    <span class="inline-flex size-4 shrink-0 items-center justify-center">
+      <LoadingIndicator size={10} fill />
+    </span>
+  {/if}
   <div>
     <PopupMenu open={menu} align="end" label={t("MORE_OPTIONS")} onOpenChange={(value) => (menu = value)}>
       {#snippet trigger()}

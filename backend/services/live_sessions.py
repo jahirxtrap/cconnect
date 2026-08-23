@@ -50,6 +50,12 @@ class LiveSession:
     def attached(self):
         return len(self._sinks) > 0
 
+    @property
+    def activity(self):
+        if self._pending:
+            return "waiting"
+        return "working" if self.running else None
+
     def wanted(self):
         """What the attached sockets asked to see, so a turn never produces detail
         nobody wants (nor buffers it for replay)."""
@@ -101,12 +107,27 @@ class LiveSession:
         except Exception:
             self._sinks.pop(sink, None)
 
+    def _publish_activity(self, activity):
+        from services.chat_list import hub
+
+        hub.set_activity(self.state.session_id, activity)
+
+    def _settle(self):
+        from services import sessions as sessions_service
+
+        self._publish_activity(None)
+        if self.state.session_id and self.state.cwd:
+            sessions_service.reassert_meta(
+                sessions_service.project_key_for(self.state.cwd), self.state.session_id
+            )
+
     async def _ask(self, payload):
         """Bridge the SDK's permission/question callback to the client and wait
         for the answer. The wait lives on the session, so it survives reconnects."""
         rid = uuid.uuid4().hex
         future = asyncio.get_running_loop().create_future()
         self._pending[rid] = {"future": future, "event": None}
+        self._publish_activity("waiting")
         try:
             self._pending[rid]["event"] = await self._emit(
                 {"type": "interaction_request", "id": rid, **payload}
@@ -114,6 +135,7 @@ class LiveSession:
             return await future
         finally:
             self._pending.pop(rid, None)
+            self._publish_activity(self.activity)
 
     def resolve(self, rid, response):
         entry = self._pending.get(rid)
@@ -208,6 +230,7 @@ class LiveSession:
         self._cancelled.clear()
         self._result_seen = False
         self._worker = asyncio.create_task(self._run(runner_factory))
+        self._publish_activity("working")
         for item in carried:
             self._inbox.put_nowait(item)
         return True
@@ -268,15 +291,18 @@ class LiveSession:
                     if not self._queued and self._unconsumed <= 0:
                         self._inbox.put_nowait(_CLOSE)
         except asyncio.CancelledError:
+            self._settle()
             raise  # interrupt(): stop without a trailing `done`
         except Exception as exc:
             logger.error(f"live session worker failed: {type(exc).__name__}: {exc}")
             await self._emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
             await self._flush_inflight()
             await self._emit({"type": "done"})
+            self._settle()
         else:
             await self._flush_inflight()
             await self._emit({"type": "done"})
+            self._settle()
 
 
 class SessionRegistry:
@@ -321,6 +347,9 @@ class SessionRegistry:
                 continue
             since = self._idle_since.setdefault(channel, now)
             if now - since >= self._grace:
+                from services import sessions as sessions_service
+
+                sessions_service.forget_pinned(session.state.session_id)
                 del self._sessions[channel]
                 self._idle_since.pop(channel, None)
 

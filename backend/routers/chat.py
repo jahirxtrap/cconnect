@@ -111,6 +111,14 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     wanted=wanted,
                     request_compact=request_compact,
                     capabilities=capabilities,
+                    session_info=lambda: {
+                        "session_id": state.session_id,
+                        "cwd": state.cwd,
+                        "model": _resolve_model(state.model),
+                        "account": accounts.resolve(state.account),
+                        "effort": state.effort,
+                        "permission_mode": state.permission_mode,
+                    },
                 ):
                     if event.get("type") == "session_started":
                         state.session_id = event["session_id"]
@@ -207,7 +215,7 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
 
 
 async def _run_usage(send, account: str | None = None, capabilities=None):
-    """Send the plan-usage report as a one-off component message, or markdown for clients without them."""
+    """Send the plan-usage report as a one-off markdown message."""
     from mcps.components import CAPABILITY as COMPONENTS
     from services.usage import usage_blocks, usage_markdown
 

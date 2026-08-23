@@ -565,7 +565,7 @@ fun SettingsScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    stringResource(Res.string.app_name),
+                                    "${stringResource(Res.string.app_name)} (Compose)",
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                 )

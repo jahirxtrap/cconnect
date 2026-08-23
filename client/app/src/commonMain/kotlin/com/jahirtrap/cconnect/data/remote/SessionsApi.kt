@@ -43,6 +43,7 @@ object SessionsApi {
         preview = o["preview"]?.jsonPrimitive?.contentOrNull,
         title = o["title"]?.jsonPrimitive?.contentOrNull,
         color = o["color"]?.jsonPrimitive?.contentOrNull,
+        activity = o["activity"]?.jsonPrimitive?.contentOrNull,
     )
 
     data class MessagesPage(

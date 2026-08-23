@@ -8,6 +8,12 @@ COMPACT = (
     " nothing to wait for. Use it when the user asks you to compact, and only then."
 )
 
+INFO = (
+    "What this very conversation is running on: its session id, working directory and project,"
+    " plus the model, effort, account and permission mode in use. Call it when the user asks"
+    " about the session itself, or when you need its id to read or act on this transcript."
+)
+
 USAGE = (
     "How much of the user's Claude plan is spent: percentage per limit window and when each one"
     " resets. Call it when they ask about their usage or how much they have left; the chat also"
@@ -20,7 +26,22 @@ def make_tools(context: dict) -> list:
     request_compact = context.get("request_compact")
     emit = context.get("emit")
     account = context.get("account")
+    info = context.get("session_info")
     capabilities = context.get("capabilities") or ()
+
+    if info is not None:
+        @tool("session_info", INFO, {})
+        async def session_info(args):
+            from services.sessions import project_key_for
+
+            current = info() or {}
+            cwd = current.get("cwd")
+            lines = [f"{key}: {value}" for key, value in current.items() if value]
+            if cwd:
+                lines.append(f"project: {project_key_for(cwd)}")
+            return {"content": [{"type": "text", "text": "\n".join(lines) or "No session yet."}]}
+
+        tools.append(session_info)
 
     if request_compact is not None:
         @tool("compact", COMPACT, {})

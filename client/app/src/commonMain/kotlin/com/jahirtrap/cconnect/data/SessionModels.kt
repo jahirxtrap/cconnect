@@ -17,6 +17,7 @@ data class SessionInfo(
     val preview: String?,
     val title: String?,
     val color: String?,
+    val activity: String? = null,
 )
 
 data class SessionMessage(

@@ -24,7 +24,7 @@ _POLL_SECONDS = 2.0
 
 def _session_sig(s: dict) -> tuple:
     return (s.get("title"), s.get("color"), s.get("preview"), s.get("last_active"),
-            s.get("size"), s.get("path"), s.get("project_key"))
+            s.get("size"), s.get("path"), s.get("project_key"), s.get("activity"))
 
 
 def _project_sig(p: dict) -> tuple:
@@ -34,6 +34,7 @@ def _project_sig(p: dict) -> tuple:
 class ChatListHub:
     def __init__(self):
         self._sessions: dict[str, dict] = {}
+        self._activity: dict[str, str] = {}
         self._projects: dict[str, dict] = {}
         self._sig_cache: dict[str, tuple] = {}
         self._subscribers: set[asyncio.Queue] = set()
@@ -84,6 +85,31 @@ class ChatListHub:
     def sessions(self) -> list[dict]:
         with self._lock:
             return list(self._sessions.values())
+
+    def set_activity(self, session_id: Optional[str], activity: Optional[str]):
+        if not session_id:
+            return
+        with self._lock:
+            if activity:
+                self._activity[session_id] = activity
+            else:
+                self._activity.pop(session_id, None)
+            entry = self._sessions.get(session_id)
+            if entry is None or entry.get("activity") == activity:
+                return
+            entry = {**entry, "activity": activity} if activity else {k: v for k, v in entry.items() if k != "activity"}
+            self._sessions[session_id] = entry
+        self._emit([{"type": "session_changed", "session": entry}])
+
+    def restore_activity(self, session_id: Optional[str]):
+        from services.live_sessions import registry
+
+        live = registry.get_by_session(session_id)
+        self.set_activity(session_id, live.activity if live else None)
+
+    async def settle_activity(self, session_id: Optional[str]):
+        await asyncio.to_thread(self._refresh, True)
+        self.restore_activity(session_id)
 
     def _emit(self, events: list[dict]):
         loop = self._loop
@@ -185,6 +211,9 @@ class ChatListHub:
                         }
                     self._sig_cache[sid] = (sig, meta)
                 if meta is not None:
+                    activity = self._activity.get(sid)
+                    if activity:
+                        meta = {**meta, "activity": activity}
                     sessions[sid] = meta
                 if newest_mtime is None or st.st_mtime > newest_mtime:
                     newest_mtime = st.st_mtime

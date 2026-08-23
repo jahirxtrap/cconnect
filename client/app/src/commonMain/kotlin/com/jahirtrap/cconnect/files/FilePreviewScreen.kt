@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -28,7 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -222,13 +223,17 @@ fun FilePreviewScreen(
                 if (kind == PreviewKind.Markdown && formatted) {
                     MarkdownText(text.orEmpty(), modifier = Modifier.fillMaxWidth())
                 } else {
-                    SelectionContainer {
-                        Text(
-                            text.orEmpty(),
-                            style = MaterialTheme.typography.bodySmall,
+                    BasicTextField(
+                        value = text.orEmpty(),
+                        onValueChange = {},
+                        readOnly = true,
+                        textStyle = MaterialTheme.typography.bodySmall.copy(
                             fontFamily = LocalMonoFontFamily.current,
-                        )
-                    }
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }

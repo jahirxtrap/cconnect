@@ -174,6 +174,8 @@ export class ChatState {
   uploading = $state(false);
   oldestLoadedIndex = $state<number | null>(null);
   transcriptLoading = $state(false);
+  transcriptPaging = $state(false);
+  scrollTop = $state(0);
   transcriptExhausted = $state(false);
   followBottom = $state(true);
 
@@ -247,6 +249,7 @@ export class ChatState {
             preview: null,
             title: null,
             color: context.color ?? null,
+            activity: null,
           }
         : null;
     this.#loadEnvOverrides();
@@ -588,6 +591,15 @@ export class ChatState {
   }
 
   async #openSession(session: SessionInfo) {
+    if (session.sessionId !== this.sessionId) {
+      this.sessionId = session.sessionId;
+      this.projectKey = session.projectKey ?? this.projectKey;
+      this.sessionColor = session.color;
+      this.todos = [];
+      this.queue = [];
+      this.transcriptLoading = this.messages.length === 0;
+      this.transcriptPaging = false;
+    }
     if (!(await this.#loadSessionInto(session))) return;
     this.#socket.resetResume();
     this.#startSession(session.sessionId);
@@ -606,6 +618,7 @@ export class ChatState {
         preview: null,
         title: null,
         color: null,
+        activity: null,
       },
     );
   }
@@ -614,8 +627,9 @@ export class ChatState {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     const before = this.oldestLoadedIndex;
-    if (!sessionId || !project || before === null || this.transcriptLoading || this.transcriptExhausted) return;
-    this.transcriptLoading = true;
+    if (!sessionId || !project || before === null || this.transcriptExhausted) return;
+    if (this.transcriptLoading || this.transcriptPaging) return;
+    this.transcriptPaging = true;
     this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE);
   }
 
@@ -925,6 +939,7 @@ export class ChatState {
     this.pendingToolIds = [];
     this.oldestLoadedIndex = null;
     this.transcriptLoading = false;
+    this.transcriptPaging = false;
     this.transcriptExhausted = false;
     this.#assistantId = null;
     this.#thinkingId = null;
@@ -965,6 +980,7 @@ export class ChatState {
     this.queue = [];
     this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
     this.transcriptLoading = false;
+    this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
     this.contextTokens = page.contextTokens;
@@ -998,6 +1014,7 @@ export class ChatState {
     this.todos = [];
     this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
     this.transcriptLoading = false;
+    this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
   }
@@ -1158,6 +1175,7 @@ export class ChatState {
   #onHistoryChunk(sessionId: string, startIndex: number, items: SessionMessage[], hasMore: boolean) {
     if (sessionId !== this.sessionId) {
       this.transcriptLoading = false;
+      this.transcriptPaging = false;
       return;
     }
     const older = items.filter(isVisible);
@@ -1168,6 +1186,7 @@ export class ChatState {
     this.messages = [...prepended, ...this.messages];
     this.oldestLoadedIndex = startIndex;
     this.transcriptLoading = false;
+    this.transcriptPaging = false;
     this.transcriptExhausted = !hasMore;
   }
 
@@ -1464,6 +1483,7 @@ export class ChatState {
             preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
             title: null,
             color: this.sessionColor,
+            activity: null,
           });
         }
         this.sessionId = sessionId;

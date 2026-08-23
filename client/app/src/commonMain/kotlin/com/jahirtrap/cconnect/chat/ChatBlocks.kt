@@ -109,6 +109,7 @@ import com.jahirtrap.cconnect.ui.componentIcon
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.MetricBar
+import com.jahirtrap.cconnect.ui.settledMarkdown
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import com.jahirtrap.cconnect.ui.OptionRow
 import com.jahirtrap.cconnect.ui.OutlinedPanel
@@ -118,6 +119,7 @@ import com.jahirtrap.cconnect.ui.formatClock
 import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import com.jahirtrap.cconnect.ui.theme.palette
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -250,7 +252,12 @@ fun ChatMessageItem(
             }
 
             Role.ASSISTANT -> Plain {
-                MarkdownText(message.text, modifier = Modifier.fillMaxWidth(), selectable = false, onSharedLink = onSharedLink)
+                MarkdownText(
+                    if (running) settledMarkdown(message.text) else message.text,
+                    modifier = Modifier.fillMaxWidth(),
+                    selectable = false,
+                    onSharedLink = onSharedLink,
+                )
             }
 
             Role.THINKING -> Collapsible(label = stringResource(Res.string.thinking), text = message.text, icon = Lucide.Lightbulb, labelOnly = message.labelOnly, running = running, expanded = expanded, onToggle = onToggle)
@@ -1034,7 +1041,12 @@ private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState)
             SelectChip(
                 label = page.label?.ifBlank { null } ?: "${index + 1}",
                 selected = index == pagerState.currentPage,
-                onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                onClick = {
+                    scope.launch {
+                        if (abs(index - pagerState.currentPage) > 1) pagerState.scrollToPage(index)
+                        else pagerState.animateScrollToPage(index)
+                    }
+                },
             )
         }
     }

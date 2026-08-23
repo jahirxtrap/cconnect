@@ -114,7 +114,7 @@
   <Pressable onclick={() => open(release?.url ?? RELEASES_URL)} class="flex w-full items-center gap-3 px-4 py-3">
       <AppLogo size={28} />
       <div class="min-w-0 flex-1">
-      <p class="truncate text-body-md">{t("APP_NAME")}</p>
+      <p class="truncate text-body-md">{t("APP_NAME")} (Tauri)</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>

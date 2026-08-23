@@ -1,6 +1,6 @@
 <script lang="ts">
   import ChevronsDown from "@lucide/svelte/icons/chevrons-down";
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
@@ -30,6 +30,9 @@
     onLoadOlder: () => void;
     onFollowChange: (following: boolean) => void;
     onSharedLink: (url: string, filename: string) => void;
+    tabId: string;
+    savedScroll: { top: number; follow: boolean };
+    onScrollTop: (top: number, following: boolean) => void;
     component: import("svelte").Snippet<[InteractionData]>;
   }
 
@@ -44,6 +47,9 @@
     onLoadOlder,
     onFollowChange,
     onSharedLink,
+    tabId,
+    savedScroll,
+    onScrollTop,
     component,
   }: Props = $props();
 
@@ -61,7 +67,7 @@
   const visible = $derived(messages.filter((item) => modeFor(item.role) !== "off"));
 
   const runningAt = (item: ChatMessage, index: number) =>
-    item.role === "thinking" || item.role === "working"
+    item.role === "thinking" || item.role === "working" || item.role === "assistant"
       ? index === visible.length - 1 && streaming
       : !!item.toolUseId && pendingToolIds.includes(item.toolUseId);
 
@@ -80,10 +86,12 @@
   let container = $state<HTMLDivElement | null>(null);
   let content = $state<HTMLDivElement | null>(null);
   let follow = $state(true);
+  let restoredTab: string | null = null;
   let belowFold = $state(0);
   let viewport = $state(0);
   let anchorHeight: number | null = null;
   let ownTop = -1;
+  let lastTop = 0;
   let smooth = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   let lastId: number | null = null;
@@ -95,6 +103,7 @@
     if (!container) return;
     container.scrollTop = top;
     ownTop = container.scrollTop;
+    lastTop = container.scrollTop;
   };
 
   const smoothToEnd = () => {
@@ -176,11 +185,14 @@
     if (!container) return;
     measureScrollbar();
     const top = container.scrollTop;
+    const movedUp = top < lastTop - OWN_TOP_PX;
+    lastTop = top;
+    onScrollTop(top, follow);
     belowFold = distanceToBottom();
     viewport = container.clientHeight;
     const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
     ownTop = -1;
-    if (!ours && belowFold > AT_BOTTOM_PX) follow = false;
+    if (!ours && movedUp && belowFold > AT_BOTTOM_PX) follow = false;
     if (!SCROLL_END) {
       if (settleTimer !== null) clearTimeout(settleTimer);
       settleTimer = setTimeout(settle, SETTLE_MS);
@@ -276,6 +288,19 @@
   });
 
   $effect(() => onFollowChange(follow));
+
+  $effect(() => {
+    const id = tabId;
+    if (id === restoredTab) return;
+    restoredTab = id;
+    const target = untrack(() => savedScroll);
+    follow = target.follow;
+    void tick().then(() => {
+      if (!container) return;
+      container.scrollTop = target.follow ? container.scrollHeight : target.top;
+      ownTop = container.scrollTop;
+    });
+  });
 
   $effect(() => () => {
     if (settleTimer !== null) clearTimeout(settleTimer);

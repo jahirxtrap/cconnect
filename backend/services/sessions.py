@@ -21,6 +21,7 @@ _ASK_ANSWERS_RE = re.compile(r'"([^"]+)"="([^"]*)"')
 # Slash-command invocations and their output are stored as user messages.
 _COMMAND_META_RE = re.compile(r"<command-(name|message|args)>|<local-command-stdout>")
 _COMMAND_NAME_RE = re.compile(r"<command-name>\s*([^<]+?)\s*</command-name>")
+_COMPACT_MARK = b'"compact_boundary"'
 # The CLI writes interruption notices as plain user text.
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
 
@@ -80,16 +81,39 @@ def _session_file(project_key: str, session_id: str) -> Path:
     return path
 
 
-def _iter_lines(path: Path):
-    with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            line = line.strip()
+def _iter_lines(path: Path, offset: int = 0):
+    with path.open("rb") as fh:
+        if offset:
+            fh.seek(offset)
+        for raw in fh:
+            line = raw.strip()
             if not line:
                 continue
             try:
                 yield json.loads(line)
-            except json.JSONDecodeError:
+            except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
+
+
+def _last_compact_offset(path: Path, block: int = 1 << 20) -> int:
+    try:
+        size = path.stat().st_size
+        with path.open("rb") as fh:
+            pos = size
+            tail = b""
+            while pos > 0:
+                step = min(block, pos)
+                pos -= step
+                fh.seek(pos)
+                chunk = fh.read(step) + tail
+                found = chunk.rfind(_COMPACT_MARK)
+                if found != -1:
+                    start = chunk.rfind(b"\n", 0, found)
+                    return pos + start + 1 if start != -1 else pos
+                tail = chunk[: len(_COMPACT_MARK)]
+    except OSError:
+        return 0
+    return 0
 
 
 def last_context_tokens(project_key: str, session_id: str) -> Optional[int]:
@@ -205,6 +229,42 @@ def _read_cwd(path: Path) -> Optional[str]:
     return None
 
 
+_META_WINDOW = 256 * 1024
+
+
+def _tail_offset(path: Path, window: int) -> int:
+    try:
+        size = path.stat().st_size
+        if size <= window:
+            return 0
+        with path.open("rb") as fh:
+            fh.seek(size - window)
+            fh.readline()
+            return fh.tell()
+    except OSError:
+        return 0
+
+
+def _meta_entries(path: Path):
+    size = path.stat().st_size
+    with path.open("rb") as fh:
+        head = fh.read(_META_WINDOW)
+        tail = b""
+        if size > _META_WINDOW * 2:
+            fh.seek(size - _META_WINDOW)
+            tail = fh.read(_META_WINDOW)
+    if len(head) == _META_WINDOW:
+        head = head.rsplit(b"\n", 1)[0]
+    for raw in head.splitlines() + tail.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        try:
+            yield json.loads(line)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            continue
+
+
 def _session_meta(path: Path) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], bool]:
     """Single pass over a transcript: (cwd, first-user preview, title, color, entrypoint,
     has_content). Title prefers the user's `custom-title`, falling back to the CLI's
@@ -213,18 +273,18 @@ def _session_meta(path: Path) -> tuple[Optional[str], Optional[str], Optional[st
     otherwise list with a `<command-...>` preview and open empty."""
     cwd = preview = title = ai_title = color = entrypoint = None
     has_content = False
-    for entry in _iter_lines(path):
+    for entry in _meta_entries(path):
         etype = entry.get("type")
         if cwd is None and entry.get("cwd"):
             cwd = entry.get("cwd")
         if entrypoint is None and entry.get("entrypoint"):
             entrypoint = entry.get("entrypoint")
-        if etype == "custom-title" and entry.get("customTitle"):
-            title = entry.get("customTitle")
+        if etype == "custom-title":
+            title = entry.get("customTitle") or None
         elif etype == "ai-title" and entry.get("aiTitle"):
             ai_title = entry.get("aiTitle")
-        elif etype == "agent-color" and entry.get("agentColor"):
-            color = entry.get("agentColor")
+        elif etype == "agent-color":
+            color = entry.get("agentColor") or None
         elif etype == "user" and not entry.get("isMeta") and not entry.get("isSidechain"):
             text = _text_from_content(entry.get("message", {}).get("content"))
             if not _COMMAND_META_RE.search(text):
@@ -247,27 +307,14 @@ def rename_session(project_key: str, session_id: str, title: str) -> bool:
     if not file.is_file():
         return False
     safe = title.replace("\n", " ").strip()[:80]
-    out: list[str] = []
-    found = False
-    for line in file.read_text(encoding="utf-8").splitlines():
-        try:
-            obj = json.loads(line)
-        except json.JSONDecodeError:
-            out.append(line)
-            continue
-        if obj.get("type") == "custom-title":
-            obj["customTitle"] = safe
-            found = True
-            out.append(json.dumps(obj, ensure_ascii=False))
-        elif obj.get("type") == "agent-name":
-            obj["agentName"] = safe
-            out.append(json.dumps(obj, ensure_ascii=False))
-        else:
-            out.append(line)
-    if not found:
-        out.append(json.dumps({"type": "custom-title", "customTitle": safe, "sessionId": session_id}, ensure_ascii=False))
-    file.write_text("\n".join(out) + "\n", encoding="utf-8")
+    _pin_meta(session_id, "custom-title", safe)
+    _append_entry(file, _meta_entry("custom-title", safe, session_id))
     return True
+
+
+def _append_entry(file: Path, entry: dict) -> None:
+    with file.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
 
 def set_session_color(project_key: str, session_id: str, color: str) -> bool:
@@ -276,27 +323,46 @@ def set_session_color(project_key: str, session_id: str, color: str) -> bool:
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return False
-    out = [
-        line
-        for line in file.read_text(encoding="utf-8").splitlines()
-        if not _is_type(line, "agent-color")
-    ]
-    if color:
-        out.append(json.dumps({"type": "agent-color", "agentColor": color, "sessionId": session_id}, ensure_ascii=False))
-    file.write_text("\n".join(out) + "\n", encoding="utf-8")
+    _pin_meta(session_id, "agent-color", color)
+    _append_entry(file, _meta_entry("agent-color", color, session_id))
     return True
 
 
-def _is_type(line: str, type_name: str) -> bool:
-    try:
-        return json.loads(line).get("type") == type_name
-    except json.JSONDecodeError:
-        return False
+_META_FIELD = {"custom-title": "customTitle", "agent-color": "agentColor"}
+_pinned: dict[str, dict[str, str]] = {}
+
+
+def _meta_entry(etype: str, value: str, session_id: str) -> dict:
+    return {"type": etype, _META_FIELD[etype]: value, "sessionId": session_id}
+
+
+def _pin_meta(session_id: str, etype: str, value: str) -> None:
+    if session_id:
+        _pinned.setdefault(session_id, {})[etype] = value
+
+
+def reassert_meta(project_key: str, session_id: str) -> None:
+    pinned = _pinned.get(session_id)
+    if not pinned:
+        return
+    file = _session_file(project_key, session_id)
+    if not file.is_file():
+        return
+    _, _, title, color, _, _ = _session_meta(file)
+    current = {"custom-title": title or "", "agent-color": color or ""}
+    for etype, value in pinned.items():
+        if current.get(etype) != value:
+            _append_entry(file, _meta_entry(etype, value, session_id))
+
+
+def forget_pinned(session_id: str) -> None:
+    _pinned.pop(session_id, None)
+
 
 
 def _transcript_for_title(path: Path, max_chars: int = 2000) -> str:
     parts: list[str] = []
-    for entry in _iter_lines(path):
+    for entry in _iter_lines(path, max(_last_compact_offset(path), _tail_offset(path, 1 << 20))):
         if entry.get("type") not in ("user", "assistant"):
             continue
         text = _text_from_content(entry.get("message", {}).get("content"))
@@ -323,14 +389,19 @@ async def auto_generate_title(project_key: str, session_id: str) -> Optional[str
     transcript = _transcript_for_title(file)
     if not transcript:
         return None
+    from services.chat_list import hub
     from services.claude_runtime import generate_title
 
-    raw = await generate_title(transcript)
-    title = raw.replace("\n", " ").strip().strip("\"'").strip().rstrip(".")[:80]
-    if not title:
-        return None
-    rename_session(project_key, session_id, title)
-    return title
+    hub.set_activity(session_id, "renaming")
+    try:
+        raw = await generate_title(transcript)
+        title = raw.replace("\n", " ").strip().strip("\"'").strip().rstrip(".")[:80]
+        if not title:
+            return None
+        rename_session(project_key, session_id, title)
+        return title
+    finally:
+        await hub.settle_activity(session_id)
 
 
 def delete_session(project_key: str, session_id: str) -> bool:
@@ -338,6 +409,7 @@ def delete_session(project_key: str, session_id: str) -> bool:
     if not file.is_file():
         return False
     file.unlink()
+    forget_pinned(session_id)
     return True
 
 
@@ -660,7 +732,7 @@ def list_checkpoints(project_key: str, session_id: str) -> list[dict]:
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return []
-    entries = _active_entries(list(_iter_lines(file)), session_id)
+    entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
     points: list[dict] = []
     last_anchor: Optional[str] = None
     for entry in entries:
@@ -799,7 +871,7 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return []
-    entries = _active_entries(list(_iter_lines(file)), session_id)
+    entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
     queued_user_texts: set[str] = set()
     real_user_texts: set[str] = set()
 
