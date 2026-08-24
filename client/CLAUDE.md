@@ -260,6 +260,18 @@ each into a `ChatMessage` or state mutation. Notable:
 | **`queued`** / **`dequeued`** | message queue: `queued` (id, text) acks an enqueued prompt; `dequeued` (id) renders its user bubble in place (render-on-dequeue) and drops the chip — see **Message queue** |
 | `result` / `done` / `interrupted` / `error` | session id / UI transitions; an `error` block now shows a red warning icon + the clean SDK message |
 | `history_chunk` | older messages backfill (prepended; non-active session dropped) |
+| **`attached`** | the replay is over: publishes the conversation in one step and clears the loading state. Until it lands the previous chat stays on screen (`frozen`, read through `state.view`), so opening or reattaching never shows a half-rebuilt turn |
+
+**The message list is anchored from the bottom**, so the newest message is where
+the list starts rather than somewhere an effect has to scroll to afterwards:
+Compose uses `reverseLayout = true` (index 0 is the last message; items are fed
+`asReversed()` and the real index is recomputed inside) and Tauri a
+`column-reverse` container. A tab switch remounts the list in Compose, and
+before this it laid out from index 0 and showed the top of the chat for a frame.
+Going to the end is `scrollToItem(0)` / `scrollTop = 0`; in Tauri the sign of
+`scrollTop` differs per engine, so reads use `Math.abs` and writes a sign
+detected at runtime. Prepending history no longer shifts the view, which is why
+no anchor compensation is left.
 
 Reconnect/replay (`channel`+`last_seq` resume tokens), the cursor-based
 transcript window (100 initial / 500 tail cap), chat attachments (sequential

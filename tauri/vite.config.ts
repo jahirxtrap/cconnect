@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 
-const SUPPORTED_SERVER = ">=1.4.0";
+const SUPPORTED_SERVER = ">=1.6.0";
 
 const mobileHost = process.env.TAURI_DEV_HOST;
 

@@ -186,7 +186,7 @@ Every REST endpoint returns `core.responses.api_response()` —
 | POST | `/api/settings/reset` | Restore settings to defaults |
 | GET / POST | `/api/cli` | Read / set the active Claude CLI (system, bundled, or custom path) |
 | POST | `/api/cli/update` | Update the bundled/system CLI (invalidates the version cache) |
-| GET | `/api/sessions/{id}/messages?project=<key>&limit=200&before_index=N` | Cursor-based transcript slice. Without `before_index` returns the most recent `limit` items. Each item carries its `index`; clients pass the smallest index they have to pull the slice before it. Response: `{items, total, start_index, has_more}`. |
+| GET | `/api/sessions/{id}/messages?project=<key>&limit=200&before_index=N` | Cursor-based transcript slice. Without `before_index` returns the most recent `limit` items. Each item carries its `index`; clients pass the smallest index they have to pull the slice before it. Response: `{items, total, start_index, has_more}`. While a live session still has events to replay, the tail is cut at its `turn_start_index` (`registry.committed_cut`) so the same turn never arrives twice — once from disk and once from the replay. |
 | GET | `/api/sessions/{id}/checkpoints` | Rewind points (one per user prompt on the active branch) |
 | POST | `/api/sessions/{id}/rewind/preview` | Dry-run: `{can_rewind, files_changed, insertions, deletions}` |
 | POST | `/api/sessions/{id}/rewind` | Execute rewind; `mode ∈ both \| conversation` |
@@ -312,6 +312,9 @@ Control/ephemeral messages (`ready`, `permission_mode`, `history_chunk`,
   travel as keys (`title_key`, `label_key`, `placeholder_key`) for the client to
   translate, never as ready-made text. Paired by id with the client's
   `interaction_response` (`option_id` / `values` / `chat`).
+- `attached` — sent once the replay (and the task/todos re-emit) is done, so the
+  client knows the reattach is complete and can show the conversation in one go
+  instead of watching it rebuild event by event.
 - `system`, `result` (carries `session_id`), `done`, `interrupted`, `error`.
 - `queued` (id, text) / `dequeued` (id) — message-queue lifecycle: `queued`
   acknowledges a prompt accepted into the queue while a turn was running;
@@ -443,8 +446,12 @@ Two services with a strict split:
 
 `run.py` is a **supervisor**: it launches uvicorn as a child process and
 relaunches it when the child exits with `RESTART_EXIT_CODE` **or** the
-`RESTART_FLAG` file exists (both declared in `core/config`; the flag covers
-reload/multi-worker managers that swallow the child's exit code). Ctrl+C still
+`RESTART_FLAG` file exists (both declared in `core/config`). The flag is polled
+**while the child runs**, not only after it exits: under `--reload` the child is
+uvicorn's reloader and the worker's exit code never reaches the supervisor, so
+waiting for it left Linux/macOS with a dead server. On the flag the whole
+process tree is terminated (`_terminate_tree`, psutil) and relaunched, which is
+the same path on every platform. Ctrl+C still
 tears everything down and the Funnel cleanup stays in the supervisor, which
 never dies. `POST /api/system/restart` replies, touches the flag and
 `os._exit`s — the app's sockets drop and reconnect on their own. Works the

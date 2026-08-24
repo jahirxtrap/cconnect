@@ -169,6 +169,13 @@ working and it's held, then picked up in order and placed in the conversation
 as each one runs — and anything still waiting comes back if you reload or
 resume the chat.
 
+**Questions come as forms.** When Claude needs something from you it asks in
+the chat itself — choices, text fields, toggles and a note kept apart from the
+answer — and longer questions arrive as pages you move through. Its replies can
+carry more than text too: galleries, audio, PDFs and live previews, plus blocks
+it draws with bars, text and media. Ask what the session is spending and the
+plan usage is drawn the same way, and ask it to compact and it does.
+
 **Attachments** travel with your message: tap the clip, pick any files or
 photos on your device, and they land on the PC before the prompt runs. Images
 reach Claude as real vision input — it sees them, not a path — and other files
