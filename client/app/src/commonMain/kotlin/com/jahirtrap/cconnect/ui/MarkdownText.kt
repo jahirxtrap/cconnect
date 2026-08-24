@@ -139,7 +139,8 @@ fun MarkdownText(
     dense: Boolean = false,
     onSharedLink: ((url: String, filename: String) -> Unit)? = null,
 ) {
-    val root = remember(markdown) { MarkdownParser(flavour).buildMarkdownTreeFromString(markdown) }
+    val source = remember(markdown) { markdown.replace("\r\n", "\n").replace('\r', '\n') }
+    val root = remember(source) { MarkdownParser(flavour).buildMarkdownTreeFromString(source) }
     val codeBg = MaterialTheme.colorScheme.surfaceContainerHigh
     val linkColor = MaterialTheme.colorScheme.primary
     val defaultHandler = LocalUriHandler.current
@@ -173,7 +174,7 @@ fun MarkdownText(
         }
     }
     val monoFamily = LocalMonoFontFamily.current
-    val ctx = remember(markdown, linkColor, codeBg, monoFamily) { MdContext(markdown, linkColor, codeBg, monoFamily) }
+    val ctx = remember(source, linkColor, codeBg, monoFamily) { MdContext(source, linkColor, codeBg, monoFamily) }
     DenseTypography(dense) {
         CompositionLocalProvider(
             LocalUriHandler provides uriHandler,
@@ -813,7 +814,7 @@ private fun AnnotatedString.Builder.appendNode(n: ASTNode, ctx: MdContext) {
             appendUrl(url, ctx) { append(url) }
         }
         MarkdownTokenTypes.EOL -> append("\n")
-        MarkdownTokenTypes.HARD_LINE_BREAK -> append("\n")
+        MarkdownTokenTypes.HARD_LINE_BREAK -> Unit
         MarkdownTokenTypes.ESCAPED_BACKTICKS -> append(n.text(ctx.src))
         MarkdownTokenTypes.EMPH -> Unit
         MarkdownElementTypes.EMPH -> styled(SpanStyle(fontStyle = FontStyle.Italic)) { appendChildren(n, ctx) }
@@ -858,9 +859,7 @@ private fun AnnotatedString.Builder.appendLink(node: ASTNode, ctx: MdContext) {
     val dest = (node.child(MarkdownElementTypes.LINK_DESTINATION)?.text(ctx.src)?.trim()?.trim('<', '>')).orEmpty()
     val label = node.child(MarkdownElementTypes.LINK_TEXT)
     if (dest.isEmpty()) {
-        styled(SpanStyle(color = ctx.linkColor, textDecoration = TextDecoration.Underline)) {
-            if (label != null) appendInner(label, ctx) else appendChildren(node, ctx)
-        }
+        append(node.text(ctx.src))
         return
     }
     appendUrl(dest, ctx) {

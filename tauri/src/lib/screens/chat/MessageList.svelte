@@ -140,6 +140,8 @@
   let stickyHeight = $state(0);
   let sticky = $state<{ message: ChatMessage; gap: number; push: number } | null>(null);
 
+  const topOf = (node: HTMLElement) => node.offsetTop - (content?.offsetTop ?? 0);
+
   const firstVisible = (): HTMLElement | null => {
     if (!container || !content) return null;
     const items = content.children;
@@ -149,7 +151,7 @@
     while (low <= high) {
       const middle = (low + high) >> 1;
       const node = items[middle] as HTMLElement;
-      if (node.offsetTop + node.offsetHeight > distanceToTop()) {
+      if (topOf(node) + node.offsetHeight > distanceToTop()) {
         found = node;
         high = middle - 1;
       } else {
@@ -173,7 +175,7 @@
       return;
     }
     const gap = gapAbove(visible[index - 1]?.role ?? null, message.role);
-    const top = node.offsetTop - distanceToTop();
+    const top = topOf(node) - distanceToTop();
     if (top + gap >= 0) {
       sticky = null;
       return;
@@ -186,7 +188,7 @@
     const current = sticky;
     if (!current || !container) return;
     const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
-    const top = node ? node.offsetTop + current.gap : distanceToTop();
+    const top = node ? topOf(node) + current.gap : distanceToTop();
     expandedState[current.message.id] = false;
     await tick();
     scrollFromTop(top);
@@ -328,7 +330,7 @@
     ontouchmove={stopFollowing}
     class="selectable flex h-full flex-col-reverse overflow-x-hidden overflow-y-auto"
   >
-    <div bind:this={content} class="shrink-0">
+    <div bind:this={content} class="mb-auto shrink-0">
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
       <div data-mid={item.id}>

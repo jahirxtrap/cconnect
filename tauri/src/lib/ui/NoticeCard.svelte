@@ -25,7 +25,7 @@
     <Button onclick={onAction} variant="accent">{actionLabel}</Button>
   {/if}
   {#if !isTouch}
-    <TooltipIconButton label={t("CLOSE")} tooltip={false} onclick={onDismiss}>
+    <TooltipIconButton label={t("CLOSE")} onclick={onDismiss}>
       <X />
     </TooltipIconButton>
   {/if}

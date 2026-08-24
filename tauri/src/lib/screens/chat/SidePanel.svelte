@@ -2,7 +2,7 @@
   import ChevronsDown from "@lucide/svelte/icons/chevrons-down";
   import Eraser from "@lucide/svelte/icons/eraser";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
-  import type { ChatMessage, InteractionData } from "$lib/data/chatModels";
+  import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
@@ -12,6 +12,7 @@
     messages: ChatMessage[];
     streaming: boolean;
     height: number;
+    instant?: boolean;
     onHeight: (value: number) => void;
     onDragging: (value: boolean) => void;
     onClear: () => void;
@@ -24,6 +25,7 @@
     messages,
     streaming,
     height,
+    instant = false,
     onHeight,
     onDragging,
     onClear,
@@ -66,6 +68,7 @@
       dragging = false;
       onDragging(false);
       if (live < CLOSE_BELOW) {
+        exitFrom = hiddenFraction;
         onHeight(PEEK);
         onClose();
       } else if (live < FULL_ABOVE) {
@@ -101,21 +104,36 @@
   let horizontalScrollbar = $state(0);
   let verticalScrollbar = $state(0);
   let ownTop = -1;
+  let lastTop = 0;
   let smooth = false;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastPrompt: number | null = null;
+  let exitFrom = 0;
 
-  const distanceToBottom = () => (list ? list.scrollHeight - list.scrollTop - list.clientHeight : 0);
+  const shown = $derived(Math.min(MAX, Math.max(PEEK, height)));
+  const hiddenFraction = $derived(Math.max(0, (PEEK - Math.max(MIN, height)) / PEEK));
+
+  const distanceToBottom = () => (list ? Math.abs(list.scrollTop) : 0);
 
   const scrollToEnd = () => {
     if (!list) return;
-    list.scrollTop = list.scrollHeight;
+    list.scrollTop = 0;
     ownTop = list.scrollTop;
+    lastTop = list.scrollTop;
   };
 
   const smoothToEnd = () => {
     if (!list) return;
     smooth = true;
-    list.scrollTo({ top: list.scrollHeight, behavior: "smooth" });
+    list.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const stopFollowing = () => {
+    follow = false;
+  };
+
+  const onwheel = (event: WheelEvent) => {
+    if (event.deltaY < 0) stopFollowing();
   };
 
   const settle = () => {
@@ -127,13 +145,15 @@
   const onscroll = () => {
     if (!list) return;
     const top = list.scrollTop;
+    const movedUp = Math.abs(top) > Math.abs(lastTop) + OWN_TOP_PX;
+    lastTop = top;
     belowFold = distanceToBottom();
     viewport = list.clientHeight;
     verticalScrollbar = list.offsetWidth - list.clientWidth;
     horizontalScrollbar = list.offsetHeight - list.clientHeight;
     const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
     ownTop = -1;
-    if (!ours && belowFold > AT_BOTTOM_PX) follow = false;
+    if (!ours && movedUp && belowFold > AT_BOTTOM_PX) follow = false;
     if (!SCROLL_END) {
       if (settleTimer !== null) clearTimeout(settleTimer);
       settleTimer = setTimeout(settle, SETTLE_MS);
@@ -151,26 +171,40 @@
     if (follow) scrollToEnd();
   });
 
+  $effect(() => {
+    const last = messages.at(-1);
+    const id = last?.id ?? null;
+    if (id === lastPrompt) return;
+    lastPrompt = id;
+    if (!last || last.role !== "interaction" || !last.interaction || !isPending(last.interaction)) return;
+    follow = true;
+    smoothToEnd();
+  });
+
   $effect(() => () => {
     if (settleTimer !== null) clearTimeout(settleTimer);
   });
 
   const PANEL_MS = 350;
 
-  const grow = (_node: Element, { duration }: { duration: number }) => ({
-    duration,
-    easing: cubicOut,
-    css: (progress: number) => `height: ${Math.min(MAX, Math.max(MIN, height)) * progress}%`,
-  });
+  const slide = (_node: Element, { duration }: { duration: number }) => {
+    const from = exitFrom;
+    exitFrom = 0;
+    return {
+      duration,
+      easing: cubicOut,
+      css: (progress: number) => `transform: translateY(${(from + (1 - from) * (1 - progress)) * PERCENT}%)`,
+    };
+  };
 </script>
 
 <div
   bind:this={panel}
-  transition:grow={{ duration: PANEL_MS }}
-  class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background {dragging
+  transition:slide={{ duration: instant ? 0 : PANEL_MS }}
+  class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background {dragging || instant
     ? ''
     : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
-  style="height: {Math.min(MAX, Math.max(MIN, height))}%; border-top-left-radius: {corner}px; border-top-right-radius: {corner}px"
+  style="height: {shown}%; transform: translateY({hiddenFraction * PERCENT}%); border-top-left-radius: {corner}px; border-top-right-radius: {corner}px"
 >
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -199,17 +233,27 @@
   <div class="h-px shrink-0 bg-outline-variant"></div>
 
   <div class="relative min-h-0 flex-1">
-    <div bind:this={list} {onscroll} onscrollend={settle} class="selectable h-full overflow-x-hidden overflow-y-auto">
-      {#each messages as item, index (item.id)}
-        <MessageItem
-          message={item}
-          prevRole={messages[index - 1]?.role ?? null}
-          nextRole={messages[index + 1]?.role ?? null}
-          running={item.role === "working" && index === messages.length - 1 && streaming}
-          {onAnswer}
-          {component}
-        />
-      {/each}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div
+      bind:this={list}
+      {onscroll}
+      {onwheel}
+      onscrollend={settle}
+      ontouchmove={stopFollowing}
+      class="selectable flex h-full flex-col-reverse overflow-x-hidden overflow-y-auto"
+    >
+      <div class="mb-auto shrink-0">
+        {#each messages as item, index (item.id)}
+          <MessageItem
+            message={item}
+            prevRole={messages[index - 1]?.role ?? null}
+            nextRole={messages[index + 1]?.role ?? null}
+            running={item.role === "working" && index === messages.length - 1 && streaming}
+            {onAnswer}
+            {component}
+          />
+        {/each}
+      </div>
     </div>
 
     {#if !follow && messages.length && viewport > 0 && belowFold > viewport / HALF}

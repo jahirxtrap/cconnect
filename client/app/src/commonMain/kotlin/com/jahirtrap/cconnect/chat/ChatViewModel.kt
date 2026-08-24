@@ -599,7 +599,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun stopSide() {
-        if (_state.value.boundSide()?.streaming == true) client.sendInterrupt("side")
+        if (_state.value.sideChat?.streaming == true) client.sendInterrupt("side")
     }
 
     fun submit(text: String) {
@@ -643,11 +643,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun sendSideQuestion(text: String) {
         val trimmed = text.trim()
-        val sc = _state.value.boundSide() ?: return
+        val sc = _state.value.sideChat ?: return
         if (trimmed.isEmpty() || sc.streaming) return
         currentSideAssistantId = null
         _state.update {
-            val cur = it.boundSide() ?: SideChatState(boundSessionId = it.sessionId)
+            val cur = it.sideChat ?: SideChatState(boundSessionId = it.sessionId)
             it.copy(sideChat = cur.copy(messages = cur.messages + ChatMessage(nextId++, Role.USER, trimmed), streaming = true))
         }
         client.sendAsk(trimmed, sc.sideSessionId)

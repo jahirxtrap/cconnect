@@ -57,6 +57,7 @@
 
   const chat = $derived(tabs.state);
 
+  const SIDE_PEEK = 58;
   const RAIL_WIDTH = 64;
   const PANEL_WIDTH = 300;
   const SESSION_ID_PREVIEW = 8;
@@ -77,7 +78,7 @@
   let queuedId = $state<string | null>(null);
   let sharedLink = $state<{ url: string; filename: string } | null>(null);
   let visibilityOpen = $state(false);
-  let sideHeight = $state(58);
+  let sideHeight = $state(SIDE_PEEK);
   let sideDragging = $state(false);
   let dropOver = $state(false);
   let composerHeight = $state(0);
@@ -125,7 +126,21 @@
 
   const notices = $derived(serverStatus.notices.filter((notice) => !dismissed.includes(notice)));
 
+  let layoutTab = $state(tabs.activeId);
+  const instantLayout = $derived(tabs.activeId !== layoutTab);
+
+  $effect(() => {
+    if (!instantLayout) return;
+    const id = tabs.activeId;
+    requestAnimationFrame(() => requestAnimationFrame(() => (layoutTab = id)));
+  });
+
   const selectTab = (id: string) => tabs.select(id);
+
+  const closeSide = () => {
+    chat.closeSideChat();
+    sideHeight = SIDE_PEEK;
+  };
 
   $effect(() => {
     layout.bottomInset = composerHeight;
@@ -182,7 +197,7 @@
   $effect(() =>
     navigation.intercept(() => {
       if (chat.sideOpen) {
-        chat.closeSideChat();
+        closeSide();
         return true;
       }
       if (drawer.open) {
@@ -298,12 +313,12 @@
       ondrop={onDrop}
     >
       <DropOverlay visible={dropOver} />
-      <div class="relative min-h-0 flex-1">
+      <div class="relative min-h-0 flex-1 overflow-hidden">
         {#if opening}
           <CenteredProgress class="absolute inset-0 z-10" />
         {/if}
         <div
-          class="overflow-hidden {opening ? 'opacity-0' : ''} {sideDragging
+          class="overflow-hidden {opening ? 'opacity-0' : ''} {sideDragging || instantLayout
             ? ''
             : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
           style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
@@ -337,11 +352,12 @@
           <SidePanel
             messages={chat.showWorking === "label" ? chat.sideMessages : chat.sideMessages.filter((item) => item.role !== "working")}
             height={sideHeight}
+            instant={instantLayout}
             onHeight={(value) => (sideHeight = value)}
             onDragging={(value) => (sideDragging = value)}
             onClear={() => chat.clearSideChat()}
             streaming={chat.sideStreaming}
-            onClose={() => chat.closeSideChat()}
+            onClose={closeSide}
             onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
             {component}
           />
@@ -349,7 +365,7 @@
     </div>
 
     {#if notices.length}
-      <div class="flex flex-col gap-1.5 px-3 pb-3">
+      <div class="absolute right-0 bottom-0 left-0 z-20 flex flex-col gap-1.5 px-3 pb-3">
         {#each notices as notice (notice)}
           <NoticeCard
             text={t(NOTICE_KEYS[notice])}
@@ -384,7 +400,7 @@
       onInterrupt={() => (chat.sideOpen ? chat.stopSide() : chat.interrupt())}
       onAttach={(files) => chat.addAttachments(files)}
       onRemoveAttachment={(id) => chat.removeAttachment(id)}
-        onCloseSide={chat.sideOpen ? () => chat.closeSideChat() : null}
+        onCloseSide={chat.sideOpen ? closeSide : null}
         sessionColor={chat.sessionColor}
         controls={chat.sideOpen ? undefined : controls}
       />
@@ -423,7 +439,7 @@
     streamingSelected={chat.streamingOverride === null ? "" : chat.streamingOverride ? "on" : "off"}
     simpleMode={chat.effectiveVisibility.simple}
     onVisibility={() => (visibilityOpen = true)}
-    onQuickChat={() => (chat.sideOpen ? chat.closeSideChat() : chat.openSideChat())}
+    onQuickChat={() => (chat.sideOpen ? closeSide() : chat.openSideChat())}
     quickChatActive={chat.sideMessages.length > 0}
   />
 {/snippet}

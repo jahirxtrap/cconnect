@@ -503,7 +503,7 @@ export class ChatState {
     const body = text.trim();
     if (!body || this.sideStreaming) return;
     this.#sideAssistantId = null;
-    this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "user", { text: body })];
+    this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "user", { text: body, timestamp: null })];
     this.sideStreaming = true;
     this.#socket.sendAsk(body, this.#sideSessionId);
   }
@@ -517,7 +517,7 @@ export class ChatState {
       case "ask_working":
         if (this.sideMessages.at(-1)?.role !== "working") {
           this.#sideAssistantId = null;
-          this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "working")];
+          this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "working", { timestamp: null })];
         }
         break;
       case "ask_text": {
@@ -525,7 +525,7 @@ export class ChatState {
         if (current === null) {
           const id = this.#nextId++;
           this.#sideAssistantId = id;
-          this.sideMessages = [...this.sideMessages, newMessage(id, "assistant", { text: event.text })];
+          this.sideMessages = [...this.sideMessages, newMessage(id, "assistant", { text: event.text, timestamp: null })];
         } else {
           this.sideMessages = this.sideMessages.map((item) =>
             item.id === current ? { ...item, text: item.text + event.text } : item,
@@ -545,6 +545,7 @@ export class ChatState {
             ),
             newMessage(this.#nextId++, "interaction", {
               text: event.input ?? "",
+              timestamp: null,
               toolName: event.toolName,
               toolUseId: event.toolUseId,
               interaction: {
@@ -568,7 +569,7 @@ export class ChatState {
           ...this.sideMessages.filter(
             (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
           ),
-          newMessage(this.#nextId++, "interrupted"),
+          newMessage(this.#nextId++, "interrupted", { timestamp: null }),
         ];
         break;
       case "done":
