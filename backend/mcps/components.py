@@ -17,7 +17,7 @@ Use it when a decision has several options, needs more than one field at once, o
 form than as prose. For a single yes/no or a quick question, just ask in text.
 
 Elements, in the order you list them:
-- text: a markdown paragraph to explain. No id.
+- text: a markdown paragraph to explain, written in `text`.
 - select: options with label, and optional description and preview. Set multiple for checkboxes.
 - input: a text field. Set multiline for a text area, lines for a fixed-height one, secret to
   mask what is typed behind a reveal toggle, value to prefill it.
@@ -44,7 +44,7 @@ Use it to show a state worth seeing rather than describing: progress, a comparis
 For plain prose or a single image, write markdown instead.
 
 Elements, in the order you list them:
-- text: a markdown paragraph.
+- text: a markdown paragraph, written in `text`.
 - bar: read-only progress bar for a 0-100 value, with its label and an optional line under it.
   It turns into the alert colour past alert_above or under alert_below.
 - preview: {PREVIEW}
@@ -90,9 +90,9 @@ LEAF = {
     "properties": {
         "type": {"type": "string", "enum": TYPES},
         "id": {"type": "string", "description": "Required for every element that carries a value."},
-        "label": {"type": "string"},
+        "label": {"type": "string", "description": "Heading of the element."},
         "value": {"description": "Prefilled value: string for input, boolean for toggle, 0-100 for bar."},
-        "text": {"type": "string", "description": "bar: the line under it."},
+        "text": {"type": "string", "description": "text: its markdown. bar: the line under it."},
         "color": {"type": "string", "enum": COLORS, "description": "bar: its colour. Accent by default."},
         "alert_above": {"type": "number", "description": "bar: alert colour from this value up."},
         "alert_below": {"type": "number", "description": "bar: alert colour from this value down."},

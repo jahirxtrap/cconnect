@@ -441,7 +441,7 @@ internal fun JsonObject.toElement(): ComponentElement? {
         type = type,
         id = this["id"]?.jsonPrimitive?.contentOrNull,
         label = this["label"]?.jsonPrimitive?.contentOrNull,
-        text = (this["text"] ?: this["value"])?.jsonPrimitive?.contentOrNull.takeIf { type == "text" || type == "bar" },
+        text = this["text"]?.jsonPrimitive?.contentOrNull.takeIf { type == "text" || type == "bar" },
         placeholder = this["placeholder"]?.jsonPrimitive?.contentOrNull,
         placeholderKey = this["placeholder_key"]?.jsonPrimitive?.contentOrNull,
         value = raw?.contentOrNull.takeIf { type == "input" || type == "bar" },

@@ -86,7 +86,7 @@ import com.jahirtrap.cconnect.ui.Claude
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.EnvironmentSelectDialog
 import com.jahirtrap.cconnect.ui.SelectDialog
-import com.jahirtrap.cconnect.ui.LocalRefreshTick
+import com.jahirtrap.cconnect.ui.refreshRequests
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.MetricBar
@@ -140,7 +140,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     }
     LaunchedEffect(state.activeEnvironmentId) { loaded = false; load() }
     LaunchedEffect(state.connection) { if (state.connection == ConnectionState.Connected) load() }
-    val refreshTick = LocalRefreshTick.current
+    val refreshTick = refreshRequests()
     LaunchedEffect(refreshTick) { if (refreshTick > 0) { refreshing = true; load() } }
 
     detail?.let { kind ->

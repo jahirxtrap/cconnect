@@ -2,6 +2,7 @@ package com.jahirtrap.cconnect.chat
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.DragInteraction
 import com.jahirtrap.cconnect.ui.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyRow
@@ -46,6 +47,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.layout
 import com.jahirtrap.cconnect.ui.theme.Radius
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
@@ -133,6 +135,9 @@ import androidx.compose.foundation.text.InlineTextContent
 private val BIG = 16.dp
 private val SMALL = 6.dp
 
+// Kept in step with OutlinedPanel's own horizontal padding.
+private val PANEL_PAD = 14.dp
+
 private data class UserContent(
     val body: String,
     val attachments: List<Pair<String, String>>,
@@ -178,27 +183,21 @@ private fun userContent(message: ChatMessage): UserContent {
     return UserContent(body, media + files)
 }
 
+// Plain field, not snapshot state: it is written from the layout pass.
+private class HeldHeight {
+    private var height: Int? = null
+
+    fun keep(natural: Int): Int = height ?: natural.also { height = it }
+
+    fun release(natural: Int): Int {
+        height = null
+        return natural
+    }
+}
+
 internal val LocalPageAnchored = compositionLocalOf { false }
 
 internal val LocalAnchorPage = compositionLocalOf<() -> Boolean> { { false } }
-
-@Composable
-internal fun PageAnchorScope(
-    message: ChatMessage,
-    anchored: Boolean,
-    anchor: () -> Boolean,
-    content: @Composable () -> Unit,
-) {
-    if (message.interaction?.kind != "component") {
-        content()
-        return
-    }
-    CompositionLocalProvider(
-        LocalPageAnchored provides anchored,
-        LocalAnchorPage provides anchor,
-        content = content,
-    )
-}
 
 @Composable
 fun ChatMessageItem(
@@ -405,6 +404,8 @@ private fun bottomGap(cur: Role, next: Role?): Dp = when {
 
 internal fun gapAbove(prev: Role?, cur: Role): Dp {
     if (prev == null) return BIG
+    // Two component panels in a row read as one box when they touch.
+    if (prev == Role.INTERACTION && cur == Role.INTERACTION) return SMALL
     if (prev == cur) return 0.dp
     if (isNotice(cur) || isNotice(prev)) {
         val other = if (isNotice(cur)) prev else cur
@@ -992,11 +993,34 @@ private fun ComponentBlock(
             Spacer(Modifier.height(10.dp))
             var appeared by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { appeared = true }
+            // A swipe changes the height continuously as the finger moves, which drags everything
+            // above it. Hold the height for the gesture so settling is the single anchored change
+            // a tap already makes.
+            val held = remember { HeldHeight() }
+            var holding by remember { mutableStateOf(false) }
+            LaunchedEffect(pagerState) {
+                pagerState.interactionSource.interactions.collect { interaction ->
+                    if (interaction is DragInteraction.Start) holding = anchorPage()
+                }
+            }
+            LaunchedEffect(pagerState.isScrollInProgress) {
+                if (!pagerState.isScrollInProgress && holding) {
+                    anchorPage()
+                    holding = false
+                }
+            }
             val animateSize = appeared && !LocalPageAnchored.current
             HorizontalPager(
                 state = pagerState,
                 verticalAlignment = Alignment.Top,
-                modifier = if (animateSize) Modifier.animateContentSize() else Modifier,
+                // Keeps the page being dragged clear of the next one instead of both touching.
+                pageSpacing = PANEL_PAD,
+                modifier = (if (animateSize) Modifier.animateContentSize() else Modifier)
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val height = if (holding) held.keep(placeable.height) else held.release(placeable.height)
+                        layout(placeable.width, height) { placeable.place(0, 0) }
+                    },
             ) { page ->
                 Column(modifier = Modifier.fillMaxWidth()) {
                     ComponentElements(pages[page].blocks, data, onSharedLink, onValue, onPick)
@@ -1104,13 +1128,14 @@ private fun ComponentElements(
     onValue: (String, String) -> Unit,
     onPick: (String, String, Boolean) -> Unit,
 ) {
-    elements.forEach { element ->
+    Column(verticalArrangement = Arrangement.spacedBy(SMALL)) {
+        elements.forEach { element ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         when (element.type) {
                 "text" -> MarkdownText(element.text.orEmpty(), modifier = Modifier.fillMaxWidth(), selectable = false)
 
                 "preview" -> element.block?.let { raw ->
                     parseCconnectBlock(raw)?.let { block ->
-                        Spacer(Modifier.height(4.dp))
                         CconnectBlockView(block, MaterialTheme.colorScheme.primary, compact = true, onSharedLink = onSharedLink)
                     }
                 }
@@ -1136,7 +1161,6 @@ private fun ComponentElements(
 
                 "input" -> {
                     val id = element.id.orEmpty()
-                    Spacer(Modifier.height(4.dp))
                     InputField(
                         value = data.values[id].orEmpty(),
                         onValueChange = { if (!data.submitted) onValue(id, it) },
@@ -1163,7 +1187,6 @@ private fun ComponentElements(
                     val percent = element.value?.toFloatOrNull() ?: 0f
                     val alerting = element.alertAbove?.let { percent >= it } == true ||
                         element.alertBelow?.let { percent <= it } == true
-                    Spacer(Modifier.height(6.dp))
                     MetricBar(
                         title = element.label.orEmpty(),
                         subtitle = element.text.orEmpty(),
@@ -1176,7 +1199,6 @@ private fun ComponentElements(
                     val id = element.id.orEmpty()
                     val note = data.values[id].orEmpty()
                     var showNotes by rememberSaveable(data.requestId, id) { mutableStateOf(note.isNotBlank()) }
-                    Spacer(Modifier.height(if (showNotes) 6.dp else 2.dp))
                     if (showNotes) {
                         InputField(
                             value = note,
@@ -1216,6 +1238,8 @@ private fun ComponentElements(
                 }
 
                 else -> Unit
+            }
+            }
         }
     }
 }

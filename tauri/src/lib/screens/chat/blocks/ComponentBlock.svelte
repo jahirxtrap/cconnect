@@ -194,12 +194,13 @@
 
 {#snippet elements(list: ComponentElement[])}
   {#each list as element, index (index)}
-    {#if element.type === "text"}
+    <div class="flex flex-col gap-1">
+      {#if element.type === "text"}
       <MarkdownText text={element.text ?? ""} />
     {:else if element.type === "preview" && element.block}
       {@const parsed = parseCconnectBlock(element.block)}
       {#if parsed}
-        <div class="mt-1 w-full">
+        <div class="w-full">
           <CconnectBlockView data={parsed} onOpen={onPreviewOpen} compact />
         </div>
       {/if}
@@ -219,7 +220,7 @@
           multi={element.multiple}
         />
         {#if selected && option.preview?.trim()}
-          <OutlinedPanel class="my-1 w-full">
+          <OutlinedPanel class="w-full">
             <pre
               class="overflow-x-auto font-mono text-body-sm leading-snug whitespace-pre">{option.preview.replace(
                 /\n+$/,
@@ -230,7 +231,6 @@
       {/each}
     {:else if element.type === "input"}
       <InputField
-        class="mt-1"
         label={element.label ?? undefined}
         required={element.required}
         value={valueOf(element)}
@@ -252,7 +252,6 @@
     {:else if element.type === "bar"}
       {@const percent = Number(element.value ?? 0)}
       <MetricBar
-        class="mt-1.5"
         title={element.label ?? ""}
         subtitle={element.text ?? ""}
         {percent}
@@ -263,7 +262,6 @@
     {:else if element.type === "notes"}
       {#if notesShown(element)}
         <InputField
-          class="mt-1.5"
           value={valueOf(element)}
           oninput={(value) => !data.submitted && onValue(element.id ?? "", value)}
           placeholder={element.placeholder ?? keyed(element.placeholderKey) ?? undefined}
@@ -278,13 +276,14 @@
         <button
           type="button"
           onclick={() => (openNotes[element.id ?? ""] = true)}
-          class="mt-1 flex w-full cursor-pointer items-center gap-2 rounded-item px-2 py-1.5 text-left text-label-lg text-accent transition-colors select-none hover:bg-on-surface/8"
+          class="flex w-full cursor-pointer items-center gap-2 rounded-item px-2 py-1.5 text-left text-label-lg text-accent transition-colors select-none hover:bg-on-surface/8"
         >
           <NotepadText size={18} class="shrink-0" />
           <span class="truncate">{element.label?.trim() || t("ADD_NOTES")}</span>
         </button>
       {/if}
-    {/if}
+      {/if}
+    </div>
   {/each}
 {/snippet}
 
@@ -347,14 +346,15 @@
           {/each}
         </div>
         <div class="mt-2.5 overflow-hidden" style={pageHeight === null ? "" : `height: ${pageHeight}px`}>
+          <!-- The gap keeps the page being dragged clear of the next one instead of both touching. -->
           <div
             bind:this={pager}
             onscroll={onPagerScroll}
-            class="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
+            class="no-scrollbar flex snap-x snap-mandatory gap-3.5 overflow-x-auto overscroll-x-contain"
           >
             {#each pages as item, index (index)}
               <div class="w-full shrink-0 snap-center self-start">
-                <div bind:clientHeight={heights[index]}>
+                <div bind:clientHeight={heights[index]} class="flex flex-col gap-1.5">
                   {@render elements(item.blocks)}
                 </div>
               </div>
@@ -366,7 +366,9 @@
           <SelectChip label={pages[0].label} selected />
           <div class="h-1"></div>
         {/if}
-        {@render elements(shown)}
+        <div class="flex flex-col gap-1.5">
+          {@render elements(shown)}
+        </div>
       {/if}
     {/if}
 

@@ -180,7 +180,7 @@ import com.jahirtrap.cconnect.ui.SwitchRow
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.LocalIsTouch
-import com.jahirtrap.cconnect.ui.LocalRefreshTick
+import com.jahirtrap.cconnect.ui.refreshRequests
 import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.SelectField
 import com.jahirtrap.cconnect.ui.languageLabel
@@ -271,7 +271,7 @@ fun SettingsScreen(
             else -> {}
         }
     }
-    val refreshTick = LocalRefreshTick.current
+    val refreshTick = refreshRequests()
     val isTouch = LocalIsTouch.current
     LaunchedEffect(refreshTick) { if (refreshTick > 0) { refreshing = true; loadServerSettings(); refreshing = false } }
 

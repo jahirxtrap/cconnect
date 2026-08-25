@@ -29,6 +29,8 @@ const group = (role: Role | null): number => {
 
 export const gapAbove = (prev: Role | null, current: Role): number => {
   if (prev === null) return BIG;
+  // Two component panels in a row read as one box when they touch.
+  if (prev === "interaction" && current === "interaction") return SMALL;
   if (prev === current) return 0;
   if (isNotice(current) || isNotice(prev)) {
     const other = isNotice(current) ? prev : current;

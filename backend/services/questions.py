@@ -33,7 +33,7 @@ def questions_to_blocks(questions: list[dict]) -> list[dict]:
         elements: list[dict] = []
         text = question.get("question")
         if text:
-            elements.append({"type": "text", "value": str(text)})
+            elements.append({"type": "text", "text": str(text)})
         elements.append({
             "type": "select",
             "id": f"q{index}",

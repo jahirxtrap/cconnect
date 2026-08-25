@@ -847,6 +847,24 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
     return out
 
 
+_NOTIFICATION_BLOCK_RE = re.compile(r"<task-notification>(.*?)</task-notification>", re.DOTALL)
+
+
+def _split_notifications(text: str) -> tuple[str, list[dict]]:
+    items = []
+    for match in _NOTIFICATION_BLOCK_RE.finditer(text):
+        body = match.group(1)
+
+        def _tag(name: str) -> str | None:
+            found = re.search(rf"<{name}>(.*?)</{name}>", body, re.DOTALL)
+            return found.group(1).strip() if found else None
+
+        items.append({"type": "notification", "text": _tag("summary") or "", "result": _tag("status")})
+    if not items:
+        return text, items
+    return _NOTIFICATION_BLOCK_RE.sub("", text).strip(), items
+
+
 def _notification_item(text: str) -> dict | None:
     if not text.startswith("<task-notification>"):
         return None
@@ -968,14 +986,20 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                 qtext = _text_from_content(att.get("prompt")).strip()
                 qlines = [ln.strip() for ln in qtext.split("\n") if ln.strip()]
                 consumed = bool(qlines) and all(ln in real_user_texts for ln in qlines)
+                qtext, notifs = _split_notifications(qtext)
                 if qtext and not consumed and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
                     messages.append({"type": "text", "role": "user", "text": qtext})
+                messages.extend(notifs)
             continue
         if etype == "queue-operation":
             if entry.get("operation") == "enqueue":
                 qtext = (entry.get("content") or "").strip()
-                if qtext and qtext not in queued_user_texts and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
+                seen = qtext in queued_user_texts
+                qtext, notifs = _split_notifications(qtext)
+                if qtext and not seen and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
                     messages.append({"type": "text", "role": "user", "text": qtext})
+                if not seen:
+                    messages.extend(notifs)
             continue
         message = entry.get("message", {})
         if entry.get("isSidechain"):
@@ -996,11 +1020,10 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                 continue
         if isinstance(content, str):
             text = content.strip()
-            notif = _notification_item(text)
-            if notif is not None:
-                messages.append(notif)
-            elif text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
+            text, notifs = _split_notifications(text)
+            if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
                 messages.append({"type": "text", "role": role, "text": text})
+            messages.extend(notifs)
             continue
         if not isinstance(content, list):
             continue
@@ -1018,12 +1041,14 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
             btype = block.get("type")
             if btype == "text":
                 text = block.get("text", "").strip()
+                text, notifs = _split_notifications(text)
                 if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
                     item = {"type": "text", "role": role, "text": text}
                     if user_images:
                         item["images"] = user_images
                         user_images = None
                     messages.append(item)
+                messages.extend(notifs)
             elif btype == "thinking":
                 if vis["thinking"] == "off":
                     _working(messages, vis)

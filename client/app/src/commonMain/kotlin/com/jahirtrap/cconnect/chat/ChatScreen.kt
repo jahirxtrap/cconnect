@@ -162,7 +162,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -275,11 +274,18 @@ import com.jahirtrap.cconnect.ui.TooltipWrap
 import com.jahirtrap.cconnect.ui.dayIndex
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import com.jahirtrap.cconnect.ui.theme.snapDp
 import com.jahirtrap.cconnect.settings.VisibilityDialog
 import com.jahirtrap.cconnect.data.VisibilityPrefs
+
+private const val ANCHOR_TIMEOUT_MS = 250L
+
+private class OpenedChat {
+    var sessionId: String? = null
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -309,6 +315,13 @@ fun ChatScreen(
     LaunchedEffect(tabId) {
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { (index, offset) -> TabsController.saveMessageScroll(tabId, index, offset) }
+    }
+    val shown = remember(tabId) { OpenedChat() }
+    val published = if (state.frozen == null) state.sessionId else shown.sessionId
+    if (shown.sessionId != published) {
+        val switching = shown.sessionId != null
+        shown.sessionId = published
+        if (switching) listState.requestScrollToItem(0)
     }
     val focusManager = LocalFocusManager.current
     val density = LocalDensity.current
@@ -347,7 +360,7 @@ fun ChatScreen(
 
     val itemHeights = remember { mutableStateMapOf<Long, Int>() }
     var anchorPending by remember { mutableStateOf<Long?>(null) }
-    var pageAnchor by remember { mutableStateOf<Long?>(null) }
+    var pageAnchor by remember { mutableStateOf(false) }
     var collapseToTop by remember { mutableStateOf<Long?>(null) }
     var pendingScroll by remember { mutableStateOf(0) }
     var growth by remember { mutableStateOf(0) }
@@ -358,12 +371,22 @@ fun ChatScreen(
             pendingScroll = 0
         }
     }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }.collect { if (it) pageAnchor = null }
+    val anchorPage = remember(listState) {
+        {
+            val hold = !(listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 4)
+            pageAnchor = hold
+            hold
+        }
+    }
+    LaunchedEffect(pageAnchor) {
+        if (!pageAnchor) return@LaunchedEffect
+        delay(ANCHOR_TIMEOUT_MS)
+        pageAnchor = false
     }
     val firstMessage = state.view.firstOrNull()
     val conversationId = firstMessage?.timestamp ?: firstMessage?.text?.hashCode()?.toLong()
     var contentPx by remember(conversationId) { mutableStateOf(-1) }
+    val imeInsets = WindowInsets.ime
     LaunchedEffect(conversationId) {
         snapshotFlow {
             val info = listState.layoutInfo
@@ -371,6 +394,10 @@ fun ChatScreen(
             if (items.isEmpty() || items.size != info.totalItemsCount) -1
             else items.sumOf { it.size } - (items.firstOrNull { it.key == "filler" }?.size ?: 0)
         }.collect {
+            // The keyboard shrinks the viewport frame by frame, and mid-animation the list reports
+            // fewer items than it holds. Taking that -1 dropped the filler, so a short chat fell to
+            // the bottom and climbed back on every frame.
+            if (it < 0 && imeInsets.getBottom(density) > 0) return@collect
             contentPx = it
             growth = 0
         }
@@ -730,6 +757,10 @@ fun ChatScreen(
                                     val fillerPx = if (contentPx < 0) 0 else ((boxHeightPx * listFraction).roundToInt() - contentPx).coerceAtLeast(0)
                                     Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight(listFraction).clipToBounds()) {
                                         if (opening) CenteredProgress(Modifier.fillMaxSize())
+                                        CompositionLocalProvider(
+                                            LocalPageAnchored provides pageAnchor,
+                                            LocalAnchorPage provides anchorPage,
+                                        ) {
                                         SelectionContainer(modifier = Modifier.fillMaxSize().alpha(if (opening) 0f else 1f).selectionTextCursor()) {
                                             LazyColumn(
                                                 state = listState,
@@ -778,8 +809,8 @@ fun ChatScreen(
                                                             growth += size.height - (previous ?: 0)
                                                             if (previous == null || previous == size.height) return@onSizeChanged
                                                             val delta = size.height - previous
-                                                            if (pageAnchor == message.id) {
-                                                                pageAnchor = null
+                                                            if (pageAnchor) {
+                                                                pageAnchor = false
                                                                 growth -= delta
                                                                 listState.requestScrollToItem(
                                                                     listState.firstVisibleItemIndex,
@@ -810,15 +841,6 @@ fun ChatScreen(
                                                         },
                                                     ) {
                                                     if (separated && ts != null) ChatDateSeparator(ts)
-                                                    val atBottom = rememberUpdatedState(isAtBottom)
-                                                    val anchor = remember(message.id) {
-                                                        {
-                                                            val hold = !atBottom.value
-                                                            pageAnchor = if (hold) message.id else null
-                                                            hold
-                                                        }
-                                                    }
-                                                    PageAnchorScope(message, pageAnchor == message.id, anchor) {
                                                     ChatMessageItem(
                                                         message,
                                                         prevRole = state.view.getOrNull(index - 1)?.role,
@@ -842,9 +864,9 @@ fun ChatScreen(
                                                         showTime = showTime,
                                                     )
                                                     }
-                                                    }
                                                 }
                                             }
+                                        }
                                         }
                                         var stickyHeaderHeight by remember { mutableStateOf(0) }
                                         val sticky by remember(expandedState) {
@@ -1357,9 +1379,18 @@ private fun SidePanel(
             val itemHeights = remember { mutableStateMapOf<Long, Int>() }
             var pendingScroll by remember { mutableStateOf(0) }
             var growth by remember { mutableStateOf(0) }
-            var pageAnchor by remember { mutableStateOf<Long?>(null) }
-            LaunchedEffect(listState) {
-                snapshotFlow { listState.isScrollInProgress }.collect { if (it) pageAnchor = null }
+            var pageAnchor by remember { mutableStateOf(false) }
+            val anchorPage = remember(listState) {
+                {
+                    val hold = !(listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset <= 4)
+                    pageAnchor = hold
+                    hold
+                }
+            }
+            LaunchedEffect(pageAnchor) {
+                if (!pageAnchor) return@LaunchedEffect
+                delay(ANCHOR_TIMEOUT_MS)
+                pageAnchor = false
             }
             LaunchedEffect(listState) {
                 snapshotFlow { pendingScroll }.collect { amount ->
@@ -1434,6 +1465,10 @@ private fun SidePanel(
             }
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 val fillerPx = if (sideContentPx < 0) 0 else (constraints.maxHeight - sideContentPx).coerceAtLeast(0)
+                CompositionLocalProvider(
+                    LocalPageAnchored provides pageAnchor,
+                    LocalAnchorPage provides anchorPage,
+                ) {
                 SelectionContainer(modifier = Modifier.fillMaxSize().selectionTextCursor()) {
                     LazyColumn(
                         state = listState,
@@ -1467,8 +1502,8 @@ private fun SidePanel(
                                     growth += size.height - (previous ?: 0)
                                     if (previous == null || previous == size.height) return@onSizeChanged
                                     val delta = size.height - previous
-                                    if (pageAnchor == message.id) {
-                                        pageAnchor = null
+                                    if (pageAnchor) {
+                                        pageAnchor = false
                                         growth -= delta
                                         listState.requestScrollToItem(
                                             listState.firstVisibleItemIndex,
@@ -1477,15 +1512,6 @@ private fun SidePanel(
                                     } else if (!followBottom && delta > 0) pendingScroll += delta
                                 },
                             ) {
-                            val atBottom = rememberUpdatedState(isAtBottom)
-                            val anchor = remember(message.id) {
-                                {
-                                    val hold = !atBottom.value
-                                    pageAnchor = if (hold) message.id else null
-                                    hold
-                                }
-                            }
-                            PageAnchorScope(message, pageAnchor == message.id, anchor) {
                             ChatMessageItem(
                                 message,
                                 prevRole = sideVisible.getOrNull(index - 1)?.role,
@@ -1500,9 +1526,9 @@ private fun SidePanel(
                                 onSharedLink = onSharedLink,
                             )
                             }
-                            }
                         }
                     }
+                }
                 }
                 if (showScrollButton && sideChat.messages.isNotEmpty()) {
                     Surface(

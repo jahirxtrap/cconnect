@@ -199,10 +199,7 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       type,
       id: text(raw, "id"),
       label: text(raw, "label"),
-      text:
-        type === "bar" || type === "text"
-          ? (text(raw, "text") ?? (typeof value === "string" ? value : null))
-          : null,
+      text: type === "text" || type === "bar" ? text(raw, "text") : null,
       placeholder: text(raw, "placeholder"),
       placeholderKey: text(raw, "placeholder_key"),
       value:
