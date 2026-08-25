@@ -115,7 +115,7 @@ data class ChatUiState(
     val followBottom: Boolean = true,
     val compacting: Boolean = false,
     val streamStatus: String? = null,
-    val sideChat: SideChatState? = null,             // persisted side conversation (kept while the session lives)
+    val sideChats: Map<String, SideChatState> = emptyMap(),  // side conversation per main session, keyed by its id
     val sideChatOpen: Boolean = false,               // whether the side panel is currently shown
     val sideFullscreen: Boolean = false,
     val showWorking: String = "label",               // quick-chat working indicator visibility (label/off)
@@ -147,6 +147,7 @@ data class ChatUiState(
     val queue: List<QueuedMessage> = emptyList(),
 ) {
     val view: List<ChatMessage> get() = frozen ?: messages
+    val sideChat: SideChatState? get() = sideChats[sessionId.orEmpty()]
 }
 
 data class Attachment(
@@ -599,7 +600,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun stopSide() {
-        if (_state.value.sideChat?.streaming == true) client.sendInterrupt("side")
+        if (_state.value.sideChats.values.any { it.streaming }) client.sendInterrupt("side")
     }
 
     fun submit(text: String) {
@@ -618,13 +619,28 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
-    private fun ChatUiState.boundSide(): SideChatState? = sideChat?.takeIf { it.boundSessionId == sessionId }
+    private fun ChatUiState.withSide(side: SideChatState?): ChatUiState {
+        val key = sessionId.orEmpty()
+        return copy(sideChats = if (side == null) sideChats - key else sideChats + (key to side))
+    }
 
-    private fun SideChatState?.promote(sid: String?): SideChatState? =
-        if (this != null && boundSessionId == null && sid != null) copy(boundSessionId = sid) else this
+    private fun ChatUiState.streamingSideKey(): String? =
+        sideChats.entries.firstOrNull { it.value.streaming }?.key ?: sessionId.orEmpty().takeIf { sideChats.containsKey(it) }
+
+    private fun ChatUiState.updateSide(block: (SideChatState) -> SideChatState): ChatUiState {
+        val key = streamingSideKey() ?: return this
+        val current = sideChats[key] ?: return this
+        return copy(sideChats = sideChats + (key to block(current)))
+    }
+
+    private fun ChatUiState.promoteSide(sid: String?): ChatUiState {
+        if (sid == null || sid.isEmpty()) return this
+        val pending = sideChats[""] ?: return this
+        return copy(sideChats = sideChats - "" + (sid to pending.copy(boundSessionId = sid)))
+    }
 
     fun openSideChat() {
-        _state.update { it.copy(sideChat = it.boundSide() ?: SideChatState(boundSessionId = it.sessionId), sideChatOpen = true) }
+        _state.update { it.withSide(it.sideChat ?: SideChatState(boundSessionId = it.sessionId)).copy(sideChatOpen = true) }
     }
 
     fun closeSideChat() {
@@ -638,19 +654,19 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun clearSideChat() {
         currentSideAssistantId = null
-        _state.update { it.copy(sideChat = SideChatState(boundSessionId = it.sessionId), sideChatOpen = true) }
+        _state.update { it.withSide(SideChatState(boundSessionId = it.sessionId)).copy(sideChatOpen = true) }
     }
 
     fun sendSideQuestion(text: String) {
         val trimmed = text.trim()
-        val sc = _state.value.sideChat ?: return
-        if (trimmed.isEmpty() || sc.streaming) return
+        val sc = _state.value.sideChat
+        if (trimmed.isEmpty() || sc?.streaming == true) return
         currentSideAssistantId = null
         _state.update {
             val cur = it.sideChat ?: SideChatState(boundSessionId = it.sessionId)
-            it.copy(sideChat = cur.copy(messages = cur.messages + ChatMessage(nextId++, Role.USER, trimmed), streaming = true))
+            it.withSide(cur.copy(messages = cur.messages + ChatMessage(nextId++, Role.USER, trimmed), streaming = true))
         }
-        client.sendAsk(trimmed, sc.sideSessionId)
+        client.sendAsk(trimmed, sc?.sideSessionId)
     }
 
     fun clearConversation() {
@@ -934,10 +950,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 oldestLoadedIndex = page.startIndex.takeIf { page.items.isNotEmpty() },
                 transcriptPaging = false,
                 transcriptExhausted = !page.hasMore,
-                sideChat = it.sideChat.promote(session.sessionId),
                 pendingToolIds = emptySet(),
                 contextTokens = page.contextTokens,
-            )
+            ).promoteSide(session.sessionId)
         }
         return true
     }
@@ -1149,10 +1164,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         sessionId = sid,
                         activeProjectKey = event.project ?: it.activeProjectKey,
                         streaming = event.running,
-                        sideChat = it.sideChat.promote(sid),
                         messages = if (pendingTrim == null) it.messages.filterNot { m -> m.ephemeral } else it.messages,
                         queue = event.queued + it.queue.filter { q -> q.uploading },
-                    )
+                    ).promoteSide(sid)
                 }
                 sentIds.addAll(event.queued.map { q -> q.id })
                 viewModelScope.launch { refreshServerInfo() }
@@ -1285,7 +1299,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         )
                     )
                 }
-                _state.update { it.copy(sessionId = sid, sideChat = it.sideChat.promote(sid), contextTokens = ctxTokens) }
+                _state.update { it.copy(sessionId = sid, contextTokens = ctxTokens).promoteSide(sid) }
             }
             is ServerEvent.Done -> {
                 if (_state.value.streaming && settings.notifyTaskDone) {
@@ -1397,7 +1411,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         frozen = null,
                         transcriptLoading = false,
                         error = event.reason,
-                        sideChat = it.sideChat?.copy(streaming = false),
+                        sideChats = it.sideChats.mapValues { (_, sc) -> sc.copy(streaming = false) },
                     )
                 }
             }
@@ -1446,63 +1460,54 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun onSideEvent(event: ServerEvent) {
         when (event) {
             is ServerEvent.AskWorking -> {
-                if (_state.value.sideChat?.messages?.lastOrNull()?.role != Role.WORKING) {
+                val key = _state.value.streamingSideKey()
+                if (_state.value.sideChats[key]?.messages?.lastOrNull()?.role != Role.WORKING) {
                     currentSideAssistantId = null
-                    _state.update { st ->
-                        val sc = st.sideChat ?: return@update st
-                        st.copy(sideChat = sc.copy(messages = sc.messages + ChatMessage(nextId++, Role.WORKING, "")))
-                    }
+                    _state.update { st -> st.updateSide { sc -> sc.copy(messages = sc.messages + ChatMessage(nextId++, Role.WORKING, "")) } }
                 }
             }
             is ServerEvent.AskText -> _state.update { st ->
-                val sc = st.sideChat ?: return@update st
-                val id = currentSideAssistantId
-                if (id == null) {
-                    val newId = nextId++
-                    currentSideAssistantId = newId
-                    st.copy(sideChat = sc.copy(messages = sc.messages + ChatMessage(newId, Role.ASSISTANT, event.text)))
-                } else {
-                    st.copy(sideChat = sc.copy(messages = sc.messages.map { if (it.id == id) it.copy(text = it.text + event.text) else it }))
+                st.updateSide { sc ->
+                    val id = currentSideAssistantId
+                    if (id == null) {
+                        val newId = nextId++
+                        currentSideAssistantId = newId
+                        sc.copy(messages = sc.messages + ChatMessage(newId, Role.ASSISTANT, event.text))
+                    } else {
+                        sc.copy(messages = sc.messages.map { if (it.id == id) it.copy(text = it.text + event.text) else it })
+                    }
                 }
             }
             is ServerEvent.AskSession -> _state.update { st ->
-                st.copy(sideChat = st.sideChat?.copy(sideSessionId = event.sessionId))
+                st.updateSide { sc -> sc.copy(sideSessionId = event.sessionId) }
             }
             is ServerEvent.InteractionRequest -> {
                 currentSideAssistantId = null
                 _state.update { st ->
-                    val sc = st.sideChat ?: return@update st
-                    if (sc.messages.any { it.interaction?.requestId == event.requestId }) return@update st
-                    val data = interactionDataOf(event)
-                    val tuid = event.toolUseId
-                    val cleaned = if (tuid != null) sc.messages.filterNot { it.role == Role.TOOL && it.toolUseId == tuid } else sc.messages
-                    st.copy(sideChat = sc.copy(messages = cleaned + ChatMessage(nextId++, Role.INTERACTION, event.input.orEmpty(), event.toolName, tuid, data)))
+                    st.updateSide { sc ->
+                        if (sc.messages.any { it.interaction?.requestId == event.requestId }) return@updateSide sc
+                        val data = interactionDataOf(event)
+                        val tuid = event.toolUseId
+                        val cleaned = if (tuid != null) sc.messages.filterNot { it.role == Role.TOOL && it.toolUseId == tuid } else sc.messages
+                        sc.copy(messages = cleaned + ChatMessage(nextId++, Role.INTERACTION, event.input.orEmpty(), event.toolName, tuid, data))
+                    }
                 }
             }
             is ServerEvent.Done, is ServerEvent.Interrupted -> {
                 currentSideAssistantId = null
                 _state.update { st ->
-                    val sc = st.sideChat ?: return@update st
-                    val msgs = if (event is ServerEvent.Interrupted) sc.messages + ChatMessage(nextId++, Role.INTERRUPTED, "") else sc.messages
-                    st.copy(sideChat = sc.copy(streaming = false, messages = msgs))
+                    st.updateSide { sc ->
+                        if (event !is ServerEvent.Interrupted) return@updateSide sc.copy(streaming = false)
+                        val kept = sc.messages.filterNot { it.role == Role.INTERACTION && it.interaction?.pending == true }
+                        sc.copy(streaming = false, messages = kept + ChatMessage(nextId++, Role.INTERRUPTED, ""))
+                    }
                 }
-                if (event is ServerEvent.Interrupted) dismissSidePendingInteractions()
             }
             is ServerEvent.Err -> {
                 currentSideAssistantId = null
-                _state.update { st ->
-                    val sc = st.sideChat ?: return@update st
-                    st.copy(sideChat = sc.copy(streaming = false))
-                }
+                _state.update { st -> st.updateSide { sc -> sc.copy(streaming = false) } }
             }
             else -> {}
-        }
-    }
-
-    private fun dismissSidePendingInteractions() {
-        _state.update { st ->
-            val sc = st.sideChat ?: return@update st
-            st.copy(sideChat = sc.copy(messages = sc.messages.filterNot { it.role == Role.INTERACTION && it.interaction?.pending == true }))
         }
     }
 
@@ -1702,7 +1707,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         _state.update { st ->
             st.copy(
                 messages = st.messages.resolve(),
-                sideChat = st.sideChat?.copy(messages = st.sideChat.messages.resolve()),
+                sideChats = st.sideChats.mapValues { (_, sc) -> sc.copy(messages = sc.messages.resolve()) },
             )
         }
     }
@@ -1715,14 +1720,14 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         _state.update { st ->
             st.copy(
                 messages = st.messages.apply(),
-                sideChat = st.sideChat?.let { it.copy(messages = it.messages.apply()) },
+                sideChats = st.sideChats.mapValues { (_, sc) -> sc.copy(messages = sc.messages.apply()) },
             )
         }
     }
 
     private fun findInteraction(requestId: String): InteractionData? {
         val st = _state.value
-        return (st.messages + (st.sideChat?.messages ?: emptyList()))
+        return (st.messages + st.sideChats.values.flatMap { it.messages })
             .firstNotNullOfOrNull { m -> m.interaction?.takeIf { it.requestId == requestId } }
     }
 

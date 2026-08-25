@@ -275,6 +275,7 @@ textarea::selection {
 
 .markdown-dense {
   --md-scale: calc(13 / 14);
+  line-height: 19px;
 }
 
 .markdown > *:first-child {
@@ -366,11 +367,13 @@ a > .md-link-icon:last-child {
   background: var(--c-surface-variant);
   border-radius: var(--radius-sm);
   padding: 1px 3px;
+  line-height: 0;
 }
 
 .markdown pre code {
   background: none;
   padding: 0;
+  line-height: inherit;
 }
 
 .markdown pre {

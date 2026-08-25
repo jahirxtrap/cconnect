@@ -95,10 +95,10 @@
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   let lastId: number | null = null;
 
-  let scrollSign = -1;
+  let scrollSign = 0;
 
   const detectScrollSign = () => {
-    if (!container) return;
+    if (!container || container.scrollHeight <= container.clientHeight) return;
     const previous = container.scrollTop;
     container.scrollTop = -1;
     scrollSign = container.scrollTop < 0 ? -1 : 1;
@@ -112,7 +112,8 @@
 
   const scrollTo = (top: number) => {
     if (!container) return;
-    container.scrollTop = scrollSign * Math.abs(top);
+    if (!scrollSign) detectScrollSign();
+    container.scrollTop = (scrollSign || -1) * Math.abs(top);
     ownTop = container.scrollTop;
     lastTop = container.scrollTop;
   };
@@ -187,11 +188,23 @@
   const collapseSticky = async () => {
     const current = sticky;
     if (!current || !container) return;
-    const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
-    const top = node ? topOf(node) + current.gap : distanceToTop();
+    follow = false;
     expandedState[current.message.id] = false;
     await tick();
-    scrollFromTop(top);
+    const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
+    if (!node) return;
+    scrollFromTop(topOf(node) + current.gap);
+  };
+
+  const toggleExpanded = async (id: number) => {
+    const node = container?.querySelector<HTMLElement>(`[data-mid="${id}"]`);
+    const anchored = !follow && node !== null && node !== undefined;
+    const previousTop = anchored ? topOf(node) : 0;
+    const previousDistance = anchored ? distanceToTop() : 0;
+    expandedState[id] = !expandedState[id];
+    if (!anchored) return;
+    await tick();
+    scrollFromTop(previousDistance + topOf(node) - previousTop);
   };
 
   const measureScrollbar = () => {
@@ -345,7 +358,7 @@
           gluedTop={separated}
           labelMode={modeFor(item.role) === "label"}
           expanded={expandedState[item.id] ?? false}
-          onToggle={() => (expandedState[item.id] = !expandedState[item.id])}
+          onToggle={() => toggleExpanded(item.id)}
           {onAnswer}
           {onSharedLink}
           {component}

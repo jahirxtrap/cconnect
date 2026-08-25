@@ -795,7 +795,7 @@ private fun CompactBlock(data: CompactData, expanded: Boolean? = null, onToggle:
         ) {
             Icon(Lucide.Archive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             Spacer(Modifier.size(6.dp))
-            Text(stringResource(Res.string.compacted), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            Text(stringResource(Res.string.compacted), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.weight(1f))
             if (stats != null) {
                 Text(stats, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)

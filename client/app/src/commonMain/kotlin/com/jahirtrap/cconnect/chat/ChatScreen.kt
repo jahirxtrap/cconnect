@@ -343,6 +343,18 @@ fun ChatScreen(
         }
     }
 
+    val itemHeights = remember { mutableStateMapOf<Long, Int>() }
+    var anchorPending by remember { mutableStateOf<Long?>(null) }
+    var collapseToTop by remember { mutableStateOf<Long?>(null) }
+    var pendingScroll by remember { mutableStateOf(0) }
+    var growth by remember { mutableStateOf(0) }
+    LaunchedEffect(listState) {
+        snapshotFlow { pendingScroll }.collect { amount ->
+            if (amount == 0) return@collect
+            listState.dispatchRawDelta(amount.toFloat())
+            pendingScroll = 0
+        }
+    }
     val firstMessage = state.view.firstOrNull()
     val conversationId = firstMessage?.timestamp ?: firstMessage?.text?.hashCode()?.toLong()
     var contentPx by remember(conversationId) { mutableStateOf(-1) }
@@ -352,7 +364,10 @@ fun ChatScreen(
             val items = info.visibleItemsInfo
             if (items.isEmpty() || items.size != info.totalItemsCount) -1
             else items.sumOf { it.size } - (items.firstOrNull { it.key == "filler" }?.size ?: 0)
-        }.collect { if (it >= 0) contentPx = it }
+        }.collect {
+            contentPx = it
+            growth = 0
+        }
     }
 
     // Only manual scrolling changes this, so incoming content can't flip it before we react.
@@ -444,12 +459,12 @@ fun ChatScreen(
             val first = info.visibleItemsInfo.firstOrNull()
             Triple(first?.index, first?.size, info.viewportEndOffset)
         }.collect { (index, _, _) ->
-            if (followBottom && index == 0) listState.scrollToItem(0)
+            if (followBottom && index == 0 && contentPx < 0) listState.scrollToItem(0)
         }
     }
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.viewportSize }.collect {
-            if (followBottom && state.view.isNotEmpty()) {
+            if (followBottom && state.view.isNotEmpty() && contentPx < 0) {
                 listState.scrollToItem(0)
             }
         }
@@ -645,8 +660,8 @@ fun ChatScreen(
                                 }
                             },
                         ) { padding ->
-                            val sc = state.sideChat
-                            val sideActive = state.sideChatOpen && sc != null
+                            val sc = state.sideChat ?: SideChatState(boundSessionId = state.sessionId)
+                            val sideActive = state.sideChatOpen
                             LaunchedEffect(state.pendingInput) {
                                 state.pendingInput?.let { vm.draft = it; vm.consumePendingInput() }
                             }
@@ -709,6 +724,7 @@ fun ChatScreen(
                                             LazyColumn(
                                                 state = listState,
                                                 reverseLayout = true,
+                                                verticalArrangement = Arrangement.Top,
                                                 modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                                                     awaitPointerEventScope {
                                                         while (true) {
@@ -722,18 +738,23 @@ fun ChatScreen(
                                                     item(key = "filler") {
                                                         Spacer(
                                                             Modifier.layout { measurable, constraints ->
-                                                                val placeable = measurable.measure(constraints.copy(minHeight = fillerPx, maxHeight = fillerPx))
-                                                                layout(placeable.width, fillerPx) { placeable.place(0, 0) }
+                                                                val px = (fillerPx - growth).coerceIn(0, fillerPx)
+                                                                val placeable = measurable.measure(constraints.copy(minHeight = px, maxHeight = px))
+                                                                layout(placeable.width, px) { placeable.place(0, 0) }
                                                             },
                                                         )
                                                     }
                                                 }
                                                 if (state.compacting) {
-                                                    item(key = "compacting") { CompactProgress() }
+                                                    item(key = "compacting") {
+                                                        Box(Modifier.onSizeChanged { growth += it.height }) { CompactProgress() }
+                                                    }
                                                 }
                                                 val status = state.streamStatus
                                                 if (status != null && !(state.compacting && status == "slow")) {
-                                                    item(key = "stream-status") { StatusProgress(status) }
+                                                    item(key = "stream-status") {
+                                                        Box(Modifier.onSizeChanged { growth += it.height }) { StatusProgress(status) }
+                                                    }
                                                 }
                                                 itemsIndexed(state.view.asReversed(), key = { _, it -> it.id }) { reversed, message ->
                                                     val index = state.view.lastIndex - reversed
@@ -747,7 +768,34 @@ fun ChatScreen(
                                                         Role.THINKING, Role.WORKING, Role.ASSISTANT -> index == state.view.lastIndex && state.streaming
                                                         else -> false
                                                     }
-                                                    Column {
+                                                    Column(
+                                                        modifier = Modifier.offset { IntOffset(0, pendingScroll) }.onSizeChanged { size ->
+                                                            val previous = itemHeights.put(message.id, size.height)
+                                                            growth += size.height - (previous ?: 0)
+                                                            if (previous == null || previous == size.height) return@onSizeChanged
+                                                            val delta = size.height - previous
+                                                            if (collapseToTop == message.id) {
+                                                                collapseToTop = null
+                                                                val info = listState.layoutInfo
+                                                                val listIndex = info.visibleItemsInfo.firstOrNull { it.key == message.id }?.index
+                                                                if (listIndex != null) {
+                                                                    val viewport = info.viewportEndOffset - info.viewportStartOffset
+                                                                    val gap = with(density) { gapAbove(state.view.getOrNull(index - 1)?.role, message.role).roundToPx() }
+                                                                    listState.requestScrollToItem(listIndex, size.height - gap - viewport)
+                                                                }
+                                                                return@onSizeChanged
+                                                            }
+                                                            if (anchorPending == message.id) {
+                                                                anchorPending = null
+                                                                listState.requestScrollToItem(
+                                                                    listState.firstVisibleItemIndex,
+                                                                    listState.firstVisibleItemScrollOffset + delta,
+                                                                )
+                                                            } else if (!followBottom && delta > 0) {
+                                                                pendingScroll += delta
+                                                            }
+                                                        },
+                                                    ) {
                                                     if (separated && ts != null) ChatDateSeparator(ts)
                                                     ChatMessageItem(
                                                         message,
@@ -755,7 +803,10 @@ fun ChatScreen(
                                                         nextRole = state.view.getOrNull(index + 1)?.role,
                                                         running = running,
                                                         expanded = expandedState[message.id] ?: false,
-                                                        onToggle = { expandedState[message.id] = !(expandedState[message.id] ?: false) },
+                                                        onToggle = {
+                                                            if (!isAtBottom) anchorPending = message.id
+                                                            expandedState[message.id] = !(expandedState[message.id] ?: false)
+                                                        },
                                                         onAnswer = vm::answerInteraction,
                                                         onComponentPage = vm::setActivePage,
                                                         onComponentValue = vm::setComponentValue,
@@ -795,8 +846,8 @@ fun ChatScreen(
                                                     StickyCollapsibleHeader(
                                                         message = msg,
                                                         onCollapse = {
+                                                            collapseToTop = id
                                                             expandedState[id] = false
-                                                            scope.launch { listState.scrollToItem(state.view.lastIndex - idx, gapPx) }
                                                         },
                                                         modifier = Modifier
                                                         .align(Alignment.TopCenter)
@@ -827,7 +878,7 @@ fun ChatScreen(
                                             }
                                         }
                                     }
-                                    if (sideActive && sc != null) {
+                                    if (sideActive) {
                                         val dragModifier = Modifier.pointerInput(boxHeightPx) {
                                             detectVerticalDragGestures(
                                                 onDragEnd = {
@@ -1280,6 +1331,32 @@ private fun SidePanel(
                 }
             }
             var followBottom by remember { mutableStateOf(true) }
+            val itemHeights = remember { mutableStateMapOf<Long, Int>() }
+            var pendingScroll by remember { mutableStateOf(0) }
+            var growth by remember { mutableStateOf(0) }
+            LaunchedEffect(listState) {
+                snapshotFlow { pendingScroll }.collect { amount ->
+                    if (amount == 0) return@collect
+                    listState.dispatchRawDelta(amount.toFloat())
+                    pendingScroll = 0
+                }
+            }
+            val sideVisible = if (showWorking == "label") sideChat.messages
+            else sideChat.messages.filter { it.role != Role.WORKING }
+            val firstSide = sideVisible.firstOrNull()
+            val sideConversationId = firstSide?.timestamp ?: firstSide?.text?.hashCode()?.toLong()
+            var sideContentPx by remember(sideConversationId) { mutableStateOf(-1) }
+            LaunchedEffect(sideConversationId) {
+                snapshotFlow {
+                    val info = listState.layoutInfo
+                    val items = info.visibleItemsInfo
+                    if (items.isEmpty() || items.size != info.totalItemsCount) -1
+                    else items.sumOf { it.size } - (items.firstOrNull { it.key == "filler" }?.size ?: 0)
+                }.collect {
+                    sideContentPx = it
+                    growth = 0
+                }
+            }
             val showScrollButton by remember {
                 derivedStateOf {
                     if (followBottom) return@derivedStateOf false
@@ -1311,12 +1388,14 @@ private fun SidePanel(
                     val first = info.visibleItemsInfo.firstOrNull()
                     Triple(first?.index, first?.size, info.viewportEndOffset)
                 }.collect { (index, _, _) ->
-                    if (followBottom && index == 0) listState.scrollToItem(0)
+                    if (followBottom && index == 0 && sideContentPx < 0) listState.scrollToItem(0)
                 }
             }
             LaunchedEffect(listState) {
                 snapshotFlow { listState.layoutInfo.viewportSize }.collect {
-                    if (followBottom && sideChat.messages.isNotEmpty()) listState.scrollToItem(0)
+                    if (followBottom && sideChat.messages.isNotEmpty() && sideContentPx < 0) {
+                        listState.scrollToItem(0)
+                    }
                 }
             }
             LaunchedEffect(lastMsg?.id) {
@@ -1326,25 +1405,13 @@ private fun SidePanel(
                     listState.animateScrollToItem(0)
                 }
             }
-            val sideVisible = if (showWorking == "label") sideChat.messages
-            else sideChat.messages.filter { it.role != Role.WORKING }
-            val firstSide = sideVisible.firstOrNull()
-            val sideConversationId = firstSide?.timestamp ?: firstSide?.text?.hashCode()?.toLong()
-            var sideContentPx by remember(sideConversationId) { mutableStateOf(-1) }
-            LaunchedEffect(sideConversationId) {
-                snapshotFlow {
-                    val info = listState.layoutInfo
-                    val items = info.visibleItemsInfo
-                    if (items.isEmpty() || items.size != info.totalItemsCount) -1
-                    else items.sumOf { it.size } - (items.firstOrNull { it.key == "filler" }?.size ?: 0)
-                }.collect { if (it >= 0) sideContentPx = it }
-            }
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 val fillerPx = if (sideContentPx < 0) 0 else (constraints.maxHeight - sideContentPx).coerceAtLeast(0)
                 SelectionContainer(modifier = Modifier.fillMaxSize().selectionTextCursor()) {
                     LazyColumn(
                         state = listState,
                         reverseLayout = true,
+                        verticalArrangement = Arrangement.Top,
                         modifier = Modifier.fillMaxSize().pointerInput(Unit) {
                             awaitPointerEventScope {
                                 while (true) {
@@ -1358,14 +1425,24 @@ private fun SidePanel(
                             item(key = "filler") {
                                 Spacer(
                                     Modifier.layout { measurable, constraints ->
-                                        val placeable = measurable.measure(constraints.copy(minHeight = fillerPx, maxHeight = fillerPx))
-                                        layout(placeable.width, fillerPx) { placeable.place(0, 0) }
+                                        val px = (fillerPx - growth).coerceIn(0, fillerPx)
+                                        val placeable = measurable.measure(constraints.copy(minHeight = px, maxHeight = px))
+                                        layout(placeable.width, px) { placeable.place(0, 0) }
                                     },
                                 )
                             }
                         }
                         itemsIndexed(sideVisible.asReversed(), key = { _, it -> it.id }) { reversed, message ->
                             val index = sideVisible.lastIndex - reversed
+                            Column(
+                                modifier = Modifier.offset { IntOffset(0, pendingScroll) }.onSizeChanged { size ->
+                                    val previous = itemHeights.put(message.id, size.height)
+                                    growth += size.height - (previous ?: 0)
+                                    if (previous == null || previous == size.height) return@onSizeChanged
+                                    val delta = size.height - previous
+                                    if (!followBottom && delta > 0) pendingScroll += delta
+                                },
+                            ) {
                             ChatMessageItem(
                                 message,
                                 prevRole = sideVisible.getOrNull(index - 1)?.role,
@@ -1379,6 +1456,7 @@ private fun SidePanel(
                                 onDiscardComponent = onDiscardComponent,
                                 onSharedLink = onSharedLink,
                             )
+                            }
                         }
                     }
                 }

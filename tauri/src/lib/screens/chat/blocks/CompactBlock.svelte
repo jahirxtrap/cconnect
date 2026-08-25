@@ -53,7 +53,7 @@
       : 'cursor-default'}"
   >
     <Archive size={16} class="shrink-0 text-accent" />
-    <span class="ml-1.5 shrink-0 text-body-md text-accent">{t("COMPACTED")}</span>
+    <span class="ml-1.5 shrink-0 text-label-lg text-accent">{t("COMPACTED")}</span>
     <span class="flex-1"></span>
     {#if stats}
       <span class="truncate text-body-sm text-on-surface-variant">{stats}</span>

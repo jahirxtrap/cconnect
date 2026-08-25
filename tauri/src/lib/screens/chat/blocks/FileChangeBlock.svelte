@@ -41,7 +41,7 @@
 >
   <div
     use:hscrollbar
-    class="no-scrollbar w-full overflow-x-auto rounded-sm bg-surface-variant py-1 font-mono text-body-sm leading-snug"
+    class="no-scrollbar w-full overflow-x-auto rounded-sm bg-surface-variant py-1 font-mono text-body-sm leading-[18px]"
   >
     {#each diffLines as line, index (index)}
       <div class="w-max px-2.5 py-px whitespace-pre {LINE_CLASS[line.kind]}">{!line.text &&

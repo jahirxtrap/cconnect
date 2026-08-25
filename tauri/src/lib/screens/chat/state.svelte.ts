@@ -36,6 +36,12 @@ interface Effective {
   compact: string;
   working: string;
 }
+
+interface SideChat {
+  messages: ChatMessage[];
+  sessionId: string | null;
+  streaming: boolean;
+}
 import { t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
@@ -179,13 +185,10 @@ export class ChatState {
   transcriptExhausted = $state(false);
   followBottom = $state(true);
 
-  sideMessages = $state<ChatMessage[]>([]);
-  sideStreaming = $state(false);
+  #sides = $state<Record<string, SideChat>>({});
   sideOpen = $state(false);
   sideFullscreen = $state(false);
   sideDraft = $state("");
-  #sideSessionId: string | null = null;
-  #sideBoundSessionId: string | null = null;
   #sideAssistantId: number | null = null;
 
   rewindPoints = $state<RewindPoint[]>([]);
@@ -473,12 +476,38 @@ export class ChatState {
     this.#socket.sendInterrupt();
   }
 
+  get #sideKey(): string {
+    return this.sessionId ?? "";
+  }
+
+  get #sideTarget(): string {
+    return Object.keys(this.#sides).find((key) => this.#sides[key].streaming) ?? this.#sideKey;
+  }
+
+  get sideMessages(): ChatMessage[] {
+    return this.#sides[this.#sideKey]?.messages ?? [];
+  }
+
+  get sideStreaming(): boolean {
+    return this.#sides[this.#sideKey]?.streaming ?? false;
+  }
+
+  #patchSide(key: string, patch: Partial<SideChat>) {
+    const current = this.#sides[key];
+    if (!current) return;
+    this.#sides = { ...this.#sides, [key]: { ...current, ...patch } };
+  }
+
+  #promoteSide(sessionId: string | null) {
+    const pending = this.#sides[""];
+    if (!sessionId || !pending) return;
+    const { "": _dropped, ...rest } = this.#sides;
+    this.#sides = { ...rest, [sessionId]: pending };
+  }
+
   openSideChat() {
-    if (this.#sideBoundSessionId !== this.sessionId) {
-      this.#sideBoundSessionId = this.sessionId;
-      this.sideMessages = [];
-      this.#sideSessionId = null;
-    }
+    const key = this.#sideKey;
+    if (!this.#sides[key]) this.#sides = { ...this.#sides, [key]: { messages: [], sessionId: null, streaming: false } };
     this.sideOpen = true;
   }
 
@@ -493,31 +522,40 @@ export class ChatState {
 
   clearSideChat() {
     this.#sideAssistantId = null;
-    this.#sideSessionId = null;
-    this.#sideBoundSessionId = this.sessionId;
-    this.sideMessages = [];
+    this.#sides = { ...this.#sides, [this.#sideKey]: { messages: [], sessionId: null, streaming: false } };
     this.sideOpen = true;
   }
 
   sendSideQuestion(text: string) {
     const body = text.trim();
-    if (!body || this.sideStreaming) return;
+    const key = this.#sideKey;
+    const side = this.#sides[key] ?? { messages: [], sessionId: null, streaming: false };
+    if (!body || side.streaming) return;
     this.#sideAssistantId = null;
-    this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "user", { text: body, timestamp: null })];
-    this.sideStreaming = true;
-    this.#socket.sendAsk(body, this.#sideSessionId);
+    this.#sides = {
+      ...this.#sides,
+      [key]: {
+        ...side,
+        messages: [...side.messages, newMessage(this.#nextId++, "user", { text: body, timestamp: null })],
+        streaming: true,
+      },
+    };
+    this.#socket.sendAsk(body, side.sessionId);
   }
 
   stopSide() {
-    if (this.sideStreaming) this.#socket.sendInterrupt("side");
+    if (Object.values(this.#sides).some((side) => side.streaming)) this.#socket.sendInterrupt("side");
   }
 
   #onSideEvent(event: ServerEvent) {
+    const key = this.#sideTarget;
+    const side = this.#sides[key];
+    if (!side) return;
     switch (event.type) {
       case "ask_working":
-        if (this.sideMessages.at(-1)?.role !== "working") {
+        if (side.messages.at(-1)?.role !== "working") {
           this.#sideAssistantId = null;
-          this.sideMessages = [...this.sideMessages, newMessage(this.#nextId++, "working", { timestamp: null })];
+          this.#patchSide(key, { messages: [...side.messages, newMessage(this.#nextId++, "working", { timestamp: null })] });
         }
         break;
       case "ask_text": {
@@ -525,22 +563,22 @@ export class ChatState {
         if (current === null) {
           const id = this.#nextId++;
           this.#sideAssistantId = id;
-          this.sideMessages = [...this.sideMessages, newMessage(id, "assistant", { text: event.text, timestamp: null })];
+          this.#patchSide(key, { messages: [...side.messages, newMessage(id, "assistant", { text: event.text, timestamp: null })] });
         } else {
-          this.sideMessages = this.sideMessages.map((item) =>
-            item.id === current ? { ...item, text: item.text + event.text } : item,
-          );
+          this.#patchSide(key, {
+            messages: side.messages.map((item) => (item.id === current ? { ...item, text: item.text + event.text } : item)),
+          });
         }
         break;
       }
       case "ask_session":
-        this.#sideSessionId = event.sessionId;
+        this.#patchSide(key, { sessionId: event.sessionId });
         break;
       case "interaction_request":
         this.#sideAssistantId = null;
-        if (!this.sideMessages.some((item) => item.interaction?.requestId === event.requestId)) {
-          this.sideMessages = [
-            ...this.sideMessages.filter(
+        if (!side.messages.some((item) => item.interaction?.requestId === event.requestId)) {
+          this.#patchSide(key, { messages: [
+            ...side.messages.filter(
               (item) => !(item.role === "tool" && item.toolUseId === event.toolUseId),
             ),
             newMessage(this.#nextId++, "interaction", {
@@ -559,23 +597,25 @@ export class ChatState {
                 values: componentDefaults(event.blocks),
               },
             }),
-          ];
+          ] });
         }
         break;
       case "interrupted":
         this.#sideAssistantId = null;
-        this.sideStreaming = false;
-        this.sideMessages = [
-          ...this.sideMessages.filter(
-            (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
-          ),
-          newMessage(this.#nextId++, "interrupted", { timestamp: null }),
-        ];
+        this.#patchSide(key, {
+          streaming: false,
+          messages: [
+            ...side.messages.filter(
+              (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
+            ),
+            newMessage(this.#nextId++, "interrupted", { timestamp: null }),
+          ],
+        });
         break;
       case "done":
       case "error":
         this.#sideAssistantId = null;
-        this.sideStreaming = false;
+        this.#patchSide(key, { streaming: false });
         break;
     }
   }
@@ -1245,7 +1285,9 @@ export class ChatState {
         item.interaction?.requestId === requestId ? { ...item, interaction: transform(item.interaction) } : item,
       );
     this.messages = apply(this.messages);
-    this.sideMessages = apply(this.sideMessages);
+    this.#sides = Object.fromEntries(
+      Object.entries(this.#sides).map(([key, side]) => [key, { ...side, messages: apply(side.messages) }]),
+    );
   }
 
   #componentHeadline(blocks: ComponentElement[]): string | null {
@@ -1519,7 +1561,7 @@ export class ChatState {
           });
         }
         this.sessionId = sessionId;
-        if (this.#sideBoundSessionId === null) this.#sideBoundSessionId = sessionId;
+        this.#promoteSide(sessionId);
         this.contextTokens = event.contextTokens ?? this.contextTokens;
         break;
       }
@@ -1650,7 +1692,9 @@ export class ChatState {
         this.#sideAssistantId = null;
         this.connection = "disconnected";
         this.streaming = false;
-        this.sideStreaming = false;
+        this.#sides = Object.fromEntries(
+          Object.entries(this.#sides).map(([key, side]) => [key, { ...side, streaming: false }]),
+        );
         break;
     }
   }
