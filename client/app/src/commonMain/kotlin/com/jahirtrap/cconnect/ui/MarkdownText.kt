@@ -696,9 +696,6 @@ private fun ListBlock(list: ASTNode, ordered: Boolean, ctx: MdContext, depth: In
 
 private val LIST_INDENT = 20.dp
 
-// How much to widen the marker's own space so the text starts at LIST_INDENT whatever the marker
-// measures — "1." and "•" must share one text column, and padding the string with real spaces
-// would end up in the clipboard.
 @Composable
 private fun markerPad(bullet: String, style: TextStyle): TextUnit {
     val measurer = rememberTextMeasurer()

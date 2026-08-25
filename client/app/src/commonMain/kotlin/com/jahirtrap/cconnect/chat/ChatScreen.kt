@@ -753,10 +753,6 @@ fun ChatScreen(
                                                 state = listState,
                                                 reverseLayout = true,
                                                 verticalArrangement = Arrangement.Top,
-                                                // Not fillMaxSize: a list that measures its own content sits at the top of the
-                                                // box on its own, so there is no gap to compute. A filler item could only ever
-                                                // learn the new height one frame after the keyboard changed it, and that stale
-                                                // frame is what pushed the top of the chat out of view.
                                                 modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
                                                     awaitPointerEventScope {
                                                         while (true) {

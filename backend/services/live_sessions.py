@@ -120,9 +120,6 @@ class LiveSession:
     def _track(self, event):
         kind = event.get("type")
         if kind == "dequeued":
-            # Settled here, not in _run: the drain announces its own dequeue out-of-band, and
-            # leaving that one unaccounted kept the item in _inflight — so the snapshot right
-            # after put the chip back on screen next to the bubble it had just drawn.
             self._settle_dequeued(event)
             self._publish_queue()
             return
@@ -238,8 +235,6 @@ class LiveSession:
         })
 
     async def enqueue(self, mid, text, attachments=None):
-        # An item already drained sits in _inflight and is not in _seen_ids until the CLI
-        # writes it: without that check a second client re-sending the same id queues it twice.
         if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued + self._inflight)):
             return False
         item = {"id": mid, "text": text, "attachments": list(attachments or [])}
@@ -372,9 +367,6 @@ class LiveSession:
             return
         announced = False
         if self._queued or self._inflight:
-            # The CLI already holds the queued messages, and they are what keeps this turn
-            # open: killing the worker here would stop the answer AND the messages that must
-            # run next. Stop the answer, mark the cut, and let the queue carry the turn on.
             announced = await self._stop_and_continue()
             if announced and (self._drained.is_set() or worker.done()):
                 return
@@ -416,7 +408,6 @@ class LiveSession:
         await self._emit({"type": "interrupted"})
         waiter = asyncio.create_task(self._drained.wait())
         try:
-            # asyncio.wait never cancels what it waits on, so the worker is safe here.
             await asyncio.wait([waiter, self._worker], timeout=STOP_GRACE, return_when=asyncio.FIRST_COMPLETED)
         finally:
             waiter.cancel()
@@ -440,9 +431,6 @@ class LiveSession:
                 if event.get("type") == "result":
                     self._result_seen = True
                     self._results += 1
-                    # The CLI answered every message we sent, so nothing is left to render: an item
-                    # still counted as unconsumed never found its transcript entry and would hold
-                    # the turn open forever.
                     if self._results >= self._sent and self._unconsumed > 0:
                         await self._flush_inflight()
                     if not self._queued and self._unconsumed <= 0:

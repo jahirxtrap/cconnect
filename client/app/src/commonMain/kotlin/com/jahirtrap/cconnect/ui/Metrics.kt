@@ -23,8 +23,6 @@ fun MetricHeader(title: String, subtitle: String, percent: Float) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             if (title.isNotBlank()) Text(title, style = MaterialTheme.typography.bodyLarge)
-            // An empty Text still takes a full line here, which pushed the percentage off the
-            // title's line and stretched every bar that carries no subtitle.
             if (subtitle.isNotBlank()) {
                 Text(
                     subtitle,

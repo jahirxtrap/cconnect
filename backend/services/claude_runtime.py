@@ -601,10 +601,6 @@ async def run_prompt(
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 
     chips: list[dict] = [{"id": seed_id, "sent": prompt, "drained": False}]
-    # Live rendering can't wait for the transcript: the CLI only writes a queued message when it
-    # gets round to it, and until then the client has nothing to draw. The turn itself knows the
-    # order it handed the messages over and when each answer starts, so the bubble is announced
-    # from that instead of from disk.
     pending_announce: list[dict] = list(chips)
     seen_users: set[str] = set()
     if drain is not None and resume and cwd:
@@ -652,9 +648,6 @@ async def run_prompt(
             if not chips:
                 continue
             seen_users.add(uid)
-            # Match from any position, not just the head: a leading chip whose entry never shows up
-            # (a command, a turn resumed with it already on disk) used to block the whole queue, and
-            # the messages behind it stayed undrawn with their chips stuck.
             begin = end = None
             for start in range(len(chips)):
                 acc = ""
@@ -668,8 +661,6 @@ async def run_prompt(
                 if begin is not None:
                     break
             if begin is None:
-                # The CLI writes user entries of its own — "[Request interrupted by user...]", the
-                # compaction summary. Only an entry that carries what we sent takes a chip.
                 head = chips[0]["sent"] or ""
                 if not head or head not in text:
                     continue
@@ -677,7 +668,6 @@ async def run_prompt(
             skipped, taken = chips[:begin], chips[begin:end]
             del chips[:end]
             if skipped:
-                # Their entry is never coming; free the chips so the queue does not keep them.
                 events.append({
                     "type": "dequeued",
                     "ids": [c["id"] for c in skipped if c["id"]],
@@ -687,7 +677,6 @@ async def run_prompt(
             events.append({
                 "type": "dequeued",
                 "ids": [c["id"] for c in taken if c["id"]],
-                # Already on screen from the announcement; this pass only settles the count.
                 "text": "" if any(c.get("announced") for c in taken) else text,
                 "consumed": sum(1 for c in taken if c["drained"]),
             })
@@ -860,7 +849,6 @@ async def run_prompt(
                 else:
                     yield {"type": "system", "subtype": subtype, "data": data}
             elif isinstance(message, ResultMessage):
-                # This answer is done; whatever comes next belongs to the next queued message.
                 awaiting_cycle = True
                 for ev in _flush_users(getattr(message, "session_id", None) or current_sid):
                     yield ev

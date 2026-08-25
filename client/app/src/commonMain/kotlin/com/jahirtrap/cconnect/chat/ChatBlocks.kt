@@ -134,7 +134,6 @@ import androidx.compose.foundation.text.InlineTextContent
 private val BIG = 16.dp
 private val SMALL = 6.dp
 
-// Kept in step with OutlinedPanel's own horizontal padding.
 private val PANEL_PAD = 14.dp
 
 private data class UserContent(
@@ -182,7 +181,6 @@ private fun userContent(message: ChatMessage): UserContent {
     return UserContent(body, media + files)
 }
 
-// Plain field, not snapshot state: it is written from the layout pass.
 private class HeldHeight {
     private var height: Int? = null
 
@@ -401,7 +399,6 @@ private fun bottomGap(cur: Role, next: Role?): Dp = when {
 
 internal fun gapAbove(prev: Role?, cur: Role): Dp {
     if (prev == null) return BIG
-    // Two component panels in a row read as one box when they touch.
     if (prev == Role.INTERACTION && cur == Role.INTERACTION) return SMALL
     if (prev == cur) return 0.dp
     if (isNotice(cur) || isNotice(prev)) {
@@ -925,14 +922,8 @@ private fun ComponentBlock(
         initialPage = data.activePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
         pageCount = { pages.size.coerceAtLeast(1) },
     )
-    // The hold covers the whole panel, not just the pager: what changes with the page also lives
-    // outside it — the "next" button is gone on the last one. And it is keyed to the scroll state,
-    // not to a DragInteraction: the pager grows the frame it composes the neighbouring page, one
-    // frame before that interaction is delivered, and in a reversed list that frame is a tug up.
     val held = remember { HeldHeight() }
     val moving = pagerState.isScrollInProgress
-    // Armed on both edges: nothing changes height while held, so the anchor survives the gesture
-    // and is there for the single change that lands on release.
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.isScrollInProgress }.drop(1).collect { anchorPage() }
     }
@@ -1003,15 +994,12 @@ private fun ComponentBlock(
             return@OutlinedPanel
         }
         if (pages.size > 1) {
-            // Settled, not current: the page flips halfway through a swipe, and anything keyed to
-            // it changed size right then — in the middle of the gesture.
             LaunchedEffect(pagerState.settledPage) { onPage(pagerState.settledPage) }
             ComponentTabs(pages, pagerState)
             Spacer(Modifier.height(10.dp))
             HorizontalPager(
                 state = pagerState,
                 verticalAlignment = Alignment.Top,
-                // Keeps the page being dragged clear of the next one instead of both touching.
                 pageSpacing = PANEL_PAD,
             ) { page ->
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -1103,7 +1091,6 @@ private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState)
     }
 }
 
-// One behaviour for both cases: the page changes at once, anchored or not.
 private suspend fun PagerState.goToPage(index: Int) {
     scrollToPage(index)
 }
@@ -1116,8 +1103,6 @@ private fun ComponentElements(
     onValue: (String, String) -> Unit,
     onPick: (String, String, Boolean) -> Unit,
 ) {
-    // An element that draws nothing must not take a slot either: spacedBy adds its gap all the
-    // same, so an empty text left a hole the web build never shows.
     val shown = elements.filter { element ->
         when (element.type) {
             "text" -> !element.text.isNullOrBlank()

@@ -177,7 +177,6 @@ export class ChatState {
   draft = $state("");
 
   queue = $state<QueuedMessage[]>([]);
-  // What the previous chat had on screen, held until the new one is fully attached.
   #frozen = $state<{ messages: ChatMessage[]; queue: QueuedMessage[]; contextTokens: number | null } | null>(null);
   attachments = $state<Attachment[]>([]);
   uploading = $state(false);
@@ -207,9 +206,6 @@ export class ChatState {
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProjectKey) ?? []);
   readonly historyProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly connected = $derived(this.connection === "connected");
-  // The queue and the context ring belong to the chat being loaded, so they wait for the same
-  // `attached` the messages do — otherwise they empty and refill mid-load, on top of the
-  // conversation still on screen.
   readonly queueView = $derived(this.#frozen?.queue ?? this.queue);
   readonly contextView = $derived(this.#frozen ? this.#frozen.contextTokens : this.contextTokens);
   readonly visibleQueue = $derived(this.queueView.filter((item) => !this.#silent.has(item.id)));
@@ -1161,11 +1157,8 @@ export class ChatState {
     }
   }
 
-  // The queue lives on the server, so its snapshot replaces the local list instead of being
-  // merged into it — that is what keeps two devices on the same chat showing the same chips.
   #applyQueueSnapshot(items: QueuedMessage[]) {
     for (const item of items) this.#unacked.delete(item.id);
-    // A chip this client just sent has not reached the server yet; dropping it would blink.
     const local = this.queue.filter((item) => item.uploading || this.#unacked.has(item.id));
     this.queue = [...items, ...local];
     this.#sent.clear();
@@ -1383,8 +1376,6 @@ export class ChatState {
     }
     switch (event.type) {
       case "connecting":
-        // Every retry emits this, so a dropped server was repainted as "connecting" a second after
-        // it went down instead of reporting the outage. A known outage holds until a socket opens.
         if (this.connection !== "connected" && this.connection !== "disconnected") this.connection = "connecting";
         break;
       case "open":

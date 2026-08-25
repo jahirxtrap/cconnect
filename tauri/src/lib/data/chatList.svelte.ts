@@ -21,8 +21,6 @@ export class ChatListStore {
         onMessage: (message) => this.#apply(message),
         onDrop: () => {
           this.connected = false;
-          // Activity is what the server was doing; with the socket down it is a leftover, and the
-          // sidebar kept a chat spinning as "working" next to a "server unavailable" header.
           this.sessions = this.sessions.map((item) => (item.activity ? { ...item, activity: null } : item));
           if (!this.projects.length && !this.sessions.length) this.loading = true;
         },

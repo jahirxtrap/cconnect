@@ -58,8 +58,6 @@ class ListBackend internal constructor(scope: CoroutineScope, config: () -> Back
     }
 
     fun onReconnecting() {
-        // Activity is what the server was doing; with the socket down it is a leftover, and the
-        // sidebar kept a chat spinning as "working" next to a "server unavailable" header.
         _sessions.update { list -> list.map { if (it.activity != null) it.copy(activity = null) else it } }
         if (_projects.value.isEmpty() && _sessions.value.isEmpty()) _loading.value = true
     }

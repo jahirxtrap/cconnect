@@ -48,7 +48,6 @@
 
   const valueOf = (element: ComponentElement) => data.values[element.id ?? ""] ?? "";
 
-  // An element that draws nothing must not take a slot either: the flex gap spaces it out anyway.
   const visible = (list: ComponentElement[]) =>
     list.filter((element) => {
       if (element.type === "text") return !!element.text?.trim();
@@ -105,9 +104,6 @@
   let settling = false;
   let placed = false;
 
-  // Snapped to the device pixel grid: an interpolated height lands between physical pixels, and
-  // the browser rounds the scroll anchoring differently on each frame of the animation, which the
-  // chat above shows as a wobble instead of a still block.
   const snapPx = (value: number) => {
     const grid = pixelGrid();
     return Math.round(value / grid) * grid;

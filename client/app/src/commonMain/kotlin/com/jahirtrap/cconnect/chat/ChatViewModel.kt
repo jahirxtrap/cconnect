@@ -70,7 +70,6 @@ import com.jahirtrap.cconnect.data.nowMillis
 
 enum class ConnectionState { Disconnected, Connecting, Connected }
 
-// How long "connecting" is shown before a failed attempt is reported as an outage.
 private const val CONNECTING_GRACE_MS = 2000L
 private const val MESSAGE_TAIL_CAP = 500
 private const val MESSAGE_INITIAL_CAP = 100
@@ -82,7 +81,6 @@ data class SideChatState(
     val streaming: Boolean = false,
 )
 
-// What the previous chat had on screen, held until the new one is fully attached.
 data class FrozenChat(
     val messages: List<ChatMessage>,
     val queue: List<QueuedMessage>,
@@ -159,9 +157,6 @@ data class ChatUiState(
 ) {
     val view: List<ChatMessage> get() = frozen?.messages ?: messages
 
-    // The queue and the context ring belong to the chat being loaded, so they wait for the same
-    // `attached` the messages do — otherwise they empty and refill mid-load, on top of the
-    // conversation still on screen.
     val queueView: List<QueuedMessage> get() = frozen?.queue ?: queue
     val contextView: Int? get() = frozen?.let { it.contextTokens } ?: contextTokens
     val sideChat: SideChatState? get() = sideChats[sessionId.orEmpty()]
@@ -540,14 +535,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private val sentIds = mutableSetOf<String>()
     private val unacked = mutableSetOf<String>()
 
-    // The queue lives on the server, so its snapshot replaces the local list instead of being
-    // merged into it — that is what keeps two devices on the same chat showing the same chips.
     private fun applyQueueSnapshot(items: List<QueuedMessage>) {
         val known = items.map { it.id }.toSet()
         unacked.removeAll(known)
         _state.update { st ->
             val silent = st.queue.filter { it.silent }.map { it.id }.toSet()
-            // A chip this client just sent has not reached the server yet; dropping it would blink.
             val local = st.queue.filter { it.uploading || it.id in unacked }
             st.copy(queue = items.map { if (it.id in silent) it.copy(silent = true) else it } + local)
         }
@@ -1190,14 +1182,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         when (event) {
             is ServerEvent.Connecting -> {
                 _state.update {
-                    // A known outage stays put: repainting "connecting" on every retry only makes
-                    // the header blink. The first attempt and a manual reconnect set it themselves.
                     if (it.connection == ConnectionState.Connected || it.connection == ConnectionState.Disconnected) it
                     else it.copy(connection = ConnectionState.Connecting)
                 }
-                // A retry against a dead server can hang for as long as the TCP attempt lasts, and
-                // sitting on "connecting" reads as if the app were fine. Show the attempt, then call
-                // it an outage; the retry keeps running underneath either way.
                 connectingJob?.cancel()
                 connectingJob = viewModelScope.launch {
                     delay(CONNECTING_GRACE_MS)
@@ -1475,8 +1462,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     it.copy(
                         connection = ConnectionState.Disconnected,
                         streaming = false,
-                        // Server-derived state is stale the moment the socket dies; leaving it
-                        // painted the chat as "working" while the server was plainly off.
                         activity = null,
                         streamStatus = null,
                         frozen = null,

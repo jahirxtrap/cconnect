@@ -255,9 +255,6 @@ def _meta_entries(path: Path):
             cut -= len(partial)
         tail = b""
         if size > cut:
-            # Titles and colors are appended at the end, so whatever lies past the head window has
-            # to be read. Requiring twice the window left files between 1x and 2x of it with their
-            # tail never read, and a rename there looked like it did nothing.
             start = max(cut, size - _META_WINDOW)
             fh.seek(start)
             tail = fh.read()
