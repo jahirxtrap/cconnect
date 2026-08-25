@@ -23,7 +23,9 @@ export type ServerEvent =
       resumed: boolean;
       committedCount: number | null;
       queued: QueuedMessage[];
+      activity: string | null;
     }
+  | { type: "activity"; state: string | null }
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
   | { type: "working" }
@@ -477,6 +479,7 @@ export class ChatSocket {
         resumed: flag(wire, "resumed"),
         committedCount: int(wire, "committed_count"),
         queued: queuedItems(wire),
+        activity: text(wire, "activity"),
       });
       return;
     }
@@ -537,6 +540,10 @@ export class ChatSocket {
         return { type: "compacting", trigger: text(wire, "trigger") };
       case "status":
         return { type: "status", kind: text(wire, "kind") ?? "" };
+      case "activity": {
+        const state = text(wire, "state");
+        return { type: "activity", state: state === "idle" ? null : state };
+      }
       case "compact":
       case "compact_summary":
         return {

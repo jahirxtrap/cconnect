@@ -401,7 +401,7 @@ fun ChatScreen(
         if (state.connection == ConnectionState.Connected) vm.ensureHistoryLoaded()
     }
     val activeSession = state.allSessions.firstOrNull { it.sessionId == state.sessionId }
-    val busy = state.streaming || activeSession?.activity == "waiting" || activeSession?.activity == "working"
+    val busy = state.streaming || (state.activity ?: activeSession?.activity) in setOf("waiting", "working", "slow", "compacting")
     val tabLabel: String? = activeSession?.let { it.title ?: it.preview ?: state.sessionId?.take(8) }
     val tabColor: String? = if (activeSession != null) state.sessionColor else null
     LaunchedEffect(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey) {
@@ -448,6 +448,8 @@ fun ChatScreen(
         state.view.lastOrNull()?.text,
         state.view.lastOrNull()?.children?.size,
         state.view.lastOrNull()?.children?.lastOrNull()?.result,
+        state.compacting,
+        state.activity,
     ) {
         if (state.view.isNotEmpty() && followBottom) {
             listState.scrollToItem(0)
@@ -612,21 +614,23 @@ fun ChatScreen(
                                 }
                             },
                             topBar = {
-                                val activity = activeSession?.activity
-                                val waitingUser = activity == "waiting"
-                                val working = activity == "working"
+                                val activity = state.activity ?: activeSession?.activity
                                 val statusLeading: (@Composable () -> Unit) = when {
                                     state.connection == ConnectionState.Disconnected -> ({ StatusDot(palette.red, box = 8.dp) })
                                     state.connection == ConnectionState.Connecting -> ({ StatusSpinner() })
-                                    waitingUser -> ({ StatusDot(palette.orange, box = 8.dp) })
-                                    working -> ({ StatusSpinner() })
+                                    activity == "waiting" -> ({ StatusDot(palette.orange, box = 8.dp) })
+                                    activity == "compacting" -> ({ StatusSpinner(color = palette.blue) })
+                                    activity == "slow" -> ({ StatusSpinner(color = palette.yellow) })
+                                    activity == "working" -> ({ StatusSpinner() })
+                                    activity == "failed" -> ({ StatusDot(palette.red, box = 8.dp) })
                                     else -> ({ StatusDot(palette.green, box = 8.dp) })
                                 }
                                 val statusText = when {
                                     state.connection == ConnectionState.Disconnected -> stringResource(Res.string.server_unavailable)
                                     state.connection == ConnectionState.Connecting -> stringResource(Res.string.connecting)
-                                    waitingUser -> stringResource(Res.string.waiting_user)
-                                    working -> stringResource(Res.string.working)
+                                    activity == "waiting" -> stringResource(Res.string.waiting_user)
+                                    activity == "compacting" -> stringResource(Res.string.compacting)
+                                    activity == "working" || activity == "slow" -> stringResource(Res.string.working)
                                     else -> state.sessionId?.take(8) ?: stringResource(Res.string.new_chat)
                                 }
                                 Column {
@@ -745,15 +749,9 @@ fun ChatScreen(
                                                         )
                                                     }
                                                 }
-                                                if (state.compacting) {
+                                                if (state.compacting || state.activity == "compacting") {
                                                     item(key = "compacting") {
                                                         Box(Modifier.onSizeChanged { growth += it.height }) { CompactProgress() }
-                                                    }
-                                                }
-                                                val status = state.streamStatus
-                                                if (status != null && !(state.compacting && status == "slow")) {
-                                                    item(key = "stream-status") {
-                                                        Box(Modifier.onSizeChanged { growth += it.height }) { StatusProgress(status) }
                                                     }
                                                 }
                                                 itemsIndexed(state.view.asReversed(), key = { _, it -> it.id }) { reversed, message ->
@@ -1997,32 +1995,6 @@ private fun CompactProgress() {
     }
 }
 
-@Composable
-private fun StatusProgress(kind: String) {
-    val failed = kind == "failed"
-    val color = if (failed) palette.red else palette.orange
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(color.copy(alpha = 0.15f))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(if (failed) Lucide.TriangleAlert else Lucide.Clock3, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(
-                stringResource(if (failed) Res.string.status_failed else Res.string.status_slow),
-                style = MaterialTheme.typography.bodyMedium,
-                color = color,
-            )
-        }
-        if (!failed) {
-            Spacer(Modifier.size(8.dp))
-            LinearProgressIndicator(color = color, modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun CommandMenuButton(
@@ -2452,8 +2424,15 @@ private fun ConversationRow(
         )
         when (activity) {
             "waiting" -> StatusDot(palette.orange, box = 16.dp, dot = 9.dp)
+            "failed" -> StatusDot(palette.red, box = 16.dp, dot = 9.dp)
             "renaming" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
                 StatusSpinner(size = 9.dp, color = palette.purple)
+            }
+            "compacting" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                StatusSpinner(size = 9.dp, color = palette.blue)
+            }
+            "slow" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
+                StatusSpinner(size = 9.dp, color = palette.yellow)
             }
             "working" -> Box(Modifier.size(16.dp), contentAlignment = Alignment.Center) {
                 StatusSpinner(size = 9.dp)

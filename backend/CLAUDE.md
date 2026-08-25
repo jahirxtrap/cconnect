@@ -259,10 +259,20 @@ re-attach; the server replays only events past it (buffered in-memory, last
 Control/ephemeral messages (`ready`, `permission_mode`, `history_chunk`,
 `usage`, `ask_*`) are not part of the seq'd stream.
 
+- **`activity`** (`state ∈ working | slow | compacting | waiting | failed | idle`)
+  — what this chat is doing, pushed by `LiveSession` on every transition and
+  derived in `_track` from the events it emits (`compacting`/`compact`,
+  `status`). It rides the **channel**, not the session id, so a brand-new chat
+  reports state before its session exists on disk; the same value also goes to
+  `chat_list` for the sidebar (dropped there while there is no id, re-published
+  as soon as `session_started`/`result` provides one). Out of the seq'd stream:
+  it is state, not transcript, and `ready` carries the current value.
+  `failed` outlives the turn — it says the last one ended on a transient API
+  failure — and is cleared by the next `start`.
 - `ready` (session_id, project, **`channel`** — the live-session handle the
   client stores and sends back in `start` to re-attach; **`running`** — whether a
   turn is in progress, so a reconnecting client knows to show the spinner vs the
-  input). Sent before the replay. On re-attach, any still-pending
+  input; **`activity`** — the state above). Sent before the replay. On re-attach, any still-pending
   `interaction_request` is re-emitted so it can be answered over the new socket,
   and current task state is re-emitted so indicators restore.
 - `assistant_text`, `thinking`, `todos`, `task`

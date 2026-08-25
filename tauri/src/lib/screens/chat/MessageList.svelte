@@ -24,7 +24,6 @@
     pendingToolIds: string[];
     streaming: boolean;
     compacting: boolean;
-    streamStatus: string | null;
     visibility: Visibility;
     onAnswer: (requestId: string, optionId: string) => void;
     onLoadOlder: () => void;
@@ -41,7 +40,6 @@
     pendingToolIds,
     streaming,
     compacting,
-    streamStatus,
     visibility,
     onAnswer,
     onLoadOlder,
@@ -290,6 +288,7 @@
   $effect(() => {
     void messages.at(-1)?.text;
     void messages.length;
+    void compacting;
     if (!container) return;
     measureScrollbar();
     if (follow) scrollTo(0);
@@ -365,9 +364,6 @@
         />
       </div>
     {/each}
-    {#if streamStatus && !(compacting && streamStatus === "slow")}
-      <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
-    {/if}
       {#if compacting}
         <StatusProgress kind="compacting" />
       {/if}

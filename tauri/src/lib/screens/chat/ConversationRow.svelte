@@ -59,9 +59,19 @@
   </Pressable>
   {#if activity === "waiting"}
     <span class="flex shrink-0 items-center"><StatusDot class="bg-orange" box={16} dot={9} /></span>
+  {:else if activity === "failed"}
+    <span class="flex shrink-0 items-center"><StatusDot class="bg-red" box={16} dot={9} /></span>
   {:else if activity === "renaming"}
     <span class="inline-flex size-4 shrink-0 items-center justify-center">
       <LoadingIndicator size={9} fill class="text-purple" />
+    </span>
+  {:else if activity === "compacting"}
+    <span class="inline-flex size-4 shrink-0 items-center justify-center">
+      <LoadingIndicator size={9} fill class="text-blue" />
+    </span>
+  {:else if activity === "slow"}
+    <span class="inline-flex size-4 shrink-0 items-center justify-center">
+      <LoadingIndicator size={9} fill class="text-yellow" />
     </span>
   {:else if activity === "working"}
     <span class="inline-flex size-4 shrink-0 items-center justify-center">

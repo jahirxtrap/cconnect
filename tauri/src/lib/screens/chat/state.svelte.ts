@@ -103,6 +103,7 @@ export class ChatState {
   streaming = $state(false);
   compacting = $state(false);
   streamStatus = $state<string | null>(null);
+  activity = $state<string | null>(null);
   todos = $state<TodoItem[]>([]);
   contextTokens = $state<number | null>(null);
   pendingToolIds = $state<string[]>([]);
@@ -626,6 +627,9 @@ export class ChatState {
     this.sessionColor = null;
     this.#resetTranscript();
     this.streaming = false;
+    this.compacting = false;
+    this.activity = null;
+    this.streamStatus = null;
     this.#socket.resetResume();
     this.#startSession(null);
   }
@@ -650,6 +654,9 @@ export class ChatState {
       this.sessionColor = session.color;
       this.todos = [];
       this.queue = [];
+      this.compacting = false;
+      this.activity = null;
+      this.streamStatus = null;
       this.transcriptLoading = this.messages.length === 0;
       this.transcriptPaging = false;
     }
@@ -1357,6 +1364,7 @@ export class ChatState {
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         this.streaming = event.running;
+        this.activity = event.activity;
         const committed = event.committedCount;
         if (!event.resumed || !event.running) {
           this.messages = this.messages.filter((item) => !item.ephemeral);
@@ -1485,6 +1493,9 @@ export class ChatState {
         if (!(this.#interrupting && event.kind === "slow")) {
           this.streamStatus = event.kind === "ok" ? null : event.kind;
         }
+        break;
+      case "activity":
+        this.activity = event.state;
         break;
       case "compact":
         this.#assistantId = null;

@@ -40,6 +40,9 @@ class LiveSession:
         self._cancelled = set()
         self._unconsumed = 0
         self._result_seen = False
+        self._compacting = False
+        self._health = None
+        self._announced = object()
         self.turn_start_index = 0
 
     @property
@@ -58,7 +61,11 @@ class LiveSession:
     def activity(self):
         if self._pending:
             return "waiting"
-        return "working" if self.running else None
+        if self.running:
+            if self._compacting:
+                return "compacting"
+            return "slow" if self._health == "slow" else "working"
+        return "failed" if self._health == "failed" else None
 
     def wanted(self):
         """What the attached sockets asked to see, so a turn never produces detail
@@ -99,7 +106,24 @@ class LiveSession:
             if event.get("type") in ("done", "interrupted"):
                 self._committed_seq = self._seq
             await self._send(stamped)
-            return stamped
+        self._track(event)
+        return stamped
+
+    def _track(self, event):
+        kind = event.get("type")
+        if kind in ("session_started", "result"):
+            self._publish_activity(self.activity)
+            return
+        if kind == "compacting":
+            self._compacting = True
+        elif kind == "compact":
+            self._compacting = False
+        elif kind == "status":
+            health = event.get("kind")
+            self._health = None if health == "ok" else ("failed" if health == "failed" else "slow")
+        else:
+            return
+        self._publish_activity(self.activity)
 
     async def _send(self, stamped):
         for sink in list(self._sinks):
@@ -115,11 +139,24 @@ class LiveSession:
         from services.chat_list import hub
 
         hub.set_activity(self.state.session_id, activity)
+        if activity == self._announced:
+            return
+        self._announced = activity
+        try:
+            asyncio.get_running_loop().create_task(self._send_activity(activity))
+        except RuntimeError:
+            pass
+
+    async def _send_activity(self, activity):
+        payload = {"type": "activity", "state": activity or "idle", "channel": self.channel}
+        for sink in list(self._sinks):
+            await self._send_one(sink, payload)
 
     def _settle(self):
         from services import sessions as sessions_service
 
-        self._publish_activity(None)
+        self._compacting = False
+        self._publish_activity("failed" if self._health == "failed" else None)
         if self.state.session_id and self.state.cwd:
             sessions_service.reassert_meta(
                 sessions_service.project_key_for(self.state.cwd), self.state.session_id
@@ -214,7 +251,7 @@ class LiveSession:
         if mid and (text or "").strip().startswith("/"):
             await self._emit({"type": "dequeued", "ids": [mid], "text": "", "consumed": 0})
 
-    def start(self, runner_factory, seed_id=None):
+    def start(self, runner_factory, seed_id=None, compacting=False):
         if self.running:
             return False
         carried = []
@@ -233,8 +270,10 @@ class LiveSession:
         self._unconsumed = 0
         self._cancelled.clear()
         self._result_seen = False
+        self._compacting = compacting
+        self._health = None
         self._worker = asyncio.create_task(self._run(runner_factory))
-        self._publish_activity("working")
+        self._publish_activity(self.activity)
         for item in carried:
             self._inbox.put_nowait(item)
         return True

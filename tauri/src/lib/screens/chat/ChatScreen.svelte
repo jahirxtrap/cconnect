@@ -156,13 +156,15 @@
   });
 
   const activity = $derived(
-    chatListFor(backend.find(chat.environmentId))?.sessions.find(
-      (session) => session.sessionId === chat.sessionId,
-    )?.activity ?? null,
+    chat.activity ??
+      chatListFor(backend.find(chat.environmentId))?.sessions.find(
+        (session) => session.sessionId === chat.sessionId,
+      )?.activity ??
+      null,
   );
-  const waitingUser = $derived(activity === "waiting");
-  const working = $derived(activity === "working");
-  const busy = $derived(chat.streaming || waitingUser || working);
+  const busy = $derived(
+    chat.streaming || ["waiting", "working", "slow", "compacting"].includes(activity ?? ""),
+  );
 
   $effect(() => {
     tabs.updateActive({
@@ -176,8 +178,16 @@
   const status = $derived.by(() => {
     if (chat.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
     if (chat.connection === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
-    if (waitingUser) return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
-    if (working) return { dot: "bg-gray", spinner: true, text: t("WORKING") };
+    if (activity === "waiting") return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
+    if (activity === "compacting") return { dot: "bg-gray", spinner: true, tone: "text-blue", text: t("COMPACTING") };
+    if (activity === "slow") return { dot: "bg-gray", spinner: true, tone: "text-yellow", text: t("WORKING") };
+    if (activity === "working") return { dot: "bg-gray", spinner: true, text: t("WORKING") };
+    if (activity === "failed")
+      return {
+        dot: "bg-red",
+        spinner: false,
+        text: chat.sessionId?.slice(0, SESSION_ID_PREVIEW) ?? t("NEW_CHAT"),
+      };
     return {
       dot: "bg-green",
       spinner: false,
@@ -273,7 +283,7 @@
     >
       {#snippet subtitleLeading()}
         {#if status.spinner}
-          <LoadingIndicator size={8} fill />
+          <LoadingIndicator size={8} fill class={"tone" in status ? status.tone : undefined} />
         {:else}
           <StatusDot class={status.dot} box={8} />
         {/if}
@@ -327,8 +337,7 @@
         messages={chat.view}
         pendingToolIds={chat.pendingToolIds}
         streaming={chat.streaming}
-        compacting={chat.compacting}
-        streamStatus={chat.streamStatus}
+        compacting={chat.compacting || activity === "compacting"}
         visibility={{
           thinking: chat.showThinking,
           toolUse: chat.showToolUse,

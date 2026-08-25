@@ -115,6 +115,7 @@ data class ChatUiState(
     val followBottom: Boolean = true,
     val compacting: Boolean = false,
     val streamStatus: String? = null,
+    val activity: String? = null,
     val sideChats: Map<String, SideChatState> = emptyMap(),  // side conversation per main session, keyed by its id
     val sideChatOpen: Boolean = false,               // whether the side panel is currently shown
     val sideFullscreen: Boolean = false,
@@ -748,6 +749,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 todos = emptyList(),
                 streaming = false,
                 streamStatus = null,
+                compacting = false,
+                activity = null,
                 queue = emptyList(),
                 oldestLoadedIndex = null,
                 transcriptLoading = false,
@@ -786,6 +789,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 todos = emptyList(),
                 streaming = false,
                 streamStatus = null,
+                compacting = false,
+                activity = null,
                 historyProjects = emptyList(),
                 historySessions = emptyList(),
                 historyProjectKey = null,
@@ -888,6 +893,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         sessionColor = session.color,
                         todos = emptyList(),
                         queue = emptyList(),
+                        compacting = false,
+                        activity = null,
+                        streamStatus = null,
                         transcriptLoading = it.messages.isEmpty(),
                         transcriptPaging = false,
                     )
@@ -1164,6 +1172,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         sessionId = sid,
                         activeProjectKey = event.project ?: it.activeProjectKey,
                         streaming = event.running,
+                        activity = event.activity,
                         messages = if (pendingTrim == null) it.messages.filterNot { m -> m.ephemeral } else it.messages,
                         queue = event.queued + it.queue.filter { q -> q.uploading },
                     ).promoteSide(sid)
@@ -1229,6 +1238,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 addMessage(Role.FILE_CHANGE, text = "", toolUseId = event.id, path = event.path, diffLines = event.diffLines, labelOnly = event.labelOnly)
             }
             is ServerEvent.Compacting -> _state.update { it.copy(compacting = true) }
+            is ServerEvent.Activity -> _state.update { it.copy(activity = event.state) }
             is ServerEvent.Status -> {
                 if (!(interrupting && event.kind == "slow")) {
                     _state.update { it.copy(streamStatus = if (event.kind == "ok") null else event.kind) }

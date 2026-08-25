@@ -298,7 +298,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                     attachments = item["attachments"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList(),
                 )
             } ?: emptyList()
-            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queued))
+            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queued, str("activity")))
         }
         val ch = str("channel")
         val side = ch != null && channel != null && ch != channel
@@ -332,6 +332,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             )
             "compacting" -> ServerEvent.Compacting(trigger = str("trigger"))
             "status" -> ServerEvent.Status(kind = str("kind").orEmpty())
+            "activity" -> ServerEvent.Activity(str("state")?.takeIf { it != "idle" })
             "compact" -> ServerEvent.Compact(
                 trigger = str("trigger"),
                 preTokens = obj["pre_tokens"]?.jsonPrimitive?.intOrNull,

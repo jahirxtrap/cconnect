@@ -183,7 +183,11 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
                 sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs))
         except Exception:
             turn_start = 0
-    if not session.start(_build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities), seed_id=mid):
+    if not session.start(
+        _build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities),
+        seed_id=mid,
+        compacting=(text or "").strip().startswith("/compact"),
+    ):
         return False
     session.turn_start_index = turn_start
     if mid:
@@ -305,6 +309,7 @@ async def chat_ws(ws: WebSocket):
                     "project": sessions_service.project_key_for(session.state.cwd or ""),
                     "channel": session.channel,
                     "running": session.running,
+                    "activity": session.activity,
                     "resumed": bool(by_session),
                     "committed_count": session.turn_start_index,
                     "queued": session.queued_items(),
