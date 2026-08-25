@@ -2,6 +2,7 @@
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Ellipsis from "@lucide/svelte/icons/ellipsis";
+  import { isVideo } from "$lib/data/previewKind";
   import type { CconnectBlock } from "$lib/markdown/cconnectBlock";
   import { mediaSrc } from "$lib/services/mediaSource";
   import PdfView from "$lib/screens/files/PdfView.svelte";
@@ -16,7 +17,6 @@
 
   const { data, onOpen, compact = false }: Props = $props();
 
-  const VIDEO_RE = /\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i;
   const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
   const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
   const ARROW_CLASS =
@@ -68,7 +68,7 @@
 {/snippet}
 
 {#snippet media(item: { url: string; alt?: string; poster?: string })}
-  {#if VIDEO_RE.test(item.url)}
+  {#if isVideo(item.url)}
     <div
       class="flex aspect-4/3 max-w-full {compact ? 'h-40' : 'h-70'} items-center justify-center overflow-hidden rounded-panel border border-outline-variant bg-black"
     >

@@ -57,8 +57,12 @@
       : [t("RESOURCES"), t("SERVER_LOGS")],
   );
   const goToPage = (index: number) => {
+    const far = Math.abs(index - page) > 1;
     page = index;
-    if (pager) animateScrollLeft(pager, index * pager.clientWidth);
+    if (!pager) return;
+    const target = index * pager.clientWidth;
+    if (far) pager.scrollLeft = target;
+    else animateScrollLeft(pager, target);
   };
 
   const onPagerScroll = () => {

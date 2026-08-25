@@ -64,7 +64,7 @@ class _Session:
         self.partial: bool = False
 
 
-def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None):
+def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
@@ -111,6 +111,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     wanted=wanted,
                     request_compact=request_compact,
                     capabilities=capabilities,
+                    on_transport=on_transport,
                     session_info=lambda: {
                         "session_id": state.session_id,
                         "cwd": state.cwd,
@@ -184,7 +185,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
         except Exception:
             turn_start = 0
     if not session.start(
-        _build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities),
+        _build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport),
         seed_id=mid,
         compacting=(text or "").strip().startswith("/compact"),
     ):

@@ -81,6 +81,7 @@ import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.theme.palette
 import com.jahirtrap.cconnect.ui.verticalScrollIndicator
+import kotlin.math.abs
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
@@ -230,7 +231,12 @@ fun MonitorScreen(onClose: () -> Unit) {
                     labels.forEachIndexed { i, label ->
                         SegmentedButton(
                             selected = i == pagerState.currentPage,
-                            onClick = { scope.launch { pagerState.animateScrollToPage(i) } },
+                            onClick = {
+                                scope.launch {
+                                    if (abs(i - pagerState.currentPage) > 1) pagerState.scrollToPage(i)
+                                    else pagerState.animateScrollToPage(i)
+                                }
+                            },
                             shape = SegmentedButtonDefaults.itemShape(
                                 index = i,
                                 count = labels.size,

@@ -7,6 +7,7 @@ detachable transport; the work no longer dies with it.
 
 import asyncio
 import collections
+import json
 import time
 import uuid
 
@@ -18,6 +19,8 @@ from services import todos as todos_store
 # A very long disconnect can outrun this; the client then falls back to the
 # on-disk transcript via load_history.
 OUTBOX_MAX = 5000
+
+STOP_GRACE = 15.0
 
 _CLOSE = object()
 
@@ -43,6 +46,8 @@ class LiveSession:
         self._compacting = False
         self._health = None
         self._announced = object()
+        self._transport = None
+        self._stopping = False
         self.turn_start_index = 0
 
     @property
@@ -272,18 +277,50 @@ class LiveSession:
         self._result_seen = False
         self._compacting = compacting
         self._health = None
+        self._transport = None
+        self._stopping = False
         self._worker = asyncio.create_task(self._run(runner_factory))
         self._publish_activity(self.activity)
         for item in carried:
             self._inbox.put_nowait(item)
         return True
 
+    def set_transport(self, transport):
+        self._transport = transport
+
+    async def _ask_cli_to_stop(self):
+        transport = self._transport
+        worker = self._worker
+        if transport is None or worker is None:
+            return False
+        request = {
+            "type": "control_request",
+            "request_id": f"req_stop_{uuid.uuid4().hex[:8]}",
+            "request": {"subtype": "interrupt"},
+        }
+        try:
+            await transport.write(json.dumps(request) + "\n")
+        except Exception as exc:
+            logger.warning(f"interrupt request rejected: {type(exc).__name__}: {exc}")
+            return False
+        try:
+            await asyncio.wait_for(asyncio.shield(worker), timeout=STOP_GRACE)
+        except asyncio.TimeoutError:
+            return False
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+        return True
+
     async def interrupt(self):
-        """User-requested stop. Cancels the worker, waits for it to unwind, then
-        emits ``interrupted`` (and no ``done``). A no-op if no turn is running, so
-        it never races a naturally-completing turn into a spurious ``interrupted``."""
+        """User-requested stop. Asking the CLI to end the turn is what commits the
+        half-written answer; killing the worker is the fallback."""
         worker = self._worker
         if worker is None or worker.done():
+            return
+        self._stopping = True
+        if await self._ask_cli_to_stop():
             return
         worker.cancel()
         try:
@@ -320,6 +357,8 @@ class LiveSession:
     async def _run(self, runner_factory):
         try:
             async for event in runner_factory(self._ask, self._emit):
+                if self._stopping and event.get("type") in ("error", "status"):
+                    continue
                 if event.get("type") == "dequeued":
                     ids = event.get("ids", [])
                     for _id in ids:
@@ -338,13 +377,14 @@ class LiveSession:
             raise  # interrupt(): stop without a trailing `done`
         except Exception as exc:
             logger.error(f"live session worker failed: {type(exc).__name__}: {exc}")
-            await self._emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
+            if not self._stopping:
+                await self._emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
             await self._flush_inflight()
-            await self._emit({"type": "done"})
+            await self._emit({"type": "interrupted" if self._stopping else "done"})
             self._settle()
         else:
             await self._flush_inflight()
-            await self._emit({"type": "done"})
+            await self._emit({"type": "interrupted" if self._stopping else "done"})
             self._settle()
 
 

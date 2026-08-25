@@ -161,6 +161,8 @@ import com.jahirtrap.cconnect.ui.LocalMobileLayout
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -345,6 +347,7 @@ fun ChatScreen(
 
     val itemHeights = remember { mutableStateMapOf<Long, Int>() }
     var anchorPending by remember { mutableStateOf<Long?>(null) }
+    var pageAnchor by remember { mutableStateOf<Long?>(null) }
     var collapseToTop by remember { mutableStateOf<Long?>(null) }
     var pendingScroll by remember { mutableStateOf(0) }
     var growth by remember { mutableStateOf(0) }
@@ -354,6 +357,9 @@ fun ChatScreen(
             listState.dispatchRawDelta(amount.toFloat())
             pendingScroll = 0
         }
+    }
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }.collect { if (it) pageAnchor = null }
     }
     val firstMessage = state.view.firstOrNull()
     val conversationId = firstMessage?.timestamp ?: firstMessage?.text?.hashCode()?.toLong()
@@ -772,6 +778,15 @@ fun ChatScreen(
                                                             growth += size.height - (previous ?: 0)
                                                             if (previous == null || previous == size.height) return@onSizeChanged
                                                             val delta = size.height - previous
+                                                            if (pageAnchor == message.id) {
+                                                                pageAnchor = null
+                                                                growth -= delta
+                                                                listState.requestScrollToItem(
+                                                                    listState.firstVisibleItemIndex,
+                                                                    listState.firstVisibleItemScrollOffset + delta,
+                                                                )
+                                                                return@onSizeChanged
+                                                            }
                                                             if (collapseToTop == message.id) {
                                                                 collapseToTop = null
                                                                 val info = listState.layoutInfo
@@ -795,6 +810,15 @@ fun ChatScreen(
                                                         },
                                                     ) {
                                                     if (separated && ts != null) ChatDateSeparator(ts)
+                                                    val atBottom = rememberUpdatedState(isAtBottom)
+                                                    val anchor = remember(message.id) {
+                                                        {
+                                                            val hold = !atBottom.value
+                                                            pageAnchor = if (hold) message.id else null
+                                                            hold
+                                                        }
+                                                    }
+                                                    PageAnchorScope(message, pageAnchor == message.id, anchor) {
                                                     ChatMessageItem(
                                                         message,
                                                         prevRole = state.view.getOrNull(index - 1)?.role,
@@ -817,6 +841,7 @@ fun ChatScreen(
                                                         gluedTop = separated,
                                                         showTime = showTime,
                                                     )
+                                                    }
                                                     }
                                                 }
                                             }
@@ -1332,6 +1357,10 @@ private fun SidePanel(
             val itemHeights = remember { mutableStateMapOf<Long, Int>() }
             var pendingScroll by remember { mutableStateOf(0) }
             var growth by remember { mutableStateOf(0) }
+            var pageAnchor by remember { mutableStateOf<Long?>(null) }
+            LaunchedEffect(listState) {
+                snapshotFlow { listState.isScrollInProgress }.collect { if (it) pageAnchor = null }
+            }
             LaunchedEffect(listState) {
                 snapshotFlow { pendingScroll }.collect { amount ->
                     if (amount == 0) return@collect
@@ -1438,9 +1467,25 @@ private fun SidePanel(
                                     growth += size.height - (previous ?: 0)
                                     if (previous == null || previous == size.height) return@onSizeChanged
                                     val delta = size.height - previous
-                                    if (!followBottom && delta > 0) pendingScroll += delta
+                                    if (pageAnchor == message.id) {
+                                        pageAnchor = null
+                                        growth -= delta
+                                        listState.requestScrollToItem(
+                                            listState.firstVisibleItemIndex,
+                                            listState.firstVisibleItemScrollOffset + delta,
+                                        )
+                                    } else if (!followBottom && delta > 0) pendingScroll += delta
                                 },
                             ) {
+                            val atBottom = rememberUpdatedState(isAtBottom)
+                            val anchor = remember(message.id) {
+                                {
+                                    val hold = !atBottom.value
+                                    pageAnchor = if (hold) message.id else null
+                                    hold
+                                }
+                            }
+                            PageAnchorScope(message, pageAnchor == message.id, anchor) {
                             ChatMessageItem(
                                 message,
                                 prevRole = sideVisible.getOrNull(index - 1)?.role,
@@ -1454,6 +1499,7 @@ private fun SidePanel(
                                 onDiscardComponent = onDiscardComponent,
                                 onSharedLink = onSharedLink,
                             )
+                            }
                             }
                         }
                     }

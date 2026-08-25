@@ -101,7 +101,7 @@
       {#each data.options as option (option.id)}
         <Button
           variant="outlined"
-          class="h-8 text-body-md"
+          class="h-8 text-body-md font-normal"
           onclick={() => onAnswer(data.requestId, option.id)}
         >
           {optionLabel(option)}

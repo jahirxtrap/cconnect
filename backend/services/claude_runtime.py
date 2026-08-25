@@ -481,7 +481,9 @@ async def run_prompt(
     request_compact: Optional[Callable[[], None]] = None,
     capabilities: Optional[list[str]] = None,
     session_info: Optional[Callable[[], dict]] = None,
+    on_transport: Optional[Callable[[Any], None]] = None,
 ) -> AsyncIterator[dict]:
+    from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
         query,
         ClaudeAgentOptions,
@@ -677,7 +679,15 @@ async def run_prompt(
         if emit is not None:
             status_state["last"] = loop.time()
             watchdog_task = asyncio.create_task(_idle_watchdog())
-        async for message in query(prompt=prompt_arg, options=options):
+        transport = None
+        if on_transport is not None:
+            try:
+                transport = SubprocessCLITransport(prompt=prompt_arg, options=options)
+                on_transport(transport)
+            except Exception as exc:
+                logger.warning(f"no interruptible transport: {type(exc).__name__}: {exc}")
+                transport = None
+        async for message in query(prompt=prompt_arg, options=options, transport=transport):
             if emit is not None:
                 status_state["last"] = loop.time()
                 status_state["compacting"] = False

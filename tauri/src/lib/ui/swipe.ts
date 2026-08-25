@@ -2,53 +2,6 @@ const SLOP = 10;
 const DISMISS_RATIO = 0.35;
 const MIN_DISMISS = 80;
 const EXIT_MS = 180;
-const PAGE_DISTANCE = 60;
-const HORIZONTAL_BIAS = 1.5;
-
-export interface SwipePageOptions {
-  onPrevious: () => void;
-  onNext: () => void;
-}
-
-/** Flick left or right to page, ignoring gestures that are mostly vertical scrolling. */
-export function swipePage(node: HTMLElement, options: SwipePageOptions) {
-  let handlers = options;
-  let startX = 0;
-  let startY = 0;
-  let tracking = false;
-
-  const onPointerDown = (event: PointerEvent) => {
-    if (event.pointerType === "mouse") return;
-    startX = event.clientX;
-    startY = event.clientY;
-    tracking = true;
-  };
-
-  const onPointerUp = (event: PointerEvent) => {
-    if (!tracking) return;
-    tracking = false;
-    const deltaX = event.clientX - startX;
-    const deltaY = event.clientY - startY;
-    if (Math.abs(deltaX) < PAGE_DISTANCE || Math.abs(deltaX) < Math.abs(deltaY) * HORIZONTAL_BIAS) return;
-    if (deltaX < 0) handlers.onNext();
-    else handlers.onPrevious();
-  };
-
-  node.style.touchAction = "pan-y";
-  node.addEventListener("pointerdown", onPointerDown);
-  node.addEventListener("pointerup", onPointerUp);
-  node.addEventListener("pointercancel", () => (tracking = false));
-
-  return {
-    update(next: SwipePageOptions) {
-      handlers = next;
-    },
-    destroy() {
-      node.removeEventListener("pointerdown", onPointerDown);
-      node.removeEventListener("pointerup", onPointerUp);
-    },
-  };
-}
 
 export interface SwipeDismissOptions {
   onDismiss: () => void;

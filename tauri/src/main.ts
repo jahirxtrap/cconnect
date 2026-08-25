@@ -1,4 +1,5 @@
 import { mount } from "svelte";
+import { polyfillFieldSizing } from "$lib/platform/fieldSizing";
 import { clearFocusOnKeyboardHide } from "$lib/platform/keyboard";
 import { SECURE_KEYS, secureStore } from "$lib/platform/secureStorage";
 import "./app.css";
@@ -21,6 +22,7 @@ document.addEventListener("selectionchange", () => {
 });
 
 clearFocusOnKeyboardHide();
+polyfillFieldSizing();
 
 await secureStore.load(SECURE_KEYS);
 const { default: App } = await import("./App.svelte");

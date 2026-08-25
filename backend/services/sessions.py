@@ -1071,7 +1071,9 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
                     messages.append({
                         "type": "interaction",
                         "kind": "component",
+                        "shown": True,
                         "title": inp.get("title"),
+                        "icon": inp.get("icon"),
                         "blocks": [b for b in (inp.get("blocks") or []) if isinstance(b, dict)],
                     })
                     continue

@@ -5,8 +5,6 @@
   import NotepadText from "@lucide/svelte/icons/notepad-text";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
-  import { cubicOut } from "svelte/easing";
-  import { fly } from "svelte/transition";
   import {
     componentAnswerable,
     VALUE_SEPARATOR,
@@ -29,8 +27,8 @@
   import SummaryLine from "$lib/ui/SummaryLine.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import { componentIcon } from "$lib/ui/componentIcons";
+  import { animateScrollLeft } from "$lib/ui/animateScroll";
   import { hscrollbar } from "$lib/ui/scrollbar";
-  import { swipePage } from "$lib/ui/swipe";
 
   interface Props {
     data: InteractionData;
@@ -92,20 +90,58 @@
   const current = $derived(pages.length ? Math.min(page, pages.length - 1) : 0);
   const shown = $derived(pages.length ? (pages[current]?.blocks ?? []) : data.blocks);
 
-  let direction = $state(1);
-  let pageHeight = $state<number | null>(null);
-  let appeared = $state(false);
+  let pager = $state<HTMLDivElement | null>(null);
+  let heights = $state<number[]>([]);
+  let ratio = $state(0);
+  let settling = false;
+  let placed = false;
 
-  $effect(() => {
-    if (pageHeight !== null) appeared = true;
+  const pageHeight = $derived.by(() => {
+    if (!pages.length) return null;
+    const spot = Math.min(Math.max(ratio, 0), pages.length - 1);
+    const low = heights[Math.floor(spot)] ?? heights[current];
+    const high = heights[Math.ceil(spot)] ?? low;
+    if (low === undefined) return null;
+    return low + (high - low) * (spot - Math.floor(spot));
   });
+
+  const offsetOf = (node: HTMLDivElement, index: number) => {
+    const child = node.children[index] as HTMLElement | undefined;
+    if (!child) return index * node.clientWidth;
+    return node.scrollLeft + child.getBoundingClientRect().left - node.getBoundingClientRect().left;
+  };
 
   const goto = (index: number) => {
     const next = Math.min(Math.max(index, 0), pages.length - 1);
-    direction = next < page ? -1 : 1;
+    const far = Math.abs(next - page) > 1;
+    page = next;
+    onPage(page);
+    if (!pager) return;
+    const target = offsetOf(pager, next);
+    if (far) {
+      pager.scrollLeft = target;
+      return;
+    }
+    settling = true;
+    void animateScrollLeft(pager, target).then(() => (settling = false));
+  };
+
+  const onPagerScroll = () => {
+    if (!pager) return;
+    ratio = pager.scrollLeft / pager.clientWidth;
+    if (settling) return;
+    const next = Math.round(ratio);
+    if (next === page) return;
     page = next;
     onPage(page);
   };
+
+  $effect(() => {
+    const node = pager;
+    if (!node || placed) return;
+    placed = true;
+    untrack(() => (node.scrollLeft = offsetOf(node, page)));
+  });
 
   const openNotes = $state<Record<string, boolean>>({});
   const notesShown = (element: ComponentElement) =>
@@ -310,23 +346,19 @@
             />
           {/each}
         </div>
-        <div
-          class="mt-2.5"
-          use:swipePage={{ onPrevious: () => goto(current - 1), onNext: () => goto(current + 1) }}
-        >
+        <div class="mt-2.5 overflow-hidden" style={pageHeight === null ? "" : `height: ${pageHeight}px`}>
           <div
-            class="overflow-hidden {appeared
-              ? 'transition-[height] duration-200 ease-[cubic-bezier(0.33,1,0.68,1)]'
-              : ''}"
-            style={pageHeight === null ? "" : `height: ${pageHeight}px`}
+            bind:this={pager}
+            onscroll={onPagerScroll}
+            class="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
           >
-            <div bind:clientHeight={pageHeight}>
-              {#key current}
-                <div in:fly={{ x: direction * 24, duration: 200, easing: cubicOut }}>
-                  {@render elements(shown)}
+            {#each pages as item, index (index)}
+              <div class="w-full shrink-0 snap-center self-start">
+                <div bind:clientHeight={heights[index]}>
+                  {@render elements(item.blocks)}
                 </div>
-              {/key}
-            </div>
+              </div>
+            {/each}
           </div>
         </div>
       {:else}
@@ -349,7 +381,7 @@
             {@const Icon = componentIcon(option.icon)}
             <Button
               variant={option.style === "primary" ? "filled" : "outlined"}
-              class="h-8 text-body-md"
+              class="h-8 text-body-md font-normal"
               enabled={ready || option.style === "plain"}
               onclick={() => onSubmit(option.value)}
             >

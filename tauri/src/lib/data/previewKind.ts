@@ -74,8 +74,9 @@ const TEXT_FALLBACK_EXTENSIONS = [
 ];
 
 export const extensionOf = (filename: string): string => {
-  const index = filename.lastIndexOf(".");
-  return index < 0 ? "" : filename.slice(index + 1).toLowerCase();
+  const name = filename.split(/[?#]/)[0];
+  const index = name.lastIndexOf(".");
+  return index < 0 ? "" : name.slice(index + 1).toLowerCase();
 };
 
 export const guessMimeType = (filename: string): string | null =>
@@ -95,5 +96,7 @@ export const previewKindOf = (filename: string): PreviewKind => {
   if (TEXT_FALLBACK_EXTENSIONS.includes(extension)) return "text";
   return "none";
 };
+
+export const isVideo = (filename: string): boolean => previewKindOf(filename) === "video";
 
 export const isPreviewable = (filename: string): boolean => previewKindOf(filename) !== "none";

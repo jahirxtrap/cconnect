@@ -105,6 +105,7 @@ import com.jahirtrap.cconnect.data.remote.AppImageLoader
 import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.UrlCodec
 import com.jahirtrap.cconnect.files.isArchive
+import com.jahirtrap.cconnect.files.isVideo
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.alert_caution
 import com.jahirtrap.cconnect.resources.alert_important
@@ -174,7 +175,7 @@ fun MarkdownText(
         }
     }
     val monoFamily = LocalMonoFontFamily.current
-    val ctx = remember(source, linkColor, codeBg, monoFamily) { MdContext(source, linkColor, codeBg, monoFamily) }
+    val ctx = remember(source, linkColor, codeBg, monoFamily, onSharedLink) { MdContext(source, linkColor, codeBg, monoFamily, onSharedLink) }
     DenseTypography(dense) {
         CompositionLocalProvider(
             LocalUriHandler provides uriHandler,
@@ -231,15 +232,21 @@ private fun BlockLink(label: String, url: String, color: Color) {
     )
 }
 
-private val VIDEO_EXT = Regex("""\.(mp4|webm|mov|m4v|ogv)($|[?#])""", RegexOption.IGNORE_CASE)
-
 @Composable
 private fun GalleryItemView(item: GalleryItem, width: Dp) {
-    if (!VIDEO_EXT.containsMatchIn(item.url)) {
+    if (!isVideo(item.url)) {
         MarkdownImage(item.url, item.alt.orEmpty(), width)
         return
     }
-    val handler = LocalUriHandler.current
+    VideoTile(item.url, item.alt, width, item.poster)
+}
+
+@Composable
+private fun VideoTile(url: String, alt: String?, width: Dp, poster: String? = null) {
+    val uriHandler = LocalUriHandler.current
+    val download = LocalImageDownload.current
+    val resolved = remember(url) { resolveMediaUrl(url) }
+    val onTap = { if (download != null) download(resolved, filenameFromUrl(resolved)) else uriHandler.openUri(resolved) }
     val shape = RoundedCornerShape(Radius.panel)
     DisableSelection {
         Box(
@@ -248,16 +255,16 @@ private fun GalleryItemView(item: GalleryItem, width: Dp) {
                 .aspectRatio(IMAGE_TILE_RATIO)
                 .clip(shape)
                 .border(snapDp(1.dp), MaterialTheme.colorScheme.outlineVariant, shape)
-                .clickable { handler.openUri(item.url) },
+                .clickable(onClick = onTap),
             contentAlignment = Alignment.Center,
         ) {
-            item.poster?.let { poster ->
+            poster?.let { poster ->
                 val context = LocalPlatformContext.current
                 val loader = remember { AppImageLoader.get(context) }
                 val painter = rememberAsyncImagePainter(model = ImageRequest.Builder(context).data(poster).build(), imageLoader = loader)
                 Image(
                     painter = painter,
-                    contentDescription = item.alt,
+                    contentDescription = alt,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -361,6 +368,13 @@ private fun CarouselArrow(icon: ImageVector, modifier: Modifier, enabled: Boolea
 
 @Composable
 internal fun CconnectBlockView(block: CconnectBlock, linkColor: Color, compact: Boolean = false, onSharedLink: ((url: String, filename: String) -> Unit)? = null) {
+    CompositionLocalProvider(LocalImageDownload provides (onSharedLink ?: LocalImageDownload.current)) {
+        CconnectBlockContent(block, compact, onSharedLink)
+    }
+}
+
+@Composable
+private fun CconnectBlockContent(block: CconnectBlock, compact: Boolean, onSharedLink: ((url: String, filename: String) -> Unit)?) {
     when (block) {
         is CconnectBlock.Gallery -> GalleryCarousel(block.items, if (compact) COMPACT_TILE else IMAGE_TILE_HEIGHT)
         is CconnectBlock.Playlist -> MarkdownText(
@@ -643,7 +657,7 @@ private fun TableView(table: ASTNode, ctx: MdContext) {
     val cols = rows.firstOrNull()?.children?.count { it.type == GFMTokenTypes.CELL } ?: 0
     val cellWidth = 140.dp
     val totalWidth = cellWidth * cols.coerceAtLeast(1)
-    Column(modifier = Modifier.fillMaxWidth().horizontalScrollbar(scroll).horizontalScroll(scroll)) {
+    Column(modifier = Modifier.fillMaxWidth().horizontalScrollbar(scroll).horizontalScroll(scroll, enabled = scroll.maxValue > 0)) {
         rows.forEach { rowNode ->
             val header = rowNode.type == GFMElementTypes.HEADER
             Row {
@@ -910,17 +924,15 @@ internal val LocalImageDownload = staticCompositionLocalOf<((url: String, filena
 
 @Composable
 private fun MarkdownImage(url: String, alt: String, width: Dp) {
+    if (isVideo(url)) {
+        VideoTile(url, alt.ifBlank { null }, width)
+        return
+    }
     val context = LocalPlatformContext.current
     val uriHandler = LocalUriHandler.current
     val download = LocalImageDownload.current
     val loader = remember { AppImageLoader.get(context) }
-    val resolved = remember(url) {
-        when {
-            url.startsWith("http://") || url.startsWith("https://") -> url
-            url.startsWith("/") -> Backend.baseUrl.removeSuffix("/api") + url
-            else -> url
-        }
-    }
+    val resolved = remember(url) { resolveMediaUrl(url) }
     val onTap = { if (download != null) download(resolved, filenameFromUrl(resolved)) else uriHandler.openUri(resolved) }
     val painter = rememberAsyncImagePainter(model = ImageRequest.Builder(context).data(resolved).build(), imageLoader = loader)
     val state by painter.state.collectAsState()
@@ -987,6 +999,12 @@ fun RemoteImageThumb(url: String, modifier: Modifier = Modifier) {
         }
         else -> CenteredProgress(base.aspectRatio(1f), size = 22.dp)
     }
+}
+
+private fun resolveMediaUrl(url: String): String = when {
+    url.startsWith("http://") || url.startsWith("https://") -> url
+    url.startsWith("/") -> Backend.baseUrl.removeSuffix("/api") + url
+    else -> url
 }
 
 private fun filenameFromUrl(url: String): String {

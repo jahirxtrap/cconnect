@@ -90,6 +90,11 @@
 
   const tick = $derived(refreshTick + desktop.refreshTick);
 
+  const refresh = () => {
+    refreshing = true;
+    refreshTick++;
+  };
+
   $effect(() => {
     if (tick === 0) return;
     void serverStatus.refresh();
@@ -153,10 +158,10 @@
   };
 </script>
 
-<Screen title={t("SETTINGS")} {refreshing} onRefresh={() => refreshTick++}>
+<Screen title={t("SETTINGS")} {refreshing} onRefresh={refresh}>
   {#snippet actions()}
     {#if !isTouch}
-      <TooltipIconButton label={t("REFRESH")} onclick={() => refreshTick++}>
+      <TooltipIconButton label={t("REFRESH")} onclick={refresh}>
         <RotateCw size={20} />
       </TooltipIconButton>
     {/if}
@@ -271,7 +276,9 @@
     <div bind:this={serverSection} class={flashed === "cli" ? "flash-highlight" : ""}>
       <ServerGroup
         {tick}
-        onLoadingChange={(value) => (refreshing = value)}
+        onLoadingChange={(value) => {
+          if (!value) refreshing = false;
+        }}
         onChangelog={(version) => (cliChangelog = version)}
       />
     </div>

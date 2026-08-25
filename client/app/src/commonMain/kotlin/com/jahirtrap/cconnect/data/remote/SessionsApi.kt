@@ -134,17 +134,19 @@ object SessionsApi {
                 if (value is JsonArray) value.joinToString(VALUE_SEPARATOR) { it.jsonPrimitive.content }
                 else value.jsonPrimitive.content
             } ?: emptyMap()
+            val shown = o["shown"]?.jsonPrimitive?.booleanOrNull == true
             return InteractionData(
-                requestId = "resumed",
+                requestId = if (shown) "shown" else "resumed",
                 kind = kind,
                 title = o["title"]?.jsonPrimitive?.contentOrNull,
                 titleKey = o["title_key"]?.jsonPrimitive?.contentOrNull,
+                icon = o["icon"]?.jsonPrimitive?.contentOrNull,
                 submitLabel = o["submit"]?.jsonPrimitive?.contentOrNull,
                 submitKey = o["submit_key"]?.jsonPrimitive?.contentOrNull,
                 dismiss = (o["dismiss"] as? JsonObject)?.toDismiss(),
                 blocks = o["blocks"]?.jsonArray?.mapNotNull { it.jsonObject.toElement() } ?: emptyList(),
                 values = values,
-                submitted = true,
+                submitted = !shown,
                 declined = o["declined"]?.jsonPrimitive?.booleanOrNull == true,
             )
         }

@@ -39,7 +39,7 @@
         {@render titleTrailing?.()}
       </div>
       {#if children}
-        <div class="scrollbar-thin mt-4 min-h-0 flex-1 overflow-x-clip overflow-y-auto {padded ? '' : '-mx-5'}">
+        <div class="scrollbar-thin mt-4 min-h-0 shrink overflow-x-clip overflow-y-auto {padded ? '' : '-mx-5'}">
           {@render children()}
         </div>
       {/if}

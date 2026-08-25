@@ -34,6 +34,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -176,6 +178,28 @@ private fun userContent(message: ChatMessage): UserContent {
     return UserContent(body, media + files)
 }
 
+internal val LocalPageAnchored = compositionLocalOf { false }
+
+internal val LocalAnchorPage = compositionLocalOf<() -> Boolean> { { false } }
+
+@Composable
+internal fun PageAnchorScope(
+    message: ChatMessage,
+    anchored: Boolean,
+    anchor: () -> Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (message.interaction?.kind != "component") {
+        content()
+        return
+    }
+    CompositionLocalProvider(
+        LocalPageAnchored provides anchored,
+        LocalAnchorPage provides anchor,
+        content = content,
+    )
+}
+
 @Composable
 fun ChatMessageItem(
     message: ChatMessage,
@@ -214,7 +238,7 @@ fun ChatMessageItem(
                             if (content.attachments.isNotEmpty()) {
                                 val chipScroll = rememberScrollState()
                                 Row(
-                                    modifier = Modifier.weight(1f).horizontalScrollbar(chipScroll, touchIndicator = false).horizontalScroll(chipScroll),
+                                    modifier = Modifier.weight(1f).horizontalScrollbar(chipScroll, touchIndicator = false).horizontalScroll(chipScroll, enabled = chipScroll.maxValue > 0),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     content.attachments.forEach { (url, name) ->
@@ -745,7 +769,7 @@ private fun FileChangeBlock(path: String, diffLines: List<DiffLine>, labelOnly: 
                 Column(
                     modifier = Modifier
                         .horizontalScrollbar(scroll)
-                        .horizontalScroll(scroll)
+                        .horizontalScroll(scroll, enabled = scroll.maxValue > 0)
                         .padding(vertical = 4.dp),
                 ) {
                     diffLines.forEach { line ->
@@ -957,6 +981,7 @@ private fun ComponentBlock(
             return@OutlinedPanel
         }
         val scope = rememberCoroutineScope()
+        val anchorPage = LocalAnchorPage.current
         val pagerState = rememberPagerState(
             initialPage = data.activePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
             pageCount = { pages.size.coerceAtLeast(1) },
@@ -967,10 +992,11 @@ private fun ComponentBlock(
             Spacer(Modifier.height(10.dp))
             var appeared by remember { mutableStateOf(false) }
             LaunchedEffect(Unit) { appeared = true }
+            val animateSize = appeared && !LocalPageAnchored.current
             HorizontalPager(
                 state = pagerState,
                 verticalAlignment = Alignment.Top,
-                modifier = if (appeared) Modifier.animateContentSize() else Modifier,
+                modifier = if (animateSize) Modifier.animateContentSize() else Modifier,
             ) { page ->
                 Column(modifier = Modifier.fillMaxWidth()) {
                     ComponentElements(pages[page].blocks, data, onSharedLink, onValue, onPick)
@@ -991,7 +1017,10 @@ private fun ComponentBlock(
         if (pending) {
             ActionButton(
                 text = stringResource(Res.string.next),
-                onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
+                onClick = {
+                    val anchored = anchorPage()
+                    scope.launch { pagerState.goToPage(pagerState.currentPage + 1, anchored) }
+                },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -1042,6 +1071,7 @@ private fun ComponentBlock(
 @Composable
 private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState) {
     val scope = rememberCoroutineScope()
+    val anchorPage = LocalAnchorPage.current
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         itemsIndexed(pages) { index, page ->
             SelectChip(
@@ -1049,14 +1079,21 @@ private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState)
                 selected = index == pagerState.currentPage,
                 required = page.required,
                 onClick = {
-                    scope.launch {
-                        if (abs(index - pagerState.currentPage) > 1) pagerState.scrollToPage(index)
-                        else pagerState.animateScrollToPage(index)
-                    }
+                    val anchored = anchorPage()
+                    scope.launch { pagerState.goToPage(index, anchored) }
                 },
             )
         }
     }
+}
+
+private suspend fun PagerState.goToPage(index: Int, anchored: Boolean) {
+    if (anchored) {
+        withFrameNanos { }
+        scrollToPage(index)
+        return
+    }
+    if (abs(index - currentPage) > 1) scrollToPage(index) else animateScrollToPage(index)
 }
 
 @Composable
@@ -1342,7 +1379,7 @@ private fun PreviewBox(preview: String) {
             style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp),
             color = MaterialTheme.colorScheme.onSurface,
             softWrap = false,
-            modifier = Modifier.horizontalScrollbar(scroll, touchIndicator = false).horizontalScroll(scroll),
+            modifier = Modifier.horizontalScrollbar(scroll, touchIndicator = false).horizontalScroll(scroll, enabled = scroll.maxValue > 0),
         )
     }
 }

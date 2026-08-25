@@ -12,22 +12,29 @@ private val TEXT_FALLBACK_EXTENSIONS = setOf(
     "ts", "tsx", "jsx", "rs", "go", "ps1", "diff", "patch", "log", "lock",
 )
 
+private val VIDEO_EXTENSIONS = setOf("mp4", "webm", "ogv", "mov", "m4v", "mkv")
+
 expect fun guessMimeType(filename: String): String?
 
-enum class PreviewKind { Image, Markdown, Html, Text, None }
+enum class PreviewKind { Image, Markdown, Html, Text, Video, None }
 
 fun previewKindOf(filename: String): PreviewKind {
-    val extension = filename.substringAfterLast('.', "").lowercase()
+    val name = filename.substringBefore('?').substringBefore('#')
+    val extension = name.substringAfterLast('.', "").lowercase()
     if (extension in MARKDOWN_EXTENSIONS) return PreviewKind.Markdown
-    val mime = guessMimeType(filename)
+    val mime = guessMimeType(name)
     return when {
         mime == "text/html" -> PreviewKind.Html
         mime?.startsWith("image/") == true -> PreviewKind.Image
+        mime?.startsWith("video/") == true -> PreviewKind.Video
         mime?.startsWith("text/") == true -> PreviewKind.Text
         mime in TEXT_APPLICATION_MIMES -> PreviewKind.Text
+        extension in VIDEO_EXTENSIONS -> PreviewKind.Video
         extension in TEXT_FALLBACK_EXTENSIONS -> PreviewKind.Text
         else -> PreviewKind.None
     }
 }
+
+fun isVideo(filename: String): Boolean = previewKindOf(filename) == PreviewKind.Video
 
 fun isPreviewable(filename: String): Boolean = previewKindOf(filename) != PreviewKind.None
