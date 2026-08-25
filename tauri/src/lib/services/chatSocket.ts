@@ -68,6 +68,7 @@ export type ServerEvent =
   | { type: "api_error"; message: string }
   | { type: "closed"; reason: string }
   | { type: "queued"; id: string | null; text: string }
+  | { type: "queue"; items: QueuedMessage[] }
   | { type: "dequeued"; ids: string[]; text: string | null }
   | {
       type: "history_chunk";
@@ -138,8 +139,8 @@ const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw
 const strings = (raw: Wire, key: string): string[] =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
 
-const queuedItems = (raw: Wire): QueuedMessage[] =>
-  list(raw, "queued")
+const queuedItems = (raw: Wire, key = "queued"): QueuedMessage[] =>
+  list(raw, key)
     .map((item) => ({
       id: text(item, "id") ?? "",
       text: text(item, "text") ?? "",
@@ -577,6 +578,8 @@ export class ChatSocket {
         return { type: "notification", summary: text(wire, "text") ?? "", status: text(wire, "result") };
       case "queued":
         return { type: "queued", id: text(wire, "id"), text: text(wire, "text") ?? "" };
+      case "queue":
+        return { type: "queue", items: queuedItems(wire, "items") };
       case "dequeued":
         return {
           type: "dequeued",

@@ -13,6 +13,7 @@
   } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
+  import { pixelGrid } from "$lib/ui/pixelGrid";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CconnectBlockView from "$lib/ui/CconnectBlockView.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -46,6 +47,14 @@
     blocks.flatMap((element) => (element.type === "page" ? flatten(element.blocks) : [element]));
 
   const valueOf = (element: ComponentElement) => data.values[element.id ?? ""] ?? "";
+
+  // An element that draws nothing must not take a slot either: the flex gap spaces it out anyway.
+  const visible = (list: ComponentElement[]) =>
+    list.filter((element) => {
+      if (element.type === "text") return !!element.text?.trim();
+      if (element.type === "preview") return !!element.block && !!parseCconnectBlock(element.block);
+      return true;
+    });
 
   const pages = $derived(data.blocks.filter((element) => element.type === "page"));
   const actions = $derived(data.blocks.find((element) => element.type === "buttons"));
@@ -96,13 +105,21 @@
   let settling = false;
   let placed = false;
 
+  // Snapped to the device pixel grid: an interpolated height lands between physical pixels, and
+  // the browser rounds the scroll anchoring differently on each frame of the animation, which the
+  // chat above shows as a wobble instead of a still block.
+  const snapPx = (value: number) => {
+    const grid = pixelGrid();
+    return Math.round(value / grid) * grid;
+  };
+
   const pageHeight = $derived.by(() => {
     if (!pages.length) return null;
     const spot = Math.min(Math.max(ratio, 0), pages.length - 1);
     const low = heights[Math.floor(spot)] ?? heights[current];
     const high = heights[Math.ceil(spot)] ?? low;
     if (low === undefined) return null;
-    return low + (high - low) * (spot - Math.floor(spot));
+    return snapPx(low + (high - low) * (spot - Math.floor(spot)));
   });
 
   const offsetOf = (node: HTMLDivElement, index: number) => {
@@ -193,7 +210,7 @@
 {/if}
 
 {#snippet elements(list: ComponentElement[])}
-  {#each list as element, index (index)}
+  {#each visible(list) as element, index (index)}
     <div class="flex flex-col gap-1">
       {#if element.type === "text"}
       <MarkdownText text={element.text ?? ""} />

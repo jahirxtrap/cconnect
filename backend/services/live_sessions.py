@@ -42,12 +42,15 @@ class LiveSession:
         self._seen_ids = set()
         self._cancelled = set()
         self._unconsumed = 0
+        self._sent = 0
+        self._results = 0
         self._result_seen = False
         self._compacting = False
         self._health = None
         self._announced = object()
         self._transport = None
         self._stopping = False
+        self._drained = asyncio.Event()
         self.turn_start_index = 0
 
     @property
@@ -116,6 +119,16 @@ class LiveSession:
 
     def _track(self, event):
         kind = event.get("type")
+        if kind == "dequeued":
+            # Settled here, not in _run: the drain announces its own dequeue out-of-band, and
+            # leaving that one unaccounted kept the item in _inflight — so the snapshot right
+            # after put the chip back on screen next to the bubble it had just drawn.
+            self._settle_dequeued(event)
+            self._publish_queue()
+            return
+        if kind == "queued":
+            self._publish_queue()
+            return
         if kind in ("session_started", "result"):
             self._publish_activity(self.activity)
             return
@@ -154,6 +167,31 @@ class LiveSession:
 
     async def _send_activity(self, activity):
         payload = {"type": "activity", "state": activity or "idle", "channel": self.channel}
+        for sink in list(self._sinks):
+            await self._send_one(sink, payload)
+
+    def _settle_dequeued(self, event):
+        ids = event.get("ids") or []
+        for _id in ids:
+            self._seen_ids.add(_id)
+        consumed = event.get("consumed", 0)
+        self._unconsumed -= consumed
+        if consumed:
+            self._drained.set()  # the queue is moving: an interrupt can let the turn run on
+        if ids:
+            done = set(ids)
+            self._inflight = [it for it in self._inflight if it.get("id") not in done]
+
+    def _publish_queue(self):
+        """The queue lives here, not in each socket: every attached client renders this
+        snapshot instead of its own copy, so two devices on one chat can't drift."""
+        try:
+            asyncio.get_running_loop().create_task(self._send_queue())
+        except RuntimeError:
+            pass
+
+    async def _send_queue(self):
+        payload = {"type": "queue", "items": self.queued_items(), "channel": self.channel}
         for sink in list(self._sinks):
             await self._send_one(sink, payload)
 
@@ -200,7 +238,9 @@ class LiveSession:
         })
 
     async def enqueue(self, mid, text, attachments=None):
-        if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued)):
+        # An item already drained sits in _inflight and is not in _seen_ids until the CLI
+        # writes it: without that check a second client re-sending the same id queues it twice.
+        if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued + self._inflight)):
             return False
         item = {"id": mid, "text": text, "attachments": list(attachments or [])}
         self._queued.append(item)
@@ -221,6 +261,7 @@ class LiveSession:
             except ValueError:
                 pass
             self._unconsumed += 1
+            self._sent += 1
             self._inflight.append(item)
             yield item
 
@@ -273,22 +314,26 @@ class LiveSession:
         self._queued = list(carried)
         self._inflight = []
         self._unconsumed = 0
+        self._sent = 1  # the seed; every drained item adds one
+        self._results = 0
         self._cancelled.clear()
         self._result_seen = False
         self._compacting = compacting
         self._health = None
         self._transport = None
         self._stopping = False
+        self._drained.clear()
         self._worker = asyncio.create_task(self._run(runner_factory))
         self._publish_activity(self.activity)
         for item in carried:
             self._inbox.put_nowait(item)
+        self._publish_queue()
         return True
 
     def set_transport(self, transport):
         self._transport = transport
 
-    async def _ask_cli_to_stop(self):
+    async def _send_stop(self):
         transport = self._transport
         worker = self._worker
         if transport is None or worker is None:
@@ -302,6 +347,12 @@ class LiveSession:
             await transport.write(json.dumps(request) + "\n")
         except Exception as exc:
             logger.warning(f"interrupt request rejected: {type(exc).__name__}: {exc}")
+            return False
+        return True
+
+    async def _ask_cli_to_stop(self):
+        worker = self._worker
+        if not await self._send_stop():
             return False
         try:
             await asyncio.wait_for(asyncio.shield(worker), timeout=STOP_GRACE)
@@ -319,9 +370,18 @@ class LiveSession:
         worker = self._worker
         if worker is None or worker.done():
             return
-        self._stopping = True
-        if await self._ask_cli_to_stop():
-            return
+        announced = False
+        if self._queued or self._inflight:
+            # The CLI already holds the queued messages, and they are what keeps this turn
+            # open: killing the worker here would stop the answer AND the messages that must
+            # run next. Stop the answer, mark the cut, and let the queue carry the turn on.
+            announced = await self._stop_and_continue()
+            if announced and (self._drained.is_set() or worker.done()):
+                return
+        if not announced:
+            self._stopping = True
+            if await self._ask_cli_to_stop():
+                return
         worker.cancel()
         try:
             await worker
@@ -343,7 +403,24 @@ class LiveSession:
                 self._queued = leftover + pending
                 for it in self._queued:
                     self._inbox.put_nowait(it)
-            await self._emit({"type": "interrupted"})
+            self._publish_queue()
+            if not announced:
+                await self._emit({"type": "interrupted"})
+
+    async def _stop_and_continue(self):
+        """Stop the running answer and wait for the queue to take over. False when the CLI
+        never got the request; a turn that goes quiet instead falls back to the hard stop."""
+        if not await self._send_stop():
+            return False
+        self._drained.clear()
+        await self._emit({"type": "interrupted"})
+        waiter = asyncio.create_task(self._drained.wait())
+        try:
+            # asyncio.wait never cancels what it waits on, so the worker is safe here.
+            await asyncio.wait([waiter, self._worker], timeout=STOP_GRACE, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            waiter.cancel()
+        return True
 
     async def _flush_inflight(self):
         stuck = [item["id"] for item in self._inflight if item.get("id")]
@@ -359,17 +436,15 @@ class LiveSession:
             async for event in runner_factory(self._ask, self._emit):
                 if self._stopping and event.get("type") in ("error", "status"):
                     continue
-                if event.get("type") == "dequeued":
-                    ids = event.get("ids", [])
-                    for _id in ids:
-                        self._seen_ids.add(_id)
-                    self._unconsumed -= event.get("consumed", 0)
-                    if ids:
-                        done = set(ids)
-                        self._inflight = [it for it in self._inflight if it.get("id") not in done]
                 await self._emit(event)
                 if event.get("type") == "result":
                     self._result_seen = True
+                    self._results += 1
+                    # The CLI answered every message we sent, so nothing is left to render: an item
+                    # still counted as unconsumed never found its transcript entry and would hold
+                    # the turn open forever.
+                    if self._results >= self._sent and self._unconsumed > 0:
+                        await self._flush_inflight()
                     if not self._queued and self._unconsumed <= 0:
                         self._inbox.put_nowait(_CLOSE)
         except asyncio.CancelledError:

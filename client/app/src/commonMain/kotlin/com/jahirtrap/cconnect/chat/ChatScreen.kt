@@ -167,6 +167,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -363,7 +364,6 @@ fun ChatScreen(
     var pageAnchor by remember { mutableStateOf(false) }
     var collapseToTop by remember { mutableStateOf<Long?>(null) }
     var pendingScroll by remember { mutableStateOf(0) }
-    var growth by remember { mutableStateOf(0) }
     LaunchedEffect(listState) {
         snapshotFlow { pendingScroll }.collect { amount ->
             if (amount == 0) return@collect
@@ -386,21 +386,12 @@ fun ChatScreen(
     val firstMessage = state.view.firstOrNull()
     val conversationId = firstMessage?.timestamp ?: firstMessage?.text?.hashCode()?.toLong()
     var contentPx by remember(conversationId) { mutableStateOf(-1) }
-    val imeInsets = WindowInsets.ime
     LaunchedEffect(conversationId) {
         snapshotFlow {
             val info = listState.layoutInfo
             val items = info.visibleItemsInfo
-            if (items.isEmpty() || items.size != info.totalItemsCount) -1
-            else items.sumOf { it.size } - (items.firstOrNull { it.key == "filler" }?.size ?: 0)
-        }.collect {
-            // The keyboard shrinks the viewport frame by frame, and mid-animation the list reports
-            // fewer items than it holds. Taking that -1 dropped the filler, so a short chat fell to
-            // the bottom and climbed back on every frame.
-            if (it < 0 && imeInsets.getBottom(density) > 0) return@collect
-            contentPx = it
-            growth = 0
-        }
+            if (items.isEmpty() || items.size != info.totalItemsCount) -1 else items.sumOf { it.size }
+        }.collect { contentPx = it }
     }
 
     // Only manual scrolling changes this, so incoming content can't flip it before we react.
@@ -754,19 +745,19 @@ fun ChatScreen(
                                     val panelH = expansion.value.coerceAtLeast(peek)
                                     val showTime = vm.showTimestamps
                                     val listFraction = (1f - panelH * (1f - toolbarReveal)).coerceIn(0.0001f, 1f)
-                                    val fillerPx = if (contentPx < 0) 0 else ((boxHeightPx * listFraction).roundToInt() - contentPx).coerceAtLeast(0)
                                     Box(modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth().fillMaxHeight(listFraction).clipToBounds()) {
                                         if (opening) CenteredProgress(Modifier.fillMaxSize())
-                                        CompositionLocalProvider(
-                                            LocalPageAnchored provides pageAnchor,
-                                            LocalAnchorPage provides anchorPage,
-                                        ) {
+                                        CompositionLocalProvider(LocalAnchorPage provides anchorPage) {
                                         SelectionContainer(modifier = Modifier.fillMaxSize().alpha(if (opening) 0f else 1f).selectionTextCursor()) {
                                             LazyColumn(
                                                 state = listState,
                                                 reverseLayout = true,
                                                 verticalArrangement = Arrangement.Top,
-                                                modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                                                // Not fillMaxSize: a list that measures its own content sits at the top of the
+                                                // box on its own, so there is no gap to compute. A filler item could only ever
+                                                // learn the new height one frame after the keyboard changed it, and that stale
+                                                // frame is what pushed the top of the chat out of view.
+                                                modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
                                                     awaitPointerEventScope {
                                                         while (true) {
                                                             val e = awaitPointerEvent(PointerEventPass.Initial)
@@ -775,20 +766,9 @@ fun ChatScreen(
                                                     }
                                                 },
                                             ) {
-                                                if (fillerPx > 0) {
-                                                    item(key = "filler") {
-                                                        Spacer(
-                                                            Modifier.layout { measurable, constraints ->
-                                                                val px = (fillerPx - growth).coerceIn(0, fillerPx)
-                                                                val placeable = measurable.measure(constraints.copy(minHeight = px, maxHeight = px))
-                                                                layout(placeable.width, px) { placeable.place(0, 0) }
-                                                            },
-                                                        )
-                                                    }
-                                                }
                                                 if (state.compacting || state.activity == "compacting") {
                                                     item(key = "compacting") {
-                                                        Box(Modifier.onSizeChanged { growth += it.height }) { CompactProgress() }
+                                                        CompactProgress()
                                                     }
                                                 }
                                                 itemsIndexed(state.view.asReversed(), key = { _, it -> it.id }) { reversed, message ->
@@ -806,12 +786,10 @@ fun ChatScreen(
                                                     Column(
                                                         modifier = Modifier.offset { IntOffset(0, pendingScroll) }.onSizeChanged { size ->
                                                             val previous = itemHeights.put(message.id, size.height)
-                                                            growth += size.height - (previous ?: 0)
                                                             if (previous == null || previous == size.height) return@onSizeChanged
                                                             val delta = size.height - previous
                                                             if (pageAnchor) {
                                                                 pageAnchor = false
-                                                                growth -= delta
                                                                 listState.requestScrollToItem(
                                                                     listState.firstVisibleItemIndex,
                                                                     listState.firstVisibleItemScrollOffset + delta,
@@ -976,7 +954,7 @@ fun ChatScreen(
                                     ) {
                                         val queueScroll = TabsController.queueScroll
                                         val attachScroll = TabsController.attachmentsScroll
-                                        val visibleQueue = state.queue.filterNot { it.silent }
+                                        val visibleQueue = state.queueView.filterNot { it.silent }
                                         val composerChips: (@Composable () -> Unit)? = if (
                                             !sideActive && (visibleQueue.isNotEmpty() || state.attachments.isNotEmpty())
                                         ) ({
@@ -1022,7 +1000,7 @@ fun ChatScreen(
                                             onVisibility = { showVisibility = true },
                                             onQuickChat = vm::openSideChat,
                                             quickChatActive = sc != null && sc.messages.isNotEmpty(),
-                                            contextTokens = state.contextTokens,
+                                            contextTokens = state.contextView,
                                             modifier = Modifier.weight(1f),
                                             )
                                         }
@@ -1056,7 +1034,7 @@ fun ChatScreen(
 
     if (queueFilePreview == null) {
         queuePreview?.let { snap ->
-            state.queue.firstOrNull { it.id == snap.id }?.let { q ->
+            state.queueView.firstOrNull { it.id == snap.id }?.let { q ->
                 CompactDialog(
                     onDismiss = { queuePreview = null },
                     title = stringResource(Res.string.queued_message),
@@ -1378,7 +1356,6 @@ private fun SidePanel(
             var followBottom by remember { mutableStateOf(true) }
             val itemHeights = remember { mutableStateMapOf<Long, Int>() }
             var pendingScroll by remember { mutableStateOf(0) }
-            var growth by remember { mutableStateOf(0) }
             var pageAnchor by remember { mutableStateOf(false) }
             val anchorPage = remember(listState) {
                 {
@@ -1408,12 +1385,8 @@ private fun SidePanel(
                 snapshotFlow {
                     val info = listState.layoutInfo
                     val items = info.visibleItemsInfo
-                    if (items.isEmpty() || items.size != info.totalItemsCount) -1
-                    else items.sumOf { it.size } - (items.firstOrNull { it.key == "filler" }?.size ?: 0)
-                }.collect {
-                    sideContentPx = it
-                    growth = 0
-                }
+                    if (items.isEmpty() || items.size != info.totalItemsCount) -1 else items.sumOf { it.size }
+                }.collect { sideContentPx = it }
             }
             val showScrollButton by remember {
                 derivedStateOf {
@@ -1464,17 +1437,13 @@ private fun SidePanel(
                 }
             }
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                val fillerPx = if (sideContentPx < 0) 0 else (constraints.maxHeight - sideContentPx).coerceAtLeast(0)
-                CompositionLocalProvider(
-                    LocalPageAnchored provides pageAnchor,
-                    LocalAnchorPage provides anchorPage,
-                ) {
+                CompositionLocalProvider(LocalAnchorPage provides anchorPage) {
                 SelectionContainer(modifier = Modifier.fillMaxSize().selectionTextCursor()) {
                     LazyColumn(
                         state = listState,
                         reverseLayout = true,
                         verticalArrangement = Arrangement.Top,
-                        modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                        modifier = Modifier.fillMaxWidth().pointerInput(Unit) {
                             awaitPointerEventScope {
                                 while (true) {
                                     val e = awaitPointerEvent(PointerEventPass.Initial)
@@ -1483,28 +1452,15 @@ private fun SidePanel(
                             }
                         },
                     ) {
-                        if (fillerPx > 0) {
-                            item(key = "filler") {
-                                Spacer(
-                                    Modifier.layout { measurable, constraints ->
-                                        val px = (fillerPx - growth).coerceIn(0, fillerPx)
-                                        val placeable = measurable.measure(constraints.copy(minHeight = px, maxHeight = px))
-                                        layout(placeable.width, px) { placeable.place(0, 0) }
-                                    },
-                                )
-                            }
-                        }
                         itemsIndexed(sideVisible.asReversed(), key = { _, it -> it.id }) { reversed, message ->
                             val index = sideVisible.lastIndex - reversed
                             Column(
                                 modifier = Modifier.offset { IntOffset(0, pendingScroll) }.onSizeChanged { size ->
                                     val previous = itemHeights.put(message.id, size.height)
-                                    growth += size.height - (previous ?: 0)
                                     if (previous == null || previous == size.height) return@onSizeChanged
                                     val delta = size.height - previous
                                     if (pageAnchor) {
                                         pageAnchor = false
-                                        growth -= delta
                                         listState.requestScrollToItem(
                                             listState.firstVisibleItemIndex,
                                             listState.firstVisibleItemScrollOffset + delta,

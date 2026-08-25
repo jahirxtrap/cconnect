@@ -5,6 +5,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
+  import { measurePixelGrid, pixelGrid } from "$lib/ui/pixelGrid";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
   import StatusProgress from "./blocks/StatusProgress.svelte";
@@ -77,6 +78,7 @@
   const SCROLL_BUTTON_GAP = 12;
   const STICKY_FALLBACK = 40;
   const HALF = 2;
+  const GRID_EPSILON = 0.0005;
 
   let horizontalScrollbar = $state(0);
   let verticalScrollbar = $state(0);
@@ -94,6 +96,7 @@
   let lastId: number | null = null;
 
   let scrollSign = 0;
+  let carry = 0;
 
   const detectScrollSign = () => {
     if (!container || container.scrollHeight <= container.clientHeight) return;
@@ -194,15 +197,62 @@
     scrollFromTop(topOf(node) + current.gap);
   };
 
+  // Anchored by how far the block itself moved, not by rebuilding an offset from scrollHeight:
+  // those are whole pixels while the scroll lands on the device grid, and the leftover fell the
+  // same way every time — each toggle slid the chat a fraction of a pixel, and it added up.
+  // What the grid still swallows rides on `carry` to the next adjustment instead of being lost.
+  const shiftBy = (delta: number) => {
+    if (!container) return;
+    const wanted = delta + carry;
+    if (!wanted) return;
+    if (!scrollSign) detectScrollSign();
+    const previous = container.scrollTop;
+    container.scrollTop += -(scrollSign || -1) * wanted;
+    carry = wanted + (scrollSign || -1) * (container.scrollTop - previous);
+    ownTop = container.scrollTop;
+    lastTop = container.scrollTop;
+  };
+
+  // Padded up to the next device pixel. The scroll only lands on that grid, so a block that grows
+  // by something in between can never be cancelled exactly — the browser's own anchoring moves
+  // 129.6px for a 130px block and leaves 0.4 behind, which is the shift seen on every toggle.
+  const snapToGrid = (node: HTMLElement) => {
+    const grid = container ? measurePixelGrid(container) : pixelGrid();
+    const pad = parseFloat(node.style.paddingBottom) || 0;
+    const natural = node.getBoundingClientRect().height - pad;
+    if (natural <= 0) return;
+    // Clamped at zero: a height already on the grid comes out a hair negative here, and a negative
+    // padding is invalid CSS — the browser drops it and keeps the previous value.
+    const next = Math.max(0, Math.round((Math.ceil(natural / grid - GRID_EPSILON) * grid - natural) * 1000) / 1000);
+    if (Math.abs(next - pad) > GRID_EPSILON) node.style.paddingBottom = next ? `${next}px` : "";
+  };
+
+  // Both heights have to sit on the grid for their difference to sit on it too, so an item is
+  // snapped as soon as it is on screen — while nothing is anchored to it yet.
+  const snapOnMount = (node: HTMLElement) => {
+    snapToGrid(node);
+    const frame = requestAnimationFrame(() => snapToGrid(node));
+    return { destroy: () => cancelAnimationFrame(frame) };
+  };
+
   const toggleExpanded = async (id: number) => {
     const node = container?.querySelector<HTMLElement>(`[data-mid="${id}"]`);
-    const anchored = !follow && node !== null && node !== undefined;
-    const previousTop = anchored ? topOf(node) : 0;
-    const previousDistance = anchored ? distanceToTop() : 0;
+    if (follow || !node || !container) {
+      expandedState[id] = !expandedState[id];
+      return;
+    }
+    // Off for this one change: with the browser anchoring too, its rounded correction lands first
+    // and there is no way to recover the fraction it left. Everything else (streaming, older
+    // history) keeps its anchoring.
+    container.style.overflowAnchor = "none";
+    const previousTop = node.getBoundingClientRect().top;
     expandedState[id] = !expandedState[id];
-    if (!anchored) return;
     await tick();
-    scrollFromTop(previousDistance + topOf(node) - previousTop);
+    snapToGrid(node);
+    shiftBy(node.getBoundingClientRect().top - previousTop);
+    requestAnimationFrame(() => {
+      if (container) container.style.overflowAnchor = "";
+    });
   };
 
   const measureScrollbar = () => {
@@ -222,6 +272,7 @@
     viewport = container.clientHeight;
     const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
     ownTop = -1;
+    if (!ours) carry = 0;
     if (!ours && movedUp && belowFold > AT_BOTTOM_PX) follow = false;
     if (!SCROLL_END) {
       if (settleTimer !== null) clearTimeout(settleTimer);
@@ -276,6 +327,9 @@
     measureScrollbar();
     const observer = new ResizeObserver(() => {
       measureScrollbar();
+      // Cheap after the first success: it caches, and it can only measure once there is something
+      // to scroll, which is not true yet when the list mounts empty.
+      if (element.scrollHeight > element.clientHeight) measurePixelGrid(element);
       if (follow) scrollTo(0);
       belowFold = distanceToBottom();
       viewport = element.clientHeight;
@@ -321,6 +375,7 @@
     void tick().then(() => {
       if (!container) return;
       detectScrollSign();
+      measurePixelGrid(container);
       scrollTo(target.follow ? 0 : target.top);
     });
   });
@@ -345,7 +400,7 @@
     <div bind:this={content} class="mb-auto shrink-0">
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
-      <div data-mid={item.id}>
+      <div use:snapOnMount data-mid={item.id}>
         {#if separated}
           <DateSeparator millis={item.timestamp ?? 0} />
         {/if}

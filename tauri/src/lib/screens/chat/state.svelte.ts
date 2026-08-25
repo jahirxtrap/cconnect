@@ -177,6 +177,8 @@ export class ChatState {
   draft = $state("");
 
   queue = $state<QueuedMessage[]>([]);
+  // What the previous chat had on screen, held until the new one is fully attached.
+  #frozen = $state<{ messages: ChatMessage[]; queue: QueuedMessage[]; contextTokens: number | null } | null>(null);
   attachments = $state<Attachment[]>([]);
   uploading = $state(false);
   oldestLoadedIndex = $state<number | null>(null);
@@ -205,7 +207,12 @@ export class ChatState {
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProjectKey) ?? []);
   readonly historyProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly connected = $derived(this.connection === "connected");
-  readonly visibleQueue = $derived(this.queue.filter((item) => !this.#silent.has(item.id)));
+  // The queue and the context ring belong to the chat being loaded, so they wait for the same
+  // `attached` the messages do — otherwise they empty and refill mid-load, on top of the
+  // conversation still on screen.
+  readonly queueView = $derived(this.#frozen?.queue ?? this.queue);
+  readonly contextView = $derived(this.#frozen ? this.#frozen.contextTokens : this.contextTokens);
+  readonly visibleQueue = $derived(this.queueView.filter((item) => !this.#silent.has(item.id)));
 
   readonly effectiveModel = $derived(this.modelOverride || this.model);
   readonly effectiveEffort = $derived(this.effortOverride || this.effort);
@@ -228,12 +235,12 @@ export class ChatState {
   #outgoingTag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   #attachmentId = 0;
   #sent = new Set<string>();
+  #unacked = new Set<string>();
   #silent = new Set<string>();
   #optimisticChipId: string | null = null;
   #optimisticMessageId: number | null = null;
   #interrupting = false;
   #pendingTrim: ((list: ChatMessage[]) => ChatMessage[]) | null = null;
-  #frozen = $state<ChatMessage[] | null>(null);
   #uploadAbort: AbortController | null = null;
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
@@ -419,6 +426,7 @@ export class ChatState {
 
     if (!this.streaming) {
       this.#sent.clear();
+      this.#unacked.clear();
       this.#optimisticChipId = null;
       this.#optimisticMessageId = null;
       this.queue = this.queue.filter((item) => item.uploading);
@@ -463,6 +471,7 @@ export class ChatState {
     if (this.#sent.has(id)) this.#socket.sendUnqueue(id);
     this.queue = this.queue.filter((item) => item.id !== id);
     this.#sent.delete(id);
+    this.#unacked.delete(id);
     this.#silent.delete(id);
   }
 
@@ -639,11 +648,13 @@ export class ChatState {
   }
 
   get view(): ChatMessage[] {
-    return this.#frozen ?? this.messages;
+    return this.#frozen?.messages ?? this.messages;
   }
 
   #freeze() {
-    if (this.#frozen === null && this.messages.length) this.#frozen = this.messages;
+    if (this.#frozen === null && this.messages.length) {
+      this.#frozen = { messages: this.messages, queue: this.queue, contextTokens: this.contextTokens };
+    }
   }
 
   async #openSession(session: SessionInfo) {
@@ -1010,6 +1021,7 @@ export class ChatState {
     this.#assistantId = null;
     this.#thinkingId = null;
     this.#sent.clear();
+    this.#unacked.clear();
     this.#silent.clear();
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
@@ -1033,6 +1045,7 @@ export class ChatState {
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
     this.#sent.clear();
+    this.#unacked.clear();
     this.#silent.clear();
     this.#interrupting = false;
     this.#pendingTrim = null;
@@ -1074,6 +1087,7 @@ export class ChatState {
     this.#optimisticMessageId = null;
     const pending = new Set(this.queue.map((item) => item.id));
     for (const id of [...this.#sent]) if (!pending.has(id)) this.#sent.delete(id);
+    for (const id of [...this.#unacked]) if (!pending.has(id)) this.#unacked.delete(id);
     this.#silent.clear();
     this.#interrupting = false;
     this.#pendingTrim = null;
@@ -1140,8 +1154,23 @@ export class ChatState {
     if (this.connection !== "connected") return;
     for (const item of this.queue) {
       if (item.uploading || this.#sent.has(item.id)) continue;
-      if (this.#socket.sendPrompt(item.text, item.attachments, item.id)) this.#sent.add(item.id);
+      if (this.#socket.sendPrompt(item.text, item.attachments, item.id)) {
+        this.#sent.add(item.id);
+        this.#unacked.add(item.id);
+      }
     }
+  }
+
+  // The queue lives on the server, so its snapshot replaces the local list instead of being
+  // merged into it — that is what keeps two devices on the same chat showing the same chips.
+  #applyQueueSnapshot(items: QueuedMessage[]) {
+    for (const item of items) this.#unacked.delete(item.id);
+    // A chip this client just sent has not reached the server yet; dropping it would blink.
+    const local = this.queue.filter((item) => item.uploading || this.#unacked.has(item.id));
+    this.queue = [...items, ...local];
+    this.#sent.clear();
+    for (const item of items) this.#sent.add(item.id);
+    for (const id of this.#unacked) this.#sent.add(id);
   }
 
   #findInteraction(requestId: string): InteractionData | null {
@@ -1235,6 +1264,7 @@ export class ChatState {
       this.queue = this.queue.filter((item) => !ids.includes(item.id));
       ids.forEach((id) => {
         this.#sent.delete(id);
+        this.#unacked.delete(id);
         this.#silent.delete(id);
       });
     }
@@ -1353,7 +1383,9 @@ export class ChatState {
     }
     switch (event.type) {
       case "connecting":
-        if (this.connection !== "connected") this.connection = "connecting";
+        // Every retry emits this, so a dropped server was repainted as "connecting" a second after
+        // it went down instead of reporting the outage. A known outage holds until a socket opens.
+        if (this.connection !== "connected" && this.connection !== "disconnected") this.connection = "connecting";
         break;
       case "open":
         this.#startSession(this.sessionId);
@@ -1381,8 +1413,7 @@ export class ChatState {
             return [...kept.slice(0, lastUser + 1), ...kept.slice(lastUser + 1).filter(awaiting)];
           };
         }
-        this.queue = [...event.queued, ...this.queue.filter((item) => item.uploading)];
-        for (const item of event.queued) this.#sent.add(item.id);
+        this.#applyQueueSnapshot(event.queued);
         void this.refreshServerInfo();
         this.#pumpQueue();
         break;
@@ -1538,6 +1569,9 @@ export class ChatState {
           this.#sent.add(event.id);
           this.queue = [...this.queue, { id: event.id, text: event.text, attachments: [], uploading: false }];
         }
+        break;
+      case "queue":
+        this.#applyQueueSnapshot(event.items);
         break;
       case "dequeued":
         this.#onDequeued(event.ids, event.text);

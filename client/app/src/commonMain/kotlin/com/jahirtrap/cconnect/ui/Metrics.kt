@@ -22,14 +22,18 @@ import com.jahirtrap.cconnect.ui.theme.palette
 fun MetricHeader(title: String, subtitle: String, percent: Float) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(
-                subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (title.isNotBlank()) Text(title, style = MaterialTheme.typography.bodyLarge)
+            // An empty Text still takes a full line here, which pushed the percentage off the
+            // title's line and stretched every bar that carries no subtitle.
+            if (subtitle.isNotBlank()) {
+                Text(
+                    subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
         Text(
@@ -49,8 +53,10 @@ fun MetricBar(title: String, subtitle: String, percent: Float, modifier: Modifie
         LinearProgressIndicator(
             progress = { (percent / 100f).coerceIn(0f, 1f) },
             color = barColor,
+            trackColor = MaterialTheme.colorScheme.outlineVariant,
+            gapSize = 0.dp,
             drawStopIndicator = {},
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(4.dp),
         )
     }
 }

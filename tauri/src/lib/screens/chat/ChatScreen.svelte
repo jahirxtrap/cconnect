@@ -440,7 +440,7 @@
     accountSelected={chat.accountOverride}
     onAccount={(value) => chat.setAccount(value)}
     streamTokens={chat.effectiveStreamTokens}
-    contextTokens={chat.contextTokens}
+    contextTokens={chat.contextView}
     onModel={(value) => chat.setModel(value)}
     onEffort={(value) => chat.setEffort(value)}
     onPermissionMode={(value) => chat.setPermissionMode(value)}
@@ -536,7 +536,7 @@
 {/if}
 
 {#if queuedId}
-  {@const item = chat.queue.find((entry) => entry.id === queuedId) ?? null}
+  {@const item = chat.queueView.find((entry) => entry.id === queuedId) ?? null}
   {#if item}
     <CompactDialog title={t("QUEUED_MESSAGE")} onDismiss={() => (queuedId = null)}>
       {#snippet buttons()}

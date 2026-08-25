@@ -1,8 +1,6 @@
 package com.jahirtrap.cconnect.chat
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.DragInteraction
 import com.jahirtrap.cconnect.ui.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.lazy.LazyRow
@@ -43,10 +41,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.layout
 import com.jahirtrap.cconnect.ui.theme.Radius
 import androidx.compose.ui.graphics.RectangleShape
@@ -123,7 +122,7 @@ import com.jahirtrap.cconnect.ui.formatClock
 import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import com.jahirtrap.cconnect.ui.theme.palette
-import kotlin.math.abs
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.PlaceholderVerticalAlign
@@ -194,8 +193,6 @@ private class HeldHeight {
         return natural
     }
 }
-
-internal val LocalPageAnchored = compositionLocalOf { false }
 
 internal val LocalAnchorPage = compositionLocalOf<() -> Boolean> { { false } }
 
@@ -922,7 +919,31 @@ private fun ComponentBlock(
     val dismissOption = data.dismiss
     val answerable = componentAnswerable(data.blocks)
     val heading = componentText(data.titleKey) ?: data.title.orEmpty()
-    OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    val scope = rememberCoroutineScope()
+    val anchorPage = LocalAnchorPage.current
+    val pagerState = rememberPagerState(
+        initialPage = data.activePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
+        pageCount = { pages.size.coerceAtLeast(1) },
+    )
+    // The hold covers the whole panel, not just the pager: what changes with the page also lives
+    // outside it — the "next" button is gone on the last one. And it is keyed to the scroll state,
+    // not to a DragInteraction: the pager grows the frame it composes the neighbouring page, one
+    // frame before that interaction is delivered, and in a reversed list that frame is a tug up.
+    val held = remember { HeldHeight() }
+    val moving = pagerState.isScrollInProgress
+    // Armed on both edges: nothing changes height while held, so the anchor survives the gesture
+    // and is there for the single change that lands on release.
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.isScrollInProgress }.drop(1).collect { anchorPage() }
+    }
+    OutlinedPanel(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).clipToBounds()
+            .layout { measurable, constraints ->
+                val placeable = measurable.measure(constraints)
+                val height = if (moving) held.keep(placeable.height) else held.release(placeable.height)
+                layout(placeable.width, height) { placeable.place(0, 0) }
+            },
+    ) {
         val closable = !data.submitted && answerable && dismissOption == null
         if (heading.isNotBlank() || closable) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
@@ -981,46 +1002,17 @@ private fun ComponentBlock(
             }
             return@OutlinedPanel
         }
-        val scope = rememberCoroutineScope()
-        val anchorPage = LocalAnchorPage.current
-        val pagerState = rememberPagerState(
-            initialPage = data.activePage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)),
-            pageCount = { pages.size.coerceAtLeast(1) },
-        )
         if (pages.size > 1) {
-            LaunchedEffect(pagerState.currentPage) { onPage(pagerState.currentPage) }
+            // Settled, not current: the page flips halfway through a swipe, and anything keyed to
+            // it changed size right then — in the middle of the gesture.
+            LaunchedEffect(pagerState.settledPage) { onPage(pagerState.settledPage) }
             ComponentTabs(pages, pagerState)
             Spacer(Modifier.height(10.dp))
-            var appeared by remember { mutableStateOf(false) }
-            LaunchedEffect(Unit) { appeared = true }
-            // A swipe changes the height continuously as the finger moves, which drags everything
-            // above it. Hold the height for the gesture so settling is the single anchored change
-            // a tap already makes.
-            val held = remember { HeldHeight() }
-            var holding by remember { mutableStateOf(false) }
-            LaunchedEffect(pagerState) {
-                pagerState.interactionSource.interactions.collect { interaction ->
-                    if (interaction is DragInteraction.Start) holding = anchorPage()
-                }
-            }
-            LaunchedEffect(pagerState.isScrollInProgress) {
-                if (!pagerState.isScrollInProgress && holding) {
-                    anchorPage()
-                    holding = false
-                }
-            }
-            val animateSize = appeared && !LocalPageAnchored.current
             HorizontalPager(
                 state = pagerState,
                 verticalAlignment = Alignment.Top,
                 // Keeps the page being dragged clear of the next one instead of both touching.
                 pageSpacing = PANEL_PAD,
-                modifier = (if (animateSize) Modifier.animateContentSize() else Modifier)
-                    .layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
-                        val height = if (holding) held.keep(placeable.height) else held.release(placeable.height)
-                        layout(placeable.width, height) { placeable.place(0, 0) }
-                    },
             ) { page ->
                 Column(modifier = Modifier.fillMaxWidth()) {
                     ComponentElements(pages[page].blocks, data, onSharedLink, onValue, onPick)
@@ -1037,13 +1029,13 @@ private fun ComponentBlock(
         }
         Spacer(Modifier.height(8.dp))
         val ready = !componentMissing(data)
-        val pending = pages.size > 1 && pagerState.currentPage < pages.lastIndex
+        val pending = pages.size > 1 && pagerState.settledPage < pages.lastIndex
         if (pending) {
             ActionButton(
                 text = stringResource(Res.string.next),
                 onClick = {
-                    val anchored = anchorPage()
-                    scope.launch { pagerState.goToPage(pagerState.currentPage + 1, anchored) }
+                    anchorPage()
+                    scope.launch { pagerState.goToPage(pagerState.currentPage + 1) }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -1103,21 +1095,17 @@ private fun ComponentTabs(pages: List<ComponentElement>, pagerState: PagerState)
                 selected = index == pagerState.currentPage,
                 required = page.required,
                 onClick = {
-                    val anchored = anchorPage()
-                    scope.launch { pagerState.goToPage(index, anchored) }
+                    anchorPage()
+                    scope.launch { pagerState.goToPage(index) }
                 },
             )
         }
     }
 }
 
-private suspend fun PagerState.goToPage(index: Int, anchored: Boolean) {
-    if (anchored) {
-        withFrameNanos { }
-        scrollToPage(index)
-        return
-    }
-    if (abs(index - currentPage) > 1) scrollToPage(index) else animateScrollToPage(index)
+// One behaviour for both cases: the page changes at once, anchored or not.
+private suspend fun PagerState.goToPage(index: Int) {
+    scrollToPage(index)
 }
 
 @Composable
@@ -1128,8 +1116,17 @@ private fun ComponentElements(
     onValue: (String, String) -> Unit,
     onPick: (String, String, Boolean) -> Unit,
 ) {
+    // An element that draws nothing must not take a slot either: spacedBy adds its gap all the
+    // same, so an empty text left a hole the web build never shows.
+    val shown = elements.filter { element ->
+        when (element.type) {
+            "text" -> !element.text.isNullOrBlank()
+            "preview" -> element.block?.let { parseCconnectBlock(it) } != null
+            else -> true
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(SMALL)) {
-        elements.forEach { element ->
+        shown.forEach { element ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         when (element.type) {
                 "text" -> MarkdownText(element.text.orEmpty(), modifier = Modifier.fillMaxWidth(), selectable = false)

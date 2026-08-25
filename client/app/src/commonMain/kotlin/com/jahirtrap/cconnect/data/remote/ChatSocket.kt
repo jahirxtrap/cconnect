@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
@@ -289,16 +290,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 channel = newChannel
                 lastSeq = 0
             }
-            val queued = obj["queued"]?.jsonArray?.mapNotNull { entry ->
-                val item = entry as? JsonObject ?: return@mapNotNull null
-                val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                QueuedMessage(
-                    id = id,
-                    text = item["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                    attachments = item["attachments"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList(),
-                )
-            } ?: emptyList()
-            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queued, str("activity")))
+            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queuedItems(obj["queued"]), str("activity")))
         }
         val ch = str("channel")
         val side = ch != null && channel != null && ch != channel
@@ -353,6 +345,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             "plan" -> ServerEvent.Plan(str("markdown").orEmpty())
             "notification" -> ServerEvent.Notification(str("text").orEmpty(), str("result"))
             "queued" -> ServerEvent.Queued(str("id"), str("text").orEmpty())
+            "queue" -> ServerEvent.Queue(queuedItems(obj["items"]))
             "dequeued" -> ServerEvent.Dequeued(
                 obj["ids"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList(),
                 str("text"),
@@ -425,6 +418,17 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
 }
 
 private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview", "page", "notes", "bar")
+
+private fun queuedItems(element: JsonElement?): List<QueuedMessage> =
+    element?.jsonArray?.mapNotNull { entry ->
+        val item = entry as? JsonObject ?: return@mapNotNull null
+        val id = item["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+        QueuedMessage(
+            id = id,
+            text = item["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            attachments = item["attachments"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList(),
+        )
+    } ?: emptyList()
 
 internal fun JsonObject.toDismiss(): ComponentOption = ComponentOption(
     value = "",

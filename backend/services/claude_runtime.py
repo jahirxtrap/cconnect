@@ -601,6 +601,11 @@ async def run_prompt(
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 
     chips: list[dict] = [{"id": seed_id, "sent": prompt, "drained": False}]
+    # Live rendering can't wait for the transcript: the CLI only writes a queued message when it
+    # gets round to it, and until then the client has nothing to draw. The turn itself knows the
+    # order it handed the messages over and when each answer starts, so the bubble is announced
+    # from that instead of from disk.
+    pending_announce: list[dict] = list(chips)
     seen_users: set[str] = set()
     if drain is not None and resume and cwd:
         try:
@@ -609,6 +614,21 @@ async def run_prompt(
                 seen_users.add(_u["uuid"])
         except Exception:
             pass
+
+    def _announce_next() -> list[dict]:
+        """The answer to the next message just started, so that message is on screen now."""
+        while pending_announce:
+            chip = pending_announce.pop(0)
+            if chip.get("announced"):
+                continue
+            chip["announced"] = True
+            return [{
+                "type": "dequeued",
+                "ids": [chip["id"]] if chip.get("id") else [],
+                "text": chip.get("sent") or "",
+                "consumed": 0,  # the transcript pass still settles the count
+            }]
+        return []
 
     def _flush_users(sid: str | None) -> list[dict]:
         if drain is None or not sid or not cwd:
@@ -632,21 +652,43 @@ async def run_prompt(
             if not chips:
                 continue
             seen_users.add(uid)
-            matched = None
-            acc = ""
-            for i, c in enumerate(chips):
-                acc = c["sent"] if i == 0 else acc + "\n" + c["sent"]
-                if acc == text:
-                    matched = i + 1
+            # Match from any position, not just the head: a leading chip whose entry never shows up
+            # (a command, a turn resumed with it already on disk) used to block the whole queue, and
+            # the messages behind it stayed undrawn with their chips stuck.
+            begin = end = None
+            for start in range(len(chips)):
+                acc = ""
+                for i in range(start, len(chips)):
+                    acc = chips[i]["sent"] if i == start else acc + "\n" + chips[i]["sent"]
+                    if acc == text:
+                        begin, end = start, i + 1
+                        break
+                    if len(acc) >= len(text):
+                        break
+                if begin is not None:
                     break
-                if len(acc) >= len(text):
-                    break
-            k = matched if matched is not None else 1
-            taken, chips[:k] = chips[:k], []
+            if begin is None:
+                # The CLI writes user entries of its own — "[Request interrupted by user...]", the
+                # compaction summary. Only an entry that carries what we sent takes a chip.
+                head = chips[0]["sent"] or ""
+                if not head or head not in text:
+                    continue
+                begin, end = 0, 1
+            skipped, taken = chips[:begin], chips[begin:end]
+            del chips[:end]
+            if skipped:
+                # Their entry is never coming; free the chips so the queue does not keep them.
+                events.append({
+                    "type": "dequeued",
+                    "ids": [c["id"] for c in skipped if c["id"]],
+                    "text": "",
+                    "consumed": sum(1 for c in skipped if c["drained"]),
+                })
             events.append({
                 "type": "dequeued",
                 "ids": [c["id"] for c in taken if c["id"]],
-                "text": text,
+                # Already on screen from the announcement; this pass only settles the count.
+                "text": "" if any(c.get("announced") for c in taken) else text,
                 "consumed": sum(1 for c in taken if c["drained"]),
             })
         return events
@@ -664,11 +706,14 @@ async def run_prompt(
                 else:
                     icontent = item["text"]
                     sent = item["text"]
-                chips.append({"id": item.get("id"), "sent": sent, "drained": True})
+                chip = {"id": item.get("id"), "sent": sent, "drained": True}
+                chips.append(chip)
+                pending_announce.append(chip)
                 yield {"type": "user", "message": {"role": "user", "content": icontent}}
     prompt_arg = _prompt_stream() if (ask_user is not None or images or drain is not None) else prompt
 
     hidden_tool_ids: set[str] = set()
+    awaiting_cycle = True  # the next answer that starts belongs to the next message we handed over
     first_chunk_pending: set[int] = set()
     streamed_text: dict[int, str] = {}
     streamed_sent: dict[int, int] = {}
@@ -712,6 +757,10 @@ async def run_prompt(
                     if isinstance(idx, int):
                         first_chunk_pending.add(idx)
                     if not parent:
+                        if awaiting_cycle:
+                            awaiting_cycle = False
+                            for ev in _announce_next():
+                                yield ev
                         for ev in _flush_users(current_sid):
                             yield ev
                 if isinstance(raw, dict) and raw.get("type") == "content_block_stop" and isinstance(idx, int):
@@ -741,6 +790,10 @@ async def run_prompt(
                     yield event
             elif isinstance(message, AssistantMessage):
                 if not parent:
+                    if awaiting_cycle:
+                        awaiting_cycle = False
+                        for ev in _announce_next():
+                            yield ev
                     for ev in _flush_users(current_sid):
                         yield ev
                 _err = getattr(message, "error", None)
@@ -807,6 +860,8 @@ async def run_prompt(
                 else:
                     yield {"type": "system", "subtype": subtype, "data": data}
             elif isinstance(message, ResultMessage):
+                # This answer is done; whatever comes next belongs to the next queued message.
+                awaiting_cycle = True
                 for ev in _flush_users(getattr(message, "session_id", None) or current_sid):
                     yield ev
                 _cmd = [c for c in chips if str(c.get("sent") or "").lstrip().startswith("/")]

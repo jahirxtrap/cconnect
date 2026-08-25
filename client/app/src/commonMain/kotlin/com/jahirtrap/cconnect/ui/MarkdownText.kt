@@ -74,7 +74,9 @@ import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -693,7 +695,23 @@ private fun ListBlock(list: ASTNode, ordered: Boolean, ctx: MdContext, depth: In
 }
 
 private val LIST_INDENT = 20.dp
-private val LIST_MARKER_GAP = 6.dp
+
+// How much to widen the marker's own space so the text starts at LIST_INDENT whatever the marker
+// measures — "1." and "•" must share one text column, and padding the string with real spaces
+// would end up in the clipboard.
+@Composable
+private fun markerPad(bullet: String, style: TextStyle): TextUnit {
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    return remember(bullet, style, density) {
+        with(density) {
+            val marker = measurer.measure(AnnotatedString(bullet), style).size.width
+            val space = measurer.measure(AnnotatedString("x x"), style).size.width -
+                measurer.measure(AnnotatedString("xx"), style).size.width
+            (LIST_INDENT.toPx() - marker - space).coerceAtLeast(0f).toSp()
+        }
+    }
+}
 
 @Composable
 private fun ListItemBlock(item: ASTNode, bullet: String, ctx: MdContext, depth: Int) {
@@ -706,8 +724,7 @@ private fun ListItemBlock(item: ASTNode, bullet: String, ctx: MdContext, depth: 
                 Text(
                     text = bullet,
                     style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.widthIn(min = LIST_INDENT).padding(end = LIST_MARKER_GAP),
+                    modifier = Modifier.widthIn(min = LIST_INDENT),
                 )
             }
             Column { Blocks(item, ctx, depth + 1) }
@@ -716,16 +733,18 @@ private fun ListItemBlock(item: ASTNode, bullet: String, ctx: MdContext, depth: 
     }
     val rest = item.children.drop(at + 1)
     val style = MaterialTheme.typography.bodyMedium
-    val measurer = rememberTextMeasurer()
-    val markerIndent = with(LocalDensity.current) {
-        measurer.measure(AnnotatedString("$bullet "), style).size.width.toSp()
-    }
+    val pad = markerPad(bullet, style)
+    val indent = with(LocalDensity.current) { LIST_INDENT.toSp() }
     Column {
         MdText(
-            text = buildAnnotatedString { append("$bullet "); append(head) },
+            text = buildAnnotatedString {
+                append(bullet)
+                withStyle(SpanStyle(letterSpacing = pad)) { append(" ") }
+                append(head)
+            },
             codeBg = ctx.codeBg,
             modifier = Modifier.fillMaxWidth(),
-            style = style.copy(textIndent = TextIndent(restLine = markerIndent)),
+            style = style.copy(textIndent = TextIndent(restLine = indent)),
         )
         if (rest.isNotEmpty()) {
             Column(modifier = Modifier.padding(start = LIST_INDENT)) {

@@ -57,6 +57,7 @@ import com.jahirtrap.cconnect.service.Notifier
 import com.jahirtrap.cconnect.data.remote.UrlCodec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,6 +70,8 @@ import com.jahirtrap.cconnect.data.nowMillis
 
 enum class ConnectionState { Disconnected, Connecting, Connected }
 
+// How long "connecting" is shown before a failed attempt is reported as an outage.
+private const val CONNECTING_GRACE_MS = 2000L
 private const val MESSAGE_TAIL_CAP = 500
 private const val MESSAGE_INITIAL_CAP = 100
 
@@ -79,10 +82,17 @@ data class SideChatState(
     val streaming: Boolean = false,
 )
 
+// What the previous chat had on screen, held until the new one is fully attached.
+data class FrozenChat(
+    val messages: List<ChatMessage>,
+    val queue: List<QueuedMessage>,
+    val contextTokens: Int?,
+)
+
 data class ChatUiState(
     val connection: ConnectionState = ConnectionState.Connecting,
     val messages: List<ChatMessage> = emptyList(),
-    val frozen: List<ChatMessage>? = null,
+    val frozen: FrozenChat? = null,
     val streaming: Boolean = false,
     val permissionMode: String = "bypassPermissions",
     val model: String = "opus[1m]",
@@ -147,7 +157,13 @@ data class ChatUiState(
     val uploadingAttachments: Boolean = false,
     val queue: List<QueuedMessage> = emptyList(),
 ) {
-    val view: List<ChatMessage> get() = frozen ?: messages
+    val view: List<ChatMessage> get() = frozen?.messages ?: messages
+
+    // The queue and the context ring belong to the chat being loaded, so they wait for the same
+    // `attached` the messages do — otherwise they empty and refill mid-load, on top of the
+    // conversation still on screen.
+    val queueView: List<QueuedMessage> get() = frozen?.queue ?: queue
+    val contextView: Int? get() = frozen?.let { it.contextTokens } ?: contextTokens
     val sideChat: SideChatState? get() = sideChats[sessionId.orEmpty()]
 }
 
@@ -522,11 +538,29 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private val outgoingTag = nowMillis().toString(36)
     private fun nextOutgoingId() = "q$outgoingTag-${outgoingSeq++}"
     private val sentIds = mutableSetOf<String>()
+    private val unacked = mutableSetOf<String>()
+
+    // The queue lives on the server, so its snapshot replaces the local list instead of being
+    // merged into it — that is what keeps two devices on the same chat showing the same chips.
+    private fun applyQueueSnapshot(items: List<QueuedMessage>) {
+        val known = items.map { it.id }.toSet()
+        unacked.removeAll(known)
+        _state.update { st ->
+            val silent = st.queue.filter { it.silent }.map { it.id }.toSet()
+            // A chip this client just sent has not reached the server yet; dropping it would blink.
+            val local = st.queue.filter { it.uploading || it.id in unacked }
+            st.copy(queue = items.map { if (it.id in silent) it.copy(silent = true) else it } + local)
+        }
+        sentIds.clear()
+        sentIds.addAll(known)
+        sentIds.addAll(unacked)
+    }
 
     private fun enqueueOutgoing(text: String, attachments: List<String>) {
         if (text.isEmpty() && attachments.isEmpty()) return
         if (!_state.value.streaming) {
             sentIds.clear()
+            unacked.clear()
             optimisticChipId = null
             optimisticMsgId = null
             if (_state.value.queue.any { !it.uploading }) {
@@ -558,6 +592,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         for (q in _state.value.queue) {
             if (q.uploading || q.id in sentIds) continue
             sentIds.add(q.id)
+            unacked.add(q.id)
             client.sendPrompt(q.text, q.attachments, q.id)
         }
     }
@@ -570,9 +605,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         if (id in sentIds) client.sendUnqueue(id)
         _state.update { it.copy(queue = it.queue.filterNot { q -> q.id == id }) }
         sentIds.remove(id)
+        unacked.remove(id)
     }
 
     private var uploadJob: Job? = null
+    private var connectingJob: Job? = null
     private var attachmentId = 0L
 
     fun addAttachments(files: List<AttachmentFile>) {
@@ -738,6 +775,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         optimisticChipId = null
         optimisticMsgId = null
         sentIds.clear()
+        unacked.clear()
         interrupting = false
         pendingTrim = null
         _state.update {
@@ -752,6 +790,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 compacting = false,
                 activity = null,
                 queue = emptyList(),
+                contextTokens = null,  // a fresh chat has no context yet; Tauri already cleared it
                 oldestLoadedIndex = null,
                 transcriptLoading = false,
                 transcriptPaging = false,
@@ -879,7 +918,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     private fun freezeView() {
-        _state.update { if (it.frozen == null && it.messages.isNotEmpty()) it.copy(frozen = it.messages) else it }
+        _state.update {
+            if (it.frozen == null && it.messages.isNotEmpty()) {
+                it.copy(frozen = FrozenChat(it.messages, it.queue, it.contextTokens))
+            } else it
+        }
     }
 
     fun openSession(session: SessionInfo) {
@@ -944,6 +987,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         optimisticChipId = null
         optimisticMsgId = null
         sentIds.clear()
+        unacked.clear()
         interrupting = false
         pendingTrim = null
         session.path?.let { ctx.cwd = it }
@@ -1144,9 +1188,23 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             _state.update { it.copy(messages = trim(it.messages)) }
         }
         when (event) {
-            is ServerEvent.Connecting -> _state.update {
-                if (it.connection == ConnectionState.Connected) it
-                else it.copy(connection = ConnectionState.Connecting)
+            is ServerEvent.Connecting -> {
+                _state.update {
+                    // A known outage stays put: repainting "connecting" on every retry only makes
+                    // the header blink. The first attempt and a manual reconnect set it themselves.
+                    if (it.connection == ConnectionState.Connected || it.connection == ConnectionState.Disconnected) it
+                    else it.copy(connection = ConnectionState.Connecting)
+                }
+                // A retry against a dead server can hang for as long as the TCP attempt lasts, and
+                // sitting on "connecting" reads as if the app were fine. Show the attempt, then call
+                // it an outage; the retry keeps running underneath either way.
+                connectingJob?.cancel()
+                connectingJob = viewModelScope.launch {
+                    delay(CONNECTING_GRACE_MS)
+                    _state.update {
+                        if (it.connection == ConnectionState.Connecting) it.copy(connection = ConnectionState.Disconnected) else it
+                    }
+                }
             }
             is ServerEvent.Open -> startSession(_state.value.sessionId)
             is ServerEvent.Ready -> {
@@ -1174,10 +1232,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         streaming = event.running,
                         activity = event.activity,
                         messages = if (pendingTrim == null) it.messages.filterNot { m -> m.ephemeral } else it.messages,
-                        queue = event.queued + it.queue.filter { q -> q.uploading },
                     ).promoteSide(sid)
                 }
-                sentIds.addAll(event.queued.map { q -> q.id })
+                applyQueueSnapshot(event.queued)
                 viewModelScope.launch { refreshServerInfo() }
                 drainQueue()
             }
@@ -1418,6 +1475,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     it.copy(
                         connection = ConnectionState.Disconnected,
                         streaming = false,
+                        // Server-derived state is stale the moment the socket dies; leaving it
+                        // painted the chat as "working" while the server was plainly off.
+                        activity = null,
+                        streamStatus = null,
                         frozen = null,
                         transcriptLoading = false,
                         error = event.reason,
@@ -1432,6 +1493,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     _state.update { it.copy(queue = it.queue + QueuedMessage(id, event.text)) }
                 }
             }
+            is ServerEvent.Queue -> applyQueueSnapshot(event.items)
             is ServerEvent.Dequeued -> {
                 val text = event.text.orEmpty()
                 val ids = event.ids.toSet()
@@ -1460,6 +1522,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 if (ids.isNotEmpty()) {
                     _state.update { it.copy(queue = it.queue.filterNot { m -> m.id in ids }) }
                     sentIds.removeAll(ids)
+                    unacked.removeAll(ids)
                 }
             }
             is ServerEvent.HistoryChunk -> onHistoryChunk(event)

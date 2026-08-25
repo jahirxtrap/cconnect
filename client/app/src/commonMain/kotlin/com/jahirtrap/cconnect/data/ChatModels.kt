@@ -190,6 +190,7 @@ sealed interface ServerEvent {
     data class ApiError(val message: String) : ServerEvent
     data class Closed(val reason: String) : ServerEvent
     data class Queued(val id: String?, val text: String) : ServerEvent
+    data class Queue(val items: List<QueuedMessage> = emptyList()) : ServerEvent
     data class Dequeued(val ids: List<String> = emptyList(), val text: String? = null) : ServerEvent
     data class HistoryChunk(
         val sessionId: String,

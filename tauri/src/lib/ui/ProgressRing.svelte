@@ -66,7 +66,7 @@
       stroke-dasharray={circumference}
       stroke-dashoffset={circumference * (1 - queued)}
       transform="rotate({QUARTER_TURN + FULL_TURN * progress} {size / 2} {size / 2})"
-      class="transition-[stroke-dashoffset] duration-200 ease-out {pendingClass}"
+      class={pendingClass}
     />
   {/if}
   <circle
@@ -80,6 +80,5 @@
     stroke-dasharray={circumference}
     stroke-dashoffset={circumference * (1 - progress)}
     transform="rotate({QUARTER_TURN} {size / 2} {size / 2})"
-    class="transition-[stroke-dashoffset] duration-200 ease-out"
   />
 </svg>
