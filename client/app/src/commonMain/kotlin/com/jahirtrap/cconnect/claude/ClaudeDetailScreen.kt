@@ -72,6 +72,10 @@ import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
 import com.jahirtrap.cconnect.ui.CompactSwitch
+import com.jahirtrap.cconnect.ui.DialogItemInset
+import com.jahirtrap.cconnect.ui.DialogItemPaddingH
+import com.jahirtrap.cconnect.ui.DialogItemPaddingV
+import com.jahirtrap.cconnect.ui.DialogItemShape
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.OutlinedPanel
 import com.jahirtrap.cconnect.ui.RenameDialog
@@ -511,6 +515,11 @@ fun ClaudeDetailScreen(
                         title = entry.name + (entry.version?.let { " - $it" } ?: ""),
                         subtitle = entry.description,
                         enabled = entry.installed,
+                        modifier = Modifier.padding(horizontal = DialogItemInset).clip(DialogItemShape),
+                        contentPadding = PaddingValues(
+                            horizontal = DialogItemPaddingH,
+                            vertical = DialogItemPaddingV,
+                        ),
                         onClick = {
                             if (entry.installed) {
                                 pluginMenu = extensions?.plugins?.firstOrNull { it.name == entry.name && it.marketplace == market }
@@ -872,12 +881,20 @@ internal fun memoryScopeLabel(scope: String): String = when (scope) {
 }
 
 @Composable
-private fun DetailRow(title: String, subtitle: String?, enabled: Boolean, onClick: (() -> Unit)? = null) {
+private fun DetailRow(
+    title: String,
+    subtitle: String?,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    onClick: (() -> Unit)? = null,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .then(modifier)
             .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

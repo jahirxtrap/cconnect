@@ -93,7 +93,13 @@ fun AppBottomSheet(
         properties = appSheetProperties(lightBars),
         dragHandle = null,
     ) {
-        Column(modifier = Modifier.height(sheetHeight).navigationBarsPadding().nestedScroll(blockSheetScroll)) {
+        Column(
+            modifier = Modifier
+                .height(sheetHeight)
+                .navigationBarsPadding()
+                .nestedScroll(blockSheetScroll)
+                .clearFocusOnTap(),
+        ) {
             if (dismissible) {
                 Box(
                     modifier = Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp),

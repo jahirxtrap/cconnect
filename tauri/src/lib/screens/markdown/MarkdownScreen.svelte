@@ -59,7 +59,6 @@
           <DropdownMenu.Content
             onOpenAutoFocus={(event) => event.preventDefault()}
             onCloseAutoFocus={(event) => event.preventDefault()}
-            align="end"
             sideOffset={4}
             class={MENU_CONTENT_CLASS}
           >

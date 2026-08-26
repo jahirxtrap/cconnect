@@ -94,7 +94,8 @@ fun CompactDialog(
         Surface(
             modifier = Modifier
                 .shadowXl(shape)
-                .widthIn(min = 384.dp.coerceAtMost(available), max = 672.dp.coerceAtMost(available)),
+                .widthIn(min = 384.dp.coerceAtMost(available), max = 672.dp.coerceAtMost(available))
+                .clearFocusOnTap(),
             shape = shape,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 0.dp,
@@ -124,11 +125,11 @@ fun CompactDialog(
                     if (titleTrailing != null) titleTrailing()
                 }
                 if (header != null) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(6.dp))
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp), content = header)
                 }
                 if (content != null) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(if (header != null) 6.dp else 16.dp))
                     Column(
                         modifier = Modifier
                             .weight(1f, fill = false)

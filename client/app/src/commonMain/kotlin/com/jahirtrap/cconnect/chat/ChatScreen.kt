@@ -2468,7 +2468,10 @@ private fun Composer(
         chips?.invoke()
         BasicTextField(
             value = field,
-            onValueChange = { field = it; onValueChange(it.text) },
+            onValueChange = { next ->
+                field = TextFieldValue(next.text, next.selection, next.composition)
+                onValueChange(next.text)
+            },
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = 14.dp)
                 .padding(top = if (chips != null) 6.dp else 14.dp)
@@ -3387,7 +3390,10 @@ private fun ConversationRow(
             IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
                 Icon(Lucide.EllipsisVertical, contentDescription = null, modifier = Modifier.size(16.dp))
             }
-            AppDropdownMenu(expanded = menu, onDismissRequest = { menu = false; categoryMenu = false }) {
+            AppDropdownMenu(
+                expanded = menu,
+                onDismissRequest = { menu = false; categoryMenu = false; projectMenu = false },
+            ) {
                 CompactDropdownItem(stringResource(Res.string.rename)) { menu = false; onRename() }
                 CompactDropdownItem(stringResource(Res.string.auto_rename)) { menu = false; onAutoRename() }
                 CompactDropdownItem(stringResource(Res.string.conversation_color)) { menu = false; onColor() }

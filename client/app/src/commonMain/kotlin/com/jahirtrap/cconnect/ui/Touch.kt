@@ -25,9 +25,23 @@ val LocalIsTouch = compositionLocalOf { false }
 val LocalMobileLayout = compositionLocalOf { false }
 
 @Composable
+fun Modifier.clearFocusOnTap(): Modifier {
+    val focus = LocalFocusManager.current
+    return pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent(PointerEventPass.Final)
+                if (event.type == PointerEventType.Press && event.changes.none { it.isConsumed }) {
+                    focus.clearFocus()
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun ProvideIsTouch(content: @Composable () -> Unit) {
     var touch by remember { mutableStateOf(isCoarsePointer()) }
-    val focus = LocalFocusManager.current
     val density = LocalDensity.current
     val size = LocalWindowInfo.current.containerSize
     val mobile = if (size.width == 0 || size.height == 0) isCoarsePointer()
@@ -39,17 +53,13 @@ fun ProvideIsTouch(content: @Composable () -> Unit) {
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
-                            val started = awaitPointerEvent(PointerEventPass.Initial)
-                            val type = started.changes.firstOrNull()?.type
+                            val type = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull()?.type
                             if (type == PointerType.Touch) touch = true
                             else if (type == PointerType.Mouse) touch = false
-                            val settled = awaitPointerEvent(PointerEventPass.Final)
-                            if (settled.type == PointerEventType.Press && settled.changes.none { it.isConsumed }) {
-                                focus.clearFocus()
-                            }
                         }
                     }
-                },
+                }
+                .clearFocusOnTap(),
         ) {
             content()
         }

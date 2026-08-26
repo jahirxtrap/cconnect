@@ -9,11 +9,21 @@
     description?: string | null;
     padded?: boolean;
     titleTrailing?: Snippet;
+    header?: Snippet;
     buttons?: Snippet;
     children?: Snippet;
   }
 
-  const { title, onDismiss, description, padded = true, titleTrailing, buttons, children }: Props = $props();
+  const {
+    title,
+    onDismiss,
+    description,
+    padded = true,
+    titleTrailing,
+    header,
+    buttons,
+    children,
+  }: Props = $props();
 
   $effect(() => pushDismiss(() => onDismiss()));
 </script>
@@ -36,8 +46,15 @@
         </div>
         {@render titleTrailing?.()}
       </div>
+      {#if header}
+        <div class="mt-1.5 shrink-0">{@render header()}</div>
+      {/if}
       {#if children}
-        <div class="scrollbar-thin mt-4 min-h-0 shrink overflow-x-clip overflow-y-auto {padded ? '' : '-mx-5'}">
+        <div
+          class="scrollbar-thin min-h-0 shrink overflow-x-clip overflow-y-auto {header ? 'mt-1.5' : 'mt-4'} {padded
+            ? ''
+            : '-mx-5'}"
+        >
           {@render children()}
         </div>
       {/if}

@@ -9,6 +9,8 @@
     subtitle?: string | null;
     iconClass?: string;
     dim?: boolean;
+    padding?: string;
+    subtitleLines?: number;
     onclick?: () => void;
     onlongclick?: () => void;
     oncontextmenu?: () => void;
@@ -24,6 +26,8 @@
     subtitle,
     iconClass = "text-accent",
     dim = false,
+    padding = "py-1.5 pr-2 pl-4",
+    subtitleLines = 1,
     onclick,
     onlongclick,
     oncontextmenu,
@@ -38,7 +42,7 @@
   {onclick}
   {onlongclick}
   {oncontextmenu}
-  class="flex w-full items-center py-1.5 pr-2 pl-4 {dim ? 'opacity-50' : ''} {className}"
+  class="flex w-full items-center {padding} {dim ? 'opacity-50' : ''} {className}"
 >
   {@render leading?.()}
   {#if IconComponent}
@@ -48,7 +52,13 @@
     <p class="truncate text-body-lg">{title}</p>
     {#if subtitle}
       <div class="flex items-center">
-        <p class="min-w-0 flex-1 truncate text-body-sm text-on-surface-variant">{subtitle}</p>
+        <p
+          class="min-w-0 flex-1 text-body-sm text-on-surface-variant {subtitleLines > 1
+            ? 'line-clamp-2'
+            : 'truncate'}"
+        >
+          {subtitle}
+        </p>
         {@render subtitleTrailing?.()}
       </div>
     {/if}

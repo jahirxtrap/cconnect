@@ -640,7 +640,6 @@
             <DropdownMenu.Content
               onOpenAutoFocus={(event) => event.preventDefault()}
               onCloseAutoFocus={(event) => event.preventDefault()}
-              align="end"
               sideOffset={4}
               collisionPadding={layout.menuPadding}
               class={MENU_CONTENT_CLASS}
@@ -859,7 +858,6 @@
             onOpenAutoFocus={(event) => event.preventDefault()}
             onCloseAutoFocus={(event) => event.preventDefault()}
             side="top"
-            align="end"
             sideOffset={4}
             class={MENU_CONTENT_CLASS}
           >

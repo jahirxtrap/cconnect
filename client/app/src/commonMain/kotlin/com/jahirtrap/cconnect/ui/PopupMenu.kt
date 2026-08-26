@@ -1,8 +1,10 @@
 package com.jahirtrap.cconnect.ui
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -19,10 +21,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,6 +49,15 @@ private val MenuMinWidth = 160.dp
 private val SubMenuMinWidth = 192.dp
 private val MenuMaxHeight = 384.dp
 val MenuPadding = 4.dp
+val MenuEdge = 8.dp
+private const val MenuExitMillis = 90
+
+@Stable
+class SubMenuScope {
+    var active by mutableStateOf<Any?>(null)
+}
+
+val LocalSubMenuScope = staticCompositionLocalOf<SubMenuScope?> { null }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -67,17 +81,22 @@ private fun MenuPopup(
     ) {
         val transition = rememberTransition(state, "MenuPopup")
         val scale by transition.animateFloat(
-            transitionSpec = { MaterialTheme.motionScheme.fastSpatialSpec() },
-        ) { if (it) 1f else 0.8f }
+            transitionSpec = {
+                if (targetState) MaterialTheme.motionScheme.fastSpatialSpec() else tween(MenuExitMillis, easing = LinearEasing)
+            },
+        ) { if (it) 1f else 0.96f }
         val alpha by transition.animateFloat(
-            transitionSpec = { MaterialTheme.motionScheme.fastEffectsSpec() },
+            transitionSpec = {
+                if (targetState) MaterialTheme.motionScheme.fastEffectsSpec() else tween(MenuExitMillis, easing = LinearEasing)
+            },
         ) { if (it) 1f else 0f }
+        val shownScale = if (state.targetState) scale else 1f
         val shape = RoundedCornerShape(Radius.md)
         Surface(
             modifier = modifier
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = shownScale
+                    scaleY = shownScale
                     this.alpha = alpha
                     transformOrigin = origin
                 }
@@ -87,15 +106,17 @@ private fun MenuPopup(
             tonalElevation = 0.dp,
             border = BorderStroke(snapDp(2.dp), MaterialTheme.colorScheme.outlineVariant),
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(MenuPadding)
-                    .heightIn(max = MenuMaxHeight)
-                    .width(IntrinsicSize.Max)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Spacer(Modifier.width((minWidth - MenuPadding * 2).coerceAtLeast(0.dp)))
-                content()
+            CompositionLocalProvider(LocalSubMenuScope provides remember { SubMenuScope() }) {
+                Column(
+                    modifier = Modifier
+                        .padding(MenuPadding)
+                        .heightIn(max = MenuMaxHeight)
+                        .width(IntrinsicSize.Max)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    Spacer(Modifier.width((minWidth - MenuPadding * 2).coerceAtLeast(0.dp)))
+                    content()
+                }
             }
         }
     }
@@ -110,12 +131,14 @@ fun AppDropdownMenu(
     properties: PopupProperties = PopupProperties(focusable = true),
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val gap = with(LocalDensity.current) { MenuPadding.roundToPx() }
+    val density = LocalDensity.current
+    val gap = with(density) { MenuPadding.roundToPx() }
+    val edge = with(density) { MenuEdge.roundToPx() }
     var above by remember { mutableStateOf(false) }
     MenuPopup(
         expanded = expanded,
         onDismiss = onDismissRequest,
-        positionProvider = remember(gap) { BelowAnchorPositionProvider(gap) { above = it } },
+        positionProvider = remember(gap, edge) { BelowAnchorPositionProvider(gap, edge) { above = it } },
         origin = TransformOrigin(0f, if (above) 1f else 0f),
         minWidth = minWidth,
         modifier = modifier,
@@ -132,11 +155,13 @@ fun AbovePopupMenu(
 ) {
     if (expanded) DropdownScrim(onDismiss)
     if (expanded) Dismissable(onDismiss = onDismiss)
-    val gap = with(LocalDensity.current) { MenuPadding.roundToPx() }
+    val density = LocalDensity.current
+    val gap = with(density) { MenuPadding.roundToPx() }
+    val edge = with(density) { MenuEdge.roundToPx() }
     MenuPopup(
         expanded = expanded,
         onDismiss = onDismiss,
-        positionProvider = remember(gap) { AboveAnchorPositionProvider(gap) },
+        positionProvider = remember(gap, edge) { AboveAnchorPositionProvider(gap, edge) },
         origin = TransformOrigin(0f, 1f),
         minWidth = MenuMinWidth,
         modifier = Modifier,
@@ -152,11 +177,13 @@ fun SubMenuPopup(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val pad = with(LocalDensity.current) { MenuPadding.roundToPx() }
+    val density = LocalDensity.current
+    val pad = with(density) { MenuPadding.roundToPx() }
+    val edge = with(density) { MenuEdge.roundToPx() }
     MenuPopup(
         expanded = expanded,
         onDismiss = onDismiss,
-        positionProvider = remember(pad) { BesideAnchorPositionProvider(pad) },
+        positionProvider = remember(pad, edge) { BesideAnchorPositionProvider(pad, edge) },
         origin = TransformOrigin(0f, 0f),
         minWidth = SubMenuMinWidth,
         modifier = modifier,
@@ -167,6 +194,7 @@ fun SubMenuPopup(
 
 class BelowAnchorPositionProvider(
     private val gapPx: Int,
+    private val edgePx: Int,
     private val onPlacedAbove: (Boolean) -> Unit = {},
 ) : PopupPositionProvider {
     override fun calculatePosition(
@@ -177,15 +205,15 @@ class BelowAnchorPositionProvider(
     ): IntOffset {
         val below = anchorBounds.bottom + gapPx
         val above = anchorBounds.top - popupContentSize.height - gapPx
-        val fitsBelow = below + popupContentSize.height <= windowSize.height
+        val fitsBelow = below + popupContentSize.height <= windowSize.height - edgePx
         onPlacedAbove(!fitsBelow)
-        val y = if (fitsBelow) below else above.coerceAtLeast(0)
-        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-        return IntOffset(anchorBounds.left.coerceIn(0, maxX), y)
+        val y = if (fitsBelow) below else above.coerceAtLeast(edgePx)
+        val maxX = (windowSize.width - popupContentSize.width - edgePx).coerceAtLeast(edgePx)
+        return IntOffset(anchorBounds.left.coerceIn(edgePx, maxX), y)
     }
 }
 
-class BesideAnchorPositionProvider(private val padPx: Int) : PopupPositionProvider {
+class BesideAnchorPositionProvider(private val padPx: Int, private val edgePx: Int) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -194,21 +222,22 @@ class BesideAnchorPositionProvider(private val padPx: Int) : PopupPositionProvid
     ): IntOffset {
         val right = anchorBounds.right + padPx
         val left = anchorBounds.left - popupContentSize.width - padPx
-        val x = if (right + popupContentSize.width <= windowSize.width) right else left.coerceAtLeast(0)
-        val maxY = (windowSize.height - popupContentSize.height).coerceAtLeast(0)
-        return IntOffset(x, (anchorBounds.top - padPx).coerceIn(0, maxY))
+        val fitsRight = right + popupContentSize.width <= windowSize.width - edgePx
+        val x = if (fitsRight) right else left.coerceAtLeast(edgePx)
+        val maxY = (windowSize.height - popupContentSize.height - edgePx).coerceAtLeast(edgePx)
+        return IntOffset(x, (anchorBounds.top - padPx).coerceIn(edgePx, maxY))
     }
 }
 
-class AboveAnchorPositionProvider(private val gapPx: Int) : PopupPositionProvider {
+class AboveAnchorPositionProvider(private val gapPx: Int, private val edgePx: Int) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        val y = (anchorBounds.top - popupContentSize.height - gapPx).coerceAtLeast(0)
-        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-        return IntOffset(anchorBounds.left.coerceIn(0, maxX), y)
+        val y = (anchorBounds.top - popupContentSize.height - gapPx).coerceAtLeast(edgePx)
+        val maxX = (windowSize.width - popupContentSize.width - edgePx).coerceAtLeast(edgePx)
+        return IntOffset(anchorBounds.left.coerceIn(edgePx, maxX), y)
     }
 }

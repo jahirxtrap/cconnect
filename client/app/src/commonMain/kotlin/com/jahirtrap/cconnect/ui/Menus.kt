@@ -101,13 +101,19 @@ fun CompactDropdownSubMenu(
     val popupSource = remember { MutableInteractionSource() }
     val overTrigger by triggerSource.collectIsHoveredAsState()
     val overPopup by popupSource.collectIsHoveredAsState()
+    val siblings = LocalSubMenuScope.current
+    val id = remember { Any() }
     LaunchedEffect(overTrigger, overPopup) {
-        if (overTrigger) {
-            onExpandedChange(true)
-        } else if (!overPopup) {
+        if (overTrigger || overPopup) {
+            siblings?.active = id
+            if (overTrigger) onExpandedChange(true)
+        } else {
             delay(SUBMENU_CLOSE_MS)
             onExpandedChange(false)
         }
+    }
+    LaunchedEffect(siblings?.active) {
+        if (siblings != null && siblings.active !== id && expanded) onExpandedChange(false)
     }
     Box(modifier = Modifier.hoverable(triggerSource)) {
         CompactDropdownItem(
@@ -121,7 +127,10 @@ fun CompactDropdownSubMenu(
                     modifier = Modifier.size(16.dp),
                 )
             },
-            onClick = { onExpandedChange(!expanded) },
+            onClick = {
+                siblings?.active = id
+                onExpandedChange(!expanded)
+            },
         )
         SubMenuPopup(
             expanded = expanded,

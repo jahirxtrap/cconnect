@@ -235,7 +235,6 @@
               onOpenAutoFocus={(event) => event.preventDefault()}
               onCloseAutoFocus={(event) => event.preventDefault()}
               side="top"
-              align="start"
               sideOffset={6}
               class={MENU_CONTENT_CLASS}
             >

@@ -14,7 +14,8 @@
     align?: "start" | "center" | "end";
     matchTriggerWidth?: boolean;
     triggerClass?: string;
-    trigger: Snippet;
+    trigger?: Snippet;
+    triggerChild?: Snippet<[Record<string, unknown>]>;
     children: Snippet;
   }
 
@@ -27,6 +28,7 @@
     matchTriggerWidth = false,
     triggerClass = "",
     trigger,
+    triggerChild,
     children,
   }: Props = $props();
 </script>
@@ -34,9 +36,17 @@
 <MenuScrim {open} onDismiss={() => onOpenChange(false)} />
 
 <DropdownMenu.Root {open} {onOpenChange}>
-  <DropdownMenu.Trigger onmousedown={holdFocus} class={triggerClass} aria-label={label}>
-    {@render trigger()}
-  </DropdownMenu.Trigger>
+  {#if triggerChild}
+    <DropdownMenu.Trigger onmousedown={holdFocus}>
+      {#snippet child({ props })}
+        {@render triggerChild(props)}
+      {/snippet}
+    </DropdownMenu.Trigger>
+  {:else}
+    <DropdownMenu.Trigger onmousedown={holdFocus} class={triggerClass} aria-label={label}>
+      {@render trigger?.()}
+    </DropdownMenu.Trigger>
+  {/if}
   <DropdownMenu.Portal>
     <DropdownMenu.Content
       onOpenAutoFocus={(event) => event.preventDefault()}

@@ -51,6 +51,8 @@
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import MenuItem from "$lib/ui/MenuItem.svelte";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { componentLabel, componentTone, incidentLabel, indicatorLabel, indicatorTone } from "./serviceStatus";
 
@@ -62,6 +64,7 @@
   const { kind, onClose }: Props = $props();
 
   const STATUS_PAGE = "https://status.claude.com";
+  const ROW_PADDING = "py-2 pr-4 pl-4";
   const SKILL_FILE = "SKILL.md";
   const TRANSPORTS = ["stdio", "http", "sse"];
 
@@ -91,6 +94,7 @@
   let catalogMarket = $state<string | null>(null);
   let catalog = $state<CatalogPlugin[] | null>(null);
   let catalogQuery = $state("");
+  let marketPicker = $state(false);
   let installCandidate = $state<CatalogPlugin | null>(null);
   let mcpMenu = $state<McpServer | null>(null);
   let confirmMcpRemove = $state<McpServer | null>(null);
@@ -217,7 +221,9 @@
 </script>
 
 {#snippet stateDot(enabled: boolean)}
-  <StatusDot class={enabled ? "bg-green" : "bg-outline-variant"} box={16} dot={10} />
+  <span class="ml-3 inline-flex">
+    <StatusDot class={enabled ? "bg-green" : "bg-outline-variant"} box={16} dot={10} />
+  </span>
 {/snippet}
 
 <div class="flex h-full flex-col">
@@ -314,6 +320,7 @@
       {#if kind === "plugins"}
         {#each extensions?.plugins ?? [] as plugin (pluginKey(plugin))}
           <ListRow
+            padding={ROW_PADDING}
             title={plugin.name}
             subtitle={[plugin.marketplace, plugin.version, plugin.scope].filter(Boolean).join(" • ")}
             onclick={() => (pluginMenu = plugin)}
@@ -326,6 +333,7 @@
       {:else if kind === "skills"}
         {#each filteredSkills as skill (`${skill.plugin}/${skill.id}`)}
           <ListRow
+            padding={ROW_PADDING}
             title={skill.name}
             subtitle={skill.description ?? skill.pluginName}
             onclick={() => (skillSheet = skill)}
@@ -338,6 +346,7 @@
       {:else if kind === "mcp"}
         {#each mcpServers ?? [] as server (server.name)}
           <ListRow
+            padding={ROW_PADDING}
             title={server.name}
             subtitle={[server.enabled ? null : t("DISABLED_STATE"), server.type, server.detail]
               .filter(Boolean)
@@ -351,7 +360,12 @@
         {/each}
       {:else if kind === "marketplaces"}
         {#each extensions?.marketplaces ?? [] as market (market.name)}
-          <ListRow title={market.name} subtitle={market.repo} onclick={() => (marketMenu = market)}>
+          <ListRow
+            padding={ROW_PADDING}
+            title={market.name}
+            subtitle={market.repo}
+            onclick={() => (marketMenu = market)}
+          >
             {#snippet trailing()}
               {@render stateDot(true)}
             {/snippet}
@@ -531,34 +545,56 @@
   {@const market = catalogMarket}
   <CompactDialog title={market} padded={false} onDismiss={() => (catalogMarket = null)}>
     {#snippet titleTrailing()}
-      <TooltipIconButton label={t("MARKETPLACES")} onclick={() => (catalogMarket = null)} class="[&_svg]:size-5">
-        <Store size={20} />
-      </TooltipIconButton>
+      <PopupMenu open={marketPicker} label={t("MARKETPLACES")} onOpenChange={(open) => (marketPicker = open)}>
+        {#snippet triggerChild(props)}
+          <TooltipIconButton label={t("MARKETPLACES")} class="[&_svg]:size-5" {...props}>
+            <Store size={20} />
+          </TooltipIconButton>
+        {/snippet}
+        {#each extensions?.marketplaces ?? [] as entry (entry.name)}
+          <MenuItem
+            text={entry.name}
+            selected={entry.name === market}
+            onclick={() => {
+              marketPicker = false;
+              void openCatalog(entry.name);
+            }}
+          />
+        {/each}
+      </PopupMenu>
     {/snippet}
     {#snippet buttons()}
       <Button onclick={() => (catalogMarket = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
-    <div class="px-5 pb-2">
+    {#snippet header()}
       <InputField value={catalogQuery} oninput={(value) => (catalogQuery = value)} label={t("SEARCH")} singleLine />
-    </div>
+    {/snippet}
     {#if !catalog}
       <CenteredProgress class="py-6" />
     {:else}
       {#each filteredCatalog as entry (entry.name)}
-        <ListRow
-          title={entry.name + (entry.version ? ` - ${entry.version}` : "")}
-          subtitle={entry.description}
-          dim={!entry.installed}
-          onclick={() => {
-            if (entry.installed) {
-              pluginMenu =
-                extensions?.plugins.find((item) => item.name === entry.name && item.marketplace === market) ?? null;
-              catalogMarket = null;
-            } else {
-              installCandidate = entry;
-            }
-          }}
-        />
+        <div class="px-5">
+          <ListRow
+            class="rounded-lg"
+            padding="py-2.5 pr-3 pl-3"
+            subtitleLines={2}
+            title={entry.name + (entry.version ? ` - ${entry.version}` : "")}
+            subtitle={entry.description}
+            onclick={() => {
+              if (entry.installed) {
+                pluginMenu =
+                  extensions?.plugins.find((item) => item.name === entry.name && item.marketplace === market) ?? null;
+                catalogMarket = null;
+              } else {
+                installCandidate = entry;
+              }
+            }}
+          >
+            {#snippet trailing()}
+              {@render stateDot(entry.installed)}
+            {/snippet}
+          </ListRow>
+        </div>
       {/each}
     {/if}
   </CompactDialog>
@@ -600,15 +636,6 @@
       </OutlinedPanel>
     {/if}
     <div class="flex flex-col gap-2.5">
-      <ActionButton
-        text={t("INSTALL")}
-        enabled={!busy}
-        onclick={() => {
-          marketMenu = null;
-          void openCatalog(market.name);
-        }}
-        class="w-full"
-      />
       <ActionButton
         text={t("UPDATE_ACTION")}
         enabled={!busy}
