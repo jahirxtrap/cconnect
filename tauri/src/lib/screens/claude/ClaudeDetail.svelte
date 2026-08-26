@@ -9,6 +9,7 @@
   import Store from "@lucide/svelte/icons/store";
   import X from "@lucide/svelte/icons/x";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { projectLabel } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
@@ -264,10 +265,7 @@
       <SelectField
         label={t("PROJECT")}
         selected={memoriesProject ?? ""}
-        options={chat.historyProjects.map((item) => ({
-          value: item.projectKey,
-          label: item.name ?? item.path ?? item.projectKey,
-        }))}
+        options={chat.historyProjects.map((item) => ({ value: item.projectKey, label: projectLabel(item) }))}
         onSelect={(key) => {
           memoriesProject = key;
           void claudeApi.memories(key).then((value) => (memories = value));

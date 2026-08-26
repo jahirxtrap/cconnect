@@ -1178,6 +1178,19 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
+    fun addProject(path: String, name: String? = null) {
+        val clean = path.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch { SessionsApi.addProject(clean, name?.trim()?.ifEmpty { null }) }
+    }
+
+    /** An empty name clears it, so the project falls back to the name of its folder. */
+    fun renameProject(project: ProjectInfo, name: String) {
+        val clean = name.trim()
+        if (clean == project.name.orEmpty()) return
+        viewModelScope.launch { SessionsApi.renameProject(project.projectKey, clean, project.path) }
+    }
+
     fun deleteProject(projectKey: String) {
         viewModelScope.launch {
             if (!SessionsApi.deleteProject(projectKey)) return@launch
@@ -1311,6 +1324,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             is ServerEvent.Open -> startSession(_state.value.sessionId)
             is ServerEvent.Ready -> {
                 if (!initialConsumed) consumeInitialSession(event.project)
+                // The server read it off the transcript, so it outranks whatever this tab was
+                // carrying (a tab restored from a URL has no cwd of its own).
+                event.cwd?.takeIf { it.isNotBlank() && it != ctx.cwd }?.let { ctx.cwd = it }
                 historyLoaded = false
                 val n = event.committedCount
                 pendingTrim = if (event.resumed && event.running) {

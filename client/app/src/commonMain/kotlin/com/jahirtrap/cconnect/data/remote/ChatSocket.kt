@@ -291,7 +291,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 channel = newChannel
                 lastSeq = 0
             }
-            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queuedItems(obj["queued"]), str("activity")))
+            return Triple(false, null, ServerEvent.Ready(str("session_id"), str("project"), newChannel, flag("running"), flag("resumed"), obj["committed_count"]?.jsonPrimitive?.intOrNull, queuedItems(obj["queued"]), str("activity"), str("cwd")))
         }
         val ch = str("channel")
         val side = ch != null && channel != null && ch != channel

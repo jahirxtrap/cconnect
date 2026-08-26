@@ -2,6 +2,8 @@ export interface ProjectInfo {
   projectKey: string;
   path: string | null;
   name: string | null;
+  /** The name was set by the user, so it can be reset back to the folder's own. */
+  customName: boolean;
   sessionCount: number;
   lastActive: number | null;
 }
@@ -49,6 +51,7 @@ export const parseProject = (raw: Wire): ProjectInfo => ({
   projectKey: text(raw.project_key) ?? "",
   path: text(raw.path),
   name: text(raw.name),
+  customName: raw.custom_name === true,
   sessionCount: number(raw.session_count) ?? 0,
   lastActive: number(raw.last_active),
 });
@@ -72,6 +75,10 @@ export const parseCategory = (raw: Wire): ChatCategory => ({
   color: text(raw.color),
   collapsed: raw.collapsed === true,
 });
+
+/** What a project is called on screen: the name the user gave it, else its folder. */
+export const projectLabel = (project: ProjectInfo): string =>
+  project.name ?? project.path ?? project.projectKey;
 
 export const parsePlacement = (raw: Wire): ChatPlacement => ({
   sessionId: text(raw.session_id) ?? "",

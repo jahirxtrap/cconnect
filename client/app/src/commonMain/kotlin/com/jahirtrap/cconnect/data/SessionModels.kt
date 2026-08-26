@@ -6,7 +6,12 @@ data class ProjectInfo(
     val name: String?,
     val sessionCount: Int,
     val lastActive: Double?,
+    /** The name was set by the user, so it can be reset back to the folder's own. */
+    val customName: Boolean = false,
 )
+
+/** What a project is called on screen: the name the user gave it, else its folder. */
+fun projectLabel(project: ProjectInfo): String = project.name ?: project.path ?: project.projectKey
 
 data class ChatCategory(
     val id: String,

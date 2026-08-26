@@ -50,6 +50,22 @@ class SessionPlacement(Base):
     )
 
 
+class ProjectMeta(Base):
+    __tablename__ = "project_meta"
+
+    project_key: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Encoded project directory under ~/.claude/projects",
+    )
+    path: Mapped[str] = mapped_column(
+        comment="Working directory the project stands for",
+    )
+    name: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Display name; NULL falls back to the last folder of the path",
+    )
+
+
 class Setting(Base):
     __tablename__ = "settings"
 

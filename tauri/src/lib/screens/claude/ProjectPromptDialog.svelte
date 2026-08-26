@@ -1,7 +1,7 @@
 <script lang="ts">
   import Eraser from "@lucide/svelte/icons/eraser";
   import { untrack } from "svelte";
-  import type { ProjectInfo } from "$lib/data/models";
+  import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import { claudeApi } from "$lib/services/claudeApi";
   import Button from "$lib/ui/Button.svelte";
@@ -25,7 +25,7 @@
   let text = $state("");
 
   const options = $derived(
-    projects.map((item) => ({ value: item.projectKey, label: item.name ?? item.path ?? item.projectKey })),
+    projects.map((item) => ({ value: item.projectKey, label: projectLabel(item) })),
   );
 
   $effect(() => {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
-  import type { ProjectInfo } from "$lib/data/models";
+  import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -17,8 +17,6 @@
   const { projects, selected, onSelect, class: className = "" }: Props = $props();
 
   let open = $state(false);
-
-  const projectLabel = (project: ProjectInfo) => project.name ?? project.path ?? project.projectKey;
 
   const label = $derived.by(() => {
     if (selected === null) return t("ALL_PROJECTS");

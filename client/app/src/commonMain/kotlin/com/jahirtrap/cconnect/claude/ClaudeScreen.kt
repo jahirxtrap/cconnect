@@ -65,6 +65,7 @@ import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
 import com.jahirtrap.cconnect.chat.ConnectionState
+import com.jahirtrap.cconnect.data.projectLabel
 import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.AccountsApi
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
@@ -432,7 +433,7 @@ private fun CliInlineControls(
     var updating by remember { mutableStateOf(false) }
 
     val systemLabel = stringResource(Res.string.cli_source_system)
-    val customLabel = stringResource(Res.string.cli_source_custom)
+    val customLabel = stringResource(Res.string.custom_path)
     val bundledLabel = stringResource(Res.string.cli_source_bundled)
     fun labelFor(src: String) = when (src) {
         "system" -> systemLabel
@@ -559,7 +560,7 @@ internal fun ProjectPromptDialog(
         SelectField(
             label = stringResource(Res.string.project),
             selected = project,
-            options = projects.map { it.projectKey to (it.name ?: it.path ?: it.projectKey) },
+            options = projects.map { it.projectKey to projectLabel(it) },
             enabled = !projectLocked,
             onSelect = { project = it },
         )

@@ -56,7 +56,7 @@
     <string name="cli">Claude CLI</string>
     <string name="cli_source">CLI source</string>
     <string name="cli_source_system">System</string>
-    <string name="cli_source_custom">Custom path</string>
+    <string name="custom_path">Custom path</string>
     <string name="cli_source_bundled">Bundled</string>
     <string name="cli_custom_path">CLI path</string>
     <string name="cli_update">Update to latest</string>
@@ -313,6 +313,9 @@
     <string name="organize">Organize</string>
     <string name="categories">Categories</string>
     <string name="projects">Projects</string>
+    <string name="add_project">Add project</string>
+    <string name="browse">Browse</string>
+    <string name="reset_name">Reset name</string>
     <string name="add_category">Add category</string>
     <string name="no_category">No category</string>
     <string name="category">Category</string>

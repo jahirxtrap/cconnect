@@ -10,6 +10,7 @@ from core.config import COLORS
 from core.responses import api_response
 from services import categories as categories_service
 from services import chat_list
+from services import projects as projects_service
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services.live_sessions import registry
@@ -46,6 +47,16 @@ class CategoryBody(BaseModel):
 class PlacementBody(BaseModel):
     category_id: Optional[str] = None
     index: Optional[int] = None
+
+
+class NewProjectBody(BaseModel):
+    path: str
+    name: Optional[str] = None
+
+
+class ProjectNameBody(BaseModel):
+    name: str
+    path: Optional[str] = None
 
 
 @router.get("/sessions/categories")
@@ -97,6 +108,28 @@ async def place_session(session_id: str, body: PlacementBody):
     return api_response(data=placement)
 
 
+@router.post("/sessions/projects")
+async def add_project(body: NewProjectBody):
+    try:
+        created = projects_service.register(body.path, body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    await chat_list.hub.resync()
+    return api_response(data=created)
+
+
+@router.patch("/sessions/projects/{project_key}")
+async def rename_project(project_key: str, body: ProjectNameBody):
+    try:
+        renamed = projects_service.rename(project_key, body.name, body.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if renamed is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    await chat_list.hub.resync()
+    return api_response(data=renamed)
+
+
 @router.delete("/sessions/projects/{project_key}")
 async def delete_project(project_key: str):
     try:
@@ -105,10 +138,11 @@ async def delete_project(project_key: str):
         raise HTTPException(status_code=409, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    if removed is None:
+    registered = projects_service.forget(project_key)
+    if removed is None and not registered:
         raise HTTPException(status_code=404, detail="project not found")
     await chat_list.hub.resync()
-    return api_response(data={"removed": removed}, message="deleted")
+    return api_response(data={"removed": removed or []}, message="deleted")
 
 
 @router.delete("/sessions/{session_id}")

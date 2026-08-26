@@ -288,7 +288,11 @@ async def chat_ws(ws: WebSocket):
                     session.state.account = msg.account
                 else:
                     state = _Session()
-                    state.cwd = msg.cwd or DEFAULT_CWD
+                    # A resume takes the cwd from the transcript: the client's own can be stale
+                    # (a moved chat, or a tab restored from a URL, which carries no cwd), and
+                    # trusting it announces the wrong project right back to it.
+                    resumed_cwd = sessions_service.find_session_cwd(msg.resume) if msg.resume else None
+                    state.cwd = resumed_cwd or msg.cwd or DEFAULT_CWD
                     requested = msg.permission_mode or settings_store.get("permission_mode")
                     state.permission_mode = (
                         requested if requested in permission_modes()
@@ -308,6 +312,7 @@ async def chat_ws(ws: WebSocket):
                     "type": "ready",
                     "session_id": session.state.session_id,
                     "project": sessions_service.project_key_for(session.state.cwd or ""),
+                    "cwd": session.state.cwd,
                     "channel": session.channel,
                     "running": session.running,
                     "activity": session.activity,

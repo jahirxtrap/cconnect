@@ -63,6 +63,7 @@ import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
 import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.formatDateShort
 import com.jahirtrap.cconnect.data.parseIsoMillis
+import com.jahirtrap.cconnect.data.projectLabel
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
@@ -225,7 +226,7 @@ fun ClaudeDetailScreen(
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             if (kind == ClaudeKind.Memories) {
-                val projects = state.historyProjects.map { it.projectKey to (it.name ?: it.path ?: it.projectKey) }
+                val projects = state.historyProjects.map { it.projectKey to projectLabel(it) }
                 if (projects.isNotEmpty()) {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)) {
                         SelectField(

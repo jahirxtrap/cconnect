@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -35,10 +36,28 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
+import com.composables.icons.lucide.Folder
+import com.composables.icons.lucide.Lucide
 import com.jahirtrap.cconnect.isAndroidPlatform
+import com.jahirtrap.cconnect.resources.Res
+import com.jahirtrap.cconnect.resources.choose
 import com.jahirtrap.cconnect.ui.theme.Radius
+import org.jetbrains.compose.resources.stringResource
 import com.jahirtrap.cconnect.ui.theme.shadowLg
 import kotlinx.coroutines.launch
+
+/** Folder button that sits inside a path field, next to the local-server and project ones. */
+@Composable
+fun PickerIcon(onClick: () -> Unit) {
+    TooltipIconButton(label = stringResource(Res.string.choose), onClick = onClick, size = 24.dp) {
+        Icon(
+            Lucide.Folder,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

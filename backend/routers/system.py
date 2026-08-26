@@ -9,7 +9,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 from core.config import RESTART_EXIT_CODE, RESTART_FLAG
 from core.responses import api_response
 from middleware.public_auth import ws_bearer_ok
-from services import system_monitor
+from services import directories, system_monitor
 
 router = APIRouter(tags=["system"])
 
@@ -36,6 +36,15 @@ async def restart_server():
 
     asyncio.get_running_loop().create_task(_exit_soon())
     return api_response()
+
+
+@router.get("/system/dirs")
+def list_dirs(
+    path: str = Query("", description="Directory to list; empty starts at home"),
+    files: bool = Query(False, description="Include files, for pickers choosing one"),
+):
+    """Folder tree for the path pickers, for the clients that have no native file dialog."""
+    return api_response(data=directories.listing(path, files))
 
 
 @router.websocket("/system/ws")

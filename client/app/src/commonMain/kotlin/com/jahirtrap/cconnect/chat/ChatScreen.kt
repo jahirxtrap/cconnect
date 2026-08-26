@@ -234,6 +234,7 @@ import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.PermissionMode
 import com.jahirtrap.cconnect.data.ProjectInfo
+import com.jahirtrap.cconnect.data.projectLabel
 import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.pending
@@ -270,10 +271,15 @@ import com.jahirtrap.cconnect.data.ChatCategory
 import com.composables.icons.lucide.ChevronRight
 import com.composables.icons.lucide.GripHorizontal
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.RotateCcw
 import com.composables.icons.lucide.Settings2
 import com.composables.icons.lucide.Trash
 import com.jahirtrap.cconnect.ui.ActionButton
 import com.jahirtrap.cconnect.ui.EditableText
+import com.jahirtrap.cconnect.ui.PathChoice
+import com.jahirtrap.cconnect.ui.PathPickerDialog
+import com.jahirtrap.cconnect.ui.PickerIcon
+import com.jahirtrap.cconnect.ui.pickPath
 import com.jahirtrap.cconnect.ui.CompactDropdownSubMenu
 import com.jahirtrap.cconnect.ui.ColorOption
 import com.jahirtrap.cconnect.ui.CompactDialog
@@ -293,6 +299,7 @@ import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.jahirtrap.cconnect.ui.theme.snapDp
 import com.jahirtrap.cconnect.settings.VisibilityDialog
@@ -348,6 +355,7 @@ fun ChatScreen(
     var deleteTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var colorTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var moveTarget by remember { mutableStateOf<SessionInfo?>(null) }
+    var movePreset by remember { mutableStateOf<String?>(null) }
     var newCategoryTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var organizeOpen by remember { mutableStateOf(false) }
     var confirmCommand by remember { mutableStateOf<CommandOption?>(null) }
@@ -551,7 +559,7 @@ fun ChatScreen(
                         onRename = { renameTarget = it },
                         onColor = { colorTarget = it },
                         onDelete = { deleteTarget = it },
-                        onMove = { moveTarget = it },
+                        onMove = { session, preset -> movePreset = preset; moveTarget = session },
                         onNewCategory = { newCategoryTarget = it },
                         onOrganize = { organizeOpen = true },
                     )
@@ -598,7 +606,7 @@ fun ChatScreen(
                                         onRename = { renameTarget = it },
                                         onColor = { colorTarget = it },
                                         onDelete = { deleteTarget = it },
-                                        onMove = { moveTarget = it },
+                                        onMove = { session, preset -> movePreset = preset; moveTarget = session },
                                         onNewCategory = { newCategoryTarget = it },
                                         onOrganize = { organizeOpen = true },
                                     )
@@ -1119,6 +1127,7 @@ fun ChatScreen(
         MoveSessionDialog(
             session = s,
             projects = state.historyProjects,
+            preset = movePreset,
             onConfirm = { cwd -> vm.moveSession(s, cwd); moveTarget = null },
             onDismiss = { moveTarget = null },
         )
@@ -1567,7 +1576,7 @@ private fun ColumnScope.ChatPanelContent(
     onRename: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
     onColor: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
     onDelete: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
-    onMove: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
+    onMove: (com.jahirtrap.cconnect.data.SessionInfo, String?) -> Unit,
     onNewCategory: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
     onOrganize: () -> Unit,
 ) {
@@ -1647,11 +1656,13 @@ private fun ColumnScope.ChatPanelContent(
                             onColor = { onColor(s) },
                             onOpenNewTab = { s.projectKey?.let { pk -> TabsController.openSessionTab(TabsController.active.ctx.environmentId, s.path.orEmpty(), s.sessionId, pk, s.title ?: s.preview, s.color); onAfterSelect() } },
                             onDelete = { onDelete(s) },
-                            onMove = { onMove(s) },
+                            onMove = { preset -> onMove(s, preset) },
                             categories = state.categories,
                             currentCategoryId = state.placement[s.sessionId]?.categoryId,
                             onPlace = { categoryId -> vm.placeSession(s.sessionId, categoryId) },
                             onNewCategory = { onNewCategory(s) },
+                            projects = state.historyProjects,
+                            currentProjectKey = s.projectKey,
                             activity = s.activity,
                         )
                     }
@@ -2490,7 +2501,6 @@ private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, lock
     }
 }
 
-private fun projectLabel(p: ProjectInfo): String = p.name ?: p.path ?: p.projectKey
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -2499,6 +2509,7 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
     var draft by remember { mutableStateOf("") }
     var deletingCategory by remember { mutableStateOf<ChatCategory?>(null) }
     var deletingProject by remember { mutableStateOf<ProjectInfo?>(null) }
+    var addingProject by remember { mutableStateOf(false) }
     var draggingId by remember { mutableStateOf<String?>(null) }
     var dragDy by remember { mutableStateOf(0f) }
     val rowHeights = remember { mutableStateMapOf<String, Float>() }
@@ -2622,18 +2633,29 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 modifier = Modifier.fillMaxWidth(),
             )
             FieldLabel(stringResource(Res.string.projects))
-            state.historyProjects.forEach { project ->
+            // Alphabetical: projects carry no order of their own, unlike categories.
+            state.historyProjects.sortedBy { projectLabel(it).lowercase() }.forEach { project ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        projectLabel(project),
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp),
+                    EditableText(
+                        value = if (editing == project.projectKey) draft else projectLabel(project),
+                        editing = editing == project.projectKey,
+                        onEdit = { editing = project.projectKey; draft = projectLabel(project) },
+                        onValueChange = { draft = it },
+                        onCommit = { if (draft.isNotBlank()) vm.renameProject(project, draft); editing = null },
+                        onCancel = { editing = null },
+                        modifier = Modifier.weight(1f),
+                        interactive = draggingId == null,
                     )
+                    if (project.customName) {
+                        TooltipIconButton(
+                            label = stringResource(Res.string.reset_name),
+                            onClick = { vm.renameProject(project, "") },
+                            size = 32.dp,
+                        ) { Icon(Lucide.RotateCcw, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    }
                     TooltipIconButton(
                         label = stringResource(Res.string.delete),
                         onClick = { deletingProject = project },
@@ -2641,6 +2663,11 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                     ) { Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp)) }
                 }
             }
+            ActionButton(
+                text = stringResource(Res.string.add_project),
+                onClick = { addingProject = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
     deletingCategory?.let { category ->
@@ -2659,6 +2686,55 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
             confirmLabel = stringResource(Res.string.delete),
             onConfirm = { vm.deleteProject(project.projectKey); deletingProject = null },
             onDismiss = { deletingProject = null },
+        )
+    }
+    if (addingProject) {
+        ProjectPathDialog(
+            onConfirm = { path, name -> vm.addProject(path, name.ifBlank { null }); addingProject = false },
+            onDismiss = { addingProject = false },
+        )
+    }
+}
+
+@Composable
+private fun ProjectPathDialog(onConfirm: (String, String) -> Unit, onDismiss: () -> Unit) {
+    var path by remember { mutableStateOf("") }
+    var name by remember { mutableStateOf("") }
+    var browsing by remember { mutableStateOf(false) }
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.add_project),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(path.trim(), name.trim()) }, enabled = path.isNotBlank()) {
+                Text(stringResource(Res.string.create))
+            }
+        },
+    ) {
+        InputField(
+            value = path,
+            onValueChange = { path = it },
+            singleLine = true,
+            placeholder = stringResource(Res.string.move_project_path),
+            // The path belongs to the machine running the backend, so browsing happens there.
+            trailingIcon = { PickerIcon { browsing = true } },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Box(Modifier.height(10.dp))
+        // Optional: left empty, the project shows the name of its folder.
+        InputField(
+            value = name,
+            onValueChange = { name = it },
+            singleLine = true,
+            placeholder = stringResource(Res.string.name),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+    if (browsing) {
+        PathPickerDialog(
+            onConfirm = { path = it; browsing = false },
+            onDismiss = { browsing = false },
+            start = path,
         )
     }
 }
@@ -2764,43 +2840,52 @@ private fun CategoryHeader(category: ChatCategory, count: Int, onToggle: () -> U
 private fun MoveSessionDialog(
     session: SessionInfo,
     projects: List<ProjectInfo>,
+    /** Project path picked in the menu; null opens straight on the custom-path field. */
+    preset: String?,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val targets = projects.filter { it.projectKey != session.projectKey }.mapNotNull { it.path }.distinct()
-    var path by remember { mutableStateOf(targets.firstOrNull().orEmpty()) }
+    var custom by remember { mutableStateOf("") }
+    var browsing by remember { mutableStateOf(false) }
+    val target = preset ?: custom.trim()
+    // The menu already picked the project, so that case is only confirmed here.
+    val targetName = preset?.let { path -> projects.firstOrNull { it.path == path }?.let(::projectLabel) ?: path }
     CompactDialog(
         onDismiss = onDismiss,
         title = stringResource(Res.string.move_to_project),
+        description = targetName,
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
-            Button(onClick = { onConfirm(path) }, enabled = path.isNotBlank() && path != session.path) {
+            Button(onClick = { onConfirm(target) }, enabled = target.isNotBlank() && target != session.path) {
                 Text(stringResource(Res.string.move))
             }
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            if (targets.isNotEmpty()) {
-                SelectField(
-                    label = stringResource(Res.string.project),
-                    selected = path,
-                    options = targets.map { it to it },
-                    onSelect = { path = it },
+            if (preset == null) {
+                InputField(
+                    value = custom,
+                    onValueChange = { custom = it },
+                    singleLine = true,
+                    placeholder = stringResource(Res.string.move_project_path),
+                    // The path belongs to the machine running the backend, so browsing happens there.
+                    trailingIcon = { PickerIcon { browsing = true } },
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
-            InputField(
-                value = path,
-                onValueChange = { path = it },
-                singleLine = true,
-                placeholder = stringResource(Res.string.move_project_path),
-                modifier = Modifier.fillMaxWidth(),
-            )
             Text(
                 stringResource(Res.string.move_project_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+    if (browsing) {
+        PathPickerDialog(
+            onConfirm = { custom = it; browsing = false },
+            onDismiss = { browsing = false },
+            start = custom,
+        )
     }
 }
 
@@ -2814,16 +2899,20 @@ private fun ConversationRow(
     onColor: () -> Unit,
     onOpenNewTab: () -> Unit,
     onDelete: () -> Unit,
-    onMove: () -> Unit,
+    /** `preset` is the project path to land on, or null to type a custom one. */
+    onMove: (String?) -> Unit,
     categories: List<ChatCategory> = emptyList(),
     currentCategoryId: String? = null,
     onPlace: (String?) -> Unit = {},
     onNewCategory: () -> Unit = {},
+    projects: List<ProjectInfo> = emptyList(),
+    currentProjectKey: String? = null,
     selected: Boolean = false,
     activity: String? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
     var categoryMenu by remember { mutableStateOf(false) }
+    var projectMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2868,7 +2957,6 @@ private fun ConversationRow(
                 CompactDropdownItem(stringResource(Res.string.auto_rename)) { menu = false; onAutoRename() }
                 CompactDropdownItem(stringResource(Res.string.conversation_color)) { menu = false; onColor() }
                 CompactDropdownItem(stringResource(Res.string.open_in_new_tab)) { menu = false; onOpenNewTab() }
-                CompactDropdownItem(stringResource(Res.string.move_to_project)) { menu = false; onMove() }
                 CompactDropdownSubMenu(
                     text = stringResource(Res.string.category),
                     expanded = categoryMenu,
@@ -2902,6 +2990,36 @@ private fun ConversationRow(
                         menu = false
                         categoryMenu = false
                         onNewCategory()
+                    }
+                }
+                CompactDropdownSubMenu(
+                    text = stringResource(Res.string.project),
+                    expanded = projectMenu,
+                    onExpandedChange = { projectMenu = it },
+                ) {
+                    projects.forEach { project ->
+                        val path = project.path
+                        val current = project.projectKey == currentProjectKey
+                        CompactDropdownItem(projectLabel(project), selected = current) {
+                            menu = false
+                            projectMenu = false
+                            if (!current && path != null) onMove(path)
+                        }
+                    }
+                    CompactDropdownItem(
+                        stringResource(Res.string.add_project),
+                        trailing = {
+                            Icon(
+                                Lucide.Plus,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                    ) {
+                        menu = false
+                        projectMenu = false
+                        onMove(null)
                     }
                 }
                 CompactDropdownItem(stringResource(Res.string.delete)) { menu = false; onDelete() }

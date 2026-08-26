@@ -2,6 +2,19 @@ import { backend, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 import { ReconnectingSocket } from "./socket";
 
+export interface DirEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+}
+
+export interface DirListing {
+  path: string;
+  parent: string | null;
+  roots: string[];
+  entries: DirEntry[];
+}
+
 export interface DiskInfo {
   mount: string;
   used: number;
@@ -107,6 +120,22 @@ const parseLog = (raw: Wire): LogEntry => ({
 export const createSystemApi = (client: HttpClient, profile: () => Profile) => ({
   async restart(): Promise<boolean> {
     return (await client.post("/system/restart")) !== null;
+  },
+
+  /** Folder tree for the path picker, for the platforms without a native file dialog. */
+  async dirs(path: string, files = false): Promise<DirListing | null> {
+    const data = await client.get<Wire>(`/system/dirs?path=${encodeURIComponent(path)}&files=${files}`);
+    if (!data) return null;
+    return {
+      path: typeof data.path === "string" ? data.path : "",
+      parent: typeof data.parent === "string" ? data.parent : null,
+      roots: Array.isArray(data.roots) ? (data.roots as string[]) : [],
+      entries: (Array.isArray(data.entries) ? (data.entries as Wire[]) : []).map((item) => ({
+        name: typeof item.name === "string" ? item.name : "",
+        path: typeof item.path === "string" ? item.path : "",
+        isDir: item.is_dir === true,
+      })),
+    };
   },
 
   stream(handlers: SystemHandlers): ReconnectingSocket {

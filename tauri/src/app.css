@@ -243,7 +243,15 @@ textarea,
   user-select: text;
   -webkit-user-select: text;
   -webkit-touch-callout: default;
-  cursor: auto;
+}
+
+/* In a layer so a `cursor-*` utility still wins: unlayered rules beat Tailwind's layers. */
+@layer base {
+  input,
+  textarea,
+  .selectable {
+    cursor: auto;
+  }
 }
 
 .no-callout {

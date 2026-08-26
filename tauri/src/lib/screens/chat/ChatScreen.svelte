@@ -75,6 +75,7 @@
   let deleteTarget = $state<SessionInfo | null>(null);
   let colorTarget = $state<SessionInfo | null>(null);
   let moveTarget = $state<SessionInfo | null>(null);
+  let movePreset = $state<string | null>(null);
   let newCategoryTarget = $state<SessionInfo | null>(null);
   let organizeOpen = $state(false);
   let confirmCommand = $state<CommandOption | null>(null);
@@ -242,7 +243,7 @@
           onRename={(session) => (renameTarget = session)}
           onColor={(session) => (colorTarget = session)}
           onDelete={(session) => (deleteTarget = session)}
-          onMove={(session) => (moveTarget = session)}
+          onMove={(session, preset) => ((movePreset = preset), (moveTarget = session))}
           onNewCategory={(session) => (newCategoryTarget = session)}
           onOrganize={() => (organizeOpen = true)}
         />
@@ -589,7 +590,7 @@
       onRename={(session) => (renameTarget = session)}
       onColor={(session) => (colorTarget = session)}
       onDelete={(session) => (deleteTarget = session)}
-      onMove={(session) => (moveTarget = session)}
+      onMove={(session, preset) => ((movePreset = preset), (moveTarget = session))}
       onNewCategory={(session) => (newCategoryTarget = session)}
       onOrganize={() => (organizeOpen = true)}
     />
@@ -631,6 +632,7 @@
   <MoveSessionDialog
     session={target}
     projects={chat.historyProjects}
+    preset={movePreset}
     onConfirm={(cwd) => {
       void chat.move(target, cwd);
       moveTarget = null;

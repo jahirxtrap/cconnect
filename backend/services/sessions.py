@@ -511,6 +511,24 @@ def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional
     return target_key
 
 
+def find_session_cwd(session_id: str) -> Optional[str]:
+    """The cwd a transcript records, looked up wherever it lives. What the client sends can be
+    stale — a chat moved to another project, or a tab restored from a URL, which carries no cwd —
+    and the transcript is the only thing that knows where the session actually belongs."""
+    if not session_id or "/" in session_id or "\\" in session_id:
+        return None
+    base = _base()
+    if not base.is_dir():
+        return None
+    for directory in base.iterdir():
+        if not directory.is_dir():
+            continue
+        file = directory / f"{session_id}.jsonl"
+        if file.is_file():
+            return _read_cwd(file)
+    return None
+
+
 def session_cwd(project_key: str, session_id: str) -> Optional[str]:
     file = _session_file(project_key, session_id)
     if not file.is_file():

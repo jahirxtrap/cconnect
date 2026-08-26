@@ -2,7 +2,8 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import Folder from "@lucide/svelte/icons/folder";
-  import { isTauri } from "$lib/platform";
+  import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
+  import { pickPath } from "$lib/ui/pathPicker.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { localServer } from "$lib/services/localServer.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -35,13 +36,16 @@
     { value: "caddy", label: t("MODE_CADDY") },
   ];
 
+  let browsing = $state<"dir" | "file" | null>(null);
+
   const pick = async (directory: boolean) => {
-    if (!isTauri) return;
-    const { open } = await import("@tauri-apps/plugin-dialog");
-    const selected = await open({ directory, multiple: false });
-    if (typeof selected !== "string") return;
-    if (directory) dir = selected;
-    else pythonPath = selected;
+    const mode = directory ? "dir" : "file";
+    const selected = await pickPath(mode);
+    if (selected === "fallback") browsing = mode;
+    else if (selected) {
+      if (directory) dir = selected;
+      else pythonPath = selected;
+    }
   };
 
   const info = $derived(localServer.info);
@@ -131,3 +135,17 @@
     {/if}
   </div>
 </CompactDialog>
+
+{#if browsing}
+  {@const mode = browsing}
+  <PathPickerDialog
+    {mode}
+    start={mode === "dir" ? dir : pythonPath}
+    onConfirm={(chosen) => {
+      if (mode === "dir") dir = chosen;
+      else pythonPath = chosen;
+      browsing = null;
+    }}
+    onDismiss={() => (browsing = null)}
+  />
+{/if}

@@ -18,6 +18,8 @@ export type ServerEvent =
       type: "ready";
       sessionId: string | null;
       project: string | null;
+      /** Where the session really lives, read off the transcript by the server. */
+      cwd: string | null;
       channel: string | null;
       running: boolean;
       resumed: boolean;
@@ -475,6 +477,7 @@ export class ChatSocket {
         type: "ready",
         sessionId: text(wire, "session_id"),
         project: text(wire, "project"),
+        cwd: text(wire, "cwd"),
         channel,
         running: flag(wire, "running"),
         resumed: flag(wire, "resumed"),

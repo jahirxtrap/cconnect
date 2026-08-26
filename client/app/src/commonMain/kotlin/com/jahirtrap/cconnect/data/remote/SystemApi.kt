@@ -17,6 +17,15 @@ import kotlinx.serialization.json.longOrNull
 
 object SystemApi {
 
+    data class DirEntry(val name: String, val path: String, val isDir: Boolean)
+
+    data class DirListing(
+        val path: String,
+        val parent: String?,
+        val roots: List<String>,
+        val entries: List<DirEntry>,
+    )
+
     data class DiskInfo(
         val mount: String,
         val used: Long,
@@ -70,6 +79,25 @@ object SystemApi {
     }
 
     suspend fun restart(): Boolean = Http.post("/system/restart", buildJsonObject {}) != null
+
+    /** Folder tree for the path picker, for the platforms without a native file dialog. */
+    suspend fun dirs(path: String, files: Boolean = false): DirListing? {
+        val data = Http.get("/system/dirs", mapOf("path" to path, "files" to files.toString()))?.jsonObject
+            ?: return null
+        return DirListing(
+            path = data["path"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            parent = data["parent"]?.jsonPrimitive?.contentOrNull,
+            roots = data["roots"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+            entries = data["entries"]?.jsonArray?.map { element ->
+                val entry = element.jsonObject
+                DirEntry(
+                    name = entry["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    path = entry["path"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    isDir = entry["is_dir"]?.jsonPrimitive?.contentOrNull == "true",
+                )
+            }.orEmpty(),
+        )
+    }
 
     fun stream(): Flow<Event> = callbackFlow {
         val socket = openWebSocket(Backend.systemWsUrl, Backend.authHeaders, object : WsListener {

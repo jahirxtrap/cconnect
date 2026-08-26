@@ -1,9 +1,12 @@
 <script lang="ts">
+  import Folder from "@lucide/svelte/icons/folder";
   import { t } from "$lib/i18n/index.svelte";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import InputField from "$lib/ui/InputField.svelte";
+  import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
     info: CliInfo;
@@ -17,12 +20,16 @@
   let customPath = $state("");
   let saving = $state(false);
   let updating = $state(false);
+  let browsing = $state(false);
+
+  // The CLI runs on the machine hosting the backend, so its path is browsed there.
+  const pick = () => (browsing = true);
 
   const labelFor = (value: string) =>
     value === "system"
       ? t("CLI_SOURCE_SYSTEM")
       : value === "custom"
-        ? t("CLI_SOURCE_CUSTOM")
+        ? t("CUSTOM_PATH")
         : value === "bundled"
           ? t("CLI_SOURCE_BUNDLED")
           : value;
@@ -67,7 +74,13 @@
       oninput={(value) => (customPath = value)}
       label={t("CLI_CUSTOM_PATH")}
       singleLine
-    />
+    >
+      {#snippet trailing()}
+        <TooltipIconButton label={t("CHOOSE")} onclick={pick} class="size-6 [&_svg]:size-[18px]">
+          <Folder />
+        </TooltipIconButton>
+      {/snippet}
+    </InputField>
   {/if}
   {#if dirty}
     <ActionButton
@@ -85,3 +98,15 @@
     />
   {/if}
 </div>
+
+{#if browsing}
+  <PathPickerDialog
+    mode="file"
+    start={customPath}
+    onConfirm={(chosen) => {
+      customPath = chosen;
+      browsing = false;
+    }}
+    onDismiss={() => (browsing = false)}
+  />
+{/if}

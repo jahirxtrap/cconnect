@@ -1,7 +1,7 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Plus from "@lucide/svelte/icons/plus";
-  import type { ChatCategory } from "$lib/data/models";
+  import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -19,12 +19,15 @@
     onAutoRename: () => void;
     onColor: () => void;
     onOpenNewTab: () => void;
-    onMove: () => void;
+    /** `preset` is the project path to land on, or null to type a custom one. */
+    onMove: (preset: string | null) => void;
     onDelete: () => void;
     categories?: ChatCategory[];
     currentCategoryId?: string | null;
     onPlace?: (categoryId: string | null) => void;
     onNewCategory?: () => void;
+    projects?: ProjectInfo[];
+    currentProjectKey?: string | null;
   }
 
   const {
@@ -42,6 +45,8 @@
     currentCategoryId = null,
     onPlace = () => {},
     onNewCategory = () => {},
+    projects = [],
+    currentProjectKey = null,
   }: Props = $props();
 
   let menu = $state(false);
@@ -104,7 +109,6 @@
       <MenuItem text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
       <MenuItem text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
       <MenuItem text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
-      <MenuItem text={t("MOVE_TO_PROJECT")} onclick={() => run(onMove)} />
       <MenuSub text={t("CATEGORY")}>
         {#if categories.length}
           <MenuItem
@@ -121,6 +125,21 @@
           {/each}
         {/if}
         <MenuItem text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)}>
+          {#snippet trailing()}
+            <Plus size={16} class="shrink-0 text-on-surface-variant" />
+          {/snippet}
+        </MenuItem>
+      </MenuSub>
+      <MenuSub text={t("PROJECT")}>
+        {#each projects as project (project.projectKey)}
+          {@const current = project.projectKey === currentProjectKey}
+          <MenuItem
+            text={projectLabel(project)}
+            selected={current}
+            onclick={() => run(() => (current || !project.path ? undefined : onMove(project.path)))}
+          />
+        {/each}
+        <MenuItem text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))}>
           {#snippet trailing()}
             <Plus size={16} class="shrink-0 text-on-surface-variant" />
           {/snippet}

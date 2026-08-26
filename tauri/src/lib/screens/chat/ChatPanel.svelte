@@ -30,7 +30,7 @@
     onRename: (session: SessionInfo) => void;
     onColor: (session: SessionInfo) => void;
     onDelete: (session: SessionInfo) => void;
-    onMove: (session: SessionInfo) => void;
+    onMove: (session: SessionInfo, preset: string | null) => void;
     onNewCategory: (session: SessionInfo) => void;
     onOrganize: () => void;
   }
@@ -171,11 +171,13 @@
                 onAfterSelect();
               }}
               onDelete={() => onDelete(session)}
-              onMove={() => onMove(session)}
+              onMove={(preset) => onMove(session, preset)}
               categories={chat.categories}
               currentCategoryId={chat.placement[session.sessionId]?.categoryId ?? null}
               onPlace={(categoryId) => void chat.placeSession(session.sessionId, categoryId)}
               onNewCategory={() => onNewCategory(session)}
+              projects={chat.historyProjects}
+              currentProjectKey={session.projectKey}
               activity={session.activity}
             />
           {/each}

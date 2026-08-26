@@ -34,6 +34,7 @@ object SessionsApi {
         name = o["name"]?.jsonPrimitive?.contentOrNull,
         sessionCount = o["session_count"]?.jsonPrimitive?.intOrNull ?: 0,
         lastActive = o["last_active"]?.jsonPrimitive?.doubleOrNull,
+        customName = o["custom_name"]?.jsonPrimitive?.contentOrNull == "true",
     )
 
     fun parseSession(o: JsonObject): SessionInfo = SessionInfo(
@@ -285,6 +286,18 @@ object SessionsApi {
 
     suspend fun deleteProject(projectKey: String): Boolean =
         Http.delete("/sessions/projects/$projectKey") != null
+
+    suspend fun addProject(path: String, name: String? = null): Boolean =
+        Http.post("/sessions/projects", buildJsonObject {
+            put("path", path)
+            put("name", name)
+        }) != null
+
+    suspend fun renameProject(projectKey: String, name: String, path: String?): Boolean =
+        Http.patch("/sessions/projects/$projectKey", buildJsonObject {
+            put("name", name)
+            put("path", path)
+        }) != null
 
     suspend fun moveSession(sessionId: String, project: String, cwd: String): String? =
         Http.post("/sessions/$sessionId/move", buildJsonObject {

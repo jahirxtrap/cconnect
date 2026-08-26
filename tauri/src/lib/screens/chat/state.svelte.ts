@@ -346,7 +346,10 @@ export class ChatState {
     if (!directory) return projects;
     const target = projectKeyOf(directory);
     if (projects.some((item) => item.projectKey === target || item.path === directory)) return projects;
-    return [{ projectKey: target, path: directory, name: null, sessionCount: 0, lastActive: null }, ...projects];
+    return [
+      { projectKey: target, path: directory, name: null, customName: false, sessionCount: 0, lastActive: null },
+      ...projects,
+    ];
   }
 
   addAttachments(files: File[]) {
@@ -973,6 +976,19 @@ export class ChatState {
     await this.#sessions.placeSession(sessionId, categoryId, index);
   }
 
+  async addProject(path: string, name: string | null = null) {
+    const clean = path.trim();
+    if (!clean) return;
+    await this.#sessions.addProject(clean, name?.trim() || null);
+  }
+
+  /** An empty name clears it, so the project falls back to the name of its folder. */
+  async renameProject(project: ProjectInfo, name: string) {
+    const clean = name.trim();
+    if (clean === (project.name ?? "")) return;
+    await this.#sessions.renameProject(project.projectKey, clean, project.path);
+  }
+
   async deleteProject(projectKey: string) {
     if (!(await this.#sessions.deleteProject(projectKey))) return;
     this.list?.removeProject(projectKey);
@@ -1469,6 +1485,12 @@ export class ChatState {
         this.connection = "connected";
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
+        // The server read it off the transcript, so it outranks whatever this tab was carrying
+        // (a tab restored from a URL has no cwd of its own).
+        if (event.cwd && event.cwd !== this.cwd) {
+          this.cwd = event.cwd;
+          this.onContextChange?.();
+        }
         this.streaming = event.running;
         this.activity = event.activity;
         const committed = event.committedCount;

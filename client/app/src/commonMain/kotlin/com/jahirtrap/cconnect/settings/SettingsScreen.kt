@@ -177,6 +177,7 @@ import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.SelectDialog
 import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.SwitchRow
+import com.jahirtrap.cconnect.ui.PickerIcon
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.LocalIsTouch
@@ -1352,18 +1353,6 @@ private fun AccentDialog(
 }
 
 @Composable
-private fun PickerIcon(onClick: () -> Unit) {
-    TooltipIconButton(label = stringResource(Res.string.choose), onClick = onClick, size = 24.dp) {
-        Icon(
-            Lucide.Folder,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(18.dp),
-        )
-    }
-}
-
-@Composable
 private fun LockToggle(locked: Boolean, onToggle: (Boolean) -> Unit, size: Dp = 36.dp) {
     TooltipIconButton(
         label = stringResource(if (locked) Res.string.unlock_selection else Res.string.lock_selection),
@@ -1805,7 +1794,7 @@ private fun CliDialog(
     var updating by remember { mutableStateOf(false) }
 
     val systemLabel = stringResource(Res.string.cli_source_system)
-    val customLabel = stringResource(Res.string.cli_source_custom)
+    val customLabel = stringResource(Res.string.custom_path)
     val bundledLabel = stringResource(Res.string.cli_source_bundled)
     fun labelFor(src: String) = when (src) {
         "system" -> systemLabel

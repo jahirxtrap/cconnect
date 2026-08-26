@@ -16,6 +16,7 @@ from typing import Optional
 from loguru import logger
 
 from core.config import CLAUDE_PROJECTS_DIR
+from services import projects as projects_service
 from services import sessions as sessions_service
 
 _DEBOUNCE_SECONDS = 0.5
@@ -28,7 +29,7 @@ def _session_sig(s: dict) -> tuple:
 
 
 def _project_sig(p: dict) -> tuple:
-    return (p.get("path"), p.get("name"), p.get("session_count"), p.get("last_active"))
+    return (p.get("path"), p.get("name"), p.get("custom_name"), p.get("session_count"), p.get("last_active"))
 
 
 class ChatListHub:
@@ -236,11 +237,28 @@ class ChatListHub:
                     "project_key": pkey,
                     "path": path,
                     "name": sessions_service._project_name(path),
+                    "custom_name": False,
                     "session_count": count,
                     "last_active": newest_mtime,
                 }
         if len(self._sig_cache) > len(seen):
             self._sig_cache = {k: v for k, v in self._sig_cache.items() if k in seen}
+        # Registered projects: the name the user chose wins over the one read off the path, and
+        # a project registered before its first chat lists with no sessions of its own.
+        for key, meta in projects_service.snapshot().items():
+            found = projects.get(key)
+            if found is None:
+                projects[key] = {
+                    "project_key": key,
+                    "path": meta["path"],
+                    "name": meta["name"] or sessions_service._project_name(meta["path"]),
+                    "custom_name": bool(meta["name"]),
+                    "session_count": 0,
+                    "last_active": None,
+                }
+            elif meta["name"]:
+                found["name"] = meta["name"]
+                found["custom_name"] = True
         return projects, sessions
 
     def _refresh(self, broadcast: bool):

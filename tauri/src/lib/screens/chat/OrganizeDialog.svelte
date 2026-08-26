@@ -1,7 +1,8 @@
 <script lang="ts">
   import GripHorizontal from "@lucide/svelte/icons/grip-horizontal";
+  import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Trash from "@lucide/svelte/icons/trash";
-  import type { ChatCategory, ProjectInfo } from "$lib/data/models";
+  import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -11,6 +12,7 @@
   import EditableText from "$lib/ui/EditableText.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import ProjectPathDialog from "./ProjectPathDialog.svelte";
   import type { ChatState } from "./state.svelte";
 
   interface Props {
@@ -27,6 +29,7 @@
   let draft = $state("");
   let deletingCategory = $state<ChatCategory | null>(null);
   let deletingProject = $state<ProjectInfo | null>(null);
+  let addingProject = $state(false);
   let draggingId = $state<string | null>(null);
   let dragDy = $state(0);
   let step = $state(0);
@@ -52,12 +55,21 @@
     return 0;
   };
 
-  const projectLabel = (project: ProjectInfo) => project.name ?? project.path ?? project.projectKey;
-
   const commit = (category: ChatCategory) => {
     if (draft.trim() && draft !== category.name) void chat.renameCategory(category, draft);
     editing = null;
   };
+
+  // Alphabetical: projects carry no order of their own, unlike categories.
+  const sortedProjects = $derived(
+    [...chat.historyProjects].sort((a, b) => projectLabel(a).localeCompare(projectLabel(b))),
+  );
+
+  const commitProject = (project: ProjectInfo) => {
+    if (draft.trim()) void chat.renameProject(project, draft);
+    editing = null;
+  };
+
 
   const startDrag = (event: PointerEvent, id: string) => {
     if (event.button !== 0) return;
@@ -177,16 +189,48 @@
     />
 
     <p class="mt-1 mb-1.5 text-label-lg">{t("PROJECTS")}</p>
-    {#each chat.historyProjects as project (project.projectKey)}
+    {#each sortedProjects as project (project.projectKey)}
       <div class="flex items-center pr-1">
-        <span class="min-w-0 flex-1 truncate px-3 py-2.5 text-body-md">{projectLabel(project)}</span>
+        <div class="min-w-0 flex-1">
+          <EditableText
+            value={editing === project.projectKey ? draft : projectLabel(project)}
+            editing={editing === project.projectKey}
+            onEdit={() => {
+              editing = project.projectKey;
+              draft = projectLabel(project);
+            }}
+            oninput={(value) => (draft = value)}
+            onCommit={() => commitProject(project)}
+            onCancel={() => (editing = null)}
+          />
+        </div>
+        {#if project.customName}
+          <TooltipIconButton
+            label={t("RESET_NAME")}
+            class="size-8 [&_svg]:size-4"
+            onclick={() => void chat.renameProject(project, "")}
+          >
+            <RotateCcw />
+          </TooltipIconButton>
+        {/if}
         <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingProject = project)}>
           <Trash />
         </TooltipIconButton>
       </div>
     {/each}
+    <ActionButton class="w-full" text={t("ADD_PROJECT")} onclick={() => (addingProject = true)} />
   </div>
 </CompactDialog>
+
+{#if addingProject}
+  <ProjectPathDialog
+    onConfirm={(path, name) => {
+      void chat.addProject(path, name || null);
+      addingProject = false;
+    }}
+    onDismiss={() => (addingProject = false)}
+  />
+{/if}
 
 {#if deletingCategory}
   {@const target = deletingCategory}

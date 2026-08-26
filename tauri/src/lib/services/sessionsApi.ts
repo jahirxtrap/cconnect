@@ -145,6 +145,14 @@ export const createSessionsApi = (http: HttpClient) => ({
     return (await http.delete(`/sessions/projects/${projectKey}`)) !== null;
   },
 
+  async addProject(path: string, name: string | null = null): Promise<boolean> {
+    return (await http.post("/sessions/projects", { path, name })) !== null;
+  },
+
+  async renameProject(projectKey: string, name: string, path: string | null = null): Promise<boolean> {
+    return (await http.patch(`/sessions/projects/${projectKey}`, { name, path })) !== null;
+  },
+
   async move(sessionId: string, project: string, cwd: string): Promise<string | null> {
     const data = await http.post<{ project_key?: string }>(`/sessions/${sessionId}/move`, { project, cwd });
     return data?.project_key ?? null;
