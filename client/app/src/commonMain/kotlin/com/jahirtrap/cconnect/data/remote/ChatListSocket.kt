@@ -66,7 +66,13 @@ class ChatListSocket(
             "snapshot" -> store.applySnapshot(
                 obj["projects"]?.jsonArray?.map { SessionsApi.parseProject(it.jsonObject) } ?: emptyList(),
                 obj["sessions"]?.jsonArray?.map { SessionsApi.parseSession(it.jsonObject) } ?: emptyList(),
+                obj["categories"]?.jsonArray?.map { SessionsApi.parseCategory(it.jsonObject) } ?: emptyList(),
+                obj["placement"]?.jsonArray?.map { SessionsApi.parsePlacement(it.jsonObject) } ?: emptyList(),
             )
+            "category_changed" -> obj["category"]?.let { store.upsertCategory(SessionsApi.parseCategory(it.jsonObject)) }
+            "category_removed" -> obj["category_id"]?.jsonPrimitive?.contentOrNull?.let { store.removeCategory(it) }
+            "placement_changed" -> obj["placement"]?.let { store.upsertPlacement(SessionsApi.parsePlacement(it.jsonObject)) }
+            "placement_removed" -> obj["session_id"]?.jsonPrimitive?.contentOrNull?.let { store.removePlacement(it) }
             "session_changed" -> obj["session"]?.let { store.upsertSession(SessionsApi.parseSession(it.jsonObject)) }
             "session_removed" -> obj["session_id"]?.jsonPrimitive?.contentOrNull?.let { store.removeSession(it) }
             "project_changed" -> obj["project"]?.let { store.upsertProject(SessionsApi.parseProject(it.jsonObject)) }

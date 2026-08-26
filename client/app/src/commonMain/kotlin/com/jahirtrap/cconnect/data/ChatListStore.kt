@@ -20,16 +20,64 @@ class ListBackend internal constructor(scope: CoroutineScope, config: () -> Back
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
+    private val _categories = MutableStateFlow<List<ChatCategory>>(emptyList())
+    val categories: StateFlow<List<ChatCategory>> = _categories.asStateFlow()
+
+    private val _placement = MutableStateFlow<Map<String, ChatPlacement>>(emptyMap())
+    val placement: StateFlow<Map<String, ChatPlacement>> = _placement.asStateFlow()
+
     private val socket = ChatListSocket(scope, config, this)
 
     init {
         socket.connect()
     }
 
-    fun applySnapshot(projects: List<ProjectInfo>, sessions: List<SessionInfo>) {
+    fun applySnapshot(
+        projects: List<ProjectInfo>,
+        sessions: List<SessionInfo>,
+        categories: List<ChatCategory> = emptyList(),
+        placement: List<ChatPlacement> = emptyList(),
+    ) {
         _projects.value = projects.sortedByDescending { it.lastActive ?: 0.0 }
         _sessions.value = sessions.sortedByDescending { it.lastActive ?: 0.0 }
+        _categories.value = categories.sortedBy { it.position }
+        _placement.value = placement.associateBy { it.sessionId }
         _loading.value = false
+    }
+
+    fun upsertCategory(category: ChatCategory) {
+        if (category.id.isBlank()) return
+        _categories.update { list -> (list.filterNot { it.id == category.id } + category).sortedBy { it.position } }
+    }
+
+    // The existing positions are dealt out in the new order: made-up ones would sort wrong
+    // against the real position the server sends back for the moved category.
+    fun moveCategory(categoryId: String, index: Int) {
+        _categories.update { list ->
+            val from = list.indexOfFirst { it.id == categoryId }
+            if (from < 0) return@update list
+            val target = index.coerceIn(0, list.lastIndex)
+            if (target == from) return@update list
+            val positions = list.map { it.position }.sorted()
+            val reordered = list.toMutableList().apply { add(target, removeAt(from)) }
+            reordered.mapIndexed { slot, category -> category.copy(position = positions[slot]) }
+        }
+    }
+
+    fun removeCategory(categoryId: String) {
+        _categories.update { list -> list.filterNot { it.id == categoryId } }
+        _placement.update { map ->
+            map.mapValues { (_, item) -> if (item.categoryId == categoryId) item.copy(categoryId = null) else item }
+        }
+    }
+
+    fun upsertPlacement(item: ChatPlacement) {
+        if (item.sessionId.isBlank()) return
+        _placement.update { it + (item.sessionId to item) }
+    }
+
+    fun removePlacement(sessionId: String) {
+        _placement.update { it - sessionId }
     }
 
     fun upsertSession(session: SessionInfo) {
@@ -42,6 +90,7 @@ class ListBackend internal constructor(scope: CoroutineScope, config: () -> Back
 
     fun removeSession(sessionId: String) {
         _sessions.update { list -> list.filterNot { it.sessionId == sessionId } }
+        removePlacement(sessionId)
     }
 
     fun upsertProject(project: ProjectInfo) {

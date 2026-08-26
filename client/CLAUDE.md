@@ -308,6 +308,20 @@ render-on-dequeue — no extra `user_message` round-trip, so a resume never
 duplicates it) and the chip is dropped. `QueueRow` lists the pending,
 non-`silent` items above the composer.
 
+## Moving a chat between projects
+
+The conversation row's "Move to project" opens `MoveSessionDialog` (project picker
+plus a free path field) and calls `POST /api/sessions/{id}/move`. The transcript
+keeps everything except the `cwd` of its entries, so the history, subagents and
+tool results survive the move.
+
+The tab caches the working directory, so `ChatViewModel.moveSession` (Tauri:
+`ChatState.move`) repoints it on success — `ctx.cwd` and `activeProjectKey` for the
+open session, plus the sidebar entry — or the next prompt would start the CLI in the
+old directory and it would answer `No conversation found`. The dialog says what does
+not travel: absolute paths already written in the history still point at the old
+project, and the chat starts reading the memories of the new one.
+
 ## Version compatibility & updates
 
 Same split as `backend/CLAUDE.md`: **compat** (AppOutdated /

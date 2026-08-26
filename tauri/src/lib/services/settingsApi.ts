@@ -14,6 +14,7 @@ export interface SettingsSnapshot {
   showCompact: string;
   showWorking: string;
   simpleMode: boolean;
+  chatOrder: string;
 }
 
 export interface SettingsPatch {
@@ -29,6 +30,7 @@ export interface SettingsPatch {
   show_compact?: string;
   show_working?: string;
   simple_mode?: boolean;
+  chat_order?: string;
 }
 
 type Field = { effective?: unknown };
@@ -53,6 +55,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   showCompact: effectiveStr(wire, "show_compact", "full"),
   showWorking: effectiveStr(wire, "show_working", "label"),
   simpleMode: effectiveBool(wire, "simple_mode", false),
+  chatOrder: effectiveStr(wire, "chat_order", "auto"),
 });
 
 export const createSettingsApi = (http: HttpClient) => ({

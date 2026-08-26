@@ -13,7 +13,7 @@ import {
   type Role,
   type TodoItem,
 } from "$lib/data/chatModels";
-import type { ProjectInfo, SessionInfo } from "$lib/data/models";
+import type { ChatCategory, ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 
@@ -174,6 +174,7 @@ export class ChatState {
   capabilitiesReady = $state(false);
 
   historyProjectKey = $state<string | null>(null);
+  chatOrder = $state("auto");
   draft = $state("");
 
   queue = $state<QueuedMessage[]>([]);
@@ -915,6 +916,84 @@ export class ChatState {
     if (this.sessionId === session.sessionId) this.sessionColor = color;
   }
 
+  readonly categories = $derived(this.list?.categories ?? []);
+  readonly placement = $derived(this.list?.placement ?? {});
+
+  async setChatOrder(order: string) {
+    if (order === this.chatOrder) return;
+    this.chatOrder = order;
+    await this.#settings.update({ chat_order: order });
+  }
+
+  async createCategory(name: string, color: string | null = null) {
+    const clean = name.trim();
+    if (!clean) return;
+    const created = await this.#sessions.createCategory(clean, color);
+    if (created) this.list?.upsertCategory(created);
+  }
+
+  async createCategoryWith(name: string, sessionId: string) {
+    const clean = name.trim();
+    if (!clean) return;
+    const created = await this.#sessions.createCategory(clean, null);
+    if (!created) return;
+    this.list?.upsertCategory(created);
+    await this.#sessions.placeSession(sessionId, created.id, 0);
+  }
+
+  async renameCategory(category: ChatCategory, name: string) {
+    const clean = name.trim();
+    if (!clean) return;
+    const updated = await this.#sessions.updateCategory(category.id, { name: clean });
+    if (updated) this.list?.upsertCategory(updated);
+  }
+
+  async toggleCategory(category: ChatCategory) {
+    const updated = await this.#sessions.updateCategory(category.id, { collapsed: !category.collapsed });
+    if (updated) this.list?.upsertCategory(updated);
+  }
+
+  reorderCategory(categoryId: string, index: number) {
+    this.list?.moveCategory(categoryId, index);
+  }
+
+  // Persisted once the drag ends, so a mid-drag response can't fight the local order.
+  async commitCategoryOrder(categoryId: string) {
+    const index = this.categories.findIndex((item) => item.id === categoryId);
+    if (index < 0) return;
+    const updated = await this.#sessions.updateCategory(categoryId, { index });
+    if (updated) this.list?.upsertCategory(updated);
+  }
+
+  async deleteCategory(category: ChatCategory) {
+    if (await this.#sessions.deleteCategory(category.id)) this.list?.removeCategory(category.id);
+  }
+
+  async placeSession(sessionId: string, categoryId: string | null, index: number | null = null) {
+    await this.#sessions.placeSession(sessionId, categoryId, index);
+  }
+
+  async deleteProject(projectKey: string) {
+    if (!(await this.#sessions.deleteProject(projectKey))) return;
+    this.list?.removeProject(projectKey);
+    if (this.historyProjectKey === projectKey) this.selectHistoryProject(null);
+    if (this.projectKey === projectKey) this.newSession();
+  }
+
+  async move(session: SessionInfo, targetCwd: string): Promise<boolean> {
+    const cwd = targetCwd.trim();
+    if (!session.projectKey || !cwd) return false;
+    const movedKey = await this.#sessions.move(session.sessionId, session.projectKey, cwd);
+    if (!movedKey) return false;
+    const known = this.list?.sessions.find((item) => item.sessionId === session.sessionId);
+    if (known) this.list?.upsertSession({ ...known, projectKey: movedKey, path: cwd });
+    if (this.sessionId === session.sessionId) {
+      this.cwd = cwd;
+      this.projectKey = movedKey;
+    }
+    return true;
+  }
+
   async remove(session: SessionInfo) {
     if (!session.projectKey) return;
     if (!(await this.#sessions.remove(session.sessionId, session.projectKey))) return;
@@ -951,6 +1030,7 @@ export class ChatState {
       this.effort = snapshot.effort;
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
+      this.chatOrder = snapshot.chatOrder;
       this.serverVisibility = {
         simple: snapshot.simpleMode,
         thinking: snapshot.showThinking,

@@ -71,12 +71,20 @@ class ChatListHub:
         self._subscribers.discard(q)
 
     def snapshot(self) -> dict:
+        from services import categories
+
+        organization = categories.snapshot()
         with self._lock:
             return {
                 "type": "snapshot",
                 "projects": list(self._projects.values()),
                 "sessions": list(self._sessions.values()),
+                "categories": organization["categories"],
+                "placement": organization["placement"],
             }
+
+    def publish(self, events: list[dict]):
+        self._emit(events)
 
     def projects(self) -> list[dict]:
         with self._lock:
@@ -106,6 +114,9 @@ class ChatListHub:
 
         live = registry.get_by_session(session_id)
         self.set_activity(session_id, live.activity if live else None)
+
+    async def resync(self):
+        await asyncio.to_thread(self._refresh, True)
 
     async def settle_activity(self, session_id: Optional[str]):
         await asyncio.to_thread(self._refresh, True)
@@ -233,12 +244,16 @@ class ChatListHub:
         return projects, sessions
 
     def _refresh(self, broadcast: bool):
+        from services import categories
+
         try:
             new_projects, new_sessions = self._scan()
         except Exception as exc:
             logger.debug(f"chat_list refresh failed: {type(exc).__name__}: {exc}")
             return
         events: list[dict] = []
+        for gone in categories.prune(set(new_sessions)):
+            events.append({"type": "placement_removed", "session_id": gone})
         with self._lock:
             old_projects, old_sessions = self._projects, self._sessions
             if broadcast:

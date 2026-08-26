@@ -7,8 +7,12 @@
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import Settings2 from "@lucide/svelte/icons/settings-2";
   import { navigation } from "$lib/app/navigation.svelte";
-  import type { SessionInfo } from "$lib/data/models";
+  import { sessionColorOf } from "$lib/design/sessionColors";
+  import type { ChatCategory, SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
@@ -26,9 +30,49 @@
     onRename: (session: SessionInfo) => void;
     onColor: (session: SessionInfo) => void;
     onDelete: (session: SessionInfo) => void;
+    onMove: (session: SessionInfo) => void;
+    onNewCategory: (session: SessionInfo) => void;
+    onOrganize: () => void;
   }
 
-  const { drawerMode, onClose, onAfterSelect, onRename, onColor, onDelete }: Props = $props();
+  const {
+    drawerMode,
+    onClose,
+    onAfterSelect,
+    onRename,
+    onColor,
+    onDelete,
+    onMove,
+    onNewCategory,
+    onOrganize,
+  }: Props = $props();
+
+  interface SessionGroup {
+    category: ChatCategory | null;
+    sessions: SessionInfo[];
+  }
+
+  const groups = $derived.by((): SessionGroup[] => {
+    const sessions = chat.historySessions;
+    if (!chat.categories.length) return [{ category: null, sessions }];
+    const manual = chat.chatOrder === "manual";
+    const ordered = (list: SessionInfo[]) =>
+      manual
+        ? [...list].sort(
+            (a, b) =>
+              (chat.placement[a.sessionId]?.position ?? Number.MAX_VALUE) -
+              (chat.placement[b.sessionId]?.position ?? Number.MAX_VALUE),
+          )
+        : [...list].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+    const inCategory = (id: string | null) =>
+      ordered(sessions.filter((item) => (chat.placement[item.sessionId]?.categoryId ?? null) === id));
+    const result: SessionGroup[] = chat.categories.map((category) => ({
+      category,
+      sessions: inCategory(category.id),
+    }));
+    const loose = inCategory(null);
+    return loose.length ? [...result, { category: null, sessions: loose }] : result;
+  });
 
   const chat = $derived(tabs.state);
 
@@ -67,34 +111,75 @@
     {/if}
   </div>
 
-  <div class="shrink-0 px-2">
-    <ProjectSelector
-      projects={chat.historyProjects}
-      selected={chat.historyProjectKey}
-      onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
-    />
+  <div class="flex shrink-0 items-center px-2">
+    <div class="min-w-0 flex-1">
+      <ProjectSelector
+        projects={chat.historyProjects}
+        selected={chat.historyProjectKey}
+        onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
+      />
+    </div>
+    <TooltipIconButton label={t("ORGANIZE")} class="size-8 [&_svg]:size-4" onclick={onOrganize}>
+      <Settings2 />
+    </TooltipIconButton>
   </div>
 
   <div bind:this={list} class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
     {#if chat.historySessions.length}
-      {#each chat.historySessions as session (session.sessionId)}
-        <ConversationRow
-          title={session.title ?? session.preview ?? session.sessionId.slice(0, 8)}
-          selected={session.sessionId === chat.sessionId}
-          onOpen={() => {
-            chat.openSession(session);
-            onAfterSelect();
-          }}
-          onRename={() => onRename(session)}
-          onAutoRename={() => void chat.autoRename(session)}
-          onColor={() => onColor(session)}
-          onOpenNewTab={() => {
-            tabs.openSessionTab(session, tabs.active?.environmentId ?? null);
-            onAfterSelect();
-          }}
-          onDelete={() => onDelete(session)}
-          activity={session.activity}
-        />
+      {#each groups as group, groupIndex (group.category?.id ?? "loose")}
+        <!-- The loose group has no header of its own, so it needs a line to break from the one above. -->
+        {#if !group.category && groupIndex > 0}
+          <div class="mx-2 my-1 h-px shrink-0 bg-outline-variant"></div>
+        {/if}
+        {#if group.category}
+          {@const category = group.category}
+          <button
+            type="button"
+            class="flex w-full cursor-pointer items-center rounded-item pr-1 text-left transition-colors hover:bg-on-surface/8"
+            onclick={() => void chat.toggleCategory(category)}
+          >
+            {#if category.collapsed}
+              <ChevronRight size={14} class="ml-1 shrink-0 text-on-surface-variant" />
+            {:else}
+              <ChevronDown size={14} class="ml-1 shrink-0 text-on-surface-variant" />
+            {/if}
+            <span
+              class="min-w-0 flex-1 truncate py-2 pl-1 text-label-sm uppercase"
+              style={`color: ${sessionColorOf(category.color) ?? "var(--c-on-surface-variant)"}`}
+            >
+              {category.name}
+            </span>
+            <span class="flex size-7 shrink-0 items-center justify-center text-label-sm text-on-surface-variant">
+              {group.sessions.length}
+            </span>
+          </button>
+        {/if}
+        {#if !group.category?.collapsed}
+          {#each group.sessions as session (session.sessionId)}
+            <ConversationRow
+              title={session.title ?? session.preview ?? session.sessionId.slice(0, 8)}
+              selected={session.sessionId === chat.sessionId}
+              onOpen={() => {
+                chat.openSession(session);
+                onAfterSelect();
+              }}
+              onRename={() => onRename(session)}
+              onAutoRename={() => void chat.autoRename(session)}
+              onColor={() => onColor(session)}
+              onOpenNewTab={() => {
+                tabs.openSessionTab(session, tabs.active?.environmentId ?? null);
+                onAfterSelect();
+              }}
+              onDelete={() => onDelete(session)}
+              onMove={() => onMove(session)}
+              categories={chat.categories}
+              currentCategoryId={chat.placement[session.sessionId]?.categoryId ?? null}
+              onPlace={(categoryId) => void chat.placeSession(session.sessionId, categoryId)}
+              onNewCategory={() => onNewCategory(session)}
+              activity={session.activity}
+            />
+          {/each}
+        {/if}
       {/each}
     {:else if chat.historyLoading}
       <CenteredProgress class="h-full" />

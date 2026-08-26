@@ -34,6 +34,8 @@ import com.jahirtrap.cconnect.data.InteractionData
 import com.jahirtrap.cconnect.data.InteractionOption
 import com.jahirtrap.cconnect.data.pending
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
+import com.jahirtrap.cconnect.data.ChatCategory
+import com.jahirtrap.cconnect.data.ChatPlacement
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.ServerEvent
@@ -114,6 +116,9 @@ data class ChatUiState(
     val allSessions: List<SessionInfo> = emptyList(),
     val historyProjectKey: String? = null,
     val historyLoading: Boolean = true,
+    val categories: List<ChatCategory> = emptyList(),
+    val placement: Map<String, ChatPlacement> = emptyMap(),
+    val chatOrder: String = "auto",
     val environments: List<EnvironmentProfile> = emptyList(),
     val activeEnvironmentId: String? = null,
     val oldestLoadedIndex: Int? = null,
@@ -405,6 +410,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     permissionMode = s.permissionMode,
                     streamTokens = s.streaming,
                     showWorking = s.showWorking,
+                    chatOrder = s.chatOrder,
                     serverVisibility = VisibilityPrefs(
                         simple = if (s.simpleMode) "on" else "off",
                         thinking = s.showThinking,
@@ -858,6 +864,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     }
                 }
             },
+            viewModelScope.launch {
+                combine(backend.categories, backend.placement) { c, p -> c to p }.collect { (c, p) ->
+                    _state.update { it.copy(categories = c, placement = p) }
+                }
+            },
         )
     }
 
@@ -1100,6 +1111,110 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 ChatListStore.forConfig(listConfig())?.removeSession(session.sessionId)
                 if (session.sessionId == _state.value.sessionId) newSession()
             }
+        }
+    }
+
+    fun createCategory(name: String, color: String? = null) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            SessionsApi.createCategory(clean, color)?.let { store()?.upsertCategory(it) }
+        }
+    }
+
+    fun renameCategory(category: ChatCategory, name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            SessionsApi.updateCategory(category.id, name = clean)?.let { store()?.upsertCategory(it) }
+        }
+    }
+
+    fun setCategoryColor(category: ChatCategory, color: String?) {
+        viewModelScope.launch {
+            SessionsApi.updateCategory(category.id, color = color.orEmpty())?.let { store()?.upsertCategory(it) }
+        }
+    }
+
+    fun toggleCategory(category: ChatCategory) {
+        viewModelScope.launch {
+            SessionsApi.updateCategory(category.id, collapsed = !category.collapsed)?.let { store()?.upsertCategory(it) }
+        }
+    }
+
+    fun reorderCategory(categoryId: String, index: Int) {
+        store()?.moveCategory(categoryId, index)
+    }
+
+    // Persisted once the drag ends, so a mid-drag response can't fight the local order.
+    fun commitCategoryOrder(categoryId: String) {
+        val backend = store() ?: return
+        val index = backend.categories.value.indexOfFirst { it.id == categoryId }
+        if (index < 0) return
+        viewModelScope.launch {
+            SessionsApi.updateCategory(categoryId, index = index)?.let { backend.upsertCategory(it) }
+        }
+    }
+
+    fun deleteCategory(category: ChatCategory) {
+        viewModelScope.launch {
+            if (SessionsApi.deleteCategory(category.id)) store()?.removeCategory(category.id)
+        }
+    }
+
+    fun createCategoryWith(name: String, sessionId: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            val created = SessionsApi.createCategory(clean, null) ?: return@launch
+            store()?.upsertCategory(created)
+            if (SessionsApi.placeSession(sessionId, created.id, 0)) ensureHistoryLoaded()
+        }
+    }
+
+    fun placeSession(sessionId: String, categoryId: String?, index: Int? = null) {
+        viewModelScope.launch {
+            if (SessionsApi.placeSession(sessionId, categoryId, index)) ensureHistoryLoaded()
+        }
+    }
+
+    fun deleteProject(projectKey: String) {
+        viewModelScope.launch {
+            if (!SessionsApi.deleteProject(projectKey)) return@launch
+            store()?.removeProject(projectKey)
+            if (_state.value.historyProjectKey == projectKey) selectHistoryProject(null)
+            if (_state.value.activeProjectKey == projectKey) newSession()
+        }
+    }
+
+    fun setChatOrder(order: String) {
+        if (order == _state.value.chatOrder) return
+        _state.update { it.copy(chatOrder = order) }
+        viewModelScope.launch { SettingsApi.update(chatOrder = order) }
+    }
+
+    private fun store() = ChatListStore.forConfig(listConfig())
+
+    fun moveSession(session: SessionInfo, targetCwd: String, onDone: (Boolean) -> Unit = {}) {
+        val projectKey = session.projectKey ?: return
+        val cwd = targetCwd.trim()
+        if (cwd.isEmpty()) return
+        viewModelScope.launch {
+            val movedKey = SessionsApi.moveSession(session.sessionId, projectKey, cwd)
+            if (movedKey == null) {
+                onDone(false)
+                return@launch
+            }
+            ChatListStore.forConfig(listConfig())?.let { b ->
+                b.sessions.value.firstOrNull { it.sessionId == session.sessionId }?.let {
+                    b.upsertSession(it.copy(projectKey = movedKey, path = cwd))
+                }
+            }
+            if (session.sessionId == _state.value.sessionId) {
+                ctx.cwd = cwd
+                _state.update { it.copy(activeProjectKey = movedKey) }
+            }
+            onDone(true)
         }
     }
 

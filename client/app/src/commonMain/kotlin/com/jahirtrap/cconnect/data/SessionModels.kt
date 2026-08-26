@@ -8,6 +8,20 @@ data class ProjectInfo(
     val lastActive: Double?,
 )
 
+data class ChatCategory(
+    val id: String,
+    val name: String,
+    val position: Double,
+    val color: String?,
+    val collapsed: Boolean,
+)
+
+data class ChatPlacement(
+    val sessionId: String,
+    val categoryId: String?,
+    val position: Double,
+)
+
 data class SessionInfo(
     val sessionId: String,
     val projectKey: String?,

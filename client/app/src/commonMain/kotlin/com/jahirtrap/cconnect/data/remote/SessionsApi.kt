@@ -1,5 +1,7 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.ChatCategory
+import com.jahirtrap.cconnect.data.ChatPlacement
 import com.jahirtrap.cconnect.data.CompactData
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionData
@@ -45,6 +47,23 @@ object SessionsApi {
         color = o["color"]?.jsonPrimitive?.contentOrNull,
         activity = o["activity"]?.jsonPrimitive?.contentOrNull,
     )
+
+    fun parseCategory(o: JsonObject): ChatCategory = ChatCategory(
+        id = o["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        name = o["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        position = o["position"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+        color = o["color"]?.jsonPrimitive?.contentOrNull,
+        collapsed = o["collapsed"]?.jsonPrimitive?.booleanOrNull ?: false,
+    )
+
+    fun parsePlacement(o: JsonObject): ChatPlacement = ChatPlacement(
+        sessionId = o["session_id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+        categoryId = o["category_id"]?.jsonPrimitive?.contentOrNull,
+        position = o["position"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+    )
+
+    private fun JsonObject.toCategory(): ChatCategory? =
+        parseCategory(this).takeIf { it.id.isNotEmpty() }
 
     data class MessagesPage(
         val items: List<SessionMessage>,
@@ -234,4 +253,42 @@ object SessionsApi {
             put("project", project)
             put("color", color)
         }) != null
+
+    suspend fun createCategory(name: String, color: String?): ChatCategory? =
+        Http.post("/sessions/categories", buildJsonObject {
+            put("name", name)
+            color?.let { put("color", it) }
+        })?.jsonObject?.toCategory()
+
+    suspend fun updateCategory(
+        id: String,
+        name: String? = null,
+        color: String? = null,
+        collapsed: Boolean? = null,
+        index: Int? = null,
+    ): ChatCategory? =
+        Http.patch("/sessions/categories/$id", buildJsonObject {
+            name?.let { put("name", it) }
+            color?.let { put("color", it) }
+            collapsed?.let { put("collapsed", it) }
+            index?.let { put("index", it) }
+        })?.jsonObject?.toCategory()
+
+    suspend fun deleteCategory(id: String): Boolean =
+        Http.delete("/sessions/categories/$id") != null
+
+    suspend fun placeSession(sessionId: String, categoryId: String?, index: Int?): Boolean =
+        Http.post("/sessions/$sessionId/category", buildJsonObject {
+            put("category_id", categoryId)
+            index?.let { put("index", it) }
+        }) != null
+
+    suspend fun deleteProject(projectKey: String): Boolean =
+        Http.delete("/sessions/projects/$projectKey") != null
+
+    suspend fun moveSession(sessionId: String, project: String, cwd: String): String? =
+        Http.post("/sessions/$sessionId/move", buildJsonObject {
+            put("project", project)
+            put("cwd", cwd)
+        })?.jsonObject?.get("project_key")?.jsonPrimitive?.contentOrNull
 }

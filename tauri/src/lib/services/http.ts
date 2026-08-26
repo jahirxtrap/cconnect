@@ -13,6 +13,7 @@ export interface HttpClient {
   get: <T>(path: string, query?: Query) => Promise<T | null>;
   post: <T>(path: string, body?: unknown) => Promise<T | null>;
   put: <T>(path: string, body?: unknown) => Promise<T | null>;
+  patch: <T>(path: string, body?: unknown) => Promise<T | null>;
   delete: <T>(path: string, query?: Query) => Promise<T | null>;
 }
 
@@ -51,6 +52,7 @@ export const createHttp = (profile: () => Profile): HttpClient => {
     get: <T>(path: string, query?: Query) => execute<T>("GET", path, query),
     post: <T>(path: string, body?: unknown) => execute<T>("POST", path, undefined, body ?? {}),
     put: <T>(path: string, body?: unknown) => execute<T>("PUT", path, undefined, body ?? {}),
+    patch: <T>(path: string, body?: unknown) => execute<T>("PATCH", path, undefined, body ?? {}),
     delete: <T>(path: string, query?: Query) => execute<T>("DELETE", path, query),
   };
 };

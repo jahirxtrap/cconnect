@@ -26,6 +26,7 @@ object SettingsApi {
         val showCompact: String,
         val showWorking: String,
         val simpleMode: Boolean,
+        val chatOrder: String,
     )
 
     private fun effectiveStr(o: JsonObject, key: String, fallback: String): String =
@@ -47,6 +48,7 @@ object SettingsApi {
         showCompact = effectiveStr(o, "show_compact", "full"),
         showWorking = effectiveStr(o, "show_working", "label"),
         simpleMode = effectiveBool(o, "simple_mode", false),
+        chatOrder = effectiveStr(o, "chat_order", "auto"),
     )
 
     suspend fun get(): Snapshot? = Http.get("/settings")?.jsonObject?.let(::parse)
@@ -64,6 +66,7 @@ object SettingsApi {
         showCompact: String? = null,
         showWorking: String? = null,
         simpleMode: Boolean? = null,
+        chatOrder: String? = null,
     ): Snapshot? = Http.post("/settings", buildJsonObject {
         if (account != null) put("account", account)
         if (model != null) put("model", model)
@@ -77,6 +80,7 @@ object SettingsApi {
         if (showCompact != null) put("show_compact", showCompact)
         if (showWorking != null) put("show_working", showWorking)
         if (simpleMode != null) put("simple_mode", simpleMode)
+        if (chatOrder != null) put("chat_order", chatOrder)
     })?.jsonObject?.let(::parse)?.also { ServerDefaults.bump() }
 
     suspend fun reset(): Snapshot? =

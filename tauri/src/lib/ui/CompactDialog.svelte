@@ -23,9 +23,7 @@
     <Dialog.Overlay class="fixed inset-0 z-60 bg-black/60" />
     <Dialog.Content
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="menu-surface fixed inset-0 z-60 m-auto flex h-max max-h-[min(40rem,85%)] min-w-[min(24rem,calc(100vw-2rem))] max-w-[min(42rem,calc(100vw-2rem))] flex-col rounded-lg border-2 border-outline-variant bg-surface p-5 shadow-xl {children
-        ? 'w-[min(42rem,calc(100vw-2rem))]'
-        : 'w-max'}"
+      class="menu-surface fixed inset-0 z-60 m-auto flex h-max max-h-[min(40rem,85%)] w-[min(42rem,calc(100vw-2rem))] flex-col rounded-lg border-2 border-outline-variant bg-surface p-5 shadow-xl"
     >
       <div class="flex items-center">
         <div class="min-w-0 flex-1">

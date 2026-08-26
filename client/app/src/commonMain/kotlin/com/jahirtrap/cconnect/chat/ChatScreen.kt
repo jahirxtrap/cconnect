@@ -7,6 +7,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -182,6 +183,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.zIndex
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -259,6 +264,17 @@ import com.composables.icons.lucide.History
 import com.jahirtrap.cconnect.data.remote.SessionsApi
 import com.jahirtrap.cconnect.data.remote.SharedApi
 import com.jahirtrap.cconnect.ui.ColorDialog
+import com.jahirtrap.cconnect.ui.InputField
+import com.jahirtrap.cconnect.ui.SelectField
+import com.jahirtrap.cconnect.data.ChatCategory
+import com.composables.icons.lucide.ChevronRight
+import com.composables.icons.lucide.GripHorizontal
+import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.Settings2
+import com.composables.icons.lucide.Trash
+import com.jahirtrap.cconnect.ui.ActionButton
+import com.jahirtrap.cconnect.ui.EditableText
+import com.jahirtrap.cconnect.ui.CompactDropdownSubMenu
 import com.jahirtrap.cconnect.ui.ColorOption
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.CompactDropdownItem
@@ -331,6 +347,9 @@ fun ChatScreen(
     var renameTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var deleteTarget by remember { mutableStateOf<SessionInfo?>(null) }
     var colorTarget by remember { mutableStateOf<SessionInfo?>(null) }
+    var moveTarget by remember { mutableStateOf<SessionInfo?>(null) }
+    var newCategoryTarget by remember { mutableStateOf<SessionInfo?>(null) }
+    var organizeOpen by remember { mutableStateOf(false) }
     var confirmCommand by remember { mutableStateOf<CommandOption?>(null) }
     var sharedLinkAction by remember { mutableStateOf<Pair<String, String>?>(null) }
     var discardComponent by remember { mutableStateOf<String?>(null) }
@@ -532,6 +551,9 @@ fun ChatScreen(
                         onRename = { renameTarget = it },
                         onColor = { colorTarget = it },
                         onDelete = { deleteTarget = it },
+                        onMove = { moveTarget = it },
+                        onNewCategory = { newCategoryTarget = it },
+                        onOrganize = { organizeOpen = true },
                     )
                 }
             },
@@ -576,6 +598,9 @@ fun ChatScreen(
                                         onRename = { renameTarget = it },
                                         onColor = { colorTarget = it },
                                         onDelete = { deleteTarget = it },
+                                        onMove = { moveTarget = it },
+                                        onNewCategory = { newCategoryTarget = it },
+                                        onOrganize = { organizeOpen = true },
                                     )
                                 } else {
                                     Spacer(Modifier.height(8.dp))
@@ -1087,6 +1112,26 @@ fun ChatScreen(
             onDismiss = { deleteTarget = null },
         )
     }
+    if (organizeOpen) {
+        OrganizeDialog(state = state, vm = vm, onDismiss = { organizeOpen = false })
+    }
+    moveTarget?.let { s ->
+        MoveSessionDialog(
+            session = s,
+            projects = state.historyProjects,
+            onConfirm = { cwd -> vm.moveSession(s, cwd); moveTarget = null },
+            onDismiss = { moveTarget = null },
+        )
+    }
+    newCategoryTarget?.let { s ->
+        RenameDialog(
+            initial = "",
+            title = stringResource(Res.string.add_category),
+            confirmLabel = stringResource(Res.string.create),
+            onConfirm = { name -> vm.createCategoryWith(name, s.sessionId); newCategoryTarget = null },
+            onDismiss = { newCategoryTarget = null },
+        )
+    }
     colorTarget?.let { s ->
         ColorDialog(
             title = stringResource(Res.string.conversation_color),
@@ -1522,6 +1567,9 @@ private fun ColumnScope.ChatPanelContent(
     onRename: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
     onColor: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
     onDelete: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
+    onMove: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
+    onNewCategory: (com.jahirtrap.cconnect.data.SessionInfo) -> Unit,
+    onOrganize: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().height(56.dp).padding(start = 8.dp, end = 8.dp),
@@ -1554,6 +1602,9 @@ private fun ColumnScope.ChatPanelContent(
             onSelect = vm::selectHistoryProject,
             modifier = Modifier.weight(1f),
         )
+        TooltipIconButton(label = stringResource(Res.string.organize), onClick = onOrganize, size = 32.dp) {
+            Icon(Lucide.Settings2, contentDescription = null, modifier = Modifier.size(16.dp))
+        }
     }
     val drawerListState = rememberLazyListState()
     LaunchedEffect(state.historyProjectKey) {
@@ -1564,19 +1615,47 @@ private fun ColumnScope.ChatPanelContent(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
+        val groups = groupSessions(state)
         when {
-            state.historySessions.isNotEmpty() -> items(state.historySessions, key = { it.sessionId }) { s ->
-                ConversationRow(
-                    title = s.title ?: s.preview ?: s.sessionId.take(8),
-                    selected = s.sessionId == state.sessionId,
-                    onOpen = { vm.openSession(s); onAfterSelect() },
-                    onRename = { onRename(s) },
-                    onAutoRename = { vm.autoRenameSession(s) },
-                    onColor = { onColor(s) },
-                    onOpenNewTab = { s.projectKey?.let { pk -> TabsController.openSessionTab(TabsController.active.ctx.environmentId, s.path.orEmpty(), s.sessionId, pk, s.title ?: s.preview, s.color); onAfterSelect() } },
-                    onDelete = { onDelete(s) },
-                    activity = s.activity,
-                )
+            state.historySessions.isNotEmpty() -> groups.forEachIndexed { groupIndex, group ->
+                // The loose group has no header of its own, so it needs a line to break from the one above.
+                if (group.category == null && groupIndex > 0) {
+                    item(key = "loose-divider") {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                    }
+                }
+                if (group.category != null) {
+                    item(key = "cat-${group.category.id}") {
+                        CategoryHeader(
+                            category = group.category,
+                            count = group.sessions.size,
+                            onToggle = { vm.toggleCategory(group.category) },
+                        )
+                    }
+                }
+                if (group.category?.collapsed != true) {
+                    items(group.sessions, key = { it.sessionId }) { s ->
+                        ConversationRow(
+                            title = s.title ?: s.preview ?: s.sessionId.take(8),
+                            selected = s.sessionId == state.sessionId,
+                            onOpen = { vm.openSession(s); onAfterSelect() },
+                            onRename = { onRename(s) },
+                            onAutoRename = { vm.autoRenameSession(s) },
+                            onColor = { onColor(s) },
+                            onOpenNewTab = { s.projectKey?.let { pk -> TabsController.openSessionTab(TabsController.active.ctx.environmentId, s.path.orEmpty(), s.sessionId, pk, s.title ?: s.preview, s.color); onAfterSelect() } },
+                            onDelete = { onDelete(s) },
+                            onMove = { onMove(s) },
+                            categories = state.categories,
+                            currentCategoryId = state.placement[s.sessionId]?.categoryId,
+                            onPlace = { categoryId -> vm.placeSession(s.sessionId, categoryId) },
+                            onNewCategory = { onNewCategory(s) },
+                            activity = s.activity,
+                        )
+                    }
+                }
             }
 
             state.historyLoading -> item { CenteredProgress(Modifier.fillParentMaxSize()) }
@@ -2413,6 +2492,318 @@ private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, lock
 
 private fun projectLabel(p: ProjectInfo): String = p.name ?: p.path ?: p.projectKey
 
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () -> Unit) {
+    var editing by remember { mutableStateOf<String?>(null) }
+    var draft by remember { mutableStateOf("") }
+    var deletingCategory by remember { mutableStateOf<ChatCategory?>(null) }
+    var deletingProject by remember { mutableStateOf<ProjectInfo?>(null) }
+    var draggingId by remember { mutableStateOf<String?>(null) }
+    var dragDy by remember { mutableStateOf(0f) }
+    val rowHeights = remember { mutableStateMapOf<String, Float>() }
+    val isTouch = LocalIsTouch.current
+    val categoryWord = stringResource(Res.string.category)
+    val spacingPx = with(LocalDensity.current) { 4.dp.toPx() }
+
+    fun commit(category: ChatCategory) {
+        if (draft.isNotBlank() && draft != category.name) vm.renameCategory(category, draft)
+        editing = null
+    }
+
+    val dragFrom = state.categories.indexOfFirst { it.id == draggingId }
+    val step = (rowHeights[draggingId] ?: 0f) + spacingPx
+    // Where the dragged row would land; the rows in between open the gap for it.
+    val dropIndex = if (draggingId == null || step <= spacingPx) -1
+    else (dragFrom + (dragDy / step).roundToInt()).coerceIn(0, state.categories.lastIndex)
+
+    fun shiftOf(index: Int): Float = when {
+        dropIndex < 0 || index == dragFrom -> 0f
+        dropIndex > dragFrom && index > dragFrom && index <= dropIndex -> -step
+        dropIndex < dragFrom && index < dragFrom && index >= dropIndex -> step
+        else -> 0f
+    }
+
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.organize),
+        buttons = { Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) } },
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 420.dp)
+                .verticalScroll(rememberScrollState())
+                // A drag owns the pointer: nothing under it may claim the cursor.
+                .then(
+                    if (draggingId == null) Modifier
+                    else Modifier.pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true),
+                ),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            SelectField(
+                label = stringResource(Res.string.chat_order),
+                selected = state.chatOrder,
+                options = listOf(
+                    "auto" to stringResource(Res.string.chat_order_auto),
+                    "manual" to stringResource(Res.string.chat_order_manual),
+                ),
+                shown = stringResource(
+                    if (state.chatOrder == "manual") Res.string.chat_order_manual else Res.string.chat_order_auto,
+                ),
+                onSelect = { vm.setChatOrder(it) },
+            )
+            FieldLabel(stringResource(Res.string.categories))
+            state.categories.forEachIndexed { index, category ->
+                val dragging = category.id == draggingId
+                val shift = remember(category.id) { Animatable(0f) }
+                LaunchedEffect(shiftOf(index), draggingId) {
+                    // The rows land where the gap already showed them, so the drop must not animate.
+                    if (draggingId == null) shift.snapTo(0f) else shift.animateTo(shiftOf(index), tween(160))
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onSizeChanged { rowHeights[category.id] = it.height.toFloat() }
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer { translationY = if (dragging) dragDy else shift.value }
+                        .clip(RoundedCornerShape(Radius.item))
+                        .then(
+                            if (dragging) {
+                                Modifier
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                                    .pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true)
+                            } else {
+                                Modifier
+                            },
+                        )
+                        .padding(end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    DragHandle(
+                        isTouch = isTouch,
+                        onStart = { draggingId = category.id; dragDy = 0f },
+                        onDrag = { dragDy += it },
+                        onEnd = {
+                            if (dropIndex >= 0 && dropIndex != dragFrom) {
+                                vm.reorderCategory(category.id, dropIndex)
+                                vm.commitCategoryOrder(category.id)
+                            }
+                            draggingId = null
+                            dragDy = 0f
+                        },
+                    )
+                    EditableText(
+                        value = if (editing == category.id) draft else category.name,
+                        editing = editing == category.id,
+                        onEdit = { editing = category.id; draft = category.name },
+                        onValueChange = { draft = it },
+                        onCommit = { commit(category) },
+                        onCancel = { editing = null },
+                        modifier = Modifier.weight(1f),
+                        interactive = draggingId == null,
+                    )
+                    if (draggingId == null) {
+                        TooltipIconButton(
+                            label = stringResource(Res.string.delete),
+                            onClick = { deletingCategory = category },
+                            size = 32.dp,
+                        ) { Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else {
+                        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                            Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+            ActionButton(
+                text = stringResource(Res.string.add_category),
+                onClick = { vm.createCategory("$categoryWord ${state.categories.size + 1}") },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            FieldLabel(stringResource(Res.string.projects))
+            state.historyProjects.forEach { project ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        projectLabel(project),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp),
+                    )
+                    TooltipIconButton(
+                        label = stringResource(Res.string.delete),
+                        onClick = { deletingProject = project },
+                        size = 32.dp,
+                    ) { Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                }
+            }
+        }
+    }
+    deletingCategory?.let { category ->
+        ConfirmDialog(
+            title = stringResource(Res.string.delete),
+            text = stringResource(Res.string.delete_category_confirm, category.name),
+            confirmLabel = stringResource(Res.string.delete),
+            onConfirm = { vm.deleteCategory(category); deletingCategory = null },
+            onDismiss = { deletingCategory = null },
+        )
+    }
+    deletingProject?.let { project ->
+        ConfirmDialog(
+            title = stringResource(Res.string.delete),
+            text = stringResource(Res.string.delete_project_confirm, projectLabel(project)),
+            confirmLabel = stringResource(Res.string.delete),
+            onConfirm = { vm.deleteProject(project.projectKey); deletingProject = null },
+            onDismiss = { deletingProject = null },
+        )
+    }
+}
+
+@Composable
+private fun FieldLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(top = 4.dp))
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DragHandle(
+    isTouch: Boolean,
+    onStart: () -> Unit,
+    onDrag: (Float) -> Unit,
+    onEnd: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .pointerInput(isTouch) {
+                if (isTouch) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { onStart() },
+                        onDragEnd = onEnd,
+                        onDragCancel = onEnd,
+                        onDrag = { change, amount -> change.consume(); onDrag(amount.y) },
+                    )
+                } else {
+                    detectDragGestures(
+                        onDragStart = { onStart() },
+                        onDragEnd = onEnd,
+                        onDragCancel = onEnd,
+                        onDrag = { change, amount -> change.consume(); onDrag(amount.y) },
+                    )
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Lucide.GripHorizontal,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+    }
+}
+
+private data class SessionGroup(val category: ChatCategory?, val sessions: List<SessionInfo>)
+
+private fun groupSessions(state: ChatUiState): List<SessionGroup> {
+    val sessions = state.historySessions
+    if (state.categories.isEmpty()) return listOf(SessionGroup(null, sessions))
+    val manual = state.chatOrder == "manual"
+    val ordered = { list: List<SessionInfo> ->
+        if (manual) list.sortedBy { state.placement[it.sessionId]?.position ?: Double.MAX_VALUE }
+        else list.sortedByDescending { it.lastActive ?: 0.0 }
+    }
+    val byCategory = sessions.groupBy { state.placement[it.sessionId]?.categoryId }
+    val groups = state.categories.map { SessionGroup(it, ordered(byCategory[it.id].orEmpty())) }
+    val loose = ordered(byCategory[null].orEmpty())
+    return if (loose.isEmpty()) groups else groups + SessionGroup(null, loose)
+}
+
+@Composable
+private fun CategoryHeader(category: ChatCategory, count: Int, onToggle: () -> Unit) {
+    val accent = sessionColorOf(category.color) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.item))
+            .clickable(onClick = onToggle)
+            .pointerHoverIcon(PointerIcon.Hand)
+            .padding(end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            if (category.collapsed) Lucide.ChevronRight else Lucide.ChevronDown,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp).size(14.dp),
+        )
+        Text(
+            category.name.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f).padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
+        )
+        Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+            Text(
+                count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoveSessionDialog(
+    session: SessionInfo,
+    projects: List<ProjectInfo>,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val targets = projects.filter { it.projectKey != session.projectKey }.mapNotNull { it.path }.distinct()
+    var path by remember { mutableStateOf(targets.firstOrNull().orEmpty()) }
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.move_to_project),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(path) }, enabled = path.isNotBlank() && path != session.path) {
+                Text(stringResource(Res.string.move))
+            }
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (targets.isNotEmpty()) {
+                SelectField(
+                    label = stringResource(Res.string.project),
+                    selected = path,
+                    options = targets.map { it to it },
+                    onSelect = { path = it },
+                )
+            }
+            InputField(
+                value = path,
+                onValueChange = { path = it },
+                singleLine = true,
+                placeholder = stringResource(Res.string.move_project_path),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text(
+                stringResource(Res.string.move_project_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ConversationRow(
@@ -2423,10 +2814,16 @@ private fun ConversationRow(
     onColor: () -> Unit,
     onOpenNewTab: () -> Unit,
     onDelete: () -> Unit,
+    onMove: () -> Unit,
+    categories: List<ChatCategory> = emptyList(),
+    currentCategoryId: String? = null,
+    onPlace: (String?) -> Unit = {},
+    onNewCategory: () -> Unit = {},
     selected: Boolean = false,
     activity: String? = null,
 ) {
     var menu by remember { mutableStateOf(false) }
+    var categoryMenu by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2466,11 +2863,47 @@ private fun ConversationRow(
             IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
                 Icon(Lucide.EllipsisVertical, contentDescription = null, modifier = Modifier.size(16.dp))
             }
-            AppDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            AppDropdownMenu(expanded = menu, onDismissRequest = { menu = false; categoryMenu = false }) {
                 CompactDropdownItem(stringResource(Res.string.rename)) { menu = false; onRename() }
                 CompactDropdownItem(stringResource(Res.string.auto_rename)) { menu = false; onAutoRename() }
                 CompactDropdownItem(stringResource(Res.string.conversation_color)) { menu = false; onColor() }
                 CompactDropdownItem(stringResource(Res.string.open_in_new_tab)) { menu = false; onOpenNewTab() }
+                CompactDropdownItem(stringResource(Res.string.move_to_project)) { menu = false; onMove() }
+                CompactDropdownSubMenu(
+                    text = stringResource(Res.string.category),
+                    expanded = categoryMenu,
+                    onExpandedChange = { categoryMenu = it },
+                ) {
+                    if (categories.isNotEmpty()) {
+                        CompactDropdownItem(stringResource(Res.string.no_category), selected = currentCategoryId == null) {
+                            menu = false
+                            categoryMenu = false
+                            onPlace(null)
+                        }
+                        categories.forEach { category ->
+                            CompactDropdownItem(category.name, selected = currentCategoryId == category.id) {
+                                menu = false
+                                categoryMenu = false
+                                onPlace(category.id)
+                            }
+                        }
+                    }
+                    CompactDropdownItem(
+                        stringResource(Res.string.add_category),
+                        trailing = {
+                            Icon(
+                                Lucide.Plus,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        },
+                    ) {
+                        menu = false
+                        categoryMenu = false
+                        onNewCategory()
+                    }
+                }
                 CompactDropdownItem(stringResource(Res.string.delete)) { menu = false; onDelete() }
             }
         }

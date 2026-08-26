@@ -26,6 +26,7 @@ internal actual suspend fun httpExecute(
         when (method) {
             "POST" -> builder.post((jsonBody ?: "{}").toRequestBody(JSON_MEDIA_TYPE))
             "PUT" -> builder.put((jsonBody ?: "{}").toRequestBody(JSON_MEDIA_TYPE))
+            "PATCH" -> builder.patch((jsonBody ?: "{}").toRequestBody(JSON_MEDIA_TYPE))
             "DELETE" -> builder.delete()
             else -> builder.get()
         }

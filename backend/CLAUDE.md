@@ -194,6 +194,7 @@ Every REST endpoint returns `core.responses.api_response()` —
 | POST | `/api/sessions/{id}/rename` | Set a custom title |
 | POST | `/api/sessions/{id}/auto-rename` | Ask the SDK (haiku) to generate a title |
 | POST | `/api/sessions/{id}/color` | Set the session color |
+| POST | `/api/sessions/{id}/move` | Move the session to the project that owns `cwd` (`{project, cwd}`): rewrites only the `cwd` of each transcript entry, moves the sibling `<sessionId>/` directory, and resyncs `chat_list`. 409 while a turn is running, 400 when the target already holds that session id |
 | DELETE | `/api/sessions/{id}?project=<key>` | Delete a session |
 | WS | `/api/shared/ws` | Live folder listing for the file explorer (`services/shared_watch.py`): client sends `{type:"watch", path}`; server replies `{type:"snapshot", path, entries}` on connect and re-pushes it as that folder changes (watchdog watcher on `backend/shared/`, polling fallback). Replaces the removed `GET /api/shared`. Bearer via `ws_bearer_ok`. |
 | GET | `/api/shared/{path:path}` | Download a file |

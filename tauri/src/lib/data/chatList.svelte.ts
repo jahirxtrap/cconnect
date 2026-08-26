@@ -1,4 +1,13 @@
-import { parseProject, parseSession, type ProjectInfo, type SessionInfo } from "./models";
+import {
+  parseCategory,
+  parsePlacement,
+  parseProject,
+  parseSession,
+  type ChatCategory,
+  type ChatPlacement,
+  type ProjectInfo,
+  type SessionInfo,
+} from "./models";
 import { isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
 import { ReconnectingSocket } from "$lib/services/socket";
 
@@ -8,6 +17,8 @@ const byLastActive = <T extends { lastActive: number | null }>(items: T[]) =>
 export class ChatListStore {
   projects = $state<ProjectInfo[]>([]);
   sessions = $state<SessionInfo[]>([]);
+  categories = $state<ChatCategory[]>([]);
+  placement = $state<Record<string, ChatPlacement>>({});
   loading = $state(true);
   connected = $state(false);
 
@@ -45,6 +56,47 @@ export class ChatListStore {
 
   removeSession(sessionId: string) {
     this.sessions = this.sessions.filter((item) => item.sessionId !== sessionId);
+    this.removePlacement(sessionId);
+  }
+
+  upsertCategory(category: ChatCategory) {
+    if (!category.id) return;
+    this.categories = [...this.categories.filter((item) => item.id !== category.id), category].sort(
+      (a, b) => a.position - b.position,
+    );
+  }
+
+  // The existing positions are dealt out in the new order: made-up ones would sort wrong
+  // against the real position the server sends back for the moved category.
+  moveCategory(categoryId: string, index: number) {
+    const from = this.categories.findIndex((item) => item.id === categoryId);
+    if (from < 0) return;
+    const target = Math.max(0, Math.min(index, this.categories.length - 1));
+    if (target === from) return;
+    const positions = this.categories.map((item) => item.position).sort((a, b) => a - b);
+    const reordered = [...this.categories];
+    const [moved] = reordered.splice(from, 1);
+    reordered.splice(target, 0, moved);
+    this.categories = reordered.map((item, slot) => ({ ...item, position: positions[slot] }));
+  }
+
+  removeCategory(categoryId: string) {
+    this.categories = this.categories.filter((item) => item.id !== categoryId);
+    this.placement = Object.fromEntries(
+      Object.entries(this.placement).map(([key, item]) =>
+        item.categoryId === categoryId ? [key, { ...item, categoryId: null }] : [key, item],
+      ),
+    );
+  }
+
+  upsertPlacement(item: ChatPlacement) {
+    if (!item.sessionId) return;
+    this.placement = { ...this.placement, [item.sessionId]: item };
+  }
+
+  removePlacement(sessionId: string) {
+    const { [sessionId]: _gone, ...rest } = this.placement;
+    this.placement = rest;
   }
 
   upsertProject(project: ProjectInfo) {
@@ -65,7 +117,25 @@ export class ChatListStore {
       case "snapshot":
         this.projects = byLastActive(((message.projects as Record<string, unknown>[]) ?? []).map(parseProject));
         this.sessions = byLastActive(((message.sessions as Record<string, unknown>[]) ?? []).map(parseSession));
+        this.categories = ((message.categories as Record<string, unknown>[]) ?? [])
+          .map(parseCategory)
+          .sort((a, b) => a.position - b.position);
+        this.placement = Object.fromEntries(
+          ((message.placement as Record<string, unknown>[]) ?? []).map(parsePlacement).map((item) => [item.sessionId, item]),
+        );
         this.loading = false;
+        break;
+      case "category_changed":
+        this.upsertCategory(parseCategory((message.category as Record<string, unknown>) ?? {}));
+        break;
+      case "category_removed":
+        this.removeCategory(message.category_id as string);
+        break;
+      case "placement_changed":
+        this.upsertPlacement(parsePlacement((message.placement as Record<string, unknown>) ?? {}));
+        break;
+      case "placement_removed":
+        this.removePlacement(message.session_id as string);
         break;
       case "session_changed":
         this.upsertSession(parseSession((message.session as Record<string, unknown>) ?? {}));

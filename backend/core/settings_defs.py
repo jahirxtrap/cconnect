@@ -35,4 +35,5 @@ SETTINGS: dict[str, SettingDef] = {
     "show_compact": SettingDef("full", str, "How to show compaction blocks: full summary or just a label", allowed=("full", "label")),
     "show_working": SettingDef("label", str, "How to show the quick-chat working indicator: label or off", allowed=("label", "off")),
     "simple_mode": SettingDef(False, bool, "Collapse thinking, tools and edits into a single working block, like the quick chat"),
+    "chat_order": SettingDef("auto", str, "How chats sort inside their category: by last activity, or as arranged by hand", allowed=("auto", "manual")),
 }

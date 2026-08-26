@@ -1,3 +1,4 @@
+import type { ChatCategory } from "$lib/data/models";
 import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { http, type HttpClient } from "./http";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
@@ -119,6 +120,34 @@ export const createSessionsApi = (http: HttpClient) => ({
 
   async setColor(sessionId: string, project: string, color: string): Promise<boolean> {
     return (await http.post(`/sessions/${sessionId}/color`, { project, color })) !== null;
+  },
+
+  async createCategory(name: string, color: string | null): Promise<ChatCategory | null> {
+    return await http.post<ChatCategory>("/sessions/categories", { name, color });
+  },
+
+  async updateCategory(
+    id: string,
+    patch: { name?: string; color?: string; collapsed?: boolean; index?: number },
+  ): Promise<ChatCategory | null> {
+    return await http.patch<ChatCategory>(`/sessions/categories/${id}`, patch);
+  },
+
+  async deleteCategory(id: string): Promise<boolean> {
+    return (await http.delete(`/sessions/categories/${id}`)) !== null;
+  },
+
+  async placeSession(sessionId: string, categoryId: string | null, index: number | null): Promise<boolean> {
+    return (await http.post(`/sessions/${sessionId}/category`, { category_id: categoryId, index })) !== null;
+  },
+
+  async deleteProject(projectKey: string): Promise<boolean> {
+    return (await http.delete(`/sessions/projects/${projectKey}`)) !== null;
+  },
+
+  async move(sessionId: string, project: string, cwd: string): Promise<string | null> {
+    const data = await http.post<{ project_key?: string }>(`/sessions/${sessionId}/move`, { project, cwd });
+    return data?.project_key ?? null;
   },
 });
 

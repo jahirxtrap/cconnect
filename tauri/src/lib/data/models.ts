@@ -6,6 +6,20 @@ export interface ProjectInfo {
   lastActive: number | null;
 }
 
+export interface ChatCategory {
+  id: string;
+  name: string;
+  position: number;
+  color: string | null;
+  collapsed: boolean;
+}
+
+export interface ChatPlacement {
+  sessionId: string;
+  categoryId: string | null;
+  position: number;
+}
+
 export interface SessionInfo {
   sessionId: string;
   projectKey: string | null;
@@ -49,6 +63,20 @@ export const parseSession = (raw: Wire): SessionInfo => ({
   title: text(raw.title),
   color: text(raw.color),
   activity: text(raw.activity),
+});
+
+export const parseCategory = (raw: Wire): ChatCategory => ({
+  id: text(raw.id) ?? "",
+  name: text(raw.name) ?? "",
+  position: number(raw.position) ?? 0,
+  color: text(raw.color),
+  collapsed: raw.collapsed === true,
+});
+
+export const parsePlacement = (raw: Wire): ChatPlacement => ({
+  sessionId: text(raw.session_id) ?? "",
+  categoryId: text(raw.category_id),
+  position: number(raw.position) ?? 0,
 });
 
 export const parseSharedEntry = (raw: Wire): SharedEntry => ({

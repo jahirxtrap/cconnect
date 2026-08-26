@@ -44,6 +44,8 @@
   import ChatToolbar from "./ChatToolbar.svelte";
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
+  import MoveSessionDialog from "./MoveSessionDialog.svelte";
+  import OrganizeDialog from "./OrganizeDialog.svelte";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import RewindDialog from "./RewindDialog.svelte";
@@ -72,6 +74,9 @@
   let renameTarget = $state<SessionInfo | null>(null);
   let deleteTarget = $state<SessionInfo | null>(null);
   let colorTarget = $state<SessionInfo | null>(null);
+  let moveTarget = $state<SessionInfo | null>(null);
+  let newCategoryTarget = $state<SessionInfo | null>(null);
+  let organizeOpen = $state(false);
   let confirmCommand = $state<CommandOption | null>(null);
   let dismissed = $state<CompatNotice[]>([]);
   let rewindOpen = $state(false);
@@ -98,6 +103,8 @@
     renameTarget !== null ||
       deleteTarget !== null ||
       colorTarget !== null ||
+      moveTarget !== null ||
+      newCategoryTarget !== null ||
       confirmCommand !== null ||
       rewindOpen ||
       queuedId !== null ||
@@ -235,6 +242,9 @@
           onRename={(session) => (renameTarget = session)}
           onColor={(session) => (colorTarget = session)}
           onDelete={(session) => (deleteTarget = session)}
+          onMove={(session) => (moveTarget = session)}
+          onNewCategory={(session) => (newCategoryTarget = session)}
+          onOrganize={() => (organizeOpen = true)}
         />
       {:else}
         <div class="flex h-full flex-col items-center border-r border-outline-variant py-2">
@@ -579,6 +589,9 @@
       onRename={(session) => (renameTarget = session)}
       onColor={(session) => (colorTarget = session)}
       onDelete={(session) => (deleteTarget = session)}
+      onMove={(session) => (moveTarget = session)}
+      onNewCategory={(session) => (newCategoryTarget = session)}
+      onOrganize={() => (organizeOpen = true)}
     />
   </Drawer>
 {/if}
@@ -592,6 +605,37 @@
       renameTarget = null;
     }}
     onDismiss={() => (renameTarget = null)}
+  />
+{/if}
+
+{#if newCategoryTarget}
+  {@const target = newCategoryTarget}
+  <RenameDialog
+    initial=""
+    title={t("ADD_CATEGORY")}
+    confirmLabel={t("CREATE")}
+    onConfirm={(name) => {
+      void chat.createCategoryWith(name, target.sessionId);
+      newCategoryTarget = null;
+    }}
+    onDismiss={() => (newCategoryTarget = null)}
+  />
+{/if}
+
+{#if organizeOpen}
+  <OrganizeDialog {chat} onDismiss={() => (organizeOpen = false)} />
+{/if}
+
+{#if moveTarget}
+  {@const target = moveTarget}
+  <MoveSessionDialog
+    session={target}
+    projects={chat.historyProjects}
+    onConfirm={(cwd) => {
+      void chat.move(target, cwd);
+      moveTarget = null;
+    }}
+    onDismiss={() => (moveTarget = null)}
   />
 {/if}
 

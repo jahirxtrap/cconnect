@@ -1,8 +1,11 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+  import Plus from "@lucide/svelte/icons/plus";
+  import type { ChatCategory } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
@@ -16,7 +19,12 @@
     onAutoRename: () => void;
     onColor: () => void;
     onOpenNewTab: () => void;
+    onMove: () => void;
     onDelete: () => void;
+    categories?: ChatCategory[];
+    currentCategoryId?: string | null;
+    onPlace?: (categoryId: string | null) => void;
+    onNewCategory?: () => void;
   }
 
   const {
@@ -28,7 +36,12 @@
     onAutoRename,
     onColor,
     onOpenNewTab,
+    onMove,
     onDelete,
+    categories = [],
+    currentCategoryId = null,
+    onPlace = () => {},
+    onNewCategory = () => {},
   }: Props = $props();
 
   let menu = $state(false);
@@ -91,6 +104,28 @@
       <MenuItem text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
       <MenuItem text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
       <MenuItem text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
+      <MenuItem text={t("MOVE_TO_PROJECT")} onclick={() => run(onMove)} />
+      <MenuSub text={t("CATEGORY")}>
+        {#if categories.length}
+          <MenuItem
+            text={t("NO_CATEGORY")}
+            selected={currentCategoryId === null}
+            onclick={() => run(() => onPlace(null))}
+          />
+          {#each categories as category (category.id)}
+            <MenuItem
+              text={category.name}
+              selected={currentCategoryId === category.id}
+              onclick={() => run(() => onPlace(category.id))}
+            />
+          {/each}
+        {/if}
+        <MenuItem text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)}>
+          {#snippet trailing()}
+            <Plus size={16} class="shrink-0 text-on-surface-variant" />
+          {/snippet}
+        </MenuItem>
+      </MenuSub>
       <MenuItem text={t("DELETE")} onclick={() => run(onDelete)} />
     </PopupMenu>
   </div>

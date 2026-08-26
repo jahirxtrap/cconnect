@@ -1,7 +1,9 @@
 """Read Claude Code projects and session transcripts from ~/.claude/projects."""
 
 import json
+import os
 import re
+import shutil
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -410,12 +412,103 @@ async def auto_generate_title(project_key: str, session_id: str) -> Optional[str
 
 
 def delete_session(project_key: str, session_id: str) -> bool:
+    from services import categories
+
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return False
     file.unlink()
+    extras = file.parent / session_id
+    if extras.is_dir():
+        shutil.rmtree(extras, ignore_errors=True)
     forget_pinned(session_id)
+    categories.forget_session(session_id)
     return True
+
+
+def delete_project(project_key: str) -> Optional[list[str]]:
+    """Delete a project directory and every chat in it, returning the ids that were removed.
+    None when the directory does not exist; RuntimeError while any of its turns is running."""
+    from services import categories
+    from services.live_sessions import registry
+
+    directory = _project_dir(project_key)
+    if not directory.is_dir():
+        return None
+    session_ids = [file.stem for file in directory.glob("*.jsonl")]
+    for session_id in session_ids:
+        live = registry.get_by_session(session_id)
+        if live is not None and live.running:
+            raise RuntimeError("a turn is running in this project")
+    shutil.rmtree(directory)
+    for session_id in session_ids:
+        forget_pinned(session_id)
+        categories.forget_session(session_id)
+    return session_ids
+
+
+def _rewrite_cwd(source: Path, target: Path, cwd: str) -> None:
+    """Copy a transcript to `target`, rewriting only the cwd of the entries that carry one.
+    Anything else, including lines that are not valid JSON, is written back verbatim."""
+    with (
+        source.open("r", encoding="utf-8", errors="surrogateescape", newline="") as src,
+        target.open("w", encoding="utf-8", errors="surrogateescape", newline="") as dst,
+    ):
+        for line in src:
+            body = line.rstrip("\r\n")
+            ending = line[len(body):]
+            if not body.strip():
+                dst.write(line)
+                continue
+            try:
+                entry = json.loads(body)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                dst.write(line)
+                continue
+            if isinstance(entry, dict) and entry.get("cwd") and entry["cwd"] != cwd:
+                entry["cwd"] = cwd
+                dst.write(json.dumps(entry, ensure_ascii=False, separators=(",", ":")) + ending)
+            else:
+                dst.write(line)
+
+
+def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional[str]:
+    """Move a session to the project that owns `target_cwd`, returning the new project key.
+    None when the transcript does not exist; RuntimeError while a turn is running."""
+    from services.live_sessions import registry
+
+    target_cwd = (target_cwd or "").strip()
+    if not target_cwd:
+        raise ValueError("target cwd is required")
+    target_key = project_key_for(target_cwd)
+    if target_key == project_key:
+        raise ValueError("the session is already in that project")
+    source = _session_file(project_key, session_id)
+    if not source.is_file():
+        return None
+    live = registry.get_by_session(session_id)
+    if live is not None and live.running:
+        raise RuntimeError("a turn is running in this session")
+    target_dir = _project_dir(target_key)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target = _session_file(target_key, session_id)
+    if target.exists():
+        raise ValueError("the target project already has a session with this id")
+    source_extras = source.parent / session_id
+    target_extras = target_dir / session_id
+    if source_extras.is_dir() and target_extras.exists():
+        raise ValueError("the target project already has data for this session")
+    staged = target_dir / f".{session_id}.jsonl.moving"
+    try:
+        _rewrite_cwd(source, staged, target_cwd)
+        os.replace(staged, target)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
+    if source_extras.is_dir():
+        os.replace(source_extras, target_extras)
+    source.unlink()
+    return target_key
 
 
 def session_cwd(project_key: str, session_id: str) -> Optional[str]:

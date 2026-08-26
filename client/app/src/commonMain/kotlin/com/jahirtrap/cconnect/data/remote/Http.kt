@@ -28,6 +28,9 @@ object Http {
     suspend fun put(path: String, body: JsonObject? = null): JsonElement? =
         execute("PUT", path, emptyMap(), body?.toString() ?: "{}")
 
+    suspend fun patch(path: String, body: JsonObject? = null): JsonElement? =
+        execute("PATCH", path, emptyMap(), body?.toString() ?: "{}")
+
     suspend fun delete(path: String, query: Map<String, String> = emptyMap()): JsonElement? =
         execute("DELETE", path, query, null)
 

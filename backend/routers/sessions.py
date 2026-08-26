@@ -1,11 +1,15 @@
 """Browse Claude Code projects and session transcripts."""
 
+from typing import Optional
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
 from core.config import COLORS
 from core.responses import api_response
+from services import categories as categories_service
+from services import chat_list
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services.live_sessions import registry
@@ -25,6 +29,86 @@ class ProjectBody(BaseModel):
 class ColorBody(BaseModel):
     project: str
     color: str
+
+
+class MoveBody(BaseModel):
+    project: str
+    cwd: str
+
+
+class CategoryBody(BaseModel):
+    name: Optional[str] = None
+    color: Optional[str] = None
+    collapsed: Optional[bool] = None
+    index: Optional[int] = None
+
+
+class PlacementBody(BaseModel):
+    category_id: Optional[str] = None
+    index: Optional[int] = None
+
+
+@router.get("/sessions/categories")
+def list_categories():
+    return api_response(data=categories_service.snapshot())
+
+
+@router.post("/sessions/categories")
+async def create_category(body: CategoryBody):
+    if body.color and body.color not in COLORS:
+        raise HTTPException(status_code=400, detail="invalid color")
+    try:
+        created = categories_service.create_category(body.name or "", body.color)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    chat_list.hub.publish([{"type": "category_changed", "category": created}])
+    return api_response(data=created)
+
+
+@router.patch("/sessions/categories/{category_id}")
+async def update_category(category_id: str, body: CategoryBody):
+    if body.color and body.color not in COLORS:
+        raise HTTPException(status_code=400, detail="invalid color")
+    try:
+        updated = categories_service.update_category(category_id, body.name, body.color, body.collapsed, body.index)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if updated is None:
+        raise HTTPException(status_code=404, detail="category not found")
+    chat_list.hub.publish([{"type": "category_changed", "category": updated}])
+    return api_response(data=updated)
+
+
+@router.delete("/sessions/categories/{category_id}")
+async def delete_category(category_id: str):
+    if not categories_service.delete_category(category_id):
+        raise HTTPException(status_code=404, detail="category not found")
+    chat_list.hub.publish([{"type": "category_removed", "category_id": category_id}])
+    return api_response(message="deleted")
+
+
+@router.post("/sessions/{session_id}/category")
+async def place_session(session_id: str, body: PlacementBody):
+    try:
+        placement = categories_service.place_session(session_id, body.category_id, body.index)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    chat_list.hub.publish([{"type": "placement_changed", "placement": placement}])
+    return api_response(data=placement)
+
+
+@router.delete("/sessions/projects/{project_key}")
+async def delete_project(project_key: str):
+    try:
+        removed = sessions_service.delete_project(project_key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if removed is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    await chat_list.hub.resync()
+    return api_response(data={"removed": removed}, message="deleted")
 
 
 @router.delete("/sessions/{session_id}")
@@ -47,6 +131,20 @@ def rename_session(session_id: str, body: RenameBody):
     if not renamed:
         raise HTTPException(status_code=404, detail="session not found")
     return api_response(message="renamed")
+
+
+@router.post("/sessions/{session_id}/move")
+async def move_session(session_id: str, body: MoveBody):
+    try:
+        target_key = sessions_service.move_session(body.project, session_id, body.cwd)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if target_key is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    await chat_list.hub.resync()
+    return api_response(data={"project_key": target_key, "path": body.cwd}, message="moved")
 
 
 @router.post("/sessions/{session_id}/auto-rename")
