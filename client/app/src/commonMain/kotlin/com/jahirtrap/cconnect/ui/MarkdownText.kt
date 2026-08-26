@@ -666,8 +666,6 @@ private fun TableView(table: ASTNode, ctx: MdContext) {
     val head = body.copy(fontWeight = FontWeight.Bold)
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    // Each column takes the width its content asks for — capped, so one long cell can't stretch the
-    // table forever, and floored so a column of single digits doesn't get a paragraph's worth.
     val widths = remember(cells, body, density) {
         List(cols) { index ->
             val widest = cells.withIndex().maxOf { (row, texts) ->

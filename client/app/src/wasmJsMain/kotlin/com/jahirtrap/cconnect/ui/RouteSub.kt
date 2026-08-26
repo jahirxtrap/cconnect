@@ -7,7 +7,6 @@ private val ROUTES = listOf("/settings", "/claude", "/monitor", "/files", "/term
 private fun encodeUri(value: String): String = js("encodeURIComponent(value)")
 private fun decodeUri(value: String): String = js("decodeURIComponent(value)")
 
-/** The route a path belongs to, whether or not it carries a segment after it. */
 fun routeBaseOf(path: String): String =
     ROUTES.firstOrNull { path == it || path.startsWith("$it/") } ?: "/"
 

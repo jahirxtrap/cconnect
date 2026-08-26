@@ -179,13 +179,7 @@ export class ChatState {
   capabilitiesReady = $state(false);
 
   historyProjectKey = $state<string | null>(null);
-  chatOrder = $state("auto");
-  defaultCategory = $state("");
-  /** Deleting a chat only sets it aside, so the confirmation says so and the trash is reachable. */
-  trashEnabled = $state(false);
-  /** A chat opened for reading only: the transcript renders as always, nothing can be sent to it. */
   viewOnly = $state<TrashedSession | null>(null);
-  /** Category this chat was started in; applied once the session has an id of its own. */
   pendingCategoryId: string | null = null;
   draft = $state("");
 
@@ -215,7 +209,10 @@ export class ChatState {
 
   readonly environment = $derived(backend.find(this.environmentId));
   readonly list = $derived(chatListFor(this.environment));
-  readonly historyLoading = $derived(this.list?.loading ?? true);
+  readonly historyLoading = $derived((this.list?.loading ?? true) || !(this.list?.settingsReady ?? false));
+  readonly chatOrder = $derived(this.list?.chatOrder ?? "auto");
+  readonly defaultCategory = $derived(this.list?.defaultCategory ?? "");
+  readonly trashEnabled = $derived(this.list?.trashEnabled ?? false);
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProjectKey) ?? []);
   readonly historyProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly connected = $derived(this.connection === "connected");
@@ -527,13 +524,12 @@ export class ChatState {
     this.#sides = { ...rest, [sessionId]: pending };
   }
 
-  /** A chat born in this tab gets filed once the CLI hands out its session id: the category its
-   *  `+` came from, else the default one. Callers only run this on that first id. */
   #claimPendingCategory(sessionId: string | null) {
-    const categoryId = this.pendingCategoryId || this.defaultCategory;
+    const wanted = this.pendingCategoryId || this.defaultCategory;
     this.pendingCategoryId = null;
-    if (!sessionId || !categoryId) return;
-    if (this.categories.some((item) => item.id === categoryId)) void this.placeSession(sessionId, categoryId, 0);
+    if (!sessionId) return;
+    const categoryId = this.categories.some((item) => item.id === wanted) ? wanted : null;
+    void this.placeSession(sessionId, categoryId, 0);
   }
 
   openSideChat() {
@@ -726,7 +722,6 @@ export class ChatState {
   loadOlder() {
     const before = this.oldestLoadedIndex;
     if (before === null || this.transcriptExhausted || this.transcriptLoading || this.transcriptPaging) return;
-    // A view-only chat has no socket of its own, so its older pages come over HTTP.
     if (this.viewOnly) {
       void this.#loadOlderViewOnly(this.viewOnly, before);
       return;
@@ -977,13 +972,20 @@ export class ChatState {
 
   async setChatOrder(order: string) {
     if (order === this.chatOrder) return;
-    this.chatOrder = order;
+    if (order === "manual") await this.#seedManualOrder();
+    if (this.list) this.list.chatOrder = order;
     await this.#settings.update({ chat_order: order });
+  }
+
+  async #seedManualOrder() {
+    const ordered = [...this.historySessions].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
+    const missing = ordered.filter((item) => !this.placement[item.sessionId]).map((item) => item.sessionId);
+    if (missing.length) await this.#sessions.seedOrder(missing);
   }
 
   async setDefaultCategory(categoryId: string) {
     if (categoryId === this.defaultCategory) return;
-    this.defaultCategory = categoryId;
+    if (this.list) this.list.defaultCategory = categoryId;
     await this.#settings.update({ default_category: categoryId });
   }
 
@@ -1010,7 +1012,6 @@ export class ChatState {
     if (updated) this.list?.upsertCategory(updated);
   }
 
-  /** Folded or not is per device, so it stays in the local settings and never leaves it. */
   isCategoryCollapsed(categoryId: string): boolean {
     return settings.collapsedCategories.includes(categoryId);
   }
@@ -1022,7 +1023,6 @@ export class ChatState {
       : [...folded, category.id];
   }
 
-  /** Hiding is the same kind of view state: it only takes the row out of this device's list. */
   isCategoryHidden(categoryId: string): boolean {
     return settings.hiddenCategories.includes(categoryId);
   }
@@ -1049,7 +1049,6 @@ export class ChatState {
     this.list?.moveCategory(categoryId, index);
   }
 
-  // Persisted once the drag ends, so a mid-drag response can't fight the local order.
   async commitCategoryOrder(categoryId: string) {
     const index = this.categories.findIndex((item) => item.id === categoryId);
     if (index < 0) return;
@@ -1069,8 +1068,6 @@ export class ChatState {
     return await this.#sessions.trash();
   }
 
-  /** Opens a chat the URL points at: the trash is asked for it, which also says whether it is
-   *  still there — restored or purged elsewhere, the tab falls back to a blank chat. */
   async openTrashed(sessionId: string, projectKey: string) {
     const item = (await this.#sessions.trash()).items.find((entry) => entry.sessionId === sessionId);
     if (!item) {
@@ -1080,8 +1077,6 @@ export class ChatState {
     await this.openViewOnly(item.projectKey ? item : { ...item, projectKey });
   }
 
-  /** Reads a deleted chat in place of this tab's conversation. Nothing is sent while it is up:
-   *  the socket keeps its own session, so leaving the view restores the tab as it was left. */
   async openViewOnly(item: TrashedSession) {
     this.newSession();
     this.viewOnly = item;
@@ -1106,7 +1101,6 @@ export class ChatState {
     this.transcriptLoading = false;
   }
 
-  /** Back to a blank chat: the trashed transcript was never this tab's session to begin with. */
   closeViewOnly() {
     if (!this.viewOnly) return;
     this.viewOnly = null;
@@ -1157,7 +1151,6 @@ export class ChatState {
     await this.#sessions.addProject(clean, name?.trim() || null);
   }
 
-  /** An empty name clears it, so the project falls back to the name of its folder. */
   async renameProject(project: ProjectInfo, name: string) {
     const clean = name.trim();
     if (clean === (project.name ?? "")) return;
@@ -1221,9 +1214,7 @@ export class ChatState {
       this.effort = snapshot.effort;
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
-      this.chatOrder = snapshot.chatOrder;
-      this.defaultCategory = snapshot.defaultCategory;
-      this.trashEnabled = snapshot.trashEnabled;
+      this.list?.applySettings(snapshot);
       this.serverVisibility = {
         simple: snapshot.simpleMode,
         thinking: snapshot.showThinking,
@@ -1483,8 +1474,6 @@ export class ChatState {
     }
   }
 
-  // `ts` is when the message was actually sent: the bubble can be drawn much later (the turn
-  // reaches it, or a reattach replays the event), and it must not read as sent just now.
   #onDequeued(ids: string[], text: string | null, ts: number | null) {
     const body = text ?? "";
     const reconcile = this.#optimisticChipId !== null && ids.includes(this.#optimisticChipId);
@@ -1662,8 +1651,6 @@ export class ChatState {
         this.connection = "connected";
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
-        // The server read it off the transcript, so it outranks whatever this tab was carrying
-        // (a tab restored from a URL has no cwd of its own).
         if (event.cwd && event.cwd !== this.cwd) {
           this.cwd = event.cwd;
           this.onContextChange?.();

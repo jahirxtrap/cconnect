@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -82,6 +83,7 @@ fun CompactDialog(
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp),
     titleTrailing: (@Composable RowScope.() -> Unit)? = null,
     header: (@Composable ColumnScope.() -> Unit)? = null,
+    contentScroll: ScrollState = rememberScrollState(),
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     Dismissable(onDismiss = onDismiss)
@@ -130,7 +132,7 @@ fun CompactDialog(
                     Column(
                         modifier = Modifier
                             .weight(1f, fill = false)
-                            .verticalScroll(rememberScrollState())
+                            .verticalScroll(contentScroll)
                             .padding(contentPadding),
                         content = content,
                     )

@@ -22,7 +22,6 @@
   let updating = $state(false);
   let browsing = $state(false);
 
-  // The CLI runs on the machine hosting the backend, so its path is browsed there.
   const pick = () => (browsing = true);
 
   const labelFor = (value: string) =>

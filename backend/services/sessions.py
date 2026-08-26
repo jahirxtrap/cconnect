@@ -77,8 +77,6 @@ def _project_dir(project_key: str) -> Path:
 def _session_file(project_key: str, session_id: str, trashed: bool = False) -> Path:
     if not _SESSION_RE.match(session_id):
         raise ValueError("invalid session id")
-    # Reading a deleted chat is opt-in per call: no caller falls back to the trash on its own, so
-    # renaming, moving or deleting can never reach a chat that is already there.
     directory = _trash_dir(project_key) if trashed else _project_dir(project_key)
     path = (directory / f"{session_id}.jsonl").resolve()
     if path.parent != directory:
@@ -431,8 +429,6 @@ def delete_session(project_key: str, session_id: str) -> bool:
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return False
-    # With the trash on, the transcript is moved aside instead of removed, and its placement rides
-    # along in the trash row so restoring puts the chat back in the category it sat in.
     if trash.enabled():
         _, _, title, _, _, _ = _session_meta(file)
         placement = categories.placement_of(session_id) or {}
@@ -456,8 +452,7 @@ def delete_session(project_key: str, session_id: str) -> bool:
 
 
 def delete_project(project_key: str) -> Optional[list[str]]:
-    """Delete a project directory and every chat in it, returning the ids that were removed.
-    None when the directory does not exist; RuntimeError while any of its turns is running."""
+    """Delete a project directory and every chat in it, returning the ids that were removed."""
     from services import categories
     from services.live_sessions import registry
 
@@ -477,8 +472,7 @@ def delete_project(project_key: str) -> Optional[list[str]]:
 
 
 def _rewrite_cwd(source: Path, target: Path, cwd: str) -> None:
-    """Copy a transcript to `target`, rewriting only the cwd of the entries that carry one.
-    Anything else, including lines that are not valid JSON, is written back verbatim."""
+    """Copy a transcript to `target`, rewriting only the cwd of the entries that carry one."""
     with (
         source.open("r", encoding="utf-8", errors="surrogateescape", newline="") as src,
         target.open("w", encoding="utf-8", errors="surrogateescape", newline="") as dst,
@@ -502,8 +496,7 @@ def _rewrite_cwd(source: Path, target: Path, cwd: str) -> None:
 
 
 def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional[str]:
-    """Move a session to the project that owns `target_cwd`, returning the new project key.
-    None when the transcript does not exist; RuntimeError while a turn is running."""
+    """Move a session to the project that owns `target_cwd`, returning the new project key."""
     from services.live_sessions import registry
 
     target_cwd = (target_cwd or "").strip()
@@ -541,9 +534,7 @@ def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional
 
 
 def find_session_cwd(session_id: str) -> Optional[str]:
-    """The cwd a transcript records, looked up wherever it lives. What the client sends can be
-    stale — a chat moved to another project, or a tab restored from a URL, which carries no cwd —
-    and the transcript is the only thing that knows where the session actually belongs."""
+    """The cwd a transcript records, looked up wherever it lives."""
     if not session_id or "/" in session_id or "\\" in session_id:
         return None
     base = _base()

@@ -11,7 +11,6 @@
   interface Props {
     session: SessionInfo;
     projects: ProjectInfo[];
-    /** Project path picked in the menu; null asks for a path instead. */
     preset?: string | null;
     onConfirm: (cwd: string) => void;
     onDismiss: () => void;
@@ -23,14 +22,12 @@
   let browsing = $state(false);
 
   const target = $derived(preset ?? custom.trim());
-  // The menu already picked the project, so that case is only confirmed here.
   const targetName = $derived.by(() => {
     if (!preset) return "";
     const found = projects.find((item) => item.path === preset);
     return found ? projectLabel(found) : preset;
   });
 
-  // The path belongs to the machine running the backend, so browsing happens there.
   const pick = () => (browsing = true);
 </script>
 

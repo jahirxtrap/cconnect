@@ -24,7 +24,9 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
+import kotlinx.serialization.json.add
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import com.jahirtrap.cconnect.data.VisibilityPrefs
 
 object SessionsApi {
@@ -79,7 +81,6 @@ object SessionsApi {
         limit: Int = 200,
         beforeIndex: Int? = null,
         visibility: VisibilityPrefs = VisibilityPrefs(),
-        /** Reads the transcript from the trash instead of the project; only a view-only chat asks for it. */
         trashed: Boolean = false,
     ): MessagesPage? {
         val query = mutableMapOf("project" to project, "limit" to limit.toString())
@@ -283,6 +284,11 @@ object SessionsApi {
         Http.post("/sessions/$sessionId/category", buildJsonObject {
             put("category_id", categoryId)
             index?.let { put("index", it) }
+        }) != null
+
+    suspend fun seedOrder(sessionIds: List<String>): Boolean =
+        Http.post("/sessions/order", buildJsonObject {
+            putJsonArray("session_ids") { sessionIds.forEach { add(it) } }
         }) != null
 
     suspend fun deleteProject(projectKey: String): Boolean =

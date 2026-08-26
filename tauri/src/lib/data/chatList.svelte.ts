@@ -9,6 +9,8 @@ import {
   type SessionInfo,
 } from "./models";
 import { isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
+import { createHttp } from "$lib/services/http";
+import { createSettingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
 import { ReconnectingSocket } from "$lib/services/socket";
 
 const byLastActive = <T extends { lastActive: number | null }>(items: T[]) =>
@@ -22,9 +24,17 @@ export class ChatListStore {
   loading = $state(true);
   connected = $state(false);
 
+  chatOrder = $state("auto");
+  defaultCategory = $state("");
+  trashEnabled = $state(false);
+  settingsReady = $state(false);
+
   #socket: ReconnectingSocket;
+  #settings: ReturnType<typeof createSettingsApi>;
 
   constructor(profile: Profile) {
+    this.#settings = createSettingsApi(createHttp(() => profile));
+    void this.#loadSettings();
     this.#socket = new ReconnectingSocket(
       "/list/ws",
       {
@@ -39,6 +49,18 @@ export class ChatListStore {
       () => profile,
     );
     this.#socket.connect();
+  }
+
+  async #loadSettings() {
+    const snapshot = await this.#settings.get();
+    if (snapshot) this.applySettings(snapshot);
+    this.settingsReady = true;
+  }
+
+  applySettings(snapshot: SettingsSnapshot) {
+    this.chatOrder = snapshot.chatOrder;
+    this.defaultCategory = snapshot.defaultCategory;
+    this.trashEnabled = snapshot.trashEnabled;
   }
 
   sessionsOf(projectKey: string | null): SessionInfo[] {
@@ -66,8 +88,6 @@ export class ChatListStore {
     );
   }
 
-  // The existing positions are dealt out in the new order: made-up ones would sort wrong
-  // against the real position the server sends back for the moved category.
   moveCategory(categoryId: string, index: number) {
     const from = this.categories.findIndex((item) => item.id === categoryId);
     if (from < 0) return;
@@ -92,6 +112,20 @@ export class ChatListStore {
   upsertPlacement(item: ChatPlacement) {
     if (!item.sessionId) return;
     this.placement = { ...this.placement, [item.sessionId]: item };
+  }
+
+  movePlacement(sessionId: string, categoryId: string | null, index: number | null, order: string[]) {
+    const siblings = order.filter((id) => id !== sessionId);
+    const positions = siblings.map((id) => this.placement[id]?.position ?? 0);
+    const spot = index === null ? positions.length : Math.max(0, Math.min(index, positions.length));
+    const previous = spot > 0 ? positions[spot - 1] : null;
+    const following = spot < positions.length ? positions[spot] : null;
+    const position =
+      previous === null && following === null ? 0
+      : previous === null ? following! - 1024
+      : following === null ? previous + 1024
+      : (previous + following) / 2;
+    this.upsertPlacement({ sessionId, categoryId, position });
   }
 
   removePlacement(sessionId: string) {

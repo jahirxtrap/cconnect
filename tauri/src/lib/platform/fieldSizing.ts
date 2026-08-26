@@ -2,10 +2,6 @@ const NATIVE = typeof CSS !== "undefined" && (CSS.supports?.("field-sizing", "co
 
 const SELECTOR = "textarea.field-auto";
 
-// A textarea does not scroll to its own caret: once the field stops growing (its max height) a
-// new line lands out of sight, and typing goes on somewhere the user cannot see. Compose gets
-// this from BasicTextField; here it is measured with a mirror of the field, which is the only
-// way to know where the caret sits once the text wraps.
 const MIRRORED = [
   "boxSizing", "width", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft",
   "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth",
@@ -28,7 +24,6 @@ const caretTop = (node: HTMLTextAreaElement): number => {
   return top;
 };
 
-/** Scrolls the field just enough for the caret to stay visible. */
 export const keepCaretInView = (node: HTMLTextAreaElement) => {
   if (node.scrollHeight <= node.clientHeight) return;
   const line = parseFloat(getComputedStyle(node).lineHeight) || 20;
@@ -48,7 +43,6 @@ const fitAll = (root: ParentNode) => {
 };
 
 export function polyfillFieldSizing() {
-  // The caret tracking is needed either way — it is the browser that never does it.
   const track = (event: Event) => {
     const target = event.target;
     if (target instanceof HTMLTextAreaElement) requestAnimationFrame(() => keepCaretInView(target));

@@ -1,9 +1,4 @@
-"""Project metadata: the display name, and the projects the user registered by path.
-
-The transcripts on disk stay the source of truth for which projects hold chats — this table
-only adds what disk cannot say: a name of the user's choosing, and a project that exists
-before its first chat does. `chat_list` merges both when it publishes the list.
-"""
+"""Project metadata: the display name, and the projects the user registered by path."""
 
 from typing import Optional
 
@@ -42,8 +37,7 @@ def register(path: str, name: Optional[str] = None) -> dict:
 
 
 def rename(project_key: str, name: str, path: Optional[str] = None) -> Optional[dict]:
-    """Set the display name; an empty one clears it, back to the folder's own name.
-    `path` seeds the row for a project that so far only exists on disk."""
+    """Set the display name; an empty one clears it, back to the folder's own name."""
     clean = (name or "").strip() or None
     with Session() as s:
         row = s.get(ProjectMeta, project_key)

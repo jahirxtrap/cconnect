@@ -49,7 +49,6 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
   <div class="scrollbar-thin flex max-h-[420px] flex-col gap-1 overflow-y-auto">
-    <!-- "Nothing here" is an answer, not a starting point: it waits until the list has arrived. -->
     {#if loading}
       <CenteredProgress class="h-[72px]" />
     {:else if items.length === 0}
@@ -57,7 +56,6 @@
     {/if}
     {#each items as item (item.sessionId)}
       <div class="flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8">
-        <!-- Opens it read-only: deciding between restore and delete is easier having seen it. -->
         <button
           type="button"
           class="min-w-0 flex-1 cursor-pointer truncate px-3 py-2.5 text-left text-body-md"
@@ -72,7 +70,6 @@
         >
           <RotateCcw />
         </TooltipIconButton>
-        <!-- Deleting here is the end of the line, so it asks like every other point of no return. -->
         <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (purging = item)}>
           <Trash />
         </TooltipIconButton>

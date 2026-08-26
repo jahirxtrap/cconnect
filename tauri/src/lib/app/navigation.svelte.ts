@@ -10,8 +10,6 @@ const baseOf = (path: string): Route => {
   return (base as Route) ?? "/";
 };
 
-/** The segment after the route: a screen that lives inside one, with an entry of its own in the
- *  history. What it means is each screen's business — this only carries it to and from the URL. */
 const subOf = (path: string): string | null => {
   const base = (ROUTES as readonly string[]).find((route) => path.startsWith(`${route}/`));
   return base ? decodeURIComponent(path.slice(base.length + 1)) || null : null;

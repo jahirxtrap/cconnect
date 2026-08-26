@@ -681,8 +681,6 @@ async def run_prompt(
                 "ids": [c["id"] for c in taken if c["id"]],
                 "text": "" if any(c.get("announced") for c in taken) else text,
                 "consumed": sum(1 for c in taken if c["drained"]),
-                # The transcript's own time, so a reattach replaying this event still shows
-                # when the message was sent rather than when the replay happened.
                 "ts": u.get("ts") or next((c.get("ts") for c in taken if c.get("ts")), None),
             })
         return events

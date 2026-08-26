@@ -1,9 +1,4 @@
-"""Read-only directory browsing for the apps' path pickers.
-
-The desktop apps open the OS folder dialog; the web and Android ones have no such thing —
-the browser cannot hand out a real filesystem path — so they walk the PC's folders through
-here instead. Names of directories only: no file contents, no listing of files.
-"""
+"""Read-only directory browsing for the apps' path pickers."""
 
 import os
 import string
@@ -18,8 +13,7 @@ def _roots() -> list[str]:
 
 
 def listing(path: Optional[str] = None, files: bool = False) -> dict:
-    """What is inside `path` (the home directory when empty), with its parent and the roots.
-    Directories always; files only when the picker is choosing one (the CLI path)."""
+    """What is inside `path` (the home directory when empty), with its parent and the roots."""
     target = Path(path).expanduser() if path else Path.home()
     try:
         target = target.resolve()

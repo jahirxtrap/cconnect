@@ -61,20 +61,26 @@
     }
   };
 
+  const maxScroll = () => {
+    if (!strip || !plus) return 0;
+    return Math.max(0, plus.offsetLeft + plus.offsetWidth - strip.clientWidth);
+  };
+
   const autoScroll = (id: string) => {
     if (draggingId !== id || !strip) return;
     const viewport = strip.clientWidth;
     if (viewport > 0) {
+      const limit = maxScroll();
       const visible = centerOf(id) + dragDx - strip.scrollLeft;
       const direction =
         visible < EDGE && strip.scrollLeft > 0
           ? -1
-          : visible > viewport - EDGE && strip.scrollLeft < strip.scrollWidth - viewport
+          : visible > viewport - EDGE && strip.scrollLeft < limit
             ? 1
             : 0;
       if (direction !== 0) {
         const before = strip.scrollLeft;
-        strip.scrollLeft += direction * STEP;
+        strip.scrollLeft = Math.max(0, Math.min(before + direction * STEP, limit));
         dragDx += strip.scrollLeft - before;
         reorder(id);
       }

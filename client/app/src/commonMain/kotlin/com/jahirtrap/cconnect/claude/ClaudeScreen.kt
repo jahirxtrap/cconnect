@@ -123,7 +123,6 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     val environmentLocked by SelectionLock.environment.collectAsState()
     var showChangelog by remember { mutableStateOf(false) }
     var editingPrompt by remember { mutableStateOf(false) }
-    // Which page is open lives in the URL, not here: back and reload both have to land on it.
     val sub by RouteSub.value.collectAsState()
     val detail = ClaudeKind.entries.firstOrNull { it.slug == sub }
     val activeName = state.environments.firstOrNull { it.id == state.activeEnvironmentId }?.name
@@ -147,7 +146,6 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     val refreshTick = refreshRequests()
     LaunchedEffect(refreshTick) { if (refreshTick > 0) { refreshing = true; load() } }
 
-    // Leaving a page can have changed what this screen lists (a plugin installed, an MCP removed).
     LaunchedEffect(detail) { if (detail == null && loaded) load() }
 
     detail?.let { kind ->

@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.ui.theme.Radius
 import com.jahirtrap.cconnect.ui.theme.snapDp
 
-/** Text that becomes its own editor in place: the box keeps its metrics and only the border shows up. */
 @Composable
 fun EditableText(
     value: String,

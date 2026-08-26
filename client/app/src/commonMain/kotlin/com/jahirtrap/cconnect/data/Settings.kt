@@ -122,12 +122,10 @@ class Settings {
         get() = prefs.getString("tabs_state", "") ?: ""
         set(value) = prefs.edit { putString("tabs_state", value) }
 
-    /** Which categories are folded, per device: a view state, not something to share. */
     var collapsedCategories: List<String>
         get() = (prefs.getString("collapsed_categories", "") ?: "").split(",").filter { it.isNotBlank() }
         set(value) = prefs.edit { putString("collapsed_categories", value.joinToString(",")) }
 
-    /** Kept out of the list on this device only; the category and its chats stay untouched. */
     var hiddenCategories: List<String>
         get() = (prefs.getString("hidden_categories", "") ?: "").split(",").filter { it.isNotBlank() }
         set(value) = prefs.edit { putString("hidden_categories", value.joinToString(",")) }

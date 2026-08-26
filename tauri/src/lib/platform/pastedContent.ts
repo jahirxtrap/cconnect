@@ -1,6 +1,3 @@
-/** Files the Android host hands over when the system takes the paste before the page can see it:
- *  a <textarea> only accepts plain text, so media never reaches a `paste` event there. The native
- *  side reads it and calls back here. Nothing to do on the other platforms. */
 interface PastedFile {
   name: string;
   mime: string;

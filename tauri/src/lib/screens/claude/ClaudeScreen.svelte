@@ -60,7 +60,6 @@
   let projects = $state<ProjectInfo[]>([]);
   let loaded = $state(false);
   let refreshing = $state(false);
-  // Which page is open lives in the URL, not here: back and reload both have to land on it.
   const detail = $derived(
     (CLAUDE_KINDS as readonly string[]).includes(navigation.sub ?? "") ? (navigation.sub as ClaudeKind) : null,
   );
@@ -133,7 +132,6 @@
     }
   });
 
-  // Leaving a page can have changed what this screen lists (a plugin installed, an MCP removed).
   let lastDetail: ClaudeKind | null = null;
   $effect(() => {
     const current = detail;

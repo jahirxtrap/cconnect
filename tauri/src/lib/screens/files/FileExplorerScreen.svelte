@@ -689,6 +689,7 @@
     }}
     ondrop={onDrop}
   >
+  <DropOverlay visible={dropOver} />
   <PathBar
     path={archive === null ? path : [archive, archiveDir].filter(Boolean).join("/")}
     {searching}
@@ -712,7 +713,6 @@
   />
 
   <div class="relative min-h-0 flex-1">
-    <DropOverlay visible={dropOver} />
     {#if ordered.length}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
       <div

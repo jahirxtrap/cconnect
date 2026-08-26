@@ -123,7 +123,6 @@ object TabsController {
         return tab
     }
 
-    /** [categoryId] lands the chat in that category as soon as the session gets an id. */
     fun newTab(categoryId: String? = null): Tab {
         val envId = active.ctx.environmentId ?: settings.activeEnvironment?.id
         val dir = settings.environments.firstOrNull { it.id == envId }?.directory.orEmpty()
@@ -144,8 +143,6 @@ object TabsController {
         return tab
     }
 
-    /** [viewTitle] names a chat being read: the tab has no session of its own while it is up, and
-     *  it is never persisted — a restored tab is a blank one, not a view of something deleted. */
     fun updateActive(
         title: String?,
         color: String?,
@@ -265,8 +262,6 @@ object TabsController {
         syncUrl()
     }
 
-    /** A chat read from the trash has no session of its own, so its identity comes from what is
-     *  being read; `v=1` is the one thing the URL adds — where to read it from. */
     var viewing: TrashedSession? = null
         set(value) {
             if (field == value) return

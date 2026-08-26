@@ -6,7 +6,6 @@
   import Trash from "@lucide/svelte/icons/trash";
   import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
-  import { isTouch } from "$lib/platform";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -40,12 +39,16 @@
   let settling = $state(false);
 
   let listElement = $state<HTMLDivElement | null>(null);
+  let rows: { key: string; top: number; bottom: number }[] = [];
+  let dragAt = -1;
+  let grab = 0;
+  let pointerY = 0;
+  let frame: number | null = null;
 
   const heightOf = (id: string) =>
     listElement?.querySelector<HTMLElement>(`[data-category="${id}"]`)?.offsetHeight ?? 0;
 
   const dragFrom = $derived(chat.categories.findIndex((item) => item.id === draggingId));
-  // Where the dragged row would land; the rows in between open the gap for it.
   const dropIndex = $derived(
     draggingId === null || step <= 0
       ? -1
@@ -59,12 +62,42 @@
     return 0;
   };
 
+  const measure = () => {
+    const nodes = Array.from(listElement?.querySelectorAll<HTMLElement>("[data-category]") ?? []);
+    rows = nodes.map((node) => {
+      const box = node.getBoundingClientRect();
+      return { key: node.dataset.category ?? "", top: box.top, bottom: box.bottom };
+    });
+    dragAt = rows.findIndex((row) => row.key === draggingId);
+  };
+
+  const place = () => {
+    const row = rows[dragAt];
+    const first = rows[0];
+    const last = rows[rows.length - 1];
+    if (!row || !first || !last) return;
+    const wanted = pointerY - grab - row.top;
+    dragDy = Math.max(first.top - row.top, Math.min(wanted, last.bottom - row.bottom));
+  };
+
+  const watch = () => {
+    const tick = () => {
+      if (draggingId === null) {
+        frame = null;
+        return;
+      }
+      measure();
+      place();
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+  };
+
   const commit = (category: ChatCategory) => {
     if (draft.trim() && draft !== category.name) void chat.renameCategory(category, draft);
     editing = null;
   };
 
-  // Alphabetical: projects carry no order of their own, unlike categories.
   const sortedProjects = $derived(
     [...chat.historyProjects].sort((a, b) => projectLabel(a).localeCompare(projectLabel(b))),
   );
@@ -78,7 +111,7 @@
   const startDrag = (event: PointerEvent, id: string) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    let lastY = event.clientY;
+    pointerY = event.clientY;
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const detach = () => {
@@ -86,6 +119,8 @@
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
       window.removeEventListener("blur", onUp);
+      if (frame !== null) cancelAnimationFrame(frame);
+      frame = null;
       if (timer !== null) clearTimeout(timer);
       timer = null;
     };
@@ -94,16 +129,15 @@
       step = heightOf(id) + SPACING;
       dragDy = 0;
       draggingId = id;
+      measure();
+      grab = rows[dragAt] ? pointerY - rows[dragAt].top : 0;
+      watch();
     };
 
     const onMove = (move: PointerEvent) => {
       if (move.pointerId !== event.pointerId) return;
-      if (draggingId !== id) {
-        lastY = move.clientY;
-        return;
-      }
-      dragDy += move.clientY - lastY;
-      lastY = move.clientY;
+      pointerY = move.clientY;
+      if (draggingId === id) place();
     };
 
     const onUp = (up: Event) => {
@@ -111,7 +145,6 @@
       detach();
       const target = draggingId === id && dropIndex >= 0 && dropIndex !== dragFrom ? dropIndex : -1;
       if (target >= 0) {
-        // The rows land where the gap already showed them, so the reorder must not animate.
         settling = true;
         chat.reorderCategory(id, target);
         void chat.commitCategoryOrder(id);
@@ -125,7 +158,7 @@
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     window.addEventListener("blur", onUp);
-    if (isTouch) timer = setTimeout(begin, LONG_PRESS_MS);
+    if (event.pointerType === "touch") timer = setTimeout(begin, LONG_PRESS_MS);
     else begin();
   };
 </script>
@@ -134,11 +167,7 @@
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
-  <!-- A drag owns the pointer: nothing under it may claim the cursor or react to hover. -->
-  <div
-    bind:this={listElement}
-    class="scrollbar-thin flex max-h-[420px] flex-col gap-1 overflow-y-auto {draggingId === null ? '' : 'cursor-pointer'}"
-  >
+  <div bind:this={listElement} class="flex flex-col gap-1 {draggingId === null ? '' : 'cursor-pointer'}">
     <SelectField
       label={t("CHAT_ORDER")}
       selected={chat.chatOrder}
@@ -164,13 +193,15 @@
       {@const hidden = chat.isCategoryHidden(category.id)}
       <div
         data-category={category.id}
-        class="flex items-center rounded-item pr-1 {dragging ? 'bg-on-surface/8' : ''} {draggingId === null
-          ? ''
-          : 'pointer-events-none'}"
-        style="transform: translateY({dragging ? dragDy : shiftOf(index)}px); z-index: {dragging
-          ? 1
-          : 0}; transition: {dragging || settling ? 'none' : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
+        class="relative {draggingId === null ? '' : 'pointer-events-none'}"
+        style="z-index: {dragging ? 1 : 0}"
       >
+        <div
+          class="flex items-center rounded-item pr-1 {dragging ? 'bg-on-surface/8' : ''}"
+          style="transform: translateY({dragging ? dragDy : shiftOf(index)}px); transition: {dragging || settling
+            ? 'none'
+            : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
+        >
         <span
           class="flex size-7 shrink-0 cursor-pointer touch-none items-center justify-center text-on-surface-variant"
           onpointerdown={(event) => startDrag(event, category.id)}
@@ -205,6 +236,7 @@
         <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingCategory = category)}>
           <Trash />
         </TooltipIconButton>
+        </div>
       </div>
     {/each}
     <ActionButton
@@ -230,7 +262,6 @@
             onCancel={() => (editing = null)}
           />
         </div>
-        <!-- Always in place so the row keeps its shape; it only has something to reset with a custom name. -->
         <TooltipIconButton
           label={t("RESET_NAME")}
           enabled={project.customName}
@@ -257,7 +288,6 @@
     {/each}
     <ActionButton class="w-full" text={t("ADD_PROJECT")} onclick={() => (addingProject = true)} />
 
-    <!-- The trash is a place of its own, not a third list crammed under these two. -->
     {#if chat.trashEnabled}
       <ActionButton class="mt-1 w-full" text={t("TRASH")} onclick={() => (trashOpen = true)} />
     {/if}

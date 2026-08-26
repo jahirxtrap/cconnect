@@ -12,8 +12,6 @@ export interface Tab {
   title: string | null;
   color: string | null;
   running: boolean;
-  /** Name of the chat being read: the tab has no session of its own while it is up, and it is
-   *  not persisted — a restored tab is a blank one, never a view of something deleted. */
   viewTitle?: string | null;
 }
 
@@ -36,7 +34,6 @@ export interface ChatLocation {
   tab: number;
   sessionId: string;
   projectKey: string;
-  /** The chat is being read from the trash: same identity, read from somewhere else. */
   view: boolean;
 }
 
@@ -70,7 +67,6 @@ class Tabs {
     let active = restored.active;
 
     const location = readChatLocation();
-    // A view-only entry never becomes the tab's session: `start()` opens it for reading instead.
     if (location && !location.view) {
       const known = this.list.findIndex((tab) => tab.sessionId === location.sessionId);
       if (known >= 0) {
@@ -96,8 +92,6 @@ class Tabs {
     }
 
     $effect(() => {
-      // Going back has to land on the chat the entry points at, not only on a tab that happens to
-      // hold it: most history is made switching chats inside one tab, and that tab has to follow.
       const onPopState = () => {
         if (!onChatRoute()) return;
         const location = readChatLocation();
@@ -206,7 +200,6 @@ class Tabs {
     return tab;
   }
 
-  /** `categoryId` lands the chat in that category as soon as the session gets an id. */
   newTab(categoryId: string | null = null): Tab {
     const environmentId = this.active?.environmentId ?? backend.active?.id ?? null;
     const directory = backend.environments.find((item) => item.id === environmentId)?.directory ?? "";
@@ -348,8 +341,6 @@ class Tabs {
       this.list.findIndex((tab) => tab.id === this.activeId),
       0,
     );
-    // A chat read from the trash has no session of its own, so its identity comes from what is
-    // being read; `v=1` is the one thing the URL adds — where to read it from.
     const view = current ? this.stateFor(current).viewOnly : null;
     const chat = view ?? (current?.sessionId && current.projectKey ? current : null);
     const target = chat

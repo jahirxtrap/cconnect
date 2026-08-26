@@ -365,7 +365,6 @@ fun StickyCollapsibleHeader(message: ChatMessage, onCollapse: () -> Unit, modifi
     val (icon, label, tint) = spec
     Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.shadowSm(RectangleShape)) {
         Row(
-            // Pinned edge to edge over the list: a rounded hover would cut the band it sits on.
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { onCollapse() }

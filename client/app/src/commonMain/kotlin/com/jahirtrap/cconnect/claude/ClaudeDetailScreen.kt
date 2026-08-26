@@ -82,7 +82,6 @@ import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-/** [slug] is what the URL carries, so a page can be reopened by name after a reload. */
 enum class ClaudeKind(val slug: String) {
     Plugins("plugins"),
     Skills("skills"),

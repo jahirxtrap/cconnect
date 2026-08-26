@@ -80,7 +80,6 @@ object SystemApi {
 
     suspend fun restart(): Boolean = Http.post("/system/restart", buildJsonObject {}) != null
 
-    /** Folder tree for the path picker, for the platforms without a native file dialog. */
     suspend fun dirs(path: String, files: Boolean = false): DirListing? {
         val data = Http.get("/system/dirs", mapOf("path" to path, "files" to files.toString()))?.jsonObject
             ?: return null

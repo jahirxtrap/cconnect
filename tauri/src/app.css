@@ -66,13 +66,12 @@ html[data-theme="dark"] {
 }
 
 .drop-overlay {
-  animation: drop-overlay-enter 120ms ease-out;
+  animation: drop-overlay-enter 90ms ease-out;
 }
 
 @keyframes drop-overlay-enter {
   from {
     opacity: 0;
-    transform: scale(0.99);
   }
 }
 
@@ -245,7 +244,6 @@ textarea,
   -webkit-touch-callout: default;
 }
 
-/* In a layer so a `cursor-*` utility still wins: unlayered rules beat Tailwind's layers. */
 @layer base {
   input,
   textarea,
@@ -289,7 +287,6 @@ textarea::selection {
   line-height: var(--chat-line-dense-snap, var(--chat-line-dense));
 }
 
-/* The chat's 6px stack gap, snapped (see tokens.css). */
 .chat-gap {
   gap: var(--chat-gap-sm-snap, var(--chat-gap-sm));
 }

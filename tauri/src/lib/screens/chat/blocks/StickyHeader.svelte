@@ -47,7 +47,6 @@
 </script>
 
 <div class="w-full bg-background shadow-sm">
-  <!-- Pinned edge to edge over the list: a rounded hover would cut the band it sits on. -->
   <button
     type="button"
     onclick={onCollapse}

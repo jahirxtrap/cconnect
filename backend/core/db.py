@@ -19,8 +19,7 @@ class Base(DeclarativeBase):
 
 
 def _add_missing_columns() -> list[str]:
-    """Bring existing tables up to what the models declare. SQLite can only append a column,
-    which is all the models ever ask for — a field added to a table someone already has."""
+    """Append the columns the models declare and the table is missing."""
     inspector = inspect(engine)
     tables = set(inspector.get_table_names())
     added: list[str] = []
@@ -32,7 +31,6 @@ def _add_missing_columns() -> list[str]:
             for column in table.columns:
                 if column.name in existing:
                     continue
-                # A NOT NULL column has no value to give the rows already there.
                 if not column.nullable and column.server_default is None:
                     logger.warning(f"Cannot add {table.name}.{column.name}: it is NOT NULL without a default")
                     continue
@@ -43,8 +41,7 @@ def _add_missing_columns() -> list[str]:
 
 
 def init_db() -> None:
-    """Create any missing table and append any missing column, so a database from an older
-    run keeps working. Changing or dropping a column is still out of scope."""
+    """Create the missing tables and append the missing columns."""
     from core import models  # noqa: F401  (register models on Base before create_all)
     db_existed = _DB_PATH.exists()
     before = set(inspect(engine).get_table_names())

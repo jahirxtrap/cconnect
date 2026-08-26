@@ -1,9 +1,4 @@
-"""Chat categories and their manual order, kept in SQLite.
-
-The transcripts on disk stay the source of truth for which chats exist: these tables only
-say where each one sits. Positions are fractional so moving an item rewrites a single row,
-and rows whose session is gone are pruned instead of resurrecting a chat that was deleted.
-"""
+"""Chat categories and their manual order, kept in SQLite."""
 
 import uuid
 from typing import Optional
@@ -152,6 +147,25 @@ def place_session(session_id: str, category_id: Optional[str], index: Optional[i
         return _placement_dict(row)
 
 
+def seed_order(session_ids: list[str]) -> list[dict]:
+    """Give every chat without a placement one, following the order it is listed in."""
+    if not session_ids:
+        return []
+    with Session() as s:
+        known = {row.session_id for row in s.query(SessionPlacement).all()}
+        missing = [session_id for session_id in session_ids if session_id not in known]
+        if not missing:
+            return []
+        lowest = min((row.position for row in s.query(SessionPlacement).all()), default=0.0)
+        created = []
+        for offset, session_id in enumerate(reversed(missing), start=1):
+            row = SessionPlacement(session_id=session_id, category_id=None, position=lowest - offset * _STEP)
+            s.add(row)
+            created.append(row)
+        s.commit()
+        return [_placement_dict(row) for row in created]
+
+
 def placement_of(session_id: str) -> Optional[dict]:
     with Session() as s:
         row = s.get(SessionPlacement, session_id)
@@ -187,8 +201,7 @@ def forget_session(session_id: str) -> bool:
 
 
 def prune(known_session_ids: set[str]) -> list[str]:
-    """Drop placements whose transcript is gone. Callers must pass a complete scan:
-    an empty set on a failed read would wipe the whole arrangement."""
+    """Drop placements whose transcript is gone; callers must pass a complete scan."""
     if not known_session_ids:
         return []
     with Session() as s:

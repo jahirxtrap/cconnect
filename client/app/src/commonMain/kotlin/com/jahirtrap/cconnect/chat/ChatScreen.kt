@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -18,6 +19,7 @@ import com.jahirtrap.cconnect.ui.combinedClickable
 import androidx.compose.foundation.clickable as foundationClickable
 import com.jahirtrap.cconnect.ui.secondaryClick
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -300,11 +302,13 @@ import com.jahirtrap.cconnect.ui.TooltipWrap
 import com.jahirtrap.cconnect.ui.dayIndex
 import com.jahirtrap.cconnect.ui.theme.sessionColorOf
 import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import com.jahirtrap.cconnect.ui.theme.snapDp
+import com.jahirtrap.cconnect.ui.dropOverlay
 import com.jahirtrap.cconnect.settings.VisibilityDialog
 import com.jahirtrap.cconnect.data.VisibilityPrefs
 
@@ -459,12 +463,10 @@ fun ChatScreen(
     val busy = state.streaming || (state.activity ?: activeSession?.activity) in setOf("waiting", "working", "slow", "compacting")
     val tabLabel: String? = activeSession?.let { it.title ?: it.preview ?: state.sessionId?.take(8) }
     val tabColor: String? = if (activeSession != null) state.sessionColor else null
-    // The tab names the chat being read; the status line under the app name says where it lives.
     val viewTabLabel = state.viewOnly?.let { it.title ?: it.sessionId.take(8) }
     LaunchedEffect(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey, viewTabLabel) {
         TabsController.updateActive(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey, viewTabLabel)
     }
-    // What the tab is reading rides the URL, so a reload lands back on it instead of a blank chat.
     LaunchedEffect(state.viewOnly) { TabsController.viewing = state.viewOnly }
     val tabIndex = remember { TabsController.tabs.indexOfFirst { it.id == TabsController.activeId } }
     val chatLoc = remember { readChatLocation() }
@@ -476,8 +478,6 @@ fun ChatScreen(
             else vm.restoreSession(chatLoc.sessionId, chatLoc.projectKey)
         }
     }
-    // Going back has to land on the chat the entry points at, not only on a tab that happens to
-    // hold it: most history is made switching chats inside one tab, and that tab has to follow.
     ChatPopstate { location ->
         if (location == null) {
             vm.newSession()
@@ -690,7 +690,6 @@ fun ChatScreen(
                             topBar = {
                                 val activity = state.activity ?: activeSession?.activity
                                 val statusLeading: (@Composable () -> Unit) = when {
-                                    // Reading a deleted chat: where it lives is the whole state, there is no session to report on.
                                     state.viewOnly != null -> ({ StatusDot(palette.gray, box = 8.dp) })
                                     state.connection == ConnectionState.Disconnected -> ({ StatusDot(palette.red, box = 8.dp) })
                                     state.connection == ConnectionState.Connecting -> ({ StatusSpinner() })
@@ -801,7 +800,7 @@ fun ChatScreen(
                             Column(
                                 modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)).imePadding()
                                 .fileDropTarget(enabled = !sideActive && state.viewOnly == null, onDragChange = { dropOver = it }) { vm.addAttachments(it) }
-                                .then(if (dropOver) Modifier.border(snapDp(2.dp), MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
+                                .dropOverlay(dropOver, MaterialTheme.colorScheme.primary),
                             ) {
                                 BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
                                     val boxHeightPx = constraints.maxHeight.toFloat()
@@ -912,10 +911,6 @@ fun ChatScreen(
                                         }
                                         }
                                         var stickyHeaderHeight by remember { mutableStateOf(0) }
-                                        // Two open blocks can both start above the fold; the header
-                                        // belongs to the lower one, the one being read. In this
-                                        // reversed list that is the smallest index whose own header
-                                        // is still out of sight.
                                         val sticky by remember(expandedState) {
                                             derivedStateOf {
                                                 val info = listState.layoutInfo
@@ -1018,7 +1013,6 @@ fun ChatScreen(
                                         )
                                     }
                                 }
-                                // Nothing can be sent to a chat that is only being read, so the composer is not there at all.
                                 if (state.viewOnly == null) {
                                 Column(
                                     modifier = Modifier
@@ -1168,7 +1162,6 @@ fun ChatScreen(
         )
     }
     deleteTarget?.let { s ->
-        // With the trash on nothing is lost, so the dialog reads as a move, not as a deletion.
         ConfirmDialog(
             title = stringResource(if (state.trashEnabled) Res.string.trash else Res.string.delete),
             text = stringResource(
@@ -1665,7 +1658,6 @@ private fun ColumnScope.ChatPanelContent(
     Row(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         val projectLocked by SelectionLock.project.collectAsState()
         ProjectSelector(
-            // The one in front stays listed even when hidden, or the selector would name a project it cannot show.
             projects = state.historyProjects.filter {
                 it.projectKey !in state.hiddenProjects || it.projectKey == state.historyProjectKey
             },
@@ -1682,36 +1674,193 @@ private fun ColumnScope.ChatPanelContent(
     LaunchedEffect(state.historyProjectKey) {
         if (state.historySessions.isNotEmpty()) drawerListState.scrollToItem(0)
     }
+    val groups = groupSessions(state)
+    val drag = remember { ChatDrag() }
+    val categoryDrag = remember { CategoryDrag() }
+    val manualOrder = state.chatOrder == "manual"
+    val touch = LocalIsTouch.current
+    var settling by remember { mutableStateOf<String?>(null) }
+    val dragRows = remember(groups, state.collapsedCategories) {
+        buildList {
+            groups.forEachIndexed { groupIndex, group ->
+                val categoryId = group.category?.id
+                if (categoryId == null && groupIndex > 0) {
+                    add(DragRow("loose-divider", null, -1, header = false, spacer = true))
+                }
+                if (categoryId != null) {
+                    add(
+                        DragRow(
+                            key = "cat-$categoryId",
+                            categoryId = categoryId,
+                            index = -1,
+                            header = true,
+                            collapsed = categoryId in state.collapsedCategories,
+                        ),
+                    )
+                }
+                group.sessions.forEachIndexed { index, session ->
+                    add(DragRow(session.sessionId, categoryId, index, header = false))
+                }
+            }
+        }
+    }
+    LaunchedEffect(drag.active) {
+        if (!drag.active) return@LaunchedEffect
+        var over: String? = null
+        var spring: Job? = null
+        try {
+            while (true) {
+                val tick = withFrameNanos { drag.tick(drawerListState, dragRows) }
+                if (tick.scroll != 0f) drawerListState.scrollBy(tick.scroll)
+                if (tick.springOver != over) {
+                    over = tick.springOver
+                    spring?.cancel()
+                    spring = over?.let { id ->
+                        launch {
+                            delay(SPRING_OPEN_MS)
+                            state.categories.firstOrNull { it.id == id && id in state.collapsedCategories }
+                                ?.let { vm.toggleCategory(it) }
+                        }
+                    }
+                }
+            }
+        } finally {
+            spring?.cancel()
+        }
+    }
+    LaunchedEffect(categoryDrag.active) {
+        if (!categoryDrag.active) return@LaunchedEffect
+        while (true) {
+            val scroll = withFrameNanos { categoryDrag.tick(drawerListState, dragRows) }
+            if (scroll != 0f) drawerListState.scrollBy(scroll)
+        }
+    }
+    LaunchedEffect(settling) {
+        if (settling == null) return@LaunchedEffect
+        withFrameNanos {}
+        withFrameNanos {}
+        settling = null
+    }
     LazyColumn(
         state = drawerListState,
         modifier = Modifier.weight(1f).fillMaxWidth(),
         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 8.dp),
     ) {
-        val groups = groupSessions(state)
         when {
             state.historySessions.isNotEmpty() -> groups.forEachIndexed { groupIndex, group ->
-                // The loose group has no header of its own, so it needs a line to break from the one above.
                 if (group.category == null && groupIndex > 0) {
                     item(key = "loose-divider") {
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier
+                                .graphicsLayer { translationY = drag.shiftFor("loose-divider") }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
                             color = MaterialTheme.colorScheme.outlineVariant,
                         )
                     }
                 }
                 if (group.category != null) {
                     item(key = "cat-${group.category.id}") {
+                        val categoryId = group.category.id
+                        val held = categoryDrag.dragging(categoryId)
+                        val collapsed = categoryId in state.collapsedCategories
+                        val wanted = drag.shiftFor("cat-$categoryId") + categoryDrag.shiftFor(categoryId)
+                        val shift = remember(categoryId) { Animatable(0f) }
+                        LaunchedEffect(wanted, drag.active, categoryDrag.active, settling) {
+                            if (settling != null || (!drag.active && !categoryDrag.active)) shift.snapTo(0f)
+                            else shift.animateTo(wanted, tween(160))
+                        }
                         CategoryHeader(
                             category = group.category,
                             count = group.sessions.size,
-                            collapsed = group.category.id in state.collapsedCategories,
+                            collapsed = collapsed,
+                            targeted = drag.highlights(categoryId),
+                            held = held,
+                            joined = held && !collapsed && group.sessions.isNotEmpty(),
                             onToggle = { vm.toggleCategory(group.category) },
-                            onNewChat = { TabsController.newTab(group.category.id); onAfterSelect() },
+                            onNewChat = { TabsController.newTab(categoryId); onAfterSelect() },
+                            modifier = Modifier
+                                .zIndex(if (held) 1f else 0f)
+                                .graphicsLayer {
+                                    translationY = when {
+                                        held -> categoryDrag.offset
+                                        !drag.active && !categoryDrag.active -> 0f
+                                        else -> shift.value
+                                    }
+                                }
+                                .dragCategory(
+                                    drag = categoryDrag,
+                                    categoryId = categoryId,
+                                    listState = drawerListState,
+                                    touch = touch,
+                                    onCommit = { moved, beforeId ->
+                                        val rest = state.categories.filter { it.id != moved }
+                                        val at = if (beforeId == null) rest.size
+                                        else rest.indexOfFirst { it.id == beforeId }.takeIf { it >= 0 } ?: rest.size
+                                        if (state.categories.indexOfFirst { it.id == moved } != at) {
+                                            settling = moved
+                                            vm.reorderCategory(moved, at)
+                                            vm.commitCategoryOrder(moved)
+                                        }
+                                    },
+                                ),
                         )
                     }
                 }
                 if (group.category?.id !in state.collapsedCategories) {
-                    items(group.sessions, key = { it.sessionId }) { s ->
+                    val groupId = group.category?.id
+                    itemsIndexed(group.sessions, key = { _, item -> item.sessionId }) { index, s ->
+                        val dragged = drag.sessionId == s.sessionId
+                        val carried = categoryDrag.dragging(groupId)
+                        val wanted = drag.shiftFor(s.sessionId) + categoryDrag.shiftFor(groupId)
+                        val shift = remember(s.sessionId) { Animatable(0f) }
+                        LaunchedEffect(wanted, drag.active, categoryDrag.active, settling) {
+                            if (settling != null || (!drag.active && !categoryDrag.active)) shift.snapTo(0f)
+                            else shift.animateTo(wanted, tween(160))
+                        }
+                        val lifted = when {
+                            dragged -> RoundedCornerShape(Radius.item)
+                            carried && index == group.sessions.lastIndex ->
+                                RoundedCornerShape(bottomStart = Radius.item, bottomEnd = Radius.item)
+
+                            carried -> RectangleShape
+                            else -> null
+                        }
+                        Box(
+                            modifier = Modifier
+                                .zIndex(if (dragged || carried) 1f else 0f)
+                                .graphicsLayer {
+                                    translationY = when {
+                                        dragged -> drag.offset
+                                        carried -> categoryDrag.offset
+                                        !drag.active && !categoryDrag.active -> 0f
+                                        else -> shift.value
+                                    }
+                                }
+                                .then(
+                                    if (lifted != null) {
+                                        Modifier
+                                            .clip(lifted)
+                                            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                                    } else Modifier,
+                                )
+                                .dragChat(
+                                    drag = drag,
+                                    sessionId = s.sessionId,
+                                    origin = DropTarget(groupId, index),
+                                    listState = drawerListState,
+                                    manual = manualOrder,
+                                    touch = touch,
+                                    onCommit = { sessionId, target ->
+                                        val destination = groups.firstOrNull { it.category?.id == target.categoryId }
+                                        vm.dropSession(
+                                            sessionId,
+                                            target.categoryId,
+                                            target.index,
+                                            destination?.sessions.orEmpty().map { it.sessionId },
+                                        )
+                                    },
+                                ),
+                        ) {
                         ConversationRow(
                             title = s.title ?: s.preview ?: s.sessionId.take(8),
                             selected = s.sessionId == state.sessionId,
@@ -1730,6 +1879,7 @@ private fun ColumnScope.ChatPanelContent(
                             currentProjectKey = s.projectKey,
                             activity = s.activity,
                         )
+                        }
                     }
                 }
             }
@@ -2151,7 +2301,6 @@ private fun SelectorChip(
     }
 }
 
-/** The turn is dragging or the API failed: same band as compacting, in its own colour. */
 @Composable
 private fun StatusProgress(kind: String) {
     val failed = kind == "failed"
@@ -2611,11 +2760,13 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
     var addingProject by remember { mutableStateOf(false) }
     var trashOpen by remember { mutableStateOf(false) }
     var draggingId by remember { mutableStateOf<String?>(null) }
-    var dragDy by remember { mutableStateOf(0f) }
+    var dragRaw by remember { mutableStateOf(0f) }
+    var scrollAt by remember { mutableStateOf(0) }
     val rowHeights = remember { mutableStateMapOf<String, Float>() }
     val isTouch = LocalIsTouch.current
     val categoryWord = stringResource(Res.string.category)
     val spacingPx = with(LocalDensity.current) { 4.dp.toPx() }
+    val scroll = rememberScrollState()
 
     fun commit(category: ChatCategory) {
         if (draft.isNotBlank() && draft != category.name) vm.renameCategory(category, draft)
@@ -2624,7 +2775,12 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
 
     val dragFrom = state.categories.indexOfFirst { it.id == draggingId }
     val step = (rowHeights[draggingId] ?: 0f) + spacingPx
-    // Where the dragged row would land; the rows in between open the gap for it.
+    val spans = state.categories.map { (rowHeights[it.id] ?: 0f) + spacingPx }
+    val dragDy = if (dragFrom < 0) 0f else {
+        val ceiling = -spans.take(dragFrom).sum()
+        val floor = spans.drop(dragFrom + 1).sum()
+        (dragRaw + (scroll.value - scrollAt)).coerceIn(ceiling, floor)
+    }
     val dropIndex = if (draggingId == null || step <= spacingPx) -1
     else (dragFrom + (dragDy / step).roundToInt()).coerceIn(0, state.categories.lastIndex)
 
@@ -2639,13 +2795,11 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
         onDismiss = onDismiss,
         title = stringResource(Res.string.organize),
         buttons = { Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) } },
+        contentScroll = scroll,
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 420.dp)
-                .verticalScroll(rememberScrollState())
-                // A drag owns the pointer: nothing under it may claim the cursor.
                 .then(
                     if (draggingId == null) Modifier
                     else Modifier.pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true),
@@ -2677,7 +2831,6 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 val dragging = category.id == draggingId
                 val shift = remember(category.id) { Animatable(0f) }
                 LaunchedEffect(shiftOf(index), draggingId) {
-                    // The rows land where the gap already showed them, so the drop must not animate.
                     if (draggingId == null) shift.snapTo(0f) else shift.animateTo(shiftOf(index), tween(160))
                 }
                 Row(
@@ -2685,7 +2838,13 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                         .fillMaxWidth()
                         .onSizeChanged { rowHeights[category.id] = it.height.toFloat() }
                         .zIndex(if (dragging) 1f else 0f)
-                        .graphicsLayer { translationY = if (dragging) dragDy else shift.value }
+                        .graphicsLayer {
+                            translationY = when {
+                                dragging -> dragDy
+                                draggingId == null -> 0f
+                                else -> shift.value
+                            }
+                        }
                         .clip(RoundedCornerShape(Radius.item))
                         .then(
                             if (dragging) {
@@ -2701,15 +2860,15 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 ) {
                     DragHandle(
                         isTouch = isTouch,
-                        onStart = { draggingId = category.id; dragDy = 0f },
-                        onDrag = { dragDy += it },
+                        onStart = { draggingId = category.id; dragRaw = 0f; scrollAt = scroll.value },
+                        onDrag = { dragRaw += it },
                         onEnd = {
                             if (dropIndex >= 0 && dropIndex != dragFrom) {
                                 vm.reorderCategory(category.id, dropIndex)
                                 vm.commitCategoryOrder(category.id)
                             }
                             draggingId = null
-                            dragDy = 0f
+                            dragRaw = 0f
                         },
                     )
                     EditableText(
@@ -2751,7 +2910,6 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 modifier = Modifier.fillMaxWidth(),
             )
             FieldLabel(stringResource(Res.string.projects))
-            // Alphabetical: projects carry no order of their own, unlike categories.
             state.historyProjects.sortedBy { projectLabel(it).lowercase() }.forEach { project ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
@@ -2767,7 +2925,6 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                         modifier = Modifier.weight(1f),
                         interactive = draggingId == null,
                     )
-                    // Always in place so the row keeps its shape; it only has something to reset with a custom name.
                     TooltipIconButton(
                         label = stringResource(Res.string.reset_name),
                         onClick = { vm.renameProject(project, "") },
@@ -2798,7 +2955,6 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 onClick = { addingProject = true },
                 modifier = Modifier.fillMaxWidth(),
             )
-            // The trash is a place of its own, not a third list crammed under these two.
             if (state.trashEnabled) {
                 ActionButton(
                     text = stringResource(Res.string.trash),
@@ -2870,7 +3026,6 @@ private fun TrashDialog(vm: ChatViewModel, onView: (TrashedSession) -> Unit, onD
             modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            // "Nothing here" is an answer, not a starting point: it waits until the list has arrived.
             if (loading) {
                 Box(modifier = Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
                     LoadingIndicator(modifier = Modifier.size(28.dp))
@@ -2884,7 +3039,6 @@ private fun TrashDialog(vm: ChatViewModel, onView: (TrashedSession) -> Unit, onD
                 )
             }
             items.forEach { item ->
-                // The whole row opens it read-only, like a chat row does, so the hover covers it all.
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2905,7 +3059,6 @@ private fun TrashDialog(vm: ChatViewModel, onView: (TrashedSession) -> Unit, onD
                         onClick = { scope.launch { vm.restoreTrashed(item.sessionId); load() } },
                         size = 32.dp,
                     ) { Icon(Lucide.RotateCcw, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                    // Deleting here is the end of the line, so it asks like every other point of no return.
                     TooltipIconButton(
                         label = stringResource(Res.string.delete),
                         onClick = { purging = item },
@@ -2955,12 +3108,10 @@ private fun ProjectPathDialog(onConfirm: (String, String) -> Unit, onDismiss: ()
             onValueChange = { path = it },
             singleLine = true,
             placeholder = stringResource(Res.string.move_project_path),
-            // The path belongs to the machine running the backend, so browsing happens there.
             trailingIcon = { PickerIcon { browsing = true } },
             modifier = Modifier.fillMaxWidth(),
         )
         Box(Modifier.height(10.dp))
-        // Optional: left empty, the project shows the name of its folder.
         InputField(
             value = name,
             onValueChange = { name = it },
@@ -3034,7 +3185,6 @@ private fun groupSessions(state: ChatUiState): List<SessionGroup> {
         else list.sortedByDescending { it.lastActive ?: 0.0 }
     }
     val byCategory = sessions.groupBy { state.placement[it.sessionId]?.categoryId }
-    // A hidden category takes its chats with it: they are not loose, just out of sight.
     val groups = state.categories
         .filter { it.id !in state.hiddenCategories }
         .map { SessionGroup(it, ordered(byCategory[it.id].orEmpty())) }
@@ -3049,12 +3199,29 @@ private fun CategoryHeader(
     collapsed: Boolean,
     onToggle: () -> Unit,
     onNewChat: () -> Unit,
+    targeted: Boolean = false,
+    held: Boolean = false,
+    joined: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val accent = sessionColorOf(category.color) ?: MaterialTheme.colorScheme.onSurfaceVariant
+    val corners =
+        if (joined) RoundedCornerShape(topStart = Radius.item, topEnd = Radius.item)
+        else RoundedCornerShape(Radius.item)
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(Radius.item))
+            .clip(corners)
+            .then(
+                when {
+                    targeted -> Modifier
+                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f))
+                        .border(snapDp(2.dp), MaterialTheme.colorScheme.primary, corners)
+
+                    held -> Modifier.background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+                    else -> Modifier
+                },
+            )
             .clickable(onClick = onToggle)
             .pointerHoverIcon(PointerIcon.Hand)
             .padding(end = 4.dp),
@@ -3072,7 +3239,6 @@ private fun CategoryHeader(
             color = accent,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            // Shorter than a chat row on purpose: a header, not another entry in the list.
             modifier = Modifier.weight(1f).padding(start = 4.dp, top = 6.dp, bottom = 6.dp),
         )
         Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
@@ -3082,7 +3248,6 @@ private fun CategoryHeader(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        // Starts a chat already inside this category.
         TooltipIconButton(
             label = stringResource(Res.string.new_chat),
             size = 24.dp,
@@ -3103,7 +3268,6 @@ private fun CategoryHeader(
 private fun MoveSessionDialog(
     session: SessionInfo,
     projects: List<ProjectInfo>,
-    /** Project path picked in the menu; null opens straight on the custom-path field. */
     preset: String?,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -3111,7 +3275,6 @@ private fun MoveSessionDialog(
     var custom by remember { mutableStateOf("") }
     var browsing by remember { mutableStateOf(false) }
     val target = preset ?: custom.trim()
-    // The menu already picked the project, so that case is only confirmed here.
     val targetName = preset?.let { path -> projects.firstOrNull { it.path == path }?.let(::projectLabel) ?: path }
     CompactDialog(
         onDismiss = onDismiss,
@@ -3131,8 +3294,7 @@ private fun MoveSessionDialog(
                     onValueChange = { custom = it },
                     singleLine = true,
                     placeholder = stringResource(Res.string.move_project_path),
-                    // The path belongs to the machine running the backend, so browsing happens there.
-                    trailingIcon = { PickerIcon { browsing = true } },
+                            trailingIcon = { PickerIcon { browsing = true } },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -3162,7 +3324,6 @@ private fun ConversationRow(
     onColor: () -> Unit,
     onOpenNewTab: () -> Unit,
     onDelete: () -> Unit,
-    /** `preset` is the project path to land on, or null to type a custom one. */
     onMove: (String?) -> Unit,
     categories: List<ChatCategory> = emptyList(),
     currentCategoryId: String? = null,
@@ -3181,7 +3342,7 @@ private fun ConversationRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(Radius.item))
             .then(if (selected) Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)) else Modifier)
-            .combinedClickable(onClick = onOpen, onLongClick = { menu = true })
+            .clickable(onClick = onOpen)
             .secondaryClick { menu = true }
             .padding(end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

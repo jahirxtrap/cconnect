@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 actual fun Modifier.receiveAttachments(onFiles: (List<AttachmentFile>) -> Unit): Modifier = contentReceiver(
     object : ReceiveContentListener {
         override fun onReceive(transferableContent: TransferableContent): TransferableContent? {
-            // Anything the system can point at with a URI is an attachment; plain text stays in the field.
             val files = mutableListOf<AttachmentFile>()
             val rest = transferableContent.consume { item ->
                 val uri = item.uri

@@ -122,7 +122,6 @@ export const createSystemApi = (client: HttpClient, profile: () => Profile) => (
     return (await client.post("/system/restart")) !== null;
   },
 
-  /** Folder tree for the path picker, for the platforms without a native file dialog. */
   async dirs(path: string, files = false): Promise<DirListing | null> {
     const data = await client.get<Wire>(`/system/dirs?path=${encodeURIComponent(path)}&files=${files}`);
     if (!data) return null;

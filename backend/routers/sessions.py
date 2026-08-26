@@ -108,6 +108,19 @@ async def place_session(session_id: str, body: PlacementBody):
     return api_response(data=placement)
 
 
+class OrderBody(BaseModel):
+    session_ids: list[str]
+
+
+@router.post("/sessions/order")
+async def seed_order(body: OrderBody):
+    """Placements for the chats that never had one, in the order the client is showing them."""
+    created = categories_service.seed_order(body.session_ids)
+    if created:
+        chat_list.hub.publish([{"type": "placement_changed", "placement": item} for item in created])
+    return api_response(data=created)
+
+
 @router.get("/sessions/trash")
 def list_trash():
     return api_response(data={"enabled": trash_service.enabled(), "items": trash_service.snapshot()})
@@ -119,7 +132,6 @@ async def restore_trashed(session_id: str):
     if project_key is None:
         raise HTTPException(status_code=404, detail="not in the trash")
     await chat_list.hub.resync()
-    # The resync only brings the chat back; its category comes from the placement the trash kept.
     placement = categories_service.placement_of(session_id)
     if placement:
         chat_list.hub.publish([{"type": "placement_changed", "placement": placement}])

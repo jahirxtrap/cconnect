@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
+private const val PLACEMENT_STEP = 1024.0
+
 class ListBackend internal constructor(scope: CoroutineScope, config: () -> BackendConfig) {
     private val _projects = MutableStateFlow<List<ProjectInfo>>(emptyList())
     val projects: StateFlow<List<ProjectInfo>> = _projects.asStateFlow()
@@ -26,10 +28,37 @@ class ListBackend internal constructor(scope: CoroutineScope, config: () -> Back
     private val _placement = MutableStateFlow<Map<String, ChatPlacement>>(emptyMap())
     val placement: StateFlow<Map<String, ChatPlacement>> = _placement.asStateFlow()
 
+    private val _chatOrder = MutableStateFlow("auto")
+    val chatOrder: StateFlow<String> = _chatOrder.asStateFlow()
+
+    private val _defaultCategory = MutableStateFlow("")
+    val defaultCategory: StateFlow<String> = _defaultCategory.asStateFlow()
+
+    private val _trashEnabled = MutableStateFlow(false)
+    val trashEnabled: StateFlow<Boolean> = _trashEnabled.asStateFlow()
+
+    private val _settingsReady = MutableStateFlow(false)
+    val settingsReady: StateFlow<Boolean> = _settingsReady.asStateFlow()
+
     private val socket = ChatListSocket(scope, config, this)
 
     init {
         socket.connect()
+    }
+
+    fun applySettings(chatOrder: String, defaultCategory: String, trashEnabled: Boolean) {
+        _chatOrder.value = chatOrder
+        _defaultCategory.value = defaultCategory
+        _trashEnabled.value = trashEnabled
+        _settingsReady.value = true
+    }
+
+    fun setChatOrder(order: String) {
+        _chatOrder.value = order
+    }
+
+    fun setDefaultCategory(categoryId: String) {
+        _defaultCategory.value = categoryId
     }
 
     fun applySnapshot(
@@ -50,8 +79,6 @@ class ListBackend internal constructor(scope: CoroutineScope, config: () -> Back
         _categories.update { list -> (list.filterNot { it.id == category.id } + category).sortedBy { it.position } }
     }
 
-    // The existing positions are dealt out in the new order: made-up ones would sort wrong
-    // against the real position the server sends back for the moved category.
     fun moveCategory(categoryId: String, index: Int) {
         _categories.update { list ->
             val from = list.indexOfFirst { it.id == categoryId }
@@ -78,6 +105,20 @@ class ListBackend internal constructor(scope: CoroutineScope, config: () -> Back
 
     fun removePlacement(sessionId: String) {
         _placement.update { it - sessionId }
+    }
+
+    fun movePlacement(sessionId: String, categoryId: String?, index: Int?, order: List<String>) {
+        val positions = order.filter { it != sessionId }.map { _placement.value[it]?.position ?: 0.0 }
+        val spot = (index ?: positions.size).coerceIn(0, positions.size)
+        val previous = positions.getOrNull(spot - 1)
+        val following = positions.getOrNull(spot)
+        val position = when {
+            previous == null && following == null -> 0.0
+            previous == null -> following!! - PLACEMENT_STEP
+            following == null -> previous + PLACEMENT_STEP
+            else -> (previous + following) / 2
+        }
+        upsertPlacement(ChatPlacement(sessionId, categoryId, position))
     }
 
     fun upsertSession(session: SessionInfo) {

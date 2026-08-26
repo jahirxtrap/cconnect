@@ -106,7 +106,6 @@ class Settings {
     this.#write("show_timestamps", value);
   }
 
-  /** Which categories are folded, per device: a view state, not something to share. */
   get collapsedCategories(): string[] {
     return this.#read("collapsed_categories").split(",").filter(Boolean);
   }
@@ -114,7 +113,6 @@ class Settings {
     this.#write("collapsed_categories", value.join(","));
   }
 
-  /** Kept out of the list on this device only; the category and its chats stay untouched. */
   get hiddenCategories(): string[] {
     return this.#read("hidden_categories").split(",").filter(Boolean);
   }

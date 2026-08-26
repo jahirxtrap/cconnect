@@ -16,7 +16,6 @@
   import { pickPath } from "./pathPicker.svelte";
 
   interface Props {
-    /** "dir" confirms the folder being browsed; "file" confirms the file the user clicks. */
     mode?: "dir" | "file";
     start?: string;
     onConfirm: (path: string) => void;
@@ -25,8 +24,6 @@
 
   const { mode = "dir", start = "", onConfirm, onDismiss }: Props = $props();
 
-  // These paths belong to the machine running the backend, which is why the browsing happens
-  // there. When the backend is this same machine, the OS dialog is nicer — hence the way out.
   const local = async () => {
     const selected = await pickPath(mode);
     if (selected && selected !== "fallback") onConfirm(selected);

@@ -6,14 +6,11 @@ data class ProjectInfo(
     val name: String?,
     val sessionCount: Int,
     val lastActive: Double?,
-    /** The name was set by the user, so it can be reset back to the folder's own. */
     val customName: Boolean = false,
 )
 
-/** What a project is called on screen: the name the user gave it, else its folder. */
 fun projectLabel(project: ProjectInfo): String = project.name ?: project.path ?: project.projectKey
 
-/** Folded or not is a per-device view state; it lives in the local settings, not here. */
 data class ChatCategory(
     val id: String,
     val name: String,
@@ -39,7 +36,6 @@ data class SessionInfo(
     val activity: String? = null,
 )
 
-/** A chat waiting in the trash: its transcript is aside, out of every list, until restored. */
 data class TrashedSession(
     val sessionId: String,
     val projectKey: String,

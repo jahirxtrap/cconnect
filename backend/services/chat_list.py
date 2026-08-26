@@ -188,7 +188,6 @@ class ChatListHub:
             return projects, sessions
         ai_key = sessions_service._AI_PROJECT_KEY
         for directory in base.iterdir():
-            # `.trash` holds deleted chats waiting to be restored; it is not a project.
             if not directory.is_dir() or directory.name in (ai_key, trash_service.TRASH_DIR):
                 continue
             pkey = directory.name
@@ -245,8 +244,6 @@ class ChatListHub:
                 }
         if len(self._sig_cache) > len(seen):
             self._sig_cache = {k: v for k, v in self._sig_cache.items() if k in seen}
-        # Registered projects: the name the user chose wins over the one read off the path, and
-        # a project registered before its first chat lists with no sessions of its own.
         for key, meta in projects_service.snapshot().items():
             found = projects.get(key)
             if found is None:
@@ -273,8 +270,6 @@ class ChatListHub:
             logger.debug(f"chat_list refresh failed: {type(exc).__name__}: {exc}")
             return
         events: list[dict] = []
-        # A chat filed the moment it was born may not be on disk yet (or this scan may predate it),
-        # and pruning against the scan alone would throw its category away.
         for gone in categories.prune(set(new_sessions) | registry.live_session_ids()):
             events.append({"type": "placement_removed", "session_id": gone})
         with self._lock:

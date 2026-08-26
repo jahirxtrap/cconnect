@@ -18,7 +18,6 @@
   let name = $state("");
   let browsing = $state(false);
 
-  // The path belongs to the machine running the backend, so browsing happens there.
   const pick = () => (browsing = true);
 </script>
 
@@ -35,7 +34,6 @@
         </TooltipIconButton>
       {/snippet}
     </InputField>
-    <!-- Optional: left empty, the project shows the name of its folder. -->
     <InputField value={name} oninput={(value) => (name = value)} singleLine label={t("NAME")} />
   </div>
 </CompactDialog>

@@ -5,7 +5,6 @@ import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
 type Wire = Record<string, unknown>;
 
-/** A chat waiting in the trash: its transcript is aside, out of every list, until restored. */
 export interface TrashedSession {
   sessionId: string;
   projectKey: string;
@@ -59,7 +58,6 @@ export const createSessionsApi = (http: HttpClient) => ({
     limit = 200,
     beforeIndex: number | null = null,
     prefs: VisibilityPrefs | null = null,
-    /** Reads the transcript from the trash instead of the project; only a view-only chat asks for it. */
     trashed = false,
   ): Promise<MessagesPage | null> {
     const data = await http.get<{
@@ -153,6 +151,10 @@ export const createSessionsApi = (http: HttpClient) => ({
 
   async placeSession(sessionId: string, categoryId: string | null, index: number | null): Promise<boolean> {
     return (await http.post(`/sessions/${sessionId}/category`, { category_id: categoryId, index })) !== null;
+  },
+
+  async seedOrder(sessionIds: string[]): Promise<boolean> {
+    return (await http.post("/sessions/order", { session_ids: sessionIds })) !== null;
   },
 
   async deleteProject(projectKey: string): Promise<boolean> {

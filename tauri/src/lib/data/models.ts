@@ -2,7 +2,6 @@ export interface ProjectInfo {
   projectKey: string;
   path: string | null;
   name: string | null;
-  /** The name was set by the user, so it can be reset back to the folder's own. */
   customName: boolean;
   sessionCount: number;
   lastActive: number | null;
@@ -13,7 +12,6 @@ export interface ChatCategory {
   name: string;
   position: number;
   color: string | null;
-  // Folded or not is a per-device view state; it lives in the local settings, not here.
 }
 
 export interface ChatPlacement {
@@ -75,7 +73,6 @@ export const parseCategory = (raw: Wire): ChatCategory => ({
   color: text(raw.color),
 });
 
-/** What a project is called on screen: the name the user gave it, else its folder. */
 export const projectLabel = (project: ProjectInfo): string =>
   project.name ?? project.path ?? project.projectKey;
 

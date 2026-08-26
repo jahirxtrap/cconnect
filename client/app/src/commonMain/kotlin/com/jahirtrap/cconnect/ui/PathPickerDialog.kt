@@ -44,7 +44,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
-/** Walks the PC's folders through the backend, for the targets with no native file dialog. */
 @Composable
 fun PathPickerDialog(
     onConfirm: (String) -> Unit,
@@ -72,8 +71,6 @@ fun PathPickerDialog(
             }
         },
         titleTrailing = {
-            // These paths belong to the machine running the backend, which is why the browsing
-            // happens there. When the backend is this same machine, the OS dialog is nicer.
             if (!isWebPlatform && !isAndroidPlatform) {
                 TooltipIconButton(
                     label = stringResource(Res.string.browse),

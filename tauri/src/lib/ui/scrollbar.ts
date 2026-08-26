@@ -30,7 +30,18 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   let frame = 0;
 
   const thickness = isTouch ? TOUCH_THICKNESS : THICKNESS;
-  const maxScroll = () => node.scrollWidth - node.clientWidth;
+
+  const contentWidth = () => {
+    let end = 0;
+    for (const child of node.children) {
+      if (child === thumb || !(child instanceof HTMLElement)) continue;
+      end = Math.max(end, child.offsetLeft + Math.max(child.offsetWidth, child.scrollWidth));
+    }
+    end += parseFloat(getComputedStyle(node).paddingRight) || 0;
+    return end > node.clientWidth ? end : node.scrollWidth;
+  };
+
+  const maxScroll = () => Math.max(0, contentWidth() - node.clientWidth);
 
   const render = () => {
     frame = 0;
@@ -42,7 +53,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     }
     if (!isTouch && gutter) node.style.paddingBottom = `${basePadding + thickness + GAP}px`;
     const viewport = node.clientWidth;
-    const size = (viewport / node.scrollWidth) * viewport;
+    const size = (viewport / contentWidth()) * viewport;
     const offset = (node.scrollLeft / max) * (viewport - size);
     const alpha = !isTouch && (hovered || dragging) ? ACTIVE : IDLE;
     thumb.style.opacity = "1";
@@ -65,7 +76,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   const scrollTo = (clientX: number) => {
     const max = maxScroll();
     const viewport = node.clientWidth;
-    const size = (viewport / node.scrollWidth) * viewport;
+    const size = (viewport / contentWidth()) * viewport;
     const track = Math.max(viewport - size, 1);
     const left = Math.min(Math.max(clientX - node.getBoundingClientRect().left - grab, 0), track);
     node.scrollLeft = (left / track) * max;
@@ -104,7 +115,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     event.preventDefault();
     event.stopPropagation();
     const viewport = node.clientWidth;
-    const size = (viewport / node.scrollWidth) * viewport;
+    const size = (viewport / contentWidth()) * viewport;
     const track = Math.max(viewport - size, 1);
     const offset = (node.scrollLeft / maxScroll()) * track;
     const local = event.clientX - node.getBoundingClientRect().left;

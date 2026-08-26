@@ -67,10 +67,6 @@
   --color-purple: var(--c-purple);
   --color-gray: var(--c-gray);
 
-  /* Chat metrics, nominal. `pixelGrid.ts` publishes a `-snap` twin of each one rounded onto the
-     device pixel grid the same way Compose rounds dp to whole pixels, and the chat reads the
-     twin: a length that lands between physical pixels lets the browser round the blocks under
-     it either way, so content shifts by a pixel whenever the list reflows. */
   --chat-gap-lg: 16px;
   --chat-gap-sm: 6px;
   --chat-line-dense: 19px;

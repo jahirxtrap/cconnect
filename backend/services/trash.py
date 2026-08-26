@@ -1,10 +1,4 @@
-"""Deleted chats kept aside instead of removed, when the `trash_enabled` setting says so.
-
-The transcript is *moved* to `<projects dir>/.trash/<project key>/`, not flagged: the chat list
-scans the projects directory, so moving the file takes the chat out of every list without
-teaching the scanner about deleted state, and restoring is the same move backwards. Nothing here
-expires — the trash only empties when the user says so.
-"""
+"""Deleted chats kept aside instead of removed, when the `trash_enabled` setting says so."""
 
 import shutil
 import time

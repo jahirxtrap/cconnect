@@ -90,6 +90,22 @@ data class FrozenChat(
     val contextTokens: Int?,
 )
 
+private data class ListSettings(
+    val loading: Boolean,
+    val ready: Boolean,
+    val chatOrder: String,
+    val defaultCategory: String,
+    val trashEnabled: Boolean,
+)
+
+private data class HistoryView(
+    val projects: List<ProjectInfo>,
+    val sessions: List<SessionInfo>,
+    val categories: List<ChatCategory>,
+    val placement: Map<String, ChatPlacement>,
+    val settings: ListSettings,
+)
+
 data class ChatUiState(
     val connection: ConnectionState = ConnectionState.Connecting,
     val messages: List<ChatMessage> = emptyList(),
@@ -118,18 +134,13 @@ data class ChatUiState(
     val historyProjectKey: String? = null,
     val historyLoading: Boolean = true,
     val categories: List<ChatCategory> = emptyList(),
-    /** Ids of the folded categories, read from this device's own settings. */
     val collapsedCategories: Set<String> = emptySet(),
-    /** Hidden ones only leave this device's lists; the categories and projects stay untouched. */
     val hiddenCategories: Set<String> = emptySet(),
     val hiddenProjects: Set<String> = emptySet(),
     val placement: Map<String, ChatPlacement> = emptyMap(),
     val chatOrder: String = "auto",
-    /** Category a chat born in this tab is filed into; empty leaves it out of every category. */
     val defaultCategory: String = "",
-    /** Deleting a chat only sets it aside, so the confirmation says so and the trash is reachable. */
     val trashEnabled: Boolean = false,
-    /** A chat opened for reading only: the transcript renders as always, nothing can be sent to it. */
     val viewOnly: TrashedSession? = null,
     val environments: List<EnvironmentProfile> = emptyList(),
     val activeEnvironmentId: String? = null,
@@ -250,6 +261,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             }
         }
         loadEnvOverrides()
+        loadHistory()
         viewModelScope.launch {
             client.events.collect { (side, parent, event) -> if (side) onSideEvent(event) else onEvent(event, parent) }
         }
@@ -417,6 +429,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private suspend fun refreshServerInfo() {
         refreshCompat()
         SettingsApi.get()?.let { s ->
+            store()?.applySettings(s.chatOrder, s.defaultCategory, s.trashEnabled)
             _state.update {
                 it.copy(
                     visibility = localVisibility(),
@@ -425,9 +438,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     permissionMode = s.permissionMode,
                     streamTokens = s.streaming,
                     showWorking = s.showWorking,
-                    chatOrder = s.chatOrder,
-                    defaultCategory = s.defaultCategory,
-                    trashEnabled = s.trashEnabled,
                     serverVisibility = VisibilityPrefs(
                         simple = if (s.simpleMode) "on" else "off",
                         thinking = s.showThinking,
@@ -824,7 +834,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         _state.update { it.copy(environments = settings.environments, activeEnvironmentId = ctx.environmentId) }
     }
 
-    /** Re-reads the local view state after an import replaced the settings behind our back. */
     fun refreshViewPrefs() {
         _state.update {
             it.copy(
@@ -880,26 +889,62 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private fun observeHistory() {
         historyJobs.forEach { it.cancel() }
         val backend = ChatListStore.forConfig(listConfig()) ?: run { historyJobs = emptyList(); return }
+        val settings = combine(
+            backend.loading,
+            backend.settingsReady,
+            backend.chatOrder,
+            backend.defaultCategory,
+            backend.trashEnabled,
+        ) { loading, ready, order, category, trash -> ListSettings(loading, ready, order, category, trash) }
+        syncHistory()
         historyJobs = listOf(
             viewModelScope.launch {
-                combine(backend.projects, backend.sessions, backend.loading) { p, s, l -> Triple(p, s, l) }.collect { (p, s, l) ->
-                    val key = _state.value.historyProjectKey
-                    _state.update {
-                        it.copy(
-                            historyProjects = withDefaultProject(p),
-                            historySessions = if (key == null) s else s.filter { x -> x.projectKey == key },
-                            allSessions = s,
-                            historyLoading = l,
-                        )
-                    }
-                }
-            },
-            viewModelScope.launch {
-                combine(backend.categories, backend.placement) { c, p -> c to p }.collect { (c, p) ->
-                    _state.update { it.copy(categories = c, placement = p) }
-                }
+                combine(
+                    backend.projects,
+                    backend.sessions,
+                    backend.categories,
+                    backend.placement,
+                    settings,
+                ) { p, s, c, pl, set -> HistoryView(p, s, c, pl, set) }.collect(::publishHistory)
             },
         )
+    }
+
+    private fun syncHistory() {
+        val backend = ChatListStore.forConfig(listConfig()) ?: return
+        publishHistory(
+            HistoryView(
+                projects = backend.projects.value,
+                sessions = backend.sessions.value,
+                categories = backend.categories.value,
+                placement = backend.placement.value,
+                settings = ListSettings(
+                    loading = backend.loading.value,
+                    ready = backend.settingsReady.value,
+                    chatOrder = backend.chatOrder.value,
+                    defaultCategory = backend.defaultCategory.value,
+                    trashEnabled = backend.trashEnabled.value,
+                ),
+            ),
+        )
+    }
+
+    private fun publishHistory(view: HistoryView) {
+        val key = _state.value.historyProjectKey
+        _state.update {
+            it.copy(
+                historyProjects = withDefaultProject(view.projects),
+                historySessions = if (key == null) view.sessions
+                else view.sessions.filter { x -> x.projectKey == key },
+                allSessions = view.sessions,
+                categories = view.categories,
+                placement = view.placement,
+                historyLoading = view.settings.loading || !view.settings.ready,
+                chatOrder = view.settings.chatOrder,
+                defaultCategory = view.settings.defaultCategory,
+                trashEnabled = view.settings.trashEnabled,
+            )
+        }
     }
 
     fun withDefaultProject(projects: List<ProjectInfo>): List<ProjectInfo> {
@@ -1169,7 +1214,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
-    /** Folded or not is per device, so it stays in the local settings and never leaves it. */
     fun toggleCategory(category: ChatCategory) {
         val folded = settings.collapsedCategories.toMutableList()
         if (!folded.remove(category.id)) folded.add(category.id)
@@ -1177,7 +1221,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         _state.update { it.copy(collapsedCategories = folded.toSet()) }
     }
 
-    /** Hiding is the same kind of view state: it only takes the row out of this device's lists. */
     fun toggleCategoryHidden(categoryId: String) {
         val hidden = settings.hiddenCategories.toMutableList()
         if (!hidden.remove(categoryId)) hidden.add(categoryId)
@@ -1194,9 +1237,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun reorderCategory(categoryId: String, index: Int) {
         store()?.moveCategory(categoryId, index)
+        syncHistory()
     }
 
-    // Persisted once the drag ends, so a mid-drag response can't fight the local order.
     fun commitCategoryOrder(categoryId: String) {
         val backend = store() ?: return
         val index = backend.categories.value.indexOfFirst { it.id == categoryId }
@@ -1222,13 +1265,12 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
-    /** A chat born in this tab gets filed once the CLI hands out its session id: the category its
-     *  `+` came from, else the default one. Callers only run this on that first id. */
     private fun claimPendingCategory(sessionId: String?) {
-        val categoryId = ctx.pendingCategoryId?.ifEmpty { null } ?: _state.value.defaultCategory
+        val wanted = ctx.pendingCategoryId?.ifEmpty { null } ?: _state.value.defaultCategory
         ctx.pendingCategoryId = null
-        if (sessionId == null || categoryId.isEmpty()) return
-        if (_state.value.categories.any { it.id == categoryId }) placeSession(sessionId, categoryId, 0)
+        if (sessionId == null) return
+        val categoryId = wanted.takeIf { id -> _state.value.categories.any { it.id == id } }
+        placeSession(sessionId, categoryId, 0)
     }
 
     fun placeSession(sessionId: String, categoryId: String?, index: Int? = null) {
@@ -1237,10 +1279,14 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
+    fun dropSession(sessionId: String, categoryId: String?, index: Int?, order: List<String>) {
+        store()?.movePlacement(sessionId, categoryId, index, order)
+        syncHistory()
+        placeSession(sessionId, categoryId, index)
+    }
+
     suspend fun trash(): SessionsApi.Trash = SessionsApi.trash()
 
-    /** Opens a chat the URL points at: the trash is asked for it, which also says whether it is
-     *  still there — restored or purged elsewhere, the tab falls back to a blank chat. */
     fun openTrashed(sessionId: String, projectKey: String) {
         viewModelScope.launch {
             val item = SessionsApi.trash().items.firstOrNull { it.sessionId == sessionId }
@@ -1252,8 +1298,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
-    /** Reads a deleted chat in place of this tab's conversation. Nothing is sent while it is up:
-     *  the socket keeps its own session, so leaving the view restores the tab as it was left. */
     fun openViewOnly(item: TrashedSession) {
         newSession()
         _state.update { it.copy(viewOnly = item, transcriptLoading = true) }
@@ -1284,7 +1328,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
-    /** Back to a blank chat: the trashed transcript was never this tab's session to begin with. */
     fun closeViewOnly() {
         if (_state.value.viewOnly == null) return
         newSession()
@@ -1318,7 +1361,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
-    /** A view-only chat has no socket of its own, so its older pages come over HTTP. */
     private fun loadMoreViewOnly(item: TrashedSession, before: Int) {
         _state.update { it.copy(transcriptPaging = true) }
         viewModelScope.launch {
@@ -1369,7 +1411,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         viewModelScope.launch { SessionsApi.addProject(clean, name?.trim()?.ifEmpty { null }) }
     }
 
-    /** An empty name clears it, so the project falls back to the name of its folder. */
     fun renameProject(project: ProjectInfo, name: String) {
         val clean = name.trim()
         if (clean == project.name.orEmpty()) return
@@ -1387,13 +1428,23 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun setChatOrder(order: String) {
         if (order == _state.value.chatOrder) return
-        _state.update { it.copy(chatOrder = order) }
-        viewModelScope.launch { SettingsApi.update(chatOrder = order) }
+        store()?.setChatOrder(order)
+        viewModelScope.launch {
+            if (order == "manual") {
+                val state = _state.value
+                val missing = state.historySessions
+                    .sortedByDescending { it.lastActive ?: 0.0 }
+                    .filter { state.placement[it.sessionId] == null }
+                    .map { it.sessionId }
+                if (missing.isNotEmpty()) SessionsApi.seedOrder(missing)
+            }
+            SettingsApi.update(chatOrder = order)
+        }
     }
 
     fun setDefaultCategory(categoryId: String) {
         if (categoryId == _state.value.defaultCategory) return
-        _state.update { it.copy(defaultCategory = categoryId) }
+        store()?.setDefaultCategory(categoryId)
         viewModelScope.launch { SettingsApi.update(defaultCategory = categoryId) }
     }
 
@@ -1521,8 +1572,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             is ServerEvent.Open -> startSession(_state.value.sessionId)
             is ServerEvent.Ready -> {
                 if (!initialConsumed) consumeInitialSession(event.project)
-                // The server read it off the transcript, so it outranks whatever this tab was
-                // carrying (a tab restored from a URL has no cwd of its own).
                 event.cwd?.takeIf { it.isNotBlank() && it != ctx.cwd }?.let { ctx.cwd = it }
                 historyLoaded = false
                 val n = event.committedCount
@@ -1826,8 +1875,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         if (!_state.value.streaming) {
                             _state.update { st -> resetToInitialWindow(st).copy(streaming = true, compacting = compacting, streamStatus = null, error = null) }
                         }
-                        // The event's own time: the bubble may be drawn long after the message was
-                        // sent (the turn reaches it, or a reattach replays the event).
                         if (!compacting) addMessage(Role.USER, text, attachments = atts, timestamp = event.timestamp)
                     }
                 }

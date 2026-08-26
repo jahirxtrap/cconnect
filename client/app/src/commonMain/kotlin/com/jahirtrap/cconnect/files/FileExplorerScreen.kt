@@ -175,6 +175,7 @@ import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.jahirtrap.cconnect.ui.theme.snapDp
+import com.jahirtrap.cconnect.ui.dropOverlay
 
 private enum class TransferKind { Move, Copy, Extract }
 
@@ -733,7 +734,7 @@ fun FileExplorerScreen(
         Column(
             modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding()
                 .fileDropTarget(enabled = archive == null, onDragChange = { dropOver = it }) { pendingUploads = it }
-                .then(if (dropOver) Modifier.border(snapDp(2.dp), MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier)
+                .dropOverlay(dropOver, MaterialTheme.colorScheme.primary)
                 .focusRequester(screenFocus).focusable()
                 .onPreviewKeyEvent { e ->
                     if (e.type != KeyEventType.KeyDown) false

@@ -124,7 +124,6 @@
     const active = document.activeElement;
     if (active instanceof HTMLInputElement) return;
     const data = event.clipboardData;
-    // Some engines leave `files` empty for pasted media and only fill `items`, so both are read.
     const pasted = Array.from(data?.files ?? []);
     if (!pasted.length) {
       for (const item of Array.from(data?.items ?? [])) {
@@ -195,7 +194,6 @@
       sessionId: chat.sessionId,
       projectKey: chat.projectKey,
       running: busy,
-      // The tab names the chat being read; the status line under the app name says where it lives.
       viewTitle: chat.viewOnly ? viewLabel : null,
     });
     tabs.syncUrl();
@@ -206,7 +204,6 @@
   );
 
   const status = $derived.by(() => {
-    // Reading a deleted chat: where it lives is the whole state, there is no session to report on.
     if (chat.viewOnly) return { dot: "bg-gray", spinner: false, text: t("TRASH") };
     if (chat.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
     if (chat.connection === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
@@ -438,7 +435,6 @@
       </div>
     {/if}
 
-    <!-- Nothing can be sent to a chat that is only being read, so the composer is not there at all. -->
     {#if !chat.viewOnly}
     <div class="shrink-0" bind:clientHeight={composerHeight}>
     <Composer
@@ -725,7 +721,6 @@
 
 {#if deleteTarget}
   {@const target = deleteTarget}
-  <!-- With the trash on nothing is lost, so the dialog reads as a move, not as a deletion. -->
   <ConfirmDialog
     title={t(chat.trashEnabled ? "TRASH" : "DELETE")}
     text={t(

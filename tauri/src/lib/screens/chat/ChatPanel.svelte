@@ -20,6 +20,8 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ConversationRow from "./ConversationRow.svelte";
+  import { CategoryDrag } from "./dragCategories.svelte";
+  import { ChatDrag } from "./dragChats.svelte";
   import EnvironmentSelector from "./EnvironmentSelector.svelte";
   import ProjectSelector from "./ProjectSelector.svelte";
   import { tabs } from "./tabs.svelte";
@@ -67,7 +69,6 @@
         : [...list].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
     const inCategory = (id: string | null) =>
       ordered(sessions.filter((item) => (chat.placement[item.sessionId]?.categoryId ?? null) === id));
-    // A hidden category takes its chats with it: they are not loose, just out of sight.
     const result: SessionGroup[] = chat.categories
       .filter((category) => !chat.isCategoryHidden(category.id))
       .map((category) => ({ category, sessions: inCategory(category.id) }));
@@ -77,7 +78,6 @@
 
   const chat = $derived(tabs.state);
 
-  // The one in front stays listed even when hidden, or the selector would name a project it cannot show.
   const visibleProjects = $derived(
     chat.historyProjects.filter(
       (item) => !chat.isProjectHidden(item.projectKey) || item.projectKey === chat.historyProjectKey,
@@ -85,6 +85,45 @@
   );
 
   let list = $state<HTMLDivElement | null>(null);
+  const drag = new ChatDrag();
+  const categoryDrag = new CategoryDrag();
+  let settling = $state(false);
+
+  const startCategoryDrag = (event: PointerEvent, categoryId: string) =>
+    categoryDrag.begin(event, categoryId, {
+      list,
+      onCommit: (moved, beforeId) => {
+        const rest = chat.categories.filter((item) => item.id !== moved);
+        const at = beforeId === null ? rest.length : rest.findIndex((item) => item.id === beforeId);
+        const index = at < 0 ? rest.length : at;
+        if (chat.categories.findIndex((item) => item.id === moved) === index) return;
+        settling = true;
+        chat.reorderCategory(moved, index);
+        void chat.commitCategoryOrder(moved);
+        requestAnimationFrame(() => requestAnimationFrame(() => (settling = false)));
+      },
+    });
+
+  const startDrag = (event: PointerEvent, session: SessionInfo, index: number) =>
+    drag.begin(event, session.sessionId, {
+      list,
+      manual: chat.chatOrder === "manual",
+      origin: { categoryId: chat.placement[session.sessionId]?.categoryId ?? null, index },
+      onExpand: (categoryId) => {
+        const category = chat.categories.find((item) => item.id === categoryId);
+        if (category && chat.isCategoryCollapsed(categoryId)) chat.toggleCategory(category);
+      },
+      onCommit: (sessionId, target) => {
+        const destination = groups.find((item) => (item.category?.id ?? null) === target.categoryId);
+        chat.list?.movePlacement(
+          sessionId,
+          target.categoryId,
+          target.index,
+          (destination?.sessions ?? []).map((item) => item.sessionId),
+        );
+        void chat.placeSession(sessionId, target.categoryId, target.index);
+      },
+    });
 
   $effect(() => {
     void chat.historyProjectKey;
@@ -132,17 +171,50 @@
     </TooltipIconButton>
   </div>
 
-  <div bind:this={list} class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2">
+  <div
+    bind:this={list}
+    class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2 {drag.active ? 'cursor-pointer' : ''}"
+  >
     {#if chat.historySessions.length}
       {#each groups as group, groupIndex (group.category?.id ?? "loose")}
-        <!-- The loose group has no header of its own, so it needs a line to break from the one above. -->
         {#if !group.category && groupIndex > 0}
-          <div class="mx-2 my-1 h-px shrink-0 bg-outline-variant"></div>
+          <div data-spacer={groupIndex} class="my-1 shrink-0">
+            <div
+              class="mx-2 h-px bg-outline-variant"
+              style="transform: translateY({drag.shiftFor(`spacer:${groupIndex}`)}px); transition: {drag.active
+                ? 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'
+                : 'none'}"
+            ></div>
+          </div>
         {/if}
         {#if group.category}
           {@const category = group.category}
           {@const collapsed = chat.isCategoryCollapsed(category.id)}
-          <div class="flex w-full items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8">
+          {@const held = categoryDrag.dragging(category.id)}
+          {@const joined = held && !collapsed && group.sessions.length > 0}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            data-header={category.id}
+            data-collapsed={collapsed}
+            class="relative {held ? 'z-10' : ''} {drag.active || categoryDrag.active ? 'pointer-events-none' : ''}"
+            onpointerdown={(event) => startCategoryDrag(event, category.id)}
+          >
+            <div
+              class="flex w-full items-center pr-1 transition-colors {joined
+                ? 'rounded-t-item'
+                : 'rounded-item'} {drag.highlights(category.id)
+                ? 'bg-accent/14 outline-2 -outline-offset-2 outline-accent'
+                : held
+                  ? 'bg-on-surface/8'
+                  : 'hover:bg-on-surface/8'}"
+              style="transform: translateY({held
+                ? categoryDrag.offset
+                : drag.shiftFor(`cat:${category.id}`) + categoryDrag.shiftFor(category.id)}px); transition: {held ||
+              settling ||
+              (!drag.active && !categoryDrag.active)
+                ? 'none'
+                : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
+            >
             <button
               type="button"
               class="flex min-w-0 flex-1 cursor-pointer items-center text-left"
@@ -153,7 +225,6 @@
               {:else}
                 <ChevronDown size={14} class="ml-1 shrink-0 text-on-surface-variant" />
               {/if}
-              <!-- Shorter than a chat row on purpose: a header, not another entry in the list. -->
               <span
                 class="min-w-0 flex-1 truncate py-1.5 pl-1 text-label-sm uppercase"
                 style={`color: ${sessionColorOf(category.color) ?? "var(--c-on-surface-variant)"}`}
@@ -164,11 +235,11 @@
                 {group.sessions.length}
               </span>
             </button>
-            <!-- Starts a chat already inside this category. -->
             <button
               type="button"
               aria-label={t("NEW_CHAT")}
               class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+              onpointerdown={(event) => event.stopPropagation()}
               onclick={() => {
                 tabs.newTab(category.id);
                 onAfterSelect();
@@ -176,10 +247,41 @@
             >
               <Plus size={14} />
             </button>
+            </div>
           </div>
         {/if}
         {#if !group.category || !chat.isCategoryCollapsed(group.category.id)}
-          {#each group.sessions as session (session.sessionId)}
+          {@const groupId = group.category?.id ?? null}
+          {#each group.sessions as session, index (session.sessionId)}
+            {@const dragged = drag.sessionId === session.sessionId}
+            {@const carried = categoryDrag.dragging(groupId)}
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div
+              data-session={session.sessionId}
+              data-group={groupId ?? ""}
+              data-index={index}
+              class="relative {dragged || carried ? 'z-10' : ''} {drag.active || categoryDrag.active
+                ? 'pointer-events-none'
+                : ''}"
+              onpointerdown={(event) => startDrag(event, session, index)}
+            >
+            <div
+              class={dragged
+                ? "rounded-item bg-on-surface/8"
+                : carried
+                  ? `bg-on-surface/8 ${index === group.sessions.length - 1 ? "rounded-b-item" : ""}`
+                  : ""}
+              style="transform: translateY({dragged
+                ? drag.offset
+                : carried
+                  ? categoryDrag.offset
+                  : drag.shiftFor(session.sessionId) + categoryDrag.shiftFor(groupId)}px); transition: {dragged ||
+              carried ||
+              settling ||
+              (!drag.active && !categoryDrag.active)
+                ? 'none'
+                : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
+            >
             <ConversationRow
               title={session.title ?? session.preview ?? session.sessionId.slice(0, 8)}
               selected={session.sessionId === chat.sessionId}
@@ -204,6 +306,8 @@
               currentProjectKey={session.projectKey}
               activity={session.activity}
             />
+            </div>
+            </div>
           {/each}
         {/if}
       {/each}

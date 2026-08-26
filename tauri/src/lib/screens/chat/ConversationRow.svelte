@@ -19,7 +19,6 @@
     onAutoRename: () => void;
     onColor: () => void;
     onOpenNewTab: () => void;
-    /** `preset` is the project path to land on, or null to type a custom one. */
     onMove: (preset: string | null) => void;
     onDelete: () => void;
     categories?: ChatCategory[];
@@ -69,7 +68,6 @@
 >
   <Pressable
     onclick={onOpen}
-    onlongclick={() => (menu = true)}
     hover={false}
     class="min-w-0 flex-1 truncate px-2 py-2 text-body-md {selected ? 'font-semibold text-accent' : ''}"
   >

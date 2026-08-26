@@ -46,7 +46,6 @@ import org.jetbrains.compose.resources.stringResource
 import com.jahirtrap.cconnect.ui.theme.shadowLg
 import kotlinx.coroutines.launch
 
-/** Folder button that sits inside a path field, next to the local-server and project ones. */
 @Composable
 fun PickerIcon(onClick: () -> Unit) {
     TooltipIconButton(label = stringResource(Res.string.choose), onClick = onClick, size = 24.dp) {
