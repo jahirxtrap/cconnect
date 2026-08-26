@@ -168,10 +168,13 @@ class Tabs {
     return tab;
   }
 
-  newTab(): Tab {
+  /** `categoryId` lands the chat in that category as soon as the session gets an id. */
+  newTab(categoryId: string | null = null): Tab {
     const environmentId = this.active?.environmentId ?? backend.active?.id ?? null;
     const directory = backend.environments.find((item) => item.id === environmentId)?.directory ?? "";
-    return this.openTab(environmentId, directory);
+    const tab = this.openTab(environmentId, directory);
+    if (categoryId) this.stateFor(tab).pendingCategoryId = categoryId;
+    return tab;
   }
 
   openSessionTab(session: SessionInfo, environmentId: string | null): Tab {

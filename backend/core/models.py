@@ -28,10 +28,6 @@ class SessionCategory(Base):
         nullable=True,
         comment="Accent name from the shared palette; NULL uses the default one",
     )
-    collapsed: Mapped[bool] = mapped_column(
-        default=False,
-        comment="Whether the group is folded in the list, shared across devices",
-    )
 
 
 class SessionPlacement(Base):
@@ -47,6 +43,37 @@ class SessionPlacement(Base):
     )
     position: Mapped[float] = mapped_column(
         comment="Sort key inside the category, only read while the order is manual",
+    )
+
+
+class TrashedSession(Base):
+    __tablename__ = "trashed_sessions"
+
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Transcript id; the file itself waits under the projects dir's .trash",
+    )
+    project_key: Mapped[str] = mapped_column(
+        comment="Project it was deleted from, and the one it goes back to on restore",
+    )
+    title: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="What to call it in the trash list, since the transcript is out of the scan",
+    )
+    path: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Working directory it belonged to, shown next to the title",
+    )
+    deleted_at: Mapped[float] = mapped_column(
+        comment="Epoch seconds it was thrown away; the trash itself never expires",
+    )
+    category_id: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Category it sat in, kept here so restoring puts it back where it was",
+    )
+    position: Mapped[Optional[float]] = mapped_column(
+        nullable=True,
+        comment="Its sort key inside that category, restored along with it",
     )
 
 

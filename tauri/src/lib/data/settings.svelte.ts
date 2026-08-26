@@ -18,6 +18,9 @@ const DEFAULTS = {
   minimize_to_tray: false,
   cwd: "",
   tabs_state: "",
+  collapsed_categories: "",
+  hidden_categories: "",
+  hidden_projects: "",
   file_sort_field: "date",
   file_sort_ascending: false,
   local_server_enabled: false,
@@ -101,6 +104,29 @@ class Settings {
   }
   set showTimestamps(value: boolean) {
     this.#write("show_timestamps", value);
+  }
+
+  /** Which categories are folded, per device: a view state, not something to share. */
+  get collapsedCategories(): string[] {
+    return this.#read("collapsed_categories").split(",").filter(Boolean);
+  }
+  set collapsedCategories(value: string[]) {
+    this.#write("collapsed_categories", value.join(","));
+  }
+
+  /** Kept out of the list on this device only; the category and its chats stay untouched. */
+  get hiddenCategories(): string[] {
+    return this.#read("hidden_categories").split(",").filter(Boolean);
+  }
+  set hiddenCategories(value: string[]) {
+    this.#write("hidden_categories", value.join(","));
+  }
+
+  get hiddenProjects(): string[] {
+    return this.#read("hidden_projects").split(",").filter(Boolean);
+  }
+  set hiddenProjects(value: string[]) {
+    this.#write("hidden_projects", value.join(","));
   }
 
   get sidebarExpanded() {

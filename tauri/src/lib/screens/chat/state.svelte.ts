@@ -175,6 +175,11 @@ export class ChatState {
 
   historyProjectKey = $state<string | null>(null);
   chatOrder = $state("auto");
+  defaultCategory = $state("");
+  /** Deleting a chat only sets it aside, so the confirmation says so and the trash is reachable. */
+  trashEnabled = $state(false);
+  /** Category this chat was started in; applied once the session has an id of its own. */
+  pendingCategoryId: string | null = null;
   draft = $state("");
 
   queue = $state<QueuedMessage[]>([]);
@@ -515,6 +520,15 @@ export class ChatState {
     this.#sides = { ...rest, [sessionId]: pending };
   }
 
+  /** A chat born in this tab gets filed once the CLI hands out its session id: the category its
+   *  `+` came from, else the default one. Callers only run this on that first id. */
+  #claimPendingCategory(sessionId: string | null) {
+    const categoryId = this.pendingCategoryId || this.defaultCategory;
+    this.pendingCategoryId = null;
+    if (!sessionId || !categoryId) return;
+    if (this.categories.some((item) => item.id === categoryId)) void this.placeSession(sessionId, categoryId, 0);
+  }
+
   openSideChat() {
     const key = this.#sideKey;
     if (!this.#sides[key]) this.#sides = { ...this.#sides, [key]: { messages: [], sessionId: null, streaming: false } };
@@ -631,6 +645,7 @@ export class ChatState {
   }
 
   newSession() {
+    this.pendingCategoryId = null;
     this.sessionId = null;
     this.projectKey = null;
     this.sessionColor = null;
@@ -659,6 +674,7 @@ export class ChatState {
 
   async #openSession(session: SessionInfo) {
     this.#freeze();
+    this.pendingCategoryId = null;
     if (session.sessionId !== this.sessionId) {
       this.sessionId = session.sessionId;
       this.projectKey = session.projectKey ?? this.projectKey;
@@ -928,6 +944,12 @@ export class ChatState {
     await this.#settings.update({ chat_order: order });
   }
 
+  async setDefaultCategory(categoryId: string) {
+    if (categoryId === this.defaultCategory) return;
+    this.defaultCategory = categoryId;
+    await this.#settings.update({ default_category: categoryId });
+  }
+
   async createCategory(name: string, color: string | null = null) {
     const clean = name.trim();
     if (!clean) return;
@@ -951,9 +973,39 @@ export class ChatState {
     if (updated) this.list?.upsertCategory(updated);
   }
 
-  async toggleCategory(category: ChatCategory) {
-    const updated = await this.#sessions.updateCategory(category.id, { collapsed: !category.collapsed });
-    if (updated) this.list?.upsertCategory(updated);
+  /** Folded or not is per device, so it stays in the local settings and never leaves it. */
+  isCategoryCollapsed(categoryId: string): boolean {
+    return settings.collapsedCategories.includes(categoryId);
+  }
+
+  toggleCategory(category: ChatCategory) {
+    const folded = settings.collapsedCategories;
+    settings.collapsedCategories = folded.includes(category.id)
+      ? folded.filter((id) => id !== category.id)
+      : [...folded, category.id];
+  }
+
+  /** Hiding is the same kind of view state: it only takes the row out of this device's list. */
+  isCategoryHidden(categoryId: string): boolean {
+    return settings.hiddenCategories.includes(categoryId);
+  }
+
+  toggleCategoryHidden(categoryId: string) {
+    const hidden = settings.hiddenCategories;
+    settings.hiddenCategories = hidden.includes(categoryId)
+      ? hidden.filter((id) => id !== categoryId)
+      : [...hidden, categoryId];
+  }
+
+  isProjectHidden(projectKey: string): boolean {
+    return settings.hiddenProjects.includes(projectKey);
+  }
+
+  toggleProjectHidden(projectKey: string) {
+    const hidden = settings.hiddenProjects;
+    settings.hiddenProjects = hidden.includes(projectKey)
+      ? hidden.filter((key) => key !== projectKey)
+      : [...hidden, projectKey];
   }
 
   reorderCategory(categoryId: string, index: number) {
@@ -974,6 +1026,22 @@ export class ChatState {
 
   async placeSession(sessionId: string, categoryId: string | null, index: number | null = null) {
     await this.#sessions.placeSession(sessionId, categoryId, index);
+  }
+
+  async trash() {
+    return await this.#sessions.trash();
+  }
+
+  async restoreTrashed(sessionId: string) {
+    await this.#sessions.restoreTrashed(sessionId);
+  }
+
+  async purgeTrashed(sessionId: string) {
+    await this.#sessions.purgeTrashed(sessionId);
+  }
+
+  async emptyTrash() {
+    await this.#sessions.emptyTrash();
   }
 
   async addProject(path: string, name: string | null = null) {
@@ -1047,6 +1115,8 @@ export class ChatState {
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
       this.chatOrder = snapshot.chatOrder;
+      this.defaultCategory = snapshot.defaultCategory;
+      this.trashEnabled = snapshot.trashEnabled;
       this.serverVisibility = {
         simple: snapshot.simpleMode,
         thinking: snapshot.showThinking,
@@ -1686,6 +1756,7 @@ export class ChatState {
       case "result": {
         this.#assistantId = null;
         this.#thinkingId = null;
+        const born = this.sessionId === null;
         const sessionId = event.sessionId ?? this.sessionId;
         const list = this.list;
         if (sessionId && list && !list.sessions.some((item) => item.sessionId === sessionId)) {
@@ -1702,6 +1773,7 @@ export class ChatState {
           });
         }
         this.sessionId = sessionId;
+        if (born) this.#claimPendingCategory(sessionId);
         this.#promoteSide(sessionId);
         this.contextTokens = event.contextTokens ?? this.contextTokens;
         break;

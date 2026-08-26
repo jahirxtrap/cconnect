@@ -21,7 +21,6 @@ def _category_dict(row: SessionCategory) -> dict:
         "name": row.name,
         "position": row.position,
         "color": row.color,
-        "collapsed": bool(row.collapsed),
     }
 
 
@@ -78,7 +77,7 @@ def create_category(name: str, color: Optional[str] = None) -> dict:
         raise ValueError("name is required")
     with Session() as s:
         last = max((row.position for row in s.query(SessionCategory).all()), default=-_STEP)
-        row = SessionCategory(id=uuid.uuid4().hex, name=clean, position=last + _STEP, color=color or None, collapsed=False)
+        row = SessionCategory(id=uuid.uuid4().hex, name=clean, position=last + _STEP, color=color or None)
         s.add(row)
         s.commit()
         return _category_dict(row)
@@ -88,7 +87,6 @@ def update_category(
     category_id: str,
     name: Optional[str] = None,
     color: Optional[str] = None,
-    collapsed: Optional[bool] = None,
     index: Optional[int] = None,
 ) -> Optional[dict]:
     with Session() as s:
@@ -102,8 +100,6 @@ def update_category(
             row.name = clean
         if color is not None:
             row.color = color or None
-        if collapsed is not None:
-            row.collapsed = collapsed
         if index is not None:
             others = sorted(
                 (item for item in s.query(SessionCategory).all() if item.id != category_id),
@@ -152,6 +148,30 @@ def place_session(session_id: str, category_id: Optional[str], index: Optional[i
             row.position = position
         if previous is not None and following is not None and following - previous < _MIN_GAP:
             _normalize_placements(s, category_id)
+        s.commit()
+        return _placement_dict(row)
+
+
+def placement_of(session_id: str) -> Optional[dict]:
+    with Session() as s:
+        row = s.get(SessionPlacement, session_id)
+        return _placement_dict(row) if row else None
+
+
+def restore_placement(session_id: str, category_id: Optional[str], position: Optional[float]) -> Optional[dict]:
+    """Put a chat back exactly where it sat, unless its category is gone by now."""
+    if category_id is None or position is None:
+        return None
+    with Session() as s:
+        if s.get(SessionCategory, category_id) is None:
+            return None
+        row = s.get(SessionPlacement, session_id)
+        if row is None:
+            row = SessionPlacement(session_id=session_id, category_id=category_id, position=position)
+            s.add(row)
+        else:
+            row.category_id = category_id
+            row.position = position
         s.commit()
         return _placement_dict(row)
 

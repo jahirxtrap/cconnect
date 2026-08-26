@@ -365,7 +365,11 @@ fun StickyCollapsibleHeader(message: ChatMessage, onCollapse: () -> Unit, modifi
     val (icon, label, tint) = spec
     Surface(color = MaterialTheme.colorScheme.background, modifier = modifier.shadowSm(RectangleShape)) {
         Row(
-            modifier = Modifier.fillMaxWidth().clickable { onCollapse() }.padding(horizontal = 16.dp),
+            // Pinned edge to edge over the list: a rounded hover would cut the band it sits on.
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onCollapse() }
+                .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
@@ -454,7 +458,10 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
     val toggle = onToggle ?: { localExpanded = !localExpanded }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().then(if (labelOnly) Modifier else Modifier.clickable { toggle() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .then(if (labelOnly) Modifier else Modifier.clickable { toggle() }),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (icon != null) {
@@ -506,7 +513,14 @@ private fun AgentBlock(message: ChatMessage, running: Boolean = false, expanded:
     val nameColor = MaterialTheme.colorScheme.primary
     val previewColor = MaterialTheme.colorScheme.onSurfaceVariant
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).clickable { toggle() }, verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .clip(RoundedCornerShape(Radius.sm))
+                .clickable { toggle() },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             Icon(Lucide.Bot, contentDescription = null, tint = nameColor, modifier = Modifier.size(16.dp))
             Spacer(Modifier.size(6.dp))
             Box(modifier = Modifier.weight(1f)) {
@@ -567,7 +581,7 @@ private fun PlanBlock(markdown: String, expanded: Boolean? = null, onToggle: (()
     }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().clickable { toggle() },
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.sm)).clickable { toggle() },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -633,7 +647,7 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
             .padding(horizontal = 16.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().clickable { toggle() },
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.sm)).clickable { toggle() },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -722,7 +736,10 @@ private fun FileChangeBlock(path: String, diffLines: List<DiffLine>, labelOnly: 
     val toggle = onToggle ?: { localExpanded = !localExpanded }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().then(if (labelOnly) Modifier else Modifier.clickable { toggle() }),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .then(if (labelOnly) Modifier else Modifier.clickable { toggle() }),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -809,7 +826,10 @@ private fun CompactBlock(data: CompactData, expanded: Boolean? = null, onToggle:
     }.ifBlank { null }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
-            modifier = Modifier.fillMaxWidth().clickable(enabled = hasSummary) { toggle() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .clickable(enabled = hasSummary) { toggle() },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(Lucide.Archive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
@@ -1249,7 +1269,11 @@ private fun InteractionBlock(
     OutlinedPanel(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = if (isPlan) Modifier.fillMaxWidth().clickable { togglePlan() } else Modifier,
+            modifier = if (isPlan) {
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.sm)).clickable { togglePlan() }
+            } else {
+                Modifier
+            },
         ) {
             Icon(
                 headerIcon,

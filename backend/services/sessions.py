@@ -412,15 +412,30 @@ async def auto_generate_title(project_key: str, session_id: str) -> Optional[str
 
 
 def delete_session(project_key: str, session_id: str) -> bool:
-    from services import categories
+    from services import categories, trash
 
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return False
-    file.unlink()
-    extras = file.parent / session_id
-    if extras.is_dir():
-        shutil.rmtree(extras, ignore_errors=True)
+    # With the trash on, the transcript is moved aside instead of removed, and its placement rides
+    # along in the trash row so restoring puts the chat back in the category it sat in.
+    if trash.enabled():
+        _, _, title, _, _, _ = _session_meta(file)
+        placement = categories.placement_of(session_id) or {}
+        trash.store(
+            project_key,
+            session_id,
+            file,
+            title,
+            _read_cwd(file),
+            placement.get("category_id"),
+            placement.get("position"),
+        )
+    else:
+        file.unlink()
+        extras = file.parent / session_id
+        if extras.is_dir():
+            shutil.rmtree(extras, ignore_errors=True)
     forget_pinned(session_id)
     categories.forget_session(session_id)
     return True

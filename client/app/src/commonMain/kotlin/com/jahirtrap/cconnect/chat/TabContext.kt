@@ -10,6 +10,9 @@ class TabContext(
 ) {
     var onChange: (() -> Unit)? = null
 
+    /** Category this chat was started in; applied once the session has an id of its own. */
+    var pendingCategoryId: String? = null
+
     var environmentId: String? = environmentId
         set(value) {
             if (field == value) return

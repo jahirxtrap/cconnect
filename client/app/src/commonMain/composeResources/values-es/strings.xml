@@ -324,6 +324,13 @@
     <string name="chat_order_manual">Manual</string>
     <string name="delete_category_confirm">¿Eliminar la categoría «%1$s»? Sus chats se conservan, sin categoría.</string>
     <string name="delete_project_confirm">¿Eliminar el proyecto «%1$s» y sus chats?</string>
+    <string name="trash">Papelera</string>
+    <string name="trash_empty">No hay chats eliminados</string>
+    <string name="restore">Restaurar</string>
+    <string name="empty_trash">Vaciar papelera</string>
+    <string name="empty_trash_confirm">¿Eliminar todos los chats de la papelera?</string>
+    <string name="trash_hint">Los chats eliminados pasan a la papelera en lugar de borrarse</string>
+    <string name="default_category">Categoría predeterminada</string>
     <string name="color_none">Ninguno</string>
     <string name="delete">Eliminar</string>
     <string name="cancel">Cancelar</string>
@@ -332,6 +339,7 @@
     <string name="discard">Descartar</string>
     <string name="component_discard_confirm">¿Descartar este componente y continuar en el chat?</string>
     <string name="delete_conversation_confirm">¿Eliminar la conversación «%1$s»?</string>
+    <string name="trash_conversation_confirm">¿Enviar la conversación «%1$s» a la papelera?</string>
     <string name="type_message">Escribe un mensaje…</string>
     <string name="commands">Comandos</string>
     <string name="quick_chat">Chat rápido</string>

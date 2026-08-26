@@ -3,6 +3,17 @@ import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessa
 import { http, type HttpClient } from "./http";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
+type Wire = Record<string, unknown>;
+
+/** A chat waiting in the trash: its transcript is aside, out of every list, until restored. */
+export interface TrashedSession {
+  sessionId: string;
+  projectKey: string;
+  title: string | null;
+  path: string | null;
+  deletedAt: number;
+}
+
 export interface MessagesPage {
   items: SessionMessage[];
   startIndex: number;
@@ -128,7 +139,7 @@ export const createSessionsApi = (http: HttpClient) => ({
 
   async updateCategory(
     id: string,
-    patch: { name?: string; color?: string; collapsed?: boolean; index?: number },
+    patch: { name?: string; color?: string; index?: number },
   ): Promise<ChatCategory | null> {
     return await http.patch<ChatCategory>(`/sessions/categories/${id}`, patch);
   },
@@ -143,6 +154,32 @@ export const createSessionsApi = (http: HttpClient) => ({
 
   async deleteProject(projectKey: string): Promise<boolean> {
     return (await http.delete(`/sessions/projects/${projectKey}`)) !== null;
+  },
+
+  async trash(): Promise<{ enabled: boolean; items: TrashedSession[] }> {
+    const data = await http.get<Wire>("/sessions/trash");
+    return {
+      enabled: data?.enabled === true,
+      items: (Array.isArray(data?.items) ? (data.items as Wire[]) : []).map((item) => ({
+        sessionId: typeof item.session_id === "string" ? item.session_id : "",
+        projectKey: typeof item.project_key === "string" ? item.project_key : "",
+        title: typeof item.title === "string" ? item.title : null,
+        path: typeof item.path === "string" ? item.path : null,
+        deletedAt: typeof item.deleted_at === "number" ? item.deleted_at : 0,
+      })),
+    };
+  },
+
+  async restoreTrashed(sessionId: string): Promise<boolean> {
+    return (await http.post(`/sessions/trash/${sessionId}/restore`)) !== null;
+  },
+
+  async purgeTrashed(sessionId: string): Promise<boolean> {
+    return (await http.delete(`/sessions/trash/${sessionId}`)) !== null;
+  },
+
+  async emptyTrash(): Promise<boolean> {
+    return (await http.delete("/sessions/trash")) !== null;
   },
 
   async addProject(path: string, name: string | null = null): Promise<boolean> {

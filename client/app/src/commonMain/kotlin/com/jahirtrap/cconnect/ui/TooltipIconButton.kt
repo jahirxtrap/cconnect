@@ -109,6 +109,7 @@ fun TooltipIconButton(
             Box(
                 modifier = modifier
                     .size(size)
+                    .alpha(if (enabled) 1f else 0.4f)
                     .clip(CircleShape)
                     .combinedClickable(
                         enabled = enabled,

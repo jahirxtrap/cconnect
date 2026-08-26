@@ -239,6 +239,7 @@ import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.pending
 import com.jahirtrap.cconnect.data.SessionInfo
+import com.jahirtrap.cconnect.data.TrashedSession
 import com.jahirtrap.cconnect.data.TodoItem
 import com.jahirtrap.cconnect.files.ClipboardPasteEffect
 import com.jahirtrap.cconnect.files.clipboardHasFiles
@@ -799,6 +800,11 @@ fun ChatScreen(
                                                     item(key = "compacting") {
                                                         CompactProgress()
                                                     }
+                                                } else {
+                                                    val status = state.streamStatus
+                                                    if (status == "slow" || status == "failed") {
+                                                        item(key = "stream-status") { StatusProgress(status) }
+                                                    }
                                                 }
                                                 itemsIndexed(state.view.asReversed(), key = { _, it -> it.id }) { reversed, message ->
                                                     val index = state.view.lastIndex - reversed
@@ -876,15 +882,22 @@ fun ChatScreen(
                                         }
                                         }
                                         var stickyHeaderHeight by remember { mutableStateOf(0) }
+                                        // Two open blocks can both start above the fold; the header
+                                        // belongs to the lower one, the one being read. In this
+                                        // reversed list that is the smallest index whose own header
+                                        // is still out of sight.
                                         val sticky by remember(expandedState) {
                                             derivedStateOf {
                                                 val info = listState.layoutInfo
                                                 val end = info.viewportEndOffset
-                                                val first = info.visibleItemsInfo.maxByOrNull { it.index }
-                                                ?: return@derivedStateOf null
-                                                val id = first.key as? Long ?: return@derivedStateOf null
-                                                if (expandedState[id] != true) return@derivedStateOf null
-                                                Triple(id, end - first.offset - first.size, end - first.offset)
+                                                info.visibleItemsInfo
+                                                    .sortedByDescending { it.index }
+                                                    .takeWhile { end - it.offset - it.size < 0 }
+                                                    .lastOrNull { (it.key as? Long)?.let { id -> expandedState[id] == true } == true }
+                                                    ?.let { item ->
+                                                        val id = item.key as? Long ?: return@derivedStateOf null
+                                                        Triple(id, end - item.offset - item.size, end - item.offset)
+                                                    }
                                             }
                                         }
                                         sticky?.let { (id, topRel, bottomRel) ->
@@ -1112,10 +1125,14 @@ fun ChatScreen(
         )
     }
     deleteTarget?.let { s ->
+        // With the trash on nothing is lost, so the dialog reads as a move, not as a deletion.
         ConfirmDialog(
-            title = stringResource(Res.string.delete),
-            text = stringResource(Res.string.delete_conversation_confirm, s.title ?: s.preview ?: s.sessionId),
-            confirmLabel = stringResource(Res.string.delete),
+            title = stringResource(if (state.trashEnabled) Res.string.trash else Res.string.delete),
+            text = stringResource(
+                if (state.trashEnabled) Res.string.trash_conversation_confirm else Res.string.delete_conversation_confirm,
+                s.title ?: s.preview ?: s.sessionId,
+            ),
+            confirmLabel = stringResource(if (state.trashEnabled) Res.string.confirm else Res.string.delete),
             onConfirm = { vm.deleteSession(s); deleteTarget = null },
             onDismiss = { deleteTarget = null },
         )
@@ -1605,7 +1622,10 @@ private fun ColumnScope.ChatPanelContent(
     Row(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         val projectLocked by SelectionLock.project.collectAsState()
         ProjectSelector(
-            projects = state.historyProjects,
+            // The one in front stays listed even when hidden, or the selector would name a project it cannot show.
+            projects = state.historyProjects.filter {
+                it.projectKey !in state.hiddenProjects || it.projectKey == state.historyProjectKey
+            },
             selected = state.historyProjectKey,
             locked = projectLocked,
             onSelect = vm::selectHistoryProject,
@@ -1641,11 +1661,13 @@ private fun ColumnScope.ChatPanelContent(
                         CategoryHeader(
                             category = group.category,
                             count = group.sessions.size,
+                            collapsed = group.category.id in state.collapsedCategories,
                             onToggle = { vm.toggleCategory(group.category) },
+                            onNewChat = { TabsController.newTab(group.category.id); onAfterSelect() },
                         )
                     }
                 }
-                if (group.category?.collapsed != true) {
+                if (group.category?.id !in state.collapsedCategories) {
                     items(group.sessions, key = { it.sessionId }) { s ->
                         ConversationRow(
                             title = s.title ?: s.preview ?: s.sessionId.take(8),
@@ -2086,6 +2108,38 @@ private fun SelectorChip(
     }
 }
 
+/** The turn is dragging or the API failed: same band as compacting, in its own colour. */
+@Composable
+private fun StatusProgress(kind: String) {
+    val failed = kind == "failed"
+    val color = if (failed) palette.red else palette.orange
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                if (failed) Lucide.TriangleAlert else Lucide.Clock3,
+                contentDescription = null,
+                tint = color,
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                stringResource(if (failed) Res.string.status_failed else Res.string.status_slow),
+                style = MaterialTheme.typography.bodyMedium,
+                color = color,
+            )
+        }
+        if (!failed) {
+            Spacer(Modifier.size(8.dp))
+            LinearProgressIndicator(color = color, modifier = Modifier.fillMaxWidth())
+        }
+    }
+}
+
 @Composable
 private fun CompactProgress() {
     val color = palette.blue
@@ -2510,6 +2564,7 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
     var deletingCategory by remember { mutableStateOf<ChatCategory?>(null) }
     var deletingProject by remember { mutableStateOf<ProjectInfo?>(null) }
     var addingProject by remember { mutableStateOf(false) }
+    var trashOpen by remember { mutableStateOf(false) }
     var draggingId by remember { mutableStateOf<String?>(null) }
     var dragDy by remember { mutableStateOf(0f) }
     val rowHeights = remember { mutableStateMapOf<String, Float>() }
@@ -2564,6 +2619,14 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 ),
                 onSelect = { vm.setChatOrder(it) },
             )
+            val noCategory = stringResource(Res.string.no_category)
+            SelectField(
+                label = stringResource(Res.string.default_category),
+                selected = state.defaultCategory,
+                options = listOf("" to noCategory) + state.categories.map { it.id to it.name },
+                shown = state.categories.firstOrNull { it.id == state.defaultCategory }?.name ?: noCategory,
+                onSelect = { vm.setDefaultCategory(it) },
+            )
             FieldLabel(stringResource(Res.string.categories))
             state.categories.forEachIndexed { index, category ->
                 val dragging = category.id == draggingId
@@ -2614,13 +2677,23 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                         modifier = Modifier.weight(1f),
                         interactive = draggingId == null,
                     )
+                    val hidden = category.id in state.hiddenCategories
+                    val eye = if (hidden) Lucide.EyeOff else Lucide.Eye
                     if (draggingId == null) {
+                        TooltipIconButton(
+                            label = stringResource(if (hidden) Res.string.show else Res.string.hide),
+                            onClick = { vm.toggleCategoryHidden(category.id) },
+                            size = 32.dp,
+                        ) { Icon(eye, contentDescription = null, modifier = Modifier.size(16.dp)) }
                         TooltipIconButton(
                             label = stringResource(Res.string.delete),
                             onClick = { deletingCategory = category },
                             size = 32.dp,
                         ) { Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp)) }
                     } else {
+                        Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+                            Icon(eye, contentDescription = null, modifier = Modifier.size(16.dp))
+                        }
                         Box(Modifier.size(32.dp), contentAlignment = Alignment.Center) {
                             Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp))
                         }
@@ -2649,12 +2722,24 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                         modifier = Modifier.weight(1f),
                         interactive = draggingId == null,
                     )
-                    if (project.customName) {
-                        TooltipIconButton(
-                            label = stringResource(Res.string.reset_name),
-                            onClick = { vm.renameProject(project, "") },
-                            size = 32.dp,
-                        ) { Icon(Lucide.RotateCcw, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    // Always in place so the row keeps its shape; it only has something to reset with a custom name.
+                    TooltipIconButton(
+                        label = stringResource(Res.string.reset_name),
+                        onClick = { vm.renameProject(project, "") },
+                        enabled = project.customName,
+                        size = 32.dp,
+                    ) { Icon(Lucide.RotateCcw, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    val hidden = project.projectKey in state.hiddenProjects
+                    TooltipIconButton(
+                        label = stringResource(if (hidden) Res.string.show else Res.string.hide),
+                        onClick = { vm.toggleProjectHidden(project.projectKey) },
+                        size = 32.dp,
+                    ) {
+                        Icon(
+                            if (hidden) Lucide.EyeOff else Lucide.Eye,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
                     }
                     TooltipIconButton(
                         label = stringResource(Res.string.delete),
@@ -2668,7 +2753,18 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                 onClick = { addingProject = true },
                 modifier = Modifier.fillMaxWidth(),
             )
+            // The trash is a place of its own, not a third list crammed under these two.
+            if (state.trashEnabled) {
+                ActionButton(
+                    text = stringResource(Res.string.trash),
+                    onClick = { trashOpen = true },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
+    }
+    if (trashOpen) {
+        TrashDialog(vm = vm, onDismiss = { trashOpen = false })
     }
     deletingCategory?.let { category ->
         ConfirmDialog(
@@ -2692,6 +2788,88 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
         ProjectPathDialog(
             onConfirm = { path, name -> vm.addProject(path, name.ifBlank { null }); addingProject = false },
             onDismiss = { addingProject = false },
+        )
+    }
+}
+
+@Composable
+private fun TrashDialog(vm: ChatViewModel, onDismiss: () -> Unit) {
+    var items by remember { mutableStateOf<List<TrashedSession>>(emptyList()) }
+    var emptying by remember { mutableStateOf(false) }
+    var purging by remember { mutableStateOf<TrashedSession?>(null) }
+    val scope = rememberCoroutineScope()
+    suspend fun load() {
+        items = vm.trash().items
+    }
+    LaunchedEffect(Unit) { load() }
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.trash),
+        titleTrailing = {
+            TooltipIconButton(
+                label = stringResource(Res.string.empty_trash),
+                onClick = { emptying = true },
+                enabled = items.isNotEmpty(),
+                size = 32.dp,
+            ) { Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        },
+        buttons = { Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.close)) } },
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (items.isEmpty()) {
+                Text(
+                    stringResource(Res.string.trash_empty),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                )
+            }
+            items.forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        item.title ?: item.sessionId.take(8),
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp),
+                    )
+                    TooltipIconButton(
+                        label = stringResource(Res.string.restore),
+                        onClick = { scope.launch { vm.restoreTrashed(item.sessionId); load() } },
+                        size = 32.dp,
+                    ) { Icon(Lucide.RotateCcw, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    // Deleting here is the end of the line, so it asks like every other point of no return.
+                    TooltipIconButton(
+                        label = stringResource(Res.string.delete),
+                        onClick = { purging = item },
+                        size = 32.dp,
+                    ) { Icon(Lucide.Trash, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                }
+            }
+        }
+    }
+    purging?.let { item ->
+        ConfirmDialog(
+            title = stringResource(Res.string.delete),
+            text = stringResource(Res.string.delete_conversation_confirm, item.title ?: item.sessionId.take(8)),
+            confirmLabel = stringResource(Res.string.delete),
+            onConfirm = { scope.launch { vm.purgeTrashed(item.sessionId); load() }; purging = null },
+            onDismiss = { purging = null },
+        )
+    }
+    if (emptying) {
+        ConfirmDialog(
+            title = stringResource(Res.string.empty_trash),
+            text = stringResource(Res.string.empty_trash_confirm),
+            confirmLabel = stringResource(Res.string.delete),
+            onConfirm = { scope.launch { vm.emptyTrash(); load() }; emptying = false },
+            onDismiss = { emptying = false },
         )
     }
 }
@@ -2795,13 +2973,22 @@ private fun groupSessions(state: ChatUiState): List<SessionGroup> {
         else list.sortedByDescending { it.lastActive ?: 0.0 }
     }
     val byCategory = sessions.groupBy { state.placement[it.sessionId]?.categoryId }
-    val groups = state.categories.map { SessionGroup(it, ordered(byCategory[it.id].orEmpty())) }
+    // A hidden category takes its chats with it: they are not loose, just out of sight.
+    val groups = state.categories
+        .filter { it.id !in state.hiddenCategories }
+        .map { SessionGroup(it, ordered(byCategory[it.id].orEmpty())) }
     val loose = ordered(byCategory[null].orEmpty())
     return if (loose.isEmpty()) groups else groups + SessionGroup(null, loose)
 }
 
 @Composable
-private fun CategoryHeader(category: ChatCategory, count: Int, onToggle: () -> Unit) {
+private fun CategoryHeader(
+    category: ChatCategory,
+    count: Int,
+    collapsed: Boolean,
+    onToggle: () -> Unit,
+    onNewChat: () -> Unit,
+) {
     val accent = sessionColorOf(category.color) ?: MaterialTheme.colorScheme.onSurfaceVariant
     Row(
         modifier = Modifier
@@ -2813,7 +3000,7 @@ private fun CategoryHeader(category: ChatCategory, count: Int, onToggle: () -> U
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(
-            if (category.collapsed) Lucide.ChevronRight else Lucide.ChevronDown,
+            if (collapsed) Lucide.ChevronRight else Lucide.ChevronDown,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(start = 4.dp).size(14.dp),
@@ -2824,13 +3011,28 @@ private fun CategoryHeader(category: ChatCategory, count: Int, onToggle: () -> U
             color = accent,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
+            // Shorter than a chat row on purpose: a header, not another entry in the list.
+            modifier = Modifier.weight(1f).padding(start = 4.dp, top = 6.dp, bottom = 6.dp),
         )
-        Box(modifier = Modifier.size(28.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
             Text(
                 count.toString(),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        // Starts a chat already inside this category.
+        TooltipIconButton(
+            label = stringResource(Res.string.new_chat),
+            size = 24.dp,
+            tooltip = false,
+            onClick = onNewChat,
+        ) {
+            Icon(
+                Lucide.Plus,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
             )
         }
     }

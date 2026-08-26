@@ -9,6 +9,7 @@
   import Type from "@lucide/svelte/icons/type";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import Plus from "@lucide/svelte/icons/plus";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import { navigation } from "$lib/app/navigation.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
@@ -66,15 +67,22 @@
         : [...list].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
     const inCategory = (id: string | null) =>
       ordered(sessions.filter((item) => (chat.placement[item.sessionId]?.categoryId ?? null) === id));
-    const result: SessionGroup[] = chat.categories.map((category) => ({
-      category,
-      sessions: inCategory(category.id),
-    }));
+    // A hidden category takes its chats with it: they are not loose, just out of sight.
+    const result: SessionGroup[] = chat.categories
+      .filter((category) => !chat.isCategoryHidden(category.id))
+      .map((category) => ({ category, sessions: inCategory(category.id) }));
     const loose = inCategory(null);
     return loose.length ? [...result, { category: null, sessions: loose }] : result;
   });
 
   const chat = $derived(tabs.state);
+
+  // The one in front stays listed even when hidden, or the selector would name a project it cannot show.
+  const visibleProjects = $derived(
+    chat.historyProjects.filter(
+      (item) => !chat.isProjectHidden(item.projectKey) || item.projectKey === chat.historyProjectKey,
+    ),
+  );
 
   let list = $state<HTMLDivElement | null>(null);
 
@@ -114,7 +122,7 @@
   <div class="flex shrink-0 items-center px-2">
     <div class="min-w-0 flex-1">
       <ProjectSelector
-        projects={chat.historyProjects}
+        projects={visibleProjects}
         selected={chat.historyProjectKey}
         onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
       />
@@ -133,28 +141,44 @@
         {/if}
         {#if group.category}
           {@const category = group.category}
-          <button
-            type="button"
-            class="flex w-full cursor-pointer items-center rounded-item pr-1 text-left transition-colors hover:bg-on-surface/8"
-            onclick={() => void chat.toggleCategory(category)}
-          >
-            {#if category.collapsed}
-              <ChevronRight size={14} class="ml-1 shrink-0 text-on-surface-variant" />
-            {:else}
-              <ChevronDown size={14} class="ml-1 shrink-0 text-on-surface-variant" />
-            {/if}
-            <span
-              class="min-w-0 flex-1 truncate py-2 pl-1 text-label-sm uppercase"
-              style={`color: ${sessionColorOf(category.color) ?? "var(--c-on-surface-variant)"}`}
+          {@const collapsed = chat.isCategoryCollapsed(category.id)}
+          <div class="flex w-full items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8">
+            <button
+              type="button"
+              class="flex min-w-0 flex-1 cursor-pointer items-center text-left"
+              onclick={() => chat.toggleCategory(category)}
             >
-              {category.name}
-            </span>
-            <span class="flex size-7 shrink-0 items-center justify-center text-label-sm text-on-surface-variant">
-              {group.sessions.length}
-            </span>
-          </button>
+              {#if collapsed}
+                <ChevronRight size={14} class="ml-1 shrink-0 text-on-surface-variant" />
+              {:else}
+                <ChevronDown size={14} class="ml-1 shrink-0 text-on-surface-variant" />
+              {/if}
+              <!-- Shorter than a chat row on purpose: a header, not another entry in the list. -->
+              <span
+                class="min-w-0 flex-1 truncate py-1.5 pl-1 text-label-sm uppercase"
+                style={`color: ${sessionColorOf(category.color) ?? "var(--c-on-surface-variant)"}`}
+              >
+                {category.name}
+              </span>
+              <span class="flex size-6 shrink-0 items-center justify-center text-label-sm text-on-surface-variant">
+                {group.sessions.length}
+              </span>
+            </button>
+            <!-- Starts a chat already inside this category. -->
+            <button
+              type="button"
+              aria-label={t("NEW_CHAT")}
+              class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+              onclick={() => {
+                tabs.newTab(category.id);
+                onAfterSelect();
+              }}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         {/if}
-        {#if !group.category?.collapsed}
+        {#if !group.category || !chat.isCategoryCollapsed(group.category.id)}
           {#each group.sessions as session (session.sessionId)}
             <ConversationRow
               title={session.title ?? session.preview ?? session.sessionId.slice(0, 8)}

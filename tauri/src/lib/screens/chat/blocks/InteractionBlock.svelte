@@ -76,7 +76,7 @@
     <button
       type="button"
       onclick={toggle}
-      class="flex w-full cursor-pointer items-center gap-1.5 text-left"
+      class="flex w-full cursor-pointer items-center gap-1.5 rounded-sm text-left transition-colors select-none hover:bg-on-surface/8"
     >
       {@render header()}
     </button>

@@ -48,7 +48,7 @@
     type="button"
     disabled={!hasSummary}
     onclick={toggle}
-    class="flex w-full items-center text-left transition-colors select-none {hasSummary
+    class="flex w-full items-center rounded-sm text-left transition-colors select-none {hasSummary
       ? 'cursor-pointer hover:bg-on-surface/8'
       : 'cursor-default'}"
   >

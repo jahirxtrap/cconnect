@@ -50,7 +50,7 @@
     type="button"
     disabled={labelOnly}
     onclick={toggle}
-    class="flex w-full items-center text-left transition-colors select-none {labelOnly
+    class="flex w-full items-center rounded-sm text-left transition-colors select-none {labelOnly
       ? 'cursor-default'
       : 'cursor-pointer hover:bg-on-surface/8'}"
   >

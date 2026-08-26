@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Eye from "@lucide/svelte/icons/eye";
+  import EyeOff from "@lucide/svelte/icons/eye-off";
   import GripHorizontal from "@lucide/svelte/icons/grip-horizontal";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Trash from "@lucide/svelte/icons/trash";
@@ -13,6 +15,7 @@
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ProjectPathDialog from "./ProjectPathDialog.svelte";
+  import TrashDialog from "./TrashDialog.svelte";
   import type { ChatState } from "./state.svelte";
 
   interface Props {
@@ -30,6 +33,7 @@
   let deletingCategory = $state<ChatCategory | null>(null);
   let deletingProject = $state<ProjectInfo | null>(null);
   let addingProject = $state(false);
+  let trashOpen = $state(false);
   let draggingId = $state<string | null>(null);
   let dragDy = $state(0);
   let step = $state(0);
@@ -144,10 +148,20 @@
       ]}
       onSelect={(value) => void chat.setChatOrder(value)}
     />
+    <SelectField
+      label={t("DEFAULT_CATEGORY")}
+      selected={chat.defaultCategory}
+      options={[
+        { value: "", label: t("NO_CATEGORY") },
+        ...chat.categories.map((category) => ({ value: category.id, label: category.name })),
+      ]}
+      onSelect={(value) => void chat.setDefaultCategory(value)}
+    />
 
     <p class="mt-1 mb-1.5 text-label-lg">{t("CATEGORIES")}</p>
     {#each chat.categories as category, index (category.id)}
       {@const dragging = draggingId === category.id}
+      {@const hidden = chat.isCategoryHidden(category.id)}
       <div
         data-category={category.id}
         class="flex items-center rounded-item pr-1 {dragging ? 'bg-on-surface/8' : ''} {draggingId === null
@@ -177,6 +191,17 @@
             onCancel={() => (editing = null)}
           />
         </div>
+        <TooltipIconButton
+          label={hidden ? t("SHOW") : t("HIDE")}
+          class="size-8 [&_svg]:size-4"
+          onclick={() => chat.toggleCategoryHidden(category.id)}
+        >
+          {#if hidden}
+            <EyeOff />
+          {:else}
+            <Eye />
+          {/if}
+        </TooltipIconButton>
         <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingCategory = category)}>
           <Trash />
         </TooltipIconButton>
@@ -190,6 +215,7 @@
 
     <p class="mt-1 mb-1.5 text-label-lg">{t("PROJECTS")}</p>
     {#each sortedProjects as project (project.projectKey)}
+      {@const hidden = chat.isProjectHidden(project.projectKey)}
       <div class="flex items-center pr-1">
         <div class="min-w-0 flex-1">
           <EditableText
@@ -204,23 +230,43 @@
             onCancel={() => (editing = null)}
           />
         </div>
-        {#if project.customName}
-          <TooltipIconButton
-            label={t("RESET_NAME")}
-            class="size-8 [&_svg]:size-4"
-            onclick={() => void chat.renameProject(project, "")}
-          >
-            <RotateCcw />
-          </TooltipIconButton>
-        {/if}
+        <!-- Always in place so the row keeps its shape; it only has something to reset with a custom name. -->
+        <TooltipIconButton
+          label={t("RESET_NAME")}
+          enabled={project.customName}
+          class="size-8 [&_svg]:size-4"
+          onclick={() => void chat.renameProject(project, "")}
+        >
+          <RotateCcw />
+        </TooltipIconButton>
+        <TooltipIconButton
+          label={hidden ? t("SHOW") : t("HIDE")}
+          class="size-8 [&_svg]:size-4"
+          onclick={() => chat.toggleProjectHidden(project.projectKey)}
+        >
+          {#if hidden}
+            <EyeOff />
+          {:else}
+            <Eye />
+          {/if}
+        </TooltipIconButton>
         <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingProject = project)}>
           <Trash />
         </TooltipIconButton>
       </div>
     {/each}
     <ActionButton class="w-full" text={t("ADD_PROJECT")} onclick={() => (addingProject = true)} />
+
+    <!-- The trash is a place of its own, not a third list crammed under these two. -->
+    {#if chat.trashEnabled}
+      <ActionButton class="mt-1 w-full" text={t("TRASH")} onclick={() => (trashOpen = true)} />
+    {/if}
   </div>
 </CompactDialog>
+
+{#if trashOpen}
+  <TrashDialog {chat} onDismiss={() => (trashOpen = false)} />
+{/if}
 
 {#if addingProject}
   <ProjectPathDialog

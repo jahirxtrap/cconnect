@@ -481,6 +481,10 @@ class SessionRegistry:
                 return session
         return None
 
+    def live_session_ids(self):
+        """Ids of the chats alive in this process, transcript on disk or not yet."""
+        return {s.state.session_id for s in self._sessions.values() if s.state.session_id}
+
     def committed_cut(self, session_id):
         session = self.get_by_session(session_id)
         if session is None or not session.has_replay:

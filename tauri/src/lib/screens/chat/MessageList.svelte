@@ -24,6 +24,8 @@
     pendingToolIds: string[];
     streaming: boolean;
     compacting: boolean;
+    /** "slow" / "failed" while the turn drags or the API failed; same band as compacting. */
+    streamStatus: string | null;
     visibility: Visibility;
     onAnswer: (requestId: string, optionId: string) => void;
     onLoadOlder: () => void;
@@ -40,6 +42,7 @@
     pendingToolIds,
     streaming,
     compacting,
+    streamStatus,
     visibility,
     onAnswer,
     onLoadOlder,
@@ -161,27 +164,35 @@
     return found;
   };
 
+  // Two open blocks can both start above the fold; the header belongs to the lower one, the one
+  // being read, so the walk starts at the first visible block and keeps going down while the
+  // next one also has its own header out of sight.
   const updateSticky = () => {
-    const node = firstVisible();
-    const id = Number(node?.dataset.mid);
-    if (!container || !node || !node.dataset.mid || !expandedState[id]) {
+    if (!container || !content) {
       sticky = null;
       return;
     }
-    const index = visible.findIndex((item) => item.id === id);
-    const message = visible[index];
-    if (!message || !hasCollapsibleContent(message, modeFor(message.role) === "label")) {
+    const start = firstVisible();
+    if (!start) {
       sticky = null;
       return;
     }
-    const gap = gapAbove(visible[index - 1]?.role ?? null, message.role);
-    const top = topOf(node) - distanceToTop();
-    if (top + gap >= 0) {
-      sticky = null;
-      return;
+    let candidate: { message: ChatMessage; gap: number; push: number } | null = null;
+    let node: HTMLElement | null = start;
+    while (node) {
+      const id = Number(node.dataset.mid);
+      const index = node.dataset.mid ? visible.findIndex((item) => item.id === id) : -1;
+      const message = index >= 0 ? visible[index] : null;
+      const gap = message ? gapAbove(visible[index - 1]?.role ?? null, message.role) : 0;
+      const top = topOf(node) - distanceToTop();
+      if (top + gap >= 0) break; // this one starts inside the viewport: nothing below can win
+      if (message && expandedState[id] && hasCollapsibleContent(message, modeFor(message.role) === "label")) {
+        const height = stickyHeight > 0 ? stickyHeight : STICKY_FALLBACK;
+        candidate = { message, gap, push: Math.min(0, top + node.offsetHeight - height) };
+      }
+      node = node.nextElementSibling as HTMLElement | null;
     }
-    const height = stickyHeight > 0 ? stickyHeight : STICKY_FALLBACK;
-    sticky = { message, gap, push: Math.min(0, top + node.offsetHeight - height) };
+    sticky = candidate;
   };
 
   const collapseSticky = async () => {
@@ -308,6 +319,7 @@
     void messages.at(-1)?.text;
     void messages.length;
     void compacting;
+    void streamStatus;
     if (!container) return;
     measureScrollbar();
     if (follow) scrollTo(0);
@@ -385,6 +397,8 @@
     {/each}
       {#if compacting}
         <StatusProgress kind="compacting" />
+      {:else if streamStatus === "slow" || streamStatus === "failed"}
+        <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
       {/if}
     </div>
   </div>

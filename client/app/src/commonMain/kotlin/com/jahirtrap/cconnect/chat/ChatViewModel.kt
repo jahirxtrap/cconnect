@@ -117,8 +117,17 @@ data class ChatUiState(
     val historyProjectKey: String? = null,
     val historyLoading: Boolean = true,
     val categories: List<ChatCategory> = emptyList(),
+    /** Ids of the folded categories, read from this device's own settings. */
+    val collapsedCategories: Set<String> = emptySet(),
+    /** Hidden ones only leave this device's lists; the categories and projects stay untouched. */
+    val hiddenCategories: Set<String> = emptySet(),
+    val hiddenProjects: Set<String> = emptySet(),
     val placement: Map<String, ChatPlacement> = emptyMap(),
     val chatOrder: String = "auto",
+    /** Category a chat born in this tab is filed into; empty leaves it out of every category. */
+    val defaultCategory: String = "",
+    /** Deleting a chat only sets it aside, so the confirmation says so and the trash is reachable. */
+    val trashEnabled: Boolean = false,
     val environments: List<EnvironmentProfile> = emptyList(),
     val activeEnvironmentId: String? = null,
     val oldestLoadedIndex: Int? = null,
@@ -199,6 +208,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 streamTokens = true,
                 environments = settings.environments,
                 activeEnvironmentId = ctx.environmentId,
+                collapsedCategories = Settings().collapsedCategories.toSet(),
+                hiddenCategories = Settings().hiddenCategories.toSet(),
+                hiddenProjects = Settings().hiddenProjects.toSet(),
             )
         }
     )
@@ -411,6 +423,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     streamTokens = s.streaming,
                     showWorking = s.showWorking,
                     chatOrder = s.chatOrder,
+                    defaultCategory = s.defaultCategory,
+                    trashEnabled = s.trashEnabled,
                     serverVisibility = VisibilityPrefs(
                         simple = if (s.simpleMode) "on" else "off",
                         thinking = s.showThinking,
@@ -768,6 +782,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun newSession() {
+        ctx.pendingCategoryId = null
         currentAssistantId = null
         currentThinkingId = null
         optimisticChipId = null
@@ -803,6 +818,17 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     fun refreshEnvironments() {
         ctx.environmentId = settings.activeEnvironment?.id
         _state.update { it.copy(environments = settings.environments, activeEnvironmentId = ctx.environmentId) }
+    }
+
+    /** Re-reads the local view state after an import replaced the settings behind our back. */
+    fun refreshViewPrefs() {
+        _state.update {
+            it.copy(
+                collapsedCategories = settings.collapsedCategories.toSet(),
+                hiddenCategories = settings.hiddenCategories.toSet(),
+                hiddenProjects = settings.hiddenProjects.toSet(),
+            )
+        }
     }
 
     fun selectEnvironment(id: String) {
@@ -929,6 +955,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun openSession(session: SessionInfo) {
+        ctx.pendingCategoryId = null
         viewModelScope.launch {
             freezeView()
             if (session.sessionId != _state.value.sessionId) {
@@ -1136,10 +1163,27 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
+    /** Folded or not is per device, so it stays in the local settings and never leaves it. */
     fun toggleCategory(category: ChatCategory) {
-        viewModelScope.launch {
-            SessionsApi.updateCategory(category.id, collapsed = !category.collapsed)?.let { store()?.upsertCategory(it) }
-        }
+        val folded = settings.collapsedCategories.toMutableList()
+        if (!folded.remove(category.id)) folded.add(category.id)
+        settings.collapsedCategories = folded
+        _state.update { it.copy(collapsedCategories = folded.toSet()) }
+    }
+
+    /** Hiding is the same kind of view state: it only takes the row out of this device's lists. */
+    fun toggleCategoryHidden(categoryId: String) {
+        val hidden = settings.hiddenCategories.toMutableList()
+        if (!hidden.remove(categoryId)) hidden.add(categoryId)
+        settings.hiddenCategories = hidden
+        _state.update { it.copy(hiddenCategories = hidden.toSet()) }
+    }
+
+    fun toggleProjectHidden(projectKey: String) {
+        val hidden = settings.hiddenProjects.toMutableList()
+        if (!hidden.remove(projectKey)) hidden.add(projectKey)
+        settings.hiddenProjects = hidden
+        _state.update { it.copy(hiddenProjects = hidden.toSet()) }
     }
 
     fun reorderCategory(categoryId: String, index: Int) {
@@ -1172,10 +1216,33 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         }
     }
 
+    /** A chat born in this tab gets filed once the CLI hands out its session id: the category its
+     *  `+` came from, else the default one. Callers only run this on that first id. */
+    private fun claimPendingCategory(sessionId: String?) {
+        val categoryId = ctx.pendingCategoryId?.ifEmpty { null } ?: _state.value.defaultCategory
+        ctx.pendingCategoryId = null
+        if (sessionId == null || categoryId.isEmpty()) return
+        if (_state.value.categories.any { it.id == categoryId }) placeSession(sessionId, categoryId, 0)
+    }
+
     fun placeSession(sessionId: String, categoryId: String?, index: Int? = null) {
         viewModelScope.launch {
             if (SessionsApi.placeSession(sessionId, categoryId, index)) ensureHistoryLoaded()
         }
+    }
+
+    suspend fun trash(): SessionsApi.Trash = SessionsApi.trash()
+
+    suspend fun restoreTrashed(sessionId: String) {
+        SessionsApi.restoreTrashed(sessionId)
+    }
+
+    suspend fun purgeTrashed(sessionId: String) {
+        SessionsApi.purgeTrashed(sessionId)
+    }
+
+    suspend fun emptyTrash() {
+        SessionsApi.emptyTrash()
     }
 
     fun addProject(path: String, name: String? = null) {
@@ -1204,6 +1271,12 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         if (order == _state.value.chatOrder) return
         _state.update { it.copy(chatOrder = order) }
         viewModelScope.launch { SettingsApi.update(chatOrder = order) }
+    }
+
+    fun setDefaultCategory(categoryId: String) {
+        if (categoryId == _state.value.defaultCategory) return
+        _state.update { it.copy(defaultCategory = categoryId) }
+        viewModelScope.launch { SettingsApi.update(defaultCategory = categoryId) }
     }
 
     private fun store() = ChatListStore.forConfig(listConfig())
@@ -1485,6 +1558,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                     )
                 }
                 _state.update { it.copy(sessionId = sid, contextTokens = ctxTokens).promoteSide(sid) }
+                if (st0.sessionId == null) claimPendingCategory(sid)
             }
             is ServerEvent.Done -> {
                 if (_state.value.streaming && settings.notifyTaskDone) {

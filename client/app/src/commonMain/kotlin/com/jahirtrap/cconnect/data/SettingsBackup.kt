@@ -3,6 +3,7 @@ package com.jahirtrap.cconnect.data
 import com.jahirtrap.cconnect.data.SshProfile
 import com.jahirtrap.cconnect.data.SshStore
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonObject
@@ -49,6 +50,9 @@ object SettingsBackup {
                 put("cwd", settings.cwd)
                 put("environment_locked", settings.environmentLocked)
                 put("project_locked", settings.projectLocked)
+                putJsonArray("collapsed_categories") { settings.collapsedCategories.forEach { add(it) } }
+                putJsonArray("hidden_categories") { settings.hiddenCategories.forEach { add(it) } }
+                putJsonArray("hidden_projects") { settings.hiddenProjects.forEach { add(it) } }
                 put("file_sort_field", settings.fileSortField)
                 put("file_sort_ascending", settings.fileSortAscending)
                 put("local_server_enabled", settings.localServerEnabled)
@@ -120,6 +124,9 @@ object SettingsBackup {
             values.text("cwd")?.let { settings.cwd = it }
             values.flag("environment_locked")?.let { settings.environmentLocked = it }
             values.flag("project_locked")?.let { settings.projectLocked = it }
+            values.texts("collapsed_categories")?.let { settings.collapsedCategories = it }
+            values.texts("hidden_categories")?.let { settings.hiddenCategories = it }
+            values.texts("hidden_projects")?.let { settings.hiddenProjects = it }
             values.text("file_sort_field")?.let { settings.fileSortField = it }
             values.flag("file_sort_ascending")?.let { settings.fileSortAscending = it }
             values.flag("local_server_enabled")?.let { settings.localServerEnabled = it }
@@ -182,4 +189,6 @@ object SettingsBackup {
     private fun JsonObject.text(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
     private fun JsonObject.flag(key: String): Boolean? = this[key]?.jsonPrimitive?.booleanOrNull
     private fun JsonObject.number(key: String): Int? = this[key]?.jsonPrimitive?.intOrNull
+    private fun JsonObject.texts(key: String): List<String>? =
+        (this[key] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull }
 }

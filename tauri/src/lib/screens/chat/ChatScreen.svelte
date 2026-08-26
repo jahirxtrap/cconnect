@@ -349,6 +349,7 @@
         pendingToolIds={chat.pendingToolIds}
         streaming={chat.streaming}
         compacting={chat.compacting || activity === "compacting"}
+        streamStatus={chat.streamStatus}
         visibility={{
           thinking: chat.showThinking,
           toolUse: chat.showToolUse,
@@ -670,10 +671,14 @@
 
 {#if deleteTarget}
   {@const target = deleteTarget}
+  <!-- With the trash on nothing is lost, so the dialog reads as a move, not as a deletion. -->
   <ConfirmDialog
-    title={t("DELETE")}
-    text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? target.preview ?? target.sessionId)}
-    confirmLabel={t("DELETE")}
+    title={t(chat.trashEnabled ? "TRASH" : "DELETE")}
+    text={t(
+      chat.trashEnabled ? "TRASH_CONVERSATION_CONFIRM" : "DELETE_CONVERSATION_CONFIRM",
+      target.title ?? target.preview ?? target.sessionId,
+    )}
+    confirmLabel={t(chat.trashEnabled ? "CONFIRM" : "DELETE")}
     onConfirm={() => {
       void chat.remove(target);
       deleteTarget = null;

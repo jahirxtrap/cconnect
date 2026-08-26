@@ -17,6 +17,8 @@ const flag = (raw: Wire, key: string): boolean | null =>
 const number = (raw: Wire, key: string): number | null =>
   typeof raw[key] === "number" ? (raw[key] as number) : null;
 const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
+const texts = (raw: Wire, key: string): string[] | null =>
+  Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : null;
 
 export const exportSettings = (): string =>
   JSON.stringify(
@@ -40,6 +42,9 @@ export const exportSettings = (): string =>
         cwd: settings.cwd,
         environment_locked: settings.environmentLocked,
         project_locked: settings.projectLocked,
+        collapsed_categories: settings.collapsedCategories,
+        hidden_categories: settings.hiddenCategories,
+        hidden_projects: settings.hiddenProjects,
         file_sort_field: settings.fileSortField,
         file_sort_ascending: settings.fileSortAscending,
         local_server_enabled: settings.localServerEnabled,
@@ -125,6 +130,16 @@ const applySettings = (values: Wire) => {
   ];
   for (const [key, apply] of strings) {
     const value = text(values, key);
+    if (value !== null) apply(value);
+  }
+
+  const idLists: Array<[string, (value: string[]) => void]> = [
+    ["collapsed_categories", (value) => (settings.collapsedCategories = value)],
+    ["hidden_categories", (value) => (settings.hiddenCategories = value)],
+    ["hidden_projects", (value) => (settings.hiddenProjects = value)],
+  ];
+  for (const [key, apply] of idLists) {
+    const value = texts(values, key);
     if (value !== null) apply(value);
   }
 };

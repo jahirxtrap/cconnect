@@ -4,6 +4,7 @@
   import FileText from "@lucide/svelte/icons/file-text";
   import Shield from "@lucide/svelte/icons/shield";
   import Sparkles from "@lucide/svelte/icons/sparkles";
+  import Trash2 from "@lucide/svelte/icons/trash-2";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
@@ -12,6 +13,7 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
+  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -134,6 +136,22 @@
     enabled={ready}
     onclick={() => (dialog = "visibility")}
   />
+
+  <PreferenceRow
+    icon={Trash2}
+    title={t("TRASH")}
+    summary={summary(t("TRASH_HINT"))}
+    enabled={ready}
+    onclick={() => void apply({ trash_enabled: !(snapshot?.trashEnabled ?? false) })}
+  >
+    {#snippet trailing()}
+      <CompactSwitch
+        checked={snapshot?.trashEnabled ?? false}
+        enabled={ready}
+        onCheckedChange={(value) => void apply({ trash_enabled: value })}
+      />
+    {/snippet}
+  </PreferenceRow>
 
   {#if (capabilities?.accounts.length ?? 0) > 1}
     <PreferenceRow

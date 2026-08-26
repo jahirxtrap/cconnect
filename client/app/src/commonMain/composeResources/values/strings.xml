@@ -324,6 +324,13 @@
     <string name="chat_order_manual">Manual</string>
     <string name="delete_category_confirm">Delete the category \"%1$s\"? Its chats stay, without a category.</string>
     <string name="delete_project_confirm">Delete the project \"%1$s\" and its chats?</string>
+    <string name="trash">Trash</string>
+    <string name="trash_empty">No deleted chats</string>
+    <string name="restore">Restore</string>
+    <string name="empty_trash">Empty trash</string>
+    <string name="empty_trash_confirm">Delete every chat in the trash?</string>
+    <string name="trash_hint">Deleted chats go to the trash instead of being removed</string>
+    <string name="default_category">Default category</string>
     <string name="color_none">None</string>
     <string name="delete">Delete</string>
     <string name="cancel">Cancel</string>
@@ -332,6 +339,7 @@
     <string name="discard">Discard</string>
     <string name="component_discard_confirm">Discard this component and continue in the chat?</string>
     <string name="delete_conversation_confirm">Delete the conversation \"%1$s\"?</string>
+    <string name="trash_conversation_confirm">Move the conversation \"%1$s\" to the trash?</string>
     <string name="type_message">Type a message…</string>
     <string name="commands">Commands</string>
     <string name="quick_chat">Quick chat</string>

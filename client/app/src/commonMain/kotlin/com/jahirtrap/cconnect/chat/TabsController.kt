@@ -122,10 +122,11 @@ object TabsController {
         return tab
     }
 
-    fun newTab(): Tab {
+    /** [categoryId] lands the chat in that category as soon as the session gets an id. */
+    fun newTab(categoryId: String? = null): Tab {
         val envId = active.ctx.environmentId ?: settings.activeEnvironment?.id
         val dir = settings.environments.firstOrNull { it.id == envId }?.directory.orEmpty()
-        return openTab(envId, dir)
+        return openTab(envId, dir).also { it.ctx.pendingCategoryId = categoryId }
     }
 
     fun openSessionTab(environmentId: String?, cwd: String, sessionId: String, projectKey: String, title: String? = null, color: String? = null): Tab {

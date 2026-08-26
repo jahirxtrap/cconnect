@@ -18,6 +18,7 @@ from loguru import logger
 from core.config import CLAUDE_PROJECTS_DIR
 from services import projects as projects_service
 from services import sessions as sessions_service
+from services import trash as trash_service
 
 _DEBOUNCE_SECONDS = 0.5
 _POLL_SECONDS = 2.0
@@ -187,7 +188,8 @@ class ChatListHub:
             return projects, sessions
         ai_key = sessions_service._AI_PROJECT_KEY
         for directory in base.iterdir():
-            if not directory.is_dir() or directory.name == ai_key:
+            # `.trash` holds deleted chats waiting to be restored; it is not a project.
+            if not directory.is_dir() or directory.name in (ai_key, trash_service.TRASH_DIR):
                 continue
             pkey = directory.name
             count = 0
@@ -263,6 +265,7 @@ class ChatListHub:
 
     def _refresh(self, broadcast: bool):
         from services import categories
+        from services.live_sessions import registry
 
         try:
             new_projects, new_sessions = self._scan()
@@ -270,7 +273,9 @@ class ChatListHub:
             logger.debug(f"chat_list refresh failed: {type(exc).__name__}: {exc}")
             return
         events: list[dict] = []
-        for gone in categories.prune(set(new_sessions)):
+        # A chat filed the moment it was born may not be on disk yet (or this scan may predate it),
+        # and pruning against the scan alone would throw its category away.
+        for gone in categories.prune(set(new_sessions) | registry.live_session_ids()):
             events.append({"type": "placement_removed", "session_id": gone})
         with self._lock:
             old_projects, old_sessions = self._projects, self._sessions

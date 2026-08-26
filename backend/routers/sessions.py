@@ -11,6 +11,7 @@ from core.responses import api_response
 from services import categories as categories_service
 from services import chat_list
 from services import projects as projects_service
+from services import trash as trash_service
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services.live_sessions import registry
@@ -40,7 +41,6 @@ class MoveBody(BaseModel):
 class CategoryBody(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
-    collapsed: Optional[bool] = None
     index: Optional[int] = None
 
 
@@ -81,7 +81,7 @@ async def update_category(category_id: str, body: CategoryBody):
     if body.color and body.color not in COLORS:
         raise HTTPException(status_code=400, detail="invalid color")
     try:
-        updated = categories_service.update_category(category_id, body.name, body.color, body.collapsed, body.index)
+        updated = categories_service.update_category(category_id, body.name, body.color, body.index)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if updated is None:
@@ -106,6 +106,36 @@ async def place_session(session_id: str, body: PlacementBody):
         raise HTTPException(status_code=400, detail=str(exc))
     chat_list.hub.publish([{"type": "placement_changed", "placement": placement}])
     return api_response(data=placement)
+
+
+@router.get("/sessions/trash")
+def list_trash():
+    return api_response(data={"enabled": trash_service.enabled(), "items": trash_service.snapshot()})
+
+
+@router.post("/sessions/trash/{session_id}/restore")
+async def restore_trashed(session_id: str):
+    project_key = trash_service.restore(session_id)
+    if project_key is None:
+        raise HTTPException(status_code=404, detail="not in the trash")
+    await chat_list.hub.resync()
+    # The resync only brings the chat back; its category comes from the placement the trash kept.
+    placement = categories_service.placement_of(session_id)
+    if placement:
+        chat_list.hub.publish([{"type": "placement_changed", "placement": placement}])
+    return api_response(data={"project_key": project_key})
+
+
+@router.delete("/sessions/trash/{session_id}")
+def purge_trashed(session_id: str):
+    if not trash_service.purge(session_id):
+        raise HTTPException(status_code=404, detail="not in the trash")
+    return api_response(message="deleted")
+
+
+@router.delete("/sessions/trash")
+def empty_trash():
+    return api_response(data={"removed": trash_service.purge_all()}, message="deleted")
 
 
 @router.post("/sessions/projects")

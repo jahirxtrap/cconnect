@@ -15,6 +15,8 @@ export interface SettingsSnapshot {
   showWorking: string;
   simpleMode: boolean;
   chatOrder: string;
+  trashEnabled: boolean;
+  defaultCategory: string;
 }
 
 export interface SettingsPatch {
@@ -31,6 +33,8 @@ export interface SettingsPatch {
   show_working?: string;
   simple_mode?: boolean;
   chat_order?: string;
+  trash_enabled?: boolean;
+  default_category?: string;
 }
 
 type Field = { effective?: unknown };
@@ -56,6 +60,8 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   showWorking: effectiveStr(wire, "show_working", "label"),
   simpleMode: effectiveBool(wire, "simple_mode", false),
   chatOrder: effectiveStr(wire, "chat_order", "auto"),
+  trashEnabled: effectiveBool(wire, "trash_enabled", false),
+  defaultCategory: effectiveStr(wire, "default_category", ""),
 });
 
 export const createSettingsApi = (http: HttpClient) => ({

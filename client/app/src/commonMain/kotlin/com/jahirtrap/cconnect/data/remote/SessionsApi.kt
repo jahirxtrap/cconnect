@@ -10,6 +10,7 @@ import com.jahirtrap.cconnect.data.diffKindOf
 import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.SessionInfo
 import com.jahirtrap.cconnect.data.SessionMessage
+import com.jahirtrap.cconnect.data.TrashedSession
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -54,7 +55,6 @@ object SessionsApi {
         name = o["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         position = o["position"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
         color = o["color"]?.jsonPrimitive?.contentOrNull,
-        collapsed = o["collapsed"]?.jsonPrimitive?.booleanOrNull ?: false,
     )
 
     fun parsePlacement(o: JsonObject): ChatPlacement = ChatPlacement(
@@ -265,13 +265,11 @@ object SessionsApi {
         id: String,
         name: String? = null,
         color: String? = null,
-        collapsed: Boolean? = null,
         index: Int? = null,
     ): ChatCategory? =
         Http.patch("/sessions/categories/$id", buildJsonObject {
             name?.let { put("name", it) }
             color?.let { put("color", it) }
-            collapsed?.let { put("collapsed", it) }
             index?.let { put("index", it) }
         })?.jsonObject?.toCategory()
 
@@ -286,6 +284,32 @@ object SessionsApi {
 
     suspend fun deleteProject(projectKey: String): Boolean =
         Http.delete("/sessions/projects/$projectKey") != null
+
+    data class Trash(val enabled: Boolean, val items: List<TrashedSession>)
+
+    suspend fun trash(): Trash {
+        val data = Http.get("/sessions/trash")?.jsonObject
+        val items = (data?.get("items") as? JsonArray).orEmpty().mapNotNull { el ->
+            val o = el as? JsonObject ?: return@mapNotNull null
+            TrashedSession(
+                sessionId = o["session_id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                projectKey = o["project_key"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                title = o["title"]?.jsonPrimitive?.contentOrNull,
+                path = o["path"]?.jsonPrimitive?.contentOrNull,
+                deletedAt = o["deleted_at"]?.jsonPrimitive?.doubleOrNull ?: 0.0,
+            ).takeIf { it.sessionId.isNotEmpty() }
+        }
+        return Trash(data?.get("enabled")?.jsonPrimitive?.booleanOrNull == true, items)
+    }
+
+    suspend fun restoreTrashed(sessionId: String): Boolean =
+        Http.post("/sessions/trash/$sessionId/restore") != null
+
+    suspend fun purgeTrashed(sessionId: String): Boolean =
+        Http.delete("/sessions/trash/$sessionId") != null
+
+    suspend fun emptyTrash(): Boolean =
+        Http.delete("/sessions/trash") != null
 
     suspend fun addProject(path: String, name: String? = null): Boolean =
         Http.post("/sessions/projects", buildJsonObject {

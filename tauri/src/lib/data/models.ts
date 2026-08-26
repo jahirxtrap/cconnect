@@ -13,7 +13,7 @@ export interface ChatCategory {
   name: string;
   position: number;
   color: string | null;
-  collapsed: boolean;
+  // Folded or not is a per-device view state; it lives in the local settings, not here.
 }
 
 export interface ChatPlacement {
@@ -73,7 +73,6 @@ export const parseCategory = (raw: Wire): ChatCategory => ({
   name: text(raw.name) ?? "",
   position: number(raw.position) ?? 0,
   color: text(raw.color),
-  collapsed: raw.collapsed === true,
 });
 
 /** What a project is called on screen: the name the user gave it, else its folder. */
