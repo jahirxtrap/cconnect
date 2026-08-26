@@ -86,6 +86,7 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(Background(), "AndroidBackground")
     webView.addJavascriptInterface(CodeScanner(), "AndroidQrScan")
     webView.addJavascriptInterface(installer, "AndroidInstaller")
+    PastedContent(webView).install()
   }
 
   inner class CodeScanner {

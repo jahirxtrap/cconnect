@@ -652,23 +652,42 @@ private fun DetailsBlock(summary: String, inner: List<ASTNode>, ctx: MdContext, 
     }
 }
 
+private val CELL_PAD = 6.dp
+private val CELL_MIN = 40.dp
+private val CELL_MAX = 420.dp
+
 @Composable
 private fun TableView(table: ASTNode, ctx: MdContext) {
     val scroll = rememberScrollState()
     val rows = table.children.filter { it.type == GFMElementTypes.HEADER || it.type == GFMElementTypes.ROW }
-    val cols = rows.firstOrNull()?.children?.count { it.type == GFMTokenTypes.CELL } ?: 0
-    val cellWidth = 140.dp
-    val totalWidth = cellWidth * cols.coerceAtLeast(1)
+    val cells = rows.map { row -> row.children.filter { it.type == GFMTokenTypes.CELL }.map { inline(it, ctx) } }
+    val cols = cells.maxOfOrNull { it.size } ?: 0
+    val body = MaterialTheme.typography.bodySmall
+    val head = body.copy(fontWeight = FontWeight.Bold)
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    // Each column takes the width its content asks for — capped, so one long cell can't stretch the
+    // table forever, and floored so a column of single digits doesn't get a paragraph's worth.
+    val widths = remember(cells, body, density) {
+        List(cols) { index ->
+            val widest = cells.withIndex().maxOf { (row, texts) ->
+                val text = texts.getOrNull(index) ?: return@maxOf 0
+                measurer.measure(text, if (rows[row].type == GFMElementTypes.HEADER) head else body).size.width
+            }
+            with(density) { (widest.toDp() + CELL_PAD * 2).coerceIn(CELL_MIN, CELL_MAX) }
+        }
+    }
+    val totalWidth = widths.fold(0.dp) { sum, width -> sum + width }
     Column(modifier = Modifier.fillMaxWidth().horizontalScrollbar(scroll).horizontalScroll(scroll, enabled = scroll.maxValue > 0)) {
-        rows.forEach { rowNode ->
-            val header = rowNode.type == GFMElementTypes.HEADER
+        cells.forEachIndexed { row, texts ->
+            val header = rows[row].type == GFMElementTypes.HEADER
             Row {
-                rowNode.children.filter { it.type == GFMTokenTypes.CELL }.forEach { cell ->
+                texts.forEachIndexed { index, text ->
                     MdText(
-                        text = inline(cell, ctx),
+                        text = text,
                         codeBg = ctx.codeBg,
-                        modifier = Modifier.width(cellWidth).padding(6.dp),
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (header) FontWeight.Bold else FontWeight.Normal),
+                        modifier = Modifier.width(widths.getOrElse(index) { CELL_MAX }).padding(CELL_PAD),
+                        style = if (header) head else body,
                     )
                 }
             }

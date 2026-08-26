@@ -22,6 +22,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { onNativePaste } from "$lib/platform/pastedContent";
   import { backend } from "$lib/services/backend.svelte";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
   import { downloadUrl, relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
@@ -122,11 +123,23 @@
     if (event.defaultPrevented) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement) return;
-    const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
+    const data = event.clipboardData;
+    // Some engines leave `files` empty for pasted media and only fill `items`, so both are read.
+    const pasted = Array.from(data?.files ?? []);
+    if (!pasted.length) {
+      for (const item of Array.from(data?.items ?? [])) {
+        if (item.kind !== "file") continue;
+        const file = item.getAsFile();
+        if (file) pasted.push(file);
+      }
+    }
+    const files = pasted.map(pastedName);
     if (!files.length || !canAttach || dialogOpen) return;
     event.preventDefault();
     chat.addAttachments(files);
   };
+
+  $effect(() => onNativePaste((files) => canAttach && !dialogOpen && chat.addAttachments(files)));
 
   const onDrop = (event: DragEvent) => {
     event.preventDefault();

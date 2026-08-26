@@ -241,7 +241,9 @@ import com.jahirtrap.cconnect.data.pending
 import com.jahirtrap.cconnect.data.SessionInfo
 import com.jahirtrap.cconnect.data.TrashedSession
 import com.jahirtrap.cconnect.data.TodoItem
+import com.jahirtrap.cconnect.files.AttachmentFile
 import com.jahirtrap.cconnect.files.ClipboardPasteEffect
+import com.jahirtrap.cconnect.files.receiveAttachments
 import com.jahirtrap.cconnect.files.clipboardHasFiles
 import com.jahirtrap.cconnect.files.readClipboardFiles
 import com.jahirtrap.cconnect.files.fileDropTarget
@@ -1092,6 +1094,7 @@ fun ChatScreen(
                                             attachments = if (sideActive) emptyList() else state.attachments,
                                             uploading = !sideActive && state.uploadingAttachments,
                                             onAttach = if (sideActive) null else ({ scope.launch { vm.addAttachments(pickFiles()) } }),
+                                            onReceiveAttachments = if (sideActive) null else ({ vm.addAttachments(it) }),
                                             chips = composerChips,
                                             controls = if (sideActive) null else composerControls,
                                         )
@@ -2275,6 +2278,7 @@ private fun Composer(
     attachments: List<Attachment> = emptyList(),
     uploading: Boolean = false,
     onAttach: (() -> Unit)? = null,
+    onReceiveAttachments: ((List<AttachmentFile>) -> Unit)? = null,
     chips: (@Composable () -> Unit)? = null,
     controls: (@Composable RowScope.() -> Unit)? = null,
 ) {
@@ -2325,6 +2329,7 @@ private fun Composer(
             modifier = Modifier.fillMaxWidth()
                 .padding(horizontal = 14.dp)
                 .padding(top = if (chips != null) 6.dp else 14.dp)
+                .then(if (onReceiveAttachments != null) Modifier.receiveAttachments(onReceiveAttachments) else Modifier)
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .onPreviewKeyEvent { e ->
                     if (e.type == KeyEventType.KeyDown && e.key == Key.Enter) {
