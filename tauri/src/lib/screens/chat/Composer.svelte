@@ -18,6 +18,7 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
+  import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import StopIcon from "$lib/ui/StopIcon.svelte";
   import type { Attachment } from "./state.svelte";
@@ -130,6 +131,10 @@
     field?.focus();
   };
 
+  const ondragenter = (event: DragEvent) => {
+    if (!hasFiles(event)) field?.focus();
+  };
+
   const onpaste = (event: ClipboardEvent) => {
     const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
     if (!files.length) return;
@@ -189,6 +194,7 @@
       oninput={(event) => onDraft((event.currentTarget as HTMLTextAreaElement).value)}
         {onkeydown}
         {onpaste}
+        {ondragenter}
         rows="1"
         placeholder={t("TYPE_MESSAGE")}
         class="field-auto no-scrollbar block max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant"

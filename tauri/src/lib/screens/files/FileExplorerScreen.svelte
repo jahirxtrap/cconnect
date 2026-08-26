@@ -52,6 +52,7 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import DialogActionItem from "$lib/ui/DialogActionItem.svelte";
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
+  import { hasFiles } from "$lib/ui/fileDrop";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
@@ -416,6 +417,7 @@
   };
 
   const onDrop = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
     event.preventDefault();
     dropOver = false;
     if (archive !== null) return;
@@ -680,6 +682,7 @@
   <div
     class="relative flex min-h-0 flex-1 flex-col"
     ondragover={(event) => {
+      if (!hasFiles(event)) return;
       event.preventDefault();
       dropOver = archive === null;
     }}

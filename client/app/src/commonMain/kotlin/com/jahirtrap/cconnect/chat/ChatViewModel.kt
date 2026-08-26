@@ -1711,7 +1711,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 }
             }
             is ServerEvent.Todos -> _state.update { it.copy(todos = event.items) }
-            is ServerEvent.Context -> _state.update { it.copy(contextTokens = event.contextTokens ?: it.contextTokens) }
+            is ServerEvent.Context -> _state.update { it.copy(contextTokens = event.contextTokens) }
             is ServerEvent.Task -> upsertTask(event)
             is ServerEvent.Result -> {
                 currentAssistantId = null
@@ -1719,7 +1719,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 turnFirstResponseId = null
                 val st0 = _state.value
                 val sid = event.sessionId ?: st0.sessionId
-                val ctxTokens = event.contextTokens ?: st0.contextTokens
                 val backend = ChatListStore.forConfig(listConfig())
                 if (sid != null && backend != null && backend.sessions.value.none { it.sessionId == sid }) {
                     backend.upsertSession(
@@ -1735,7 +1734,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         )
                     )
                 }
-                _state.update { it.copy(sessionId = sid, contextTokens = ctxTokens).promoteSide(sid) }
+                _state.update { it.copy(sessionId = sid).promoteSide(sid) }
                 if (st0.sessionId == null) claimPendingCategory(sid)
             }
             is ServerEvent.Done -> {

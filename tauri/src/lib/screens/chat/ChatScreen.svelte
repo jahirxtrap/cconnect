@@ -36,6 +36,7 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import Drawer from "$lib/ui/Drawer.svelte";
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
+  import { hasFiles } from "$lib/ui/fileDrop";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -141,6 +142,7 @@
   $effect(() => onNativePaste((files) => canAttach && !dialogOpen && chat.addAttachments(files)));
 
   const onDrop = (event: DragEvent) => {
+    if (!hasFiles(event)) return;
     event.preventDefault();
     dropOver = false;
     const files = Array.from(event.dataTransfer?.files ?? []);
@@ -358,7 +360,7 @@
     <div
       class="relative flex min-h-0 flex-1 flex-col"
       ondragover={(event) => {
-        if (chat.viewOnly) return;
+        if (chat.viewOnly || !hasFiles(event)) return;
         event.preventDefault();
         dropOver = canAttach;
       }}

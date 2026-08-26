@@ -13,6 +13,15 @@ const ARCHIVE_SUFFIXES = [
   ".txz",
 ];
 
+const THOUSAND = 1000;
+const MILLION = 1_000_000;
+
+export const formatTokens = (value: number): string => {
+  if (value >= MILLION) return `${Math.round(value / (MILLION / 10)) / 10}M`;
+  if (value >= THOUSAND) return `${Math.round(value / THOUSAND)}K`;
+  return `${value}`;
+};
+
 export const formatDecimal = (value: number, decimals: number): string =>
   value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 

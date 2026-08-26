@@ -119,6 +119,7 @@ import com.jahirtrap.cconnect.data.componentInvalid
 import com.jahirtrap.cconnect.data.componentLeaves
 import com.jahirtrap.cconnect.data.toComponentNumber
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
+import com.jahirtrap.cconnect.data.formatTokens
 import com.jahirtrap.cconnect.files.AttachmentFile
 import com.jahirtrap.cconnect.files.pickFiles
 import com.jahirtrap.cconnect.ui.CollapsibleSection
@@ -858,7 +859,7 @@ private fun CompactBlock(data: CompactData, expanded: Boolean? = null, onToggle:
         val post = data.postTokens
         if (pre != null && post != null) {
             if (isNotEmpty()) append(" • ")
-            append("${fmtTokens(pre)} → ${fmtTokens(post)}")
+            append("${formatTokens(pre)} → ${formatTokens(post)}")
         }
     }.ifBlank { null }
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
@@ -885,12 +886,6 @@ private fun CompactBlock(data: CompactData, expanded: Boolean? = null, onToggle:
             MarkdownText(data.summary, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false, dense = true)
         }
     }
-}
-
-private fun fmtTokens(n: Int): String = when {
-    n >= 1_000_000 -> "${n / 1_000_000}M"
-    n >= 1_000 -> "${n / 1_000}k"
-    else -> n.toString()
 }
 
 @Composable

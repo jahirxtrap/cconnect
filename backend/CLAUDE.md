@@ -656,10 +656,13 @@ worker breaks the asyncio subprocess that Claude CLI spawns
 ## Conventions
 
 1. **Routers stay thin** — validate input, call a service, return `api_response()`.
-2. **Business logic lives in `services/`.** New integrations get their own module.
-3. **Imports at the top of the file.** The only exception is the deferred
+2. **No comments.** Self-explanatory names; a one-line descriptive docstring only
+   when a constraint cannot be expressed in code. Rationale ("why" / "how") goes in
+   the chat or the commit, never in the source.
+3. **Business logic lives in `services/`.** New integrations get their own module.
+4. **Imports at the top of the file.** The only exception is the deferred
    `claude_agent_sdk` import inside `services/claude_runtime.py` (the package is
    installed/upgraded at startup, so it may be absent at module-load time).
-4. **No secrets in the repo.** Secrets come from env vars / a gitignored `.env`.
-5. **Subprocesses that print text use `encoding="utf-8", errors="replace"`** —
+5. **No secrets in the repo.** Secrets come from env vars / a gitignored `.env`.
+6. **Subprocesses that print text use `encoding="utf-8", errors="replace"`** —
    Windows defaults to cp1252 and mojibakes CLI output otherwise.

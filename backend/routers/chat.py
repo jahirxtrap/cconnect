@@ -152,8 +152,6 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     data = sessions_service.latest_compact(state.cwd, state.session_id)
                     if data:
                         yield {"type": "compact_summary", **data}
-                        if data.get("post_tokens"):
-                            yield {"type": "context", "context_tokens": data["post_tokens"]}
                 elif is_local_cmd and sessions_service.local_command_count(state.cwd, state.session_id) > local_cmds_before:
                     md = sessions_service.latest_local_command(state.cwd, state.session_id)
                     if md:

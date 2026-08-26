@@ -212,6 +212,7 @@
           onerror: () => (failed = true),
         }}
         alt={filename}
+        draggable="false"
         class="h-full w-full object-contain {loaded ? '' : 'invisible'}"
       />
       {#if failed}

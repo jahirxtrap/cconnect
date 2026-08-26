@@ -3,6 +3,7 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import type { CompactData } from "$lib/data/chatModels";
+  import { formatTokens } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
 
@@ -14,13 +15,6 @@
 
   const { compact, expanded = null, onToggle = null }: Props = $props();
 
-  const fmtTokens = (n: number) =>
-    n >= 1_000_000
-      ? `${Math.floor(n / 1_000_000)}M`
-      : n >= 1_000
-        ? `${Math.floor(n / 1_000)}k`
-        : `${n}`;
-
   const hasSummary = $derived(compact.summary.trim().length > 0);
 
   const stats = $derived.by(() => {
@@ -28,7 +22,7 @@
     if (compact.trigger === "manual") parts.push(t("COMPACT_MANUAL"));
     else if (compact.trigger === "auto") parts.push(t("COMPACT_AUTO"));
     if (compact.preTokens !== null && compact.postTokens !== null) {
-      parts.push(`${fmtTokens(compact.preTokens)} → ${fmtTokens(compact.postTokens)}`);
+      parts.push(`${formatTokens(compact.preTokens)} → ${formatTokens(compact.postTokens)}`);
     }
     return parts.join(" • ");
   });

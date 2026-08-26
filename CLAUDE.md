@@ -113,6 +113,11 @@ uploads it as an artifact (signed when the `KEYSTORE_*` repo secrets are set).
    and the app's `versionName` / `SUPPORTED_SERVER` accordingly.
 3. **No secrets in the repo** — `.env`, `key.properties`, `keystore.jks` are
    all gitignored. `backend/prompts/USER.md` is user-owned and gitignored too.
-4. **English only** — all code, comments, docs in English.
-5. **Read before acting** — verify before editing; check existing
+4. **English only** — code, docstrings and docs in English.
+5. **No comments** — in every module (backend, client, tauri). Self-explanatory
+   names; a one-line descriptive docstring only when a constraint cannot be
+   expressed in code. Rationale belongs in the chat or the commit, never in the
+   source. The exceptions are documentation as **data**: i18n label files and the
+   `COMMENT` on database tables/columns, where it is mandatory.
+6. **Read before acting** — verify before editing; check existing
    conventions/helpers before creating new ones.

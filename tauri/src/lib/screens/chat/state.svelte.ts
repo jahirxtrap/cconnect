@@ -1860,7 +1860,7 @@ export class ChatState {
         );
         break;
       case "context":
-        this.contextTokens = event.contextTokens ?? this.contextTokens;
+        this.contextTokens = event.contextTokens;
         break;
       case "result": {
         this.#assistantId = null;
@@ -1884,7 +1884,6 @@ export class ChatState {
         this.sessionId = sessionId;
         if (born) this.#claimPendingCategory(sessionId);
         this.#promoteSide(sessionId);
-        this.contextTokens = event.contextTokens ?? this.contextTokens;
         break;
       }
       case "done":

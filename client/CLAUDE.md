@@ -425,7 +425,9 @@ Save / Save As / Share map to the local-text `SharedActions` funcs
 2. **Backend is the source of truth.** Mirror its event shapes verbatim.
 3. **Real platform divergence goes behind expect/actual**, not ad-hoc branches in
    `commonMain`.
-4. **Comments are WHY-only.** No noise restating the code.
+4. **No comments.** Self-explanatory names instead. A one-line descriptive
+   docstring only when a constraint cannot be expressed in code; rationale
+   ("why" / "how") goes in the chat or the commit, never in the source.
 5. **No inline fully-qualified names.** Always import.
 6. **Reusable shared components** (especially `ui/`) aren't deleted even if
    temporarily unused — they keep porting cheap.

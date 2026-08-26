@@ -63,6 +63,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.draw.alpha
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.LazyListLayoutInfo
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.ScrollState
@@ -174,6 +175,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -231,6 +233,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.ChatMessage
+import com.jahirtrap.cconnect.data.formatTokens
 import com.jahirtrap.cconnect.data.CommandOption
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.SelectionLock
@@ -313,6 +316,24 @@ import com.jahirtrap.cconnect.settings.VisibilityDialog
 import com.jahirtrap.cconnect.data.VisibilityPrefs
 
 private const val ANCHOR_TIMEOUT_MS = 250L
+
+private fun stickyPush(
+    info: LazyListLayoutInfo,
+    expanded: Map<Long, Boolean>,
+    id: Long,
+    gapPx: Int,
+    headerHeight: Int,
+): Int? {
+    val end = info.viewportEndOffset
+    val chosen = info.visibleItemsInfo
+        .sortedByDescending { it.index }
+        .takeWhile { end - it.offset - it.size < 0 }
+        .lastOrNull { (it.key as? Long)?.let { key -> expanded[key] == true } == true }
+        ?: return null
+    if (chosen.key != id) return null
+    if (end - chosen.offset - chosen.size + gapPx >= 0) return null
+    return minOf(0, end - chosen.offset - headerHeight)
+}
 
 private class OpenedChat {
     var sessionId: String? = null
@@ -909,29 +930,18 @@ fun ChatScreen(
                                             }
                                         }
                                         }
-                                        var stickyHeaderHeight by remember { mutableStateOf(0) }
-                                        val sticky by remember(expandedState) {
+                                        val stickyView = rememberUpdatedState(state.view)
+                                        val stickyIds by remember(expandedState) {
                                             derivedStateOf {
-                                                val info = listState.layoutInfo
-                                                val end = info.viewportEndOffset
-                                                info.visibleItemsInfo
-                                                    .sortedByDescending { it.index }
-                                                    .takeWhile { end - it.offset - it.size < 0 }
-                                                    .lastOrNull { (it.key as? Long)?.let { id -> expandedState[id] == true } == true }
-                                                    ?.let { item ->
-                                                        val id = item.key as? Long ?: return@derivedStateOf null
-                                                        Triple(id, end - item.offset - item.size, end - item.offset)
-                                                    }
+                                                stickyView.value.mapNotNull { item -> item.id.takeIf { expandedState[it] == true } }
                                             }
                                         }
-                                        sticky?.let { (id, topRel, bottomRel) ->
+                                        stickyIds.forEach { id ->
                                             val idx = state.view.indexOfFirst { it.id == id }
                                             val msg = state.view.getOrNull(idx)
                                             if (msg != null && hasCollapsibleContent(msg)) {
                                                 val gapPx = with(density) { gapAbove(state.view.getOrNull(idx - 1)?.role, msg.role).roundToPx() }
-                                                if (topRel + gapPx < 0) {
-                                                    val h = if (stickyHeaderHeight > 0) stickyHeaderHeight else with(density) { 40.dp.roundToPx() }
-                                                    val pushY = minOf(0, bottomRel - h)
+                                                key(id) {
                                                     StickyCollapsibleHeader(
                                                         message = msg,
                                                         onCollapse = {
@@ -941,8 +951,12 @@ fun ChatScreen(
                                                         modifier = Modifier
                                                         .align(Alignment.TopCenter)
                                                         .fillMaxWidth()
-                                                        .offset { IntOffset(0, pushY) }
-                                                        .onSizeChanged { stickyHeaderHeight = it.height },
+                                                        .layout { measurable, constraints ->
+                                                            val placeable = measurable.measure(constraints)
+                                                            val push = stickyPush(listState.layoutInfo, expandedState, id, gapPx, placeable.height)
+                                                            if (push == null) layout(0, 0) {}
+                                                            else layout(placeable.width, placeable.height) { placeable.place(0, push) }
+                                                        },
                                                     )
                                                 }
                                             }
@@ -2146,7 +2160,7 @@ private fun ContextRing(tokens: Int, limit: Int) {
     val progress = (tokens.toFloat() / limit).coerceIn(0f, 1f)
     val pct = (progress * 100).toInt()
     Box(modifier = Modifier.padding(start = 4.dp, end = 2.dp)) {
-        TooltipTap("${fmtTokens(tokens)} / ${fmtTokens(limit)} • $pct%") {
+        TooltipTap("${formatTokens(tokens)} / ${formatTokens(limit)} • $pct%") {
             Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(
                     progress = { progress },
@@ -2158,12 +2172,6 @@ private fun ContextRing(tokens: Int, limit: Int) {
         }
     }
 }
-
-private fun fmtTokens(n: Int): String =
-    if (n >= 1_000_000) {
-        val m = n / 1_000_000.0
-        if (m % 1.0 == 0.0) "${m.toInt()}M" else "${(m * 10).toInt() / 10.0}M"
-    } else "${n / 1000}K"
 
 @Composable
 private fun VisibilityToggle(simple: Boolean, onClick: () -> Unit) {

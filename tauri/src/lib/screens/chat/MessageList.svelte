@@ -108,6 +108,9 @@
 
   const distanceToBottom = () => (container ? Math.abs(container.scrollTop) : 0);
 
+  const atBottom = () =>
+    !container || container.scrollHeight <= container.clientHeight || distanceToBottom() <= AT_BOTTOM_PX;
+
   const distanceToTop = () =>
     container ? container.scrollHeight - container.clientHeight - Math.abs(container.scrollTop) : 0;
 
@@ -198,8 +201,8 @@
     expandedState[current.message.id] = false;
     await tick();
     const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
-    if (!node) return;
-    scrollFromTop(topOf(node) + current.gap);
+    if (node) scrollFromTop(topOf(node) + current.gap);
+    updateSticky();
   };
 
   const shiftBy = (delta: number) => {
@@ -215,7 +218,12 @@
   };
 
   const anchorGrowth = async (node: HTMLElement | null, grow: () => void) => {
-    if (follow || !node || !container) {
+    if (follow || atBottom()) {
+      follow = true;
+      grow();
+      return;
+    }
+    if (!node || !container) {
       grow();
       return;
     }
@@ -315,6 +323,7 @@
       if (follow) scrollTo(0);
       belowFold = distanceToBottom();
       viewport = element.clientHeight;
+      updateSticky();
     });
     observer.observe(element);
     observer.observe(inner);

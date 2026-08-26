@@ -11,6 +11,8 @@ import com.jahirtrap.cconnect.bringAppToFront
 
 expect fun filesFromDrop(event: DragAndDropEvent): List<AttachmentFile>
 
+expect fun dropHasFiles(event: DragAndDropEvent): Boolean
+
 @Composable
 fun Modifier.fileDropTarget(
     enabled: Boolean = true,
@@ -35,5 +37,5 @@ fun Modifier.fileDropTarget(
             }
         }
     }
-    return this.dragAndDropTarget(shouldStartDragAndDrop = { true }, target = target)
+    return this.dragAndDropTarget(shouldStartDragAndDrop = ::dropHasFiles, target = target)
 }

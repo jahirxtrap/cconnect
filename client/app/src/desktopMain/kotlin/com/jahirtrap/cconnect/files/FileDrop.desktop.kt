@@ -8,6 +8,9 @@ import java.io.File
 import java.net.URI
 
 @OptIn(ExperimentalComposeUiApi::class)
+actual fun dropHasFiles(event: DragAndDropEvent): Boolean = event.dragData() is DragData.FilesList
+
+@OptIn(ExperimentalComposeUiApi::class)
 actual fun filesFromDrop(event: DragAndDropEvent): List<AttachmentFile> {
     val data = event.dragData()
     if (data !is DragData.FilesList) return emptyList()

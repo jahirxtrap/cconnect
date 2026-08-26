@@ -45,6 +45,14 @@ def _clean_error_text(text: str | None) -> str:
     return (text or "").strip() or "Unknown error"
 
 
+def _usage_context(usage: Optional[dict]) -> Optional[int]:
+    """Context size of the request that produced a message (input + cache reads)."""
+    if not isinstance(usage, dict):
+        return None
+    total = (usage.get("input_tokens") or 0) + (usage.get("cache_read_input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
+    return total or None
+
+
 def _blocks_guide(capabilities: list[str]) -> str:
     if "media.blocks" not in capabilities:
         return ""
@@ -701,6 +709,7 @@ async def run_prompt(
 
     hidden_tool_ids: set[str] = set()
     awaiting_cycle = True  # the next answer that starts belongs to the next message we handed over
+    context_tokens: Optional[int] = None
     first_chunk_pending: set[int] = set()
     streamed_text: dict[int, str] = {}
     streamed_sent: dict[int, int] = {}
@@ -801,14 +810,11 @@ async def run_prompt(
                         if parent:
                             event["parent"] = parent
                         yield event
-                    if not parent and current_sid and cwd:
-                        try:
-                            from services import sessions as _sessions
-                            cctx = _sessions.last_context_tokens(_sessions.project_key_for(cwd), current_sid)
-                        except Exception:
-                            cctx = None
-                        if cctx:
-                            yield {"type": "context", "context_tokens": cctx}
+                    if not parent:
+                        total = _usage_context(getattr(message, "usage", None))
+                        if total and total != context_tokens:
+                            context_tokens = total
+                            yield {"type": "context", "context_tokens": total}
             elif isinstance(message, UserMessage):
                 if emit is not None:
                     for _b in getattr(message, "content", None) or []:
@@ -844,6 +850,8 @@ async def run_prompt(
                         "post_tokens": meta.get("postTokens"),
                         "summary": "",
                     }
+                    context_tokens = meta.get("postTokens") or None
+                    yield {"type": "context", "context_tokens": context_tokens}
                 else:
                     yield {"type": "system", "subtype": subtype, "data": data}
             elif isinstance(message, ResultMessage):
@@ -864,20 +872,11 @@ async def run_prompt(
                         detail = f"API error {api_status}"
                     if _looks_transient(api_status, detail):
                         yield {"type": "status", "kind": "failed"}
-                sid = getattr(message, "session_id", None)
-                ctx = None
-                if sid and cwd:
-                    try:
-                        from services import sessions as _sessions
-                        ctx = _sessions.last_context_tokens(_sessions.project_key_for(cwd), sid)
-                    except Exception:
-                        ctx = None
                 yield {
                     "type": "result",
-                    "session_id": sid,
+                    "session_id": getattr(message, "session_id", None),
                     "cost_usd": getattr(message, "total_cost_usd", None),
                     "is_error": getattr(message, "is_error", None),
-                    "context_tokens": ctx,
                 }
     except Exception as exc:
         logger.error(f"run_prompt failed: {type(exc).__name__}: {exc}")

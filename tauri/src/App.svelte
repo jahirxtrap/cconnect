@@ -19,6 +19,7 @@
   import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
   import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
+  import { hasFiles } from "$lib/ui/fileDrop";
   import { refreshPixelGrid } from "$lib/ui/pixelGrid";
 
   refreshPixelGrid();
@@ -60,7 +61,9 @@
     if (handled) event.preventDefault();
   };
 
-  const blockFileOpen = (event: DragEvent) => event.preventDefault();
+  const blockFileOpen = (event: DragEvent) => {
+    if (hasFiles(event)) event.preventDefault();
+  };
 
   $effect(() => {
     theme.environmentAccent = backend.active?.accentIndex ?? null;

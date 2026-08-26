@@ -824,6 +824,11 @@ def latest_compact(cwd: str, session_id: str) -> Optional[dict]:
     }
 
 
+def _is_compact_marker(entry: dict) -> bool:
+    """A compaction boundary or its summary — a marker on the thread, not a branch of it."""
+    return (entry.get("type") == "system" and entry.get("subtype") == "compact_boundary") or bool(entry.get("isCompactSummary"))
+
+
 def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
     """Only the transcript's active branch: rewound turns append as siblings, so walk
     parentUuid (logicalParentUuid across compacts) back from the last entry, like the
@@ -844,6 +849,8 @@ def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
         if not u or e.get("isSidechain"):
             continue
         by_uuid[u] = e
+        if _is_compact_marker(e):
+            continue
         parent = e.get("parentUuid") or e.get("logicalParentUuid")
         if parent:
             child_count[parent] = child_count.get(parent, 0) + 1
@@ -859,7 +866,7 @@ def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
         active.add(u)
         parent = cur.get("parentUuid") or cur.get("logicalParentUuid")
         cur = by_uuid.get(parent) if parent else None
-    return [e for e in entries if not e.get("uuid") or e.get("isSidechain") or e.get("uuid") in active]
+    return [e for e in entries if not e.get("uuid") or e.get("isSidechain") or _is_compact_marker(e) or e.get("uuid") in active]
 
 
 def list_checkpoints(project_key: str, session_id: str) -> list[dict]:

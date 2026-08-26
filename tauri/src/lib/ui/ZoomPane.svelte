@@ -33,18 +33,27 @@
     offsetY = 0;
   };
 
-  const contain = () => {
-    const box = host?.getBoundingClientRect();
-    if (!box) return;
-    const slackX = Math.max(0, (box.width * scale - box.width) / HALF);
-    const slackY = Math.max(0, (box.height * scale - box.height) / HALF);
-    offsetX = Math.min(slackX, Math.max(-slackX, offsetX));
-    offsetY = Math.min(slackY, Math.max(-slackY, offsetY));
-  };
-
   const spread = () => {
     const [first, second] = [...points.values()];
     return Math.hypot(first.x - second.x, first.y - second.y);
+  };
+
+  const middle = () => {
+    const [first, second] = [...points.values()];
+    return { x: (first.x + second.x) / HALF, y: (first.y + second.y) / HALF };
+  };
+
+  const zoomAt = (target: number, clientX: number, clientY: number) => {
+    const next = clamp(target);
+    const box = host?.getBoundingClientRect();
+    if (box) {
+      const pointX = clientX - box.left - box.width / HALF;
+      const pointY = clientY - box.top - box.height / HALF;
+      offsetX = pointX - ((pointX - offsetX) * next) / scale;
+      offsetY = pointY - ((pointY - offsetY) * next) / scale;
+    }
+    scale = next;
+    if (scale <= minScale) reset();
   };
 
   const onPointerDown = (event: PointerEvent) => {
@@ -67,11 +76,8 @@
     if (points.size >= 2) {
       if (pinchDistance <= 0) return;
       event.preventDefault();
-      scale = clamp((pinchScale * spread()) / pinchDistance);
-      if (scale <= minScale) {
-        offsetX = 0;
-        offsetY = 0;
-      } else contain();
+      const center = middle();
+      zoomAt((pinchScale * spread()) / pinchDistance, center.x, center.y);
       return;
     }
     if (scale <= minScale) return;
@@ -80,7 +86,6 @@
     offsetY += event.clientY - dragY;
     dragX = event.clientX;
     dragY = event.clientY;
-    contain();
   };
 
   const onPointerUp = (event: PointerEvent) => {
@@ -89,23 +94,20 @@
   };
 
   const onWheel = (event: WheelEvent) => {
-    if (!event.ctrlKey) return;
     event.preventDefault();
-    scale = clamp(scale - event.deltaY * WHEEL_STEP);
-    if (scale <= minScale) reset();
-    else contain();
+    zoomAt(scale - event.deltaY * WHEEL_STEP, event.clientX, event.clientY);
   };
 
-  const onDoubleClick = () => {
+  const onDoubleClick = (event: MouseEvent) => {
     if (scale > minScale) reset();
-    else scale = clamp(DOUBLE_TAP_SCALE);
+    else zoomAt(DOUBLE_TAP_SCALE, event.clientX, event.clientY);
   };
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   bind:this={host}
-  class="relative touch-pan-y overflow-hidden {className}"
+  class="relative overflow-hidden {scale > minScale ? 'touch-none' : 'touch-pan-y'} {className}"
   onpointerdown={onPointerDown}
   onpointermove={onPointerMove}
   onpointerup={onPointerUp}
@@ -114,7 +116,7 @@
   ondblclick={onDoubleClick}
 >
   <div
-    class="h-full w-full {scale > minScale ? 'cursor-grab' : ''}"
+    class="h-full w-full cursor-pointer"
     style="transform: translate({offsetX}px, {offsetY}px) scale({scale}); transform-origin: center center"
   >
     {@render children()}

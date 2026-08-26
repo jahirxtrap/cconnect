@@ -289,7 +289,7 @@ sealed interface ServerEvent {
     data class Notification(val summary: String, val status: String?) : ServerEvent
     data class Todos(val items: List<TodoItem>) : ServerEvent
     data class Task(val id: String, val content: String?, val status: String?) : ServerEvent
-    data class Result(val sessionId: String?, val contextTokens: Int? = null) : ServerEvent
+    data class Result(val sessionId: String?) : ServerEvent
     data class Context(val contextTokens: Int?) : ServerEvent
     data object Done : ServerEvent
     data object Interrupted : ServerEvent

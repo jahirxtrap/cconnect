@@ -2,19 +2,25 @@ package com.jahirtrap.cconnect.files
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.compose.AsyncImagePainter
+import coil3.request.ImageRequest
+import coil3.size.Size
 import com.jahirtrap.cconnect.data.remote.AppImageLoader
 import com.jahirtrap.cconnect.data.remote.Backend
 import androidx.compose.foundation.layout.Column
@@ -73,6 +79,10 @@ import com.jahirtrap.cconnect.ui.MarkdownText
 import com.jahirtrap.cconnect.ui.PreviewOverlay
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import kotlinx.coroutines.launch
+
+private const val MAX_IMAGE_SCALE = 6f
+private const val DOUBLE_TAP_SCALE = 2.5f
+private const val WHEEL_ZOOM_STEP = 0.15f
 
 @Composable
 fun FilePreviewScreen(
@@ -245,32 +255,58 @@ private fun ImagePreview(url: String, fallbackUrl: String? = null, modifier: Mod
     val context = LocalPlatformContext.current
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var pane by remember { mutableStateOf(IntSize.Zero) }
     var imageState by remember { mutableStateOf<AsyncImagePainter.State>(AsyncImagePainter.State.Empty) }
     var useFallback by remember(url) { mutableStateOf(false) }
     var failedFinal by remember(url) { mutableStateOf(false) }
     val model = if (useFallback && fallbackUrl != null) fallbackUrl else url
-    val transformState = rememberTransformableState { zoomChange, panChange, _ ->
-        scale = (scale * zoomChange).coerceIn(1f, 6f)
-        offset = if (scale > 1f) offset + panChange else Offset.Zero
+    fun zoomAt(target: Float, focus: Offset, pan: Offset = Offset.Zero) {
+        val next = target.coerceIn(1f, MAX_IMAGE_SCALE)
+        val center = Offset(pane.width / 2f, pane.height / 2f)
+        val point = focus - center
+        val anchored = point - (point - offset) * (next / scale)
+        scale = next
+        offset = if (next > 1f) anchored + pan else Offset.Zero
     }
     Box(
         modifier = modifier
             .clipToBounds()
-            .transformable(transformState)
+            .onSizeChanged { pane = it }
+            .pointerHoverIcon(PointerIcon.Hand)
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = {
+                detectTransformGestures { centroid, pan, zoom, _ ->
+                    zoomAt(scale * zoom, centroid, pan)
+                }
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type != PointerEventType.Scroll) continue
+                        val change = event.changes.firstOrNull() ?: continue
+                        val delta = change.scrollDelta.y
+                        if (delta == 0f) continue
+                        event.changes.forEach { it.consume() }
+                        zoomAt(scale * (1f - delta * WHEEL_ZOOM_STEP), change.position)
+                    }
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures(onDoubleTap = { position ->
                     if (scale > 1f) {
                         scale = 1f
                         offset = Offset.Zero
                     } else {
-                        scale = 2.5f
+                        zoomAt(DOUBLE_TAP_SCALE, position)
                     }
                 })
             },
         contentAlignment = Alignment.Center,
     ) {
         AsyncImage(
-            model = model,
+            model = remember(model) {
+                ImageRequest.Builder(context).data(model).size(Size.ORIGINAL).build()
+            },
             imageLoader = AppImageLoader.get(context),
             contentDescription = null,
             contentScale = ContentScale.Fit,
