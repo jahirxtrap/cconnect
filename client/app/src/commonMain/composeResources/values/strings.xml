@@ -387,6 +387,11 @@
     <string name="add_notes">Add note</string>
     <string name="interaction_other_hint">Other (optional)</string>
     <string name="interaction_notes_hint">Note (optional)</string>
+    <string name="invalid_value">This value is not valid</string>
+    <string name="select_option">Select</string>
+    <string name="uploading">Uploading</string>
+    <string name="color">Color</string>
+    <string name="usage_unused">You haven\'t used it yet</string>
     <string name="scroll_to_bottom">Scroll to bottom</string>
     <string name="connecting">Connecting</string>
     <string name="disconnected">Disconnected</string>

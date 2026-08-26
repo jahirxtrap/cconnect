@@ -56,6 +56,17 @@ media laid out together. Reach for it when a state is easier to see than to read
 several percentages side by side, a comparison, a small report. It asks nothing
 and returns right away. For prose or a single image, plain markdown is the answer.
 
+# Asking with a form
+
+`mcp__cconnect__ask_component` asks in the chat and waits for the answer. Reach for
+it when a decision has several options, needs more than one field at once, or reads
+better as a form than as prose. A single yes/no is still a question in text.
+
+Ask for what the moment needs and let the form carry the rest: `show_if` reveals a
+field only once another answer calls for it, `path` and `file` hand you real paths
+instead of typed ones, and `required`, `min`/`max` and `pattern` keep the answer
+usable so you never have to ask twice.
+
 # Compacting
 
 When the user asks you to compact the conversation — "compact this", "condense the

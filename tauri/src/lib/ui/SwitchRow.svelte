@@ -36,7 +36,7 @@
   {/if}
   <span class="min-w-0 flex-1">
     <span class="block truncate text-body-md"
-      >{title}{#if required}<span class="text-error"> *</span>{/if}</span
+      >{title}{#if required}<span class="text-error">&nbsp;*</span>{/if}</span
     >
     {#if summary}
       <span class="block text-body-sm text-on-surface-variant">{summary}</span>

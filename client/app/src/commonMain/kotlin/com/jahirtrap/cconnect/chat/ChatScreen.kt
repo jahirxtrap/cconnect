@@ -367,7 +367,6 @@ fun ChatScreen(
     var organizeOpen by remember { mutableStateOf(false) }
     var confirmCommand by remember { mutableStateOf<CommandOption?>(null) }
     var sharedLinkAction by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var discardComponent by remember { mutableStateOf<String?>(null) }
     var queuePreview by remember { mutableStateOf<QueuedMessage?>(null) }
     var queueFilePreview by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showRewindSheet by remember { mutableStateOf(false) }
@@ -784,7 +783,7 @@ fun ChatScreen(
                             BackInterceptor(enabled = sideActive) { dismissSide(); true }
                             ClearFocusOnImeHide()
                             val dialogOpen = renameTarget != null || deleteTarget != null || colorTarget != null ||
-                                confirmCommand != null || sharedLinkAction != null || discardComponent != null || showRewindSheet
+                                confirmCommand != null || sharedLinkAction != null || showRewindSheet
                             val shortcutsEnabled = !dialogOpen && !PreviewOverlay.open && !(mobile && drawerState.targetValue == DrawerValue.Open)
                             ClipboardPasteEffect(enabled = shortcutsEnabled && !sideActive) { vm.addAttachments(it) }
                             ClipboardShortcutHandler(enabled = shortcutsEnabled) { key ->
@@ -898,9 +897,9 @@ fun ChatScreen(
                                                         onComponentValue = vm::setComponentValue,
                                                         onComponentPick = vm::toggleComponentOption,
                                                         onSubmitComponent = vm::submitComponent,
-                                                        onDiscardComponent = { requestId, dirty ->
-                                                            if (dirty) discardComponent = requestId else vm.chatQuestions(requestId)
-                                                        },
+                                                        onDiscardComponent = vm::chatQuestions,
+                                                        onComponentUpload = vm::uploadComponentFile,
+                                                        componentColors = state.capabilities.colors,
                                                         onSharedLink = { url, filename -> sharedLinkAction = url to filename },
                                                         gluedTop = separated,
                                                         showTime = showTime,
@@ -1000,9 +999,9 @@ fun ChatScreen(
                                             onComponentValue = vm::setComponentValue,
                                             onComponentPick = vm::toggleComponentOption,
                                             onSubmitComponent = vm::submitComponent,
-                                            onDiscardComponent = { requestId, dirty ->
-                                                if (dirty) discardComponent = requestId else vm.chatQuestions(requestId)
-                                            },
+                                            onDiscardComponent = vm::chatQuestions,
+                                            onComponentUpload = vm::uploadComponentFile,
+                                            componentColors = state.capabilities.colors,
                                             onSharedLink = { url, filename -> sharedLinkAction = url to filename },
                                             topCorner = (20 * (1f - dockT)).dp,
                                             modifier = Modifier
@@ -1205,15 +1204,6 @@ fun ChatScreen(
             onDismiss = { colorTarget = null },
         )
     }
-    discardComponent?.let { requestId ->
-        ConfirmDialog(
-            title = stringResource(Res.string.cancel),
-            text = stringResource(Res.string.component_discard_confirm),
-            confirmLabel = stringResource(Res.string.discard),
-            onConfirm = { vm.chatQuestions(requestId); discardComponent = null },
-            onDismiss = { discardComponent = null },
-        )
-    }
     confirmCommand?.let { cmd ->
         ConfirmDialog(
             title = "/${cmd.name}",
@@ -1395,7 +1385,9 @@ private fun SidePanel(
     onComponentValue: ((String, String, String) -> Unit)? = null,
     onComponentPick: ((String, String, String, Boolean) -> Unit)? = null,
     onSubmitComponent: ((String, String?) -> Unit)? = null,
-    onDiscardComponent: ((String, Boolean) -> Unit)? = null,
+    onDiscardComponent: ((String, String) -> Unit)? = null,
+    onComponentUpload: (suspend (AttachmentFile) -> String?)? = null,
+    componentColors: List<String> = emptyList(),
     onSharedLink: ((String, String) -> Unit)? = null,
     topCorner: Dp = 20.dp,
     modifier: Modifier = Modifier,
@@ -1582,6 +1574,8 @@ private fun SidePanel(
                                 onComponentPick = onComponentPick,
                                 onSubmitComponent = onSubmitComponent,
                                 onDiscardComponent = onDiscardComponent,
+                                onComponentUpload = onComponentUpload,
+                                componentColors = componentColors,
                                 onSharedLink = onSharedLink,
                             )
                             }
@@ -2773,6 +2767,19 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
         editing = null
     }
 
+    fun commitEditing() {
+        val id = editing ?: return
+        val category = state.categories.firstOrNull { it.id == id }
+        if (category != null) {
+            commit(category)
+            return
+        }
+        state.historyProjects.firstOrNull { it.projectKey == id }?.let { project ->
+            if (draft.isNotBlank()) vm.renameProject(project, draft)
+        }
+        editing = null
+    }
+
     val dragFrom = state.categories.indexOfFirst { it.id == draggingId }
     val step = (rowHeights[draggingId] ?: 0f) + spacingPx
     val spans = state.categories.map { (rowHeights[it.id] ?: 0f) + spacingPx }
@@ -2800,6 +2807,10 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .pointerInput(editing) {
+                    if (editing == null) return@pointerInput
+                    detectTapGestures { commitEditing() }
+                }
                 .then(
                     if (draggingId == null) Modifier
                     else Modifier.pointerHoverIcon(PointerIcon.Hand, overrideDescendants = true),
@@ -2874,7 +2885,7 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                     EditableText(
                         value = if (editing == category.id) draft else category.name,
                         editing = editing == category.id,
-                        onEdit = { editing = category.id; draft = category.name },
+                        onEdit = { commitEditing(); editing = category.id; draft = category.name },
                         onValueChange = { draft = it },
                         onCommit = { commit(category) },
                         onCancel = { editing = null },
@@ -2918,7 +2929,7 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
                     EditableText(
                         value = if (editing == project.projectKey) draft else projectLabel(project),
                         editing = editing == project.projectKey,
-                        onEdit = { editing = project.projectKey; draft = projectLabel(project) },
+                        onEdit = { commitEditing(); editing = project.projectKey; draft = projectLabel(project) },
                         onValueChange = { draft = it },
                         onCommit = { if (draft.isNotBlank()) vm.renameProject(project, draft); editing = null },
                         onCancel = { editing = null },

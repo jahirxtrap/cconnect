@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 _BAR_WIDTH = 20
 _ALERT_PERCENT = 90
+_UNUSED_KEY = "unused"
+_UNUSED_TEXT = "You haven't used it yet"
 
 
 def _oauth(field: str, account: str | None = None) -> str | None:
@@ -78,7 +80,9 @@ def _windows(data: dict) -> list[dict]:
         pct = entry.get("percent")
         wid = _window_id(entry)
         if wid and isinstance(pct, (int, float)):
-            out.append({"id": wid, "percent": float(pct), "resets_at": entry.get("resets_at")})
+            win = {"id": wid, "percent": float(pct), "resets_at": entry.get("resets_at")}
+            win["unused"] = not win["resets_at"] and round(win["percent"]) == 0
+            out.append(win)
     return out
 
 
@@ -129,10 +133,23 @@ def _resets_hint(value) -> str:
 def _window_md(win: dict) -> str:
     pct = win["percent"]
     lines = [f"**{window_label(win['id'])}** • {round(pct)}%", f"`{_bar(pct)}`"]
-    hint = _resets_hint(win.get("resets_at"))
+    hint = _UNUSED_TEXT if win["unused"] else _resets_hint(win.get("resets_at"))
     if hint:
         lines.append(hint)
     return "  \n".join(lines)
+
+
+def _bar_block(win: dict) -> dict:
+    block = {
+        "type": "bar",
+        "label": window_label(win["id"]),
+        "text": _resets_hint(win.get("resets_at")),
+        "value": round(win["percent"]),
+        "alert_above": _ALERT_PERCENT,
+    }
+    if win["unused"]:
+        block["text_key"] = _UNUSED_KEY
+    return block
 
 
 async def usage_blocks(account: str | None = None) -> list[dict]:
@@ -142,16 +159,7 @@ async def usage_blocks(account: str | None = None) -> list[dict]:
     windows = _windows(data)
     if not windows:
         return [{"type": "text", "value": "_The server returned no usage data._"}]
-    return [
-        {
-            "type": "bar",
-            "label": window_label(win["id"]),
-            "text": _resets_hint(win.get("resets_at")),
-            "value": round(win["percent"]),
-            "alert_above": _ALERT_PERCENT,
-        }
-        for win in windows
-    ]
+    return [_bar_block(win) for win in windows]
 
 
 async def usage_markdown(account: str | None = None) -> str:

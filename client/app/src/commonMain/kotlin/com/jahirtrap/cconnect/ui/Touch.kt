@@ -11,9 +11,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import com.jahirtrap.cconnect.isCoarsePointer
@@ -25,6 +27,7 @@ val LocalMobileLayout = compositionLocalOf { false }
 @Composable
 fun ProvideIsTouch(content: @Composable () -> Unit) {
     var touch by remember { mutableStateOf(isCoarsePointer()) }
+    val focus = LocalFocusManager.current
     val density = LocalDensity.current
     val size = LocalWindowInfo.current.containerSize
     val mobile = if (size.width == 0 || size.height == 0) isCoarsePointer()
@@ -36,9 +39,14 @@ fun ProvideIsTouch(content: @Composable () -> Unit) {
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
-                            val type = awaitPointerEvent(PointerEventPass.Initial).changes.firstOrNull()?.type
+                            val started = awaitPointerEvent(PointerEventPass.Initial)
+                            val type = started.changes.firstOrNull()?.type
                             if (type == PointerType.Touch) touch = true
                             else if (type == PointerType.Mouse) touch = false
+                            val settled = awaitPointerEvent(PointerEventPass.Final)
+                            if (settled.type == PointerEventType.Press && settled.changes.none { it.isConsumed }) {
+                                focus.clearFocus()
+                            }
                         }
                     }
                 },

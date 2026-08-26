@@ -60,6 +60,19 @@ data class InteractionOption(
 
 const val VALUE_SEPARATOR = "\u001F"
 
+data class ComponentConfirm(
+    val title: String? = null,
+    val text: String,
+    val confirmLabel: String? = null,
+)
+
+data class ComponentCondition(
+    val id: String,
+    val equalTo: String? = null,
+    val oneOf: List<String>? = null,
+    val truthy: Boolean? = null,
+)
+
 data class ComponentOption(
     val value: String,
     val label: String,
@@ -68,6 +81,7 @@ data class ComponentOption(
     val style: String? = null,
     val icon: String? = null,
     val labelKey: String? = null,
+    val confirm: ComponentConfirm? = null,
 )
 
 data class ComponentElement(
@@ -75,6 +89,7 @@ data class ComponentElement(
     val id: String? = null,
     val label: String? = null,
     val text: String? = null,
+    val textKey: String? = null,
     val placeholder: String? = null,
     val placeholderKey: String? = null,
     val value: String? = null,
@@ -87,6 +102,20 @@ data class ComponentElement(
     val color: String? = null,
     val alertAbove: Float? = null,
     val alertBelow: Float? = null,
+    val showIf: ComponentCondition? = null,
+    val format: String? = null,
+    val display: String? = null,
+    val min: Float? = null,
+    val max: Float? = null,
+    val step: Float? = null,
+    val minLength: Int? = null,
+    val maxLength: Int? = null,
+    val pattern: String? = null,
+    val error: String? = null,
+    val open: Boolean = false,
+    val pick: String? = null,
+    val start: String? = null,
+    val accept: String? = null,
     val options: List<ComponentOption> = emptyList(),
     val block: String? = null,
     val blocks: List<ComponentElement> = emptyList(),
@@ -108,11 +137,90 @@ data class InteractionData(
     val submitLabel: String? = null,
     val submitKey: String? = null,
     val dismiss: ComponentOption? = null,
+    val present: String? = null,
+    val dismissedBy: String? = null,
     val values: Map<String, String> = emptyMap(),            // component draft, id -> value
 )
 
+private val NESTED = setOf("page", "group")
+
+fun componentLeaves(blocks: List<ComponentElement>): List<ComponentElement> =
+    blocks.flatMap { if (it.type in NESTED) componentLeaves(it.blocks) else listOf(it) }
+
 fun componentAnswerable(blocks: List<ComponentElement>): Boolean = blocks.any {
-    if (it.type == "page") componentAnswerable(it.blocks) else it.type == "buttons" || it.id != null
+    if (it.type in NESTED) componentAnswerable(it.blocks) else it.type == "buttons" || it.id != null
+}
+
+fun Float.toComponentNumber(): String =
+    if (this == toLong().toFloat()) toLong().toString() else toString()
+
+private fun answered(raw: String): Boolean = raw.isNotEmpty() && raw != "false"
+
+fun componentHidden(element: ComponentElement, values: Map<String, String>): Boolean {
+    val rule = element.showIf ?: return false
+    val raw = values[rule.id].orEmpty()
+    val parts = raw.split(VALUE_SEPARATOR).filter { it.isNotEmpty() }
+    rule.equalTo?.let { return it !in parts }
+    rule.oneOf?.let { list -> return parts.none { it in list } }
+    rule.truthy?.let { return if (it) !answered(raw) else answered(raw) }
+    return false
+}
+
+private fun matches(pattern: String, value: String): Boolean = try {
+    Regex(pattern).containsMatchIn(value)
+} catch (_: IllegalArgumentException) {
+    true
+}
+
+fun componentInvalid(element: ComponentElement, values: Map<String, String>): Boolean {
+    val id = element.id
+    if (element.type == "buttons" || element.type == "notes" || id == null) return false
+    val raw = values[id].orEmpty()
+    if (raw.isEmpty()) return element.required
+    if (element.format == "number") {
+        val value = raw.toFloatOrNull() ?: return true
+        if (element.min != null && value < element.min) return true
+        if (element.max != null && value > element.max) return true
+        return false
+    }
+    if (element.type != "input") return false
+    if (element.minLength != null && raw.length < element.minLength) return true
+    if (element.maxLength != null && raw.length > element.maxLength) return true
+    return element.pattern != null && !matches(element.pattern, raw)
+}
+
+fun componentBlocked(blocks: List<ComponentElement>, values: Map<String, String>): Boolean = blocks.any { element ->
+    if (componentHidden(element, values)) return@any false
+    when (element.type) {
+        "page" -> {
+            val fields = componentLeaves(element.blocks)
+                .filter { it.type != "notes" && !componentHidden(it, values) }
+            if (element.required && fields.none { !values[it.id.orEmpty()].isNullOrEmpty() }) true
+            else componentBlocked(element.blocks, values)
+        }
+
+        "group" -> componentBlocked(element.blocks, values)
+        else -> componentInvalid(element, values)
+    }
+}
+
+fun componentHiddenIds(
+    blocks: List<ComponentElement>,
+    values: Map<String, String>,
+    inherited: Boolean = false,
+): Set<String> {
+    val out = mutableSetOf<String>()
+    for (element in blocks) {
+        val hidden = inherited || componentHidden(element, values)
+        if (element.blocks.isNotEmpty()) out += componentHiddenIds(element.blocks, values, hidden)
+        else if (hidden && element.id != null) out += element.id
+    }
+    return out
+}
+
+fun componentValues(blocks: List<ComponentElement>, values: Map<String, String>): Map<String, String> {
+    val hidden = componentHiddenIds(blocks, values)
+    return values.filter { (key, value) -> value.isNotEmpty() && key !in hidden }
 }
 
 val InteractionData.pending: Boolean
@@ -216,6 +324,7 @@ sealed interface ServerEvent {
         val submitLabel: String? = null,
         val submitKey: String? = null,
         val dismiss: ComponentOption? = null,
+        val present: String? = null,
         val replay: Boolean = false,
     ) : ServerEvent
     data class InteractionResolved(val requestId: String, val optionId: String?, val values: Map<String, String>? = null, val dismissed: Boolean = false) : ServerEvent

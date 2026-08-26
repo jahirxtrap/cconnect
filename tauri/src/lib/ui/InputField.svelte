@@ -17,6 +17,8 @@
     minLines?: number;
     maxLines?: number;
     autofocus?: boolean;
+    numeric?: boolean;
+    error?: string | null;
     onClear?: (() => void) | null;
     clearAlways?: boolean;
     onkeydown?: (event: KeyboardEvent) => void;
@@ -35,6 +37,8 @@
     minLines = 1,
     maxLines,
     autofocus = false,
+    numeric = false,
+    error = null,
     onClear = null,
     clearAlways = false,
     onkeydown,
@@ -62,16 +66,19 @@
 <div class={className}>
   {#if label}
     <p class="mb-1.5 text-label-lg">
-      {label}{#if required}<span class="text-error"> *</span>{/if}
+      {label}{#if required}<span class="text-error">&nbsp;*</span>{/if}
     </p>
   {/if}
   <div
-    class="flex w-full items-center gap-2 rounded-md border-2 border-outline-variant px-3 py-2 transition-colors focus-within:border-accent"
+    class="flex w-full items-center gap-2 rounded-md border-2 px-3 py-2 transition-colors {error
+      ? 'border-error'
+      : 'border-outline-variant focus-within:border-accent'}"
   >
     {#if singleLine}
       <input
         bind:this={field}
         type={secret && !revealed ? "password" : "text"}
+        inputmode={numeric ? "decimal" : undefined}
         {value}
         {placeholder}
         {onkeydown}
@@ -118,4 +125,7 @@
     {/if}
     {@render trailing?.()}
   </div>
+  {#if error}
+    <p class="mt-1 text-body-sm text-error">{error}</p>
+  {/if}
 </div>

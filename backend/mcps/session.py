@@ -62,7 +62,10 @@ def make_tools(context: dict) -> list:
         if emit is not None and COMPONENTS in capabilities and windows:
             await emit({"type": "component", "blocks": await usage_blocks(account)})
         lines = [f"Plan: {data['plan']}"] if data.get("plan") else []
-        lines += [f"{window_label(win['id'])}: {round(win['percent'])}%" for win in windows]
+        lines += [
+            f"{window_label(win['id'])}: {round(win['percent'])}%" + (" (not used yet)" if win["unused"] else "")
+            for win in windows
+        ]
         return {"content": [{"type": "text", "text": "\n".join(lines) or "No usage data available."}]}
 
     tools.append(usage)

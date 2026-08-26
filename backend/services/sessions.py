@@ -590,6 +590,7 @@ def _parse_component_result(content: object) -> Optional[dict]:
     values = payload.get("values")
     return {
         "dismissed": not payload.get("submitted"),
+        "dismissed_by": payload.get("dismissed_by"),
         "values": values if isinstance(values, dict) and payload.get("submitted") else {},
     }
 
@@ -1259,6 +1260,7 @@ def get_session_messages(
                         "values": answered["values"],
                         "submitted": True,
                         "declined": answered["dismissed"],
+                        "dismissed_by": answered["dismissed_by"],
                     })
                     continue
                 if name == "ExitPlanMode" and isinstance(inp, dict):

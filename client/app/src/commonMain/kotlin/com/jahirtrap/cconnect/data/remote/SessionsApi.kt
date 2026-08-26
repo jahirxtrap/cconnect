@@ -172,6 +172,7 @@ object SessionsApi {
                 values = values,
                 submitted = !shown,
                 declined = o["declined"]?.jsonPrimitive?.booleanOrNull == true,
+                dismissedBy = o["dismissed_by"]?.jsonPrimitive?.contentOrNull,
             )
         }
         val res = o["resolved"]?.jsonPrimitive?.contentOrNull ?: "allow"

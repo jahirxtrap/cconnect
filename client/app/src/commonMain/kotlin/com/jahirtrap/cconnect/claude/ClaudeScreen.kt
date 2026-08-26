@@ -310,7 +310,8 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                                 current.windows.forEach { window ->
                                     MetricBar(
                                         title = usageWindowLabel(window.id),
-                                        subtitle = resetsLabel(window.resetsAt),
+                                        subtitle = if (window.unused) stringResource(Res.string.usage_unused)
+                                        else resetsLabel(window.resetsAt),
                                         percent = window.percent,
                                     )
                                 }

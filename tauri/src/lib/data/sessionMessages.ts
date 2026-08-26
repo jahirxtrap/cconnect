@@ -72,6 +72,8 @@ const parseInteraction = (raw: Wire): InteractionData => {
       submitLabel: text(raw, "submit"),
       submitKey: text(raw, "submit_key"),
       dismiss: toDismiss(raw.dismiss),
+      present: null,
+      dismissedBy: text(raw, "dismissed_by"),
       blocks: list(raw, "blocks").flatMap(toElement),
       values,
       submitted: !shown,

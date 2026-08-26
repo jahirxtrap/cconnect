@@ -50,7 +50,7 @@ object ClaudeApi {
 
     data class ActionResult(val ok: Boolean, val message: String)
 
-    data class UsageWindow(val id: String, val percent: Float, val resetsAt: String?)
+    data class UsageWindow(val id: String, val percent: Float, val resetsAt: String?, val unused: Boolean = false)
 
     data class Usage(val plan: String?, val windows: List<UsageWindow>, val error: String?)
 
@@ -65,6 +65,7 @@ object ClaudeApi {
                     id = w["id"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     percent = w["percent"]?.jsonPrimitive?.floatOrNull ?: 0f,
                     resetsAt = w["resets_at"]?.jsonPrimitive?.contentOrNull,
+                    unused = w["unused"]?.jsonPrimitive?.booleanOrNull == true,
                 )
             }.orEmpty(),
             error = o["error"]?.jsonPrimitive?.contentOrNull,

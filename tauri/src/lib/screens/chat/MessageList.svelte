@@ -33,7 +33,7 @@
     tabId: string;
     savedScroll: { top: number; follow: boolean };
     onScrollTop: (top: number, following: boolean) => void;
-    component: import("svelte").Snippet<[InteractionData]>;
+    component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
   }
 
   const {
@@ -214,21 +214,31 @@
     lastTop = container.scrollTop;
   };
 
-  const toggleExpanded = async (id: number) => {
-    const node = container?.querySelector<HTMLElement>(`[data-mid="${id}"]`);
+  const anchorGrowth = async (node: HTMLElement | null, grow: () => void) => {
     if (follow || !node || !container) {
-      expandedState[id] = !expandedState[id];
+      grow();
       return;
     }
     container.style.overflowAnchor = "none";
     const previousTop = node.getBoundingClientRect().top;
-    expandedState[id] = !expandedState[id];
+    const hold = () => shiftBy(node.getBoundingClientRect().top - previousTop);
+    const observer = new ResizeObserver(hold);
+    if (content) observer.observe(content);
+    grow();
     await tick();
-    shiftBy(node.getBoundingClientRect().top - previousTop);
-    requestAnimationFrame(() => {
-      if (container) container.style.overflowAnchor = "";
-    });
+    hold();
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => {
+        observer.disconnect();
+        if (container) container.style.overflowAnchor = "";
+      }),
+    );
   };
+
+  const toggleExpanded = (id: number) =>
+    anchorGrowth(container?.querySelector<HTMLElement>(`[data-mid="${id}"]`) ?? null, () => {
+      expandedState[id] = !expandedState[id];
+    });
 
   const measureScrollbar = () => {
     if (!container) return;
@@ -385,6 +395,7 @@
           labelMode={modeFor(item.role) === "label"}
           expanded={expandedState[item.id] ?? false}
           onToggle={() => toggleExpanded(item.id)}
+          onGrow={(grow, node) => anchorGrowth(node, grow)}
           {onAnswer}
           {onSharedLink}
           {component}

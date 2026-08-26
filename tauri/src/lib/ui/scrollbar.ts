@@ -37,8 +37,13 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
       if (child === thumb || !(child instanceof HTMLElement)) continue;
       end = Math.max(end, child.offsetLeft + Math.max(child.offsetWidth, child.scrollWidth));
     }
-    end += parseFloat(getComputedStyle(node).paddingRight) || 0;
-    return end > node.clientWidth ? end : node.scrollWidth;
+    if (end) end += parseFloat(getComputedStyle(node).paddingRight) || 0;
+    else {
+      thumb.style.display = "none";
+      end = node.scrollWidth;
+      thumb.style.display = "";
+    }
+    return Math.max(end, node.clientWidth);
   };
 
   const maxScroll = () => Math.max(0, contentWidth() - node.clientWidth);
@@ -46,8 +51,12 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   const render = () => {
     frame = 0;
     const max = maxScroll();
+    if (node.scrollLeft > max) node.scrollLeft = max;
     if (max <= 1 || (isTouch && !touchIndicator)) {
       thumb.style.opacity = "0";
+      thumb.style.transform = "";
+      thumb.style.width = "0px";
+      node.style.cursor = "";
       node.style.paddingBottom = basePadding ? `${basePadding}px` : "";
       return;
     }
@@ -56,6 +65,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     const size = (viewport / contentWidth()) * viewport;
     const offset = (node.scrollLeft / max) * (viewport - size);
     const alpha = !isTouch && (hovered || dragging) ? ACTIVE : IDLE;
+    node.style.cursor = hovered || dragging ? "pointer" : "";
     thumb.style.opacity = "1";
     thumb.style.height = `${thickness}px`;
     thumb.style.width = `${size}px`;
@@ -165,6 +175,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
       node.removeEventListener("click", onClick, true);
       node.removeEventListener("wheel", onWheel);
       onDragEnd();
+      node.style.cursor = "";
       thumb.remove();
     },
   };

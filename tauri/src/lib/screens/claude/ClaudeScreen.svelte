@@ -267,7 +267,7 @@
               {#each usage.windows as window (window.id)}
                 <MetricBar
                   title={usageWindowLabel(window.id)}
-                  subtitle={resetsLabel(window.resetsAt)}
+                  subtitle={window.unused ? t("USAGE_UNUSED") : resetsLabel(window.resetsAt)}
                   percent={window.percent}
                 />
               {/each}

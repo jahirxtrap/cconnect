@@ -78,6 +78,7 @@ backend/
 │   ├── accounts.py          # Accounts router request models
 │   └── chat.py              # Inbound WebSocket message models
 ├── mcps/                    # In-process MCP server (auto-registered tools) — see below
+│                            #   mcps/media.py holds no tool: it is the table of what each client renders inline
 └── services/
     ├── live_sessions.py     # In-memory LiveSession + SessionRegistry — turns decoupled from the WS connection; reattach by channel, idle reaper, seq'd outbox replay; message queue (enqueue/drain, carry-over)
     ├── claude_runtime.py    # SDK query() -> normalized event stream; system-prompt append; side-question + usage helpers; title generation; streaming-input drain injects queued messages (`dequeued`); PreCompact hook emits `compacting`; idle watchdog + stderr callback + result/exception classification emit `status` (`slow`/retry, suppressed during compact/tool/await) vs clean `error` (usage limits/auth)
@@ -314,9 +315,11 @@ Control/ephemeral messages (`ready`, `permission_mode`, `history_chunk`,
   is suppressed.
 - `interaction_request` (id, kind, options, free_text, title, tool_name, input,
   tool_use_id; `kind: "component"` carries `blocks` plus `submit` / `submit_key`
-  / `title_key` / `dismiss`) — per-tool permission prompts and anything answered
-  with a form. The form's `dismiss` (label + icon) is drawn as a wide button
-  under the send one; without it the block shows a close icon instead.
+  / `title_key` / `dismiss` / `present`) — per-tool permission prompts and anything
+  answered with a form. The form's `dismiss` (label + icon, optional `confirm`) is
+  drawn as a wide button under the send one; the close icon in the corner is always
+  there and always confirms. `present: "dialog"` asks in a dialog over the chat
+  instead of inline, and the answered block still lands in the conversation.
   `AskUserQuestion` is translated into component blocks by
   `services/questions.py` (one `page` per question, its `select`, the free-text
   field and its `notes`), so the client keeps a single renderer. Control labels
@@ -539,8 +542,55 @@ read fresh on every turn:
 | `check_progress` | Summarizes the latest session of another project into Done / Pending / Files touched / Next step. Runs an isolated SDK subquery in `AI_WORKDIR` with `haiku`. |
 | `compact` | Asks for compaction; it starts when the turn ends. Absent from the turn it triggers, so it can't chain. |
 | `usage` | Plan usage for the turn's account: returns the per-window percentages to the model and pushes the `usage` event so the chat draws the bars. |
-| `show_component` | Draws a read-only block in the chat (bars, text, media) through the turn's `emit` and returns at once — nothing to answer, so it never marks the chat as awaiting the user. Same elements as the form, minus the ones that carry a value. |
-| `ask_component` | Shows a form in the chat and waits for it. Elements: `text`, `select`, `input`, `toggle`, `notes`, `buttons`, `preview`, `page`; plus `dismiss` for a way out of the form, which replaces the close icon. Gated on the client's `components` capability, and `preview` only mentions rich media when the client also has `media.rich`. |
+| `show_component` | Draws a read-only block in the chat (bars, text, media, `group`) through the turn's `emit` and returns at once — nothing to answer, so it never marks the chat as awaiting the user. Same elements as the form, minus the ones that carry a value. |
+| `ask_component` | Shows a form in the chat and waits for it. Elements: `text`, `select`, `input`, `toggle`, `slider`, `color`, `path`, `file`, `notes`, `buttons`, `preview`, `page`, `group`, `bar`. Plus `dismiss` (a way out as a button, next to the close icon that is always there) and `present: inline \| dialog`. Gated on the client's `components` capability; `preview` describes only what that client renders inline (see **Component elements**). |
+
+## Component elements (`mcps/components.py`)
+
+`ask_component` and `show_component` share one element list. The contract is flat:
+**every value travels as a string** (the clients join a multi-selection with U+001F
+and split it back into a JSON array before sending), an `id` means the
+element carries a value, and control labels travel as keys (`title_key`,
+`label_key`, `placeholder_key`, `text_key`) for the client to translate.
+
+- **`show_if`** (`{id, equals | in | truthy}`) — the client hides the element while
+  the condition fails and **leaves it out of `values`** entirely, so the model can
+  tell "not applicable" from "left blank". A hidden field never blocks the submit, a
+  condition pointing at an unknown id keeps the element visible, and what the user
+  already typed survives toggling the condition off and back on.
+- **Validation** — `required`, `min` / `max`, `min_length` / `max_length` and
+  `pattern` are enforced **client-side**: the send button stays disabled and `error`
+  is the line the user reads. The backend does not re-check them.
+- **Answer shaping** — before handing `values` to the model, `ask_component` turns
+  `file` answers into absolute paths under `SHARED_DIR` (ready to read), parses
+  `slider` and `format: "number"` answers into real numbers, and splits `notes` into
+  their own map.
+- **Nesting** — `page` > `group` > leaves. `page` only at the root; a `group` holds
+  leaves. `_walk` recurses, so notes / file / numeric ids are found at any depth.
+- **Media** — `mcps/media.py` is the single table of what each client renders
+  inline. It builds both the `preview` line of the tool description and the
+  `{{RICH_MEDIA}}` note in `prompts/BLOCKS.md`, so a client that only links a PDF is
+  described as doing exactly that. Capabilities: `media.gallery`, `media.video`,
+  `media.audio`, `media.pdf`, `media.html`.
+
+### Adding an element
+
+The type list lives in four places and each new element touches eight to ten files.
+There is no generator, so this checklist is the control:
+
+1. `TYPES` + `LEAF` in `mcps/components.py`.
+2. Its line in `DESCRIPTION` (and in `SHOW_DESCRIPTION` when it reads as read-only).
+3. `ComponentElement` in `client/.../data/ChatModels.kt`.
+4. `toElement` in `client/.../data/remote/ChatSocket.kt` (`SessionsApi` reuses it).
+5. The `when` in `ComponentElements` (`client/.../chat/ChatBlocks.kt`).
+6. `ComponentElement` in `tauri/src/lib/data/chatModels.ts`.
+7. `toElement` in `tauri/src/lib/services/chatSocket.ts` (`sessionMessages` reuses it).
+8. The `{#if}` chain in `tauri/.../chat/blocks/ComponentBlock.svelte`.
+9. **The summary** — `componentSummary` and the `summary` derived in Tauri. It is a
+   `when` parallel to the render and the one that gets forgotten; skipping it is what
+   printed `secret` values verbatim into the chat.
+10. **The validation** — `componentMissing` / `missing`, if the element can be required.
+11. The four translation files, if the element brings text of its own.
 
 ## Session transcript transformation
 

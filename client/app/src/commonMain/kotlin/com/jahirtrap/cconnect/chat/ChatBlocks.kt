@@ -11,16 +11,20 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.text.selection.DisableSelection
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import com.jahirtrap.cconnect.ui.textHoverCursor
@@ -59,7 +63,11 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
 import com.jahirtrap.cconnect.ui.theme.shadowSm
+import androidx.compose.ui.input.pointer.PointerIcon
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import com.jahirtrap.cconnect.ui.TooltipIconButton
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -101,9 +109,32 @@ import com.jahirtrap.cconnect.data.InteractionOption
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.ui.ActionButton
+import com.jahirtrap.cconnect.data.ComponentConfirm
 import com.jahirtrap.cconnect.data.ComponentElement
 import com.jahirtrap.cconnect.data.componentAnswerable
+import com.jahirtrap.cconnect.data.componentBlocked
+import com.jahirtrap.cconnect.data.componentHidden
+import com.jahirtrap.cconnect.data.componentHiddenIds
+import com.jahirtrap.cconnect.data.componentInvalid
+import com.jahirtrap.cconnect.data.componentLeaves
+import com.jahirtrap.cconnect.data.toComponentNumber
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
+import com.jahirtrap.cconnect.files.AttachmentFile
+import com.jahirtrap.cconnect.files.pickFiles
+import com.jahirtrap.cconnect.ui.CollapsibleSection
+import com.jahirtrap.cconnect.ui.ColorDialog
+import com.jahirtrap.cconnect.ui.ColorOption
+import com.jahirtrap.cconnect.ui.CompactDialog
+import com.jahirtrap.cconnect.ui.ConfirmDialog
+import com.jahirtrap.cconnect.ui.PathPickerDialog
+import com.jahirtrap.cconnect.ui.SelectField
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Slider
+import androidx.compose.ui.text.input.KeyboardType
+import com.composables.icons.lucide.Folder
+import com.composables.icons.lucide.Palette
+import com.composables.icons.lucide.Paperclip
 import com.jahirtrap.cconnect.ui.IconButton
 import com.composables.icons.lucide.X
 import com.jahirtrap.cconnect.ui.CconnectBlockView
@@ -122,6 +153,7 @@ import com.jahirtrap.cconnect.ui.formatClock
 import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import com.jahirtrap.cconnect.ui.theme.palette
+import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalDensity
@@ -135,6 +167,8 @@ private val BIG = 16.dp
 private val SMALL = 6.dp
 
 private val PANEL_PAD = 14.dp
+
+private val SLIDER_THUMB = 14.dp
 
 private data class UserContent(
     val body: String,
@@ -207,7 +241,9 @@ fun ChatMessageItem(
     onComponentValue: ((String, String, String) -> Unit)? = null,
     onComponentPick: ((String, String, String, Boolean) -> Unit)? = null,
     onSubmitComponent: ((String, String?) -> Unit)? = null,
-    onDiscardComponent: ((String, Boolean) -> Unit)? = null,
+    onDiscardComponent: ((String, String) -> Unit)? = null,
+    onComponentUpload: (suspend (AttachmentFile) -> String?)? = null,
+    componentColors: List<String> = emptyList(),
     onSharedLink: ((String, String) -> Unit)? = null,
     gluedTop: Boolean = false,
     showTime: Boolean = true,
@@ -292,12 +328,14 @@ fun ChatMessageItem(
                 if (it.kind == "component") {
                     ComponentBlock(
                         data = it,
+                        colors = componentColors,
                         onValue = { id, value -> onComponentValue?.invoke(it.requestId, id, value) },
                         onPick = { id, value, multiple -> onComponentPick?.invoke(it.requestId, id, value, multiple) },
                         onSubmit = { action -> onSubmitComponent?.invoke(it.requestId, action) },
-                        onDismiss = { dirty -> onDiscardComponent?.invoke(it.requestId, dirty) },
+                        onDismiss = { via -> onDiscardComponent?.invoke(it.requestId, via) },
                         onPage = { page -> onComponentPage?.invoke(it.requestId, page) },
                         onSharedLink = onSharedLink,
+                        onUpload = onComponentUpload,
                     )
                 } else {
                     InteractionBlock(data = it, toolName = message.toolName, input = message.text, expanded = expanded, onToggle = onToggle, onAnswer = onAnswer)
@@ -869,35 +907,87 @@ private fun diffStyleFor(kind: DiffKind, defaultFg: Color): Triple<Color, Color,
 
 private data class ComponentRow(val label: String, val value: String, val note: Boolean)
 
-private fun componentElements(blocks: List<ComponentElement>): List<ComponentElement> =
-    blocks.flatMap { if (it.type == "page") componentElements(it.blocks) else listOf(it) }
-
-private fun componentSummary(data: InteractionData, yes: String, no: String): List<ComponentRow> =
-    componentElements(data.blocks).mapNotNull { element ->
+private fun componentSummary(data: InteractionData, yes: String, no: String): List<ComponentRow> {
+    val hidden = componentHiddenIds(data.blocks, data.values)
+    return componentLeaves(data.blocks).mapNotNull { element ->
         val id = element.id ?: return@mapNotNull null
+        if (id in hidden) return@mapNotNull null
         val raw = data.values[id].orEmpty()
         if (raw.isEmpty()) return@mapNotNull null
-        val value = when (element.type) {
-            "select", "buttons" -> raw.split(VALUE_SEPARATOR)
+        val value = when {
+            element.secret -> "•".repeat(minOf(raw.length, 12))
+            element.type == "select" || element.type == "buttons" -> raw.split(VALUE_SEPARATOR)
                 .filter { it.isNotEmpty() }
                 .map { picked -> element.options.firstOrNull { it.value == picked }?.label ?: picked }
                 .joinToString(", ")
-            "toggle" -> if (raw == "true") yes else no
+
+            element.type == "toggle" -> if (raw == "true") yes else no
+            element.type == "file" -> raw.split(VALUE_SEPARATOR)
+                .filter { it.isNotEmpty() }
+                .joinToString(", ") { path -> path.substringAfterLast('/').substringAfterLast('\\') }
+
             else -> raw
         }
         if (value.isBlank()) null else ComponentRow(element.label.orEmpty(), value, element.type == "notes")
     }
+}
 
-private fun componentMissing(data: InteractionData): Boolean = data.blocks.any { componentMissing(it, data.values) }
+private fun snapToStep(value: Float, min: Float, step: Float?): Float {
+    val size = step ?: 1f
+    if (size <= 0f) return value
+    return min + ((value - min) / size).roundToInt() * size
+}
 
-private fun componentMissing(element: ComponentElement, values: Map<String, String>): Boolean = when (element.type) {
-    "page" -> {
-        val answerable = componentElements(element.blocks).filter { it.type != "notes" }
-        (element.required && answerable.none { !values[it.id.orEmpty()].isNullOrEmpty() }) ||
-            element.blocks.any { componentMissing(it, values) }
+@Composable
+private fun PickerRow(
+    label: AnnotatedString,
+    value: String,
+    enabled: Boolean,
+    filled: Boolean,
+    onClick: () -> Unit,
+    onClear: () -> Unit,
+    icon: @Composable () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.item))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(start = 8.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon()
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TooltipIconButton(
+            label = stringResource(Res.string.clear),
+            onClick = onClear,
+            enabled = enabled && filled,
+            size = 24.dp,
+            tooltip = false,
+        ) {
+            Icon(
+                Lucide.X,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(16.dp),
+            )
+        }
     }
-    "buttons" -> false
-    else -> element.required && values[element.id.orEmpty()].isNullOrEmpty()
 }
 
 @Composable
@@ -916,25 +1006,32 @@ private fun componentText(key: String?, many: Boolean = false): String? = when (
     "other" -> stringResource(Res.string.interaction_other_hint)
     "notes" -> stringResource(Res.string.interaction_notes_hint)
     "add_notes" -> stringResource(Res.string.add_notes)
+    "unused" -> stringResource(Res.string.usage_unused)
     else -> null
 }
+
+private data class ComponentAsk(val confirm: ComponentConfirm, val run: () -> Unit)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ComponentBlock(
     data: InteractionData,
+    colors: List<String>,
     onSharedLink: ((String, String) -> Unit)?,
     onValue: (String, String) -> Unit,
     onPick: (String, String, Boolean) -> Unit,
     onSubmit: (String?) -> Unit,
-    onDismiss: (Boolean) -> Unit,
+    onDismiss: (String) -> Unit,
     onPage: (Int) -> Unit,
+    onUpload: (suspend (AttachmentFile) -> String?)?,
 ) {
     val actions = data.blocks.firstOrNull { it.type == "buttons" }
     val pages = data.blocks.filter { it.type == "page" }
     val dismissOption = data.dismiss
     val answerable = componentAnswerable(data.blocks)
     val heading = componentText(data.titleKey) ?: data.title.orEmpty()
+    val open = !data.submitted && !data.declined
+    val asDialog = data.present == "dialog" && open && answerable
     val scope = rememberCoroutineScope()
     val anchorPage = LocalAnchorPage.current
     val pagerState = rememberPagerState(
@@ -946,6 +1043,166 @@ private fun ComponentBlock(
     LaunchedEffect(pagerState) {
         snapshotFlow { pagerState.isScrollInProgress }.drop(1).collect { anchorPage() }
     }
+
+    var asking by remember { mutableStateOf<ComponentAsk?>(null) }
+    val confirmWord = stringResource(Res.string.confirm)
+    val discard = ComponentConfirm(
+        title = stringResource(Res.string.cancel),
+        text = stringResource(Res.string.component_discard_confirm),
+        confirmLabel = stringResource(Res.string.discard),
+    )
+    asking?.let { ask ->
+        ConfirmDialog(
+            title = ask.confirm.title ?: confirmWord,
+            text = ask.confirm.text,
+            confirmLabel = ask.confirm.confirmLabel ?: confirmWord,
+            onConfirm = { asking = null; ask.run() },
+            onDismiss = { asking = null },
+        )
+    }
+    val act: (ComponentConfirm?, () -> Unit) -> Unit = { confirm, run ->
+        if (confirm != null) asking = ComponentAsk(confirm, run) else run()
+    }
+    val close = { asking = ComponentAsk(discard) { onDismiss("close") } }
+
+    val ready = !componentBlocked(data.blocks, data.values)
+    val pending = pages.size > 1 && pagerState.settledPage < pages.lastIndex
+    val shownActions = actions?.options.orEmpty().filter { !pending || it.style == "plain" }
+    val submitText = data.submitLabel?.takeIf { it.isNotBlank() }
+        ?: componentText(data.submitKey, pages.size > 1)
+        ?: stringResource(Res.string.send)
+    val cancelText = stringResource(Res.string.cancel)
+    val yes = stringResource(Res.string.yes)
+    val no = stringResource(Res.string.no)
+    val nextText = stringResource(Res.string.next)
+
+    val body: @Composable () -> Unit = {
+        when {
+            data.declined -> {
+                val byButton = data.dismissedBy == "button" && dismissOption != null
+                SummaryLine(
+                    (if (byButton) componentIcon(dismissOption?.icon) else null) ?: Lucide.X,
+                    10.dp,
+                    if (byButton) {
+                        dismissOption?.let { it.label.ifBlank { componentText(it.labelKey).orEmpty() } }.orEmpty()
+                    } else {
+                        cancelText
+                    },
+                )
+            }
+
+            data.submitted -> Column {
+                componentSummary(data, yes, no).forEach { row ->
+                    if (row.note) {
+                        SummaryLine(Lucide.CornerDownRight, 12.dp, row.value, indent = 16.dp, top = 2.dp)
+                    } else {
+                        Spacer(Modifier.height(2.dp))
+                        if (row.label.isNotBlank()) {
+                            Text(row.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                        }
+                        SummaryLine(CustomIcons.PlayFilled, 10.dp, row.value.ifBlank { "—" })
+                    }
+                }
+            }
+
+            pages.size > 1 -> Column {
+                LaunchedEffect(pagerState.settledPage) { onPage(pagerState.settledPage) }
+                ComponentTabs(pages, pagerState)
+                Spacer(Modifier.height(10.dp))
+                HorizontalPager(
+                    state = pagerState,
+                    verticalAlignment = Alignment.Top,
+                    pageSpacing = PANEL_PAD,
+                ) { page ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        ComponentElements(pages[page].blocks, data, colors, onSharedLink, onValue, onPick, onUpload)
+                    }
+                }
+            }
+
+            pages.size == 1 -> Column {
+                pages[0].label?.takeIf { it.isNotBlank() }?.let {
+                    HeaderChip(it)
+                    Spacer(Modifier.height(3.dp))
+                }
+                ComponentElements(pages[0].blocks, data, colors, onSharedLink, onValue, onPick, onUpload)
+            }
+
+            else -> ComponentElements(data.blocks, data, colors, onSharedLink, onValue, onPick, onUpload)
+        }
+    }
+
+    val controls: @Composable (Boolean) -> Unit = { inline ->
+        if (pending) {
+            val next = {
+                anchorPage()
+                scope.launch { pagerState.goToPage(pagerState.currentPage + 1) }
+                Unit
+            }
+            if (inline) ActionButton(text = nextText, onClick = next, modifier = Modifier.fillMaxWidth())
+            else Button(onClick = next) { Text(nextText) }
+        }
+        if (shownActions.isNotEmpty()) {
+            if (pending && inline) Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                shownActions.forEach { option ->
+                    Button(
+                        onClick = { act(option.confirm) { onSubmit(option.value) } },
+                        modifier = Modifier.height(32.dp),
+                        variant = if (option.style == "primary") ButtonVariant.Filled else ButtonVariant.Outlined,
+                        enabled = ready || option.style == "plain",
+                    ) {
+                        componentIcon(option.icon)?.let { icon ->
+                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.size(8.dp))
+                        }
+                        Text(
+                            option.label.ifBlank { componentText(option.labelKey, pages.size > 1).orEmpty() },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                }
+            }
+        } else if (actions == null && !pending && answerable) {
+            if (inline) {
+                ActionButton(
+                    text = submitText,
+                    onClick = { onSubmit(null) },
+                    enabled = ready,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Button(onClick = { onSubmit(null) }, enabled = ready) { Text(submitText) }
+            }
+        }
+        if (dismissOption != null) {
+            val label = dismissOption.label.ifBlank { componentText(dismissOption.labelKey).orEmpty() }
+            val leave = { act(dismissOption.confirm) { onDismiss("button") } }
+            if (inline) {
+                Spacer(Modifier.height(8.dp))
+                ActionButton(
+                    text = label,
+                    onClick = leave,
+                    icon = componentIcon(dismissOption.icon),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Button(onClick = leave, variant = ButtonVariant.Outlined) { Text(label) }
+            }
+        }
+    }
+
+    if (asDialog) {
+        CompactDialog(
+            onDismiss = close,
+            title = heading.ifBlank { stringResource(Res.string.questions_title) },
+            buttons = { controls(false) },
+        ) {
+            body()
+        }
+        return
+    }
+
     OutlinedPanel(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).clipToBounds()
             .layout { measurable, constraints ->
@@ -954,7 +1211,7 @@ private fun ComponentBlock(
                 layout(placeable.width, height) { placeable.place(0, 0) }
             },
     ) {
-        val closable = !data.submitted && answerable && dismissOption == null
+        val closable = open && answerable
         if (heading.isNotBlank() || closable) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                 if (heading.isNotBlank()) {
@@ -976,11 +1233,10 @@ private fun ComponentBlock(
                     Spacer(Modifier.weight(1f))
                 }
                 if (closable) {
-                    val dirty = data.values.values.any { it.isNotEmpty() }
-                    IconButton(onClick = { onDismiss(dirty) }, modifier = Modifier.size(24.dp)) {
+                    IconButton(onClick = close, modifier = Modifier.size(24.dp)) {
                         Icon(
                             Lucide.X,
-                            contentDescription = stringResource(Res.string.cancel),
+                            contentDescription = cancelText,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp),
                         )
@@ -989,104 +1245,10 @@ private fun ComponentBlock(
             }
             Spacer(Modifier.height(4.dp))
         }
-        if (data.declined) {
-            SummaryLine(
-                componentIcon(dismissOption?.icon) ?: Lucide.X,
-                10.dp,
-                dismissOption?.let { it.label.ifBlank { componentText(it.labelKey).orEmpty() } }
-                    ?: stringResource(Res.string.cancel),
-            )
-            return@OutlinedPanel
-        }
-        if (data.submitted) {
-            componentSummary(data, stringResource(Res.string.yes), stringResource(Res.string.no)).forEach { row ->
-                if (row.note) {
-                    SummaryLine(Lucide.CornerDownRight, 12.dp, row.value, indent = 16.dp, top = 2.dp)
-                    return@forEach
-                }
-                Spacer(Modifier.height(2.dp))
-                if (row.label.isNotBlank()) {
-                    Text(row.label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
-                }
-                SummaryLine(CustomIcons.PlayFilled, 10.dp, row.value.ifBlank { "—" })
-            }
-            return@OutlinedPanel
-        }
-        if (pages.size > 1) {
-            LaunchedEffect(pagerState.settledPage) { onPage(pagerState.settledPage) }
-            ComponentTabs(pages, pagerState)
-            Spacer(Modifier.height(10.dp))
-            HorizontalPager(
-                state = pagerState,
-                verticalAlignment = Alignment.Top,
-                pageSpacing = PANEL_PAD,
-            ) { page ->
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    ComponentElements(pages[page].blocks, data, onSharedLink, onValue, onPick)
-                }
-            }
-        } else if (pages.size == 1) {
-            pages[0].label?.takeIf { it.isNotBlank() }?.let {
-                HeaderChip(it)
-                Spacer(Modifier.height(3.dp))
-            }
-            ComponentElements(pages[0].blocks, data, onSharedLink, onValue, onPick)
-        } else {
-            ComponentElements(data.blocks, data, onSharedLink, onValue, onPick)
-        }
-        Spacer(Modifier.height(8.dp))
-        val ready = !componentMissing(data)
-        val pending = pages.size > 1 && pagerState.settledPage < pages.lastIndex
-        if (pending) {
-            ActionButton(
-                text = stringResource(Res.string.next),
-                onClick = {
-                    anchorPage()
-                    scope.launch { pagerState.goToPage(pagerState.currentPage + 1) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        val shown = actions?.options.orEmpty().filter { !pending || it.style == "plain" }
-        if (shown.isNotEmpty()) {
-            if (pending) Spacer(Modifier.height(8.dp))
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                shown.forEach { option ->
-                    Button(
-                        onClick = { onSubmit(option.value) },
-                        modifier = Modifier.height(32.dp),
-                        variant = if (option.style == "primary") ButtonVariant.Filled else ButtonVariant.Outlined,
-                        enabled = ready || option.style == "plain",
-                    ) {
-                        componentIcon(option.icon)?.let { icon ->
-                            Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.size(8.dp))
-                        }
-                        Text(
-                            option.label.ifBlank { componentText(option.labelKey, pages.size > 1).orEmpty() },
-                            style = MaterialTheme.typography.bodyMedium,
-                        )
-                    }
-                }
-            }
-        } else if (actions == null && !pending && answerable) {
-            ActionButton(
-                text = data.submitLabel?.takeIf { it.isNotBlank() }
-                    ?: componentText(data.submitKey, pages.size > 1)
-                    ?: stringResource(Res.string.send),
-                onClick = { onSubmit(null) },
-                enabled = ready,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (dismissOption != null) {
+        body()
+        if (open) {
             Spacer(Modifier.height(8.dp))
-            ActionButton(
-                text = dismissOption.label.ifBlank { componentText(dismissOption.labelKey).orEmpty() },
-                onClick = { onDismiss(data.values.values.any { it.isNotEmpty() }) },
-                icon = componentIcon(dismissOption.icon),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            controls(true)
         }
     }
 }
@@ -1118,17 +1280,22 @@ private suspend fun PagerState.goToPage(index: Int) {
 private fun ComponentElements(
     elements: List<ComponentElement>,
     data: InteractionData,
+    colors: List<String>,
     onSharedLink: ((String, String) -> Unit)?,
     onValue: (String, String) -> Unit,
     onPick: (String, String, Boolean) -> Unit,
+    onUpload: (suspend (AttachmentFile) -> String?)?,
 ) {
     val shown = elements.filter { element ->
+        if (componentHidden(element, data.values)) return@filter false
         when (element.type) {
             "text" -> !element.text.isNullOrBlank()
             "preview" -> element.block?.let { parseCconnectBlock(it) } != null
             else -> true
         }
     }
+    val invalidText = stringResource(Res.string.invalid_value)
+    val anchorPage = LocalAnchorPage.current
     Column(verticalArrangement = Arrangement.spacedBy(SMALL)) {
         shown.forEach { element ->
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1141,37 +1308,242 @@ private fun ComponentElements(
                     }
                 }
 
+                "group" -> {
+                    val key = element.id ?: element.label.orEmpty()
+                    var open by rememberSaveable(data.requestId, key) { mutableStateOf(element.open) }
+                    CollapsibleSection(
+                        label = element.label.orEmpty(),
+                        open = open,
+                        marked = componentBlocked(element.blocks, data.values),
+                        onToggle = { anchorPage(); open = !open },
+                    ) {
+                        ComponentElements(element.blocks, data, colors, onSharedLink, onValue, onPick, onUpload)
+                    }
+                }
+
                 "select" -> {
                     val id = element.id.orEmpty()
                     val picked = data.values[id].orEmpty().split(VALUE_SEPARATOR).filter { part -> part.isNotEmpty() }.toSet()
-                    if (!element.label.isNullOrBlank()) {
+                    val dropdown = element.display == "dropdown" && !element.multiple
+                    if (!element.label.isNullOrBlank() && !dropdown) {
                         Text(componentLabel(element), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                     }
-                    element.options.forEach { option ->
-                        val selected = option.value in picked
-                        OptionRow(
-                            label = option.label,
-                            onClick = { if (!data.submitted) onPick(id, option.value, element.multiple) },
-                            description = option.description,
-                            selected = selected,
-                            multi = element.multiple,
+                    if (dropdown) {
+                        val chosen = data.values[id].orEmpty()
+                        SelectField(
+                            label = element.label.orEmpty(),
+                            selected = chosen,
+                            options = element.options.map { it.value to it.label },
+                            enabled = !data.submitted,
+                            shown = element.options.firstOrNull { it.value == chosen }?.label
+                                ?: stringResource(Res.string.select_option),
+                            onSelect = { onPick(id, it, false) },
                         )
-                        if (selected && !option.preview.isNullOrBlank()) PreviewBox(option.preview)
+                    } else {
+                        element.options.forEach { option ->
+                            val selected = option.value in picked
+                            OptionRow(
+                                label = option.label,
+                                onClick = { if (!data.submitted) onPick(id, option.value, element.multiple) },
+                                description = option.description,
+                                selected = selected,
+                                multi = element.multiple,
+                            )
+                            if (selected && !option.preview.isNullOrBlank()) PreviewBox(option.preview)
+                        }
                     }
                 }
 
                 "input" -> {
                     val id = element.id.orEmpty()
+                    val raw = data.values[id].orEmpty()
                     InputField(
-                        value = data.values[id].orEmpty(),
+                        value = raw,
                         onValueChange = { if (!data.submitted) onValue(id, it) },
                         label = element.label?.takeIf { it.isNotBlank() }?.let { { Text(componentLabel(element)) } },
                         placeholder = element.placeholder ?: componentText(element.placeholderKey),
                         singleLine = element.lines == null && !element.multiline,
                         minLines = element.lines ?: 1,
                         maxLines = element.lines ?: if (element.multiline) 6 else 1,
+                        keyboardOptions = if (element.format == "number") {
+                            KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        } else {
+                            KeyboardOptions.Default
+                        },
                         secret = element.secret,
+                        error = (element.error ?: invalidText)
+                            .takeIf { raw.isNotEmpty() && componentInvalid(element, data.values) },
                     )
+                }
+
+                "slider" -> {
+                    val id = element.id.orEmpty()
+                    val min = element.min ?: 0f
+                    val max = element.max ?: 100f
+                    val current = (data.values[id]?.toFloatOrNull() ?: min).coerceIn(min, max)
+                    if (!element.label.isNullOrBlank()) {
+                        Text(componentLabel(element), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        val fraction = if (max > min) ((current - min) / (max - min)).coerceIn(0f, 1f) else 0f
+                        val filled = if (data.submitted) {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                        Slider(
+                            value = current,
+                            onValueChange = { raw ->
+                                if (!data.submitted) onValue(id, snapToStep(raw, min, element.step).toComponentNumber())
+                            },
+                            valueRange = min..max,
+                            enabled = !data.submitted,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(20.dp)
+                                .pointerHoverIcon(if (data.submitted) PointerIcon.Default else PointerIcon.Hand),
+                            thumb = { Box(Modifier.size(SLIDER_THUMB).clip(CircleShape).background(filled)) },
+                            track = { _ ->
+                                BoxWithConstraints(
+                                    modifier = Modifier
+                                        .layout { measurable, constraints ->
+                                            val width = constraints.maxWidth + SLIDER_THUMB.roundToPx()
+                                            val placeable =
+                                                measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+                                            layout(constraints.maxWidth, placeable.height) {
+                                                placeable.place(-SLIDER_THUMB.roundToPx() / 2, 0)
+                                            }
+                                        }
+                                        .height(4.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.outlineVariant),
+                                ) {
+                                    val reach = (maxWidth - SLIDER_THUMB) * fraction + SLIDER_THUMB / 2
+                                    Box(
+                                        Modifier
+                                            .width(reach)
+                                            .fillMaxHeight()
+                                            .clip(CircleShape)
+                                            .background(filled),
+                                    )
+                                }
+                            },
+                        )
+                        if (element.display != "bare") {
+                            Spacer(Modifier.width(12.dp))
+                            Text(
+                                current.toComponentNumber(),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.widthIn(min = 28.dp),
+                            )
+                        }
+                    }
+                }
+
+                "color" -> {
+                    val id = element.id.orEmpty()
+                    val name = data.values[id].orEmpty()
+                    var picking by rememberSaveable(data.requestId, id) { mutableStateOf(false) }
+                    if (picking) {
+                        ColorDialog(
+                            title = element.label ?: stringResource(Res.string.color),
+                            options = colors.mapNotNull { entry ->
+                                sessionColorOf(entry)?.let { ColorOption(entry, it, entry) }
+                            },
+                            selected = name.ifEmpty { null },
+                            onSelect = { onValue(id, it.orEmpty()) },
+                            onDismiss = { picking = false },
+                        )
+                    }
+                    PickerRow(
+                        label = componentLabel(element),
+                        value = name.ifEmpty { stringResource(Res.string.choose) },
+                        enabled = !data.submitted,
+                        filled = name.isNotEmpty(),
+                        onClick = { picking = true },
+                        onClear = { onValue(id, "") },
+                    ) {
+                        val swatch = sessionColorOf(name)
+                        if (swatch != null) {
+                            Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(swatch))
+                        } else {
+                            Icon(
+                                Lucide.Palette,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+                    }
+                }
+
+                "path" -> {
+                    val id = element.id.orEmpty()
+                    var browsing by rememberSaveable(data.requestId, id) { mutableStateOf(false) }
+                    if (browsing) {
+                        PathPickerDialog(
+                            onConfirm = { onValue(id, it); browsing = false },
+                            onDismiss = { browsing = false },
+                            files = element.pick == "file",
+                            start = element.start.orEmpty(),
+                        )
+                    }
+                    PickerRow(
+                        label = componentLabel(element),
+                        value = data.values[id]?.takeIf { it.isNotEmpty() } ?: stringResource(Res.string.choose),
+                        enabled = !data.submitted,
+                        filled = !data.values[id].isNullOrEmpty(),
+                        onClick = { browsing = true },
+                        onClear = { onValue(id, "") },
+                    ) {
+                        Icon(
+                            Lucide.Folder,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
+                }
+
+                "file" -> {
+                    val id = element.id.orEmpty()
+                    val scope = rememberCoroutineScope()
+                    var busy by rememberSaveable(data.requestId, id) { mutableStateOf(false) }
+                    val names = data.values[id].orEmpty()
+                        .split(VALUE_SEPARATOR)
+                        .filter { it.isNotEmpty() }
+                        .joinToString(", ") { path -> path.substringAfterLast('/').substringAfterLast('\\') }
+                    PickerRow(
+                        label = componentLabel(element),
+                        value = when {
+                            busy -> stringResource(Res.string.uploading)
+                            names.isNotEmpty() -> names
+                            else -> stringResource(Res.string.choose)
+                        },
+                        enabled = !data.submitted && !busy && onUpload != null,
+                        filled = names.isNotEmpty(),
+                        onClear = { onValue(id, "") },
+                        onClick = {
+                            val upload = onUpload ?: return@PickerRow
+                            scope.launch {
+                                val files = pickFiles()
+                                if (files.isEmpty()) return@launch
+                                busy = true
+                                val saved = files.mapNotNull { upload(it) }
+                                busy = false
+                                if (saved.isNotEmpty()) onValue(id, saved.joinToString(VALUE_SEPARATOR))
+                            }
+                        },
+                    ) {
+                        Icon(
+                            Lucide.Paperclip,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    }
                 }
 
                 "toggle" -> {
@@ -1190,9 +1562,11 @@ private fun ComponentElements(
                         element.alertBelow?.let { percent <= it } == true
                     MetricBar(
                         title = element.label.orEmpty(),
-                        subtitle = element.text.orEmpty(),
+                        subtitle = element.text?.takeIf { it.isNotBlank() }
+                            ?: componentText(element.textKey).orEmpty(),
                         percent = percent,
                         color = if (alerting) palette.red else sessionColorOf(element.color) ?: MaterialTheme.colorScheme.primary,
+                        showValue = element.display != "bare",
                     )
                 }
 

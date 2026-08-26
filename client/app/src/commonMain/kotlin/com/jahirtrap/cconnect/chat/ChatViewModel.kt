@@ -29,6 +29,8 @@ import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.CommandOption
 import com.jahirtrap.cconnect.data.CompactData
 import com.jahirtrap.cconnect.data.ComponentElement
+import com.jahirtrap.cconnect.data.componentValues
+import com.jahirtrap.cconnect.data.toComponentNumber
 import com.jahirtrap.cconnect.data.DiffLine
 import com.jahirtrap.cconnect.data.InteractionData
 import com.jahirtrap.cconnect.data.InteractionOption
@@ -649,6 +651,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         if (_state.value.uploadingAttachments) return
         _state.update { it.copy(attachments = it.attachments.filterNot { a -> a.id == id }) }
     }
+
+    suspend fun uploadComponentFile(file: AttachmentFile): String? =
+        uploadAttachment(file = file, path = "uploads/${file.name}") {}
 
     fun stop() {
         if (_state.value.uploadingAttachments) {
@@ -2019,24 +2024,26 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         submitLabel = event.submitLabel,
         submitKey = event.submitKey,
         dismiss = event.dismiss,
-        values = componentValues(event.blocks),
+        present = event.present,
+        values = componentDefaults(event.blocks),
     )
 
     private fun componentHeadline(blocks: List<ComponentElement>): String? = blocks.firstNotNullOfOrNull { element ->
         if (element.type == "page") componentHeadline(element.blocks) else element.text?.takeIf { element.type == "text" }
     }
 
-    private fun componentValues(blocks: List<ComponentElement>): Map<String, String> {
+    private fun componentDefaults(blocks: List<ComponentElement>): Map<String, String> {
         val out = mutableMapOf<String, String>()
         for (element in blocks) {
-            if (element.type == "page") {
-                out += componentValues(element.blocks)
+            if (element.type == "page" || element.type == "group") {
+                out += componentDefaults(element.blocks)
                 continue
             }
             val id = element.id ?: continue
             when (element.type) {
-                "input", "notes" -> out[id] = element.value.orEmpty()
+                "input", "notes", "path", "file", "color" -> out[id] = element.value.orEmpty()
                 "toggle" -> out[id] = element.checked.toString()
+                "slider" -> out[id] = element.value ?: (element.min ?: 0f).toComponentNumber()
             }
         }
         return out
@@ -2065,7 +2072,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         if (data.submitted) return
         val values = data.values.toMutableMap()
         action?.let { (data.blocks.firstOrNull { el -> el.type == "buttons" }?.id)?.let { id -> values[id] = it } }
-        client.sendComponentResponse(requestId, values.filterValues { it.isNotEmpty() })
+        client.sendComponentResponse(requestId, componentValues(data.blocks, values))
         updateInteraction(requestId) { it.copy(submitted = true, values = values) }
     }
 
@@ -2171,11 +2178,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     fun setActivePage(requestId: String, index: Int) =
         updateInteraction(requestId) { if (it.submitted || it.activePage == index) it else it.copy(activePage = index) }
 
-    fun chatQuestions(requestId: String) {
+    fun chatQuestions(requestId: String, dismissedBy: String = "close") {
         val data = findInteraction(requestId) ?: return
         if (data.submitted) return
-        client.sendQuestionsChat(requestId)
-        updateInteraction(requestId) { it.copy(submitted = true, declined = true) }
+        client.sendQuestionsChat(requestId, dismissedBy)
+        updateInteraction(requestId) { it.copy(submitted = true, declined = true, dismissedBy = dismissedBy) }
     }
 
     override fun onCleared() {

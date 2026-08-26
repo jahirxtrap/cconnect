@@ -501,15 +501,18 @@
   />
 {/snippet}
 
-{#snippet component(data: InteractionData)}
+{#snippet component(data: InteractionData, onGrow: (grow: () => void, anchor: HTMLElement | null) => void)}
   <ComponentBlock
     {data}
+    {onGrow}
+    colors={chat.capabilities?.colors ?? []}
     onValue={(id, value) => chat.setComponentValue(data.requestId, id, value)}
     onPick={(id, value, multiple) => chat.toggleComponentOption(data.requestId, id, value, multiple)}
     onSubmit={(action) => chat.submitComponent(data.requestId, action)}
-    onDismiss={() => chat.declineQuestions(data.requestId)}
+    onDismiss={(via) => chat.declineQuestions(data.requestId, via)}
     onPage={(index) => chat.setActivePage(data.requestId, index)}
     onPreviewOpen={(url, filename) => (sharedLink = { url, filename })}
+    onUpload={(file, onProgress) => chat.uploadComponentFile(file, onProgress)}
   />
 {/snippet}
 

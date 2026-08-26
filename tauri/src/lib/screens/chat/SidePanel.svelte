@@ -18,7 +18,7 @@
     onClear: () => void;
     onClose: () => void;
     onAnswer: (requestId: string, optionId: string) => void;
-    component?: import("svelte").Snippet<[InteractionData]>;
+    component?: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
   }
 
   const {

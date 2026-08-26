@@ -433,6 +433,7 @@ async def chat_ws(ws: WebSocket):
                         "free_text": raw.get("free_text"),
                         "values": raw.get("values"),
                         "chat": raw.get("chat"),
+                        "dismissed_by": raw.get("dismissed_by"),
                     }
                     for s in (session, side_session):
                         if s is not None and s.resolve(rid, payload):

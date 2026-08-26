@@ -1,11 +1,13 @@
 import { chatListFor } from "$lib/data/chatList.svelte";
 import {
+  componentValues,
   emptyInteraction,
   isPending,
   message as newMessage,
   VALUE_SEPARATOR,
   type ChatMessage,
   type ComponentElement,
+  type ComponentType,
   type ConnectionState,
   type InteractionData,
   type InteractionOption,
@@ -17,13 +19,18 @@ import type { ChatCategory, ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 
+const PREFILLED_TYPES = new Set<ComponentType>(["input", "notes", "path", "file", "color"]);
+
 const componentDefaults = (blocks: ComponentElement[]): Record<string, string> =>
   Object.fromEntries(
     blocks.flatMap((element): [string, string][] => {
-      if (element.type === "page") return Object.entries(componentDefaults(element.blocks));
+      if (element.type === "page" || element.type === "group") {
+        return Object.entries(componentDefaults(element.blocks));
+      }
       if (!element.id) return [];
-      if (element.type === "input" || element.type === "notes") return [[element.id, element.value ?? ""]];
       if (element.type === "toggle") return [[element.id, String(element.checked)]];
+      if (element.type === "slider") return [[element.id, element.value ?? String(element.min ?? 0)]];
+      if (PREFILLED_TYPES.has(element.type)) return [[element.id, element.value ?? ""]];
       return [];
     }),
   );
@@ -373,6 +380,10 @@ export class ChatState {
         progress: 0,
       })),
     ];
+  }
+
+  uploadComponentFile(file: File, onProgress: (value: number) => void) {
+    return uploadAttachment(file, onProgress, this.environment, `${UPLOAD_DIR}/${file.name}`);
   }
 
   removeAttachment(id: number) {
@@ -787,16 +798,20 @@ export class ChatState {
     const values = { ...data.values };
     const actionId = data.blocks.find((element) => element.type === "buttons")?.id;
     if (action && actionId) values[actionId] = action;
-    const filled = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ""));
-    this.#socket.sendComponentResponse(requestId, filled);
+    this.#socket.sendComponentResponse(requestId, componentValues(data.blocks, values));
     this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, values }));
   }
 
-  declineQuestions(requestId: string) {
+  declineQuestions(requestId: string, dismissedBy: "button" | "close" = "close") {
     const data = this.#findInteraction(requestId);
     if (!data || data.submitted) return;
-    this.#socket.sendQuestionsChat(requestId);
-    this.#updateInteraction(requestId, (current) => ({ ...current, submitted: true, declined: true }));
+    this.#socket.sendQuestionsChat(requestId, dismissedBy);
+    this.#updateInteraction(requestId, (current) => ({
+      ...current,
+      submitted: true,
+      declined: true,
+      dismissedBy,
+    }));
   }
 
   async loadRewindPoints() {
@@ -1940,6 +1955,7 @@ export class ChatState {
             submitLabel: event.submitLabel,
             submitKey: event.submitKey,
             dismiss: event.dismiss,
+            present: event.present,
             values: componentDefaults(event.blocks),
           };
           const toolUseId = event.toolUseId;

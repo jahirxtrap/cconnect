@@ -1,8 +1,11 @@
 import {
   diffKindOf,
   VALUE_SEPARATOR,
+  type ComponentCondition,
+  type ComponentConfirm,
   type ComponentElement,
   type ComponentOption,
+  type ComponentType,
   type DiffLine,
   type InteractionOption,
   type QueuedMessage,
@@ -94,6 +97,7 @@ export type ServerEvent =
       submitLabel: string | null;
       submitKey: string | null;
       dismiss: ComponentOption | null;
+      present: string | null;
     }
   | {
       type: "interaction_resolved";
@@ -129,7 +133,15 @@ const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
 const PING_MS = 20_000;
 const STALE_MS = 45_000;
-const CLIENT_CAPABILITIES = ["media.blocks", "media.rich", "components"];
+const CLIENT_CAPABILITIES = [
+  "media.blocks",
+  "media.gallery",
+  "media.video",
+  "media.audio",
+  "media.pdf",
+  "media.html",
+  "components",
+];
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
@@ -174,9 +186,37 @@ const COMPONENT_TYPES = [
   "buttons",
   "preview",
   "page",
+  "group",
   "notes",
   "bar",
+  "slider",
+  "color",
+  "path",
+  "file",
 ] as const;
+
+const PREFILLED = new Set<ComponentType>(["input", "path", "file", "color"]);
+
+const toConfirm = (raw: unknown): ComponentConfirm | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const wire = raw as Wire;
+  const body = text(wire, "text");
+  if (!body) return null;
+  return { title: text(wire, "title"), text: body, confirmLabel: text(wire, "confirm_label") };
+};
+
+const toCondition = (raw: unknown): ComponentCondition | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const wire = raw as Wire;
+  const id = text(wire, "id");
+  if (!id) return null;
+  return {
+    id,
+    equals: text(wire, "equals"),
+    oneOf: Array.isArray(wire.in) ? strings(wire, "in") : null,
+    truthy: typeof wire.truthy === "boolean" ? (wire.truthy as boolean) : null,
+  };
+};
 
 export const toDismiss = (raw: unknown): ComponentOption | null => {
   if (!raw || typeof raw !== "object") return null;
@@ -189,11 +229,12 @@ export const toDismiss = (raw: unknown): ComponentOption | null => {
     style: null,
     icon: text(wire, "icon"),
     labelKey: text(wire, "label_key"),
+    confirm: toConfirm(wire.confirm),
   };
 };
 
 export const toElement = (raw: Wire): ComponentElement[] => {
-  const type = text(raw, "type") as ComponentElement["type"] | null;
+  const type = text(raw, "type") as ComponentType | null;
   if (!type || !COMPONENT_TYPES.includes(type)) return [];
   const value = raw.value;
   return [
@@ -202,14 +243,17 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       id: text(raw, "id"),
       label: text(raw, "label"),
       text: type === "text" || type === "bar" ? text(raw, "text") : null,
+      textKey: text(raw, "text_key"),
       placeholder: text(raw, "placeholder"),
       placeholderKey: text(raw, "placeholder_key"),
       value:
         type === "bar"
           ? String(value ?? 0)
-          : type === "input" && typeof value === "string"
-            ? value
-            : null,
+          : type === "slider"
+            ? (typeof value === "number" || typeof value === "string" ? String(value) : null)
+            : PREFILLED.has(type) && typeof value === "string"
+              ? value
+              : null,
       color: text(raw, "color"),
       alertAbove: number(raw, "alert_above"),
       alertBelow: number(raw, "alert_below"),
@@ -219,6 +263,20 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       secret: flag(raw, "secret"),
       multiple: flag(raw, "multiple"),
       required: flag(raw, "required"),
+      showIf: toCondition(raw.show_if),
+      format: text(raw, "format"),
+      display: text(raw, "display"),
+      min: number(raw, "min"),
+      max: number(raw, "max"),
+      step: number(raw, "step"),
+      minLength: number(raw, "min_length"),
+      maxLength: number(raw, "max_length"),
+      pattern: text(raw, "pattern"),
+      error: text(raw, "error"),
+      open: flag(raw, "open"),
+      pick: text(raw, "pick"),
+      start: text(raw, "start"),
+      accept: text(raw, "accept"),
       options: list(raw, "options").map((option) => ({
         value: text(option, "value") ?? "",
         label: text(option, "label") ?? "",
@@ -227,6 +285,7 @@ export const toElement = (raw: Wire): ComponentElement[] => {
         style: text(option, "style"),
         icon: text(option, "icon"),
         labelKey: text(option, "label_key"),
+        confirm: toConfirm(option.confirm),
       })),
       block: raw.block && typeof raw.block === "object" ? JSON.stringify(raw.block) : null,
       blocks: list(raw, "blocks").flatMap(toElement),
@@ -393,8 +452,8 @@ export class ChatSocket {
     this.#send({ type: "interaction_response", id: requestId, values: payload });
   }
 
-  sendQuestionsChat(requestId: string) {
-    this.#send({ type: "interaction_response", id: requestId, chat: true });
+  sendQuestionsChat(requestId: string, dismissedBy: "button" | "close") {
+    this.#send({ type: "interaction_response", id: requestId, chat: true, dismissed_by: dismissedBy });
   }
 
   #send(payload: Wire) {
@@ -650,6 +709,7 @@ export class ChatSocket {
           submitLabel: text(wire, "submit"),
           submitKey: text(wire, "submit_key"),
           dismiss: toDismiss(wire.dismiss),
+          present: text(wire, "present"),
         };
       case "interaction_resolved":
         return {

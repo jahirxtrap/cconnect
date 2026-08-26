@@ -33,9 +33,10 @@
     labelMode?: boolean;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
+    onGrow?: (grow: () => void, anchor: HTMLElement | null) => void;
     onAnswer?: (requestId: string, optionId: string) => void;
     onSharedLink?: (url: string, filename: string) => void;
-    component?: Snippet<[InteractionData]>;
+    component?: Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
   }
 
   const {
@@ -47,6 +48,7 @@
     labelMode = false,
     expanded = null,
     onToggle = null,
+    onGrow = (grow) => grow(),
     onAnswer,
     onSharedLink,
     component,
@@ -139,7 +141,7 @@
   {:else if message.role === "interaction"}
     {#if message.interaction}
       {#if message.interaction.kind === "component" && component}
-        {@render component(message.interaction)}
+        {@render component(message.interaction, onGrow)}
       {:else}
         <InteractionBlock
           data={message.interaction}

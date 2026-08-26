@@ -62,11 +62,16 @@ fun InputField(
     onClear: (() -> Unit)? = null,
     clearAlways: Boolean = false,
     focusRequester: FocusRequester? = null,
+    error: String? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     var revealed by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(Radius.md)
-    val borderColor = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+    val borderColor = when {
+        error != null -> MaterialTheme.colorScheme.error
+        focused -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.outlineVariant
+    }
     val lineHeightDp = with(LocalDensity.current) { MaterialTheme.typography.bodyMedium.lineHeight.toDp() }
     Column(modifier) {
         if (label != null) {
@@ -143,6 +148,10 @@ fun InputField(
                 Spacer(Modifier.width(8.dp))
                 trailingIcon()
             }
+        }
+        if (error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
         }
     }
 }

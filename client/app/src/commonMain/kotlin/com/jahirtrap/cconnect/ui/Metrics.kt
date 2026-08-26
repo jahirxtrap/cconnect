@@ -19,7 +19,7 @@ import com.jahirtrap.cconnect.data.formatDecimal
 import com.jahirtrap.cconnect.ui.theme.palette
 
 @Composable
-fun MetricHeader(title: String, subtitle: String, percent: Float) {
+fun MetricHeader(title: String, subtitle: String, percent: Float, showValue: Boolean = true) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             if (title.isNotBlank()) Text(title, style = MaterialTheme.typography.bodyLarge)
@@ -33,21 +33,33 @@ fun MetricHeader(title: String, subtitle: String, percent: Float) {
                 )
             }
         }
-        Spacer(Modifier.width(12.dp))
-        Text(
-            "${formatDecimal(percent.toDouble(), 1)}%",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
+        if (showValue) {
+            Spacer(Modifier.width(12.dp))
+            Text(
+                "${formatDecimal(percent.toDouble(), 1)}%",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
     }
 }
 
 @Composable
-fun MetricBar(title: String, subtitle: String, percent: Float, modifier: Modifier = Modifier, color: Color? = null) {
+fun MetricBar(
+    title: String,
+    subtitle: String,
+    percent: Float,
+    modifier: Modifier = Modifier,
+    color: Color? = null,
+    showValue: Boolean = true,
+) {
     val barColor = color ?: if (percent >= 90f) palette.red else MaterialTheme.colorScheme.primary
+    val heading = title.isNotBlank() || subtitle.isNotBlank() || showValue
     Column(modifier = modifier.fillMaxWidth()) {
-        MetricHeader(title, subtitle, percent)
-        Spacer(Modifier.height(8.dp))
+        if (heading) {
+            MetricHeader(title, subtitle, percent, showValue)
+            Spacer(Modifier.height(8.dp))
+        }
         LinearProgressIndicator(
             progress = { (percent / 100f).coerceIn(0f, 1f) },
             color = barColor,

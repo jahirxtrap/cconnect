@@ -14,6 +14,7 @@ from loguru import logger
 from core import cli_manager
 from core.config import AI_WORKDIR, PORT, SHARED_DIR
 from mcps import build_cconnect_server
+from mcps.media import blocks_note
 from services import settings_store, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -44,12 +45,6 @@ def _clean_error_text(text: str | None) -> str:
     return (text or "").strip() or "Unknown error"
 
 
-RICH_MEDIA_NOTE = (
-    " This client also renders `playlist` (audio items, each with `title` and `duration`), `pdf`"
-    " and `html` (both take `url` and `title`), and video inside a gallery."
-)
-
-
 def _blocks_guide(capabilities: list[str]) -> str:
     if "media.blocks" not in capabilities:
         return ""
@@ -57,7 +52,7 @@ def _blocks_guide(capabilities: list[str]) -> str:
         guide = (_PROMPTS_DIR / "BLOCKS.md").read_text(encoding="utf-8")
     except OSError:
         return ""
-    return guide.replace("{{RICH_MEDIA}}", RICH_MEDIA_NOTE if "media.rich" in capabilities else "")
+    return guide.replace("{{RICH_MEDIA}}", blocks_note(capabilities))
 
 
 def _system_append(base_url: Optional[str], cwd: Optional[str] = None, capabilities: Optional[list[str]] = None) -> str:

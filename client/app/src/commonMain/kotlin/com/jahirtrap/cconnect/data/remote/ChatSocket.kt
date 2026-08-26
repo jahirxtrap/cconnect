@@ -34,9 +34,11 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import com.jahirtrap.cconnect.data.ComponentCondition
+import com.jahirtrap.cconnect.data.ComponentConfirm
 import com.jahirtrap.cconnect.data.VisibilityPrefs
 
-private val CLIENT_CAPABILITIES = listOf("media.blocks", "components")
+private val CLIENT_CAPABILITIES = listOf("media.blocks", "media.gallery", "components")
 
 class ChatSocket(private val scope: CoroutineScope, private val config: () -> BackendConfig) {
     private var ws: WsConnection? = null
@@ -257,11 +259,12 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
         })
     }
 
-    fun sendQuestionsChat(requestId: String) {
+    fun sendQuestionsChat(requestId: String, dismissedBy: String) {
         send(buildJsonObject {
             put("type", "interaction_response")
             put("id", requestId)
             put("chat", true)
+            put("dismissed_by", dismissedBy)
         })
     }
 
@@ -401,6 +404,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 submitLabel = str("submit"),
                 submitKey = str("submit_key"),
                 dismiss = (obj["dismiss"] as? JsonObject)?.toDismiss(),
+                present = str("present"),
                 replay = flag("replay"),
             )
             "interaction_resolved" -> ServerEvent.InteractionResolved(
@@ -419,7 +423,12 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
     }
 }
 
-private val COMPONENT_TYPES = setOf("text", "select", "input", "toggle", "buttons", "preview", "page", "notes", "bar")
+private val COMPONENT_TYPES = setOf(
+    "text", "select", "input", "toggle", "buttons", "preview",
+    "page", "group", "notes", "bar", "slider", "color", "path", "file",
+)
+
+private val PREFILLED = setOf("input", "path", "file", "color")
 
 private fun queuedItems(element: JsonElement?): List<QueuedMessage> =
     element?.jsonArray?.mapNotNull { entry ->
@@ -437,7 +446,29 @@ internal fun JsonObject.toDismiss(): ComponentOption = ComponentOption(
     label = this["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
     labelKey = this["label_key"]?.jsonPrimitive?.contentOrNull,
     icon = this["icon"]?.jsonPrimitive?.contentOrNull,
+    confirm = this["confirm"]?.toConfirm(),
 )
+
+private fun JsonElement.toConfirm(): ComponentConfirm? {
+    val o = this as? JsonObject ?: return null
+    val text = o["text"]?.jsonPrimitive?.contentOrNull ?: return null
+    return ComponentConfirm(
+        title = o["title"]?.jsonPrimitive?.contentOrNull,
+        text = text,
+        confirmLabel = o["confirm_label"]?.jsonPrimitive?.contentOrNull,
+    )
+}
+
+private fun JsonElement.toCondition(): ComponentCondition? {
+    val o = this as? JsonObject ?: return null
+    val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return null
+    return ComponentCondition(
+        id = id,
+        equalTo = o["equals"]?.jsonPrimitive?.contentOrNull,
+        oneOf = (o["in"] as? JsonArray)?.mapNotNull { it.jsonPrimitive.contentOrNull },
+        truthy = o["truthy"]?.jsonPrimitive?.booleanOrNull,
+    )
+}
 
 internal fun JsonObject.toElement(): ComponentElement? {
     val type = this["type"]?.jsonPrimitive?.contentOrNull ?: return null
@@ -448,9 +479,15 @@ internal fun JsonObject.toElement(): ComponentElement? {
         id = this["id"]?.jsonPrimitive?.contentOrNull,
         label = this["label"]?.jsonPrimitive?.contentOrNull,
         text = this["text"]?.jsonPrimitive?.contentOrNull.takeIf { type == "text" || type == "bar" },
+        textKey = this["text_key"]?.jsonPrimitive?.contentOrNull,
         placeholder = this["placeholder"]?.jsonPrimitive?.contentOrNull,
         placeholderKey = this["placeholder_key"]?.jsonPrimitive?.contentOrNull,
-        value = raw?.contentOrNull.takeIf { type == "input" || type == "bar" },
+        value = when (type) {
+            "bar" -> raw?.contentOrNull ?: "0"
+            "slider" -> raw?.contentOrNull
+            in PREFILLED -> raw?.contentOrNull
+            else -> null
+        },
         checked = raw?.booleanOrNull == true,
         color = this["color"]?.jsonPrimitive?.contentOrNull,
         alertAbove = this["alert_above"]?.jsonPrimitive?.floatOrNull,
@@ -460,6 +497,20 @@ internal fun JsonObject.toElement(): ComponentElement? {
         secret = this["secret"]?.jsonPrimitive?.booleanOrNull == true,
         multiple = this["multiple"]?.jsonPrimitive?.booleanOrNull == true,
         required = this["required"]?.jsonPrimitive?.booleanOrNull == true,
+        showIf = this["show_if"]?.toCondition(),
+        format = this["format"]?.jsonPrimitive?.contentOrNull,
+        display = this["display"]?.jsonPrimitive?.contentOrNull,
+        min = this["min"]?.jsonPrimitive?.floatOrNull,
+        max = this["max"]?.jsonPrimitive?.floatOrNull,
+        step = this["step"]?.jsonPrimitive?.floatOrNull,
+        minLength = this["min_length"]?.jsonPrimitive?.intOrNull,
+        maxLength = this["max_length"]?.jsonPrimitive?.intOrNull,
+        pattern = this["pattern"]?.jsonPrimitive?.contentOrNull,
+        error = this["error"]?.jsonPrimitive?.contentOrNull,
+        open = this["open"]?.jsonPrimitive?.booleanOrNull == true,
+        pick = this["pick"]?.jsonPrimitive?.contentOrNull,
+        start = this["start"]?.jsonPrimitive?.contentOrNull,
+        accept = this["accept"]?.jsonPrimitive?.contentOrNull,
         options = this["options"]?.jsonArray?.map { el ->
             val o = el.jsonObject
             ComponentOption(
@@ -470,6 +521,7 @@ internal fun JsonObject.toElement(): ComponentElement? {
                 style = o["style"]?.jsonPrimitive?.contentOrNull,
                 icon = o["icon"]?.jsonPrimitive?.contentOrNull,
                 labelKey = o["label_key"]?.jsonPrimitive?.contentOrNull,
+                confirm = o["confirm"]?.toConfirm(),
             )
         } ?: emptyList(),
         block = this["block"]?.jsonObject?.toString(),
