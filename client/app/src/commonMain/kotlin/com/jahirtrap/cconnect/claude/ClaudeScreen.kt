@@ -87,6 +87,7 @@ import com.jahirtrap.cconnect.ui.Claude
 import com.jahirtrap.cconnect.ui.EmptyState
 import com.jahirtrap.cconnect.ui.EnvironmentSelectDialog
 import com.jahirtrap.cconnect.ui.SelectDialog
+import com.jahirtrap.cconnect.ui.RouteSub
 import com.jahirtrap.cconnect.ui.refreshRequests
 import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.MarkdownText
@@ -122,7 +123,9 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     val environmentLocked by SelectionLock.environment.collectAsState()
     var showChangelog by remember { mutableStateOf(false) }
     var editingPrompt by remember { mutableStateOf(false) }
-    var detail by remember { mutableStateOf<ClaudeKind?>(null) }
+    // Which page is open lives in the URL, not here: back and reload both have to land on it.
+    val sub by RouteSub.value.collectAsState()
+    val detail = ClaudeKind.entries.firstOrNull { it.slug == sub }
     val activeName = state.environments.firstOrNull { it.id == state.activeEnvironmentId }?.name
     val serverReady = Backend.isConfigured && state.connection == ConnectionState.Connected
 
@@ -144,14 +147,14 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     val refreshTick = refreshRequests()
     LaunchedEffect(refreshTick) { if (refreshTick > 0) { refreshing = true; load() } }
 
+    // Leaving a page can have changed what this screen lists (a plugin installed, an MCP removed).
+    LaunchedEffect(detail) { if (detail == null && loaded) load() }
+
     detail?.let { kind ->
-        BackInterceptor { detail = null; scope.launch { load() }; true }
+        BackInterceptor { RouteSub.close(); true }
         ClaudeDetailScreen(
             kind = kind,
-            onClose = {
-                detail = null
-                scope.launch { load() }
-            },
+            onClose = { RouteSub.close() },
             onOpenPreview = onOpenPreview,
         )
         return
@@ -248,7 +251,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                                 else -> serviceIndicatorLabel(st.indicator)
                             },
                             enabled = serverReady,
-                        ) { detail = ClaudeKind.Status }
+                        ) { RouteSub.open(ClaudeKind.Status.slug) }
                     }
                     SettingsGroup(stringResource(Res.string.cli)) {
                         PreferenceRow(
@@ -327,31 +330,31 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                                 pluralStringResource(Res.plurals.enabled_count, enabledCount, enabledCount, pluginList.size)
                             } else "—",
                             enabled = serverReady,
-                        ) { detail = ClaudeKind.Plugins }
+                        ) { RouteSub.open(ClaudeKind.Plugins.slug) }
                         DetailLink(
                             Lucide.Wand,
                             stringResource(Res.string.skills),
                             skills?.size?.toString() ?: "—",
                             enabled = serverReady,
-                        ) { detail = ClaudeKind.Skills }
+                        ) { RouteSub.open(ClaudeKind.Skills.slug) }
                         DetailLink(
                             Lucide.Unplug,
                             stringResource(Res.string.mcp_servers),
                             mcpServers?.size?.toString() ?: "—",
                             enabled = serverReady,
-                        ) { detail = ClaudeKind.Mcp }
+                        ) { RouteSub.open(ClaudeKind.Mcp.slug) }
                         DetailLink(
                             Lucide.Store,
                             stringResource(Res.string.marketplaces),
                             extensions?.marketplaces?.size?.toString() ?: "—",
                             enabled = serverReady,
-                        ) { detail = ClaudeKind.Marketplaces }
+                        ) { RouteSub.open(ClaudeKind.Marketplaces.slug) }
                         DetailLink(
                             Lucide.Brain,
                             stringResource(Res.string.memories),
                             vm.defaultProjectKey(projects) ?: state.activeProjectKey ?: "—",
                             enabled = serverReady,
-                        ) { detail = ClaudeKind.Memories }
+                        ) { RouteSub.open(ClaudeKind.Memories.slug) }
                     }
                     Spacer(Modifier.height(16.dp))
                 }

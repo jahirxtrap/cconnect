@@ -82,7 +82,15 @@ import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
-enum class ClaudeKind { Plugins, Skills, Mcp, Marketplaces, Memories, Status }
+/** [slug] is what the URL carries, so a page can be reopened by name after a reload. */
+enum class ClaudeKind(val slug: String) {
+    Plugins("plugins"),
+    Skills("skills"),
+    Mcp("mcp"),
+    Marketplaces("marketplaces"),
+    Memories("memories"),
+    Status("status"),
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable

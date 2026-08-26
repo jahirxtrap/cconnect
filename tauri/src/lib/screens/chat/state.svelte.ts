@@ -1069,6 +1069,17 @@ export class ChatState {
     return await this.#sessions.trash();
   }
 
+  /** Opens a chat the URL points at: the trash is asked for it, which also says whether it is
+   *  still there — restored or purged elsewhere, the tab falls back to a blank chat. */
+  async openTrashed(sessionId: string, projectKey: string) {
+    const item = (await this.#sessions.trash()).items.find((entry) => entry.sessionId === sessionId);
+    if (!item) {
+      if (this.sessionId !== null || this.viewOnly) this.newSession();
+      return;
+    }
+    await this.openViewOnly(item.projectKey ? item : { ...item, projectKey });
+  }
+
   /** Reads a deleted chat in place of this tab's conversation. Nothing is sent while it is up:
    *  the socket keeps its own session, so leaving the view restores the tab as it was left. */
   async openViewOnly(item: TrashedSession) {

@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import com.jahirtrap.cconnect.data.SessionInfo
+import com.jahirtrap.cconnect.data.TrashedSession
 import com.jahirtrap.cconnect.data.Settings
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.addJsonObject
@@ -264,9 +265,20 @@ object TabsController {
         syncUrl()
     }
 
+    /** A chat read from the trash has no session of its own, so its identity comes from what is
+     *  being read; `v=1` is the one thing the URL adds — where to read it from. */
+    var viewing: TrashedSession? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            syncUrl()
+        }
+
     private fun syncUrl() {
         val idx = _tabs.indexOfFirst { it.id == activeId }.coerceAtLeast(0)
         val a = active
-        syncChatLocation(idx, a.sessionId, a.projectKey)
+        val view = viewing
+        if (view != null) syncChatLocation(idx, view.sessionId, view.projectKey, true)
+        else syncChatLocation(idx, a.sessionId, a.projectKey, false)
     }
 }

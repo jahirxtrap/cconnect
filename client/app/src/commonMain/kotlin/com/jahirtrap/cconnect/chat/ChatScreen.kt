@@ -462,23 +462,29 @@ fun ChatScreen(
     LaunchedEffect(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey, viewTabLabel) {
         TabsController.updateActive(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey, viewTabLabel)
     }
+    // What the tab is reading rides the URL, so a reload lands back on it instead of a blank chat.
+    LaunchedEffect(state.viewOnly) { TabsController.viewing = state.viewOnly }
     val tabIndex = remember { TabsController.tabs.indexOfFirst { it.id == TabsController.activeId } }
     val chatLoc = remember { readChatLocation() }
     var restoreTriggered by remember { mutableStateOf(false) }
     LaunchedEffect(state.connection) {
-        if (!restoreTriggered && chatLoc != null && chatLoc.first == tabIndex && state.connection == ConnectionState.Connected) {
+        if (!restoreTriggered && chatLoc != null && chatLoc.tab == tabIndex && state.connection == ConnectionState.Connected) {
             restoreTriggered = true
-            vm.restoreSession(chatLoc.second, chatLoc.third)
+            if (chatLoc.view) vm.openTrashed(chatLoc.sessionId, chatLoc.projectKey)
+            else vm.restoreSession(chatLoc.sessionId, chatLoc.projectKey)
         }
     }
     // Going back has to land on the chat the entry points at, not only on a tab that happens to
     // hold it: most history is made switching chats inside one tab, and that tab has to follow.
-    ChatPopstate { _, sid, pr ->
-        if (sid == null || pr == null) {
+    ChatPopstate { location ->
+        if (location == null) {
             vm.newSession()
+        } else if (location.view) {
+            vm.openTrashed(location.sessionId, location.projectKey)
         } else {
-            val open = TabsController.tabs.firstOrNull { it.sessionId == sid }
-            if (open != null) TabsController.selectTab(open.id) else vm.restoreSession(sid, pr)
+            val open = TabsController.tabs.firstOrNull { it.sessionId == location.sessionId }
+            if (open != null) TabsController.selectTab(open.id)
+            else vm.restoreSession(location.sessionId, location.projectKey)
         }
     }
 
@@ -2833,11 +2839,13 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
 @Composable
 private fun TrashDialog(vm: ChatViewModel, onView: (TrashedSession) -> Unit, onDismiss: () -> Unit) {
     var items by remember { mutableStateOf<List<TrashedSession>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
     var emptying by remember { mutableStateOf(false) }
     var purging by remember { mutableStateOf<TrashedSession?>(null) }
     val scope = rememberCoroutineScope()
     suspend fun load() {
         items = vm.trash().items
+        loading = false
     }
     LaunchedEffect(Unit) { load() }
     CompactDialog(
@@ -2857,7 +2865,12 @@ private fun TrashDialog(vm: ChatViewModel, onView: (TrashedSession) -> Unit, onD
             modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            if (items.isEmpty()) {
+            // "Nothing here" is an answer, not a starting point: it waits until the list has arrived.
+            if (loading) {
+                Box(modifier = Modifier.fillMaxWidth().height(72.dp), contentAlignment = Alignment.Center) {
+                    LoadingIndicator(modifier = Modifier.size(28.dp))
+                }
+            } else if (items.isEmpty()) {
                 Text(
                     stringResource(Res.string.trash_empty),
                     style = MaterialTheme.typography.bodyMedium,

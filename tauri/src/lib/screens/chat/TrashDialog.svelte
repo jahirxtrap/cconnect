@@ -3,6 +3,7 @@
   import Trash from "@lucide/svelte/icons/trash";
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
+  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -20,10 +21,14 @@
   const ID_PREVIEW = 8;
 
   let items = $state<TrashedSession[]>([]);
+  let loading = $state(true);
   let emptying = $state(false);
   let purging = $state<TrashedSession | null>(null);
 
-  const load = async () => (items = (await chat.trash()).items);
+  const load = async () => {
+    items = (await chat.trash()).items;
+    loading = false;
+  };
   const labelOf = (item: TrashedSession) => item.title ?? item.sessionId.slice(0, ID_PREVIEW);
 
   void load();
@@ -44,7 +49,10 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
   <div class="scrollbar-thin flex max-h-[420px] flex-col gap-1 overflow-y-auto">
-    {#if items.length === 0}
+    <!-- "Nothing here" is an answer, not a starting point: it waits until the list has arrived. -->
+    {#if loading}
+      <CenteredProgress class="h-[72px]" />
+    {:else if items.length === 0}
       <p class="px-3 py-2.5 text-body-md text-on-surface-variant">{t("TRASH_EMPTY")}</p>
     {/if}
     {#each items as item (item.sessionId)}

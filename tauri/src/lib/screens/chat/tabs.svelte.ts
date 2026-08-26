@@ -32,13 +32,26 @@ const CHAT_ROUTES = ["/settings", "/claude", "/monitor", "/files", "/terminal", 
 
 const onChatRoute = () => !CHAT_ROUTES.includes(window.location.pathname);
 
-export const readChatLocation = (): { tab: number; sessionId: string; projectKey: string } | null => {
+export interface ChatLocation {
+  tab: number;
+  sessionId: string;
+  projectKey: string;
+  /** The chat is being read from the trash: same identity, read from somewhere else. */
+  view: boolean;
+}
+
+export const readChatLocation = (): ChatLocation | null => {
   if (!onChatRoute()) return null;
   const query = new URLSearchParams(window.location.search);
   const sessionId = query.get("c");
   const projectKey = query.get("p");
   if (!sessionId || !projectKey) return null;
-  return { tab: Number.parseInt(query.get("t") ?? "0", 10) || 0, sessionId, projectKey };
+  return {
+    tab: Number.parseInt(query.get("t") ?? "0", 10) || 0,
+    sessionId,
+    projectKey,
+    view: query.get("v") === "1",
+  };
 };
 
 class Tabs {
@@ -57,7 +70,8 @@ class Tabs {
     let active = restored.active;
 
     const location = readChatLocation();
-    if (location) {
+    // A view-only entry never becomes the tab's session: `start()` opens it for reading instead.
+    if (location && !location.view) {
       const known = this.list.findIndex((tab) => tab.sessionId === location.sessionId);
       if (known >= 0) {
         active = known;
@@ -74,6 +88,13 @@ class Tabs {
   }
 
   start() {
+    const opening = readChatLocation();
+    if (opening?.view) {
+      const target = this.list[Math.min(Math.max(opening.tab, 0), this.list.length - 1)] ?? this.active;
+      this.activeId = target.id;
+      void this.stateFor(target).openTrashed(opening.sessionId, opening.projectKey);
+    }
+
     $effect(() => {
       // Going back has to land on the chat the entry points at, not only on a tab that happens to
       // hold it: most history is made switching chats inside one tab, and that tab has to follow.
@@ -82,6 +103,10 @@ class Tabs {
         const location = readChatLocation();
         if (!location) {
           this.stateFor(this.active).newSession();
+          return;
+        }
+        if (location.view) {
+          void this.stateFor(this.active).openTrashed(location.sessionId, location.projectKey);
           return;
         }
         const open = this.list.find((tab) => tab.sessionId === location.sessionId);
@@ -323,10 +348,14 @@ class Tabs {
       this.list.findIndex((tab) => tab.id === this.activeId),
       0,
     );
-    const target =
-      current?.sessionId && current.projectKey
-        ? `/?t=${index}&c=${encodeURIComponent(current.sessionId)}&p=${encodeURIComponent(current.projectKey)}`
-        : "/";
+    // A chat read from the trash has no session of its own, so its identity comes from what is
+    // being read; `v=1` is the one thing the URL adds — where to read it from.
+    const view = current ? this.stateFor(current).viewOnly : null;
+    const chat = view ?? (current?.sessionId && current.projectKey ? current : null);
+    const target = chat
+      ? `/?t=${index}&c=${encodeURIComponent(chat.sessionId!)}&p=${encodeURIComponent(chat.projectKey!)}` +
+        (view ? "&v=1" : "")
+      : "/";
     if (target !== window.location.pathname + window.location.search) {
       window.history.pushState(null, "", target);
     }

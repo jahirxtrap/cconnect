@@ -45,6 +45,8 @@ import com.jahirtrap.cconnect.settings.SettingsScreen
 import com.jahirtrap.cconnect.terminal.TerminalScreen
 import com.jahirtrap.cconnect.ui.BackInterceptors
 import com.jahirtrap.cconnect.ui.LocalMobileLayout
+import com.jahirtrap.cconnect.ui.RouteSub
+import com.jahirtrap.cconnect.ui.routeBaseOf
 import com.jahirtrap.cconnect.ui.LocalRefreshTick
 import com.jahirtrap.cconnect.ui.theme.CConnectTheme
 import com.jahirtrap.cconnect.ui.theme.accentAt
@@ -90,7 +92,7 @@ private fun App() {
     }
 
     DisposableEffect(Unit) {
-        val listener: (Event) -> Unit = { route = currentRoute() }
+        val listener: (Event) -> Unit = { route = currentRoute(); RouteSub.sync() }
         window.addEventListener("popstate", listener)
         onDispose { window.removeEventListener("popstate", listener) }
     }
@@ -130,7 +132,8 @@ private fun App() {
     }
 
     fun navigate(target: String) {
-        if (route == target) return
+        if (route == target && RouteSub.value.value == null) return
+        RouteSub.clear()
         window.history.pushState(null, "", target)
         route = target
     }
@@ -228,7 +231,4 @@ private data class PreviewRequest(
 
 private fun docHasFocus(): Boolean = js("document.hasFocus()")
 
-private fun currentRoute(): String = when (val path = window.location.pathname) {
-    "/settings", "/claude", "/monitor", "/files", "/terminal", "/markdown" -> path
-    else -> "/"
-}
+private fun currentRoute(): String = routeBaseOf(window.location.pathname)

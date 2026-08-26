@@ -1239,6 +1239,19 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     suspend fun trash(): SessionsApi.Trash = SessionsApi.trash()
 
+    /** Opens a chat the URL points at: the trash is asked for it, which also says whether it is
+     *  still there — restored or purged elsewhere, the tab falls back to a blank chat. */
+    fun openTrashed(sessionId: String, projectKey: String) {
+        viewModelScope.launch {
+            val item = SessionsApi.trash().items.firstOrNull { it.sessionId == sessionId }
+            if (item == null) {
+                if (_state.value.sessionId != null || _state.value.viewOnly != null) newSession()
+                return@launch
+            }
+            openViewOnly(if (item.projectKey.isNotEmpty()) item else item.copy(projectKey = projectKey))
+        }
+    }
+
     /** Reads a deleted chat in place of this tab's conversation. Nothing is sent while it is up:
      *  the socket keeps its own session, so leaving the view restores the tab as it was left. */
     fun openViewOnly(item: TrashedSession) {

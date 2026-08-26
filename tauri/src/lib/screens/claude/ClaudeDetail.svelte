@@ -1,5 +1,15 @@
 <script lang="ts" module>
-  export type ClaudeKind = "plugins" | "skills" | "mcp" | "marketplaces" | "memories" | "status" | "changelog";
+  export const CLAUDE_KINDS = [
+    "plugins",
+    "skills",
+    "mcp",
+    "marketplaces",
+    "memories",
+    "status",
+    "changelog",
+  ] as const;
+
+  export type ClaudeKind = (typeof CLAUDE_KINDS)[number];
 </script>
 
 <script lang="ts">

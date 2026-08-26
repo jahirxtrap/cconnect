@@ -38,7 +38,7 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import AccountsSection from "./AccountsSection.svelte";
-  import ClaudeDetail, { type ClaudeKind } from "./ClaudeDetail.svelte";
+  import ClaudeDetail, { CLAUDE_KINDS, type ClaudeKind } from "./ClaudeDetail.svelte";
   import CliControls from "./CliControls.svelte";
   import PromptDialog from "./PromptDialog.svelte";
   import ProjectPromptDialog from "./ProjectPromptDialog.svelte";
@@ -60,7 +60,10 @@
   let projects = $state<ProjectInfo[]>([]);
   let loaded = $state(false);
   let refreshing = $state(false);
-  let detail = $state<ClaudeKind | null>(null);
+  // Which page is open lives in the URL, not here: back and reload both have to land on it.
+  const detail = $derived(
+    (CLAUDE_KINDS as readonly string[]).includes(navigation.sub ?? "") ? (navigation.sub as ClaudeKind) : null,
+  );
   let envOpen = $state(false);
   let accountOpen = $state(false);
   let promptOpen = $state(false);
@@ -130,24 +133,17 @@
     }
   });
 
-  $effect(() =>
-    navigation.intercept(() => {
-      if (detail === null) return false;
-      detail = null;
-      void load();
-      return true;
-    }),
-  );
+  // Leaving a page can have changed what this screen lists (a plugin installed, an MCP removed).
+  let lastDetail: ClaudeKind | null = null;
+  $effect(() => {
+    const current = detail;
+    if (lastDetail !== null && current === null) void load();
+    lastDetail = current;
+  });
 </script>
 
 {#if detail}
-  <ClaudeDetail
-    kind={detail}
-    onClose={() => {
-      detail = null;
-      void load();
-    }}
-  />
+  <ClaudeDetail kind={detail} onClose={() => navigation.closeSub()} />
 {:else}
   <div class="flex h-full flex-col">
     <AppTopBar
@@ -211,7 +207,7 @@
             title={t("SERVICE_STATUS")}
             summary={serviceSummary}
             enabled={serverReady}
-            onclick={() => (detail = "status")}
+            onclick={() => navigation.openSub("status")}
           >
             {#snippet trailing()}
               <ChevronRight size={24} class="text-on-surface-variant" />
@@ -227,7 +223,11 @@
             enabled={serverReady}
           >
             {#snippet trailing()}
-              <TooltipIconButton label={t("CHANGELOG")} enabled={serverReady} onclick={() => (detail = "changelog")}>
+              <TooltipIconButton
+                label={t("CHANGELOG")}
+                enabled={serverReady}
+                onclick={() => navigation.openSub("changelog")}
+              >
                 <FileText size={18} />
               </TooltipIconButton>
             {/snippet}
@@ -304,7 +304,7 @@
 {/if}
 
 {#snippet link(icon: typeof Blocks, title: string, summary: string, kind: ClaudeKind)}
-  <PreferenceRow {icon} {title} {summary} enabled={serverReady} onclick={() => (detail = kind)}>
+  <PreferenceRow {icon} {title} {summary} enabled={serverReady} onclick={() => navigation.openSub(kind)}>
     {#snippet trailing()}
       <ChevronRight size={24} class="text-on-surface-variant" />
     {/snippet}

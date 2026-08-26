@@ -21,6 +21,14 @@
   let adding = $state(false);
   let deleting = $state<SshProfile | null>(null);
 
+  // A live SSH session is an action, not a document: it gets an entry of its own so back leaves it
+  // instead of eating the one behind /terminal, but it is not in the URL — a reload has no session
+  // to return to anyway, so it lands on the host list.
+  const open = (profile: SshProfile) => {
+    navigation.pushLayer();
+    active = profile;
+  };
+
   $effect(() =>
     navigation.intercept(() => {
       if (active === null) return false;
@@ -31,7 +39,7 @@
 </script>
 
 {#if active}
-  <TerminalSession profile={active} onClose={() => (active = null)} />
+  <TerminalSession profile={active} onClose={() => navigation.popLayer()} />
 {:else}
   <div class="flex h-full flex-col">
     <AppTopBar title={t("SSH_HOSTS")}>
@@ -57,7 +65,7 @@
             icon={path ? undefined : SquareTerminal}
             title={profile.name || profile.host}
             subtitle={sshAddress(profile)}
-            onclick={() => (active = profile)}
+            onclick={() => open(profile)}
           >
             {#snippet leading()}
               {#if path}

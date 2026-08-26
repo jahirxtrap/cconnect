@@ -2,9 +2,9 @@ package com.jahirtrap.cconnect.chat
 
 import androidx.compose.runtime.Composable
 
-actual fun readChatLocation(): Triple<Int, String, String>? = null
+actual fun readChatLocation(): ChatLocation? = null
 
-actual fun syncChatLocation(tab: Int, sessionId: String?, projectKey: String?) {}
+actual fun syncChatLocation(tab: Int, sessionId: String?, projectKey: String?, view: Boolean) {}
 
 @Composable
-actual fun ChatPopstate(onLocation: (Int, String?, String?) -> Unit) {}
+actual fun ChatPopstate(onLocation: (ChatLocation?) -> Unit) {}
