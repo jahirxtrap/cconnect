@@ -30,6 +30,7 @@ import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
@@ -349,6 +350,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             "dequeued" -> ServerEvent.Dequeued(
                 obj["ids"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: emptyList(),
                 str("text"),
+                obj["ts"]?.jsonPrimitive?.longOrNull,
             )
             "agent" -> ServerEvent.Agent(str("id"), str("subagent_type"), str("description"), flag("label"))
             "compact_summary" -> ServerEvent.CompactSummary(

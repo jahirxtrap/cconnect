@@ -19,7 +19,9 @@
   import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
   import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
+  import { refreshPixelGrid } from "$lib/ui/pixelGrid";
 
+  refreshPixelGrid();
   theme.start();
   layout.start();
   navigation.start();
@@ -69,7 +71,12 @@
   });
 </script>
 
-<svelte:window onkeydown={onKeydown} ondragover={blockFileOpen} ondrop={blockFileOpen} />
+<svelte:window
+  onkeydown={onKeydown}
+  ondragover={blockFileOpen}
+  ondrop={blockFileOpen}
+  onresize={() => refreshPixelGrid()}
+/>
 
 <div
   class="safe-area bg-background text-on-background"

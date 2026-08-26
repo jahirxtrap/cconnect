@@ -5,6 +5,7 @@ import difflib
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 
@@ -600,7 +601,7 @@ async def run_prompt(
 
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 
-    chips: list[dict] = [{"id": seed_id, "sent": prompt, "drained": False}]
+    chips: list[dict] = [{"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000)}]
     pending_announce: list[dict] = list(chips)
     seen_users: set[str] = set()
     if drain is not None and resume and cwd:
@@ -623,6 +624,7 @@ async def run_prompt(
                 "ids": [chip["id"]] if chip.get("id") else [],
                 "text": chip.get("sent") or "",
                 "consumed": 0,  # the transcript pass still settles the count
+                "ts": chip.get("ts"),
             }]
         return []
 
@@ -679,6 +681,9 @@ async def run_prompt(
                 "ids": [c["id"] for c in taken if c["id"]],
                 "text": "" if any(c.get("announced") for c in taken) else text,
                 "consumed": sum(1 for c in taken if c["drained"]),
+                # The transcript's own time, so a reattach replaying this event still shows
+                # when the message was sent rather than when the replay happened.
+                "ts": u.get("ts") or next((c.get("ts") for c in taken if c.get("ts")), None),
             })
         return events
 
@@ -695,7 +700,7 @@ async def run_prompt(
                 else:
                     icontent = item["text"]
                     sent = item["text"]
-                chip = {"id": item.get("id"), "sent": sent, "drained": True}
+                chip = {"id": item.get("id"), "sent": sent, "drained": True, "ts": item.get("ts")}
                 chips.append(chip)
                 pending_announce.append(chip)
                 yield {"type": "user", "message": {"role": "user", "content": icontent}}

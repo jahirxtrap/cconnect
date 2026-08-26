@@ -60,7 +60,7 @@
   {#if message.role === "user"}
     {@const content = userContent(message)}
     {@const showTime = message.timestamp !== null && settings.showTimestamps}
-    <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {content.attachments.length ? 'gap-1.5' : ''}">
+    <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {content.attachments.length ? 'chat-gap' : ''}">
       {#if content.body}
         <p class="text-body-md wrap-anywhere whitespace-pre-wrap">{content.body}</p>
       {/if}

@@ -1612,7 +1612,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         if (!_state.value.streaming) {
                             _state.update { st -> resetToInitialWindow(st).copy(streaming = true, compacting = compacting, streamStatus = null, error = null) }
                         }
-                        if (!compacting) addMessage(Role.USER, text, attachments = atts)
+                        // The event's own time: the bubble may be drawn long after the message was
+                        // sent (the turn reaches it, or a reattach replays the event).
+                        if (!compacting) addMessage(Role.USER, text, attachments = atts, timestamp = event.timestamp)
                     }
                 }
                 if (reconcile) {
@@ -1837,9 +1839,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         result: String? = null,
         ephemeral: Boolean = false,
         attachments: List<String>? = null,
+        timestamp: Long? = null,
     ) {
         _state.update {
-            applyTailCap(it.copy(messages = it.messages + ChatMessage(nextId++, role, text, toolName, toolUseId, interaction, path, diffLines, compact, labelOnly = labelOnly, result = result, ephemeral = ephemeral, attachments = attachments, timestamp = nowMillis())))
+            applyTailCap(it.copy(messages = it.messages + ChatMessage(nextId++, role, text, toolName, toolUseId, interaction, path, diffLines, compact, labelOnly = labelOnly, result = result, ephemeral = ephemeral, attachments = attachments, timestamp = timestamp ?: nowMillis())))
         }
         if (turnFirstResponseId == null && isResponseRole(role)) turnFirstResponseId = _state.value.messages.lastOrNull()?.id
     }

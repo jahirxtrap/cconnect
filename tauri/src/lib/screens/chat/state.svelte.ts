@@ -1290,7 +1290,9 @@ export class ChatState {
     }
   }
 
-  #onDequeued(ids: string[], text: string | null) {
+  // `ts` is when the message was actually sent: the bubble can be drawn much later (the turn
+  // reaches it, or a reattach replays the event), and it must not read as sent just now.
+  #onDequeued(ids: string[], text: string | null, ts: number | null) {
     const body = text ?? "";
     const reconcile = this.#optimisticChipId !== null && ids.includes(this.#optimisticChipId);
     const attachments = [
@@ -1323,6 +1325,7 @@ export class ChatState {
             newMessage(this.#nextId++, "user", {
               text: body,
               attachments: attachments.length ? attachments : null,
+              timestamp: ts ?? Date.now(),
             }),
           );
         }
@@ -1645,7 +1648,7 @@ export class ChatState {
         this.#applyQueueSnapshot(event.items);
         break;
       case "dequeued":
-        this.#onDequeued(event.ids, event.text);
+        this.#onDequeued(event.ids, event.text, event.ts);
         break;
       case "history_chunk":
         this.#onHistoryChunk(

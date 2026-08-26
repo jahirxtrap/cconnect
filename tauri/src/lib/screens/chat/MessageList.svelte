@@ -5,7 +5,6 @@
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
-  import { measurePixelGrid, pixelGrid } from "$lib/ui/pixelGrid";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
   import StatusProgress from "./blocks/StatusProgress.svelte";
@@ -78,7 +77,6 @@
   const SCROLL_BUTTON_GAP = 12;
   const STICKY_FALLBACK = 40;
   const HALF = 2;
-  const GRID_EPSILON = 0.0005;
 
   let horizontalScrollbar = $state(0);
   let verticalScrollbar = $state(0);
@@ -209,21 +207,6 @@
     lastTop = container.scrollTop;
   };
 
-  const snapToGrid = (node: HTMLElement) => {
-    const grid = container ? measurePixelGrid(container) : pixelGrid();
-    const pad = parseFloat(node.style.paddingBottom) || 0;
-    const natural = node.getBoundingClientRect().height - pad;
-    if (natural <= 0) return;
-    const next = Math.max(0, Math.round((Math.ceil(natural / grid - GRID_EPSILON) * grid - natural) * 1000) / 1000);
-    if (Math.abs(next - pad) > GRID_EPSILON) node.style.paddingBottom = next ? `${next}px` : "";
-  };
-
-  const snapOnMount = (node: HTMLElement) => {
-    snapToGrid(node);
-    const frame = requestAnimationFrame(() => snapToGrid(node));
-    return { destroy: () => cancelAnimationFrame(frame) };
-  };
-
   const toggleExpanded = async (id: number) => {
     const node = container?.querySelector<HTMLElement>(`[data-mid="${id}"]`);
     if (follow || !node || !container) {
@@ -234,7 +217,6 @@
     const previousTop = node.getBoundingClientRect().top;
     expandedState[id] = !expandedState[id];
     await tick();
-    snapToGrid(node);
     shiftBy(node.getBoundingClientRect().top - previousTop);
     requestAnimationFrame(() => {
       if (container) container.style.overflowAnchor = "";
@@ -313,7 +295,6 @@
     measureScrollbar();
     const observer = new ResizeObserver(() => {
       measureScrollbar();
-      if (element.scrollHeight > element.clientHeight) measurePixelGrid(element);
       if (follow) scrollTo(0);
       belowFold = distanceToBottom();
       viewport = element.clientHeight;
@@ -359,7 +340,6 @@
     void tick().then(() => {
       if (!container) return;
       detectScrollSign();
-      measurePixelGrid(container);
       scrollTo(target.follow ? 0 : target.top);
     });
   });
@@ -384,7 +364,7 @@
     <div bind:this={content} class="mb-auto shrink-0">
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
-      <div use:snapOnMount data-mid={item.id}>
+      <div data-mid={item.id}>
         {#if separated}
           <DateSeparator millis={item.timestamp ?? 0} />
         {/if}

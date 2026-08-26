@@ -69,7 +69,7 @@ export type ServerEvent =
   | { type: "closed"; reason: string }
   | { type: "queued"; id: string | null; text: string }
   | { type: "queue"; items: QueuedMessage[] }
-  | { type: "dequeued"; ids: string[]; text: string | null }
+  | { type: "dequeued"; ids: string[]; text: string | null; ts: number | null }
   | {
       type: "history_chunk";
       sessionId: string;
@@ -587,6 +587,7 @@ export class ChatSocket {
             (id): id is string => typeof id === "string",
           ),
           text: text(wire, "text"),
+          ts: typeof wire.ts === "number" ? wire.ts : null,
         };
       case "agent":
         return {

@@ -180,7 +180,7 @@ def tail_user_messages(project_key: str, session_id: str) -> list[dict]:
                 au = entry.get("uuid")
                 qtext = _text_from_content(att.get("prompt")).strip()
                 if au and qtext and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
-                    out.append({"uuid": au, "text": qtext})
+                    out.append({"uuid": au, "text": qtext, "ts": _parse_ts(entry.get("timestamp"))})
             continue
         if etype != "user" or entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary") or entry.get("isVisibleInTranscriptOnly"):
             continue
@@ -200,7 +200,7 @@ def tail_user_messages(project_key: str, session_id: str) -> list[dict]:
             continue
         if not text or _COMMAND_META_RE.search(text) or _INTERRUPT_RE.match(text):
             continue
-        out.append({"uuid": u, "text": text})
+        out.append({"uuid": u, "text": text, "ts": _parse_ts(entry.get("timestamp"))})
     return out
 
 

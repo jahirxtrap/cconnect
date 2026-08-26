@@ -13,7 +13,7 @@
   } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
-  import { pixelGrid } from "$lib/ui/pixelGrid";
+  import { snapPx } from "$lib/ui/pixelGrid";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CconnectBlockView from "$lib/ui/CconnectBlockView.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -103,11 +103,6 @@
   let ratio = $state(0);
   let settling = false;
   let placed = false;
-
-  const snapPx = (value: number) => {
-    const grid = pixelGrid();
-    return Math.round(value / grid) * grid;
-  };
 
   const pageHeight = $derived.by(() => {
     if (!pages.length) return null;
@@ -367,7 +362,7 @@
           >
             {#each pages as item, index (index)}
               <div class="w-full shrink-0 snap-center self-start">
-                <div bind:clientHeight={heights[index]} class="flex flex-col gap-1.5">
+                <div bind:clientHeight={heights[index]} class="chat-gap flex flex-col">
                   {@render elements(item.blocks)}
                 </div>
               </div>
@@ -379,7 +374,7 @@
           <SelectChip label={pages[0].label} selected />
           <div class="h-1"></div>
         {/if}
-        <div class="flex flex-col gap-1.5">
+        <div class="chat-gap flex flex-col">
           {@render elements(shown)}
         </div>
       {/if}

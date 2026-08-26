@@ -114,7 +114,7 @@
 </span>
 
 <div
-  class="markdown flex w-full flex-col gap-1.5 {dense ? 'markdown-dense' : ''} {className}"
+  class="markdown chat-gap flex w-full flex-col {dense ? 'markdown-dense' : ''} {className}"
   onclickcapture={onClick}
   use:decorate
 >
@@ -141,7 +141,7 @@
           <ChevronRight size={12} class="shrink-0" />
           {part.summary}
         </summary>
-        <div class="flex flex-col gap-1.5 pt-1 pl-2">
+        <div class="chat-gap flex flex-col pt-1 pl-2">
           {@render blocks(part.children)}
         </div>
       </details>

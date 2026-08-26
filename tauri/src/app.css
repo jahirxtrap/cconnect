@@ -234,6 +234,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  cursor: default;
 }
 
 input,
@@ -242,6 +243,7 @@ textarea,
   user-select: text;
   -webkit-user-select: text;
   -webkit-touch-callout: default;
+  cursor: auto;
 }
 
 .no-callout {
@@ -253,6 +255,7 @@ textarea,
 [role="tooltip"],
 .menu-surface {
   user-select: none;
+  cursor: default;
 }
 
 ::selection {
@@ -275,7 +278,12 @@ textarea::selection {
 
 .markdown-dense {
   --md-scale: calc(13 / 14);
-  line-height: 19px;
+  line-height: var(--chat-line-dense-snap, var(--chat-line-dense));
+}
+
+/* The chat's 6px stack gap, snapped (see tokens.css). */
+.chat-gap {
+  gap: var(--chat-gap-sm-snap, var(--chat-gap-sm));
 }
 
 .markdown > *:first-child {
@@ -367,7 +375,10 @@ a > .md-link-icon:last-child {
   background: var(--c-surface-variant);
   border-radius: var(--radius-sm);
   padding: 1px 3px;
-  line-height: 0;
+  /* Inherited, like Compose: a zero line-height lets the mono metrics set the line box, so a
+     line holding inline code ends up shorter than the rest and off the pixel grid. The pill is
+     painted from the content box, so it looks the same. */
+  line-height: inherit;
 }
 
 .markdown pre code {
@@ -384,6 +395,7 @@ a > .md-link-icon:last-child {
   border-radius: var(--radius-panel);
   padding: 0.5rem 0.625rem;
   font-size: calc(var(--text-body-sm) * var(--md-scale));
+  line-height: var(--chat-line-code-snap, var(--chat-line-code));
 }
 
 .markdown blockquote {

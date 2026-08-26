@@ -237,10 +237,12 @@ class LiveSession:
     async def enqueue(self, mid, text, attachments=None):
         if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued + self._inflight)):
             return False
-        item = {"id": mid, "text": text, "attachments": list(attachments or [])}
+        # Stamped on arrival: the client renders the bubble when the turn reaches the message,
+        # which can be minutes later, and a reattach replays that event later still.
+        item = {"id": mid, "text": text, "attachments": list(attachments or []), "ts": int(time.time() * 1000)}
         self._queued.append(item)
         await self._inbox.put(item)
-        await self._emit({"type": "queued", "id": mid, "text": text})
+        await self._emit({"type": "queued", "id": mid, "text": text, "ts": item["ts"]})
         return True
 
     async def drain(self):
