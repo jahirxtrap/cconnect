@@ -12,6 +12,9 @@ export interface Tab {
   title: string | null;
   color: string | null;
   running: boolean;
+  /** Name of the chat being read: the tab has no session of its own while it is up, and it is
+   *  not persisted — a restored tab is a blank one, never a view of something deleted. */
+  viewTitle?: string | null;
 }
 
 interface StoredTab {
@@ -72,11 +75,21 @@ class Tabs {
 
   start() {
     $effect(() => {
+      // Going back has to land on the chat the entry points at, not only on a tab that happens to
+      // hold it: most history is made switching chats inside one tab, and that tab has to follow.
       const onPopState = () => {
+        if (!onChatRoute()) return;
         const location = readChatLocation();
-        if (!location) return;
-        const target = this.list.find((tab) => tab.sessionId === location.sessionId);
-        if (target) this.select(target.id);
+        if (!location) {
+          this.stateFor(this.active).newSession();
+          return;
+        }
+        const open = this.list.find((tab) => tab.sessionId === location.sessionId);
+        if (open) {
+          this.select(open.id);
+          return;
+        }
+        this.stateFor(this.active).restoreSession(location.sessionId, location.projectKey);
       };
       window.addEventListener("popstate", onPopState);
       return () => window.removeEventListener("popstate", onPopState);
@@ -203,6 +216,7 @@ class Tabs {
       next.title = null;
       next.color = null;
     }
+    if (next.viewTitle) next.title = next.viewTitle;
     const changed = Object.keys(patch).some((key) => current[key as keyof Tab] !== next[key as keyof Tab]);
     if (!changed) return;
     this.list = this.list.map((tab) => (tab.id === current.id ? next : tab));

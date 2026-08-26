@@ -59,6 +59,8 @@ export const createSessionsApi = (http: HttpClient) => ({
     limit = 200,
     beforeIndex: number | null = null,
     prefs: VisibilityPrefs | null = null,
+    /** Reads the transcript from the trash instead of the project; only a view-only chat asks for it. */
+    trashed = false,
   ): Promise<MessagesPage | null> {
     const data = await http.get<{
       items?: Record<string, unknown>[];
@@ -75,6 +77,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       ...(prefs?.file_change ? { file_change: prefs.file_change } : {}),
       ...(prefs?.compact ? { compact: prefs.compact } : {}),
       ...(prefs?.working ? { working: prefs.working } : {}),
+      ...(trashed ? { trashed: true } : {}),
     });
     if (!data) return null;
     return {

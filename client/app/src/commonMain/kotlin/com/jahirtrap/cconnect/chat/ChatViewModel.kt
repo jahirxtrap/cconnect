@@ -40,6 +40,7 @@ import com.jahirtrap.cconnect.data.ProjectInfo
 import com.jahirtrap.cconnect.data.Role
 import com.jahirtrap.cconnect.data.ServerEvent
 import com.jahirtrap.cconnect.data.SessionInfo
+import com.jahirtrap.cconnect.data.TrashedSession
 import com.jahirtrap.cconnect.data.SessionMessage
 import com.jahirtrap.cconnect.data.toRole
 import com.jahirtrap.cconnect.data.visible
@@ -128,6 +129,8 @@ data class ChatUiState(
     val defaultCategory: String = "",
     /** Deleting a chat only sets it aside, so the confirmation says so and the trash is reachable. */
     val trashEnabled: Boolean = false,
+    /** A chat opened for reading only: the transcript renders as always, nothing can be sent to it. */
+    val viewOnly: TrashedSession? = null,
     val environments: List<EnvironmentProfile> = emptyList(),
     val activeEnvironmentId: String? = null,
     val oldestLoadedIndex: Int? = null,
@@ -809,6 +812,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 transcriptPaging = false,
                 transcriptExhausted = false,
                 pendingToolIds = emptySet(),
+                viewOnly = null,
             )
         }
         client.resetResume()
@@ -956,6 +960,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun openSession(session: SessionInfo) {
         ctx.pendingCategoryId = null
+        _state.update { it.copy(viewOnly = null) }
         viewModelScope.launch {
             freezeView()
             if (session.sessionId != _state.value.sessionId) {
@@ -1041,9 +1046,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun loadMoreHistory() {
         val s = _state.value
-        val sid = s.sessionId ?: return
         val before = s.oldestLoadedIndex ?: return
         if (s.transcriptLoading || s.transcriptPaging || s.transcriptExhausted) return
+        s.viewOnly?.let { return loadMoreViewOnly(it, before) }
+        val sid = s.sessionId ?: return
         val proj = s.activeProjectKey ?: return
         _state.update { it.copy(transcriptPaging = true) }
         client.sendLoadHistory(sid, proj, beforeIndex = before)
@@ -1233,6 +1239,105 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     suspend fun trash(): SessionsApi.Trash = SessionsApi.trash()
 
+    /** Reads a deleted chat in place of this tab's conversation. Nothing is sent while it is up:
+     *  the socket keeps its own session, so leaving the view restores the tab as it was left. */
+    fun openViewOnly(item: TrashedSession) {
+        newSession()
+        _state.update { it.copy(viewOnly = item, transcriptLoading = true) }
+        viewModelScope.launch {
+            val page = SessionsApi.sessionMessages(
+                item.sessionId,
+                item.projectKey,
+                limit = 100,
+                visibility = localVisibility(),
+                trashed = true,
+            )
+            if (_state.value.viewOnly != item) return@launch
+            val visible = page?.items.orEmpty().filter { it.visible() }
+            val loaded = nestAgents(visible.mapIndexed { i, m ->
+                ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, item.sessionId, item.projectKey, trashed = true), timestamp = m.timestamp) to m.parent
+            })
+            nextId = visible.size.toLong()
+            _state.update {
+                it.copy(
+                    messages = loaded,
+                    transcriptLoading = false,
+                    transcriptPaging = false,
+                    oldestLoadedIndex = page?.startIndex?.takeIf { _ -> page.items.isNotEmpty() },
+                    transcriptExhausted = page?.hasMore != true,
+                    contextTokens = page?.contextTokens,
+                )
+            }
+        }
+    }
+
+    /** Back to a blank chat: the trashed transcript was never this tab's session to begin with. */
+    fun closeViewOnly() {
+        if (_state.value.viewOnly == null) return
+        newSession()
+    }
+
+    fun restoreViewOnly() {
+        val item = _state.value.viewOnly ?: return
+        viewModelScope.launch {
+            restoreTrashed(item.sessionId)
+            newSession()
+            openSession(
+                SessionInfo(
+                    sessionId = item.sessionId,
+                    projectKey = item.projectKey,
+                    path = item.path,
+                    lastActive = null,
+                    size = 0L,
+                    preview = null,
+                    title = item.title,
+                    color = null,
+                )
+            )
+        }
+    }
+
+    fun purgeViewOnly() {
+        val item = _state.value.viewOnly ?: return
+        viewModelScope.launch {
+            purgeTrashed(item.sessionId)
+            newSession()
+        }
+    }
+
+    /** A view-only chat has no socket of its own, so its older pages come over HTTP. */
+    private fun loadMoreViewOnly(item: TrashedSession, before: Int) {
+        _state.update { it.copy(transcriptPaging = true) }
+        viewModelScope.launch {
+            val page = SessionsApi.sessionMessages(
+                item.sessionId,
+                item.projectKey,
+                limit = 100,
+                beforeIndex = before,
+                visibility = localVisibility(),
+                trashed = true,
+            )
+            if (_state.value.viewOnly != item) return@launch
+            if (page == null) {
+                _state.update { it.copy(transcriptPaging = false) }
+                return@launch
+            }
+            val older = page.items.filter { it.visible() }
+            _state.update { st ->
+                val prepended = older.mapIndexed { i, m ->
+                    ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, item.sessionId, item.projectKey, trashed = true), timestamp = m.timestamp)
+                }
+                nextId += prepended.size
+                st.copy(
+                    messages = prepended + st.messages,
+                    oldestLoadedIndex = page.startIndex,
+                    transcriptPaging = false,
+                    transcriptExhausted = !page.hasMore,
+                )
+            }
+        }
+    }
+
     suspend fun restoreTrashed(sessionId: String) {
         SessionsApi.restoreTrashed(sessionId)
     }
@@ -1344,9 +1449,15 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     private fun currentTabId(): String? = TabsController.tabs.firstOrNull { it.ctx === ctx }?.id
 
-    private fun imageUrls(m: SessionMessage, sessionId: String, projectKey: String?): List<String>? =
+    private fun imageUrls(
+        m: SessionMessage,
+        sessionId: String,
+        projectKey: String?,
+        trashed: Boolean = false,
+    ): List<String>? =
         m.images?.map { ref ->
-            "${baseUrl()}/sessions/$sessionId/images/$ref?project=${UrlCodec.encode(projectKey.orEmpty())}"
+            "${baseUrl()}/sessions/$sessionId/images/$ref?project=${UrlCodec.encode(projectKey.orEmpty())}" +
+                if (trashed) "&trashed=true" else ""
         }
 
     private fun onAgentChild(parent: String, event: ServerEvent) {

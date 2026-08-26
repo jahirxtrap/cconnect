@@ -11,10 +11,11 @@
 
   interface Props {
     chat: ChatState;
+    onView: (item: TrashedSession) => void;
     onDismiss: () => void;
   }
 
-  const { chat, onDismiss }: Props = $props();
+  const { chat, onView, onDismiss }: Props = $props();
 
   const ID_PREVIEW = 8;
 
@@ -47,8 +48,15 @@
       <p class="px-3 py-2.5 text-body-md text-on-surface-variant">{t("TRASH_EMPTY")}</p>
     {/if}
     {#each items as item (item.sessionId)}
-      <div class="flex items-center pr-1">
-        <span class="min-w-0 flex-1 truncate px-3 py-2.5 text-body-md">{labelOf(item)}</span>
+      <div class="flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8">
+        <!-- Opens it read-only: deciding between restore and delete is easier having seen it. -->
+        <button
+          type="button"
+          class="min-w-0 flex-1 cursor-pointer truncate px-3 py-2.5 text-left text-body-md"
+          onclick={() => onView(item)}
+        >
+          {labelOf(item)}
+        </button>
         <TooltipIconButton
           label={t("RESTORE")}
           class="size-8 [&_svg]:size-4"

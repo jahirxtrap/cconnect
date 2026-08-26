@@ -79,9 +79,12 @@ object SessionsApi {
         limit: Int = 200,
         beforeIndex: Int? = null,
         visibility: VisibilityPrefs = VisibilityPrefs(),
+        /** Reads the transcript from the trash instead of the project; only a view-only chat asks for it. */
+        trashed: Boolean = false,
     ): MessagesPage? {
         val query = mutableMapOf("project" to project, "limit" to limit.toString())
         if (beforeIndex != null) query["before_index"] = beforeIndex.toString()
+        if (trashed) query["trashed"] = "true"
         visibility.simple?.let { query["simple"] = (it == "on").toString() }
         visibility.thinking?.let { query["thinking"] = it }
         visibility.toolUse?.let { query["tool_use"] = it }

@@ -365,6 +365,7 @@ fun ChatScreen(
     var queuePreview by remember { mutableStateOf<QueuedMessage?>(null) }
     var queueFilePreview by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showRewindSheet by remember { mutableStateOf(false) }
+    var purgeViewTarget by remember { mutableStateOf<TrashedSession?>(null) }
     var showVisibility by remember { mutableStateOf(false) }
     LaunchedEffect(expanded) {
         if (expanded) {
@@ -456,8 +457,10 @@ fun ChatScreen(
     val busy = state.streaming || (state.activity ?: activeSession?.activity) in setOf("waiting", "working", "slow", "compacting")
     val tabLabel: String? = activeSession?.let { it.title ?: it.preview ?: state.sessionId?.take(8) }
     val tabColor: String? = if (activeSession != null) state.sessionColor else null
-    LaunchedEffect(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey) {
-        TabsController.updateActive(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey)
+    // The tab names the chat being read; the status line under the app name says where it lives.
+    val viewTabLabel = state.viewOnly?.let { it.title ?: it.sessionId.take(8) }
+    LaunchedEffect(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey, viewTabLabel) {
+        TabsController.updateActive(tabLabel, tabColor, busy, state.sessionId, state.activeProjectKey, viewTabLabel)
     }
     val tabIndex = remember { TabsController.tabs.indexOfFirst { it.id == TabsController.activeId } }
     val chatLoc = remember { readChatLocation() }
@@ -468,9 +471,14 @@ fun ChatScreen(
             vm.restoreSession(chatLoc.second, chatLoc.third)
         }
     }
-    ChatPopstate { tab, sid, pr ->
-        if (tab == tabIndex) {
-            if (sid != null && pr != null) vm.restoreSession(sid, pr) else vm.newSession()
+    // Going back has to land on the chat the entry points at, not only on a tab that happens to
+    // hold it: most history is made switching chats inside one tab, and that tab has to follow.
+    ChatPopstate { _, sid, pr ->
+        if (sid == null || pr == null) {
+            vm.newSession()
+        } else {
+            val open = TabsController.tabs.firstOrNull { it.sessionId == sid }
+            if (open != null) TabsController.selectTab(open.id) else vm.restoreSession(sid, pr)
         }
     }
 
@@ -674,6 +682,8 @@ fun ChatScreen(
                             topBar = {
                                 val activity = state.activity ?: activeSession?.activity
                                 val statusLeading: (@Composable () -> Unit) = when {
+                                    // Reading a deleted chat: where it lives is the whole state, there is no session to report on.
+                                    state.viewOnly != null -> ({ StatusDot(palette.gray, box = 8.dp) })
                                     state.connection == ConnectionState.Disconnected -> ({ StatusDot(palette.red, box = 8.dp) })
                                     state.connection == ConnectionState.Connecting -> ({ StatusSpinner() })
                                     activity == "waiting" -> ({ StatusDot(palette.orange, box = 8.dp) })
@@ -684,6 +694,7 @@ fun ChatScreen(
                                     else -> ({ StatusDot(palette.green, box = 8.dp) })
                                 }
                                 val statusText = when {
+                                    state.viewOnly != null -> stringResource(Res.string.trash)
                                     state.connection == ConnectionState.Disconnected -> stringResource(Res.string.server_unavailable)
                                     state.connection == ConnectionState.Connecting -> stringResource(Res.string.connecting)
                                     activity == "waiting" -> stringResource(Res.string.waiting_user)
@@ -705,17 +716,28 @@ fun ChatScreen(
                                         }
                                     }) else null,
                                     actions = {
-                                        if (state.sessionId != null && !busy) {
+                                        if (state.viewOnly != null) {
                                             TooltipIconButton(
-                                                label = stringResource(Res.string.rewind),
-                                                onClick = { vm.loadRewindPoints(); showRewindSheet = true },
-                                            ) { Icon(Lucide.History, contentDescription = null) }
+                                                label = stringResource(Res.string.restore),
+                                                onClick = { vm.restoreViewOnly() },
+                                            ) { Icon(Lucide.RotateCcw, contentDescription = null) }
+                                            TooltipIconButton(
+                                                label = stringResource(Res.string.delete),
+                                                onClick = { purgeViewTarget = state.viewOnly },
+                                            ) { Icon(Lucide.Trash, contentDescription = null) }
+                                        } else {
+                                            if (state.sessionId != null && !busy) {
+                                                TooltipIconButton(
+                                                    label = stringResource(Res.string.rewind),
+                                                    onClick = { vm.loadRewindPoints(); showRewindSheet = true },
+                                                ) { Icon(Lucide.History, contentDescription = null) }
+                                            }
+                                            TaskIndicator(todos = state.todos)
                                         }
-                                        TaskIndicator(todos = state.todos)
                                         if (mobile) TabSwitcher()
                                         TooltipIconButton(
                                             label = stringResource(Res.string.new_session),
-                                            onClick = { vm.newSession() },
+                                            onClick = { if (state.viewOnly != null) vm.closeViewOnly() else vm.newSession() },
                                         ) { Icon(Lucide.SquarePen, contentDescription = null) }
                                     },
                                 )
@@ -770,7 +792,7 @@ fun ChatScreen(
                             }
                             Column(
                                 modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.End + WindowInsetsSides.Bottom)).imePadding()
-                                .fileDropTarget(enabled = !sideActive, onDragChange = { dropOver = it }) { vm.addAttachments(it) }
+                                .fileDropTarget(enabled = !sideActive && state.viewOnly == null, onDragChange = { dropOver = it }) { vm.addAttachments(it) }
                                 .then(if (dropOver) Modifier.border(snapDp(2.dp), MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp)) else Modifier),
                             ) {
                                 BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds()) {
@@ -988,6 +1010,8 @@ fun ChatScreen(
                                         )
                                     }
                                 }
+                                // Nothing can be sent to a chat that is only being read, so the composer is not there at all.
+                                if (state.viewOnly == null) {
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -1066,6 +1090,7 @@ fun ChatScreen(
                                             controls = if (sideActive) null else composerControls,
                                         )
                                     }
+                                }
                             }
                         }
                     }
@@ -1122,6 +1147,15 @@ fun ChatScreen(
             initial = s.title ?: s.preview ?: "",
             onConfirm = { vm.renameSession(s, it); renameTarget = null },
             onDismiss = { renameTarget = null },
+        )
+    }
+    purgeViewTarget?.let { item ->
+        ConfirmDialog(
+            title = stringResource(Res.string.delete),
+            text = stringResource(Res.string.delete_conversation_confirm, item.title ?: item.sessionId.take(8)),
+            confirmLabel = stringResource(Res.string.delete),
+            onConfirm = { vm.purgeViewOnly(); purgeViewTarget = null },
+            onDismiss = { purgeViewTarget = null },
         )
     }
     deleteTarget?.let { s ->
@@ -2764,7 +2798,11 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
         }
     }
     if (trashOpen) {
-        TrashDialog(vm = vm, onDismiss = { trashOpen = false })
+        TrashDialog(
+            vm = vm,
+            onView = { vm.openViewOnly(it); trashOpen = false; onDismiss() },
+            onDismiss = { trashOpen = false },
+        )
     }
     deletingCategory?.let { category ->
         ConfirmDialog(
@@ -2793,7 +2831,7 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
 }
 
 @Composable
-private fun TrashDialog(vm: ChatViewModel, onDismiss: () -> Unit) {
+private fun TrashDialog(vm: ChatViewModel, onView: (TrashedSession) -> Unit, onDismiss: () -> Unit) {
     var items by remember { mutableStateOf<List<TrashedSession>>(emptyList()) }
     var emptying by remember { mutableStateOf(false) }
     var purging by remember { mutableStateOf<TrashedSession?>(null) }
@@ -2828,8 +2866,13 @@ private fun TrashDialog(vm: ChatViewModel, onDismiss: () -> Unit) {
                 )
             }
             items.forEach { item ->
+                // The whole row opens it read-only, like a chat row does, so the hover covers it all.
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(end = 4.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(Radius.item))
+                        .clickable { onView(item) }
+                        .padding(end = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(

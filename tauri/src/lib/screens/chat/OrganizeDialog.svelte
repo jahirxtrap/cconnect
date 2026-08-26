@@ -265,7 +265,15 @@
 </CompactDialog>
 
 {#if trashOpen}
-  <TrashDialog {chat} onDismiss={() => (trashOpen = false)} />
+  <TrashDialog
+    {chat}
+    onView={(item) => {
+      void chat.openViewOnly(item);
+      trashOpen = false;
+      onDismiss();
+    }}
+    onDismiss={() => (trashOpen = false)}
+  />
 {/if}
 
 {#if addingProject}

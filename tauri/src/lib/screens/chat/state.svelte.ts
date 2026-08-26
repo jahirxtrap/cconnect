@@ -49,7 +49,12 @@ import { createCapabilitiesApi, type Capabilities, type CommandOption } from "$l
 import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi } from "$lib/services/settingsApi";
-import { createSessionsApi, type RewindPoint, type RewindPreview } from "$lib/services/sessionsApi";
+import {
+  createSessionsApi,
+  type RewindPoint,
+  type RewindPreview,
+  type TrashedSession,
+} from "$lib/services/sessionsApi";
 import { uploadAttachment, UPLOAD_DIR } from "$lib/services/uploadApi";
 
 const DEFAULTS = {
@@ -178,6 +183,8 @@ export class ChatState {
   defaultCategory = $state("");
   /** Deleting a chat only sets it aside, so the confirmation says so and the trash is reachable. */
   trashEnabled = $state(false);
+  /** A chat opened for reading only: the transcript renders as always, nothing can be sent to it. */
+  viewOnly = $state<TrashedSession | null>(null);
   /** Category this chat was started in; applied once the session has an id of its own. */
   pendingCategoryId: string | null = null;
   draft = $state("");
@@ -645,6 +652,7 @@ export class ChatState {
   }
 
   newSession() {
+    this.viewOnly = null;
     this.pendingCategoryId = null;
     this.sessionId = null;
     this.projectKey = null;
@@ -674,6 +682,7 @@ export class ChatState {
 
   async #openSession(session: SessionInfo) {
     this.#freeze();
+    this.viewOnly = null;
     this.pendingCategoryId = null;
     if (session.sessionId !== this.sessionId) {
       this.sessionId = session.sessionId;
@@ -715,13 +724,41 @@ export class ChatState {
   }
 
   loadOlder() {
+    const before = this.oldestLoadedIndex;
+    if (before === null || this.transcriptExhausted || this.transcriptLoading || this.transcriptPaging) return;
+    // A view-only chat has no socket of its own, so its older pages come over HTTP.
+    if (this.viewOnly) {
+      void this.#loadOlderViewOnly(this.viewOnly, before);
+      return;
+    }
     const sessionId = this.sessionId;
     const project = this.#projectKey();
-    const before = this.oldestLoadedIndex;
-    if (!sessionId || !project || before === null || this.transcriptExhausted) return;
-    if (this.transcriptLoading || this.transcriptPaging) return;
+    if (!sessionId || !project) return;
     this.transcriptPaging = true;
     this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE);
+  }
+
+  async #loadOlderViewOnly(item: TrashedSession, before: number) {
+    this.transcriptPaging = true;
+    const page = await this.#sessions.messages(
+      item.sessionId,
+      item.projectKey,
+      HISTORY_PAGE,
+      before,
+      settings.visibility,
+      true,
+    );
+    if (this.viewOnly !== item) return;
+    this.transcriptPaging = false;
+    if (!page) return;
+    const older = page.items.filter(isVisible);
+    const prepended = this.#nest(
+      older.map((message, index) => this.#fromSession(message, this.#nextId + index, item.sessionId, item.projectKey)),
+    );
+    this.#nextId += older.length;
+    this.messages = [...prepended, ...this.messages];
+    this.oldestLoadedIndex = page.startIndex;
+    this.transcriptExhausted = !page.hasMore;
   }
 
   setActivePage(requestId: string, index: number) {
@@ -1030,6 +1067,65 @@ export class ChatState {
 
   async trash() {
     return await this.#sessions.trash();
+  }
+
+  /** Reads a deleted chat in place of this tab's conversation. Nothing is sent while it is up:
+   *  the socket keeps its own session, so leaving the view restores the tab as it was left. */
+  async openViewOnly(item: TrashedSession) {
+    this.newSession();
+    this.viewOnly = item;
+    this.transcriptLoading = true;
+    const page = await this.#sessions.messages(
+      item.sessionId,
+      item.projectKey,
+      HISTORY_PAGE,
+      null,
+      settings.visibility,
+      true,
+    );
+    if (this.viewOnly !== item) return;
+    const visible = (page?.items ?? []).filter(isVisible);
+    this.messages = this.#nest(
+      visible.map((message, index) => this.#fromSession(message, index, item.sessionId, item.projectKey)),
+    );
+    this.#nextId = visible.length;
+    this.oldestLoadedIndex = page && page.items.length ? page.startIndex : null;
+    this.transcriptExhausted = !page?.hasMore;
+    this.contextTokens = page?.contextTokens ?? null;
+    this.transcriptLoading = false;
+  }
+
+  /** Back to a blank chat: the trashed transcript was never this tab's session to begin with. */
+  closeViewOnly() {
+    if (!this.viewOnly) return;
+    this.viewOnly = null;
+    this.newSession();
+  }
+
+  async restoreViewOnly() {
+    const item = this.viewOnly;
+    if (!item) return;
+    await this.restoreTrashed(item.sessionId);
+    this.viewOnly = null;
+    this.newSession();
+    this.openSession({
+      sessionId: item.sessionId,
+      projectKey: item.projectKey,
+      path: item.path,
+      lastActive: null,
+      size: 0,
+      preview: null,
+      title: item.title,
+      color: null,
+      activity: null,
+    });
+  }
+
+  async purgeViewOnly() {
+    const item = this.viewOnly;
+    if (!item) return;
+    await this.purgeTrashed(item.sessionId);
+    this.closeViewOnly();
   }
 
   async restoreTrashed(sessionId: string) {

@@ -283,9 +283,9 @@ async def rewind_session(session_id: str, body: RewindBody):
 
 
 @router.get("/sessions/{session_id}/images/{message_uuid}/{index}")
-def get_session_image(session_id: str, message_uuid: str, index: int, project: str):
+def get_session_image(session_id: str, message_uuid: str, index: int, project: str, trashed: bool = False):
     try:
-        result = sessions_service.get_message_image(project, session_id, message_uuid, index)
+        result = sessions_service.get_message_image(project, session_id, message_uuid, index, trashed)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if result is None:
@@ -306,6 +306,7 @@ def get_session_messages(
     file_change: str | None = None,
     compact: str | None = None,
     working: str | None = None,
+    trashed: bool = False,
 ):
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="invalid limit")
@@ -317,10 +318,10 @@ def get_session_messages(
             "file_change": file_change,
             "compact": compact,
             "working": working,
-        })
+        }, trashed)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    cut = registry.committed_cut(session_id)
+    cut = None if trashed else registry.committed_cut(session_id)
     if cut is not None:
         items = items[:cut]
     total = len(items)
@@ -332,5 +333,5 @@ def get_session_messages(
         "total": total,
         "start_index": start,
         "has_more": start > 0,
-        "context_tokens": sessions_service.last_context_tokens(project, session_id),
+        "context_tokens": sessions_service.last_context_tokens(project, session_id, trashed),
     })

@@ -74,12 +74,26 @@ def _project_dir(project_key: str) -> Path:
     return path
 
 
-def _session_file(project_key: str, session_id: str) -> Path:
+def _session_file(project_key: str, session_id: str, trashed: bool = False) -> Path:
     if not _SESSION_RE.match(session_id):
         raise ValueError("invalid session id")
-    path = (_project_dir(project_key) / f"{session_id}.jsonl").resolve()
-    if path.parent != _project_dir(project_key):
+    # Reading a deleted chat is opt-in per call: no caller falls back to the trash on its own, so
+    # renaming, moving or deleting can never reach a chat that is already there.
+    directory = _trash_dir(project_key) if trashed else _project_dir(project_key)
+    path = (directory / f"{session_id}.jsonl").resolve()
+    if path.parent != directory:
         raise ValueError("session id escapes the project directory")
+    return path
+
+
+def _trash_dir(project_key: str) -> Path:
+    from services.trash import TRASH_DIR
+
+    if not _KEY_RE.match(project_key):
+        raise ValueError("invalid project key")
+    path = (_base() / TRASH_DIR / project_key).resolve()
+    if (_base() / TRASH_DIR).resolve() not in path.parents:
+        raise ValueError("project key escapes the trash directory")
     return path
 
 
@@ -118,9 +132,9 @@ def _last_compact_offset(path: Path, block: int = 1 << 20) -> int:
     return 0
 
 
-def last_context_tokens(project_key: str, session_id: str) -> Optional[int]:
+def last_context_tokens(project_key: str, session_id: str, trashed: bool = False) -> Optional[int]:
     try:
-        file = _session_file(project_key, session_id)
+        file = _session_file(project_key, session_id, trashed)
     except ValueError:
         return None
     if not file.is_file():
@@ -1016,8 +1030,13 @@ def _working(messages, vis) -> None:
     messages.append({"type": "working"})
 
 
-def get_session_messages(project_key: str, session_id: str, prefs: dict | None = None) -> list[dict]:
-    file = _session_file(project_key, session_id)
+def get_session_messages(
+    project_key: str,
+    session_id: str,
+    prefs: dict | None = None,
+    trashed: bool = False,
+) -> list[dict]:
+    file = _session_file(project_key, session_id, trashed)
     if not file.is_file():
         return []
     entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
@@ -1332,10 +1351,16 @@ def get_session_messages(project_key: str, session_id: str, prefs: dict | None =
     return messages
 
 
-def get_message_image(project_key: str, session_id: str, uuid: str, index: int) -> tuple[str, bytes] | None:
+def get_message_image(
+    project_key: str,
+    session_id: str,
+    uuid: str,
+    index: int,
+    trashed: bool = False,
+) -> tuple[str, bytes] | None:
     import base64
 
-    file = _session_file(project_key, session_id)
+    file = _session_file(project_key, session_id, trashed)
     if not file.is_file():
         return None
     for entry in _iter_lines(file):

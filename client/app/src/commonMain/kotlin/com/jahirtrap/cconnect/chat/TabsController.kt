@@ -143,13 +143,25 @@ object TabsController {
         return tab
     }
 
-    fun updateActive(title: String?, color: String?, running: Boolean, sessionId: String?, projectKey: String?) {
+    /** [viewTitle] names a chat being read: the tab has no session of its own while it is up, and
+     *  it is never persisted — a restored tab is a blank one, not a view of something deleted. */
+    fun updateActive(
+        title: String?,
+        color: String?,
+        running: Boolean,
+        sessionId: String?,
+        projectKey: String?,
+        viewTitle: String? = null,
+    ) {
         val tab = active
         tab.running = running
         var changed = tab.sessionId != sessionId || tab.projectKey != projectKey
         tab.sessionId = sessionId
         tab.projectKey = projectKey
-        if (sessionId == null) {
+        if (viewTitle != null) {
+            if (tab.title != viewTitle) { tab.title = viewTitle; changed = true }
+            if (tab.color != null) { tab.color = null; changed = true }
+        } else if (sessionId == null) {
             if (tab.title != null) { tab.title = null; changed = true }
             if (tab.color != null) { tab.color = null; changed = true }
         } else {

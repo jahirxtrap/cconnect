@@ -6,9 +6,11 @@
   import History from "@lucide/svelte/icons/history";
   import Menu from "@lucide/svelte/icons/menu";
   import PanelLeftOpen from "@lucide/svelte/icons/panel-left-open";
+  import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Settings from "@lucide/svelte/icons/settings";
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
+  import Trash from "@lucide/svelte/icons/trash";
   import Type from "@lucide/svelte/icons/type";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
@@ -81,6 +83,7 @@
   let confirmCommand = $state<CommandOption | null>(null);
   let dismissed = $state<CompatNotice[]>([]);
   let rewindOpen = $state(false);
+  let purgeViewOpen = $state(false);
   let queuedId = $state<string | null>(null);
   let sharedLink = $state<{ url: string; filename: string } | null>(null);
   let visibilityOpen = $state(false);
@@ -179,11 +182,19 @@
       sessionId: chat.sessionId,
       projectKey: chat.projectKey,
       running: busy,
+      // The tab names the chat being read; the status line under the app name says where it lives.
+      viewTitle: chat.viewOnly ? viewLabel : null,
     });
     tabs.syncUrl();
   });
 
+  const viewLabel = $derived(
+    chat.viewOnly ? (chat.viewOnly.title ?? chat.viewOnly.sessionId.slice(0, SESSION_ID_PREVIEW)) : "",
+  );
+
   const status = $derived.by(() => {
+    // Reading a deleted chat: where it lives is the whole state, there is no session to report on.
+    if (chat.viewOnly) return { dot: "bg-gray", spinner: false, text: t("TRASH") };
     if (chat.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
     if (chat.connection === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
     if (activity === "waiting") return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
@@ -300,22 +311,34 @@
         {/if}
       {/snippet}
       {#snippet actions()}
-        {#if chat.sessionId !== null && !busy}
-          <TooltipIconButton
-            label={t("REWIND")}
-            onclick={() => {
-              rewindOpen = true;
-              void chat.loadRewindPoints();
-            }}
-          >
-            <History size={20} />
+        {#if chat.viewOnly}
+          <TooltipIconButton label={t("RESTORE")} onclick={() => void chat.restoreViewOnly()}>
+            <RotateCcw size={20} />
           </TooltipIconButton>
+          <TooltipIconButton label={t("DELETE")} onclick={() => (purgeViewOpen = true)}>
+            <Trash size={20} />
+          </TooltipIconButton>
+        {:else}
+          {#if chat.sessionId !== null && !busy}
+            <TooltipIconButton
+              label={t("REWIND")}
+              onclick={() => {
+                rewindOpen = true;
+                void chat.loadRewindPoints();
+              }}
+            >
+              <History size={20} />
+            </TooltipIconButton>
+          {/if}
+          <TaskIndicator todos={chat.todos} />
         {/if}
-        <TaskIndicator todos={chat.todos} />
         {#if layout.mobile}
           <TabSwitcher />
         {/if}
-        <TooltipIconButton label={t("NEW_SESSION")} onclick={() => chat.newSession()}>
+        <TooltipIconButton
+          label={t("NEW_SESSION")}
+          onclick={() => (chat.viewOnly ? chat.closeViewOnly() : chat.newSession())}
+        >
           <SquarePen size={20} />
         </TooltipIconButton>
       {/snippet}
@@ -325,6 +348,7 @@
     <div
       class="relative flex min-h-0 flex-1 flex-col"
       ondragover={(event) => {
+        if (chat.viewOnly) return;
         event.preventDefault();
         dropOver = canAttach;
       }}
@@ -401,6 +425,8 @@
       </div>
     {/if}
 
+    <!-- Nothing can be sent to a chat that is only being read, so the composer is not there at all. -->
+    {#if !chat.viewOnly}
     <div class="shrink-0" bind:clientHeight={composerHeight}>
     <Composer
       streaming={chat.sideOpen ? chat.sideStreaming : busy}
@@ -426,6 +452,7 @@
         controls={chat.sideOpen ? undefined : controls}
       />
     </div>
+    {/if}
     </div>
   </div>
 </div>
@@ -666,6 +693,20 @@
       confirmCommand = null;
     }}
     onDismiss={() => (confirmCommand = null)}
+  />
+{/if}
+
+{#if purgeViewOpen && chat.viewOnly}
+  {@const target = chat.viewOnly}
+  <ConfirmDialog
+    title={t("DELETE")}
+    text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? target.sessionId.slice(0, SESSION_ID_PREVIEW))}
+    confirmLabel={t("DELETE")}
+    onConfirm={() => {
+      void chat.purgeViewOnly();
+      purgeViewOpen = false;
+    }}
+    onDismiss={() => (purgeViewOpen = false)}
   />
 {/if}
 
