@@ -19,8 +19,12 @@ import org.json.JSONObject
  *  reaches JS. Declaring it here is what the Compose client gets from `contentReceiver`. */
 class PastedContent(private val webView: WebView) : OnReceiveContentListener {
 
+    private companion object {
+        val MIME_TYPES = arrayOf("image/*", "video/*", "audio/*", "text/*", "application/*")
+    }
+
     fun install() {
-        ViewCompat.setOnReceiveContentListener(webView, arrayOf("*/*"), this)
+        ViewCompat.setOnReceiveContentListener(webView, MIME_TYPES, this)
     }
 
     override fun onReceiveContent(view: View, payload: ContentInfoCompat): ContentInfoCompat? {
