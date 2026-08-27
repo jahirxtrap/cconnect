@@ -332,6 +332,23 @@ none of them is needed to start the server, and each one degrades on its own.
 - **Ookla speedtest** — the speed test in Monitor → Network, which otherwise
   reports the CLI as unavailable.
 
+## Configuration
+
+Everything the backend reads comes from environment variables, taken from the
+process or from a `backend/.env` file (see `.env.example`). None of them is
+required for a plain local run.
+
+| Variable | Default | What it does |
+|---|---|---|
+| `PORT` | `8723` | Port the backend binds to |
+| `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Where Claude Code keeps its sessions |
+| `DEFAULT_MODEL` | `opus` | Model used when the app doesn't override it |
+| `DEFAULT_EFFORT` | `max` | Same, for the effort level |
+| `DEFAULT_PERMISSION_MODE` | `default` | Same, for the permission mode |
+| `AUTO_UPDATE_SDK` | `1` | Upgrades `claude-agent-sdk` on startup; set `0` to pin it |
+| `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `--expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
+| `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
+
 ## Staying current
 
 The app and the backend declare which versions of each other — and of the

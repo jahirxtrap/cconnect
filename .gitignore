@@ -29,3 +29,6 @@ backend/internal_task/
 
 # Shared drop folder (quick PC -> phone file sharing, served download-only)
 backend/shared/
+
+# Serena (project config, cache and memories)
+.serena/
