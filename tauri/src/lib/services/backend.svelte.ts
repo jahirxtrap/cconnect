@@ -46,12 +46,13 @@ export const isConfigured = (profile: Profile): profile is EnvironmentProfile =>
 
 export const baseUrlOf = (profile: Profile) => (isConfigured(profile) ? `${origin(profile, false)}/api` : "");
 
-export const socketUrlOf = (profile: Profile, path: string) => {
-  if (!isConfigured(profile)) return "";
-  const url = `${origin(profile, true)}/api${path}`;
-  const token = profile.authKind === "bearer" ? profile.authToken : "";
+export const withToken = (url: string, profile: Profile) => {
+  const token = profile?.authKind === "bearer" ? profile.authToken : "";
   return token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
 };
+
+export const socketUrlOf = (profile: Profile, path: string) =>
+  isConfigured(profile) ? withToken(`${origin(profile, true)}/api${path}`, profile) : "";
 
 export const authHeadersOf = (profile: Profile): Record<string, string> => {
   if (!profile) return {};

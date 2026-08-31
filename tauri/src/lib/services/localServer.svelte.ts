@@ -15,6 +15,18 @@ export interface LocalServerInfo {
 
 export type LocalServerState = "stopped" | "starting" | "running" | "external" | "failed";
 
+export const localServerStateOf = (
+  info: LocalServerInfo,
+  reachable: boolean,
+  connecting: boolean,
+): LocalServerState => {
+  if (info.error !== null) return "failed";
+  if ((info.ready || reachable) && info.managed) return "running";
+  if (info.ready || reachable) return "external";
+  if (info.managed || connecting) return "starting";
+  return "stopped";
+};
+
 const DEFAULT_PORT = 8723;
 const STATUS_EVENT = "local-server://status";
 
@@ -38,12 +50,6 @@ const config = () => ({
 
 class LocalServer {
   info = $state<LocalServerInfo>(empty);
-
-  readonly state = $derived.by<LocalServerState>(() => {
-    if (this.info.error !== null) return "failed";
-    if (this.info.ready) return this.info.managed ? "running" : "external";
-    return this.info.managed ? "starting" : "stopped";
-  });
 
   start() {
     void this.#call("local_server_start", { config: config() });

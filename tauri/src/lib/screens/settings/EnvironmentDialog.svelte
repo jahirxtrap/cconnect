@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Folder from "@lucide/svelte/icons/folder";
   import Lock from "@lucide/svelte/icons/lock";
   import LockOpen from "@lucide/svelte/icons/lock-open";
   import ScanQrCode from "@lucide/svelte/icons/scan-qr-code";
@@ -14,17 +15,19 @@
   import AccentDialog from "./AccentDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
+  import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
     profile: EnvironmentProfile;
     isNew: boolean;
+    isActive: boolean;
     onSave: (profile: EnvironmentProfile) => void;
     onDismiss: () => void;
   }
 
-  const { profile, isNew, onSave, onDismiss }: Props = $props();
+  const { profile, isNew, isActive, onSave, onDismiss }: Props = $props();
 
   const HTTP_PORT = "8723";
   const HTTPS_PORT = "443";
@@ -100,6 +103,7 @@
   let directory = $state(initial.directory);
   let accentIndex = $state<number | null>(initial.accentIndex);
   let picking = $state(false);
+  let browsing = $state(false);
 
   const onHost = (input: string) => {
     const parsed = parseHostInput(input);
@@ -211,6 +215,15 @@
       singleLine
     >
       {#snippet trailing()}
+        {#if isActive}
+          <TooltipIconButton
+            label={t("CHOOSE")}
+            onclick={() => (browsing = true)}
+            class="size-6 [&_svg]:size-[18px]"
+          >
+            <Folder size={18} class="text-on-surface-variant" />
+          </TooltipIconButton>
+        {/if}
         <TooltipIconButton
           label={settings.projectLocked ? t("UNLOCK_SELECTION") : t("LOCK_SELECTION")}
           onclick={() => (settings.projectLocked = !settings.projectLocked)}
@@ -237,6 +250,17 @@
     </SelectField>
   </div>
 </CompactDialog>
+
+{#if browsing}
+  <PathPickerDialog
+    start={directory}
+    onConfirm={(chosen) => {
+      directory = chosen;
+      browsing = false;
+    }}
+    onDismiss={() => (browsing = false)}
+  />
+{/if}
 
 {#if picking}
   <AccentDialog

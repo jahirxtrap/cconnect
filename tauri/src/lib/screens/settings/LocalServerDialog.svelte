@@ -5,7 +5,7 @@
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import { pickPath } from "$lib/ui/pathPicker.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { localServer } from "$lib/services/localServer.svelte";
+  import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
@@ -13,10 +13,11 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
+    serverReady: boolean;
     onDismiss: () => void;
   }
 
-  const { onDismiss }: Props = $props();
+  const { serverReady, onDismiss }: Props = $props();
 
   let dir = $state(settings.localServerDir);
   let python = $state(settings.localServerPython);
@@ -60,7 +61,7 @@
 
   const panel = $derived.by(() => {
     if (failure) return failure;
-    if (localServer.state === "external") return null;
+    if (localServerStateOf(info, serverReady, false) === "external") return null;
     const lines = [`${t("LOCAL_URL")}: http://localhost:${backend.active?.port ?? 8723}`];
     if (mode !== "local") {
       if (info.publicUrl) lines.push(`${t("PUBLIC_URL")}: ${info.publicUrl}`);

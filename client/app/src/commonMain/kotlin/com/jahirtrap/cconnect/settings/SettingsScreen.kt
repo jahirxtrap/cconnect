@@ -103,6 +103,7 @@ import com.jahirtrap.cconnect.ui.theme.LocalMonoFontFamily
 import com.composables.icons.lucide.Server
 import com.composables.icons.lucide.SquareTerminal
 import com.composables.icons.lucide.Shield
+import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Sparkles
 import com.composables.icons.lucide.Terminal
 import com.composables.icons.lucide.Trash
@@ -112,6 +113,7 @@ import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.EnvironmentProfile
+import com.jahirtrap.cconnect.data.McpTool
 import com.jahirtrap.cconnect.data.QrEnvironmentPayload
 import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.Settings
@@ -178,6 +180,7 @@ import com.jahirtrap.cconnect.ui.InputField
 import com.jahirtrap.cconnect.ui.SelectDialog
 import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.SwitchRow
+import com.jahirtrap.cconnect.ui.PathPickerDialog
 import com.jahirtrap.cconnect.ui.PickerIcon
 import com.jahirtrap.cconnect.ui.TooltipIconButton
 import com.jahirtrap.cconnect.ui.EmptyState
@@ -232,6 +235,7 @@ fun SettingsScreen(
     var permissionMode by remember { mutableStateOf(caps.defaults.permissionMode) }
     var streaming by remember { mutableStateOf(true) }
     var todoTools by remember { mutableStateOf(false) }
+    var mcpDisabled by remember { mutableStateOf("") }
     var showThinking by remember { mutableStateOf("full") }
     var showToolUse by remember { mutableStateOf("label") }
     var showFileChange by remember { mutableStateOf("full") }
@@ -255,6 +259,7 @@ fun SettingsScreen(
         if (s != null) {
             model = s.model; effort = s.effort; permissionMode = s.permissionMode; streaming = s.streaming
             todoTools = s.todoTools
+            mcpDisabled = s.mcpDisabled
             account = s.account.ifEmpty { caps.defaults.account }
             simpleMode = s.simpleMode
             trashEnabled = s.trashEnabled
@@ -476,6 +481,13 @@ fun SettingsScreen(
                         },
                     ) { dialog = SettingsDialog.Cli }
                     PreferenceRow(Lucide.Sparkles, stringResource(Res.string.generation), serverSummary("${caps.models.firstOrNull { it.id == model }?.label ?: model} • $effort"), enabled = serverReady) { dialog = SettingsDialog.Generation }
+                    val hiddenTools = mcpDisabled.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                    PreferenceRow(
+                        Lucide.Unplug,
+                        stringResource(Res.string.mcp_tools),
+                        serverSummary(stringResource(Res.string.mcp_tools_count, caps.mcpTools.count { it.name !in hiddenTools }, caps.mcpTools.size)),
+                        enabled = serverReady,
+                    ) { dialog = SettingsDialog.McpTools }
                     PreferenceRow(Lucide.Shield, stringResource(Res.string.permissions), serverSummary(permissionLabel(caps, permissionMode)), enabled = serverReady) { dialog = SettingsDialog.Permissions }
                     PreferenceRow(Lucide.Eye, stringResource(Res.string.visibility), serverSummary(stringResource(Res.string.visibility_summary)), enabled = serverReady) { dialog = SettingsDialog.Visibility }
                     PreferenceRow(
@@ -841,6 +853,17 @@ fun SettingsScreen(
             onDismiss = { dialog = null },
         )
 
+        SettingsDialog.McpTools -> McpToolsDialog(
+            tools = caps.mcpTools,
+            disabled = mcpDisabled,
+            onConfirm = { value ->
+                mcpDisabled = value
+                scope.launch { SettingsApi.update(mcpDisabled = value) }
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+
         SettingsDialog.Permissions -> ConfirmSelectDialog(
             title = stringResource(Res.string.permission_mode),
             options = caps.permissionModes.map { it.id to it.label },
@@ -898,6 +921,7 @@ fun SettingsScreen(
                     SettingsApi.reset()?.let {
                         model = it.model; effort = it.effort; permissionMode = it.permissionMode; streaming = it.streaming
                         todoTools = it.todoTools
+                        mcpDisabled = it.mcpDisabled
                         simpleMode = it.simpleMode
                         trashEnabled = it.trashEnabled
                         showThinking = it.showThinking; showToolUse = it.showToolUse
@@ -980,7 +1004,7 @@ fun SettingsScreen(
     }
 }
 
-private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, Permissions, Visibility, Notifications, Reset, LocalServer, Account, Export, Import, Switch }
+private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, McpTools, Permissions, Visibility, Notifications, Reset, LocalServer, Account, Export, Import, Switch }
 
 @Composable
 private fun BackupDialog(
@@ -1455,7 +1479,12 @@ private fun EnvironmentsDialog(
         EnvironmentEditDialog(initial = null, onConfirm = { onSave(it); adding = false }, onDismiss = { adding = false })
     }
     editing?.let { c ->
-        EnvironmentEditDialog(initial = c, onConfirm = { onSave(it); editing = null }, onDismiss = { editing = null })
+        EnvironmentEditDialog(
+            initial = c,
+            isActive = c.id == activeId,
+            onConfirm = { onSave(it); editing = null },
+            onDismiss = { editing = null },
+        )
     }
     scanned?.let { c ->
         EnvironmentEditDialog(
@@ -1482,6 +1511,7 @@ private fun EnvironmentEditDialog(
     onConfirm: (EnvironmentProfile) -> Unit,
     onDismiss: () -> Unit,
     focusName: Boolean = false,
+    isActive: Boolean = false,
 ) {
     val qrAvailable = remember { QrScan.isAvailable() }
     var kind by remember { mutableStateOf(initial?.kind ?: if (isWebPlatform) "https" else "http") }
@@ -1497,6 +1527,7 @@ private fun EnvironmentEditDialog(
     var authHeaderValue by remember { mutableStateOf(initial?.authHeaderValue ?: "") }
     var accentIndex by remember { mutableStateOf(initial?.accentIndex) }
     var picking by remember { mutableStateOf(false) }
+    var browsing by remember { mutableStateOf(false) }
     val systemColor = systemAccent() ?: MaterialTheme.colorScheme.primary
     val dynamicLabel = stringResource(Res.string.accent_dynamic)
 
@@ -1628,8 +1659,11 @@ private fun EnvironmentEditDialog(
             label = { Text(stringResource(Res.string.environment_directory)) },
             singleLine = true,
             trailingIcon = {
-                val locked by SelectionLock.project.collectAsState()
-                LockToggle(locked = locked, onToggle = { SelectionLock.setProject(it) }, size = 24.dp)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (isActive) PickerIcon(onClick = { browsing = true })
+                    val locked by SelectionLock.project.collectAsState()
+                    LockToggle(locked = locked, onToggle = { SelectionLock.setProject(it) }, size = 24.dp)
+                }
             },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -1647,6 +1681,17 @@ private fun EnvironmentEditDialog(
                 }
             },
             onClick = { picking = true },
+        )
+    }
+
+    if (browsing) {
+        PathPickerDialog(
+            start = directory,
+            onConfirm = {
+                directory = it
+                browsing = false
+            },
+            onDismiss = { browsing = false },
         )
     }
 
@@ -1699,6 +1744,46 @@ private fun GenerationDialog(
             checked = t,
             summary = stringResource(Res.string.task_tools_desc),
         ) { t = it }
+    }
+}
+
+@Composable
+private fun McpToolsDialog(
+    tools: List<McpTool>,
+    disabled: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var hidden by remember {
+        mutableStateOf(disabled.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet())
+    }
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.mcp_tools),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(hidden.joinToString(",")) }) { Text(stringResource(Res.string.save)) }
+        },
+    ) {
+        if (tools.isEmpty()) {
+            EmptyState(stringResource(Res.string.mcp_tools_empty), Modifier.fillMaxWidth().padding(vertical = 24.dp))
+        } else {
+            Text(
+                stringResource(Res.string.mcp_tools_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+            tools.forEach { tool ->
+                SwitchRow(
+                    title = tool.name,
+                    checked = tool.name !in hidden,
+                    summary = tool.description.ifEmpty { null },
+                ) { enabled ->
+                    hidden = if (enabled) hidden - tool.name else hidden + tool.name
+                }
+            }
+        }
     }
 }
 

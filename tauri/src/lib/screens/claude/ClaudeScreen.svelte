@@ -17,10 +17,10 @@
   import { isTouch } from "$lib/platform";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import type { ProjectInfo } from "$lib/data/models";
+  import { projectNameOf, type ProjectInfo } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { settings } from "$lib/data/settings.svelte";
-  import { plural, t } from "$lib/i18n/index.svelte";
+  import { t } from "$lib/i18n/index.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import { accountsApi, type AccountsSnapshot } from "$lib/services/accountsApi";
   import { claudeApi, type Extensions, type McpServer, type ServiceStatus, type Skill, type Usage } from "$lib/services/claudeApi";
@@ -282,16 +282,23 @@
           {@render link(
             Blocks,
             t("PLUGINS"),
-            extensions ? plural("ENABLED_COUNT", enabledPlugins, enabledPlugins, extensions.plugins.length) : "—",
+            extensions ? t("ENABLED_COUNT", enabledPlugins, extensions.plugins.length) : "—",
             "plugins",
           )}
           {@render link(Wand, t("SKILLS"), skills ? String(skills.length) : "—", "skills")}
-          {@render link(Unplug, t("MCP_SERVERS"), mcpServers ? String(mcpServers.length) : "—", "mcp")}
+          {@const enabledServers = mcpServers?.filter((item) => item.enabled).length ?? 0}
+          {@render link(
+            Unplug,
+            t("MCP_SERVERS"),
+            mcpServers ? t("ENABLED_COUNT", enabledServers, mcpServers.length) : "—",
+            "mcp",
+          )}
           {@render link(Store, t("MARKETPLACES"), extensions ? String(extensions.marketplaces.length) : "—", "marketplaces")}
+          {@const memoryProject = chat.defaultProjectKey(projects) ?? chat.projectKey}
           {@render link(
             Brain,
             t("MEMORIES"),
-            chat.defaultProjectKey(projects) ?? chat.projectKey ?? "—",
+            memoryProject ? projectNameOf(projects, memoryProject, chat.cwd) : "—",
             "memories",
           )}
         </SettingsGroup>
@@ -317,8 +324,8 @@
       label: profile.name,
       subtitle: address(profile),
     }))}
-    selected={backend.activeId ?? ""}
-    onSelect={(id) => backend.select(id)}
+    selected={chat.environmentId ?? ""}
+    onSelect={(id) => chat.selectEnvironment(id)}
     onDismiss={() => (envOpen = false)}
   />
 {/if}

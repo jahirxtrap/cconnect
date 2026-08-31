@@ -72,6 +72,10 @@
     <string name="streaming_desc">Show reasoning and replies as they are generated</string>
     <string name="task_tools">Task tracking</string>
     <string name="task_tools_desc">Let Claude keep a task list, shown in the chat bar. Recent models omit it to save context</string>
+    <string name="mcp_tools">Tools</string>
+    <string name="mcp_tools_desc">Built-in tools this server offers Claude in every chat.</string>
+    <string name="mcp_tools_count">%1$d/%2$d enabled</string>
+    <string name="mcp_tools_empty">No tools</string>
     <string name="permissions">Permissions</string>
     <string name="permission_mode">Default permission mode</string>
     <string name="export_settings">Export settings</string>
@@ -139,10 +143,7 @@
     <string name="add">Add</string>
     <string name="transport">Transport</string>
     <string name="command_or_url">Command or URL</string>
-    <plurals name="enabled_count">
-        <item quantity="one">%1$d/%2$d enabled</item>
-        <item quantity="other">%1$d/%2$d enabled</item>
-    </plurals>
+    <string name="enabled_count">%1$d/%2$d enabled</string>
     <string name="monitor">Monitor</string>
     <string name="resources">Resources</string>
     <string name="background_group">Background</string>

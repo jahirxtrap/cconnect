@@ -13,7 +13,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { platformName } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
-  import { authHeadersOf, backend } from "$lib/services/backend.svelte";
+  import { authHeadersOf, backend, withToken } from "$lib/services/backend.svelte";
   import { mediaSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl } from "$lib/services/sharedApi";
   import {
@@ -51,10 +51,6 @@
   let formatted = $state(settings.markdownPreviewFormatted);
   let menu = $state(false);
   let confirmingDelete = $state(false);
-  let frame = $state<HTMLIFrameElement | null>(null);
-  let frameWidth = $state(0);
-  let frameHeight = $state(0);
-  let documentWidth = $state(0);
 
   const kind = $derived(previewKindOf(filename));
   const relative = $derived(relativeFromUrl(url));
@@ -65,39 +61,11 @@
     return encoded ? decodeURIComponent(encoded) : null;
   });
 
-  const WIDTH_CHANNEL = "cconnect:width";
-  const FIT_TAGS =
-    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<style>img,video,canvas,svg,table{max-width:100%;height:auto}</style>` +
-    `<script>(function(){var report=function(){try{parent.postMessage({channel:"${WIDTH_CHANNEL}",` +
-    `width:Math.max(document.documentElement.scrollWidth,document.body?document.body.scrollWidth:0)},"*")}catch(e){}};` +
-    `addEventListener("load",report);addEventListener("resize",report);setInterval(report,1000);report()})()</` +
-    `script>`;
-
-  const htmlScale = $derived(documentWidth > frameWidth && frameWidth > 0 ? frameWidth / documentWidth : 1);
-
-  $effect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (!frame || event.source !== frame.contentWindow) return;
-      const payload = event.data as { channel?: string; width?: number } | null;
-      if (!payload || payload.channel !== WIDTH_CHANNEL || typeof payload.width !== "number") return;
-      documentWidth = Math.max(payload.width, frameWidth);
-    };
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  });
-
-  const document_ = $derived.by(() => {
-    if (kind !== "html" || text === null) return null;
-    const folder = source.slice(0, source.lastIndexOf("/") + 1);
-    const base = /<base\s/i.test(text) ? "" : `<base href="${folder}">`;
-    const tags = `${base}${FIT_TAGS}`;
-    return /<head[^>]*>/i.test(text) ? text.replace(/<head([^>]*)>/i, `<head$1>${tags}`) : `${tags}${text}`;
-  });
+  const htmlSource = $derived(withToken(source, backend.active));
 
   $effect(() => {
     const target = source;
-    if (kind !== "markdown" && kind !== "text" && kind !== "html") return;
+    if (kind !== "markdown" && kind !== "text") return;
     text = null;
     failed = false;
     void fetch(target, { headers: authHeadersOf(backend.active) })
@@ -261,22 +229,12 @@
       ></iframe>
     {/if}
   {:else if kind === "html"}
-    {#if failed}
-      <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
-    {:else if document_ === null}
-      <CenteredProgress class="flex-1" />
-    {:else}
-      <div class="min-h-0 flex-1 overflow-hidden bg-white" bind:clientWidth={frameWidth} bind:clientHeight={frameHeight}>
-        <iframe
-          bind:this={frame}
-          srcdoc={document_}
-          title={filename}
-          sandbox="allow-scripts"
-          style="width: {documentWidth || frameWidth}px; height: {frameHeight / htmlScale}px; transform: scale({htmlScale}); transform-origin: top left"
-          class="border-0 bg-white"
-        ></iframe>
-      </div>
-    {/if}
+    <iframe
+      src={htmlSource}
+      title={filename}
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      class="min-h-0 flex-1 border-0 bg-white"
+    ></iframe>
   {:else if failed}
     <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
   {:else if text === null}

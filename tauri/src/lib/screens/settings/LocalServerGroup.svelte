@@ -5,7 +5,7 @@
   import ServerCog from "@lucide/svelte/icons/server-cog";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { localServer } from "$lib/services/localServer.svelte";
+  import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
   import { systemApi } from "$lib/services/systemApi";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
@@ -27,7 +27,7 @@
   let autoStart = $state(settings.localServerEnabled);
 
   const info = $derived(localServer.info);
-  const phase = $derived(localServer.state);
+  const phase = $derived(localServerStateOf(info, serverReady, false));
 
   const tone = $derived(
     phase === "running" || phase === "external"
@@ -106,7 +106,7 @@
 </SettingsGroup>
 
 {#if dialog}
-  <LocalServerDialog onDismiss={() => (dialog = false)} />
+  <LocalServerDialog {serverReady} onDismiss={() => (dialog = false)} />
 {/if}
 
 {#if confirm === "restart"}

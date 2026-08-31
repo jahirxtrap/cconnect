@@ -28,7 +28,7 @@ self.addEventListener('fetch', function (event) {
             })
             .catch(function () {
                 return caches.match(request).then(function (cached) {
-                    return cached || caches.match('index.html');
+                    return cached || caches.match('/index.html');
                 });
             })
     );

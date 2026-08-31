@@ -4,6 +4,7 @@
   import FileText from "@lucide/svelte/icons/file-text";
   import Shield from "@lucide/svelte/icons/shield";
   import Sparkles from "@lucide/svelte/icons/sparkles";
+  import Unplug from "@lucide/svelte/icons/unplug";
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
@@ -21,6 +22,7 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CliDialog from "./CliDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
+  import McpToolsDialog from "./McpToolsDialog.svelte";
   import VisibilityDialog from "./VisibilityDialog.svelte";
 
   interface Props {
@@ -32,7 +34,7 @@
 
   const { tick = 0, flash = false, onLoadingChange, onChangelog }: Props = $props();
 
-  type Dialog = "cli" | "generation" | "permissions" | "visibility" | "account";
+  type Dialog = "cli" | "generation" | "permissions" | "visibility" | "account" | "mcpTools";
 
   let snapshot = $state<SettingsSnapshot | null>(null);
   let capabilities = $state<Capabilities | null>(null);
@@ -60,6 +62,13 @@
   };
 
   const summary = (real: string) => (ready ? real : loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE"));
+
+  const hiddenTools = $derived(
+    new Set((snapshot?.mcpDisabled ?? "").split(",").map((name) => name.trim()).filter(Boolean)),
+  );
+  const enabledTools = $derived(
+    (capabilities?.mcpTools ?? []).filter((tool) => !hiddenTools.has(tool.name)).length,
+  );
 
   const apply = async (patch: Parameters<typeof settingsApi.update>[0]) => {
     dialog = null;
@@ -124,6 +133,18 @@
   />
 
   <PreferenceRow
+    icon={Unplug}
+    title={t("MCP_TOOLS")}
+    summary={summary(
+      capabilities
+        ? t("MCP_TOOLS_COUNT", enabledTools, capabilities.mcpTools.length)
+        : "—",
+    )}
+    enabled={ready}
+    onclick={() => (dialog = "mcpTools")}
+  />
+
+  <PreferenceRow
     icon={Shield}
     title={t("PERMISSIONS")}
     summary={summary(permissionLabel)}
@@ -184,6 +205,13 @@
     todoTools={snapshot.todoTools}
     onConfirm={(model, effort, streaming, todo_tools) =>
       void apply({ model, effort, streaming, todo_tools })}
+    onDismiss={() => (dialog = null)}
+  />
+{:else if dialog === "mcpTools" && snapshot && capabilities}
+  <McpToolsDialog
+    tools={capabilities.mcpTools}
+    disabled={snapshot.mcpDisabled}
+    onConfirm={(mcp_disabled) => void apply({ mcp_disabled })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "permissions" && snapshot}

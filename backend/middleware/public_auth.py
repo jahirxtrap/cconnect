@@ -12,22 +12,19 @@ from core.responses import api_response
 _OPEN_PATHS = frozenset({"/api/health"})
 
 
+def _provided_token(authorization: str, query_token: str) -> str:
+    """The query form is what iframes and media elements can carry: they send no headers."""
+    scheme, _, value = (authorization or "").partition(" ")
+    if scheme.lower() == "bearer":
+        return value.strip()
+    return query_token or ""
+
+
 def ws_bearer_ok(ws: WebSocket) -> bool:
     if PUBLIC_ACCESS_TOKEN is None:
         return True
-    scheme, _, value = ws.headers.get("authorization", "").partition(" ")
-    token = value.strip() if scheme.lower() == "bearer" else ws.query_params.get("token", "")
+    token = _provided_token(ws.headers.get("authorization", ""), ws.query_params.get("token", ""))
     return hmac.compare_digest(token, PUBLIC_ACCESS_TOKEN)
-
-
-def _extract_bearer(request: Request) -> str | None:
-    header = request.headers.get("authorization")
-    if not header:
-        return None
-    scheme, _, value = header.partition(" ")
-    if scheme.lower() != "bearer":
-        return None
-    return value.strip() or None
 
 
 class PublicAuthMiddleware(BaseHTTPMiddleware):
@@ -37,8 +34,11 @@ class PublicAuthMiddleware(BaseHTTPMiddleware):
         if request.url.path in _OPEN_PATHS:
             return await call_next(request)
 
-        provided = _extract_bearer(request)
-        if provided is None or not hmac.compare_digest(provided, PUBLIC_ACCESS_TOKEN):
+        provided = _provided_token(
+            request.headers.get("authorization", ""),
+            request.query_params.get("token", ""),
+        )
+        if not provided or not hmac.compare_digest(provided, PUBLIC_ACCESS_TOKEN):
             return api_response(status=401)
 
         return await call_next(request)

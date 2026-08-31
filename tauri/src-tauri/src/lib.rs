@@ -3,6 +3,8 @@ mod secret;
 mod ssh;
 mod system;
 
+use tauri::Manager;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -46,6 +48,11 @@ pub fn run() {
             secret::secret_unprotect,
             secret::secret_available
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running CConnect");
+        .build(tauri::generate_context!())
+        .expect("error while running CConnect")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                local_server::shutdown(&app.state::<local_server::LocalServerState>());
+            }
+        });
 }

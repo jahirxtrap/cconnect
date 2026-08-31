@@ -154,7 +154,13 @@
 
 {#if editing}
   {@const profile = editing}
-  <EnvironmentDialog {profile} {isNew} onSave={save} onDismiss={() => (editing = null)} />
+  <EnvironmentDialog
+    {profile}
+    {isNew}
+    isActive={!isNew && profile.id === backend.activeId}
+    onSave={save}
+    onDismiss={() => (editing = null)}
+  />
 {/if}
 
 {#if deleting}

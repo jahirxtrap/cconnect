@@ -14,7 +14,7 @@ from loguru import logger
 from core import cli_manager
 from core.config import AI_WORKDIR, PORT, SHARED_DIR
 from mcps import build_cconnect_server
-from mcps.media import blocks_note
+from mcps.media import block_types
 from services import settings_store, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -56,11 +56,14 @@ def _usage_context(usage: Optional[dict]) -> Optional[int]:
 def _blocks_guide(capabilities: list[str]) -> str:
     if "media.blocks" not in capabilities:
         return ""
+    types = block_types(capabilities)
+    if not types:
+        return ""
     try:
         guide = (_PROMPTS_DIR / "BLOCKS.md").read_text(encoding="utf-8")
     except OSError:
         return ""
-    return guide.replace("{{RICH_MEDIA}}", blocks_note(capabilities))
+    return guide.replace("{{BLOCK_TYPES}}", types)
 
 
 def _system_append(base_url: Optional[str], cwd: Optional[str] = None, capabilities: Optional[list[str]] = None) -> str:

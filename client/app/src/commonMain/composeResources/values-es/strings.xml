@@ -72,6 +72,10 @@
     <string name="streaming_desc">Mostrar el razonamiento y las respuestas mientras se generan</string>
     <string name="task_tools">Seguimiento de tareas</string>
     <string name="task_tools_desc">Permitir que Claude mantenga una lista de tareas, visible en la barra del chat. Los modelos recientes la omiten para ahorrar contexto</string>
+    <string name="mcp_tools">Herramientas</string>
+    <string name="mcp_tools_desc">Herramientas propias que este servidor ofrece a Claude en cada chat.</string>
+    <string name="mcp_tools_count">%1$d/%2$d habilitadas</string>
+    <string name="mcp_tools_empty">No hay herramientas</string>
     <string name="permissions">Permisos</string>
     <string name="permission_mode">Modo de permisos por defecto</string>
     <string name="export_settings">Exportar ajustes</string>
@@ -139,10 +143,7 @@
     <string name="add">Agregar</string>
     <string name="transport">Transporte</string>
     <string name="command_or_url">Comando o URL</string>
-    <plurals name="enabled_count">
-        <item quantity="one">%1$d/%2$d habilitado</item>
-        <item quantity="other">%1$d/%2$d habilitados</item>
-    </plurals>
+    <string name="enabled_count">%1$d/%2$d habilitados</string>
     <string name="monitor">Monitor</string>
     <string name="resources">Recursos</string>
     <string name="background_group">Segundo plano</string>

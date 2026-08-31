@@ -20,6 +20,7 @@ from core.config import (
 )
 from core.responses import api_response
 from services import accounts
+import mcps
 
 router = APIRouter(tags=["Capabilities"])
 
@@ -38,6 +39,7 @@ def get_capabilities():
         "colors": COLORS,
         "commands": COMMANDS,
         "accounts": [{"id": a["id"], "label": a["label"]} for a in account_list if a["logged_in"]],
+        "mcp_tools": mcps.tool_specs(),
         "defaults": {
             "permission_mode": DEFAULT_PERMISSION_MODE,
             "effort": DEFAULT_EFFORT,

@@ -3,6 +3,7 @@ package com.jahirtrap.cconnect.data.remote
 import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.CapabilitiesDefaults
 import com.jahirtrap.cconnect.data.CommandOption
+import com.jahirtrap.cconnect.data.McpTool
 import com.jahirtrap.cconnect.data.ModelOption
 import com.jahirtrap.cconnect.data.PermissionMode
 import kotlinx.serialization.json.booleanOrNull
@@ -63,6 +64,11 @@ object CapabilitiesApi {
                 val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                 ModelOption(id, o["label"]?.jsonPrimitive?.contentOrNull ?: id)
             } ?: fallback.accounts,
+            mcpTools = data["mcp_tools"]?.jsonArray?.mapNotNull { el ->
+                val o = el.jsonObject
+                val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                McpTool(name, o["description"]?.jsonPrimitive?.contentOrNull.orEmpty())
+            } ?: fallback.mcpTools,
             defaults = data["defaults"]?.jsonObject?.let { o ->
                 CapabilitiesDefaults(
                     permissionMode = o["permission_mode"]?.jsonPrimitive?.contentOrNull ?: fallback.defaults.permissionMode,

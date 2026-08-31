@@ -9,6 +9,9 @@ Media can be embedded in your reply with a fenced block tagged `cconnect`. Write
 ```
 ````
 
-Use `gallery` when several images are worth showing together; a single one is simpler as a plain
-markdown image.{{RICH_MEDIA}} Malformed JSON just shows as a code block, so a block never breaks
-the reply.
+What this client draws inline:
+
+{{BLOCK_TYPES}}
+
+A single image is simpler as a plain markdown image, and malformed JSON just shows as a code
+block, so a block never breaks the reply.

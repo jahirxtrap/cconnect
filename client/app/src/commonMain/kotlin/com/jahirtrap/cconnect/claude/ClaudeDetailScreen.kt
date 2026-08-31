@@ -64,6 +64,7 @@ import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.formatDateShort
 import com.jahirtrap.cconnect.data.parseIsoMillis
 import com.jahirtrap.cconnect.data.projectLabel
+import com.jahirtrap.cconnect.data.projectNameOf
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
 import com.jahirtrap.cconnect.ui.AppTopBar
 import com.jahirtrap.cconnect.ui.CenteredProgress
@@ -136,6 +137,7 @@ fun ClaudeDetailScreen(
     var mcpMenu by remember { mutableStateOf<ClaudeApi.McpServer?>(null) }
     var confirmMcpRemove by remember { mutableStateOf<ClaudeApi.McpServer?>(null) }
     var addingMcp by remember { mutableStateOf(false) }
+    val environmentDirectory = state.environments.firstOrNull { it.id == state.activeEnvironmentId }?.directory
 
     suspend fun load() {
         when (kind) {
@@ -207,7 +209,7 @@ fun ClaudeDetailScreen(
             AppTopBar(
                 title = title,
                 subtitle = if (kind == ClaudeKind.Memories) {
-                    memoriesProject?.let { key -> state.historyProjects.firstOrNull { it.projectKey == key }?.path ?: key }
+                    memoriesProject?.let { key -> projectNameOf(state.historyProjects, key, environmentDirectory) }
                 } else null,
                 navigationIcon = {
                     TooltipIconButton(label = stringResource(Res.string.back), onClick = onClose) {
@@ -302,12 +304,8 @@ fun ClaudeDetailScreen(
                         ClaudeKind.Mcp -> items(mcpServers.orEmpty(), key = { it.name }) { server ->
                             DetailRow(
                                 title = server.name,
-                                subtitle = listOfNotNull(
-                                    stringResource(Res.string.disabled_state).takeIf { !server.enabled },
-                                    server.type,
-                                    server.detail,
-                                ).joinToString(" • "),
-                                enabled = true,
+                                subtitle = listOfNotNull(server.type, server.detail).joinToString(" • "),
+                                enabled = server.enabled,
                                 onClick = { mcpMenu = server },
                             )
                         }

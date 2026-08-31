@@ -1,30 +1,35 @@
 """What each client renders inline, and the wording the model reads about it."""
 
 MEDIA = (
-    {"capability": "media.gallery", "inline": "a gallery of images", "outside": "images"},
+    {
+        "capability": "media.gallery",
+        "inline": "a gallery of images",
+        "outside": "images",
+        "block": "`gallery` — several images shown together, each with `url` and `alt`",
+    },
     {
         "capability": "media.video",
         "inline": "video inside a gallery",
         "outside": "video",
-        "block": "video inside a gallery",
+        "block": "video items inside a `gallery`, with an optional `poster`",
     },
     {
         "capability": "media.audio",
         "inline": "an audio playlist",
         "outside": "audio",
-        "block": "`playlist` (audio items, each with `title` and `duration`)",
+        "block": "`playlist` — audio items, each with `title` and `duration`",
     },
     {
         "capability": "media.pdf",
         "inline": "a pdf",
         "outside": "a pdf",
-        "block": "`pdf` (takes `url` and `title`)",
+        "block": "`pdf` — takes `url` and `title`",
     },
     {
         "capability": "media.html",
         "inline": "an html page",
         "outside": "an html page",
-        "block": "`html` (takes `url` and `title`)",
+        "block": "`html` — takes `url` and `title`",
     },
 )
 
@@ -54,6 +59,9 @@ def preview_description(capabilities) -> str:
     return line
 
 
-def blocks_note(capabilities) -> str:
-    have = _picked(capabilities, "block", True)
-    return f" This client also renders {_listed(have)}." if have else ""
+def block_types(capabilities) -> str:
+    lines = [f"- {entry}" for entry in _picked(capabilities, "block", True)]
+    missing = _picked(capabilities, "outside", False)
+    if lines and missing:
+        lines.append(f"\nThis client opens {_listed(missing)} outside the app, so link those instead.")
+    return "\n".join(lines)

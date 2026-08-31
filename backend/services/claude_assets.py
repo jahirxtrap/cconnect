@@ -312,5 +312,5 @@ def list_mcp_servers() -> list[dict]:
     for name, cfg in claude_manage.disabled_mcp_servers().items():
         if isinstance(cfg, dict) and not any(i["name"] == name for i in items):
             items.append(entry(name, cfg, False))
-    items.sort(key=lambda s: s["name"])
+    items.sort(key=lambda s: (not s["enabled"], s["name"]))
     return items

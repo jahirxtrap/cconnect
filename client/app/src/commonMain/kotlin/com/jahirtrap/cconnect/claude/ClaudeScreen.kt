@@ -40,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -66,6 +65,7 @@ import com.jahirtrap.cconnect.chat.ChatViewModel
 import com.jahirtrap.cconnect.chat.LocalChatViewModelFactory
 import com.jahirtrap.cconnect.chat.ConnectionState
 import com.jahirtrap.cconnect.data.projectLabel
+import com.jahirtrap.cconnect.data.projectNameOf
 import com.jahirtrap.cconnect.data.remote.Backend
 import com.jahirtrap.cconnect.data.remote.AccountsApi
 import com.jahirtrap.cconnect.data.remote.ClaudeApi
@@ -125,7 +125,9 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
     var editingPrompt by remember { mutableStateOf(false) }
     val sub by RouteSub.value.collectAsState()
     val detail = ClaudeKind.entries.firstOrNull { it.slug == sub }
-    val activeName = state.environments.firstOrNull { it.id == state.activeEnvironmentId }?.name
+    val activeEnvironment = state.environments.firstOrNull { it.id == state.activeEnvironmentId }
+    val activeName = activeEnvironment?.name
+    val environmentDirectory = activeEnvironment?.directory
     val serverReady = Backend.isConfigured && state.connection == ConnectionState.Connected
 
     suspend fun load() {
@@ -326,7 +328,7 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                             Lucide.Blocks,
                             stringResource(Res.string.plugins),
                             if (pluginList != null) {
-                                pluralStringResource(Res.plurals.enabled_count, enabledCount, enabledCount, pluginList.size)
+                                stringResource(Res.string.enabled_count, enabledCount, pluginList.size)
                             } else "—",
                             enabled = serverReady,
                         ) { RouteSub.open(ClaudeKind.Plugins.slug) }
@@ -336,10 +338,13 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                             skills?.size?.toString() ?: "—",
                             enabled = serverReady,
                         ) { RouteSub.open(ClaudeKind.Skills.slug) }
+                        val enabledServers = mcpServers?.count { it.enabled } ?: 0
                         DetailLink(
                             Lucide.Unplug,
                             stringResource(Res.string.mcp_servers),
-                            mcpServers?.size?.toString() ?: "—",
+                            if (mcpServers != null) {
+                                stringResource(Res.string.enabled_count, enabledServers, mcpServers!!.size)
+                            } else "—",
                             enabled = serverReady,
                         ) { RouteSub.open(ClaudeKind.Mcp.slug) }
                         DetailLink(
@@ -351,7 +356,8 @@ fun ClaudeScreen(onClose: () -> Unit, onOpenPreview: (url: String, filename: Str
                         DetailLink(
                             Lucide.Brain,
                             stringResource(Res.string.memories),
-                            vm.defaultProjectKey(projects) ?: state.activeProjectKey ?: "—",
+                            (vm.defaultProjectKey(projects) ?: state.activeProjectKey)
+                                ?.let { projectNameOf(projects, it, environmentDirectory) } ?: "—",
                             enabled = serverReady,
                         ) { RouteSub.open(ClaudeKind.Memories.slug) }
                     }

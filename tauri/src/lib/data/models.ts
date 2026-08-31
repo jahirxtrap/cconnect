@@ -76,6 +76,13 @@ export const parseCategory = (raw: Wire): ChatCategory => ({
 export const projectLabel = (project: ProjectInfo): string =>
   project.name ?? project.path ?? project.projectKey;
 
+export const projectNameOf = (projects: ProjectInfo[], key: string, fallbackPath?: string | null): string => {
+  const found = projects.find((item) => item.projectKey === key);
+  if (found) return projectLabel(found);
+  const source = fallbackPath?.trim() || key;
+  return source.split(/[\\/]/).filter(Boolean).pop() ?? key;
+};
+
 export const parsePlacement = (raw: Wire): ChatPlacement => ({
   sessionId: text(raw.session_id) ?? "",
   categoryId: text(raw.category_id),

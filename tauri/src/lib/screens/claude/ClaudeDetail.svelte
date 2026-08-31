@@ -17,9 +17,8 @@
   import CirclePlus from "@lucide/svelte/icons/circle-plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import Store from "@lucide/svelte/icons/store";
-  import X from "@lucide/svelte/icons/x";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { projectLabel } from "$lib/data/models";
+  import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
@@ -233,8 +232,8 @@
 <div class="flex h-full flex-col">
   <AppTopBar
     {title}
-    subtitle={kind === "memories"
-      ? (chat.historyProjects.find((item) => item.projectKey === memoriesProject)?.path ?? memoriesProject)
+    subtitle={kind === "memories" && memoriesProject
+      ? projectNameOf(chat.historyProjects, memoriesProject, chat.cwd)
       : null}
   >
     {#snippet navigationIcon()}
@@ -296,25 +295,14 @@
 
   {#if kind === "skills" && loaded}
     <div class="px-4 py-1.5">
-      <InputField value={skillQuery} oninput={(value) => (skillQuery = value)} label={t("SEARCH")} singleLine>
-        {#snippet trailing()}
-          {#if skillQuery}
-            <button
-              type="button"
-              onclick={() => (skillQuery = "")}
-              aria-label={t("CLEAR")}
-              class="cursor-pointer text-on-surface-variant"
-            >
-              <X size={18} />
-            </button>
-          {/if}
-        {/snippet}
-      </InputField>
+      <InputField
+        value={skillQuery}
+        oninput={(value) => (skillQuery = value)}
+        onClear={() => (skillQuery = "")}
+        label={t("SEARCH")}
+        singleLine
+      />
     </div>
-  {/if}
-
-  {#if actionError}
-    <p class="px-4 py-2 text-body-sm text-error">{actionError}</p>
   {/if}
 
   {#if !loaded}
@@ -352,13 +340,11 @@
           <ListRow
             padding={ROW_PADDING}
             title={server.name}
-            subtitle={[server.enabled ? null : t("DISABLED_STATE"), server.type, server.detail]
-              .filter(Boolean)
-              .join(" • ")}
+            subtitle={[server.type, server.detail].filter(Boolean).join(" • ")}
             onclick={() => (mcpMenu = server)}
           >
             {#snippet trailing()}
-              {@render stateDot(true)}
+              {@render stateDot(server.enabled)}
             {/snippet}
           </ListRow>
         {/each}
@@ -584,7 +570,13 @@
       <Button onclick={() => (catalogMarket = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#snippet header()}
-      <InputField value={catalogQuery} oninput={(value) => (catalogQuery = value)} label={t("SEARCH")} singleLine />
+      <InputField
+        value={catalogQuery}
+        oninput={(value) => (catalogQuery = value)}
+        onClear={() => (catalogQuery = "")}
+        label={t("SEARCH")}
+        singleLine
+      />
       {#if busy}
         <LinearProgress class="mt-2" />
       {/if}
@@ -789,5 +781,15 @@
       />
       <InputField value={mcpTarget} oninput={(value) => (mcpTarget = value)} label={t("COMMAND_OR_URL")} singleLine />
     </div>
+  </CompactDialog>
+{/if}
+
+{#if actionError}
+  {@const message = actionError}
+  <CompactDialog title={t("CONNECTION_ERROR")} onDismiss={() => (actionError = null)}>
+    {#snippet buttons()}
+      <Button onclick={() => (actionError = null)}>{t("ACCEPT")}</Button>
+    {/snippet}
+    <p class="text-body-sm text-on-surface-variant">{message}</p>
   </CompactDialog>
 {/if}

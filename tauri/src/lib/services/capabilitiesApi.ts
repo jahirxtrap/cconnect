@@ -12,6 +12,11 @@ export interface CommandOption {
   requireConfirmation: boolean;
 }
 
+export interface McpTool {
+  name: string;
+  description: string;
+}
+
 export interface CapabilitiesDefaults {
   permissionMode: string;
   effort: string;
@@ -26,6 +31,7 @@ export interface Capabilities {
   colors: string[];
   commands: CommandOption[];
   accounts: LabeledOption[];
+  mcpTools: McpTool[];
   defaults: CapabilitiesDefaults;
   serverVersion: string | null;
   supportedApp: string | null;
@@ -55,6 +61,7 @@ interface CapabilitiesWire extends VersionWire {
   commands?: Array<{ name?: string; description?: string; kind?: string; require_confirmation?: boolean }>;
   accounts?: Array<{ id?: string; label?: string }>;
   defaults?: { permission_mode?: string; effort?: string; model?: string; account?: string };
+  mcp_tools?: Array<{ name?: string; description?: string }>;
 }
 
 const toVersion = (data: VersionWire): VersionInfo => ({
@@ -90,6 +97,9 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
           requireConfirmation: command.require_confirmation === true,
         })),
       accounts: toOptions(data.accounts),
+      mcpTools: (data.mcp_tools ?? [])
+        .filter((tool) => tool.name)
+        .map((tool) => ({ name: tool.name!, description: tool.description ?? "" })),
       defaults: {
         permissionMode: data.defaults?.permission_mode ?? "",
         effort: data.defaults?.effort ?? "",

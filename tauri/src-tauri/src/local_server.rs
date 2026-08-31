@@ -249,12 +249,36 @@ pub fn local_server_start(
     Ok(info)
 }
 
+fn kill_tree(child: &mut Child) {
+    let pid = child.id();
+    #[cfg(windows)]
+    {
+        let _ = Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .status();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = Command::new("pkill").args(["-TERM", "-P", &pid.to_string()]).status();
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+pub fn shutdown(state: &LocalServerState) {
+    let mut inner = state.inner.lock().unwrap();
+    if let Some(mut child) = inner.child.take() {
+        kill_tree(&mut child);
+    }
+    inner.info = LocalServerInfo::default();
+}
+
 #[tauri::command]
 pub fn local_server_stop(app: AppHandle, state: State<'_, LocalServerState>) -> LocalServerInfo {
     let mut inner = state.inner.lock().unwrap();
     if let Some(mut child) = inner.child.take() {
-        let _ = child.kill();
-        let _ = child.wait();
+        kill_tree(&mut child);
     }
     inner.info = LocalServerInfo::default();
     let info = inner.info.clone();

@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -115,11 +116,14 @@ fun InputField(
                     inner()
                 },
             )
-            if (onClear != null && (clearAlways || value.isNotEmpty())) {
+            if (onClear != null) {
+                val canClear = clearAlways || value.isNotEmpty()
                 Spacer(Modifier.width(4.dp))
                 TooltipIconButton(
                     label = stringResource(Res.string.cancel),
                     onClick = onClear,
+                    modifier = Modifier.alpha(if (canClear) 1f else 0f),
+                    enabled = canClear,
                     size = 24.dp,
                     tooltip = false,
                 ) {

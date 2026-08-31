@@ -31,6 +31,7 @@
   import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import {
     archiveFileUrl,
@@ -1010,8 +1011,8 @@
       label: profile.name,
       subtitle: address(profile),
     }))}
-    selected={backend.activeId ?? ""}
-    onSelect={(id) => backend.select(id)}
+    selected={tabs.state.environmentId ?? ""}
+    onSelect={(id) => tabs.state.selectEnvironment(id)}
     onDismiss={() => (envOpen = false)}
   />
 {/if}

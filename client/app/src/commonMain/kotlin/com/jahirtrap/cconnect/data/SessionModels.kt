@@ -11,6 +11,12 @@ data class ProjectInfo(
 
 fun projectLabel(project: ProjectInfo): String = project.name ?: project.path ?: project.projectKey
 
+fun projectNameOf(projects: List<ProjectInfo>, key: String, fallbackPath: String? = null): String {
+    projects.firstOrNull { it.projectKey == key }?.let { return projectLabel(it) }
+    val source = fallbackPath?.takeIf { it.isNotBlank() } ?: key
+    return source.split('/', '\\').lastOrNull { it.isNotBlank() } ?: key
+}
+
 data class ChatCategory(
     val id: String,
     val name: String,

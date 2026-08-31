@@ -8,6 +8,7 @@
   import { osColor, osIconPath } from "$lib/design/osIcons";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import { networkApi, type NetworkStatus } from "$lib/services/networkApi";
   import { systemApi, type GpuInfo, type LogEntry, type SystemInfo } from "$lib/services/systemApi";
@@ -327,8 +328,8 @@
       label: profile.name,
       subtitle: address(profile),
     }))}
-    selected={backend.activeId ?? ""}
-    onSelect={(id) => backend.select(id)}
+    selected={tabs.state.environmentId ?? ""}
+    onSelect={(id) => tabs.state.selectEnvironment(id)}
     onDismiss={() => (envOpen = false)}
   />
 {/if}

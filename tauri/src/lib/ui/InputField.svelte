@@ -108,15 +108,18 @@
         ></textarea>
       </div>
     {/if}
-    {#if showClear}
-      <TooltipIconButton
-        label={t("CANCEL")}
-        tooltip={false}
-        onclick={() => onClear?.()}
-        class="size-6 [&_svg]:size-[18px]"
-      >
-        <X size={18} class="text-on-surface-variant" />
-      </TooltipIconButton>
+    {#if onClear}
+      <span class="shrink-0" class:invisible={!showClear}>
+        <TooltipIconButton
+          label={t("CANCEL")}
+          tooltip={false}
+          enabled={showClear}
+          onclick={() => onClear?.()}
+          class="size-6 [&_svg]:size-[18px]"
+        >
+          <X size={18} class="text-on-surface-variant" />
+        </TooltipIconButton>
+      </span>
     {/if}
     {#if secret}
       <TooltipIconButton
