@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
 from loguru import logger
 from pydantic import BaseModel, ValidationError
 
-from core.config import DEFAULT_CWD, permission_modes
+from core.config import AI_WORKDIR, DEFAULT_CWD, permission_modes
 from core.responses import api_response
 from middleware.public_auth import ws_bearer_ok
 from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
@@ -194,7 +194,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
     return True
 
 
-def _build_side_runner(main_state: _Session, side_state: _Session, question: str, resume_id: str | None):
+def _build_side_runner(main_state: _Session, side_state: _Session, question: str, resume_id: str | None, capabilities: list[str]):
     """LiveSession runner for one quick-chat turn: runs the isolated side question (with the
     interaction callback for permissions/AskUserQuestion) and records the side SDK session id
     so it can be resumed/reattached like the main turn. The trailing ``done`` is added by the
@@ -209,6 +209,15 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
                 ask_user=ask_user,
                 account=main_state.account,
                 permission_mode=main_state.permission_mode,
+                emit=emit,
+                capabilities=capabilities,
+                base_url=main_state.base_url,
+                session_info=lambda: {
+                    "session_id": side_state.session_id,
+                    "cwd": AI_WORKDIR,
+                    "account": accounts.resolve(main_state.account),
+                    "permission_mode": main_state.permission_mode,
+                },
             ):
                 if ev.get("type") == "ask_session" and ev.get("session_id"):
                     side_state.session_id = ev["session_id"]
@@ -410,7 +419,7 @@ async def chat_ws(ws: WebSocket):
                         side_state.session_id = resume_id
                         side_session = registry.create(side_state)
                         await side_session.attach(send)
-                    if not side_session.start(_build_side_runner(session.state, side_session.state, question, resume_id)):
+                    if not side_session.start(_build_side_runner(session.state, side_session.state, question, resume_id, seen["capabilities"])):
                         await send({"type": "error", "message": "busy: a side question is already running", "channel": side_session.channel})
 
             elif mtype == "usage":

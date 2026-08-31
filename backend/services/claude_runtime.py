@@ -983,6 +983,10 @@ async def ask_side_question(
     ask_user: Optional[Callable[[dict], Awaitable[dict]]] = None,
     account: Optional[str] = None,
     permission_mode: str = "default",
+    emit: Optional[Callable[[dict], Awaitable[None]]] = None,
+    capabilities: Optional[list[str]] = None,
+    session_info: Optional[Callable[[], dict]] = None,
+    base_url: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """Quick side question in an isolated, resumable session. ``context`` seeds the first turn,
     ``resume_id`` continues it for memory, ``ask_user`` surfaces permission prompts."""
@@ -996,6 +1000,9 @@ async def ask_side_question(
         "question relates to that work, otherwise answer as a normal assistant. Never invent files, code, "
         "commands, or facts: if you don't know, say so plainly instead of guessing."
     )
+    shared = _system_append(base_url, None, [])
+    if shared:
+        system = f"{system}\n\n{shared}"
     prompt = f"<session_context>\n{context}\n</session_context>\n\n{question}" if (context and not resume_id) else question
     options_kwargs: dict[str, Any] = dict(
         cwd=AI_WORKDIR,
@@ -1008,6 +1015,13 @@ async def ask_side_question(
         resume=resume_id,
         env=accounts.env_for(accounts.resolve(account)),
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
+        mcp_servers={"cconnect": build_cconnect_server({
+            "ask_user": ask_user,
+            "emit": emit,
+            "account": account,
+            "session_info": session_info,
+            "capabilities": list(capabilities or ()),
+        }, exclude=("ask_component", "show_component"))},
     )
     hooks = [HookMatcher(matcher=None, hooks=[_block_background])]
     if ask_user is not None:

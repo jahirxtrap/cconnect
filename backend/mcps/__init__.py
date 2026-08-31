@@ -10,7 +10,7 @@ touching this file, so a new tool needs no client change to become configurable.
 import importlib
 import pkgutil
 import re
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
 from mcps import components
 
@@ -66,9 +66,9 @@ def tool_specs() -> list[dict]:
     return [{"name": name, "description": summaries[name]} for name in sorted(summaries)]
 
 
-def build_cconnect_server(context: Optional[dict] = None) -> Any:
+def build_cconnect_server(context: Optional[dict] = None, exclude: Iterable[str] = ()) -> Any:
     from claude_agent_sdk import create_sdk_mcp_server
 
-    hidden = disabled_tools()
+    hidden = disabled_tools() | set(exclude)
     collected = [tool for tool in _discover(context or {}) if _tool_name(tool) not in hidden]
     return create_sdk_mcp_server(name="cconnect", version="1.0.0", tools=collected)
