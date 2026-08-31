@@ -9,11 +9,11 @@ from core.config import CLAUDE_PROJECTS_DIR
 from core.db import Session
 from core.models import TrashedSession
 
-TRASH_DIR = ".trash"
+_TRASH_ROOT = Path(__file__).resolve().parent.parent / "trash"
 
 
-def _trash_root() -> Path:
-    return Path(CLAUDE_PROJECTS_DIR) / TRASH_DIR
+def trash_root() -> Path:
+    return _TRASH_ROOT
 
 
 def enabled() -> bool:
@@ -47,7 +47,7 @@ def store(
     position: Optional[float] = None,
 ) -> bool:
     """Move a transcript (and its sibling folder) into the trash and remember where it came from."""
-    target_dir = _trash_root() / project_key
+    target_dir = trash_root() / project_key
     target_dir.mkdir(parents=True, exist_ok=True)
     target = target_dir / file.name
     if target.exists():
@@ -85,12 +85,12 @@ def restore(session_id: str) -> Optional[str]:
             return None
         project_key = row.project_key
         category_id, position = row.category_id, row.position
-        source = _trash_root() / project_key / f"{session_id}.jsonl"
+        source = trash_root() / project_key / f"{session_id}.jsonl"
         if source.is_file():
             target_dir = Path(CLAUDE_PROJECTS_DIR) / project_key
             target_dir.mkdir(parents=True, exist_ok=True)
             shutil.move(str(source), str(target_dir / source.name))
-            extras = _trash_root() / project_key / session_id
+            extras = trash_root() / project_key / session_id
             if extras.is_dir():
                 shutil.move(str(extras), str(target_dir / session_id))
         s.delete(row)
@@ -100,7 +100,7 @@ def restore(session_id: str) -> Optional[str]:
 
 
 def _erase(session_id: str, project_key: str) -> None:
-    directory = _trash_root() / project_key
+    directory = trash_root() / project_key
     (directory / f"{session_id}.jsonl").unlink(missing_ok=True)
     extras = directory / session_id
     if extras.is_dir():

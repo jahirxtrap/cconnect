@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from core.config import CLAUDE_PROJECTS_DIR
-from services import settings_store
+from services import cli_settings, settings_store
 
 _WINDOWS = sys.platform == "win32"
 
@@ -39,7 +39,7 @@ _IDENTITY_KEYS = ("oauthAccount", "userID")
 
 # Keys a secondary account always takes from the primary instead of keeping its own.
 _SHARED_KEYS = ("mcpServers",)
-_SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces")
+_SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces") + cli_settings.json_keys()
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 
 

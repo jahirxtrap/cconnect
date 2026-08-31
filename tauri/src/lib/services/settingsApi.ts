@@ -19,6 +19,7 @@ export interface SettingsSnapshot {
   chatOrder: string;
   trashEnabled: boolean;
   defaultCategory: string;
+  retentionDays: number;
 }
 
 export interface SettingsPatch {
@@ -39,6 +40,7 @@ export interface SettingsPatch {
   chat_order?: string;
   trash_enabled?: boolean;
   default_category?: string;
+  retention_days?: number;
 }
 
 type Field = { effective?: unknown };
@@ -49,6 +51,9 @@ const effectiveStr = (wire: Wire, key: string, fallback: string): string =>
 
 const effectiveBool = (wire: Wire, key: string, fallback: boolean): boolean =>
   typeof wire[key]?.effective === "boolean" ? (wire[key]!.effective as boolean) : fallback;
+
+const effectiveNum = (wire: Wire, key: string, fallback: number): number =>
+  typeof wire[key]?.effective === "number" ? (wire[key]!.effective as number) : fallback;
 
 const parse = (wire: Wire): SettingsSnapshot => ({
   account: effectiveStr(wire, "account", ""),
@@ -68,6 +73,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   chatOrder: effectiveStr(wire, "chat_order", "auto"),
   trashEnabled: effectiveBool(wire, "trash_enabled", false),
   defaultCategory: effectiveStr(wire, "default_category", ""),
+  retentionDays: effectiveNum(wire, "retention_days", 30),
 });
 
 export const createSettingsApi = (http: HttpClient) => ({

@@ -5,7 +5,7 @@
   import Shield from "@lucide/svelte/icons/shield";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Unplug from "@lucide/svelte/icons/unplug";
-  import Trash2 from "@lucide/svelte/icons/trash-2";
+  import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
@@ -14,12 +14,12 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
-  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import ChatsDialog from "./ChatsDialog.svelte";
   import CliDialog from "./CliDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
   import McpToolsDialog from "./McpToolsDialog.svelte";
@@ -34,7 +34,7 @@
 
   const { tick = 0, flash = false, onLoadingChange, onChangelog }: Props = $props();
 
-  type Dialog = "cli" | "generation" | "permissions" | "visibility" | "account" | "mcpTools";
+  type Dialog = "cli" | "generation" | "permissions" | "visibility" | "account" | "mcpTools" | "chats";
 
   let snapshot = $state<SettingsSnapshot | null>(null);
   let capabilities = $state<Capabilities | null>(null);
@@ -86,6 +86,12 @@
   );
   const accountLabel = $derived(
     capabilities?.accounts.find((item) => item.id === snapshot?.account)?.label ?? snapshot?.account ?? "—",
+  );
+  const chatsSummary = $derived(
+    [
+      t(snapshot?.trashEnabled ? "TRASH_ON" : "TRASH_OFF"),
+      t("RETENTION_DAYS_SUMMARY", snapshot?.retentionDays ?? 30),
+    ].join(" • "),
   );
 
   $effect(() => {
@@ -161,20 +167,12 @@
   />
 
   <PreferenceRow
-    icon={Trash2}
-    title={t("TRASH")}
-    summary={summary(t("TRASH_HINT"))}
+    icon={MessagesSquare}
+    title={t("CHATS")}
+    summary={summary(chatsSummary)}
     enabled={ready}
-    onclick={() => void apply({ trash_enabled: !(snapshot?.trashEnabled ?? false) })}
-  >
-    {#snippet trailing()}
-      <CompactSwitch
-        checked={snapshot?.trashEnabled ?? false}
-        enabled={ready}
-        onCheckedChange={(value) => void apply({ trash_enabled: value })}
-      />
-    {/snippet}
-  </PreferenceRow>
+    onclick={() => (dialog = "chats")}
+  />
 
   {#if (capabilities?.accounts.length ?? 0) > 1}
     <PreferenceRow
@@ -240,6 +238,13 @@
         show_compact: values.compact,
         show_working: values.working,
       })}
+    onDismiss={() => (dialog = null)}
+  />
+{:else if dialog === "chats" && snapshot}
+  <ChatsDialog
+    trashEnabled={snapshot.trashEnabled}
+    retentionDays={snapshot.retentionDays}
+    onConfirm={(trash_enabled, retention_days) => void apply({ trash_enabled, retention_days })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "account" && snapshot}

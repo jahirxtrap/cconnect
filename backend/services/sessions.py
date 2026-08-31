@@ -24,6 +24,8 @@ _COMPACT_MARK = b'"compact_boundary"'
 # The CLI writes interruption notices as plain user text.
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
 
+_SDK_ENTRYPOINT_RE = re.compile(r'"entrypoint":"sdk-[A-Za-z]+"')
+
 
 def _base() -> Path:
     return Path(CLAUDE_PROJECTS_DIR)
@@ -54,6 +56,11 @@ def project_key_for(cwd: str) -> str:
 _AI_PROJECT_KEY = project_key_for(AI_WORKDIR)
 
 
+def _open_transcript(path: Path, mode: str):
+    """Open a transcript so its bytes and line endings survive a rewrite untouched."""
+    return path.open(mode, encoding="utf-8", errors="surrogateescape", newline="")
+
+
 def normalize_session_entrypoint(cwd: str, session_id: str):
     """Rewrite the SDK's "sdk-*" entrypoint to "cli"; `claude --resume` hides sdk sessions."""
     if not _SESSION_RE.match(session_id or ""):
@@ -62,10 +69,18 @@ def normalize_session_entrypoint(cwd: str, session_id: str):
     path = _base() / encoded / f"{session_id}.jsonl"
     if not path.is_file():
         return
-    text = path.read_text(encoding="utf-8")
-    fixed = re.sub(r'"entrypoint":"sdk-[A-Za-z]+"', '"entrypoint":"cli"', text)
-    if fixed != text:
-        path.write_text(fixed, encoding="utf-8")
+    with _open_transcript(path, "r") as src:
+        if not any(_SDK_ENTRYPOINT_RE.search(line) for line in src):
+            return
+    staged = path.with_name(f".{session_id}.jsonl.entrypoint")
+    try:
+        with _open_transcript(path, "r") as src, _open_transcript(staged, "w") as dst:
+            for line in src:
+                dst.write(_SDK_ENTRYPOINT_RE.sub('"entrypoint":"cli"', line))
+        os.replace(staged, path)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
 
 
 def _project_dir(project_key: str) -> Path:
@@ -88,12 +103,13 @@ def _session_file(project_key: str, session_id: str, trashed: bool = False) -> P
 
 
 def _trash_dir(project_key: str) -> Path:
-    from services.trash import TRASH_DIR
+    from services.trash import trash_root
 
     if not _KEY_RE.match(project_key):
         raise ValueError("invalid project key")
-    path = (_base() / TRASH_DIR / project_key).resolve()
-    if (_base() / TRASH_DIR).resolve() not in path.parents:
+    root = trash_root()
+    path = (root / project_key).resolve()
+    if root.resolve() not in path.parents:
         raise ValueError("project key escapes the trash directory")
     return path
 
@@ -335,8 +351,15 @@ def rename_session(project_key: str, session_id: str, title: str) -> bool:
 
 
 def _append_entry(file: Path, entry: dict) -> None:
+    """Append a metadata entry without moving the transcript's mtime."""
+    try:
+        stat = file.stat()
+    except OSError:
+        stat = None
     with file.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+    if stat is not None:
+        os.utime(file, (stat.st_atime, stat.st_mtime))
 
 
 def set_session_color(project_key: str, session_id: str, color: str) -> bool:
@@ -476,10 +499,7 @@ def delete_project(project_key: str) -> Optional[list[str]]:
 
 def _rewrite_cwd(source: Path, target: Path, cwd: str) -> None:
     """Copy a transcript to `target`, rewriting only the cwd of the entries that carry one."""
-    with (
-        source.open("r", encoding="utf-8", errors="surrogateescape", newline="") as src,
-        target.open("w", encoding="utf-8", errors="surrogateescape", newline="") as dst,
-    ):
+    with _open_transcript(source, "r") as src, _open_transcript(target, "w") as dst:
         for line in src:
             body = line.rstrip("\r\n")
             ending = line[len(body):]
@@ -940,6 +960,14 @@ class _StampedList(list):
         super().append(item)
 
 
+def _subagent_file(session_dir: Path, agent_id: str) -> Optional[Path]:
+    """A subagent transcript sits in `subagents/`, or nested under `workflows/<run>/`."""
+    base = session_dir / "subagents"
+    name = f"agent-{agent_id}.jsonl"
+    flat = base / name
+    return flat if flat.is_file() else next(base.rglob(name), None)
+
+
 def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> list[dict]:
     from services.claude_runtime import (
         _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
@@ -975,7 +1003,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
                 path = inp.get("file_path") or inp.get("notebook_path")
                 if isinstance(path, str) and path:
                     if vis["file_change"] == "off":
-                        _working(messages, vis)
+                        _working(out, vis)
                         continue
                     if vis["file_change"] == "label":
                         out.append({"type": "file_change", "path": path, "id": bid, "label": True, "parent": parent_id})
@@ -983,7 +1011,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
                     out.append({"type": "file_change", "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id})
                     continue
             if vis["tool_use"] == "off":
-                _working(messages, vis)
+                _working(out, vis)
                 continue
             ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id}
             if vis["tool_use"] == "full":
@@ -1311,11 +1339,10 @@ def get_session_messages(
                             "label": vis["tool_use"] == "label",
                         })
                         aid = agent_files.get(bid or "")
-                        if aid:
-                            sub_file = file.parent / session_id / "subagents" / f"agent-{aid}.jsonl"
-                            if sub_file.is_file():
-                                for child in _subagent_blocks(sub_file, bid, vis):
-                                    messages.append(child)
+                        sub_file = _subagent_file(file.parent / session_id, aid) if aid else None
+                        if sub_file is not None:
+                            for child in _subagent_blocks(sub_file, bid, vis):
+                                messages.append(child)
                     continue
                 if name == "TodoWrite" or name.startswith("Task"):
                     if isinstance(bid, str):

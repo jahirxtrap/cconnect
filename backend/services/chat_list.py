@@ -18,7 +18,6 @@ from loguru import logger
 from core.config import CLAUDE_PROJECTS_DIR
 from services import projects as projects_service
 from services import sessions as sessions_service
-from services import trash as trash_service
 
 _DEBOUNCE_SECONDS = 0.5
 _POLL_SECONDS = 2.0
@@ -188,19 +187,17 @@ class ChatListHub:
             return projects, sessions
         ai_key = sessions_service._AI_PROJECT_KEY
         for directory in base.iterdir():
-            if not directory.is_dir() or directory.name in (ai_key, trash_service.TRASH_DIR):
+            if not directory.is_dir() or directory.name == ai_key:
                 continue
             pkey = directory.name
             count = 0
             newest_mtime: Optional[float] = None
-            newest_file: Optional[Path] = None
             newest_meta: Optional[dict] = None
             for file in directory.glob("*.jsonl"):
                 try:
                     st = file.stat()
                 except OSError:
                     continue
-                count += 1
                 sid = file.stem
                 seen.add(sid)
                 sig = (st.st_mtime, st.st_size)
@@ -223,17 +220,18 @@ class ChatListHub:
                             "color": color,
                         }
                     self._sig_cache[sid] = (sig, meta)
-                if meta is not None:
-                    activity = self._activity.get(sid)
-                    if activity:
-                        meta = {**meta, "activity": activity}
-                    sessions[sid] = meta
+                if meta is None:
+                    continue
+                count += 1
+                activity = self._activity.get(sid)
+                if activity:
+                    meta = {**meta, "activity": activity}
+                sessions[sid] = meta
                 if newest_mtime is None or st.st_mtime > newest_mtime:
                     newest_mtime = st.st_mtime
-                    newest_file = file
                     newest_meta = meta
-            if count and newest_file is not None:
-                path = newest_meta["path"] if newest_meta else sessions_service._read_cwd(newest_file)
+            if newest_meta is not None:
+                path = newest_meta["path"]
                 projects[pkey] = {
                     "project_key": pkey,
                     "path": path,

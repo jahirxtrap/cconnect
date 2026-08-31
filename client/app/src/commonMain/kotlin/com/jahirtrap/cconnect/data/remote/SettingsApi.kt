@@ -5,6 +5,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -31,6 +32,7 @@ object SettingsApi {
         val chatOrder: String,
         val trashEnabled: Boolean,
         val defaultCategory: String,
+        val retentionDays: Int,
     )
 
     private fun effectiveStr(o: JsonObject, key: String, fallback: String): String =
@@ -38,6 +40,9 @@ object SettingsApi {
 
     private fun effectiveBool(o: JsonObject, key: String, fallback: Boolean): Boolean =
         o[key]?.jsonObject?.get("effective")?.jsonPrimitive?.booleanOrNull ?: fallback
+
+    private fun effectiveInt(o: JsonObject, key: String, fallback: Int): Int =
+        o[key]?.jsonObject?.get("effective")?.jsonPrimitive?.intOrNull ?: fallback
 
     private fun parse(o: JsonObject) = Snapshot(
         account = effectiveStr(o, "account", ""),
@@ -57,6 +62,7 @@ object SettingsApi {
         chatOrder = effectiveStr(o, "chat_order", "auto"),
         trashEnabled = effectiveBool(o, "trash_enabled", false),
         defaultCategory = effectiveStr(o, "default_category", ""),
+        retentionDays = effectiveInt(o, "retention_days", 30),
     )
 
     suspend fun get(): Snapshot? = Http.get("/settings")?.jsonObject?.let(::parse)
@@ -79,6 +85,7 @@ object SettingsApi {
         chatOrder: String? = null,
         trashEnabled: Boolean? = null,
         defaultCategory: String? = null,
+        retentionDays: Int? = null,
     ): Snapshot? = Http.post("/settings", buildJsonObject {
         if (account != null) put("account", account)
         if (model != null) put("model", model)
@@ -97,6 +104,7 @@ object SettingsApi {
         if (chatOrder != null) put("chat_order", chatOrder)
         if (trashEnabled != null) put("trash_enabled", trashEnabled)
         if (defaultCategory != null) put("default_category", defaultCategory)
+        if (retentionDays != null) put("retention_days", retentionDays)
     })?.jsonObject?.let(::parse)?.also { ServerDefaults.bump() }
 
     suspend fun reset(): Snapshot? =

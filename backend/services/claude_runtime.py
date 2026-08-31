@@ -12,7 +12,7 @@ from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 from loguru import logger
 
 from core import cli_manager
-from core.config import AI_WORKDIR, PORT, SHARED_DIR
+from core.config import AI_WORKDIR, PORT, SHARED_DIR, ULTRACODE_EFFORT
 from mcps import build_cconnect_server
 from mcps.media import block_types
 from services import cli_info, settings_store, visibility
@@ -516,10 +516,11 @@ async def run_prompt(
     )
 
     vis = wanted or visibility.defaults
-    ultracode = effort == "ultracode"
-    effort_level = "xhigh" if ultracode else (None if effort in (None, "", "default") else effort)
-    if not cli_info.takes_effort(await cli_info.server_info(), model):
-        effort_level = None
+    ultracode = effort == ULTRACODE_EFFORT
+    info = await cli_info.server_info()
+    if not cli_info.known_model(info, model):
+        model = None
+    effort_level = cli_info.effort_for(info, model, effort)
     extra_args = {"name": name} if name else {}
     if resume and resume_at:
         extra_args["resume-session-at"] = resume_at

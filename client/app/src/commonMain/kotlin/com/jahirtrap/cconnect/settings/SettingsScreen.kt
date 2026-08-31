@@ -105,9 +105,9 @@ import com.composables.icons.lucide.SquareTerminal
 import com.composables.icons.lucide.Shield
 import com.composables.icons.lucide.Unplug
 import com.composables.icons.lucide.Sparkles
+import com.composables.icons.lucide.MessagesSquare
 import com.composables.icons.lucide.Terminal
 import com.composables.icons.lucide.Trash
-import com.composables.icons.lucide.Trash2
 import com.composables.icons.lucide.Wand
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
@@ -244,6 +244,7 @@ fun SettingsScreen(
     var showWorking by remember { mutableStateOf("label") }
     var simpleMode by remember { mutableStateOf(false) }
     var trashEnabled by remember { mutableStateOf(false) }
+    var retentionDays by remember { mutableStateOf(30) }
     var cliInfo by remember { mutableStateOf<CliApi.CliInfo?>(null) }
     var serverReady by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(Backend.isConfigured) }
@@ -265,6 +266,7 @@ fun SettingsScreen(
             account = s.account.ifEmpty { caps.defaults.account }
             simpleMode = s.simpleMode
             trashEnabled = s.trashEnabled
+            retentionDays = s.retentionDays
             showThinking = s.showThinking; showToolUse = s.showToolUse
             showFileChange = s.showFileChange; showCompact = s.showCompact; showWorking = s.showWorking
         }
@@ -493,20 +495,14 @@ fun SettingsScreen(
                     PreferenceRow(Lucide.Shield, stringResource(Res.string.permissions), serverSummary(permissionLabel(caps, permissionMode)), enabled = serverReady) { dialog = SettingsDialog.Permissions }
                     PreferenceRow(Lucide.Eye, stringResource(Res.string.visibility), serverSummary(stringResource(Res.string.visibility_summary)), enabled = serverReady) { dialog = SettingsDialog.Visibility }
                     PreferenceRow(
-                        Lucide.Trash2,
-                        stringResource(Res.string.trash),
-                        serverSummary(stringResource(Res.string.trash_hint)),
+                        Lucide.MessagesSquare,
+                        stringResource(Res.string.chats),
+                        serverSummary(
+                            stringResource(if (trashEnabled) Res.string.trash_on else Res.string.trash_off) +
+                                " • " + stringResource(Res.string.retention_days_summary, retentionDays)
+                        ),
                         enabled = serverReady,
-                        trailing = {
-                            CompactSwitch(trashEnabled, enabled = serverReady) {
-                                trashEnabled = it
-                                scope.launch { SettingsApi.update(trashEnabled = it) }
-                            }
-                        },
-                    ) {
-                        trashEnabled = !trashEnabled
-                        scope.launch { SettingsApi.update(trashEnabled = trashEnabled) }
-                    }
+                    ) { dialog = SettingsDialog.Chats }
                     if (caps.accounts.size > 1) {
                         PreferenceRow(
                             Lucide.CircleUser,
@@ -907,6 +903,18 @@ fun SettingsScreen(
             onDismiss = { dialog = null },
         )
 
+        SettingsDialog.Chats -> ChatsDialog(
+            trashEnabled = trashEnabled,
+            retentionDays = retentionDays,
+            onConfirm = { trash, days ->
+                trashEnabled = trash
+                retentionDays = days
+                scope.launch { SettingsApi.update(trashEnabled = trash, retentionDays = days) }
+                dialog = null
+            },
+            onDismiss = { dialog = null },
+        )
+
         SettingsDialog.LocalServer -> LocalServerDialog(
             settings = settings,
             probePort = environments.firstOrNull { it.id == activeId }?.port ?: 8723,
@@ -930,6 +938,7 @@ fun SettingsScreen(
                         mcpDisabled = it.mcpDisabled
                         simpleMode = it.simpleMode
                         trashEnabled = it.trashEnabled
+                        retentionDays = it.retentionDays
                         showThinking = it.showThinking; showToolUse = it.showToolUse
                         showFileChange = it.showFileChange; showCompact = it.showCompact; showWorking = it.showWorking
                     }
@@ -1010,7 +1019,57 @@ fun SettingsScreen(
     }
 }
 
-private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, McpTools, Permissions, Visibility, Notifications, Reset, LocalServer, Account, Export, Import, Switch }
+private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, McpTools, Permissions, Visibility, Chats, Notifications, Reset, LocalServer, Account, Export, Import, Switch }
+
+private const val MIN_RETENTION_DAYS = 1
+
+@Composable
+private fun ChatsDialog(
+    trashEnabled: Boolean,
+    retentionDays: Int,
+    onConfirm: (Boolean, Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var trash by remember { mutableStateOf(trashEnabled) }
+    var days by remember { mutableStateOf(retentionDays.toString()) }
+    val parsed = days.trim().toIntOrNull()
+    val valid = parsed != null && parsed >= MIN_RETENTION_DAYS
+    val error = if (days.isBlank() || valid) null
+    else stringResource(Res.string.retention_days_error, MIN_RETENTION_DAYS)
+
+    CompactDialog(
+        onDismiss = onDismiss,
+        title = stringResource(Res.string.chats),
+        buttons = {
+            Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
+            Button(onClick = { onConfirm(trash, parsed ?: retentionDays) }, enabled = valid) {
+                Text(stringResource(Res.string.save))
+            }
+        },
+    ) {
+        SwitchRow(
+            title = stringResource(Res.string.trash),
+            summary = stringResource(Res.string.trash_hint),
+            checked = trash,
+            onChange = { trash = it },
+        )
+        Spacer(Modifier.height(14.dp))
+        InputField(
+            value = days,
+            onValueChange = { days = it.filter(Char::isDigit) },
+            label = { Text(stringResource(Res.string.retention_days)) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            error = error,
+        )
+        Spacer(Modifier.height(6.dp))
+        Text(
+            stringResource(Res.string.retention_days_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
 
 @Composable
 private fun BackupDialog(

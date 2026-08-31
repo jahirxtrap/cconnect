@@ -210,9 +210,18 @@ def output_styles(info: dict[str, Any]) -> list[str]:
     return [style for style in styles if isinstance(style, str)] if isinstance(styles, list) else []
 
 
-def takes_effort(info: dict[str, Any], model: Optional[str]) -> bool:
-    """Whether the CLI lists this model as accepting an effort level."""
+def known_model(info: dict[str, Any], model: Optional[str]) -> bool:
+    """Whether the CLI still lists this model, anything goes while it reports no lineup."""
+    entries = _entries(info)
+    return not entries or model is None or any(entry["value"] == model for entry in entries)
+
+
+def effort_for(info: dict[str, Any], model: Optional[str], effort: Optional[str]) -> Optional[str]:
+    """The `--effort` value to send, or None when this model does not list that level."""
+    wanted = "xhigh" if effort == ULTRACODE_EFFORT else effort
+    if wanted in (None, "", "default"):
+        return None
     for entry in _entries(info):
         if entry["value"] == (model or "default"):
-            return bool(_levels(entry))
-    return True
+            return wanted if wanted in _levels(entry) else None
+    return wanted

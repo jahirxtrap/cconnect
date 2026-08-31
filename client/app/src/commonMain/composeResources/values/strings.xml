@@ -333,6 +333,13 @@
     <string name="empty_trash">Empty trash</string>
     <string name="empty_trash_confirm">Delete every chat in the trash?</string>
     <string name="trash_hint">Deleted chats go to the trash instead of being removed</string>
+    <string name="chats">Chats</string>
+    <string name="trash_on">Trash on</string>
+    <string name="trash_off">Trash off</string>
+    <string name="retention_days">Keep chats for (days)</string>
+    <string name="retention_days_summary">%1$d days</string>
+    <string name="retention_days_hint">Claude Code deletes a chat after this long without activity</string>
+    <string name="retention_days_error">Enter a whole number of %1$d or more</string>
     <string name="default_category">Default category</string>
     <string name="color_none">None</string>
     <string name="delete">Delete</string>

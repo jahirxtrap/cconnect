@@ -333,6 +333,13 @@
     <string name="empty_trash">Vaciar papelera</string>
     <string name="empty_trash_confirm">¿Eliminar todos los chats de la papelera?</string>
     <string name="trash_hint">Los chats eliminados pasan a la papelera en lugar de borrarse</string>
+    <string name="chats">Chats</string>
+    <string name="trash_on">Papelera activada</string>
+    <string name="trash_off">Papelera desactivada</string>
+    <string name="retention_days">Conservar los chats (días)</string>
+    <string name="retention_days_summary">%1$d días</string>
+    <string name="retention_days_hint">Claude Code borra un chat tras este tiempo sin actividad</string>
+    <string name="retention_days_error">Escribe un número entero de %1$d o más</string>
     <string name="default_category">Categoría predeterminada</string>
     <string name="color_none">Ninguno</string>
     <string name="delete">Eliminar</string>

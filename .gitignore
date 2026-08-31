@@ -27,6 +27,9 @@ build/
 # Internal AI workspace (throwaway cwd for backend AI helper actions)
 backend/internal_task/
 
+# Soft-deleted chats, kept out of the directory the CLI sweeps
+backend/trash/
+
 # Shared drop folder (quick PC -> phone file sharing, served download-only)
 backend/shared/
 
