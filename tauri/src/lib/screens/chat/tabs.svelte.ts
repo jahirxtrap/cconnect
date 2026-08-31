@@ -1,4 +1,4 @@
-import { settings } from "$lib/data/settings.svelte";
+import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 import type { SessionInfo } from "$lib/data/models";
 import { backend } from "$lib/services/backend.svelte";
 import { ChatState } from "./state.svelte";
@@ -150,6 +150,11 @@ class Tabs {
 
   refreshDefaults() {
     for (const state of this.#states.values()) void state.refreshServerInfo();
+  }
+
+  applyVisibility(prefs: VisibilityPrefs) {
+    settings.visibility = prefs;
+    for (const state of this.#states.values()) state.syncVisibility();
   }
 
   #blank(environmentId: string | null, cwd: string): Tab {

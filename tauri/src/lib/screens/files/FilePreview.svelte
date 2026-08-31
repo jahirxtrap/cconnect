@@ -2,6 +2,7 @@
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+  import ExternalLink from "@lucide/svelte/icons/external-link";
   import Save from "@lucide/svelte/icons/save";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
@@ -15,7 +16,12 @@
   import { authHeadersOf, backend } from "$lib/services/backend.svelte";
   import { mediaSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl } from "$lib/services/sharedApi";
-  import { downloadShared, openSharedExternally, saveSharedAs } from "$lib/services/sharedFiles";
+  import {
+    downloadShared,
+    openSharedExternally,
+    openSharedInBrowser,
+    saveSharedAs,
+  } from "$lib/services/sharedFiles";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -184,6 +190,11 @@
                 <Save size={20} class="shrink-0 text-on-surface-variant" />
               {/snippet}
             </MenuItem>
+            <MenuItem text={t("OPEN_IN_BROWSER")} onclick={() => void openSharedInBrowser(url, filename)}>
+              {#snippet leading()}
+                <ExternalLink size={20} class="shrink-0 text-on-surface-variant" />
+              {/snippet}
+            </MenuItem>
             <MenuItem text={t("SHARE")} onclick={() => void openSharedExternally(url, filename)}>
               {#snippet leading()}
                 <Share2 size={20} class="shrink-0 text-on-surface-variant" />
@@ -213,6 +224,7 @@
         }}
         alt={filename}
         draggable="false"
+        data-native-menu
         class="h-full w-full object-contain {loaded ? '' : 'invisible'}"
       />
       {#if failed}

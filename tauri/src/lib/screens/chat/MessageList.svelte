@@ -5,6 +5,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
+  import { scrollbarWidth } from "$lib/ui/scrollbar";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
   import StatusProgress from "./blocks/StatusProgress.svelte";
@@ -34,6 +35,7 @@
     savedScroll: { top: number; follow: boolean };
     onScrollTop: (top: number, following: boolean) => void;
     component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
+    bottomInset?: number;
   }
 
   const {
@@ -51,6 +53,7 @@
     savedScroll,
     onScrollTop,
     component,
+    bottomInset = 0,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -250,7 +253,7 @@
 
   const measureScrollbar = () => {
     if (!container) return;
-    verticalScrollbar = container.offsetWidth - container.clientWidth;
+    verticalScrollbar = scrollbarWidth(container);
     horizontalScrollbar = container.offsetHeight - container.clientHeight;
   };
 
@@ -435,7 +438,8 @@
       onclick={toBottom}
       title={t("SCROLL_TO_BOTTOM")}
       aria-label={t("SCROLL_TO_BOTTOM")}
-      style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar}px; right: {SCROLL_BUTTON_GAP + verticalScrollbar}px"
+      style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar + bottomInset}px; right: {SCROLL_BUTTON_GAP +
+        verticalScrollbar}px"
       class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
     >
       <ChevronsDown size={24} />

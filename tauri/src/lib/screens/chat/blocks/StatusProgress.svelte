@@ -3,6 +3,7 @@
   import Clock3 from "@lucide/svelte/icons/clock-3";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import { t } from "$lib/i18n/index.svelte";
+  import LinearProgress from "$lib/ui/LinearProgress.svelte";
 
   interface Props {
     kind: "slow" | "failed" | "compacting";
@@ -28,12 +29,6 @@
     <span class="text-body-md">{label}</span>
   </div>
   {#if !failed}
-    <div class="mt-2 h-1 w-full overflow-hidden rounded-full {tone === 'blue' ? 'bg-blue/30' : 'bg-orange/30'}">
-      <span
-        class="block h-full w-2/5 animate-[indeterminate_1.4s_ease-in-out_infinite] rounded-full {tone === 'blue'
-          ? 'bg-blue'
-          : 'bg-orange'}"
-      ></span>
-    </div>
+    <LinearProgress tone={compacting ? "blue" : "orange"} class="mt-2" />
   {/if}
 </div>

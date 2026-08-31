@@ -26,10 +26,17 @@
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import ExternalIndicator from "$lib/ui/ExternalIndicator.svelte";
   import GithubIcon from "$lib/ui/GithubIcon.svelte";
+  import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+
+  interface Props {
+    flash?: boolean;
+  }
+
+  const { flash = false }: Props = $props();
 
   let changelogOpen = $state(false);
   let switchOpen = $state(false);
@@ -111,7 +118,10 @@
 {/snippet}
 
 <SettingsGroup label={t("ABOUT")}>
-  <Pressable onclick={() => open(release?.url ?? RELEASES_URL)} class="flex w-full items-center gap-3 px-4 py-3">
+  <Pressable
+    onclick={() => open(release?.url ?? RELEASES_URL)}
+    class="flex w-full items-center gap-3 px-4 py-3 {flash ? 'flash-highlight' : ''}"
+  >
       <AppLogo size={28} />
       <div class="min-w-0 flex-1">
       <p class="truncate text-body-md">{t("APP_NAME")} (Tauri)</p>
@@ -137,9 +147,7 @@
 
   {#if updater.progress !== null}
     <div class="px-4 py-3">
-      <div class="h-1.5 w-full overflow-hidden rounded-full bg-surface-variant">
-        <div class="h-full bg-accent transition-[width]" style="width: {Math.round(updater.progress * 100)}%"></div>
-      </div>
+      <LinearProgress value={updater.progress} />
     </div>
   {/if}
 

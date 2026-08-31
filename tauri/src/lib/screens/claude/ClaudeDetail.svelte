@@ -40,6 +40,7 @@
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -79,6 +80,7 @@
   let notesFailed = $state(false);
   let loaded = $state(false);
   let busy = $state(false);
+  let dialogBusy = $state<string | null>(null);
   let actionError = $state<string | null>(null);
 
   let memoriesProject = $state<string | null>(null);
@@ -137,6 +139,7 @@
 
   const cancelAction = () => {
     actionRun += 1;
+    dialogBusy = null;
     busy = false;
     void load();
   };
@@ -155,6 +158,7 @@
         ) ?? null)
       : null;
     mcpMenu = mcpMenu ? (mcpServers?.find((item) => item.name === mcpMenu?.name) ?? null) : null;
+    dialogBusy = null;
     busy = false;
   };
 
@@ -493,8 +497,10 @@
       <CompactSwitch
         checked={plugin.enabled}
         enabled={!busy}
-        onCheckedChange={() =>
-          void runAction(() => claudeApi.pluginAction(plugin.enabled ? "disable" : "enable", pluginKey(plugin)))}
+        onCheckedChange={() => {
+          dialogBusy = "toggle";
+          void runAction(() => claudeApi.pluginAction(plugin.enabled ? "disable" : "enable", pluginKey(plugin)));
+        }}
       />
     {/snippet}
     {#snippet buttons()}
@@ -511,12 +517,21 @@
       </OutlinedPanel>
     {/if}
     <div class="flex flex-col gap-2.5">
+      {#if dialogBusy === "toggle" || dialogBusy === "update"}
+        <LinearProgress />
+      {/if}
       <ActionButton
         text={t("UPDATE_ACTION")}
         enabled={!busy}
-        onclick={() => void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)))}
+        onclick={() => {
+          dialogBusy = "update";
+          void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
+        }}
         class="w-full"
       />
+      {#if dialogBusy === "uninstall"}
+        <LinearProgress />
+      {/if}
       <ActionButton
         text={t("UNINSTALL")}
         enabled={!busy}
@@ -534,8 +549,10 @@
     text={t("DELETE_FILE_CONFIRM", plugin.name)}
     confirmLabel={t("UNINSTALL")}
     onConfirm={() => {
+      const key = pluginKey(plugin);
       confirmUninstall = null;
-      void runAction(() => claudeApi.pluginAction("uninstall", pluginKey(plugin)));
+      dialogBusy = "uninstall";
+      void runAction(() => claudeApi.pluginAction("uninstall", key));
     }}
     onDismiss={() => (confirmUninstall = null)}
   />
@@ -568,6 +585,9 @@
     {/snippet}
     {#snippet header()}
       <InputField value={catalogQuery} oninput={(value) => (catalogQuery = value)} label={t("SEARCH")} singleLine />
+      {#if busy}
+        <LinearProgress class="mt-2" />
+      {/if}
     {/snippet}
     {#if !catalog}
       <CenteredProgress class="py-6" />
@@ -607,8 +627,9 @@
       <Button onclick={() => (installCandidate = null)} variant="outlined">{t("CANCEL")}</Button>
       <Button
         onclick={() => {
+          const key = `${entry.name}@${catalogMarket ?? ""}`;
           installCandidate = null;
-          void runAction(() => claudeApi.pluginAction("install", `${entry.name}@${catalogMarket ?? ""}`));
+          void runAction(() => claudeApi.pluginAction("install", key));
         }}
        
       >
@@ -636,10 +657,16 @@
       </OutlinedPanel>
     {/if}
     <div class="flex flex-col gap-2.5">
+      {#if dialogBusy === "update"}
+        <LinearProgress />
+      {/if}
       <ActionButton
         text={t("UPDATE_ACTION")}
         enabled={!busy}
-        onclick={() => void runAction(() => claudeApi.marketplaceAction("update", market.name))}
+        onclick={() => {
+          dialogBusy = "update";
+          void runAction(() => claudeApi.marketplaceAction("update", market.name));
+        }}
         class="w-full"
       />
       <ActionButton
@@ -659,9 +686,10 @@
     text={t("DELETE_FILE_CONFIRM", market.name)}
     confirmLabel={t("DELETE")}
     onConfirm={() => {
+      const name = market.name;
       confirmMarketRemove = null;
       marketMenu = null;
-      void runAction(() => claudeApi.marketplaceAction("remove", market.name));
+      void runAction(() => claudeApi.marketplaceAction("remove", name));
     }}
     onDismiss={() => (confirmMarketRemove = null)}
   />
@@ -687,7 +715,10 @@
       <CompactSwitch
         checked={server.enabled}
         enabled={!busy}
-        onCheckedChange={() => void runAction(() => claudeApi.mcpToggle(server.name, !server.enabled))}
+        onCheckedChange={() => {
+          dialogBusy = "toggle";
+          void runAction(() => claudeApi.mcpToggle(server.name, !server.enabled));
+        }}
       />
     {/snippet}
     {#snippet buttons()}
@@ -703,12 +734,17 @@
         {/if}
       </OutlinedPanel>
     {/if}
-    <ActionButton
-      text={t("DELETE")}
-      enabled={!busy}
-      onclick={() => (confirmMcpRemove = server)}
-      class="w-full"
-    />
+    <div class="flex flex-col gap-2.5">
+      {#if dialogBusy === "toggle"}
+        <LinearProgress />
+      {/if}
+      <ActionButton
+        text={t("DELETE")}
+        enabled={!busy}
+        onclick={() => (confirmMcpRemove = server)}
+        class="w-full"
+      />
+    </div>
   </CompactDialog>
 {/if}
 
@@ -719,9 +755,10 @@
     text={t("DELETE_FILE_CONFIRM", server.name)}
     confirmLabel={t("DELETE")}
     onConfirm={() => {
+      const name = server.name;
       confirmMcpRemove = null;
       mcpMenu = null;
-      void runAction(() => claudeApi.mcpRemove(server.name));
+      void runAction(() => claudeApi.mcpRemove(name));
     }}
     onDismiss={() => (confirmMcpRemove = null)}
   />

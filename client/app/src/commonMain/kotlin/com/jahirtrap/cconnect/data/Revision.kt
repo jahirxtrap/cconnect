@@ -17,3 +17,5 @@ open class Revision {
 object EnvOverrides : Revision()
 
 object ServerDefaults : Revision()
+
+object ChatVisibility : Revision()

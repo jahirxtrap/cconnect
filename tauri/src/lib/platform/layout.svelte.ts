@@ -7,6 +7,7 @@ class Layout {
   width = $state(window.innerWidth);
   height = $state(window.innerHeight);
   bottomInset = $state(0);
+  transfersInset = $state(0);
   keyboard = $state(0);
   safeTop = $state(0);
   safeBottom = $state(0);

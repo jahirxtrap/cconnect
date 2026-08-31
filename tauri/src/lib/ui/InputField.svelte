@@ -86,18 +86,27 @@
         class={FIELD_CLASS}
       />
     {:else}
-      <textarea
-        bind:this={field}
-        {value}
-        {placeholder}
-        {onkeydown}
-        rows={minLines}
-        oninput={handle}
-        style="min-height: {minLines * LINE_HEIGHT}px{maxLines
-          ? `; max-height: ${maxLines * LINE_HEIGHT}px`
-          : ''}"
-        class="{FIELD_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
-      ></textarea>
+      <div class="relative flex min-w-0 flex-1">
+        {#if placeholder && !value}
+          <span
+            style="line-height: {LINE_HEIGHT}px"
+            class="pointer-events-none absolute inset-x-0 top-0 truncate text-body-md text-on-surface-variant"
+          >
+            {placeholder}
+          </span>
+        {/if}
+        <textarea
+          bind:this={field}
+          {value}
+          {onkeydown}
+          rows={minLines}
+          oninput={handle}
+          style="min-height: {minLines * LINE_HEIGHT}px{maxLines
+            ? `; max-height: ${maxLines * LINE_HEIGHT}px`
+            : ''}"
+          class="{FIELD_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
+        ></textarea>
+      </div>
     {/if}
     {#if showClear}
       <TooltipIconButton

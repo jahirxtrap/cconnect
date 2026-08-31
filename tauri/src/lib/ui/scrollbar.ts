@@ -1,5 +1,25 @@
 import { isTouch } from "$lib/platform";
 
+export const borderWidth = (node: HTMLElement) => {
+  const style = getComputedStyle(node);
+  return parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+};
+
+export const scrollbarWidth = (node: HTMLElement, border = borderWidth(node)) => {
+  if (node.scrollHeight <= node.clientHeight) return 0;
+  return Math.max(0, node.offsetWidth - node.clientWidth - border);
+};
+
+export const scrollableUnder = (x: number, y: number) => {
+  let node = document.elementFromPoint(x, y) as HTMLElement | null;
+  while (node) {
+    const overflow = getComputedStyle(node).overflowY;
+    if (overflow === "auto" || overflow === "scroll") return node;
+    node = node.parentElement;
+  }
+  return null;
+};
+
 export interface ScrollbarOptions {
   touchIndicator?: boolean;
   wheel?: boolean;

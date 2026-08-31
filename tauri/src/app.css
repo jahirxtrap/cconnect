@@ -87,19 +87,20 @@ html[data-theme="dark"] {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: var(--radius-group);
-  background: var(--c-on-background);
+  background: var(--c-on-surface);
   pointer-events: none;
-  animation: flash-highlight 1200ms ease-out forwards;
+  animation: flash-highlight 880ms ease-in-out forwards;
 }
 
 @keyframes flash-highlight {
   0%,
-  60% {
-    opacity: 0.12;
-  }
+  50%,
   100% {
     opacity: 0;
+  }
+  25%,
+  75% {
+    opacity: 0.1;
   }
 }
 

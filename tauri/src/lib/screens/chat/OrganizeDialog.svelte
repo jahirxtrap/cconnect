@@ -20,9 +20,10 @@
   interface Props {
     chat: ChatState;
     onDismiss: () => void;
+    onOpenChat: () => void;
   }
 
-  const { chat, onDismiss }: Props = $props();
+  const { chat, onDismiss, onOpenChat }: Props = $props();
 
   const LONG_PRESS_MS = 400;
   const SPACING = 4;
@@ -300,6 +301,7 @@
     onView={(item) => {
       void chat.openViewOnly(item);
       trashOpen = false;
+      onOpenChat();
       onDismiss();
     }}
     onDismiss={() => (trashOpen = false)}

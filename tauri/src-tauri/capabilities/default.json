@@ -19,6 +19,10 @@
     "core:window:allow-set-focus",
     "opener:default",
     {
+      "identifier": "opener:allow-open-path",
+      "allow": [{ "path": "$TEMP/cconnect/**" }]
+    },
+    {
       "identifier": "http:default",
       "allow": [{ "url": "https://github.com/*" }, { "url": "https://*.githubusercontent.com/*" }]
     },
@@ -28,6 +32,7 @@
     "fs:allow-write-file",
     "fs:allow-download-write-recursive",
     "fs:allow-appdata-write-recursive",
+    "fs:allow-temp-write-recursive",
     "notification:default",
     "store:default"
   ]

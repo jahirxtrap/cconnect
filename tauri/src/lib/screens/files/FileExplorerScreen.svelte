@@ -5,6 +5,7 @@
   import Copy from "@lucide/svelte/icons/copy";
   import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+  import ExternalLink from "@lucide/svelte/icons/external-link";
   import Eye from "@lucide/svelte/icons/eye";
   import FileIcon from "@lucide/svelte/icons/file";
   import Folder from "@lucide/svelte/icons/folder";
@@ -24,7 +25,7 @@
   import { slide } from "svelte/transition";
   import { navigation } from "$lib/app/navigation.svelte";
   import { formatSize, isArchive } from "$lib/data/format";
-  import { isPreviewable } from "$lib/data/previewKind";
+  import { isPreviewable, previewKindOf } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
   import { formatDateShort } from "$lib/data/time";
   import { transfers } from "$lib/data/transfers.svelte";
@@ -41,6 +42,7 @@
     downloadShared,
     openAllSharedExternally,
     openSharedExternally,
+    openSharedInBrowser,
     saveAllShared,
     saveSharedAs,
   } from "$lib/services/sharedFiles";
@@ -879,6 +881,20 @@
               >
                 {#snippet leading()}
                   <Eye size={20} class="shrink-0 text-on-surface-variant" />
+                {/snippet}
+              </MenuItem>
+            {/if}
+            {#if single && !single.isDir && previewKindOf(single.name) === "html"}
+              <MenuItem
+                text={t("OPEN_IN_BROWSER")}
+                onclick={() => {
+                  const name = single.name;
+                  void openSharedInBrowser(downloadUrl(child(name)), name);
+                  exitSelection();
+                }}
+              >
+                {#snippet leading()}
+                  <ExternalLink size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}

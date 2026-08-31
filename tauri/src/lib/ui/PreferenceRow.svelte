@@ -9,6 +9,7 @@
     summary?: string | null;
     alert?: string | null;
     enabled?: boolean;
+    flash?: boolean;
     onclick?: () => void;
     trailing?: Snippet;
   }
@@ -19,12 +20,19 @@
     summary,
     alert,
     enabled = true,
+    flash = false,
     onclick,
     trailing,
   }: Props = $props();
 </script>
 
-<Pressable {onclick} {enabled} class="flex w-full items-center gap-3 px-4 py-3 {enabled ? '' : 'opacity-40'}">
+<Pressable
+  {onclick}
+  {enabled}
+  class="flex w-full items-center gap-3 px-4 py-3 {enabled ? '' : 'opacity-40'} {flash
+    ? 'flash-highlight'
+    : ''}"
+>
   <IconComponent size={18} class="shrink-0 text-on-surface-variant" />
   <div class="min-w-0 flex-1">
     <p class="truncate text-body-md">{title}</p>

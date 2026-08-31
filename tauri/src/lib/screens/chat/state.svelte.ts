@@ -17,7 +17,7 @@ import {
 } from "$lib/data/chatModels";
 import type { ChatCategory, ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
-import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
+import { settings } from "$lib/data/settings.svelte";
 
 const PREFILLED_TYPES = new Set<ComponentType>(["input", "notes", "path", "file", "color"]);
 
@@ -1257,9 +1257,8 @@ export class ChatState {
     });
   }
 
-  applyVisibility(prefs: VisibilityPrefs) {
-    settings.visibility = prefs;
-    this.#socket.sendVisibility(prefs);
+  syncVisibility() {
+    this.#socket.sendVisibility(settings.visibility);
     this.#reloadOnDone = this.streaming;
     void this.#reloadConversation({ keepLive: this.streaming });
   }

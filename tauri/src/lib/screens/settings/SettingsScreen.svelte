@@ -59,17 +59,17 @@
 
   let cliChangelog = $state<string | null | undefined>(undefined);
 
-  const THEME_OPTIONS = [
+  const themeOptions = $derived([
     { value: "system", label: t("THEME_SYSTEM") },
     { value: "light", label: t("THEME_LIGHT") },
     { value: "dark", label: t("THEME_DARK") },
-  ];
+  ]);
 
-  const LOCALE_OPTIONS = [
+  const localeOptions = $derived([
     { value: "system", label: t("LANGUAGE_SYSTEM") },
     { value: "en", label: "English" },
     { value: "es", label: "Español" },
-  ];
+  ]);
 
   const FONT_FAMILIES: Record<FontStyle, string> = {
     system: "system-ui, sans-serif",
@@ -77,11 +77,11 @@
     color: '"CConnect Color", system-ui, sans-serif',
   };
 
-  const FONT_OPTIONS = [
+  const fontOptions = $derived([
     { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.system },
     { value: "flat", label: t("FONT_FLAT"), font: FONT_FAMILIES.flat },
     { value: "color", label: t("FONT_COLOR"), font: FONT_FAMILIES.color },
-  ];
+  ]);
 
   let dialog = $state<Dialog | null>(null);
   let refreshTick = $state(0);
@@ -103,7 +103,7 @@
   let aboutSection = $state<HTMLDivElement | null>(null);
   let flashed = $state<string | null>(null);
 
-  const FLASH_MS = 1200;
+  const FLASH_MS = 880;
 
   $effect(() => {
     const target = navigation.settingsHighlight;
@@ -171,13 +171,13 @@
       <PreferenceRow
         icon={themeIcon}
         title={t("THEME")}
-        summary={label(THEME_OPTIONS, theme.mode)}
+        summary={label(themeOptions, theme.mode)}
         onclick={() => (dialog = "theme")}
       />
       <PreferenceRow
         icon={Languages}
         title={t("LANGUAGE")}
-        summary={label(LOCALE_OPTIONS, i18n.locale)}
+        summary={label(localeOptions, i18n.locale)}
         onclick={() => (dialog = "language")}
       />
       <PreferenceRow
@@ -193,7 +193,7 @@
       <PreferenceRow
         icon={Type}
         title={t("FONT")}
-        summary={label(FONT_OPTIONS, theme.fontStyle)}
+        summary={label(fontOptions, theme.fontStyle)}
         onclick={() => (dialog = "font")}
       >
         {#snippet trailing()}
@@ -273,9 +273,10 @@
       </PreferenceRow>
     </SettingsGroup>
 
-    <div bind:this={serverSection} class={flashed === "cli" ? "flash-highlight" : ""}>
+    <div bind:this={serverSection}>
       <ServerGroup
         {tick}
+        flash={flashed === "cli"}
         onLoadingChange={(value) => {
           if (!value) refreshing = false;
         }}
@@ -311,8 +312,8 @@
       />
     </SettingsGroup>
 
-    <div bind:this={aboutSection} class={flashed === "about" ? "flash-highlight" : ""}>
-      <AboutGroup />
+    <div bind:this={aboutSection}>
+      <AboutGroup flash={flashed === "about"} />
     </div>
   </div>
 </Screen>
@@ -320,7 +321,7 @@
 {#if dialog === "theme"}
   <SelectDialog
     title={t("THEME")}
-    options={THEME_OPTIONS}
+    options={themeOptions}
     selected={theme.mode}
     onSelect={(value) => theme.setMode(value as ThemeMode)}
     onDismiss={() => (dialog = null)}
@@ -328,7 +329,7 @@
 {:else if dialog === "language"}
   <SelectDialog
     title={t("LANGUAGE")}
-    options={LOCALE_OPTIONS}
+    options={localeOptions}
     selected={i18n.locale}
     onSelect={(value) => i18n.set(value as Locale)}
     onDismiss={() => (dialog = null)}
@@ -341,7 +342,7 @@
   {/snippet}
   <SelectDialog
     title={t("FONT")}
-    options={FONT_OPTIONS}
+    options={fontOptions}
     selected={theme.fontStyle}
     onSelect={(value) => theme.setFontStyle(value as FontStyle)}
     onDismiss={() => (dialog = null)}

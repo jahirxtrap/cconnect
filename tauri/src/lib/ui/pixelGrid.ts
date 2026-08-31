@@ -26,6 +26,13 @@ export const pixelGrid = (): number => grid || (grid = measureGrid());
 
 const densityOf = (): number => Math.round((1 / pixelGrid()) * 1000) / 1000;
 
+const layoutUnit = (): number => LAYOUT_UNIT * pixelGrid();
+
+const snapUnit = (value: number): number => {
+  const unit = layoutUnit();
+  return Math.round(value / unit) * unit;
+};
+
 export const snapPx = (value: number): number => {
   const density = densityOf();
   return Math.round(value * density) / density;
@@ -33,7 +40,7 @@ export const snapPx = (value: number): number => {
 
 export const ceilPx = (value: number): number => {
   const density = densityOf();
-  return Math.ceil((value - LAYOUT_UNIT) * density) / density;
+  return Math.ceil((value - layoutUnit()) * density) / density;
 };
 
 export const snappedToken = (name: string, fallback: number): number => snapped.get(name) ?? fallback;
@@ -43,12 +50,12 @@ export const gridHeight = (node: HTMLElement, onChange?: (value: number) => void
   let pad = 0;
   const read = () => {
     const natural = node.getBoundingClientRect().height - pad;
-    const target = ceilPx(natural);
-    if (target - natural !== pad) {
-      pad = target - natural;
-      node.style.paddingBottom = `${pad}px`;
+    const next = snapUnit(ceilPx(natural) - natural);
+    if (next !== pad) {
+      pad = next;
+      node.style.paddingBottom = pad ? `${pad}px` : "";
     }
-    notify?.(target);
+    notify?.(natural + pad);
   };
   const observer = new ResizeObserver(read);
   observer.observe(node);

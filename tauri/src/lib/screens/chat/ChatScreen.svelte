@@ -168,9 +168,11 @@
   };
 
   $effect(() => {
-    layout.bottomInset = composerHeight;
+    layout.bottomInset = Math.max(0, composerHeight - layout.menuPadding.bottom);
     return () => (layout.bottomInset = 0);
   });
+
+  const transfersLift = $derived(Math.max(0, layout.transfersInset - composerHeight));
 
   $effect(() => {
     const environmentIds = [...new Set(tabs.list.map((tab) => tab.environmentId))];
@@ -403,6 +405,7 @@
           chat.followBottom = following;
         }}
         {component}
+        bottomInset={transfersLift}
       />
         </div>
         {#if chat.sideOpen}
@@ -417,6 +420,7 @@
             onClose={closeSide}
             onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
             {component}
+            bottomInset={transfersLift}
           />
         {/if}
     </div>
@@ -557,7 +561,7 @@
     compact={local.compact ?? ""}
     working={local.working ?? ""}
     onConfirm={(values) => {
-      chat.applyVisibility({
+      tabs.applyVisibility({
         simple: values.simple === "" ? null : values.simple === "on",
         thinking: values.thinking || null,
         tool_use: values.toolUse || null,
@@ -666,7 +670,11 @@
 {/if}
 
 {#if organizeOpen}
-  <OrganizeDialog {chat} onDismiss={() => (organizeOpen = false)} />
+  <OrganizeDialog
+    {chat}
+    onDismiss={() => (organizeOpen = false)}
+    onOpenChat={() => (drawer.open = false)}
+  />
 {/if}
 
 {#if moveTarget}

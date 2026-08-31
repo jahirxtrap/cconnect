@@ -1,5 +1,6 @@
 <script lang="ts">
   import { formatDecimal } from "$lib/data/format";
+  import LinearProgress from "./LinearProgress.svelte";
 
   interface Props {
     title: string;
@@ -22,7 +23,8 @@
   }: Props = $props();
 
   const ALERT_PERCENT = 90;
-  const clamped = $derived(Math.min(100, Math.max(0, percent)));
+  const PERCENT = 100;
+  const clamped = $derived(Math.min(PERCENT, Math.max(0, percent)));
   const alerting = $derived(alert ?? percent >= ALERT_PERCENT);
   const heading = $derived(!!title || !!subtitle || showValue);
 </script>
@@ -41,10 +43,10 @@
       {/if}
     </div>
   {/if}
-  <div class="h-1 w-full overflow-hidden rounded-full bg-outline-variant {heading ? 'mt-2' : ''}">
-    <div
-      class="h-full rounded-full transition-[width] {alerting ? 'bg-red' : color ? '' : 'bg-accent'}"
-      style="width: {clamped}%{!alerting && color ? `; background: ${color}` : ''}"
-    ></div>
-  </div>
+  <LinearProgress
+    value={clamped / PERCENT}
+    tone={alerting ? "red" : "accent"}
+    color={alerting ? null : color}
+    class={heading ? "mt-2" : ""}
+  />
 </div>

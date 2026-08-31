@@ -257,6 +257,7 @@ import com.jahirtrap.cconnect.files.FilePreviewScreen
 import com.jahirtrap.cconnect.files.downloadShared
 import com.jahirtrap.cconnect.files.saveSharedAs
 import com.jahirtrap.cconnect.files.openSharedExternally
+import com.jahirtrap.cconnect.files.openSharedInBrowser
 import com.jahirtrap.cconnect.files.isArchive
 import com.jahirtrap.cconnect.files.isPreviewable
 import androidx.compose.material3.ModalBottomSheet
@@ -1187,7 +1188,12 @@ fun ChatScreen(
         )
     }
     if (organizeOpen) {
-        OrganizeDialog(state = state, vm = vm, onDismiss = { organizeOpen = false })
+        OrganizeDialog(
+            state = state,
+            vm = vm,
+            onDismiss = { organizeOpen = false },
+            onOpenChat = { scope.launch { drawerState.close() } },
+        )
     }
     moveTarget?.let { s ->
         MoveSessionDialog(
@@ -1240,6 +1246,7 @@ fun ChatScreen(
             onOpenInFiles = archiveRel?.let { rel -> { onOpenExplorer(rel) } },
             onSave = { scope.launch { downloadShared(url, filename) } },
             onSaveAs = { scope.launch { saveSharedAs(url, filename) } },
+            onOpenInBrowser = { scope.launch { openSharedInBrowser(url, filename) } },
             onShare = { scope.launch { openSharedExternally(url, filename) } },
             onDismiss = { sharedLinkAction = null },
         )
@@ -2757,7 +2764,7 @@ private fun ProjectSelector(projects: List<ProjectInfo>, selected: String?, lock
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () -> Unit) {
+private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () -> Unit, onOpenChat: () -> Unit) {
     var editing by remember { mutableStateOf<String?>(null) }
     var draft by remember { mutableStateOf("") }
     var deletingCategory by remember { mutableStateOf<ChatCategory?>(null) }
@@ -2989,7 +2996,7 @@ private fun OrganizeDialog(state: ChatUiState, vm: ChatViewModel, onDismiss: () 
     if (trashOpen) {
         TrashDialog(
             vm = vm,
-            onView = { vm.openViewOnly(it); trashOpen = false; onDismiss() },
+            onView = { vm.openViewOnly(it); trashOpen = false; onOpenChat(); onDismiss() },
             onDismiss = { trashOpen = false },
         )
     }

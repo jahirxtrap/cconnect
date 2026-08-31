@@ -1,12 +1,18 @@
 <script lang="ts">
   import Download from "@lucide/svelte/icons/download";
+  import ExternalLink from "@lucide/svelte/icons/external-link";
   import Eye from "@lucide/svelte/icons/eye";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import Save from "@lucide/svelte/icons/save";
   import Share2 from "@lucide/svelte/icons/share-2";
   import { isPreviewable } from "$lib/data/previewKind";
   import { t } from "$lib/i18n/index.svelte";
-  import { downloadShared, openSharedExternally, saveSharedAs } from "$lib/services/sharedFiles";
+  import {
+    downloadShared,
+    openSharedExternally,
+    openSharedInBrowser,
+    saveSharedAs,
+  } from "$lib/services/sharedFiles";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
   import DialogActionItem from "./DialogActionItem.svelte";
@@ -39,6 +45,11 @@
   {/if}
   <DialogActionItem text={t("SAVE")} icon={Download} onclick={() => run(() => void downloadShared(url, filename))} />
   <DialogActionItem text={t("SAVE_AS")} icon={Save} onclick={() => run(() => void saveSharedAs(url, filename))} />
+  <DialogActionItem
+    text={t("OPEN_IN_BROWSER")}
+    icon={ExternalLink}
+    onclick={() => run(() => void openSharedInBrowser(url, filename))}
+  />
   <DialogActionItem
     text={t("SHARE")}
     icon={Share2}

@@ -48,16 +48,26 @@ class TransferManager {
     ).then((saved) => this.#settle(id, saved !== null));
   }
 
-  async download(name: string, run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>) {
-    const id = this.#start("download", name, "");
+  async task(
+    kind: TransferKind,
+    name: string,
+    run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>,
+  ) {
+    const id = this.#start(kind, name, "");
     const abort = new AbortController();
     this.#aborts.set(id, abort);
     try {
-      const saved = await run((progress) => this.#patch(id, { progress }), abort.signal);
-      this.#settle(id, saved);
+      const done = await run((progress) => this.#patch(id, { progress }), abort.signal);
+      this.#settle(id, done);
+      return done;
     } catch {
       this.#settle(id, false);
+      return false;
     }
+  }
+
+  download(name: string, run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>) {
+    return this.task("download", name, run);
   }
 
   cancel(id: number) {

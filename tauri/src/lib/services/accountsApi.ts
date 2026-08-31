@@ -1,3 +1,4 @@
+import { transfers } from "$lib/data/transfers.svelte";
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 
@@ -68,16 +69,19 @@ export const createAccountsApi = (client: HttpClient) => ({
   exportUrl,
 
   async importBundle(file: File, label: string): Promise<boolean> {
-    try {
-      const response = await fetch(importUrl(label), {
-        method: "POST",
-        headers: authHeadersOf(backend.active),
-        body: file,
-      });
-      return response.ok;
-    } catch {
-      return false;
-    }
+    return transfers.task("upload", file.name, async (_onProgress, signal) => {
+      try {
+        const response = await fetch(importUrl(label), {
+          method: "POST",
+          headers: authHeadersOf(backend.active),
+          body: file,
+          signal,
+        });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    });
   },
 });
 

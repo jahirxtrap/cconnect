@@ -24,6 +24,7 @@ import com.jahirtrap.cconnect.data.ChatMessage
 import com.jahirtrap.cconnect.data.QueuedMessage
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.data.EnvOverrides
+import com.jahirtrap.cconnect.data.ChatVisibility
 import com.jahirtrap.cconnect.data.ServerDefaults
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.CommandOption
@@ -273,6 +274,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         viewModelScope.launch {
             ServerDefaults.revision.drop(1).collect { refreshServerInfo() }
         }
+        viewModelScope.launch {
+            ChatVisibility.revision.drop(1).collect { syncVisibility() }
+        }
     }
 
     private suspend fun consumeInitialSession(projectKey: String? = null) {
@@ -495,6 +499,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         settings.visibilityFileChange = prefs.fileChange.orEmpty()
         settings.visibilityCompact = prefs.compact.orEmpty()
         settings.visibilityWorking = prefs.working.orEmpty()
+        ChatVisibility.bump()
+    }
+
+    private fun syncVisibility() {
+        val prefs = localVisibility()
         _state.update { it.copy(visibility = prefs) }
         client.sendVisibility(prefs)
         val running = _state.value.streaming

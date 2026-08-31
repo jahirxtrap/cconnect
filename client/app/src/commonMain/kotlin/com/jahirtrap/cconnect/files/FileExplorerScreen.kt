@@ -112,6 +112,7 @@ import com.composables.icons.lucide.ClipboardCopy
 import com.composables.icons.lucide.Copy
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.EllipsisVertical
+import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.File
 import com.composables.icons.lucide.Folder
@@ -673,6 +674,12 @@ fun FileExplorerScreen(
                             {
                                 val rel = child(entry.name)
                                 onOpenPreview(SharedApi.downloadUrl(rel), entry.name) { scope.launch { SharedApi.delete(rel); reload() } }
+                                exitSelection()
+                            }
+                        },
+                        onOpenInBrowser = shownSingle?.takeIf { !it.isDir && previewKindOf(it.name) == PreviewKind.Html }?.let { entry ->
+                            {
+                                scope.launch { openSharedInBrowser(SharedApi.downloadUrl(child(entry.name)), entry.name) }
                                 exitSelection()
                             }
                         },
@@ -1249,6 +1256,7 @@ private fun SelectionToolbar(
     onShare: () -> Unit,
     onDelete: () -> Unit,
     onView: (() -> Unit)?,
+    onOpenInBrowser: (() -> Unit)?,
     onRename: (() -> Unit)?,
     onSave: (() -> Unit)?,
     onSaveAs: (() -> Unit)?,
@@ -1262,7 +1270,7 @@ private fun SelectionToolbar(
             ToolbarAction(Lucide.Copy, stringResource(Res.string.copy), onClick = onCopy)
             ToolbarAction(Lucide.Share2, stringResource(Res.string.share), onClick = onShare, enabled = canShare)
             ToolbarAction(Lucide.Trash, stringResource(Res.string.delete), onClick = onDelete)
-            if (onView != null || onRename != null || onSave != null || onSaveAs != null || onCopyPath != null) {
+            if (onView != null || onOpenInBrowser != null || onRename != null || onSave != null || onSaveAs != null || onCopyPath != null) {
                 Box {
                     ToolbarAction(
                         Lucide.EllipsisVertical,
@@ -1275,6 +1283,13 @@ private fun SelectionToolbar(
                                 text = stringResource(Res.string.view),
                                 leadingIcon = { Icon(Lucide.Eye, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = { menu = false; onView() },
+                            )
+                        }
+                        if (onOpenInBrowser != null) {
+                            CompactDropdownItem(
+                                text = stringResource(Res.string.open_in_browser),
+                                leadingIcon = { Icon(Lucide.ExternalLink, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = { menu = false; onOpenInBrowser() },
                             )
                         }
                         if (onRename != null) {

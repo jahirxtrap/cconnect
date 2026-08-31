@@ -5,12 +5,15 @@ import { SECURE_KEYS, secureStore } from "$lib/platform/secureStorage";
 import "./app.css";
 
 const SELECTABLE = "input, textarea, [contenteditable], .selectable";
+const NATIVE_MENU = `${SELECTABLE}, [data-native-menu]`;
 
-const allowsSelection = (target: EventTarget | null) =>
-  target instanceof Element && target.closest(SELECTABLE) !== null;
+const matches = (target: EventTarget | null, selector: string) =>
+  target instanceof Element && target.closest(selector) !== null;
+
+const allowsSelection = (target: EventTarget | null) => matches(target, SELECTABLE);
 
 document.addEventListener("contextmenu", (event) => {
-  if (!allowsSelection(event.target)) event.preventDefault();
+  if (!matches(event.target, NATIVE_MENU)) event.preventDefault();
 });
 
 document.addEventListener("selectionchange", () => {

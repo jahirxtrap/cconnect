@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Download
 import com.composables.icons.lucide.EllipsisVertical
+import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Save
 import com.composables.icons.lucide.Share2
@@ -190,6 +191,11 @@ fun FilePreviewScreen(
                                 text = stringResource(Res.string.save_as),
                                 leadingIcon = { Icon(Lucide.Save, contentDescription = null, modifier = Modifier.size(20.dp)) },
                                 onClick = { menu = false; scope.launch { saveSharedAs(url, filename) } },
+                            )
+                            CompactDropdownItem(
+                                text = stringResource(Res.string.open_in_browser),
+                                leadingIcon = { Icon(Lucide.ExternalLink, contentDescription = null, modifier = Modifier.size(20.dp)) },
+                                onClick = { menu = false; scope.launch { openSharedInBrowser(url, filename) } },
                             )
                             CompactDropdownItem(
                                 text = stringResource(Res.string.share),

@@ -25,11 +25,12 @@
 
   interface Props {
     tick?: number;
+    flash?: boolean;
     onLoadingChange?: (value: boolean) => void;
     onChangelog: (cliVersion: string | null) => void;
   }
 
-  const { tick = 0, onLoadingChange, onChangelog }: Props = $props();
+  const { tick = 0, flash = false, onLoadingChange, onChangelog }: Props = $props();
 
   type Dialog = "cli" | "generation" | "permissions" | "visibility" | "account";
 
@@ -100,6 +101,7 @@
     title={t("CLI")}
     summary={summary(cli?.activeVersion ?? "—")}
     enabled={ready}
+    {flash}
     onclick={() => (dialog = "cli")}
   >
     {#snippet trailing()}

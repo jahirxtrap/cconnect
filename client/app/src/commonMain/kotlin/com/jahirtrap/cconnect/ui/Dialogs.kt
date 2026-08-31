@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.composables.icons.lucide.Download
+import com.composables.icons.lucide.ExternalLink
 import com.composables.icons.lucide.Eye
 import com.composables.icons.lucide.FolderArchive
 import com.composables.icons.lucide.Lucide
@@ -330,6 +331,7 @@ fun SharedLinkActionsDialog(
     filename: String,
     onSave: () -> Unit,
     onSaveAs: () -> Unit,
+    onOpenInBrowser: () -> Unit,
     onShare: () -> Unit,
     onDismiss: () -> Unit,
     onView: (() -> Unit)? = null,
@@ -345,6 +347,7 @@ fun SharedLinkActionsDialog(
         if (onOpenInFiles != null) DialogActionItem(stringResource(Res.string.open_in_files), Lucide.FolderArchive) { onDismiss(); onOpenInFiles() }
         DialogActionItem(stringResource(Res.string.save), Lucide.Download) { onDismiss(); onSave() }
         DialogActionItem(stringResource(Res.string.save_as), Lucide.Save) { onDismiss(); onSaveAs() }
+        DialogActionItem(stringResource(Res.string.open_in_browser), Lucide.ExternalLink) { onDismiss(); onOpenInBrowser() }
         DialogActionItem(stringResource(Res.string.share), Lucide.Share2) { onDismiss(); onShare() }
     }
 }

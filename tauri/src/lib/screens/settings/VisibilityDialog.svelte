@@ -84,7 +84,6 @@
         title={t("SIMPLE_MODE")}
         summary={t("SIMPLE_MODE_SUMMARY")}
         checked={isSimple}
-        class="-mx-3"
         onChange={(checked) => (values = { ...values, simple: checked ? "on" : "off" })}
       />
     {/if}

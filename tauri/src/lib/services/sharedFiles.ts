@@ -207,3 +207,29 @@ export const openSharedExternally = async (url: string, filename: string) => {
   }
   openExternal(url);
 };
+
+export const openSharedInBrowser = async (url: string, filename: string) => {
+  const bridge = androidDownloads();
+  if (bridge) {
+    bridge.share(url, filename, headersJson());
+    return;
+  }
+  const blob = await fetchTracked(url, () => {}, new AbortController().signal);
+  if (!blob) return;
+  if (!isTauri) {
+    const objectUrl = URL.createObjectURL(blob);
+    window.open(objectUrl, "_blank", "noopener");
+    return;
+  }
+  try {
+    const { writeFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+    const target = `cconnect/${filename}`;
+    await mkdir("cconnect", { baseDir: BaseDirectory.Temp, recursive: true });
+    await writeFile(target, new Uint8Array(await (blob as Blob).arrayBuffer()), { baseDir: BaseDirectory.Temp });
+    const { tempDir, join } = await import("@tauri-apps/api/path");
+    const { openPath } = await import("@tauri-apps/plugin-opener");
+    await openPath(await join(await tempDir(), target));
+  } catch {
+    openExternal(url);
+  }
+};

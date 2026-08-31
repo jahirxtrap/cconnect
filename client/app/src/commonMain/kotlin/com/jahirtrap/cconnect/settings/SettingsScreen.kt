@@ -784,11 +784,11 @@ fun SettingsScreen(
             onDismiss = { dialog = null },
         )
 
-        SettingsDialog.Language -> ConfirmSelectDialog(
+        SettingsDialog.Language -> SelectDialog(
             title = stringResource(Res.string.language),
             options = (if (isWebPlatform) listOf("") else LANGUAGE_TAGS).map { it to languageLabel(it) },
             selected = language,
-            onConfirm = { onLanguage(it); dialog = null },
+            onSelect = onLanguage,
             onDismiss = { dialog = null },
         )
 

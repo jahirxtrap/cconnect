@@ -44,11 +44,16 @@
     return false;
   };
 
+  const handlesSwipe = (target: EventTarget | null) =>
+    target instanceof Element && target.closest("[data-swipe]") !== null;
+
+  const blockContext = (event: Event) => event.preventDefault();
+
   const onStart = (event: TouchEvent) => {
     if (menusOpen() || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     const touch = event.touches[0];
     if (!open && !onOpen) return;
-    if (scrollsHorizontally(event.target)) return;
+    if (scrollsHorizontally(event.target) || handlesSwipe(event.target)) return;
     tracking = true;
     decided = false;
     dragging = false;
@@ -73,6 +78,7 @@
         tracking = false;
         return;
       }
+      window.addEventListener("contextmenu", blockContext);
     }
     const elapsed = event.timeStamp - lastAt;
     if (elapsed > 0) speed = ((touch.clientX - lastX) / elapsed) * 1000;
@@ -83,6 +89,7 @@
   };
 
   const onEnd = () => {
+    window.removeEventListener("contextmenu", blockContext);
     if (!tracking) return;
     tracking = false;
     if (!dragging) return;
@@ -106,6 +113,7 @@
       window.removeEventListener("touchmove", move);
       window.removeEventListener("touchend", onEnd);
       window.removeEventListener("touchcancel", onEnd);
+      window.removeEventListener("contextmenu", blockContext);
     };
   });
 

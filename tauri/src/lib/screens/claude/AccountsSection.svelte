@@ -146,8 +146,9 @@
       <ActionButton
         text={account.loggedIn ? t("ACCOUNT_RELOGIN") : t("ACCOUNT_LOGIN")}
         onclick={() => {
+          const target = account;
           actions = null;
-          void beginLogin(account);
+          void beginLogin(target);
         }}
         class="w-full"
       />
@@ -155,8 +156,9 @@
         <ActionButton
           text={t("ACCOUNT_SET_DEFAULT")}
           onclick={() => {
+            const target = account;
             actions = null;
-            void settingsApi.update({ account: account.id }).then(refresh);
+            void settingsApi.update({ account: target.id }).then(refresh);
           }}
           class="w-full"
         />
@@ -164,8 +166,9 @@
       <ActionButton
         text={t("RENAME")}
         onclick={() => {
+          const target = account;
           actions = null;
-          renaming = account;
+          renaming = target;
         }}
         class="w-full"
       />
@@ -173,8 +176,9 @@
         <ActionButton
           text={t("ACCOUNT_EXPORT")}
           onclick={() => {
+            const target = account;
             actions = null;
-            void downloadShared(accountsApi.exportUrl(account.id), `${account.id}.zip`);
+            void downloadShared(accountsApi.exportUrl(target.id), `${target.id}.zip`);
           }}
           class="w-full"
         />
@@ -183,16 +187,18 @@
         <ActionButton
           text={t("ACCOUNT_SYNC_MCP")}
           onclick={() => {
+            const target = account;
             actions = null;
-            void accountsApi.syncMcp(account.id);
+            void accountsApi.syncMcp(target.id);
           }}
           class="w-full"
         />
         <ActionButton
           text={t("DELETE")}
           onclick={() => {
+            const target = account;
             actions = null;
-            deleting = account;
+            deleting = target;
           }}
           class="w-full"
         />

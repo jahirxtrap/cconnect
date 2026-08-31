@@ -71,6 +71,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
   };
 
   node.style.touchAction = "pan-y";
+  node.dataset.swipe = "";
   node.addEventListener("pointerdown", onPointerDown);
   node.addEventListener("pointermove", onPointerMove);
   node.addEventListener("pointerup", onPointerUp);
@@ -86,6 +87,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
     },
     destroy() {
       release();
+      delete node.dataset.swipe;
       node.removeEventListener("pointerdown", onPointerDown);
       node.removeEventListener("pointermove", onPointerMove);
       node.removeEventListener("pointerup", onPointerUp);

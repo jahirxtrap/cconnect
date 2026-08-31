@@ -19,6 +19,7 @@
     onClose: () => void;
     onAnswer: (requestId: string, optionId: string) => void;
     component?: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
+    bottomInset?: number;
   }
 
   const {
@@ -32,6 +33,7 @@
     onClose,
     onAnswer,
     component,
+    bottomInset = 0,
   }: Props = $props();
 
   const PEEK = 58;
@@ -262,7 +264,8 @@
         onclick={toBottom}
         title={t("SCROLL_TO_BOTTOM")}
         aria-label={t("SCROLL_TO_BOTTOM")}
-        style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar}px; right: {SCROLL_BUTTON_GAP + verticalScrollbar}px"
+        style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar + bottomInset}px; right: {SCROLL_BUTTON_GAP +
+          verticalScrollbar}px"
         class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
       >
         <ChevronsDown size={24} />

@@ -154,7 +154,10 @@ import com.jahirtrap.cconnect.ui.formatClock
 import com.jahirtrap.cconnect.ui.formatDay
 import com.jahirtrap.cconnect.ui.horizontalScrollbar
 import com.jahirtrap.cconnect.ui.theme.palette
+import kotlin.math.abs
+import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalDensity
@@ -927,10 +930,25 @@ private fun componentSummary(data: InteractionData, yes: String, no: String): Li
     }
 }
 
+private const val MAX_STEP_DECIMALS = 6
+private const val STEP_EPSILON = 1e-6
+
+private fun decimalsOf(value: Float): Int {
+    var scaled = value.toDouble()
+    var decimals = 0
+    while (decimals < MAX_STEP_DECIMALS && abs(scaled - scaled.roundToLong()) > STEP_EPSILON) {
+        scaled *= 10
+        decimals++
+    }
+    return decimals
+}
+
 private fun snapToStep(value: Float, min: Float, step: Float?): Float {
     val size = step ?: 1f
     if (size <= 0f) return value
-    return min + ((value - min) / size).roundToInt() * size
+    val steps = ((value - min) / size).roundToInt()
+    val factor = 10.0.pow(maxOf(decimalsOf(size), decimalsOf(min)))
+    return (((min.toDouble() + steps * size.toDouble()) * factor).roundToLong() / factor).toFloat()
 }
 
 @Composable

@@ -14,6 +14,7 @@
     type WifiNetwork,
   } from "$lib/services/networkApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
+  import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -301,9 +302,7 @@
               {formatDecimal(testProgress * PERCENT, 0)}%
             </span>
           </div>
-          <div class="mt-2 h-1 w-full overflow-hidden rounded-full bg-outline-variant">
-            <div class="h-full rounded-full bg-accent transition-[width]" style="width: {testProgress * PERCENT}%"></div>
-          </div>
+          <LinearProgress value={testProgress} class="mt-2" />
         </div>
       {:else}
         <div class="px-4 py-3">
