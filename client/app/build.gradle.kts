@@ -8,8 +8,8 @@ plugins {
     alias(libs.plugins.android.library)
 }
 
-val appVersionName = "1.6.1"
-val supportedServerRange = ">=1.6.1"
+val appVersionName = "1.6.2"
+val supportedServerRange = ">=1.6.2"
 
 val lwjglVersion = libs.versions.lwjgl.get()
 val lwjglNatives = run {
