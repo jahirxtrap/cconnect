@@ -36,7 +36,6 @@ object AccountsApi {
 
     suspend fun delete(id: String): Boolean = Http.delete("/accounts/$id") != null
 
-    suspend fun syncMcp(id: String): Boolean = Http.post("/accounts/$id/mcp-sync") != null
 
     suspend fun startLogin(id: String): String? =
         Http.post("/accounts/$id/login")?.jsonObject?.get("url")?.jsonPrimitive?.contentOrNull

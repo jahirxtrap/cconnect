@@ -20,6 +20,7 @@ object SettingsApi {
         val permissionMode: String,
         val streaming: Boolean,
         val todoTools: Boolean,
+        val outputStyle: String,
         val mcpDisabled: String,
         val showThinking: String,
         val showToolUse: String,
@@ -45,6 +46,7 @@ object SettingsApi {
         permissionMode = effectiveStr(o, "permission_mode", "bypassPermissions"),
         streaming = effectiveBool(o, "streaming", true),
         todoTools = effectiveBool(o, "todo_tools", false),
+        outputStyle = effectiveStr(o, "output_style", "default"),
         mcpDisabled = effectiveStr(o, "mcp_disabled", ""),
         showThinking = effectiveStr(o, "show_thinking", "full"),
         showToolUse = effectiveStr(o, "show_tool_use", "label"),
@@ -66,6 +68,7 @@ object SettingsApi {
         permissionMode: String? = null,
         streaming: Boolean? = null,
         todoTools: Boolean? = null,
+        outputStyle: String? = null,
         mcpDisabled: String? = null,
         showThinking: String? = null,
         showToolUse: String? = null,
@@ -83,6 +86,7 @@ object SettingsApi {
         if (permissionMode != null) put("permission_mode", permissionMode)
         if (streaming != null) put("streaming", streaming)
         if (todoTools != null) put("todo_tools", todoTools)
+        if (outputStyle != null) put("output_style", outputStyle)
         if (mcpDisabled != null) put("mcp_disabled", mcpDisabled)
         if (showThinking != null) put("show_thinking", showThinking)
         if (showToolUse != null) put("show_tool_use", showToolUse)

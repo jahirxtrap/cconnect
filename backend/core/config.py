@@ -45,9 +45,8 @@ RESTART_FLAG = Path(__file__).resolve().parent.parent / ".restart"
 # active connection has none. Defaults to the parent of the backend folder.
 DEFAULT_CWD = os.environ.get("DEFAULT_CWD", str(Path(__file__).resolve().parent.parent.parent))
 
-# Fallbacks used only if the SDK can't be introspected yet.
+# Fallback used only if the SDK can't be introspected yet.
 _FALLBACK_PERMISSION_MODES = ("default", "acceptEdits", "plan", "dontAsk", "bypassPermissions", "auto")
-_FALLBACK_EFFORT_LEVELS = ("low", "medium", "high", "xhigh", "max")
 
 DEFAULT_PERMISSION_MODE = os.environ.get("DEFAULT_PERMISSION_MODE", "bypassPermissions")
 DEFAULT_EFFORT = os.environ.get("DEFAULT_EFFORT", "xhigh")
@@ -55,22 +54,9 @@ DEFAULT_EFFORT = os.environ.get("DEFAULT_EFFORT", "xhigh")
 # Pseudo-level surfaced in capabilities; run_prompt expands it to xhigh + the ultracode setting.
 ULTRACODE_EFFORT = "ultracode"
 
-# Curated model list (the SDK does not enumerate models). Ids are CLI aliases
-# that always resolve to the latest matching model; "default" lets the CLI pick.
-MODELS = [
-    {"id": "default", "label": "Default"},
-    {"id": "fable", "label": "Fable 5"},
-    {"id": "fable[1m]", "label": "Fable 5 (1M)"},
-    {"id": "opus", "label": "Opus 5"},
-    {"id": "opus[1m]", "label": "Opus 5 (1M)"},
-    {"id": "sonnet", "label": "Sonnet 5"},
-    {"id": "sonnet[1m]", "label": "Sonnet 5 (1M)"},
-    {"id": "haiku", "label": "Haiku 4.5"},
-]
 DEFAULT_MODEL = os.environ.get("DEFAULT_MODEL", "opus[1m]")
 
-# Display labels for permission modes (the SDK only exposes the raw ids). Served with
-# capabilities so the app doesn't hardcode/translate them.
+# Display labels for permission modes (the SDK only exposes the raw ids).
 PERMISSION_LABELS = {
     "default": "Default",
     "acceptEdits": "Accept edits",
@@ -83,11 +69,13 @@ PERMISSION_LABELS = {
 # The named set Claude uses for agent colors; the app maps each to a swatch.
 COLORS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
 
-# Slash commands offered in the composer menu. kind="client" is handled in-app;
-# kind="prompt" is forwarded to the CLI; kind="usage" fetches plan usage out-of-band.
-# require_confirmation prompts first.
+# Slash commands CConnect handles itself. kind="client" is handled in-app; kind="prompt"
+# is forwarded to the CLI; kind="usage" fetches plan usage out-of-band. require_confirmation
+# prompts first. own_description keeps ours when the CLI describes a behaviour we changed.
+# Everything else the CLI reports is appended as kind="prompt" (see services/cli_info).
 COMMANDS = [
-    {"name": "clear", "description": "Clear this conversation", "kind": "client", "require_confirmation": True},
+    {"name": "clear", "description": "Clear this conversation", "kind": "client",
+     "require_confirmation": True, "own_description": True},
     {"name": "compact", "description": "Compact the conversation", "kind": "prompt"},
     {"name": "context", "description": "Show context window usage", "kind": "prompt"},
     {"name": "usage", "description": "Show plan token usage", "kind": "usage"},
@@ -102,16 +90,6 @@ def permission_modes() -> tuple[str, ...]:
         return tuple(get_args(PermissionMode)) or _FALLBACK_PERMISSION_MODES
     except Exception:
         return _FALLBACK_PERMISSION_MODES
-
-
-def effort_levels() -> tuple[str, ...]:
-    """Effort levels from the installed SDK, falling back to a static list."""
-    try:
-        from typing import get_args
-        from claude_agent_sdk.types import EffortLevel
-        return tuple(get_args(EffortLevel)) or _FALLBACK_EFFORT_LEVELS
-    except Exception:
-        return _FALLBACK_EFFORT_LEVELS
 
 
 # Pull the latest claude-agent-sdk on startup. Disable for faster dev reloads.
@@ -135,10 +113,8 @@ __all__ = [
     "DEFAULT_PERMISSION_MODE",
     "DEFAULT_EFFORT",
     "DEFAULT_MODEL",
-    "MODELS",
     "COLORS",
     "permission_modes",
-    "effort_levels",
     "AUTO_UPDATE_SDK",
     "PUBLIC_ACCESS_TOKEN",
 ]

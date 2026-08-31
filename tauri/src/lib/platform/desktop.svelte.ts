@@ -90,6 +90,8 @@ class Desktop {
       ],
     });
 
+    await TrayIcon.removeById(TRAY_ID).catch(() => undefined);
+
     try {
       await TrayIcon.new({
         id: TRAY_ID,

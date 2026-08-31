@@ -72,6 +72,9 @@
     <string name="streaming_desc">Mostrar el razonamiento y las respuestas mientras se generan</string>
     <string name="task_tools">Seguimiento de tareas</string>
     <string name="task_tools_desc">Permitir que Claude mantenga una lista de tareas, visible en la barra del chat. Los modelos recientes la omiten para ahorrar contexto</string>
+    <string name="output_style">Estilo de respuesta</string>
+    <string name="fast_mode">Modo rápido</string>
+    <string name="fast_mode_desc">Respuestas más veloces con el mismo modelo. Consume créditos de uso</string>
     <string name="mcp_tools">Herramientas</string>
     <string name="mcp_tools_desc">Herramientas propias que este servidor ofrece a Claude en cada chat.</string>
     <string name="mcp_tools_count">%1$d/%2$d habilitadas</string>
@@ -182,7 +185,6 @@
     <string name="account_connected">Sesión iniciada</string>
     <string name="account_set_default">Usar como predeterminada</string>
     <string name="account_name">Nombre</string>
-    <string name="account_sync_mcp">Sincronizar servidores MCP</string>
     <string name="account_login_failed">No se pudo completar el inicio de sesión</string>
     <string name="network">Red</string>
     <string name="network_state">Estado</string>

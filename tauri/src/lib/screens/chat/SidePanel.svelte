@@ -48,6 +48,7 @@
   let dragging = $state(false);
 
   const onPointerDown = (event: PointerEvent) => {
+    if ((event.target as HTMLElement).closest("button, a, input, textarea")) return;
     const handle = event.currentTarget as HTMLElement;
     handle.setPointerCapture(event.pointerId);
     dragging = true;

@@ -22,6 +22,7 @@ import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.ChatListStore
 import com.jahirtrap.cconnect.data.ChatMessage
 import com.jahirtrap.cconnect.data.QueuedMessage
+import com.jahirtrap.cconnect.data.resolve
 import com.jahirtrap.cconnect.data.SendStatus
 import com.jahirtrap.cconnect.data.EnvOverrides
 import com.jahirtrap.cconnect.data.ChatVisibility
@@ -395,8 +396,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 caps.accounts.none { it.id == current.accountOverride }
             val staleModel = current.modelOverride.isNotEmpty() &&
                 caps.models.none { it.id == current.modelOverride }
+            val model = if (staleModel) caps.defaults.model else current.modelOverride.ifEmpty { caps.defaults.model }
             val staleEffort = current.effortOverride.isNotEmpty() &&
-                caps.effortLevels.none { it == current.effortOverride }
+                current.effortOverride !in caps.effortLevelsFor(model)
             val stalePermission = current.permissionOverride.isNotEmpty() &&
                 caps.permissionModes.none { it.id == current.permissionOverride }
             if (staleAccount || staleModel || staleEffort || stalePermission) {
@@ -611,7 +613,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             currentAssistantId = null
             currentThinkingId = null
             _state.update { st -> resetToInitialWindow(st).copy(streaming = true, compacting = compacting, streamStatus = null, error = null) }
-            val isCommand = attachments.isEmpty() && _state.value.capabilities.commands.any { text == "/${it.name}" || text.startsWith("/${it.name} ") }
+            val isCommand = attachments.isEmpty() && _state.value.capabilities.commands.resolve(text) != null
             if (isCommand) {
                 if (!compacting) addMessage(Role.USER, text, ephemeral = true)
             } else {
@@ -681,8 +683,8 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun submit(text: String) {
-        val cmd = _state.value.capabilities.commands.firstOrNull { "/${it.name}" == text.trim() }
-        if (cmd != null) runCommand(cmd) else sendPrompt(text)
+        val cmd = _state.value.capabilities.commands.resolve(text)
+        if (cmd != null && cmd.kind != "prompt") runCommand(cmd) else sendPrompt(text)
     }
 
     fun runCommand(cmd: CommandOption) {

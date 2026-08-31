@@ -15,9 +15,6 @@ from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_b
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _SESSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
-# Project key for the internal AI workspace, hidden from history listings.
-_AI_PROJECT_KEY = re.sub(r"[^A-Za-z0-9]", "-", AI_WORKDIR)
-
 _ASK_ANSWERS_RE = re.compile(r'"([^"]+)"="([^"]*)"')
 
 # Slash-command invocations and their output are stored as user messages.
@@ -48,7 +45,13 @@ def record_prompt_history(cwd: str, session_id: str, text: str):
 
 
 def project_key_for(cwd: str) -> str:
-    return re.sub(r"[^A-Za-z0-9]", "-", cwd or "")
+    from claude_agent_sdk import project_key_for_directory
+
+    return project_key_for_directory(cwd) if cwd else ""
+
+
+# Project key for the internal AI workspace, hidden from history listings.
+_AI_PROJECT_KEY = project_key_for(AI_WORKDIR)
 
 
 def normalize_session_entrypoint(cwd: str, session_id: str):

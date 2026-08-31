@@ -36,6 +36,10 @@ _CREDENTIALS_FILE = ".credentials.json"
 _IDENTITY_FILE = ".claude.json"
 _BUNDLE_FILES = (_CREDENTIALS_FILE, "settings.json", _IDENTITY_FILE, _META_FILE)
 _IDENTITY_KEYS = ("oauthAccount", "userID")
+
+# Keys a secondary account always takes from the primary instead of keeping its own.
+_SHARED_KEYS = ("mcpServers",)
+_SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces")
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 
 
@@ -166,7 +170,7 @@ def create(label: str) -> dict:
         source = primary / name
         if source.is_file():
             shutil.copy2(source, path / name)
-    sync_mcp_servers(account_id)
+    sync_shared_config(account_id)
     return {"id": account_id, "label": label, "logged_in": False, "primary": False}
 
 
@@ -281,27 +285,34 @@ def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
     return account
 
 
-def sync_mcp_servers(account_id: str) -> None:
-    """Mirror the primary account's local MCP servers into this account's config."""
-    target = _claude_json(account_id)
-    if target is None:
-        return
+def _merge_shared(source: Path, target: Path, keys: tuple[str, ...]) -> None:
     try:
-        servers = json.loads(_claude_json(None).read_text(encoding="utf-8")).get("mcpServers") or {}
+        primary = json.loads(source.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return
-    if not servers:
         return
     try:
         current = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         current = {}
-    current["mcpServers"] = servers
+    for key in keys:
+        if key in primary:
+            current[key] = primary[key]
+        else:
+            current.pop(key, None)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(current, indent=2), encoding="utf-8")
 
 
-def sync_all_mcp_servers() -> None:
+def sync_shared_config(account_id: str) -> None:
+    """Overwrite this account's shared keys with the primary's, leaving the rest untouched."""
+    path = config_dir(account_id)
+    if path is None:
+        return
+    _merge_shared(_claude_json(None), _claude_json(account_id), _SHARED_KEYS)
+    _merge_shared(primary_dir() / "settings.json", path / "settings.json", _SHARED_SETTINGS_KEYS)
+
+
+def sync_all_shared_config() -> None:
     for account in list_accounts():
         if not account["primary"]:
-            sync_mcp_servers(account["id"])
+            sync_shared_config(account["id"])

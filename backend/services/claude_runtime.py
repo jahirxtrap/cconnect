@@ -15,7 +15,7 @@ from core import cli_manager
 from core.config import AI_WORKDIR, PORT, SHARED_DIR
 from mcps import build_cconnect_server
 from mcps.media import block_types
-from services import settings_store, visibility
+from services import cli_info, settings_store, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
@@ -30,6 +30,17 @@ _TRANSIENT_PATTERNS = (
     "gateway timeout", "stream error", "premature close",
 )
 _USAGE_PATTERNS = ("rate limit", "rate_limit", "usage limit", "quota", "too many requests")
+_CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
+
+
+def _reportable_errors(errors: Any) -> list[str]:
+    """The error strings meant for the user, without the CLI's own diagnostic lines."""
+    if not isinstance(errors, list):
+        return []
+    return [
+        e for e in errors
+        if isinstance(e, str) and e.strip() and not e.startswith(_CLI_DIAGNOSTIC_MARKERS)
+    ]
 
 
 def _looks_transient(status: int | None, text: str | None) -> bool:
@@ -507,6 +518,8 @@ async def run_prompt(
     vis = wanted or visibility.defaults
     ultracode = effort == "ultracode"
     effort_level = "xhigh" if ultracode else (None if effort in (None, "", "default") else effort)
+    if not cli_info.takes_effort(await cli_info.server_info(), model):
+        effort_level = None
     extra_args = {"name": name} if name else {}
     if resume and resume_at:
         extra_args["resume-session-at"] = resume_at
@@ -548,8 +561,12 @@ async def run_prompt(
         session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
     if session_env:
         options_kwargs["env"] = session_env
-    if ultracode:
-        options_kwargs["settings"] = json.dumps({"ultracode": True})
+    overrides: dict[str, Any] = {"ultracode": True} if ultracode else {}
+    style = settings_store.get("output_style")
+    if style:
+        overrides["outputStyle"] = style
+    if overrides:
+        options_kwargs["settings"] = json.dumps(overrides)
     status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}
     hooks_map: dict[str, Any] = {"PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background])]}
     loop = asyncio.get_running_loop() if emit is not None else None
@@ -869,8 +886,8 @@ async def run_prompt(
                     status_state["pending"].clear()
                 if getattr(message, "is_error", None):
                     api_status = getattr(message, "api_error_status", None)
-                    errs = getattr(message, "errors", None) or []
-                    detail = "; ".join(e for e in errs if e) or (getattr(message, "result", None) or "")
+                    errs = _reportable_errors(getattr(message, "errors", None))
+                    detail = "; ".join(errs) or (getattr(message, "result", None) or "")
                     if not detail and api_status:
                         detail = f"API error {api_status}"
                     if _looks_transient(api_status, detail):
@@ -882,6 +899,10 @@ async def run_prompt(
                     "is_error": getattr(message, "is_error", None),
                 }
     except Exception as exc:
+        raised = getattr(exc, "errors", None)
+        if isinstance(raised, list) and raised and not _reportable_errors(raised):
+            logger.info(f"run_prompt ended on a CLI diagnostic: {'; '.join(raised)}")
+            return
         logger.error(f"run_prompt failed: {type(exc).__name__}: {exc}")
         detail = getattr(exc, "stderr", None) or str(exc)
         if _looks_transient(None, detail):

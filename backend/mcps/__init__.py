@@ -24,7 +24,7 @@ def _tool_name(tool: Any) -> str:
 
 
 def _tool_summary(tool: Any) -> str:
-    """The opening sentence of the tool's prompt, which is what reads as a label."""
+    """The opening sentence of the tool's description."""
     text = getattr(tool, "description", "") or ""
     match = _FIRST_SENTENCE.match(text)
     return " ".join((match.group(1) if match else text).split())

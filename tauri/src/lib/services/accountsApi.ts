@@ -49,10 +49,6 @@ export const createAccountsApi = (client: HttpClient) => ({
     return (await client.delete(`/accounts/${id}`)) !== null;
   },
 
-  async syncMcp(id: string): Promise<boolean> {
-    return (await client.post(`/accounts/${id}/mcp-sync`)) !== null;
-  },
-
   async startLogin(id: string): Promise<string | null> {
     const data = await client.post<Wire>(`/accounts/${id}/login`);
     return data?.url ?? null;

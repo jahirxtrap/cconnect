@@ -166,15 +166,6 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
             if (!account.primary) {
                 Spacer(Modifier.height(6.dp))
                 ActionButton(
-                    text = stringResource(Res.string.account_sync_mcp),
-                    onClick = {
-                        actions = null
-                        scope.launch { runCatching { AccountsApi.syncMcp(account.id) } }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Spacer(Modifier.height(6.dp))
-                ActionButton(
                     text = stringResource(Res.string.delete),
                     onClick = { actions = null; deleting = account },
                     modifier = Modifier.fillMaxWidth(),

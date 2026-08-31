@@ -21,7 +21,9 @@ import com.jahirtrap.cconnect.ui.secondaryClick
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -233,8 +235,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
 import com.jahirtrap.cconnect.data.ChatMessage
+import com.jahirtrap.cconnect.data.ClaudeModel
 import com.jahirtrap.cconnect.data.formatTokens
 import com.jahirtrap.cconnect.data.CommandOption
+import com.jahirtrap.cconnect.data.commandToken
+import com.jahirtrap.cconnect.data.resolve
 import com.jahirtrap.cconnect.data.EnvironmentProfile
 import com.jahirtrap.cconnect.data.SelectionLock
 import com.jahirtrap.cconnect.data.PermissionMode
@@ -1068,7 +1073,9 @@ fun ChatScreen(
                                             onModel = vm::setModel,
                                             effort = state.effortOverride.ifEmpty { state.effort },
                                             effortSelected = state.effortOverride,
-                                            effortLevels = state.capabilities.effortLevels,
+                                            effortLevels = state.capabilities.effortLevelsFor(
+                                                state.modelOverride.ifEmpty { state.model },
+                                            ),
                                             onEffort = vm::setEffort,
                                             permissionMode = state.permissionOverride.ifEmpty { state.permissionMode },
                                             permissionSelected = state.permissionOverride,
@@ -1091,12 +1098,15 @@ fun ChatScreen(
                                             onValueChange = { if (sideActive) vm.sideDraft = it else vm.draft = it },
                                             streaming = if (sideActive) (sc?.streaming ?: false) else busy,
                                             sessionColor = state.sessionColor,
-                                            commands = state.capabilities.commands,
+                                            commands = when {
+                                                sideActive || state.connection != ConnectionState.Connected || busy -> emptyList()
+                                                state.sessionId != null -> state.capabilities.commands
+                                                else -> state.capabilities.commands.filter { it.kind == "usage" }
+                                            },
                                             onCommand = { cmd -> if (cmd.requireConfirmation) confirmCommand = cmd else vm.runCommand(cmd) },
                                             onSend = { if (sideActive) vm.sendSideQuestion(it) else vm.submit(it) },
                                             onStop = { if (sideActive) vm.stopSide() else vm.stop() },
                                             canSend = state.connection == ConnectionState.Connected,
-                                            commandsEnabled = state.sessionId != null && state.connection == ConnectionState.Connected && !busy,
                                             focusRequester = composerFocus,
                                             onCloseSide = if (sideActive) dismissSide else null,
                                             attachments = if (sideActive) emptyList() else state.attachments,
@@ -2031,7 +2041,7 @@ private fun ChatToolbar(
     onAccount: (String) -> Unit,
     model: String,
     modelSelected: String,
-    models: List<com.jahirtrap.cconnect.data.ModelOption>,
+    models: List<ClaudeModel>,
     onModel: (String) -> Unit,
     effort: String,
     effortSelected: String,
@@ -2115,15 +2125,17 @@ private fun ChatToolbar(
                     onSelect = onModel,
                 )
             }
-            TooltipWrap(stringResource(Res.string.effort)) {
-                SelectorChip(
-                    label = effort,
-                    icon = Lucide.Gauge,
-                    tint = accent,
-                    options = listOf("" to defaultLabel) + effortLevels.map { it to it },
-                    selected = effortSelected,
-                    onSelect = onEffort,
-                )
+            if (effortLevels.isNotEmpty()) {
+                TooltipWrap(stringResource(Res.string.effort)) {
+                    SelectorChip(
+                        label = effort,
+                        icon = Lucide.Gauge,
+                        tint = accent,
+                        options = listOf("" to defaultLabel) + effortLevels.map { it to it },
+                        selected = effortSelected,
+                        onSelect = onEffort,
+                    )
+                }
             }
             val styles = permissionModes.associate { it.id to permissionStyle(it.id).let { s -> s.icon to s.color } }
             TooltipWrap(stringResource(Res.string.permissions)) {
@@ -2156,8 +2168,9 @@ private fun ChatToolbar(
                 VisibilityToggle(simple = simpleMode, onClick = onVisibility)
             }
         }
-        if (ready && !disconnected && !connecting && contextTokens != null && contextTokens > 0) {
-            ContextRing(tokens = contextTokens, limit = if (model.contains("1m")) 1_000_000 else 200_000)
+        val contextWindow = models.firstOrNull { it.id == model }?.contextWindow
+        if (ready && !disconnected && !connecting && contextWindow != null) {
+            ContextRing(tokens = contextTokens ?: 0, limit = contextWindow)
         }
     }
 }
@@ -2366,53 +2379,41 @@ private fun CompactProgress() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CommandMenuButton(
-    commands: List<CommandOption>,
-    streaming: Boolean,
-    enabled: Boolean = true,
-    onCommand: (CommandOption) -> Unit,
+private fun CommandSuggestion(
+    cmd: CommandOption,
+    selected: Boolean,
+    onHover: () -> Unit,
+    onClick: () -> Unit,
 ) {
-    val ready = commands.isNotEmpty() && enabled && !streaming
-    var open by remember { mutableStateOf(false) }
-    Box {
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .then(if (ready) Modifier else Modifier.pointerHoverIcon(PointerIcon.Default))
-                .clickable(enabled = ready) { open = true },
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                Lucide.SquareSlash,
-                contentDescription = stringResource(Res.string.commands),
-                tint = if (ready) MaterialTheme.colorScheme.onSurfaceVariant
-                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-                modifier = Modifier.size(18.dp),
-            )
-        }
-        AbovePopupMenu(expanded = open, onDismiss = { open = false }) {
-            commands.forEach { cmd ->
-                CommandMenuItem(cmd) { open = false; onCommand(cmd) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CommandMenuItem(cmd: CommandOption, enabled: Boolean = true, onClick: () -> Unit) {
-    val alpha = if (enabled) 1f else 0.38f
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    LaunchedEffect(hovered) { if (hovered) onHover() }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .widthIn(min = 112.dp, max = 280.dp)
-            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .widthIn(min = 112.dp, max = 360.dp)
+            .hoverable(interaction)
+            .background(
+                if (selected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent
+            )
+            .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        Text("/${cmd.name}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface.copy(alpha = alpha))
+        Text(
+            if (cmd.argumentHint.isEmpty()) "/${cmd.name}" else "/${cmd.name} ${cmd.argumentHint}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
         if (cmd.description.isNotBlank()) {
-            Text(cmd.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha))
+            Text(
+                cmd.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
         }
     }
 }
@@ -2430,7 +2431,6 @@ private fun Composer(
     onStop: () -> Unit,
     showCommands: Boolean = true,
     canSend: Boolean = true,
-    commandsEnabled: Boolean = true,
     focusRequester: FocusRequester? = null,
     onCloseSide: (() -> Unit)? = null,
     attachments: List<Attachment> = emptyList(),
@@ -2451,11 +2451,56 @@ private fun Composer(
     val busy = streaming || uploading
     val canSubmit = value.isNotBlank() || attachments.isNotEmpty()
 
+    var typed by remember { mutableStateOf<String?>(null) }
+    var highlighted by remember { mutableStateOf(0) }
+    var previewed by remember { mutableStateOf(false) }
+    var argumentFor by remember { mutableStateOf<CommandOption?>(null) }
+
+    val ready = commands.isNotEmpty() && !streaming
+    val suggestions = when {
+        !ready -> emptyList()
+        argumentFor != null -> listOfNotNull(argumentFor)
+        typed == null -> emptyList()
+        else -> commands.filter { it.contains(typed.orEmpty()) }
+    }
+
+    fun write(text: String) {
+        field = TextFieldValue(text, TextRange(text.length))
+        onValueChange(text)
+    }
+
+    fun onTyped(text: String) {
+        val token = commandToken(text)
+        typed = token
+        argumentFor = if (token == null) commands.resolve(text)?.takeIf { it.argumentHint.isNotEmpty() } else null
+        highlighted = 0
+        previewed = false
+    }
+
+    fun cycle(step: Int, keepFirst: Boolean = false) {
+        if (suggestions.isEmpty()) return
+        if (!keepFirst || previewed) {
+            highlighted = (highlighted + step + suggestions.size) % suggestions.size
+        }
+        previewed = true
+        val cmd = suggestions[highlighted]
+        write(if (cmd.argumentHint.isNotEmpty()) "/${cmd.name} " else "/${cmd.name}")
+    }
+
+    fun complete(cmd: CommandOption) {
+        typed = null
+        argumentFor = null
+        write(if (cmd.argumentHint.isNotEmpty()) "/${cmd.name} " else "")
+        if (cmd.argumentHint.isEmpty()) onCommand(cmd)
+    }
+
     fun trySend(): Boolean {
         if (!canSubmit) return false
         val text = field.text
         field = TextFieldValue("")
         onValueChange("")
+        typed = null
+        argumentFor = null
         onSend(text)
         return true
     }
@@ -2467,100 +2512,136 @@ private fun Composer(
         onValueChange(updated)
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(12.dp)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-            .border(snapDp(2.dp), accent ?: MaterialTheme.colorScheme.outlineVariant, shape)
-            .pointerHoverIcon(PointerIcon.Text)
-            .foundationClickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { focusRequester?.requestFocus() },
-    ) {
-        chips?.invoke()
-        BasicTextField(
-            value = field,
-            onValueChange = { next ->
-                field = TextFieldValue(next.text, next.selection, next.composition)
-                onValueChange(next.text)
-            },
-            modifier = Modifier.fillMaxWidth()
-                .padding(horizontal = 14.dp)
-                .padding(top = if (chips != null) 6.dp else 14.dp)
-                .then(if (onReceiveAttachments != null) Modifier.receiveAttachments(onReceiveAttachments) else Modifier)
-                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-                .onPreviewKeyEvent { e ->
-                    if (e.type == KeyEventType.KeyDown && e.key == Key.Enter) {
-                        if (e.isCtrlPressed || e.isShiftPressed) insertNewline() else trySend()
-                        true
-                    } else false
-                },
-            textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            maxLines = 6,
-            decorationBox = { innerTextField ->
-                Box {
-                    if (value.isEmpty()) {
-                        Text(
-                            stringResource(Res.string.type_message),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    innerTextField()
-                }
-            },
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    Box(modifier = Modifier.fillMaxWidth()) {
+        AbovePopupMenu(expanded = suggestions.isNotEmpty(), onDismiss = { typed = null }) {
+            suggestions.forEachIndexed { index, cmd ->
+                CommandSuggestion(
+                    cmd = cmd,
+                    selected = index == highlighted,
+                    onHover = { highlighted = index },
+                ) { complete(cmd) }
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.surface)
+                .border(snapDp(2.dp), accent ?: MaterialTheme.colorScheme.outlineVariant, shape)
+                .pointerHoverIcon(PointerIcon.Text)
+                .foundationClickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { focusRequester?.requestFocus() },
         ) {
-            if (onCloseSide != null) {
-                ComposerButton(
-                    icon = Lucide.X,
-                    contentDescription = stringResource(Res.string.close),
-                    onClick = onCloseSide,
-                    background = MaterialTheme.colorScheme.surfaceVariant,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                if (onAttach != null) {
+            chips?.invoke()
+            BasicTextField(
+                value = field,
+                onValueChange = { next ->
+                    field = TextFieldValue(next.text, next.selection, next.composition)
+                    onValueChange(next.text)
+                    onTyped(next.text)
+                },
+                modifier = Modifier.fillMaxWidth()
+                    .padding(horizontal = 14.dp)
+                    .padding(top = if (chips != null) 6.dp else 14.dp)
+                    .then(if (onReceiveAttachments != null) Modifier.receiveAttachments(onReceiveAttachments) else Modifier)
+                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                    .onPreviewKeyEvent { e ->
+                        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        val picking = suggestions.isNotEmpty() && argumentFor == null
+                        when {
+                            picking && e.key == Key.Tab -> {
+                                cycle(if (e.isShiftPressed) -1 else 1, keepFirst = true); true
+                            }
+                            picking && e.key == Key.DirectionDown -> { cycle(1); true }
+                            picking && e.key == Key.DirectionUp -> { cycle(-1); true }
+                            picking && e.key == Key.Escape -> { typed = null; true }
+                            picking && e.key == Key.Enter && !e.isShiftPressed -> {
+                                complete(suggestions[highlighted]); true
+                            }
+                            e.key == Key.Enter -> {
+                                if (e.isCtrlPressed || e.isShiftPressed) insertNewline() else trySend()
+                                true
+                            }
+                            else -> false
+                        }
+                    },
+                textStyle = textStyle.copy(color = MaterialTheme.colorScheme.onSurface),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                maxLines = 6,
+                decorationBox = { innerTextField ->
+                    Box {
+                        if (value.isEmpty()) {
+                            Text(
+                                stringResource(Res.string.type_message),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        innerTextField()
+                    }
+                },
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (onCloseSide != null) {
                     ComposerButton(
-                        icon = Lucide.Paperclip,
-                        contentDescription = stringResource(Res.string.attach_files),
-                        onClick = onAttach,
-                        enabled = !uploading,
+                        icon = Lucide.X,
+                        contentDescription = stringResource(Res.string.close),
+                        onClick = onCloseSide,
                         background = MaterialTheme.colorScheme.surfaceVariant,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                } else {
+                    if (onAttach != null) {
+                        ComposerButton(
+                            icon = Lucide.Paperclip,
+                            contentDescription = stringResource(Res.string.attach_files),
+                            onClick = onAttach,
+                            enabled = !uploading,
+                            background = MaterialTheme.colorScheme.surfaceVariant,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (showCommands) {
+                        ComposerButton(
+                            icon = Lucide.SquareSlash,
+                            contentDescription = stringResource(Res.string.commands),
+                            onClick = {
+                                if (!field.text.trimStart().startsWith("/")) write("/")
+                                onTyped(field.text)
+                                focusRequester?.requestFocus()
+                            },
+                            background = MaterialTheme.colorScheme.surfaceVariant,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
-                if (showCommands) {
-                    CommandMenuButton(commands = commands, streaming = streaming, enabled = commandsEnabled, onCommand = onCommand)
+                if (controls != null) controls() else Spacer(Modifier.weight(1f))
+                if (busy) {
+                    ComposerButton(
+                        icon = CustomIcons.Stop,
+                        contentDescription = stringResource(Res.string.stop),
+                        onClick = onStop,
+                        background = MaterialTheme.colorScheme.surfaceVariant,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        iconSize = 14.dp,
+                    )
                 }
-            }
-            if (controls != null) controls() else Spacer(Modifier.weight(1f))
-            if (busy) {
-                ComposerButton(
-                    icon = CustomIcons.Stop,
-                    contentDescription = stringResource(Res.string.stop),
-                    onClick = onStop,
-                    background = MaterialTheme.colorScheme.surfaceVariant,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    iconSize = 14.dp,
+                CircleActionButton(
+                    icon = Lucide.ArrowUp,
+                    contentDescription = stringResource(Res.string.send),
+                    enabled = canSubmit,
+                    onClick = { onSend(value); onValueChange("") },
                 )
             }
-            CircleActionButton(
-                icon = Lucide.ArrowUp,
-                contentDescription = stringResource(Res.string.send),
-                enabled = canSubmit,
-                onClick = { onSend(value); onValueChange("") },
-            )
         }
     }
 }

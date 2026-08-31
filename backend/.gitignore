@@ -25,6 +25,9 @@ mcp_disabled.json
 # Last known good network configuration (runtime state)
 network_state.json
 
+# Context window probed per model, keyed by CLI version (runtime cache)
+context_windows.json
+
 # Per-account Claude config dirs (credentials, linked history)
 accounts/
 

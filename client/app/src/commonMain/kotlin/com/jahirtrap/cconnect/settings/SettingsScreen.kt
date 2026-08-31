@@ -235,6 +235,7 @@ fun SettingsScreen(
     var permissionMode by remember { mutableStateOf(caps.defaults.permissionMode) }
     var streaming by remember { mutableStateOf(true) }
     var todoTools by remember { mutableStateOf(false) }
+    var outputStyle by remember { mutableStateOf("default") }
     var mcpDisabled by remember { mutableStateOf("") }
     var showThinking by remember { mutableStateOf("full") }
     var showToolUse by remember { mutableStateOf("label") }
@@ -259,6 +260,7 @@ fun SettingsScreen(
         if (s != null) {
             model = s.model; effort = s.effort; permissionMode = s.permissionMode; streaming = s.streaming
             todoTools = s.todoTools
+            outputStyle = s.outputStyle
             mcpDisabled = s.mcpDisabled
             account = s.account.ifEmpty { caps.defaults.account }
             simpleMode = s.simpleMode
@@ -843,11 +845,14 @@ fun SettingsScreen(
             caps = caps,
             model = model,
             effort = effort,
+            outputStyle = outputStyle,
             streaming = streaming,
             todoTools = todoTools,
-            onConfirm = { m, e, s, t ->
-                model = m; effort = e; streaming = s; todoTools = t
-                scope.launch { SettingsApi.update(model = m, effort = e, streaming = s, todoTools = t) }
+            onConfirm = { m, e, o, s, t ->
+                model = m; effort = e; outputStyle = o; streaming = s; todoTools = t
+                scope.launch {
+                    SettingsApi.update(model = m, effort = e, outputStyle = o, streaming = s, todoTools = t)
+                }
                 dialog = null
             },
             onDismiss = { dialog = null },
@@ -921,6 +926,7 @@ fun SettingsScreen(
                     SettingsApi.reset()?.let {
                         model = it.model; effort = it.effort; permissionMode = it.permissionMode; streaming = it.streaming
                         todoTools = it.todoTools
+                        outputStyle = it.outputStyle
                         mcpDisabled = it.mcpDisabled
                         simpleMode = it.simpleMode
                         trashEnabled = it.trashEnabled
@@ -1713,13 +1719,15 @@ private fun GenerationDialog(
     caps: Capabilities,
     model: String,
     effort: String,
+    outputStyle: String,
     streaming: Boolean,
     todoTools: Boolean,
-    onConfirm: (String, String, Boolean, Boolean) -> Unit,
+    onConfirm: (String, String, String, Boolean, Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var m by remember { mutableStateOf(model) }
     var e by remember { mutableStateOf(effort) }
+    var o by remember { mutableStateOf(outputStyle) }
     var s by remember { mutableStateOf(streaming) }
     var t by remember { mutableStateOf(todoTools) }
     CompactDialog(
@@ -1727,13 +1735,40 @@ private fun GenerationDialog(
         title = stringResource(Res.string.generation),
         buttons = {
             Button(onClick = onDismiss, variant = ButtonVariant.Outlined) { Text(stringResource(Res.string.cancel)) }
-            Button(onClick = { onConfirm(m, e, s, t) }) { Text(stringResource(Res.string.save)) }
+            Button(onClick = { onConfirm(m, e, o, s, t) }) { Text(stringResource(Res.string.save)) }
         },
     ) {
-        SelectField(stringResource(Res.string.model), m, caps.models.map { it.id to it.label }) { m = it }
-        Spacer(Modifier.height(14.dp))
-        SelectField(stringResource(Res.string.effort), e, caps.effortLevels.map { it to it }) { e = it }
+        SelectField(stringResource(Res.string.model), m, caps.models.map { it.id to it.label }) { picked ->
+            m = picked
+            if (e !in caps.effortLevelsFor(picked)) e = "default"
+        }
+        val description = caps.models.firstOrNull { it.id == m }?.description.orEmpty()
+        if (description.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        val levels = caps.effortLevelsFor(m)
+        if (levels.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            SelectField(stringResource(Res.string.effort), e, levels.map { it to it }) { e = it }
+        }
+        if (caps.outputStyles.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            SelectField(stringResource(Res.string.output_style), o, caps.outputStyles.map { it to it }) { o = it }
+        }
         Spacer(Modifier.height(6.dp))
+        if (caps.models.any { it.fastMode }) {
+            SwitchRow(
+                title = stringResource(Res.string.fast_mode),
+                checked = caps.fastMode.state == "on",
+                summary = stringResource(Res.string.fast_mode_desc),
+                enabled = caps.fastMode.disabledReason == null,
+            ) {}
+        }
         SwitchRow(
             title = stringResource(Res.string.streaming),
             checked = s,

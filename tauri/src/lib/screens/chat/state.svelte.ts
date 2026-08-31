@@ -52,7 +52,13 @@ interface SideChat {
 import { t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
-import { createCapabilitiesApi, type Capabilities, type CommandOption } from "$lib/services/capabilitiesApi";
+import {
+  commandFor,
+  createCapabilitiesApi,
+  effortLevelsFor,
+  type Capabilities,
+  type CommandOption,
+} from "$lib/services/capabilitiesApi";
 import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi } from "$lib/services/settingsApi";
@@ -392,8 +398,8 @@ export class ChatState {
   }
 
   submit(text: string) {
-    const command = (this.capabilities?.commands ?? []).find((item) => `/${item.name}` === text.trim());
-    if (command) this.runCommand(command);
+    const command = commandFor(this.capabilities, text);
+    if (command && command.kind !== "prompt") this.runCommand(command);
     else void this.sendPrompt(text);
   }
 
@@ -465,11 +471,7 @@ export class ChatState {
       this.streaming = true;
       this.compacting = compacting;
       this.streamStatus = null;
-      const isCommand =
-        !attachments.length &&
-        (this.capabilities?.commands ?? []).some(
-          (command) => body === `/${command.name}` || body.startsWith(`/${command.name} `),
-        );
+      const isCommand = !attachments.length && commandFor(this.capabilities, body) !== null;
       if (isCommand) {
         if (!compacting) this.#append(newMessage(this.#nextId++, "user", { text: body, ephemeral: true }));
       } else {
@@ -884,10 +886,12 @@ export class ChatState {
   }
 
   #dropStaleOverrides(capabilities: Capabilities) {
+    const staleModel = !!this.modelOverride && !capabilities.models.some((item) => item.id === this.modelOverride);
+    const model = staleModel ? capabilities.defaults.model : this.modelOverride || capabilities.defaults.model;
     const stale = {
       account: !!this.accountOverride && !capabilities.accounts.some((item) => item.id === this.accountOverride),
-      model: !!this.modelOverride && !capabilities.models.some((item) => item.id === this.modelOverride),
-      effort: !!this.effortOverride && !capabilities.effortLevels.includes(this.effortOverride),
+      model: staleModel,
+      effort: !!this.effortOverride && !effortLevelsFor(capabilities, model).includes(this.effortOverride),
       permissionMode:
         !!this.permissionOverride &&
         !capabilities.permissionModes.some((item) => item.id === this.permissionOverride),

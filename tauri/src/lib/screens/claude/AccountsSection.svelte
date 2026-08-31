@@ -185,15 +185,6 @@
       {/if}
       {#if !account.primary}
         <ActionButton
-          text={t("ACCOUNT_SYNC_MCP")}
-          onclick={() => {
-            const target = account;
-            actions = null;
-            void accountsApi.syncMcp(target.id);
-          }}
-          class="w-full"
-        />
-        <ActionButton
           text={t("DELETE")}
           onclick={() => {
             const target = account;

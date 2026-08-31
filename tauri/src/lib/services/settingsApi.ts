@@ -8,6 +8,7 @@ export interface SettingsSnapshot {
   permissionMode: string;
   streaming: boolean;
   todoTools: boolean;
+  outputStyle: string;
   mcpDisabled: string;
   showThinking: string;
   showToolUse: string;
@@ -27,6 +28,7 @@ export interface SettingsPatch {
   permission_mode?: string;
   streaming?: boolean;
   todo_tools?: boolean;
+  output_style?: string;
   mcp_disabled?: string;
   show_thinking?: string;
   show_tool_use?: string;
@@ -55,6 +57,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   permissionMode: effectiveStr(wire, "permission_mode", "bypassPermissions"),
   streaming: effectiveBool(wire, "streaming", true),
   todoTools: effectiveBool(wire, "todo_tools", false),
+  outputStyle: effectiveStr(wire, "output_style", "default"),
   mcpDisabled: effectiveStr(wire, "mcp_disabled", ""),
   showThinking: effectiveStr(wire, "show_thinking", "full"),
   showToolUse: effectiveStr(wire, "show_tool_use", "label"),

@@ -370,6 +370,7 @@ async def chat_ws(ws: WebSocket):
                         session.state.cwd = msg.cwd
                     if msg.model is not None:
                         session.state.model = msg.model
+                        await session.set_model(_resolve_model(msg.model))
                     if msg.effort is not None:
                         session.state.effort = msg.effort
                     if msg.partial is not None:
@@ -388,6 +389,7 @@ async def chat_ws(ws: WebSocket):
                     continue
                 if session is not None:
                     session.state.permission_mode = msg.mode
+                    await session.set_permission_mode(msg.mode)
                 await send({"type": "permission_mode", "mode": msg.mode})
 
             elif mtype == "set_visibility":

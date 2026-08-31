@@ -72,6 +72,9 @@
     <string name="streaming_desc">Show reasoning and replies as they are generated</string>
     <string name="task_tools">Task tracking</string>
     <string name="task_tools_desc">Let Claude keep a task list, shown in the chat bar. Recent models omit it to save context</string>
+    <string name="output_style">Output style</string>
+    <string name="fast_mode">Fast mode</string>
+    <string name="fast_mode_desc">Faster answers from the same model. Spends usage credits</string>
     <string name="mcp_tools">Tools</string>
     <string name="mcp_tools_desc">Built-in tools this server offers Claude in every chat.</string>
     <string name="mcp_tools_count">%1$d/%2$d enabled</string>
@@ -182,7 +185,6 @@
     <string name="account_connected">Signed in</string>
     <string name="account_set_default">Set as default</string>
     <string name="account_name">Name</string>
-    <string name="account_sync_mcp">Sync MCP servers</string>
     <string name="account_login_failed">The sign-in could not be completed</string>
     <string name="network">Network</string>
     <string name="network_state">Status</string>

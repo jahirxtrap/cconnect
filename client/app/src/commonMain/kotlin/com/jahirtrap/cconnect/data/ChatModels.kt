@@ -238,16 +238,53 @@ data class CommandOption(
     val description: String,
     val kind: String,
     val requireConfirmation: Boolean = false,
-)
+    val argumentHint: String = "",
+    val aliases: List<String> = emptyList(),
+) {
+    fun answersTo(token: String): Boolean =
+        name.equals(token, ignoreCase = true) || aliases.any { it.equals(token, ignoreCase = true) }
+
+    fun contains(token: String): Boolean =
+        name.contains(token, ignoreCase = true) || aliases.any { it.contains(token, ignoreCase = true) }
+}
+
+/** The word after a leading slash, or null once the command name is complete. */
+fun commandToken(text: String): String? {
+    val body = text.trimStart()
+    if (!body.startsWith("/")) return null
+    val token = body.drop(1).substringBefore(' ').substringBefore('\n')
+    return if (body.length > token.length + 1) null else token
+}
+
+fun List<CommandOption>.resolve(text: String): CommandOption? {
+    val body = text.trim()
+    if (!body.startsWith("/")) return null
+    val token = body.drop(1).split(' ', '\n').first()
+    return if (token.isEmpty()) null else firstOrNull { it.answersTo(token) }
+}
 
 data class McpTool(val name: String, val description: String)
+
+data class FastMode(val state: String = "off", val disabledReason: String? = null)
+
+data class ClaudeModel(
+    val id: String,
+    val label: String,
+    val description: String = "",
+    val resolvedModel: String = "",
+    val effortLevels: List<String> = emptyList(),
+    val contextWindow: Int? = null,
+    val fastMode: Boolean = false,
+    val autoMode: Boolean = false,
+)
 
 data class TodoItem(val id: String? = null, val content: String, val status: String, val activeForm: String = "")
 
 data class Capabilities(
     val permissionModes: List<PermissionMode> = listOf(PermissionMode("default", "Default")),
-    val effortLevels: List<String> = listOf("low", "medium", "high", "xhigh", "max"),
-    val models: List<ModelOption> = listOf(ModelOption("opus", "Opus 4.7")),
+    val models: List<ClaudeModel> = emptyList(),
+    val outputStyles: List<String> = emptyList(),
+    val fastMode: FastMode = FastMode(),
     val colors: List<String> = listOf("red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"),
     val commands: List<CommandOption> = emptyList(),
     val accounts: List<ModelOption> = emptyList(),
@@ -257,7 +294,13 @@ data class Capabilities(
     val supportedApp: String? = null,   // version range the server accepts, e.g. ">=1.0.8"
     val cliVersion: String? = null,     // Claude Code version active on the server
     val supportedCli: String? = null,   // Claude Code range this app's features expect
-)
+) {
+    fun effortLevelsFor(model: String): List<String> =
+        models.firstOrNull { it.id == model }?.effortLevels.orEmpty()
+
+    fun contextWindowFor(model: String): Int? =
+        models.firstOrNull { it.id == model }?.contextWindow
+}
 
 data class CapabilitiesDefaults(
     val permissionMode: String = "bypassPermissions",

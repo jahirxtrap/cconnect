@@ -2,12 +2,15 @@ package com.jahirtrap.cconnect.data.remote
 
 import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.CapabilitiesDefaults
+import com.jahirtrap.cconnect.data.ClaudeModel
 import com.jahirtrap.cconnect.data.CommandOption
+import com.jahirtrap.cconnect.data.FastMode
 import com.jahirtrap.cconnect.data.McpTool
 import com.jahirtrap.cconnect.data.ModelOption
 import com.jahirtrap.cconnect.data.PermissionMode
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -40,13 +43,29 @@ object CapabilitiesApi {
                 val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
                 PermissionMode(id, o["label"]?.jsonPrimitive?.contentOrNull ?: id)
             } ?: fallback.permissionModes,
-            effortLevels = data["effort_levels"]?.jsonArray
-                ?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: fallback.effortLevels,
             models = data["models"]?.jsonArray?.mapNotNull { el ->
                 val o = el.jsonObject
                 val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                ModelOption(id, o["label"]?.jsonPrimitive?.contentOrNull ?: id)
+                ClaudeModel(
+                    id = id,
+                    label = o["label"]?.jsonPrimitive?.contentOrNull ?: id,
+                    description = o["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    resolvedModel = o["resolved_model"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    effortLevels = o["effort_levels"]?.jsonArray
+                        ?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
+                    contextWindow = o["context_window"]?.jsonPrimitive?.intOrNull,
+                    fastMode = o["fast_mode"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    autoMode = o["auto_mode"]?.jsonPrimitive?.booleanOrNull ?: false,
+                )
             } ?: fallback.models,
+            outputStyles = data["output_styles"]?.jsonArray
+                ?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: fallback.outputStyles,
+            fastMode = data["fast_mode"]?.jsonObject?.let { o ->
+                FastMode(
+                    state = o["state"]?.jsonPrimitive?.contentOrNull ?: "off",
+                    disabledReason = o["disabled_reason"]?.jsonPrimitive?.contentOrNull,
+                )
+            } ?: fallback.fastMode,
             colors = data["colors"]?.jsonArray
                 ?.mapNotNull { it.jsonPrimitive.contentOrNull } ?: fallback.colors,
             commands = data["commands"]?.jsonArray?.mapNotNull { el ->
@@ -57,6 +76,8 @@ object CapabilitiesApi {
                     description = o["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                     kind = o["kind"]?.jsonPrimitive?.contentOrNull ?: "prompt",
                     requireConfirmation = o["require_confirmation"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    argumentHint = o["argument_hint"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    aliases = o["aliases"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
                 )
             } ?: fallback.commands,
             accounts = data["accounts"]?.jsonArray?.mapNotNull { el ->

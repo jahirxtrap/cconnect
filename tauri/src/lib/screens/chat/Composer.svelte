@@ -6,25 +6,21 @@
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import SquareSlash from "@lucide/svelte/icons/square-slash";
   import X from "@lucide/svelte/icons/x";
-  import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
   import type { QueuedMessage } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
-  import type { CommandOption } from "$lib/services/capabilitiesApi";
+  import { commandToken, type CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
-  import MenuItem from "$lib/ui/MenuItem.svelte";
-  import MenuScrim from "$lib/ui/MenuScrim.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import StopIcon from "$lib/ui/StopIcon.svelte";
   import type { Attachment } from "./state.svelte";
-  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
   import { pastedName } from "$lib/data/pastedFile";
-  import { holdFocus, keepFocus } from "$lib/ui/keepFocus";
+  import { keepFocus } from "$lib/ui/keepFocus";
 
   interface Props {
     streaming: boolean;
@@ -78,7 +74,6 @@
 
   let field = $state<HTMLTextAreaElement | null>(null);
   let picker = $state<HTMLInputElement | null>(null);
-  let menu = $state(false);
 
   const canSubmit = $derived(!!draft.trim() || attachments.length > 0);
   const busy = $derived(streaming || uploading);
@@ -86,13 +81,80 @@
 
   const submit = () => {
     if (!canSubmit) return;
+    typed = null;
     onSend(draft);
     onDraft("");
   };
 
-  const runCommand = (command: CommandOption) => {
-    menu = false;
-    onCommand(command);
+  let typed = $state<string | null>(null);
+  let highlighted = $state(0);
+  let previewed = $state(false);
+  let argumentFor = $state<CommandOption | null>(null);
+
+  const write = (value: string) => {
+    onDraft(value);
+    if (field) field.value = value;
+  };
+
+  const openCommands = () => {
+    if (!draft.trimStart().startsWith("/")) write("/");
+    typed = commandToken(field?.value ?? draft);
+    highlighted = 0;
+    previewed = false;
+    field?.focus();
+  };
+
+  const matches = (command: CommandOption, token: string) =>
+    command.name.toLowerCase().includes(token) ||
+    command.aliases.some((alias) => alias.toLowerCase().includes(token));
+
+  const resolve = (text: string) => {
+    const body = text.trim();
+    if (!body.startsWith("/")) return null;
+    const token = body.slice(1).split(/\s+/)[0].toLowerCase();
+    return (
+      commands.find(
+        (command) =>
+          command.name.toLowerCase() === token ||
+          command.aliases.some((alias) => alias.toLowerCase() === token),
+      ) ?? null
+    );
+  };
+
+  const suggestions = $derived.by(() => {
+    if (!commandsReady) return [];
+    if (argumentFor) return [argumentFor];
+    const token = typed;
+    if (token === null) return [];
+    return commands.filter((command) => matches(command, token.toLowerCase()));
+  });
+
+  const oninput = (event: Event) => {
+    const value = (event.currentTarget as HTMLTextAreaElement).value;
+    onDraft(value);
+    const token = commandToken(value);
+    typed = token;
+    const command = token === null ? resolve(value) : null;
+    argumentFor = command?.argumentHint ? command : null;
+    highlighted = 0;
+    previewed = false;
+  };
+
+  const cycle = (step: number, keepFirst = false) => {
+    if (!suggestions.length) return;
+    if (!keepFirst || previewed) {
+      highlighted = (highlighted + step + suggestions.length) % suggestions.length;
+    }
+    previewed = true;
+    const command = suggestions[highlighted];
+    write(command.argumentHint ? `/${command.name} ` : `/${command.name}`);
+  };
+
+  const complete = (command: CommandOption) => {
+    typed = null;
+    write(command.argumentHint ? `/${command.name} ` : "");
+    field?.focus();
+    if (!command.argumentHint) onCommand(command);
   };
 
   const pick = (event: Event) => {
@@ -120,6 +182,28 @@
   };
 
   const onkeydown = (event: KeyboardEvent) => {
+    if (suggestions.length && !argumentFor) {
+      if (event.key === "Tab") {
+        event.preventDefault();
+        cycle(event.shiftKey ? -1 : 1, true);
+        return;
+      }
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        cycle(event.key === "ArrowDown" ? 1 : -1);
+        return;
+      }
+      if (event.key === "Enter" && !isTouch && !event.shiftKey) {
+        event.preventDefault();
+        complete(suggestions[highlighted]);
+        return;
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        typed = null;
+        return;
+      }
+    }
     if (event.key !== "Enter" || isTouch) return;
     event.preventDefault();
     if (event.shiftKey || event.ctrlKey || event.metaKey) insertNewline();
@@ -143,7 +227,34 @@
   };
 </script>
 
-<div class="shrink-0 p-3">
+<div class="relative shrink-0 p-3">
+  {#if suggestions.length}
+    <div
+      class="scrollbar-thin absolute inset-x-3 bottom-[calc(100%-0.75rem)] z-40 mb-1.5 max-h-64 overflow-y-auto rounded-lg border-2 border-outline-variant bg-surface py-1 shadow-lg"
+    >
+      {#each suggestions as command, index (command.name)}
+        <button
+          type="button"
+          use:keepFocus
+          onclick={() => complete(command)}
+          onmouseenter={() => (highlighted = index)}
+          class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start px-3.5 py-2 text-left {index ===
+          highlighted
+            ? 'bg-on-surface/8'
+            : ''}"
+        >
+          <span class="w-full truncate text-body-md">
+            /{command.name}{#if command.argumentHint}&nbsp;<span class="text-on-surface-variant"
+                >{command.argumentHint}</span
+              >{/if}
+          </span>
+          {#if command.description}
+            <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>
+          {/if}
+        </button>
+      {/each}
+    </div>
+  {/if}
   <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
   <div
     onclick={focusField}
@@ -191,7 +302,7 @@
       <textarea
         bind:this={field}
         value={draft}
-      oninput={(event) => onDraft((event.currentTarget as HTMLTextAreaElement).value)}
+      {oninput}
         {onkeydown}
         {onpaste}
         {ondragenter}
@@ -225,35 +336,16 @@
         >
           <Paperclip size={18} />
         </button>
-        <MenuScrim open={menu} onDismiss={() => (menu = false)} />
-        <DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
-          <DropdownMenu.Trigger
-            onmousedown={holdFocus}
-            disabled={!commandsReady}
-            aria-label={t("COMMANDS")}
-            title={t("COMMANDS")}
-            class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant disabled:cursor-default"
-          >
-            <SquareSlash size={18} class={commandsReady ? "" : "opacity-[0.38]"} />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              onOpenAutoFocus={(event) => event.preventDefault()}
-              onCloseAutoFocus={(event) => event.preventDefault()}
-              side="top"
-              sideOffset={6}
-              class={MENU_CONTENT_CLASS}
-            >
-              {#each commands as command (command.name)}
-                <MenuItem
-                  text="/{command.name}"
-                  description={command.description}
-                  onclick={() => runCommand(command)}
-                />
-              {/each}
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+        <button
+          type="button"
+          use:keepFocus
+          onclick={openCommands}
+          aria-label={t("COMMANDS")}
+          title={t("COMMANDS")}
+          class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant"
+        >
+          <SquareSlash size={18} />
+        </button>
       {/if}
 
       {#if controls}

@@ -330,22 +330,32 @@ class LiveSession:
     def set_transport(self, transport):
         self._transport = transport
 
-    async def _send_stop(self):
+    async def _send_control(self, subtype: str, **payload) -> bool:
         transport = self._transport
         worker = self._worker
-        if transport is None or worker is None:
+        if transport is None or worker is None or worker.done():
             return False
         request = {
             "type": "control_request",
-            "request_id": f"req_stop_{uuid.uuid4().hex[:8]}",
-            "request": {"subtype": "interrupt"},
+            "request_id": f"req_{subtype}_{uuid.uuid4().hex[:8]}",
+            "request": {"subtype": subtype, **payload},
         }
         try:
             await transport.write(json.dumps(request) + "\n")
         except Exception as exc:
-            logger.warning(f"interrupt request rejected: {type(exc).__name__}: {exc}")
+            logger.warning(f"{subtype} request rejected: {type(exc).__name__}: {exc}")
             return False
         return True
+
+    async def _send_stop(self):
+        return await self._send_control("interrupt")
+
+    async def set_model(self, model: str | None) -> bool:
+        """Retarget the model of the turn already running."""
+        return await self._send_control("set_model", model=model)
+
+    async def set_permission_mode(self, mode: str) -> bool:
+        return await self._send_control("set_permission_mode", mode=mode)
 
     async def _ask_cli_to_stop(self):
         worker = self._worker

@@ -5,9 +5,17 @@ import subprocess
 from pathlib import Path
 
 from core import cli_manager
+from services import accounts
 
 _PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "update"})
 _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
+
+
+def _shared(result: dict) -> dict:
+    """Push a successful change out to the secondary accounts."""
+    if result.get("ok"):
+        accounts.sync_all_shared_config()
+    return result
 
 
 def _cli() -> str | None:
@@ -53,27 +61,27 @@ def plugin_action(action: str, plugin: str) -> dict:
             args += ["-s", scope]
         if project_path and Path(project_path).is_dir():
             cwd = project_path
-    return _run(args, cwd=cwd)
+    return _shared(_run(args, cwd=cwd))
 
 
 def marketplace_action(action: str, target: str) -> dict:
     if action not in _MARKETPLACE_ACTIONS:
         return {"ok": False, "message": f"invalid action: {action}"}
-    return _run(["plugin", "marketplace", action, target])
+    return _shared(_run(["plugin", "marketplace", action, target]))
 
 
 def mcp_add(name: str, target: str, transport: str = "stdio") -> dict:
     if not name or not target:
         return {"ok": False, "message": "name and command/url are required"}
     if transport in ("http", "sse"):
-        return _run(["mcp", "add", "-s", "user", "--transport", transport, name, target])
-    return _run(["mcp", "add", "-s", "user", name, "--", *target.split()])
+        return _shared(_run(["mcp", "add", "-s", "user", "--transport", transport, name, target]))
+    return _shared(_run(["mcp", "add", "-s", "user", name, "--", *target.split()]))
 
 
 def mcp_remove(name: str) -> dict:
     if not name:
         return {"ok": False, "message": "name is required"}
-    return _run(["mcp", "remove", name])
+    return _shared(_run(["mcp", "remove", name]))
 
 
 _MCP_DISABLED = Path(__file__).resolve().parent.parent / "mcp_disabled.json"
@@ -102,7 +110,7 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
         if result["ok"]:
             store.pop(name, None)
             _MCP_DISABLED.write_text(json.dumps(store, indent=2), encoding="utf-8")
-        return result
+        return _shared(result)
     try:
         servers = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8")).get("mcpServers", {})
     except (OSError, json.JSONDecodeError):
@@ -114,4 +122,4 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
     if result["ok"]:
         store[name] = cfg
         _MCP_DISABLED.write_text(json.dumps(store, indent=2), encoding="utf-8")
-    return result
+    return _shared(result)

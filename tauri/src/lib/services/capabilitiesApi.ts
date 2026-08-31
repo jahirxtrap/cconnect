@@ -10,11 +10,29 @@ export interface CommandOption {
   description: string;
   kind: string;
   requireConfirmation: boolean;
+  argumentHint: string;
+  aliases: string[];
 }
 
 export interface McpTool {
   name: string;
   description: string;
+}
+
+export interface FastMode {
+  state: string;
+  disabledReason: string | null;
+}
+
+export interface ModelOption {
+  id: string;
+  label: string;
+  description: string;
+  resolvedModel: string;
+  effortLevels: string[];
+  contextWindow: number | null;
+  fastMode: boolean;
+  autoMode: boolean;
 }
 
 export interface CapabilitiesDefaults {
@@ -26,8 +44,9 @@ export interface CapabilitiesDefaults {
 
 export interface Capabilities {
   permissionModes: LabeledOption[];
-  effortLevels: string[];
-  models: LabeledOption[];
+  models: ModelOption[];
+  outputStyles: string[];
+  fastMode: FastMode;
   colors: string[];
   commands: CommandOption[];
   accounts: LabeledOption[];
@@ -53,12 +72,31 @@ interface VersionWire {
   supported_cli?: string;
 }
 
+interface ModelWire {
+  id?: string;
+  label?: string;
+  description?: string;
+  resolved_model?: string;
+  effort_levels?: string[];
+  context_window?: number | null;
+  fast_mode?: boolean;
+  auto_mode?: boolean;
+}
+
 interface CapabilitiesWire extends VersionWire {
   permission_modes?: Array<{ id?: string; label?: string }>;
-  effort_levels?: string[];
-  models?: Array<{ id?: string; label?: string }>;
+  models?: ModelWire[];
+  output_styles?: string[];
+  fast_mode?: { state?: string; disabled_reason?: string | null };
   colors?: string[];
-  commands?: Array<{ name?: string; description?: string; kind?: string; require_confirmation?: boolean }>;
+  commands?: Array<{
+    name?: string;
+    description?: string;
+    kind?: string;
+    require_confirmation?: boolean;
+    argument_hint?: string;
+    aliases?: string[];
+  }>;
   accounts?: Array<{ id?: string; label?: string }>;
   defaults?: { permission_mode?: string; effort?: string; model?: string; account?: string };
   mcp_tools?: Array<{ name?: string; description?: string }>;
@@ -74,6 +112,33 @@ const toVersion = (data: VersionWire): VersionInfo => ({
 const toOptions = (raw: Array<{ id?: string; label?: string }> | undefined): LabeledOption[] =>
   (raw ?? []).filter((option) => option.id).map((option) => ({ id: option.id!, label: option.label ?? option.id! }));
 
+export const effortLevelsFor = (capabilities: Capabilities | null, model: string): string[] =>
+  capabilities?.models.find((item) => item.id === model)?.effortLevels ?? [];
+
+export const commandToken = (text: string): string | null => {
+  const body = text.trimStart();
+  if (!body.startsWith("/")) return null;
+  const token = body.slice(1).split(/\s/, 1)[0];
+  return body.length > token.length + 1 && /\s/.test(body[token.length + 1]) ? null : token;
+};
+
+export const commandFor = (capabilities: Capabilities | null, text: string): CommandOption | null => {
+  const body = text.trim();
+  if (!body.startsWith("/")) return null;
+  const token = body.slice(1).split(/\s+/)[0].toLowerCase();
+  if (!token) return null;
+  return (
+    capabilities?.commands.find(
+      (command) =>
+        command.name.toLowerCase() === token ||
+        command.aliases.some((alias) => alias.toLowerCase() === token),
+    ) ?? null
+  );
+};
+
+export const contextWindowFor = (capabilities: Capabilities | null, model: string): number | null =>
+  capabilities?.models.find((item) => item.id === model)?.contextWindow ?? null;
+
 export const createCapabilitiesApi = (http: HttpClient) => ({
   async versionInfo(): Promise<VersionInfo | null> {
     const data = await http.get<VersionWire>("/health");
@@ -85,8 +150,23 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
     if (!data) return null;
     return {
       permissionModes: toOptions(data.permission_modes),
-      effortLevels: data.effort_levels ?? [],
-      models: toOptions(data.models),
+      models: (data.models ?? [])
+        .filter((model) => model.id)
+        .map((model) => ({
+          id: model.id!,
+          label: model.label ?? model.id!,
+          description: model.description ?? "",
+          resolvedModel: model.resolved_model ?? "",
+          effortLevels: model.effort_levels ?? [],
+          contextWindow: model.context_window ?? null,
+          fastMode: model.fast_mode === true,
+          autoMode: model.auto_mode === true,
+        })),
+      outputStyles: data.output_styles ?? [],
+      fastMode: {
+        state: data.fast_mode?.state ?? "off",
+        disabledReason: data.fast_mode?.disabled_reason ?? null,
+      },
       colors: data.colors ?? [],
       commands: (data.commands ?? [])
         .filter((command) => command.name)
@@ -95,6 +175,8 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
           description: command.description ?? "",
           kind: command.kind ?? "prompt",
           requireConfirmation: command.require_confirmation === true,
+          argumentHint: command.argument_hint ?? "",
+          aliases: command.aliases ?? [],
         })),
       accounts: toOptions(data.accounts),
       mcpTools: (data.mcp_tools ?? [])

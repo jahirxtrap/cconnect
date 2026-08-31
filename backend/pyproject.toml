@@ -10,7 +10,7 @@ dependencies = [
     "loguru>=0.7.3",
     "python-dotenv>=1.0.0",
     "slowapi>=0.1.9",
-    "claude-agent-sdk>=0.2.87",
+    "claude-agent-sdk>=0.2.148",
     "qrcode>=7.4.2",
     "sqlalchemy>=2.0.0",
     "pillow>=10.0.0",
@@ -25,7 +25,7 @@ dependencies = [
 
 [tool.cconnect]
 supported-app = ">=1.6.1"
-supported-cli = ">=2.1.220"
+supported-cli = ">=2.1.251"
 
 [project.optional-dependencies]
 dev = [

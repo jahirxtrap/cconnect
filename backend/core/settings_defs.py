@@ -24,6 +24,7 @@ SETTINGS: dict[str, SettingDef] = {
     "account": SettingDef(None, str, "Claude account used to run chats"),
     "model": SettingDef(DEFAULT_MODEL, str, "Claude model alias used for chat generation"),
     "effort": SettingDef(DEFAULT_EFFORT, str, "Reasoning effort: low..max, or ultracode (xhigh + workflow orchestration)"),
+    "output_style": SettingDef("default", str, "Voice Claude answers in, from the styles the CLI reports"),
     "permission_mode": SettingDef(DEFAULT_PERMISSION_MODE, str, "Default permission mode for new chat sessions"),
     "streaming": SettingDef(True, bool, "Stream tokens (partial messages) as they are generated"),
     "todo_tools": SettingDef(False, bool, "Expose the task-tracking tools, which recent models otherwise omit to save context"),

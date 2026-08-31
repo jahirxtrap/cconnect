@@ -201,10 +201,11 @@
     {capabilities}
     model={snapshot.model}
     effort={snapshot.effort}
+    outputStyle={snapshot.outputStyle}
     streaming={snapshot.streaming}
     todoTools={snapshot.todoTools}
-    onConfirm={(model, effort, streaming, todo_tools) =>
-      void apply({ model, effort, streaming, todo_tools })}
+    onConfirm={(model, effort, output_style, streaming, todo_tools) =>
+      void apply({ model, effort, output_style, streaming, todo_tools })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "mcpTools" && snapshot && capabilities}

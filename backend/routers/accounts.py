@@ -57,12 +57,6 @@ def export_account(account_id: str):
     )
 
 
-@router.post("/accounts/{account_id}/mcp-sync")
-def sync_account_mcp(account_id: str):
-    accounts.sync_mcp_servers(account_id)
-    return api_response()
-
-
 @router.post("/accounts/{account_id}/login")
 def start_login(account_id: str):
     if accounts.config_dir(account_id) is None:

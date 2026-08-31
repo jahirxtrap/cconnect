@@ -7,7 +7,7 @@
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import { t } from "$lib/i18n/index.svelte";
-  import type { Capabilities } from "$lib/services/capabilitiesApi";
+  import { contextWindowFor, effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -72,8 +72,6 @@
     onQuickChat,
   }: Props = $props();
 
-  const CONTEXT_LIMIT_LARGE = 1_000_000;
-  const CONTEXT_LIMIT = 200_000;
   const ITEM_CLASS =
     "flex shrink-0 cursor-pointer items-center gap-1 rounded-md bg-surface-variant px-2.5 py-1 text-label-md ripple";
   const STATE_CLASS =
@@ -90,9 +88,10 @@
     serverOption,
     ...(capabilities?.models ?? []).map((item) => ({ value: item.id, label: item.label })),
   ]);
+  const effortLevels = $derived(effortLevelsFor(capabilities, model));
   const effortOptions = $derived([
     serverOption,
-    ...(capabilities?.effortLevels ?? []).map((value) => ({ value, label: value })),
+    ...effortLevels.map((value) => ({ value, label: value })),
   ]);
   const permissionOptions = $derived([
     serverOption,
@@ -112,6 +111,7 @@
   );
 
   const modelLabel = $derived(capabilities?.models.find((item) => item.id === model)?.label ?? model);
+  const contextWindow = $derived(contextWindowFor(capabilities, model));
   const permissionLabel = $derived(
     capabilities?.permissionModes.find((item) => item.id === permissionMode)?.label ?? permissionMode,
   );
@@ -169,31 +169,33 @@
       {/each}
     </PopupMenu>
 
-    <PopupMenu
-      open={openMenu === "effort"}
-      side="top"
-      triggerClass={SLOT}
-      onOpenChange={(open) => (openMenu = open ? "effort" : null)}
-    >
-      {#snippet trigger()}
-        <TooltipWrap label={t("EFFORT")} class={SLOT}>
-          <span class={ITEM_CLASS}>
-            <Gauge size={16} class="shrink-0 text-accent" />
-            <span class="whitespace-nowrap">{effort}</span>
-          </span>
-        </TooltipWrap>
-      {/snippet}
-      {#each effortOptions as option (option.value)}
-        <MenuItem
-          text={option.label}
-          selected={option.value === effortSelected}
-          onclick={() => {
-            onEffort(option.value);
-            openMenu = null;
-          }}
-        />
-      {/each}
-    </PopupMenu>
+    {#if effortLevels.length}
+      <PopupMenu
+        open={openMenu === "effort"}
+        side="top"
+        triggerClass={SLOT}
+        onOpenChange={(open) => (openMenu = open ? "effort" : null)}
+      >
+        {#snippet trigger()}
+          <TooltipWrap label={t("EFFORT")} class={SLOT}>
+            <span class={ITEM_CLASS}>
+              <Gauge size={16} class="shrink-0 text-accent" />
+              <span class="whitespace-nowrap">{effort}</span>
+            </span>
+          </TooltipWrap>
+        {/snippet}
+        {#each effortOptions as option (option.value)}
+          <MenuItem
+            text={option.label}
+            selected={option.value === effortSelected}
+            onclick={() => {
+              onEffort(option.value);
+              openMenu = null;
+            }}
+          />
+        {/each}
+      </PopupMenu>
+    {/if}
 
     <PopupMenu
       open={openMenu === "permission"}
@@ -291,7 +293,7 @@
   {/if}
 </div>
 
-{#if !disconnected && !connecting && ready && contextTokens !== null && contextTokens > 0}
-  <ContextRing tokens={contextTokens} limit={model.includes("1m") ? CONTEXT_LIMIT_LARGE : CONTEXT_LIMIT} />
+{#if !disconnected && !connecting && ready && contextWindow !== null}
+  <ContextRing tokens={contextTokens ?? 0} limit={contextWindow} />
 {/if}
 </div>

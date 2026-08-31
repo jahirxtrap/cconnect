@@ -6,38 +6,36 @@ from core import cli_manager
 from core.config import (
     SERVER_VERSION,
     COLORS,
-    COMMANDS,
     DEFAULT_EFFORT,
     DEFAULT_MODEL,
     DEFAULT_PERMISSION_MODE,
-    MODELS,
     PERMISSION_LABELS,
     SUPPORTED_APP,
     SUPPORTED_CLI,
-    ULTRACODE_EFFORT,
-    effort_levels,
     permission_modes,
 )
 from core.responses import api_response
-from services import accounts
+from services import accounts, cli_info
 import mcps
 
 router = APIRouter(tags=["Capabilities"])
 
 
 @router.get("/capabilities")
-def get_capabilities():
+async def get_capabilities():
     account_list = accounts.list_accounts()
+    info = await cli_info.server_info()
     return api_response(data={
         "version": SERVER_VERSION,
         "supported_app": SUPPORTED_APP,
         "cli_version": cli_manager.active_version(),
         "supported_cli": SUPPORTED_CLI,
         "permission_modes": [{"id": m, "label": PERMISSION_LABELS.get(m, m)} for m in permission_modes()],
-        "effort_levels": ["default"] + list(effort_levels()) + [ULTRACODE_EFFORT],
-        "models": MODELS,
+        "models": cli_info.models(info),
+        "output_styles": cli_info.output_styles(info),
+        "fast_mode": cli_info.fast_mode(info),
         "colors": COLORS,
-        "commands": COMMANDS,
+        "commands": cli_info.commands(info),
         "accounts": [{"id": a["id"], "label": a["label"]} for a in account_list if a["logged_in"]],
         "mcp_tools": mcps.tool_specs(),
         "defaults": {

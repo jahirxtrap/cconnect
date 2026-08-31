@@ -193,6 +193,12 @@
     chat.streaming || ["waiting", "working", "slow", "compacting"].includes(activity ?? ""),
   );
 
+  const availableCommands = $derived.by(() => {
+    const all = chat.capabilities?.commands ?? [];
+    if (chat.sideOpen || !chat.connected || busy) return [];
+    return chat.sessionId !== null ? all : all.filter((command) => command.kind === "usage");
+  });
+
   $effect(() => {
     tabs.updateActive({
       sessionId: chat.sessionId,
@@ -451,9 +457,7 @@
       uploading={!chat.sideOpen && chat.uploading}
       queue={chat.sideOpen ? [] : chat.visibleQueue}
       onOpenQueued={(item) => (queuedId = item.id)}
-      commands={chat.sessionId !== null && chat.connected && !busy
-        ? (chat.capabilities?.commands ?? [])
-        : []}
+      commands={availableCommands}
       pendingInput={chat.pendingInput}
       onConsumePending={() => chat.consumePendingInput()}
       onSend={(text) => (chat.sideOpen ? chat.sendSideQuestion(text) : chat.submit(text))}
