@@ -27,11 +27,12 @@ def defaults() -> dict:
 def resolve(prefs: dict | None) -> dict:
     out = {name: settings_store.visibility_mode(name) for name in TYPES}
     out["simple"] = bool(settings_store.get("simple_mode"))
+    out["tokens"] = bool(settings_store.get("show_tokens"))
     out["working"] = settings_store.get("show_working")
     for key, value in (prefs or {}).items():
-        if key == "simple":
+        if key in ("simple", "tokens"):
             if value is not None:
-                out["simple"] = bool(value)
+                out[key] = bool(value)
         elif key == "working":
             if value in ("label", "off"):
                 out["working"] = value
@@ -56,6 +57,7 @@ def ceiling(everyone: Iterable[dict]) -> dict:
             if _RANK[prefs.get(name, "off")] > _RANK[out[name]]:
                 out[name] = prefs[name]
     out["simple"] = all(p.get("simple") for p in listed)
+    out["tokens"] = any(p.get("tokens") for p in listed)
     return out
 
 
@@ -67,6 +69,12 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
     """Cut one event down to what this socket wants, or drop it entirely.
     In simple mode a dropped event becomes a single ``working`` marker per batch."""
     kind = event.get("type")
+
+    if not prefs.get("tokens"):
+        if kind == "thinking_tokens":
+            return None
+        if kind == "agent_result":
+            return {key: value for key, value in event.items() if key != "tokens"}
 
     if kind == "working":
         if not prefs.get("simple") or carry["working"]:

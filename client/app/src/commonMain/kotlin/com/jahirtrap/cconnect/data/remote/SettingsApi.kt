@@ -28,6 +28,7 @@ object SettingsApi {
         val showFileChange: String,
         val showCompact: String,
         val showWorking: String,
+        val showTokens: Boolean,
         val simpleMode: Boolean,
         val chatOrder: String,
         val trashEnabled: Boolean,
@@ -58,6 +59,7 @@ object SettingsApi {
         showFileChange = effectiveStr(o, "show_file_change", "full"),
         showCompact = effectiveStr(o, "show_compact", "full"),
         showWorking = effectiveStr(o, "show_working", "label"),
+        showTokens = effectiveBool(o, "show_tokens", false),
         simpleMode = effectiveBool(o, "simple_mode", false),
         chatOrder = effectiveStr(o, "chat_order", "auto"),
         trashEnabled = effectiveBool(o, "trash_enabled", false),
@@ -81,6 +83,7 @@ object SettingsApi {
         showFileChange: String? = null,
         showCompact: String? = null,
         showWorking: String? = null,
+        showTokens: Boolean? = null,
         simpleMode: Boolean? = null,
         chatOrder: String? = null,
         trashEnabled: Boolean? = null,
@@ -100,6 +103,7 @@ object SettingsApi {
         if (showFileChange != null) put("show_file_change", showFileChange)
         if (showCompact != null) put("show_compact", showCompact)
         if (showWorking != null) put("show_working", showWorking)
+        if (showTokens != null) put("show_tokens", showTokens)
         if (simpleMode != null) put("simple_mode", simpleMode)
         if (chatOrder != null) put("chat_order", chatOrder)
         if (trashEnabled != null) put("trash_enabled", trashEnabled)

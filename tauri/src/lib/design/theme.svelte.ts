@@ -1,4 +1,4 @@
-import { accentAt, DEFAULT_ACCENT_INDEX } from "./accents";
+import { accentAt, DEFAULT_ACCENT_INDEX, withAlpha } from "./accents";
 import { isTauri } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 
@@ -40,6 +40,8 @@ class Theme {
       const root = document.documentElement;
       root.dataset.theme = this.dark ? "dark" : "light";
       root.style.setProperty("--c-accent", this.accent);
+      root.style.setProperty("--c-accent-selection", withAlpha(this.accent, 0.32));
+      root.style.setProperty("--c-accent-quote", withAlpha(this.accent, 0.6));
       root.dataset.font = this.fontStyle;
       this.#applySystemBars(this.dark);
     });

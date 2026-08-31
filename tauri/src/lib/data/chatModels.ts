@@ -34,6 +34,13 @@ export interface CompactData {
   summary: string;
 }
 
+export interface AgentResult {
+  status: string | null;
+  durationMs: number | null;
+  tokens: number | null;
+  toolUses: number | null;
+}
+
 export interface InteractionOption {
   id: string;
   label: string | null;
@@ -151,6 +158,8 @@ export interface ChatMessage {
   path: string | null;
   diffLines: DiffLine[] | null;
   compact: CompactData | null;
+  agentResult: AgentResult | null;
+  thinkingTokens: number | null;
   sourceIndex: number;
   labelOnly: boolean;
   result: string | null;
@@ -303,6 +312,8 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   path: null,
   diffLines: null,
   compact: null,
+  agentResult: null,
+  thinkingTokens: null,
   sourceIndex: -1,
   labelOnly: false,
   result: null,

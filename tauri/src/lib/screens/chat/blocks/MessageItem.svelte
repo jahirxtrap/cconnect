@@ -7,9 +7,9 @@
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import type { Snippet } from "svelte";
   import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
-  import { isArchive } from "$lib/data/format";
+  import { formatTokens, isArchive } from "$lib/data/format";
   import { settings } from "$lib/data/settings.svelte";
-  import { t } from "$lib/i18n/index.svelte";
+  import { plural, t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
   import { userContent } from "$lib/data/userContent";
   import Chip from "$lib/ui/Chip.svelte";
@@ -103,6 +103,9 @@
     <Collapsible
       label={t("THINKING")}
       icon={Lightbulb}
+      stat={message.thinkingTokens !== null
+        ? plural("TOKENS_COUNT", message.thinkingTokens, formatTokens(message.thinkingTokens))
+        : null}
       labelOnly={message.labelOnly || labelMode}
       iconClass="text-on-surface-variant"
       {running}
@@ -168,7 +171,7 @@
   {:else if message.role === "agent"}
     <AgentBlock {message} {running} {labelMode} {expanded} {onToggle} {onSharedLink} />
   {:else if message.role === "notification"}
-    <div class="flex w-full items-center gap-1.5 px-4">
+    <div class="flex w-full items-center gap-1.5 px-4 select-none">
       <Bell size={16} class="shrink-0 text-accent" />
       <p class="line-clamp-2 min-w-0 flex-1 text-label-lg text-accent">
         {t("NOTIFICATION")}

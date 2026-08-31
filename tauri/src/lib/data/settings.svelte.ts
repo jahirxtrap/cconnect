@@ -2,6 +2,7 @@ import { store } from "$lib/platform/storage";
 
 export interface VisibilityPrefs {
   simple: boolean | null;
+  tokens: boolean | null;
   thinking: string | null;
   tool_use: string | null;
   file_change: string | null;
@@ -34,6 +35,7 @@ const DEFAULTS = {
   environment_locked: false,
   project_locked: false,
   visibility_simple: "",
+  visibility_tokens: "",
   visibility_thinking: "",
   visibility_tool_use: "",
   visibility_file_change: "",
@@ -59,8 +61,10 @@ class Settings {
 
   get visibility(): VisibilityPrefs {
     const simple = this.#read("visibility_simple");
+    const tokens = this.#read("visibility_tokens");
     return {
       simple: simple === "" ? null : simple === "on",
+      tokens: tokens === "" ? null : tokens === "on",
       thinking: this.#read("visibility_thinking") || null,
       tool_use: this.#read("visibility_tool_use") || null,
       file_change: this.#read("visibility_file_change") || null,
@@ -71,6 +75,7 @@ class Settings {
 
   set visibility(value: VisibilityPrefs) {
     this.#write("visibility_simple", value.simple === null ? "" : value.simple ? "on" : "off");
+    this.#write("visibility_tokens", value.tokens === null ? "" : value.tokens ? "on" : "off");
     this.#write("visibility_thinking", value.thinking ?? "");
     this.#write("visibility_tool_use", value.tool_use ?? "");
     this.#write("visibility_file_change", value.file_change ?? "");

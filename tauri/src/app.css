@@ -283,7 +283,7 @@ textarea,
 .selectable ::selection,
 input::selection,
 textarea::selection {
-  background: color-mix(in srgb, var(--c-accent) 32%, transparent);
+  background: var(--c-accent-selection);
 }
 
 .markdown {
@@ -418,7 +418,7 @@ a > .md-link-icon:last-child {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  border-inline-start: 3px solid color-mix(in srgb, var(--c-accent) 60%, transparent);
+  border-inline-start: 3px solid var(--c-accent-quote);
   padding-inline-start: 10px;
 }
 

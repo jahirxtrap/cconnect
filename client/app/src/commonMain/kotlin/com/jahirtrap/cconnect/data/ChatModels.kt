@@ -20,6 +20,8 @@ data class ChatMessage(
     val path: String? = null,
     val diffLines: List<DiffLine>? = null,
     val compact: CompactData? = null,
+    val agentResult: AgentResult? = null,
+    val thinkingTokens: Int? = null,
     val sourceIndex: Int = -1,
     val labelOnly: Boolean = false,
     val result: String? = null,
@@ -36,6 +38,13 @@ data class CompactData(
     val preTokens: Int?,
     val postTokens: Int?,
     val summary: String,
+)
+
+data class AgentResult(
+    val status: String?,
+    val durationMs: Long?,
+    val tokens: Int?,
+    val toolUses: Int?,
 )
 
 enum class DiffKind { HEADER, HUNK, ADD, DEL, CTX }
@@ -332,6 +341,9 @@ sealed interface ServerEvent {
     data class Component(val title: String?, val titleKey: String?, val icon: String?, val blocks: List<ComponentElement>) : ServerEvent
     data class Plan(val markdown: String) : ServerEvent
     data class Agent(val id: String?, val subagentType: String?, val description: String?, val labelOnly: Boolean) : ServerEvent
+    data class AgentDone(val id: String?, val result: AgentResult) : ServerEvent
+    data class ThinkingTokens(val tokens: Int) : ServerEvent
+    data class HookFailed(val name: String?, val text: String) : ServerEvent
     data class Notification(val summary: String, val status: String?) : ServerEvent
     data class Todos(val items: List<TodoItem>) : ServerEvent
     data class Task(val id: String, val content: String?, val status: String?) : ServerEvent
@@ -383,6 +395,7 @@ data class VisibilityPrefs(
     val fileChange: String? = null,
     val compact: String? = null,
     val working: String? = null,
+    val tokens: String? = null,
 ) {
     fun toJson(): JsonObject = buildJsonObject {
         simple?.let { put("simple", it == "on") }
@@ -391,5 +404,6 @@ data class VisibilityPrefs(
         fileChange?.let { put("file_change", it) }
         compact?.let { put("compact", it) }
         working?.let { put("working", it) }
+        tokens?.let { put("tokens", it == "on") }
     }
 }

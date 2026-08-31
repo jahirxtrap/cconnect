@@ -168,6 +168,7 @@ data class ChatUiState(
         fileChange = "full",
         compact = "full",
         working = "label",
+        tokens = "off",
     ),
     val pendingToolIds: Set<String> = emptySet(),    // tools still running (tool_use seen, no result yet)
     val contextTokens: Int? = null,                  // approx context-window tokens used on the last turn
@@ -240,6 +241,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     private var nextId = 0L
     private var currentAssistantId: Long? = null
     private var currentThinkingId: Long? = null
+    private var pendingThinkingTokens: Int? = null
     private var optimisticChipId: String? = null
     private var optimisticMsgId: Long? = null
     private var interrupting = false
@@ -453,6 +455,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                         fileChange = s.showFileChange,
                         compact = s.showCompact,
                         working = s.showWorking,
+                        tokens = if (s.showTokens) "on" else "off",
                     ),
                 )
             }
@@ -492,6 +495,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         fileChange = settings.visibilityFileChange.takeIf { it.isNotEmpty() },
         compact = settings.visibilityCompact.takeIf { it.isNotEmpty() },
         working = settings.visibilityWorking.takeIf { it.isNotEmpty() },
+        tokens = settings.visibilityTokens.takeIf { it.isNotEmpty() },
     )
 
     fun applyVisibility(prefs: VisibilityPrefs) {
@@ -501,6 +505,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         settings.visibilityFileChange = prefs.fileChange.orEmpty()
         settings.visibilityCompact = prefs.compact.orEmpty()
         settings.visibilityWorking = prefs.working.orEmpty()
+        settings.visibilityTokens = prefs.tokens.orEmpty()
         ChatVisibility.bump()
     }
 
@@ -612,6 +617,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             val compacting = text == "/compact" || text.startsWith("/compact ")
             currentAssistantId = null
             currentThinkingId = null
+            pendingThinkingTokens = null
             _state.update { st -> resetToInitialWindow(st).copy(streaming = true, compacting = compacting, streamStatus = null, error = null) }
             val isCommand = attachments.isEmpty() && _state.value.capabilities.commands.resolve(text) != null
             if (isCommand) {
@@ -1075,7 +1081,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val page = SessionsApi.sessionMessages(session.sessionId, projectKey, limit = 100, visibility = localVisibility()) ?: return false
         val visible = page.items.filter { it.visible() }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
-            ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, session.sessionId, projectKey), timestamp = m.timestamp) to m.parent
+            ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, agentResult = m.agentResult, thinkingTokens = m.thinkingTokens, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, session.sessionId, projectKey), timestamp = m.timestamp) to m.parent
         })
         nextId = visible.size.toLong()
         currentAssistantId = null
@@ -1172,7 +1178,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         val page = SessionsApi.sessionMessages(sid, proj, limit = 100, visibility = localVisibility()) ?: return
         val visible = page.items.filter { it.visible() }
         val loaded = nestAgents(visible.mapIndexed { i, m ->
-            ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, sid, proj), timestamp = m.timestamp) to m.parent
+            ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, agentResult = m.agentResult, thinkingTokens = m.thinkingTokens, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, sid, proj), timestamp = m.timestamp) to m.parent
         })
         val live = if (keepLive) s.messages.filter { it.sourceIndex < 0 } else emptyList()
         nextId = maxOf(visible.size.toLong(), live.maxOfOrNull { it.id + 1 } ?: 0L)
@@ -1328,7 +1334,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             if (_state.value.viewOnly != item) return@launch
             val visible = page?.items.orEmpty().filter { it.visible() }
             val loaded = nestAgents(visible.mapIndexed { i, m ->
-                ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, item.sessionId, item.projectKey, trashed = true), timestamp = m.timestamp) to m.parent
+                ChatMessage(i.toLong(), m.toRole(), m.text, toolName = m.name, toolUseId = m.toolUseId, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, agentResult = m.agentResult, thinkingTokens = m.thinkingTokens, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, item.sessionId, item.projectKey, trashed = true), timestamp = m.timestamp) to m.parent
             })
             nextId = visible.size.toLong()
             _state.update {
@@ -1396,7 +1402,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             val older = page.items.filter { it.visible() }
             _state.update { st ->
                 val prepended = older.mapIndexed { i, m ->
-                    ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, item.sessionId, item.projectKey, trashed = true), timestamp = m.timestamp)
+                    ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, agentResult = m.agentResult, thinkingTokens = m.thinkingTokens, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, item.sessionId, item.projectKey, trashed = true), timestamp = m.timestamp)
                 }
                 nextId += prepended.size
                 st.copy(
@@ -1626,10 +1632,19 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 if (event.labelOnly) {
                     currentAssistantId = null
                     currentThinkingId = null
-                    addMessage(Role.THINKING, "", labelOnly = true)
+                    addMessage(Role.THINKING, "", labelOnly = true, thinkingTokens = pendingThinkingTokens)
+                    pendingThinkingTokens = null
                 } else if (event.text.isNotEmpty()) {
                     currentAssistantId = null
+                    val fresh = currentThinkingId == null
                     currentThinkingId = append(currentThinkingId, Role.THINKING, event.text)
+                    val tokens = pendingThinkingTokens
+                    if (fresh && tokens != null) {
+                        pendingThinkingTokens = null
+                        _state.update { st ->
+                            st.copy(messages = st.messages.map { if (it.id == currentThinkingId) it.copy(thinkingTokens = tokens) else it })
+                        }
+                    }
                 }
             }
             is ServerEvent.Working -> {
@@ -1652,6 +1667,30 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 currentThinkingId = null
                 addMessage(Role.AGENT, event.description.orEmpty(), toolName = event.subagentType, toolUseId = event.id, labelOnly = event.labelOnly)
                 event.id?.let { id -> _state.update { it.copy(pendingToolIds = it.pendingToolIds + id) } }
+            }
+            is ServerEvent.AgentDone -> {
+                val aid = event.id
+                if (aid != null) _state.update { st ->
+                    st.copy(
+                        pendingToolIds = st.pendingToolIds - aid,
+                        messages = st.messages.map { if (it.toolUseId == aid) it.copy(agentResult = event.result) else it },
+                    )
+                }
+            }
+            is ServerEvent.ThinkingTokens -> {
+                pendingThinkingTokens = event.tokens
+                val last = _state.value.messages.lastOrNull()
+                if (last?.role == Role.THINKING && last.id == currentThinkingId) {
+                    pendingThinkingTokens = null
+                    _state.update { st ->
+                        st.copy(messages = st.messages.dropLast(1) + last.copy(thinkingTokens = event.tokens))
+                    }
+                }
+            }
+            is ServerEvent.HookFailed -> {
+                currentAssistantId = null
+                currentThinkingId = null
+                addMessage(Role.API_ERROR, event.text, toolName = event.name)
             }
             is ServerEvent.ToolUse -> {
                 currentAssistantId = null
@@ -1971,7 +2010,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             .filter { it.visible() }
         _state.update { st ->
             val prepended = older.mapIndexed { i, m ->
-                ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, event.sessionId, st.activeProjectKey), timestamp = m.timestamp)
+                ChatMessage(nextId + i, m.toRole(), m.text, toolName = m.name, path = m.path, interaction = m.interaction, diffLines = m.diffLines, compact = m.compact, agentResult = m.agentResult, thinkingTokens = m.thinkingTokens, sourceIndex = m.index, labelOnly = m.labelOnly, result = m.result, images = imageUrls(m, event.sessionId, st.activeProjectKey), timestamp = m.timestamp)
             }
             nextId += prepended.size
             st.copy(
@@ -2118,9 +2157,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         ephemeral: Boolean = false,
         attachments: List<String>? = null,
         timestamp: Long? = null,
+        thinkingTokens: Int? = null,
     ) {
         _state.update {
-            applyTailCap(it.copy(messages = it.messages + ChatMessage(nextId++, role, text, toolName, toolUseId, interaction, path, diffLines, compact, labelOnly = labelOnly, result = result, ephemeral = ephemeral, attachments = attachments, timestamp = timestamp ?: nowMillis())))
+            applyTailCap(it.copy(messages = it.messages + ChatMessage(nextId++, role, text, toolName, toolUseId, interaction, path, diffLines, compact, thinkingTokens = thinkingTokens, labelOnly = labelOnly, result = result, ephemeral = ephemeral, attachments = attachments, timestamp = timestamp ?: nowMillis())))
         }
         if (turnFirstResponseId == null && isResponseRole(role)) turnFirstResponseId = _state.value.messages.lastOrNull()?.id
     }

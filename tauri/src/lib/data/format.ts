@@ -23,6 +23,14 @@ export const formatTokens = (value: number): string => {
   return `${Math.round(value / (MILLION / 10)) / 10}M`;
 };
 
+export const formatDuration = (millis: number): string => {
+  if (millis < 1000) return `${Math.round(millis)} ms`;
+  if (millis < 60_000) return `${Math.round(millis / 100) / 10} s`;
+  const minutes = Math.floor(millis / 60_000);
+  const seconds = Math.round((millis % 60_000) / 1000);
+  return seconds > 0 ? `${minutes} min ${seconds} s` : `${minutes} min`;
+};
+
 export const formatDecimal = (value: number, decimals: number): string =>
   value.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 

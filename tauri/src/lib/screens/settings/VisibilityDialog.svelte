@@ -13,6 +13,7 @@
     fileChange: string;
     compact: string;
     working: string;
+    tokens: string;
   }
 
   interface Props extends Visibility {
@@ -30,6 +31,7 @@
     fileChange,
     compact,
     working,
+    tokens,
     server = null,
     title = t("VISIBILITY"),
     quickChat = true,
@@ -53,7 +55,7 @@
   const onOff = withServer([ON, NO]);
 
   let values = $state<Visibility>(
-    untrack(() => ({ simple, thinking, toolUse, fileChange, compact, working })),
+    untrack(() => ({ simple, thinking, toolUse, fileChange, compact, working, tokens })),
   );
 
   const isSimple = $derived((values.simple || server?.simple) === "on");
@@ -125,6 +127,22 @@
         shown={inherited(labelOff, values.working, server?.working ?? "")}
         options={labelOff}
         onSelect={(value) => (values = { ...values, working: value })}
+      />
+    {/if}
+    {#if server}
+      <SelectField
+        label={t("SHOW_TOKENS")}
+        selected={values.tokens}
+        shown={inherited(onOff, values.tokens, server.tokens)}
+        options={onOff}
+        onSelect={(value) => (values = { ...values, tokens: value })}
+      />
+    {:else}
+      <SwitchRow
+        title={t("SHOW_TOKENS")}
+        summary={t("SHOW_TOKENS_SUMMARY")}
+        checked={values.tokens === "on"}
+        onChange={(checked) => (values = { ...values, tokens: checked ? "on" : "off" })}
       />
     {/if}
   </div>

@@ -28,3 +28,11 @@ export const accentAt = (index: number): string =>
   (ACCENTS[index] ?? ACCENTS[DEFAULT_ACCENT_INDEX]).value;
 
 export const accentNameAt = (index: number): string | undefined => ACCENTS[index]?.name;
+
+export const withAlpha = (hex: string, alpha: number): string => {
+  const value = hex.replace("#", "");
+  const full = value.length === 3 ? value.replace(/./g, (c) => c + c) : value;
+  const channels = Number.parseInt(full.slice(0, 6), 16);
+  if (full.length < 6 || Number.isNaN(channels)) return hex;
+  return `rgba(${(channels >> 16) & 255}, ${(channels >> 8) & 255}, ${channels & 255}, ${alpha})`;
+};

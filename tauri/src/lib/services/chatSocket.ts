@@ -60,6 +60,16 @@ export type ServerEvent =
     }
   | { type: "plan"; markdown: string }
   | { type: "agent"; id: string | null; subagentType: string | null; description: string | null; labelOnly: boolean }
+  | {
+      type: "agent_result";
+      id: string | null;
+      status: string | null;
+      durationMs: number | null;
+      tokens: number | null;
+      toolUses: number | null;
+    }
+  | { type: "thinking_tokens"; tokens: number }
+  | { type: "hook_failed"; name: string | null; text: string }
   | { type: "notification"; summary: string; status: string | null }
   | { type: "todos"; items: TodoItem[] }
   | { type: "task"; id: string; content: string | null; status: string | null }
@@ -658,6 +668,19 @@ export class ChatSocket {
           description: text(wire, "description"),
           labelOnly: flag(wire, "label"),
         };
+      case "agent_result":
+        return {
+          type: "agent_result",
+          id: text(wire, "id"),
+          status: text(wire, "status"),
+          durationMs: int(wire, "duration_ms"),
+          tokens: int(wire, "tokens"),
+          toolUses: int(wire, "tool_uses"),
+        };
+      case "thinking_tokens":
+        return { type: "thinking_tokens", tokens: int(wire, "tokens") ?? 0 };
+      case "hook_failed":
+        return { type: "hook_failed", name: text(wire, "name"), text: text(wire, "text") ?? "" };
       case "todos":
         return {
           type: "todos",

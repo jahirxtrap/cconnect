@@ -209,7 +209,7 @@
         class="size-2 shrink-0 rounded-full"
         style={sessionColorOf(tab.color)
           ? `background: ${sessionColorOf(tab.color)}`
-          : "background: color-mix(in srgb, var(--color-on-surface-variant) 40%, transparent)"}
+          : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
       ></span>
       <span class="max-w-[170px] truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
       <button

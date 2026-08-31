@@ -334,10 +334,20 @@
     <string name="empty_trash_confirm">¿Eliminar todos los chats de la papelera?</string>
     <string name="trash_hint">Los chats eliminados pasan a la papelera en lugar de borrarse</string>
     <string name="chats">Chats</string>
+    <plurals name="tokens_count">
+        <item quantity="one">%1$s token</item>
+        <item quantity="other">%1$s tokens</item>
+    </plurals>
+    <string name="agent_failed">falló</string>
+    <string name="agent_stopped">detenido</string>
+    <string name="hook_failed">El hook %1$s falló</string>
     <string name="trash_on">Papelera activada</string>
     <string name="trash_off">Papelera desactivada</string>
     <string name="retention_days">Conservar los chats (días)</string>
-    <string name="retention_days_summary">%1$d días</string>
+    <plurals name="retention_days_summary">
+        <item quantity="one">%1$d día</item>
+        <item quantity="other">%1$d días</item>
+    </plurals>
     <string name="retention_days_hint">Claude Code borra un chat tras este tiempo sin actividad</string>
     <string name="retention_days_error">Escribe un número entero de %1$d o más</string>
     <string name="default_category">Categoría predeterminada</string>
@@ -368,6 +378,8 @@
     <string name="visibility">Visibilidad del chat</string>
     <string name="simple_mode">Modo simple</string>
     <string name="simple_mode_summary">Muestra un solo bloque Trabajando en lugar del detalle de pensamiento y herramientas</string>
+    <string name="show_tokens">Uso de tokens</string>
+    <string name="show_tokens_summary">Muestra cuántos tokens gastó cada bloque de pensamiento y cada subagente</string>
     <string name="quick_chat_working">Trabajando (chat rápido)</string>
     <string name="visibility_summary">Qué se muestra en el chat</string>
     <string name="show_full">Completo</string>

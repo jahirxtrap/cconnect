@@ -61,6 +61,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalUriHandler
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -242,6 +243,7 @@ fun SettingsScreen(
     var showFileChange by remember { mutableStateOf("full") }
     var showCompact by remember { mutableStateOf("full") }
     var showWorking by remember { mutableStateOf("label") }
+    var showTokens by remember { mutableStateOf(false) }
     var simpleMode by remember { mutableStateOf(false) }
     var trashEnabled by remember { mutableStateOf(false) }
     var retentionDays by remember { mutableStateOf(30) }
@@ -269,6 +271,7 @@ fun SettingsScreen(
             retentionDays = s.retentionDays
             showThinking = s.showThinking; showToolUse = s.showToolUse
             showFileChange = s.showFileChange; showCompact = s.showCompact; showWorking = s.showWorking
+            showTokens = s.showTokens
         }
         cliInfo = CliApi.status()
         serverReady = s != null
@@ -499,7 +502,7 @@ fun SettingsScreen(
                         stringResource(Res.string.chats),
                         serverSummary(
                             stringResource(if (trashEnabled) Res.string.trash_on else Res.string.trash_off) +
-                                " • " + stringResource(Res.string.retention_days_summary, retentionDays)
+                                " • " + pluralStringResource(Res.plurals.retention_days_summary, retentionDays, retentionDays)
                         ),
                         enabled = serverReady,
                     ) { dialog = SettingsDialog.Chats }
@@ -882,12 +885,13 @@ fun SettingsScreen(
         )
 
         SettingsDialog.Visibility -> VisibilityDialog(
-            current = VisibilityPrefs(if (simpleMode) "on" else "off", showThinking, showToolUse, showFileChange, showCompact, showWorking),
+            current = VisibilityPrefs(if (simpleMode) "on" else "off", showThinking, showToolUse, showFileChange, showCompact, showWorking, if (showTokens) "on" else "off"),
             onConfirm = { values ->
                 simpleMode = values.simple == "on"
                 showThinking = values.thinking.orEmpty(); showToolUse = values.toolUse.orEmpty()
                 showFileChange = values.fileChange.orEmpty(); showCompact = values.compact.orEmpty()
                 showWorking = values.working.orEmpty()
+                showTokens = values.tokens == "on"
                 scope.launch {
                     SettingsApi.update(
                         simpleMode = simpleMode,
@@ -896,6 +900,7 @@ fun SettingsScreen(
                         showFileChange = showFileChange,
                         showCompact = showCompact,
                         showWorking = showWorking,
+                        showTokens = showTokens,
                     )
                 }
                 dialog = null
@@ -941,6 +946,7 @@ fun SettingsScreen(
                         retentionDays = it.retentionDays
                         showThinking = it.showThinking; showToolUse = it.showToolUse
                         showFileChange = it.showFileChange; showCompact = it.showCompact; showWorking = it.showWorking
+                        showTokens = it.showTokens
                     }
                 }
                 dialog = null
@@ -1977,6 +1983,21 @@ fun VisibilityDialog(
                 labelOff,
                 shown = inherited(labelOff, values.working, server?.working),
             ) { values = values.copy(working = it) }
+        }
+        Spacer(Modifier.height(14.dp))
+        if (server != null) {
+            SelectField(
+                stringResource(Res.string.show_tokens),
+                values.tokens.orEmpty(),
+                onOff,
+                shown = inherited(onOff, values.tokens, server.tokens),
+            ) { values = values.copy(tokens = it) }
+        } else {
+            SwitchRow(
+                title = stringResource(Res.string.show_tokens),
+                summary = stringResource(Res.string.show_tokens_summary),
+                checked = values.tokens == "on",
+            ) { values = values.copy(tokens = if (it) "on" else "off") }
         }
     }
 }

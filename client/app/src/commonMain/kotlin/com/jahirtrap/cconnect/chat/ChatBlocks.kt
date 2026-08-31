@@ -55,6 +55,7 @@ import com.jahirtrap.cconnect.ui.theme.Radius
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -119,6 +120,7 @@ import com.jahirtrap.cconnect.data.componentInvalid
 import com.jahirtrap.cconnect.data.componentLeaves
 import com.jahirtrap.cconnect.data.toComponentNumber
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
+import com.jahirtrap.cconnect.data.formatDuration
 import com.jahirtrap.cconnect.data.formatTokens
 import com.jahirtrap.cconnect.files.AttachmentFile
 import com.jahirtrap.cconnect.files.pickFiles
@@ -318,7 +320,7 @@ fun ChatMessageItem(
                 )
             }
 
-            Role.THINKING -> Collapsible(label = stringResource(Res.string.thinking), text = message.text, icon = Lucide.Lightbulb, labelOnly = message.labelOnly, running = running, expanded = expanded, onToggle = onToggle)
+            Role.THINKING -> Collapsible(label = stringResource(Res.string.thinking), text = message.text, icon = Lucide.Lightbulb, stat = message.thinkingTokens?.let { pluralStringResource(Res.plurals.tokens_count, it, formatTokens(it)) }, labelOnly = message.labelOnly, running = running, expanded = expanded, onToggle = onToggle)
 
             Role.WORKING -> Collapsible(label = stringResource(Res.string.working), text = "", icon = Lucide.Bot, labelOnly = true, running = running)
 
@@ -363,7 +365,10 @@ fun ChatMessageItem(
                         modifier = Modifier.padding(top = 1.dp).size(18.dp),
                     )
                     Spacer(Modifier.size(8.dp))
-                    SelectableText(message.text, MaterialTheme.typography.bodyMedium, palette.orange, modifier = Modifier.weight(1f))
+                    val hook = message.toolName
+                    val body = if (hook == null) message.text
+                    else listOf(stringResource(Res.string.hook_failed, hook), message.text).filter { it.isNotBlank() }.joinToString("\n")
+                    SelectableText(body, MaterialTheme.typography.bodyMedium, palette.orange, modifier = Modifier.weight(1f))
                 }
             }
 
@@ -493,7 +498,7 @@ private fun SelectableText(text: String, style: TextStyle, color: Color, modifie
 }
 
 @Composable
-private fun Collapsible(label: String, text: String, icon: ImageVector? = null, labelOnly: Boolean = false, running: Boolean = false, expanded: Boolean? = null, onToggle: (() -> Unit)? = null) {
+private fun Collapsible(label: String, text: String, icon: ImageVector? = null, stat: String? = null, labelOnly: Boolean = false, running: Boolean = false, expanded: Boolean? = null, onToggle: (() -> Unit)? = null) {
     var localExpanded by rememberSaveable { mutableStateOf(false) }
     val isExpanded = expanded ?: localExpanded
     val toggle = onToggle ?: { localExpanded = !localExpanded }
@@ -514,14 +519,27 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
                 )
                 Spacer(Modifier.size(6.dp))
             }
-            Box(modifier = Modifier.weight(1f)) {
+            DisableSelection {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            if (!stat.isNullOrBlank()) {
                 DisableSelection {
                     Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelLarge,
+                        text = stat,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
                     )
                 }
+                Spacer(Modifier.size(6.dp))
             }
             if (running) {
                 LoadingIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary)
@@ -550,7 +568,13 @@ private fun AgentBlock(message: ChatMessage, running: Boolean = false, expanded:
     val isExpanded = expanded ?: localExpanded
     val toggle = onToggle ?: { localExpanded = !localExpanded }
     val name = message.toolName ?: stringResource(Res.string.agent)
+    val done = message.agentResult
     val preview = message.text.replace("\n", " ").trim()
+    val stat = listOfNotNull(
+        done?.status?.takeIf { it != "completed" }?.let { stringResource(if (it == "failed") Res.string.agent_failed else Res.string.agent_stopped) },
+        done?.durationMs?.let { formatDuration(it) },
+        done?.tokens?.let { formatTokens(it) },
+    ).joinToString(" • ")
     val nameColor = MaterialTheme.colorScheme.primary
     val previewColor = MaterialTheme.colorScheme.onSurfaceVariant
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -580,6 +604,17 @@ private fun AgentBlock(message: ChatMessage, running: Boolean = false, expanded:
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
+            }
+            if (stat.isNotEmpty()) {
+                DisableSelection {
+                    Text(
+                        text = stat,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = previewColor,
+                        maxLines = 1,
+                    )
+                }
+                Spacer(Modifier.size(6.dp))
             }
             if (running) {
                 LoadingIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary)

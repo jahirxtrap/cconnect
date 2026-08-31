@@ -90,7 +90,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     thumb.style.height = `${thickness}px`;
     thumb.style.width = `${size}px`;
     thumb.style.transform = `translateX(${node.scrollLeft + offset}px)`;
-    thumb.style.background = `color-mix(in srgb, var(--color-on-surface-variant) ${alpha}%, transparent)`;
+    thumb.style.background = `rgba(var(--c-on-surface-variant-rgb), ${alpha / 100})`;
   };
 
   const schedule = () => {

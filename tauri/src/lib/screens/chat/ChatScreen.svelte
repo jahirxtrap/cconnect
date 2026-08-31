@@ -557,6 +557,7 @@
       fileChange: remote.file_change,
       compact: remote.compact,
       working: remote.working,
+      tokens: remote.tokens ? "on" : "off",
     }}
     simple={local.simple === null ? "" : local.simple ? "on" : "off"}
     thinking={local.thinking ?? ""}
@@ -564,6 +565,7 @@
     fileChange={local.file_change ?? ""}
     compact={local.compact ?? ""}
     working={local.working ?? ""}
+    tokens={local.tokens === null ? "" : local.tokens ? "on" : "off"}
     onConfirm={(values) => {
       tabs.applyVisibility({
         simple: values.simple === "" ? null : values.simple === "on",
@@ -572,6 +574,7 @@
         file_change: values.fileChange || null,
         compact: values.compact || null,
         working: values.working || null,
+        tokens: values.tokens === "" ? null : values.tokens === "on",
       });
       visibilityOpen = false;
     }}

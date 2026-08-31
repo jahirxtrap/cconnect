@@ -37,6 +37,7 @@ const componentDefaults = (blocks: ComponentElement[]): Record<string, string> =
 
 interface Effective {
   simple: boolean;
+  tokens: boolean;
   thinking: string;
   tool_use: string;
   file_change: string;
@@ -139,6 +140,7 @@ export class ChatState {
   streamTokens = $state(true);
   serverVisibility = $state<Effective>({
     simple: false,
+    tokens: false,
     thinking: "full",
     tool_use: "label",
     file_change: "full",
@@ -152,6 +154,7 @@ export class ChatState {
     const simple = local.simple ?? server.simple;
     const merged = {
       simple,
+      tokens: local.tokens ?? server.tokens,
       thinking: local.thinking ?? server.thinking,
       tool_use: local.tool_use ?? server.tool_use,
       file_change: local.file_change ?? server.file_change,
@@ -250,6 +253,7 @@ export class ChatState {
   #nextId = 1;
   #assistantId: number | null = null;
   #thinkingId: number | null = null;
+  #thinkingTokens: number | null = null;
   #outgoing = 0;
   #outgoingTag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   #attachmentId = 0;
@@ -1236,6 +1240,7 @@ export class ChatState {
       this.list?.applySettings(snapshot);
       this.serverVisibility = {
         simple: snapshot.simpleMode,
+        tokens: snapshot.showTokens,
         thinking: snapshot.showThinking,
         tool_use: snapshot.showToolUse,
         file_change: snapshot.showFileChange,
@@ -1401,6 +1406,8 @@ export class ChatState {
         interaction: item.interaction,
         diffLines: item.diffLines,
         compact: item.compact,
+        agentResult: item.agentResult,
+        thinkingTokens: item.thinkingTokens,
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
         result: item.result,
@@ -1641,6 +1648,7 @@ export class ChatState {
     this.pendingToolIds = [];
     this.#assistantId = null;
     this.#thinkingId = null;
+    this.#thinkingTokens = null;
   }
 
   #onEvent(side: boolean, parent: string | null, event: ServerEvent) {
@@ -1704,10 +1712,21 @@ export class ChatState {
         if (event.labelOnly) {
           this.#assistantId = null;
           this.#thinkingId = null;
-          this.#append(newMessage(this.#nextId++, "thinking", { labelOnly: true }));
+          this.#append(
+            newMessage(this.#nextId++, "thinking", { labelOnly: true, thinkingTokens: this.#thinkingTokens }),
+          );
+          this.#thinkingTokens = null;
         } else if (event.text) {
           this.#assistantId = null;
+          const fresh = this.#thinkingId === null;
           this.#thinkingId = this.#stream(this.#thinkingId, "thinking", event.text);
+          if (fresh && this.#thinkingTokens !== null) {
+            const tokens = this.#thinkingTokens;
+            this.#thinkingTokens = null;
+            this.messages = this.messages.map((item) =>
+              item.id === this.#thinkingId ? { ...item, thinkingTokens: tokens } : item,
+            );
+          }
         }
         break;
       case "working":
@@ -1758,6 +1777,44 @@ export class ChatState {
           }),
         );
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];
+        break;
+      case "agent_result": {
+        const agentId = event.id;
+        if (agentId) {
+          this.pendingToolIds = this.pendingToolIds.filter((id) => id !== agentId);
+          this.messages = this.messages.map((item) =>
+            item.toolUseId === agentId
+              ? {
+                  ...item,
+                  agentResult: {
+                    status: event.status,
+                    durationMs: event.durationMs,
+                    tokens: event.tokens,
+                    toolUses: event.toolUses,
+                  },
+                }
+              : item,
+          );
+        }
+        break;
+      }
+      case "thinking_tokens": {
+        this.#thinkingTokens = event.tokens;
+        const last = this.messages.at(-1);
+        if (last?.role === "thinking" && last.id === this.#thinkingId) {
+          this.messages = [...this.messages.slice(0, -1), { ...last, thinkingTokens: event.tokens }];
+          this.#thinkingTokens = null;
+        }
+        break;
+      }
+      case "hook_failed":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(
+          newMessage(this.#nextId++, "api_error", {
+            text: [t("HOOK_FAILED", event.name ?? "hook"), event.text].filter(Boolean).join("\n"),
+          }),
+        );
         break;
       case "tool_use":
         this.#assistantId = null;

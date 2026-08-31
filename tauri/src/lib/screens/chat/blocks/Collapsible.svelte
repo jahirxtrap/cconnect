@@ -9,6 +9,7 @@
     label: string;
     icon?: IconSource;
     preview?: string | null;
+    stat?: string | null;
     labelOnly?: boolean;
     running?: boolean;
     labelClass?: string;
@@ -23,6 +24,7 @@
     label,
     icon: IconComponent,
     preview = null,
+    stat = null,
     labelOnly = false,
     running = false,
     labelClass = "text-on-surface-variant",
@@ -57,10 +59,14 @@
     {#if IconComponent}
       <IconComponent size={16} class="mr-[6px] shrink-0 {iconClass}" />
     {/if}
-    <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant"><span
+    <span class="min-w-0 truncate text-label-lg text-on-surface-variant"><span
         class={labelClass}>{label}</span>{#if summary}<span class="ml-1.5 text-on-surface-variant"
         >{summary}</span
       >{/if}</span>
+    <span class="min-w-2 flex-1"></span>
+    {#if stat}
+      <span class="mr-1.5 shrink-0 text-body-sm text-on-surface-variant">{stat}</span>
+    {/if}
     {#if running}
       <LoadingIndicator size={16} class="text-accent {labelOnly ? '' : 'mr-0.5'}" />
     {/if}

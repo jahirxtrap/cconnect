@@ -1,5 +1,6 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.AgentResult
 import com.jahirtrap.cconnect.data.ChatCategory
 import com.jahirtrap.cconnect.data.ChatPlacement
 import com.jahirtrap.cconnect.data.CompactData
@@ -127,6 +128,14 @@ object SessionsApi {
             postTokens = o["post_tokens"]?.jsonPrimitive?.intOrNull,
             summary = o["summary"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         ) else null
+        val agentResult = (o["agent_result"] as? JsonObject)?.let { r ->
+            AgentResult(
+                status = r["status"]?.jsonPrimitive?.contentOrNull,
+                durationMs = r["duration_ms"]?.jsonPrimitive?.longOrNull,
+                tokens = r["tokens"]?.jsonPrimitive?.intOrNull,
+                toolUses = r["tool_uses"]?.jsonPrimitive?.intOrNull,
+            )
+        }
         return SessionMessage(
             type = type,
             role = o["role"]?.jsonPrimitive?.contentOrNull,
@@ -136,6 +145,8 @@ object SessionsApi {
             interaction = interaction,
             diffLines = diffLines,
             compact = compact,
+            agentResult = agentResult,
+            thinkingTokens = if (type == "thinking") o["tokens"]?.jsonPrimitive?.intOrNull else null,
             index = o["index"]?.jsonPrimitive?.intOrNull ?: -1,
             labelOnly = o["label"]?.jsonPrimitive?.booleanOrNull == true,
             result = o["result"]?.jsonPrimitive?.contentOrNull,

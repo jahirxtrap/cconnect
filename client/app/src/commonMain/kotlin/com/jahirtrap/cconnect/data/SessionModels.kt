@@ -59,6 +59,8 @@ data class SessionMessage(
     val interaction: InteractionData? = null,
     val diffLines: List<DiffLine>? = null,
     val compact: CompactData? = null,
+    val agentResult: AgentResult? = null,
+    val thinkingTokens: Int? = null,
     val index: Int = -1,
     val labelOnly: Boolean = false,
     val result: String? = null,

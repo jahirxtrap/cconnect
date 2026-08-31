@@ -960,6 +960,23 @@ class _StampedList(list):
         super().append(item)
 
 
+def _thinking_tokens(message: dict) -> Optional[int]:
+    """The final thinking count the API reported, more exact than the live estimate."""
+    details = ((message.get("usage") or {}).get("output_tokens_details") or {})
+    tokens = details.get("thinking_tokens")
+    return tokens if isinstance(tokens, int) and tokens > 0 else None
+
+
+def _agent_result(tur: dict, tokens: bool) -> dict:
+    """The live `agent_result` shape, rebuilt from the transcript's own field names."""
+    return {
+        "status": tur.get("status"),
+        "duration_ms": tur.get("totalDurationMs"),
+        "tokens": tur.get("totalTokens") if tokens else None,
+        "tool_uses": tur.get("totalToolUseCount"),
+    }
+
+
 def _subagent_file(session_dir: Path, agent_id: str) -> Optional[Path]:
     """A subagent transcript sits in `subagents/`, or nested under `workflows/<run>/`."""
     base = session_dir / "subagents"
@@ -1106,6 +1123,7 @@ def get_session_messages(
     # AskUserQuestion answers live in the tool_result, not in the tool_use input.
     tool_result_by_id: dict[str, object] = {}
     agent_files: dict[str, str] = {}
+    agent_results: dict[str, dict] = {}
     for entry in entries:
         msg = entry.get("message", {})
         content = msg.get("content")
@@ -1120,6 +1138,7 @@ def get_session_messages(
                     tool_result_by_id[tuid] = block.get("content")
                     if isinstance(aid, str) and aid:
                         agent_files[tuid] = aid
+                        agent_results[tuid] = tur
     # Everything before the last compaction boundary is replaced by its summary.
     last_boundary = max(
         (i for i, e in enumerate(entries)
@@ -1233,12 +1252,19 @@ def get_session_messages(
                 if vis["thinking"] == "off":
                     _working(messages, vis)
                     continue
+                thinking_tokens = _thinking_tokens(message) if vis.get("tokens") else None
                 if vis["thinking"] == "label":
-                    messages.append({"type": "thinking", "label": True})
+                    item = {"type": "thinking", "label": True}
+                    if thinking_tokens:
+                        item["tokens"] = thinking_tokens
+                    messages.append(item)
                     continue
                 text = (block.get("thinking") or block.get("text", "")).strip()
                 if text:
-                    messages.append({"type": "thinking", "text": text})
+                    item = {"type": "thinking", "text": text}
+                    if thinking_tokens:
+                        item["tokens"] = thinking_tokens
+                    messages.append(item)
             elif btype == "tool_use":
                 from services.claude_runtime import _FILE_EDIT_TOOLS, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
                 name = (block.get("name") or "").strip()
@@ -1331,13 +1357,17 @@ def get_session_messages(
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
                     if vis["tool_use"] != "off":
-                        messages.append({
+                        block_event = {
                             "type": "agent",
                             "id": bid,
                             "subagent_type": inp.get("subagent_type"),
                             "description": inp.get("description"),
                             "label": vis["tool_use"] == "label",
-                        })
+                        }
+                        done = agent_results.get(bid or "")
+                        if done is not None:
+                            block_event["agent_result"] = _agent_result(done, vis.get("tokens"))
+                        messages.append(block_event)
                         aid = agent_files.get(bid or "")
                         sub_file = _subagent_file(file.parent / session_id, aid) if aid else None
                         if sub_file is not None:

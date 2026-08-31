@@ -17,9 +17,9 @@ logger = logging.getLogger(__name__)
 
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 _BAR_WIDTH = 20
-_ALERT_PERCENT = 90
 _UNUSED_KEY = "unused"
 _UNUSED_TEXT = "You haven't used it yet"
+_SPEND_KEY = "spend"
 
 
 def _oauth(field: str, account: str | None = None) -> str | None:
@@ -72,6 +72,10 @@ def _window_id(entry: dict) -> str | None:
     return ((entry.get("scope") or {}).get("model") or {}).get("display_name")
 
 
+def _alerting(entry: dict) -> bool:
+    return entry.get("severity") not in (None, "normal")
+
+
 def _windows(data: dict) -> list[dict]:
     out: list[dict] = []
     for entry in data.get("limits") or []:
@@ -80,10 +84,46 @@ def _windows(data: dict) -> list[dict]:
         pct = entry.get("percent")
         wid = _window_id(entry)
         if wid and isinstance(pct, (int, float)):
-            win = {"id": wid, "percent": float(pct), "resets_at": entry.get("resets_at")}
+            win = {
+                "id": wid,
+                "percent": float(pct),
+                "resets_at": entry.get("resets_at"),
+                "alert": _alerting(entry),
+            }
             win["unused"] = not win["resets_at"] and round(win["percent"]) == 0
             out.append(win)
+    spend = _spend(data)
+    if spend is not None:
+        out.append(spend)
     return out
+
+
+def _money(amount: dict | None) -> str | None:
+    if not isinstance(amount, dict):
+        return None
+    minor, exponent = amount.get("amount_minor"), amount.get("exponent")
+    if not isinstance(minor, (int, float)) or not isinstance(exponent, int):
+        return None
+    return f"{minor / (10 ** exponent):.{exponent}f} {amount.get('currency') or ''}".strip()
+
+
+def _spend(data: dict) -> dict | None:
+    """The spend window, only for accounts that turned extra usage on."""
+    spend = data.get("spend")
+    if not isinstance(spend, dict) or not spend.get("enabled"):
+        return None
+    pct = spend.get("percent")
+    if not isinstance(pct, (int, float)):
+        return None
+    used, limit = _money(spend.get("used")), _money(spend.get("limit"))
+    return {
+        "id": _SPEND_KEY,
+        "percent": float(pct),
+        "resets_at": None,
+        "alert": _alerting(spend),
+        "unused": False,
+        "detail": " / ".join(part for part in (used, limit) if part) or None,
+    }
 
 
 async def usage_data(account: str | None = None) -> dict:
@@ -98,6 +138,8 @@ def window_label(wid: str) -> str:
         return "Current session"
     if wid == "weekly_all":
         return "All models"
+    if wid == _SPEND_KEY:
+        return "Extra usage"
     return wid
 
 
@@ -130,10 +172,16 @@ def _resets_hint(value) -> str:
     return f"resets in {m}m"
 
 
+def _window_hint(win: dict) -> str:
+    if win.get("detail"):
+        return win["detail"]
+    return _UNUSED_TEXT if win["unused"] else _resets_hint(win.get("resets_at"))
+
+
 def _window_md(win: dict) -> str:
     pct = win["percent"]
     lines = [f"**{window_label(win['id'])}** • {round(pct)}%", f"`{_bar(pct)}`"]
-    hint = _UNUSED_TEXT if win["unused"] else _resets_hint(win.get("resets_at"))
+    hint = _window_hint(win)
     if hint:
         lines.append(hint)
     return "  \n".join(lines)
@@ -143,11 +191,12 @@ def _bar_block(win: dict) -> dict:
     block = {
         "type": "bar",
         "label": window_label(win["id"]),
-        "text": _resets_hint(win.get("resets_at")),
+        "text": win.get("detail") or _resets_hint(win.get("resets_at")),
         "value": round(win["percent"]),
-        "alert_above": _ALERT_PERCENT,
     }
-    if win["unused"]:
+    if win.get("alert"):
+        block["alert_above"] = 0
+    if win["unused"] and not win.get("detail"):
         block["text_key"] = _UNUSED_KEY
     return block
 

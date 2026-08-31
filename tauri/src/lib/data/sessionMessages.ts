@@ -3,6 +3,7 @@ import {
   diffKindOf,
   emptyInteraction,
   VALUE_SEPARATOR,
+  type AgentResult,
   type CompactData,
   type DiffLine,
   type InteractionData,
@@ -18,6 +19,8 @@ export interface SessionMessage {
   interaction: InteractionData | null;
   diffLines: DiffLine[] | null;
   compact: CompactData | null;
+  agentResult: AgentResult | null;
+  thinkingTokens: number | null;
   index: number;
   labelOnly: boolean;
   result: string | null;
@@ -130,6 +133,18 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
             summary: text(raw, "summary") ?? "",
           }
         : null,
+    thinkingTokens: type === "thinking" ? int(raw, "tokens") : null,
+    agentResult: (() => {
+      const done = raw.agent_result;
+      if (type !== "agent" || typeof done !== "object" || done === null) return null;
+      const fields = done as Wire;
+      return {
+        status: text(fields, "status"),
+        durationMs: int(fields, "duration_ms"),
+        tokens: int(fields, "tokens"),
+        toolUses: int(fields, "tool_uses"),
+      };
+    })(),
     index: int(raw, "index") ?? -1,
     labelOnly: raw.label === true,
     result: text(raw, "result"),

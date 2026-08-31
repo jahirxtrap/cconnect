@@ -1,5 +1,6 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.AgentResult
 import com.jahirtrap.cconnect.data.ComponentElement
 import com.jahirtrap.cconnect.data.ComponentOption
 import com.jahirtrap.cconnect.data.VALUE_SEPARATOR
@@ -356,6 +357,17 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
                 obj["ts"]?.jsonPrimitive?.longOrNull,
             )
             "agent" -> ServerEvent.Agent(str("id"), str("subagent_type"), str("description"), flag("label"))
+            "agent_result" -> ServerEvent.AgentDone(
+                str("id"),
+                AgentResult(
+                    status = str("status"),
+                    durationMs = obj["duration_ms"]?.jsonPrimitive?.longOrNull,
+                    tokens = obj["tokens"]?.jsonPrimitive?.intOrNull,
+                    toolUses = obj["tool_uses"]?.jsonPrimitive?.intOrNull,
+                ),
+            )
+            "thinking_tokens" -> ServerEvent.ThinkingTokens(obj["tokens"]?.jsonPrimitive?.intOrNull ?: 0)
+            "hook_failed" -> ServerEvent.HookFailed(str("name"), str("text").orEmpty())
             "compact_summary" -> ServerEvent.CompactSummary(
                 trigger = str("trigger"),
                 preTokens = obj["pre_tokens"]?.jsonPrimitive?.intOrNull,

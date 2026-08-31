@@ -166,6 +166,33 @@ def _stream_event_to_events(event: Any) -> list[dict]:
     return []
 
 
+def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
+    """Typed events for the `system` subtypes the app renders; the rest are dropped."""
+    if not isinstance(data, dict):
+        return []
+    if subtype == "task_notification" and vis["tool_use"] != "off":
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        return [{
+            "type": "agent_result",
+            "id": data.get("tool_use_id"),
+            "status": data.get("status"),
+            "duration_ms": usage.get("duration_ms"),
+            "tokens": usage.get("total_tokens") if vis.get("tokens") else None,
+            "tool_uses": usage.get("tool_uses"),
+        }]
+    if subtype == "thinking_tokens" and vis["thinking"] != "off" and vis.get("tokens"):
+        tokens = data.get("estimated_tokens")
+        return [{"type": "thinking_tokens", "tokens": tokens}] if isinstance(tokens, int) else []
+    if subtype == "hook_response" and data.get("outcome") != "success":
+        return [{
+            "type": "hook_failed",
+            "name": data.get("hook_name"),
+            "event": data.get("hook_event"),
+            "text": (data.get("stderr") or data.get("output") or "").strip()[:400],
+        }]
+    return []
+
+
 def _task_events_from_result(result: Any) -> list[dict]:
     """Task* tools return their task(s) in tool_use_result, not in the tool block."""
     if not isinstance(result, dict):
@@ -874,7 +901,8 @@ async def run_prompt(
                     context_tokens = meta.get("postTokens") or None
                     yield {"type": "context", "context_tokens": context_tokens}
                 else:
-                    yield {"type": "system", "subtype": subtype, "data": data}
+                    for event in _system_events(subtype, data, vis()):
+                        yield event
             elif isinstance(message, ResultMessage):
                 awaiting_cycle = True
                 for ev in _flush_users(getattr(message, "session_id", None) or current_sid):

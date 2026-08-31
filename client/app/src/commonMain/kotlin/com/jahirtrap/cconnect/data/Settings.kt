@@ -78,6 +78,10 @@ class Settings {
         get() = prefs.getString("visibility_working", "").orEmpty()
         set(value) = prefs.edit { putString("visibility_working", value) }
 
+    var visibilityTokens: String
+        get() = prefs.getString("visibility_tokens", "").orEmpty()
+        set(value) = prefs.edit { putString("visibility_tokens", value) }
+
     var showTimestamps: Boolean
         get() = prefs.getBoolean("show_timestamps", false)
         set(value) = prefs.edit { putBoolean("show_timestamps", value) }

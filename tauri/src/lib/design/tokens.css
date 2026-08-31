@@ -124,6 +124,8 @@
 
 :root {
   --c-accent: #3f51b5;
+  --c-accent-selection: rgba(63, 81, 181, 0.32);
+  --c-accent-quote: rgba(63, 81, 181, 0.6);
 }
 
 [data-font="flat"] {
@@ -152,6 +154,7 @@
   --c-surface: #ffffff;
   --c-surface-variant: #f4f4f5;
   --c-on-surface-variant: #71717a;
+  --c-on-surface-variant-rgb: 113, 113, 122;
   --c-outline: #d4d4d8;
   --c-outline-variant: #e4e4e7;
   --c-error: #b3261e;
@@ -178,6 +181,7 @@
   --c-surface: #0f0f0f;
   --c-surface-variant: #1a1a1a;
   --c-on-surface-variant: #a3a3a3;
+  --c-on-surface-variant-rgb: 163, 163, 163;
   --c-outline: #3f3f46;
   --c-outline-variant: #262626;
   --c-error: #ffb4ab;
