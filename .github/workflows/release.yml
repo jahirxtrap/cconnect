@@ -18,139 +18,6 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: client
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: gradle
-
-      - name: Install rpm tooling (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm
-
-      - name: Package installers
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :app:packageDistributionForCurrentOS --no-configuration-cache
-
-      - name: Normalize asset names
-        run: |
-          version="${GITHUB_REF_NAME}"
-          cd app/build/compose/binaries/main
-          for file in msi/*.msi exe/*.exe deb/*.deb rpm/*.rpm dmg/*.dmg; do
-            [ -e "$file" ] || continue
-            mv "$file" "$(dirname "$file")/cconnect-$version.${file##*.}"
-          done
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cconnect-desktop-${{ matrix.os }}
-          path: |
-            client/app/build/compose/binaries/main/msi/*.msi
-            client/app/build/compose/binaries/main/exe/*.exe
-            client/app/build/compose/binaries/main/deb/*.deb
-            client/app/build/compose/binaries/main/rpm/*.rpm
-            client/app/build/compose/binaries/main/dmg/*.dmg
-
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          body_path: CHANGELOG.md
-          files: |
-            client/app/build/compose/binaries/main/msi/*.msi
-            client/app/build/compose/binaries/main/exe/*.exe
-            client/app/build/compose/binaries/main/deb/*.deb
-            client/app/build/compose/binaries/main/rpm/*.rpm
-            client/app/build/compose/binaries/main/dmg/*.dmg
-
-  android:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-        working-directory: client
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: gradle
-
-      - uses: android-actions/setup-android@v3
-
-      - name: Write signing config
-        run: |
-          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-          {
-            echo "storeFile=keystore.jks"
-            echo "storePassword=${{ secrets.SIGNING_STORE_PASSWORD }}"
-            echo "keyAlias=${{ secrets.SIGNING_KEY_ALIAS }}"
-            echo "keyPassword=${{ secrets.SIGNING_KEY_PASSWORD }}"
-          } > key.properties
-
-      - name: Build release APK
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :androidApp:assembleRelease
-
-      - name: Normalize asset name
-        run: |
-          cd androidApp/build/outputs/apk/release
-          for file in *.apk; do
-            [ -e "$file" ] || continue
-            mv "$file" "cconnect-${GITHUB_REF_NAME}.apk"
-          done
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: cconnect-android
-          path: client/androidApp/build/outputs/apk/release/*.apk
-
-      - uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          body_path: CHANGELOG.md
-          files: client/androidApp/build/outputs/apk/release/*.apk
-
-  web:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: gradle
-
-      - name: Build web (wasmJs) production bundle
-        working-directory: client
-        run: |
-          chmod +x ./gradlew
-          ./gradlew :app:wasmJsBrowserDistribution --no-configuration-cache
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy client/app/build/dist/wasmJs/productionExecutable --project-name=cconnect --branch=main --commit-dirty=true
-
-  tauri-desktop:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-22.04, macos-latest]
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: bash
         working-directory: tauri
     steps:
       - uses: actions/checkout@v4
@@ -195,7 +62,7 @@ jobs:
             tauri/src-tauri/target/release/bundle/appimage/*.AppImage
             tauri/src-tauri/target/release/bundle/dmg/*.dmg
 
-  tauri-android:
+  android:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -250,7 +117,7 @@ jobs:
           body_path: CHANGELOG.md
           files: tauri/cconnect-tauri-*.apk
 
-  tauri-web:
+  web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
