@@ -3,6 +3,7 @@ import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte"
 import { backend, type AuthKind, type EnvironmentProfile } from "$lib/services/backend.svelte";
 import { settings } from "./settings.svelte";
 import { sshStore, type SshProfile } from "./sshStore.svelte";
+import { terminalKeys } from "./terminalKeys.svelte";
 
 // Shared with the Compose client: same keys so a backup moves between both apps.
 const APP = "cconnect";
@@ -74,6 +75,7 @@ export const exportSettings = (): string =>
         permission_mode: profile.permissionMode,
         ...(profile.streaming === null ? {} : { streaming: profile.streaming }),
         ...(profile.accentIndex === null ? {} : { accent_index: profile.accentIndex }),
+        ...(terminalKeys.keyFor(profile) ? { terminal_key: terminalKeys.keyFor(profile) } : {}),
       })),
       ssh: sshStore.profiles.map((profile) => ({
         id: profile.id,
@@ -200,6 +202,12 @@ export const importSettings = (raw: string): boolean => {
     .map(toEnvironment)
     .filter((profile): profile is EnvironmentProfile => profile !== null);
   if (environments.length) backend.save(environments);
+
+  for (const raw of list(root, "environments")) {
+    const profile = toEnvironment(raw);
+    const key = text(raw, "terminal_key");
+    if (profile && key) terminalKeys.setFor(profile, key);
+  }
 
   const active = text(root, "active_environment");
   if (active) backend.select(active);

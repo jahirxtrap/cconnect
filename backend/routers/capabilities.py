@@ -1,6 +1,6 @@
 """Expose runtime capabilities (models, permission modes, effort levels) to the app."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from core import cli_manager
 from core.config import (
@@ -22,8 +22,9 @@ router = APIRouter(tags=["Capabilities"])
 
 
 @router.get("/capabilities")
-async def get_capabilities():
+async def get_capabilities(capabilities: str = Query("")):
     account_list = accounts.list_accounts()
+    client = [item.strip() for item in capabilities.split(",") if item.strip()]
     info = await cli_info.server_info()
     return api_response(data={
         "version": SERVER_VERSION,
@@ -37,7 +38,7 @@ async def get_capabilities():
         "colors": COLORS,
         "commands": cli_info.commands(info),
         "accounts": [{"id": a["id"], "label": a["label"]} for a in account_list if a["logged_in"]],
-        "mcp_tools": mcps.tool_specs(),
+        "mcp_tools": mcps.tool_specs(client),
         "defaults": {
             "permission_mode": DEFAULT_PERMISSION_MODE,
             "effort": DEFAULT_EFFORT,

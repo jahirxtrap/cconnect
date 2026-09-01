@@ -6,6 +6,7 @@
   import History from "@lucide/svelte/icons/history";
   import Menu from "@lucide/svelte/icons/menu";
   import PanelLeftOpen from "@lucide/svelte/icons/panel-left-open";
+  import PanelRightOpen from "@lucide/svelte/icons/panel-right-open";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Settings from "@lucide/svelte/icons/settings";
   import SquarePen from "@lucide/svelte/icons/square-pen";
@@ -16,10 +17,12 @@
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
+  import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import type { SessionInfo } from "$lib/data/models";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
+  import { terminalTabs } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import { onNativePaste } from "$lib/platform/pastedContent";
@@ -44,7 +47,9 @@
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { resizeHandle } from "$lib/ui/resizeHandle";
   import ChatPanel from "./ChatPanel.svelte";
+  import TerminalPanel from "./TerminalPanel.svelte";
   import ChatToolbar from "./ChatToolbar.svelte";
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
@@ -65,8 +70,10 @@
 
   const SIDE_PEEK = 58;
   const RAIL_WIDTH = 64;
-  const PANEL_WIDTH = 300;
   const SESSION_ID_PREVIEW = 8;
+  const MIN_SIDEBAR_WIDTH = 220;
+  const MIN_TERMINAL_WIDTH = 280;
+  const MAX_PANEL_FRACTION = 0.5;
 
   const NOTICE_KEYS: Record<CompatNotice, string> = {
     app_outdated: "COMPAT_APP_OUTDATED",
@@ -75,6 +82,20 @@
   };
 
   let expanded = $state(settings.sidebarExpanded);
+  let sidebarWidth = $state(settings.sidebarWidth);
+  let terminalWidth = $state(settings.terminalWidth);
+  let sidebarDragging = $state(false);
+  let terminalDragging = $state(false);
+
+  const chatFocused = $derived(paneFocus.active === "chat");
+
+  const terminalCwd = $derived.by(() => {
+    const selected = chat.historyProjectKey;
+    const project = selected
+      ? chatListFor(backend.active)?.projects.find((item) => item.projectKey === selected)
+      : null;
+    return [settings.cwd, project?.path ?? ""].filter(Boolean);
+  });
   let renameTarget = $state<SessionInfo | null>(null);
   let deleteTarget = $state<SessionInfo | null>(null);
   let colorTarget = $state<SessionInfo | null>(null);
@@ -94,6 +115,20 @@
   let dropOver = $state(false);
   let composerHeight = $state(0);
   let opening = $state(false);
+
+  $effect(() =>
+    navigation.intercept(() => {
+      if (!terminalTabs.overlayOpen) return false;
+      terminalTabs.overlayOpen = false;
+      return true;
+    }),
+  );
+
+  $effect(() => {
+    if (layout.mobile || !terminalTabs.overlayOpen) return;
+    terminalTabs.overlayOpen = false;
+    navigation.popLayer();
+  });
 
   $effect(() => {
     if (chat.transcriptLoading) {
@@ -170,6 +205,12 @@
   $effect(() => {
     layout.bottomInset = Math.max(0, composerHeight - layout.menuPadding.bottom);
     return () => (layout.bottomInset = 0);
+  });
+
+  $effect(() => {
+    layout.rightInset = !layout.mobile && terminalTabs.panelOpen ? terminalWidth : 0;
+    layout.rightInsetAnimated = !terminalDragging;
+    return () => (layout.rightInset = 0);
   });
 
   const transfersLift = $derived(Math.max(0, layout.transfersInset - composerHeight));
@@ -260,11 +301,22 @@
 
 <svelte:window onpaste={onPaste} />
 
+{#if layout.mobile && terminalTabs.overlayOpen}
+  <div
+    class="safe-area fixed inset-x-0 top-0 z-40 bg-surface"
+    style="height: calc(100% - var(--keyboard, 0px))"
+  >
+    <TerminalPanel cwd={terminalCwd} onClose={() => navigation.popLayer()} />
+  </div>
+{/if}
+
 <div class="flex h-full">
   {#if !layout.mobile}
     <div
-      class="h-full shrink-0 overflow-hidden bg-surface transition-[width] duration-200"
-      style="width: {expanded ? PANEL_WIDTH : RAIL_WIDTH}px"
+      class="relative h-full shrink-0 overflow-hidden bg-surface {sidebarDragging
+        ? ''
+        : 'transition-[width] duration-200'}"
+      style="width: {expanded ? sidebarWidth : RAIL_WIDTH}px"
     >
       {#if expanded}
         <ChatPanel
@@ -307,15 +359,41 @@
           </TooltipIconButton>
         </div>
       {/if}
+      {#if expanded}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-accent/40 {sidebarDragging
+            ? 'bg-accent/40'
+            : ''}"
+          use:resizeHandle={{
+            axis: "x",
+            value: () => sidebarWidth,
+            min: MIN_SIDEBAR_WIDTH,
+            max: () => layout.width * MAX_PANEL_FRACTION,
+            onResize: (value) => (sidebarWidth = value),
+            onDragging: (active) => {
+              sidebarDragging = active;
+              if (!active) settings.sidebarWidth = sidebarWidth;
+            },
+          }}
+        ></div>
+      {/if}
     </div>
   {/if}
 
-  <div class="flex min-w-0 flex-1 flex-col">
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="flex min-w-0 flex-1 flex-col" onpointerdowncapture={() => paneFocus.set("chat")}>
     {#if !layout.mobile}
       <TabStrip
+        items={tabs.list}
+        activeId={tabs.activeId}
         onSelect={(id) => selectTab(id)}
         onNew={() => tabs.newTab()}
         onClose={(id) => tabs.close(id)}
+        onMove={(id, index) => tabs.move(id, index)}
+        focused={chatFocused}
+        trailing={terminalTabs.panelOpen ? undefined : terminalToggle}
       />
     {/if}
     <AppTopBar
@@ -353,7 +431,7 @@
           <TaskIndicator todos={chat.todos} />
         {/if}
         {#if layout.mobile}
-          <TabSwitcher />
+          <TabSwitcher cwd={terminalCwd} />
         {/if}
         <TooltipIconButton
           label={t("NEW_SESSION")}
@@ -474,7 +552,56 @@
     {/if}
     </div>
   </div>
+
+  {#if !layout.mobile}
+    <div
+      class="h-full shrink-0 overflow-hidden {terminalDragging ? '' : 'transition-[width] duration-200'}"
+      style="width: {terminalTabs.panelOpen ? terminalWidth : 0}px"
+    >
+      <div class="relative h-full" style="width: {terminalWidth}px">
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          class="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-accent/40 {terminalDragging
+            ? 'bg-accent/40'
+            : ''}"
+          use:resizeHandle={{
+            axis: "x",
+            invert: true,
+            value: () => terminalWidth,
+            min: MIN_TERMINAL_WIDTH,
+            max: () => layout.width * MAX_PANEL_FRACTION,
+            onResize: (value) => (terminalWidth = value),
+            onDragging: (active) => {
+              terminalDragging = active;
+              if (!active) settings.terminalWidth = terminalWidth;
+            },
+          }}
+        ></div>
+        <TerminalPanel
+          cwd={terminalCwd}
+          onClose={() => {
+            terminalTabs.setPanelOpen(false);
+            paneFocus.set("chat");
+          }}
+        />
+      </div>
+    </div>
+  {/if}
 </div>
+
+{#snippet terminalToggle()}
+  <TooltipIconButton
+    label={t("TERMINAL")}
+    class="size-8"
+    onclick={() => {
+      terminalTabs.setPanelOpen(true);
+      paneFocus.set("terminal");
+    }}
+  >
+    <PanelRightOpen />
+  </TooltipIconButton>
+{/snippet}
 
 {#snippet menuButton()}
   <TooltipIconButton label={t("MENU")} onclick={() => (drawer.open = true)}>

@@ -66,9 +66,15 @@
   const hiddenTools = $derived(
     new Set((snapshot?.mcpDisabled ?? "").split(",").map((name) => name.trim()).filter(Boolean)),
   );
-  const enabledTools = $derived(
-    (capabilities?.mcpTools ?? []).filter((tool) => !hiddenTools.has(tool.name)).length,
-  );
+  const toolEntries = $derived.by(() => {
+    const entries = new Map<string, boolean>();
+    for (const tool of capabilities?.mcpTools ?? []) {
+      const key = tool.group ?? tool.name;
+      entries.set(key, (entries.get(key) ?? false) || !hiddenTools.has(tool.name));
+    }
+    return [...entries.values()];
+  });
+  const enabledTools = $derived(toolEntries.filter(Boolean).length);
 
   const apply = async (patch: Parameters<typeof settingsApi.update>[0]) => {
     dialog = null;
@@ -143,7 +149,7 @@
     title={t("MCP_TOOLS")}
     summary={summary(
       capabilities
-        ? t("MCP_TOOLS_COUNT", enabledTools, capabilities.mcpTools.length)
+        ? t("MCP_TOOLS_COUNT", enabledTools, toolEntries.length)
         : "—",
     )}
     enabled={ready}
@@ -246,6 +252,8 @@
   <ChatsDialog
     trashEnabled={snapshot.trashEnabled}
     retentionDays={snapshot.retentionDays}
+    retentionMin={snapshot.retentionMin}
+    retentionMax={snapshot.retentionMax}
     onConfirm={(trash_enabled, retention_days) => void apply({ trash_enabled, retention_days })}
     onDismiss={() => (dialog = null)}
   />

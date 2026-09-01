@@ -33,6 +33,7 @@ class StartMessage(BaseModel):
     channel: Optional[str] = None
     last_seq: int = 0
     capabilities: list[str] = []
+    terminal_key: Optional[str] = None
 
 
 class PromptMessage(BaseModel):

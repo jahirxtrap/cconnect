@@ -28,7 +28,7 @@ const withQuery = (base: string, path: string, query?: Query) => {
   return search ? `${url}?${search}` : url;
 };
 
-export const createHttp = (profile: () => Profile): HttpClient => {
+export const createHttp = (profile: () => Profile, extraHeaders?: () => Record<string, string>): HttpClient => {
   const execute = async <T>(method: string, path: string, query?: Query, body?: unknown): Promise<T | null> => {
     const target = profile();
     if (!isConfigured(target)) return null;
@@ -37,6 +37,7 @@ export const createHttp = (profile: () => Profile): HttpClient => {
         method,
         headers: {
           ...authHeadersOf(target),
+          ...(extraHeaders?.() ?? {}),
           ...(body === undefined ? {} : { "Content-Type": "application/json" }),
         },
         body: body === undefined ? undefined : JSON.stringify(body ?? {}),

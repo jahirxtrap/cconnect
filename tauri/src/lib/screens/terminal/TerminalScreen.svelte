@@ -13,7 +13,9 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { isTauri } from "$lib/platform";
   import SshEditDialog from "./SshEditDialog.svelte";
+  import { sshLink } from "./sshLink";
   import TerminalSession from "./TerminalSession.svelte";
 
   let active = $state<SshProfile | null>(null);
@@ -36,7 +38,13 @@
 </script>
 
 {#if active}
-  <TerminalSession profile={active} onClose={() => navigation.popLayer()} />
+  {@const profile = active}
+  <TerminalSession
+    title={profile.name || profile.host}
+    connect={(hooks, cols, rows) => sshLink(profile, hooks, cols, rows)}
+    unavailable={!isTauri}
+    onClose={() => navigation.popLayer()}
+  />
 {:else}
   <div class="flex h-full flex-col">
     <AppTopBar title={t("SSH_HOSTS")}>

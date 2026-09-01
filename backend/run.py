@@ -28,6 +28,7 @@ _PID_PATH = _BASE_DIR / ".detached.pid"
 _PROVIDER_PATH = _BASE_DIR / ".detached.provider"
 _DETACHED_LOG = _BASE_DIR / "logs" / "detached.log"
 _TOKEN_VAR = "PUBLIC_ACCESS_TOKEN"
+_TERMINAL_KEY_VAR = "TERMINAL_ACCESS_KEY"
 _HOSTNAME_VAR = "PUBLIC_HOSTNAME"
 _PROVIDERS = ("tailscale", "caddy")
 
@@ -37,25 +38,23 @@ def _abort(msg: str) -> None:
     sys.exit(1)
 
 
-def _persist_token_in_env(token: str) -> str:
+def _persist_in_env(var: str, value: str) -> None:
     if not _ENV_PATH.exists():
-        _ENV_PATH.write_text(f"{_TOKEN_VAR}={token}\n", encoding="utf-8")
-        return "created .env"
+        _ENV_PATH.write_text(f"{var}={value}\n", encoding="utf-8")
+        return
 
     lines = _ENV_PATH.read_text(encoding="utf-8").splitlines()
-    pattern = re.compile(rf"^\s*{re.escape(_TOKEN_VAR)}\s*=\s*(.*)$")
+    pattern = re.compile(rf"^\s*{re.escape(var)}\s*=\s*(.*)$")
     for i, line in enumerate(lines):
-        match = pattern.match(line)
-        if match:
-            lines[i] = f"{_TOKEN_VAR}={token}"
+        if pattern.match(line):
+            lines[i] = f"{var}={value}"
             _ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            return "filled empty entry in .env"
+            return
 
     if lines and lines[-1] != "":
         lines.append("")
-    lines.append(f"{_TOKEN_VAR}={token}")
+    lines.append(f"{var}={value}")
     _ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return "appended entry to .env"
 
 
 def _ensure_public_token() -> bool:
@@ -66,9 +65,34 @@ def _ensure_public_token() -> bool:
         return False
 
     token = secrets.token_urlsafe(32)
-    _persist_token_in_env(token)
+    _persist_in_env(_TOKEN_VAR, token)
     os.environ[_TOKEN_VAR] = token
     return True
+
+
+def _ensure_terminal_key(rotate: bool = False) -> bool:
+    """Make sure the key that unlocks the terminal exists. Returns True if just generated."""
+    if os.environ.get(_TERMINAL_KEY_VAR) and not rotate:
+        return False
+    key = secrets.token_urlsafe(32)
+    _persist_in_env(_TERMINAL_KEY_VAR, key)
+    os.environ[_TERMINAL_KEY_VAR] = key
+    return True
+
+
+def _print_rows(rows: list[tuple[str, str]]) -> None:
+    width = max(len(label) for label, _ in rows)
+    print("\n" + "\n".join(f"  {label.ljust(width)} : {value}" for label, value in rows) + "\n")
+
+
+def _terminal_key_row(generated: bool) -> tuple[str, str]:
+    return ("Terminal key", f"{os.environ[_TERMINAL_KEY_VAR]}{' [Auto]' if generated else ''}")
+
+
+def _print_terminal_key(generated: bool, qr: bool = False) -> None:
+    _print_rows([_terminal_key_row(generated)])
+    if qr:
+        _print_qr(json.dumps({"terminal_key": os.environ[_TERMINAL_KEY_VAR]}, separators=(",", ":")))
 
 
 def _start_tailscale_funnel(port: int) -> str:
@@ -165,6 +189,7 @@ def _caddy_url(public_host: str, port: int) -> str:
 
 
 def _print_qr(payload: str) -> None:
+    sys.stdout.flush()
     qr = qrcode.QRCode(border=1)
     qr.add_data(payload)
     qr.make(fit=True)
@@ -174,7 +199,13 @@ def _print_qr(payload: str) -> None:
     sys.stdout.buffer.flush()
 
 
-def _expose(provider: str, port: int, public_host: str = "", keep_running: bool = False) -> None:
+def _expose(
+    provider: str,
+    port: int,
+    public_host: str = "",
+    keep_running: bool = False,
+    key_generated: bool = False,
+) -> None:
     generated = _ensure_public_token()
     if provider == "tailscale":
         public_url = _start_tailscale_funnel(port)
@@ -186,15 +217,15 @@ def _expose(provider: str, port: int, public_host: str = "", keep_running: bool 
         _abort(f"unknown --expose provider: {provider}")
         return  # unreachable, satisfies static checkers
     token = os.environ[_TOKEN_VAR]
-    token_tag = " [Auto]" if generated else ""
     parsed = urlparse(public_url)
     pub_port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    print(
-        f"\n  Public URL : {public_url}"
-        f"\n  Provider   : {provider}"
-        f"\n  Port       : {pub_port}"
-        f"\n  Token      : {token}{token_tag}\n"
-    )
+    _print_rows([
+        ("Public URL", public_url),
+        ("Provider", provider),
+        ("Port", str(pub_port)),
+        ("Token", f"{token}{' [Auto]' if generated else ''}"),
+        _terminal_key_row(key_generated),
+    ])
     _print_qr(json.dumps({"url": public_url, "token": token}, separators=(",", ":")))
 
 
@@ -291,9 +322,19 @@ def main():
                         help="Run in the background and return; the server outlives the terminal.")
     parser.add_argument("--stop", action="store_true",
                         help="Stop a backend previously started with --detach.")
+    parser.add_argument("--terminal-key", action="store_true",
+                        help="Print the key that unlocks the terminal, generating it the first time.")
+    parser.add_argument("--rotate", action="store_true",
+                        help="With --terminal-key, replace the existing key instead of printing it.")
     args = parser.parse_args()
 
     is_windows = sys.platform == "win32"
+
+    if args.terminal_key:
+        _print_terminal_key(_ensure_terminal_key(args.rotate), qr=True)
+        if args.rotate:
+            print("  Every device has to enter it again, and a running backend needs a restart.\n")
+        return
 
     if args.stop:
         _stop_detached()
@@ -304,9 +345,12 @@ def main():
         if running is not None:
             _abort(f"a detached backend is already running (pid {running}). Use --stop first.")
         system_monitor.reset_log_file()
+        key_generated = _ensure_terminal_key()
         if args.expose:
-            _expose(args.expose, PORT, args.public_host, keep_running=True)
+            _expose(args.expose, PORT, args.public_host, keep_running=True, key_generated=key_generated)
             _PROVIDER_PATH.write_text(args.expose, encoding="utf-8")
+        else:
+            _print_terminal_key(key_generated)
         child_args = ["--production"] if args.production else []
         pid = _spawn_detached(child_args)
         print(
@@ -317,8 +361,11 @@ def main():
         return
 
     system_monitor.reset_log_file()
+    key_generated = _ensure_terminal_key()
     if args.expose:
-        _expose(args.expose, PORT, args.public_host)
+        _expose(args.expose, PORT, args.public_host, key_generated=key_generated)
+    else:
+        _print_terminal_key(key_generated)
 
     # Disabled on Windows: uvicorn's reload worker breaks the Claude CLI's asyncio subprocess.
     reload = not args.production and not is_windows

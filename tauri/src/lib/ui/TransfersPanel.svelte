@@ -27,14 +27,14 @@
   });
 
   $effect(() => {
-    void [layout.width, layout.height];
+    void [layout.width, layout.height, layout.rightInset];
     if (!items.length) return;
     let tracked: HTMLElement | null = null;
     let border = 0;
     let frame = 0;
     const measure = () => {
       if (!tracked?.isConnected) {
-        tracked = scrollableUnder(layout.width - layout.safeRight - 1, layout.height / HALF);
+        tracked = scrollableUnder(layout.width - layout.safeRight - layout.rightInset - 1, layout.height / HALF);
         border = tracked ? borderWidth(tracked) : 0;
       }
       scrollbar = tracked ? scrollbarWidth(tracked, border) : 0;
@@ -47,9 +47,12 @@
 
 {#if items.length}
   <div
-    style="padding: {layout.menuPadding.top}px {layout.menuPadding.right + scrollbar}px {layout.menuPadding
-      .bottom}px {layout.menuPadding.left}px"
-    class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-end"
+    style="padding: {layout.menuPadding.top}px {layout.menuPadding.right +
+      scrollbar +
+      layout.rightInset}px {layout.menuPadding.bottom}px {layout.menuPadding.left}px"
+    class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-end {layout.rightInsetAnimated
+      ? 'transition-[padding] duration-200'
+      : ''}"
   >
     <div
       bind:clientHeight={panelHeight}

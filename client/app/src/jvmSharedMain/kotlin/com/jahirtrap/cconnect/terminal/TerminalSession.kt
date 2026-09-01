@@ -136,12 +136,14 @@ actual fun TerminalSession(
                 showSoftKeyboard = true,
                 focusRequester = focusRequester,
             )
-            SoftKeyRow(
-                onKey = { connection.send(it); runCatching { focusRequester.requestFocus() } },
-                onShowKeyboard = { runCatching { focusRequester.requestFocus() }; keyboard?.show() },
-                showKeyboard = touch,
-                modifier = Modifier.imePadding(),
-            )
+            if (touch) {
+                SoftKeyRow(
+                    onKey = { connection.send(it); runCatching { focusRequester.requestFocus() } },
+                    onShowKeyboard = { runCatching { focusRequester.requestFocus() }; keyboard?.show() },
+                    showKeyboard = true,
+                    modifier = Modifier.imePadding(),
+                )
+            }
         }
     }
 }

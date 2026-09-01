@@ -101,6 +101,8 @@ PUBLIC_ACCESS_TOKEN: str | None = (
     os.environ.get("PUBLIC_ACCESS_TOKEN") if os.environ.get("CCONNECT_AUTH_ACTIVE") == "1" else None
 )
 
+TERMINAL_ACCESS_KEY: str | None = os.environ.get("TERMINAL_ACCESS_KEY") or None
+
 __all__ = [
     "PORT",
     "SERVER_VERSION",
@@ -117,4 +119,5 @@ __all__ = [
     "permission_modes",
     "AUTO_UPDATE_SDK",
     "PUBLIC_ACCESS_TOKEN",
+    "TERMINAL_ACCESS_KEY",
 ]

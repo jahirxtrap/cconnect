@@ -246,7 +246,9 @@ fun SettingsScreen(
     var showTokens by remember { mutableStateOf(false) }
     var simpleMode by remember { mutableStateOf(false) }
     var trashEnabled by remember { mutableStateOf(false) }
-    var retentionDays by remember { mutableStateOf(30) }
+    var retentionDays by remember { mutableStateOf(30L) }
+    var retentionMin by remember { mutableStateOf(1L) }
+    var retentionMax by remember { mutableStateOf(Long.MAX_VALUE) }
     var cliInfo by remember { mutableStateOf<CliApi.CliInfo?>(null) }
     var serverReady by remember { mutableStateOf(false) }
     var loading by remember { mutableStateOf(Backend.isConfigured) }
@@ -269,6 +271,8 @@ fun SettingsScreen(
             simpleMode = s.simpleMode
             trashEnabled = s.trashEnabled
             retentionDays = s.retentionDays
+            retentionMin = s.retentionMin
+            retentionMax = s.retentionMax
             showThinking = s.showThinking; showToolUse = s.showToolUse
             showFileChange = s.showFileChange; showCompact = s.showCompact; showWorking = s.showWorking
             showTokens = s.showTokens
@@ -489,10 +493,17 @@ fun SettingsScreen(
                     ) { dialog = SettingsDialog.Cli }
                     PreferenceRow(Lucide.Sparkles, stringResource(Res.string.generation), serverSummary("${caps.models.firstOrNull { it.id == model }?.label ?: model} • $effort"), enabled = serverReady) { dialog = SettingsDialog.Generation }
                     val hiddenTools = mcpDisabled.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                    val toolEntries = mcpToolEntries(caps.mcpTools)
                     PreferenceRow(
                         Lucide.Unplug,
                         stringResource(Res.string.mcp_tools),
-                        serverSummary(stringResource(Res.string.mcp_tools_count, caps.mcpTools.count { it.name !in hiddenTools }, caps.mcpTools.size)),
+                        serverSummary(
+                            stringResource(
+                                Res.string.mcp_tools_count,
+                                toolEntries.count { entry -> entry.names.any { it !in hiddenTools } },
+                                toolEntries.size,
+                            )
+                        ),
                         enabled = serverReady,
                     ) { dialog = SettingsDialog.McpTools }
                     PreferenceRow(Lucide.Shield, stringResource(Res.string.permissions), serverSummary(permissionLabel(caps, permissionMode)), enabled = serverReady) { dialog = SettingsDialog.Permissions }
@@ -502,7 +513,11 @@ fun SettingsScreen(
                         stringResource(Res.string.chats),
                         serverSummary(
                             stringResource(if (trashEnabled) Res.string.trash_on else Res.string.trash_off) +
-                                " • " + pluralStringResource(Res.plurals.retention_days_summary, retentionDays, retentionDays)
+                                " • " + pluralStringResource(
+                                    Res.plurals.retention_days_summary,
+                                    if (retentionDays == 1L) 1 else 2,
+                                    retentionDays,
+                                )
                         ),
                         enabled = serverReady,
                     ) { dialog = SettingsDialog.Chats }
@@ -911,6 +926,8 @@ fun SettingsScreen(
         SettingsDialog.Chats -> ChatsDialog(
             trashEnabled = trashEnabled,
             retentionDays = retentionDays,
+            retentionMin = retentionMin,
+            retentionMax = retentionMax,
             onConfirm = { trash, days ->
                 trashEnabled = trash
                 retentionDays = days
@@ -944,6 +961,8 @@ fun SettingsScreen(
                         simpleMode = it.simpleMode
                         trashEnabled = it.trashEnabled
                         retentionDays = it.retentionDays
+                        retentionMin = it.retentionMin
+                        retentionMax = it.retentionMax
                         showThinking = it.showThinking; showToolUse = it.showToolUse
                         showFileChange = it.showFileChange; showCompact = it.showCompact; showWorking = it.showWorking
                         showTokens = it.showTokens
@@ -1027,21 +1046,21 @@ fun SettingsScreen(
 
 private enum class SettingsDialog { Theme, Language, Font, Accent, Environments, Cli, Generation, McpTools, Permissions, Visibility, Chats, Notifications, Reset, LocalServer, Account, Export, Import, Switch }
 
-private const val MIN_RETENTION_DAYS = 1
-
 @Composable
 private fun ChatsDialog(
     trashEnabled: Boolean,
-    retentionDays: Int,
-    onConfirm: (Boolean, Int) -> Unit,
+    retentionDays: Long,
+    retentionMin: Long,
+    retentionMax: Long,
+    onConfirm: (Boolean, Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var trash by remember { mutableStateOf(trashEnabled) }
     var days by remember { mutableStateOf(retentionDays.toString()) }
-    val parsed = days.trim().toIntOrNull()
-    val valid = parsed != null && parsed >= MIN_RETENTION_DAYS
+    val parsed = days.trim().toLongOrNull()
+    val valid = parsed != null && parsed >= retentionMin && parsed <= retentionMax
     val error = if (days.isBlank() || valid) null
-    else stringResource(Res.string.retention_days_error, MIN_RETENTION_DAYS)
+    else stringResource(Res.string.retention_days_error, retentionMin, retentionMax)
 
     CompactDialog(
         onDismiss = onDismiss,
@@ -1847,6 +1866,24 @@ private fun GenerationDialog(
     }
 }
 
+private data class McpToolEntry(val key: String, val title: String, val summary: String?, val names: List<String>)
+
+private fun mcpToolEntries(tools: List<McpTool>): List<McpToolEntry> {
+    val entries = LinkedHashMap<String, McpToolEntry>()
+    tools.forEach { tool ->
+        val key = tool.group ?: tool.name
+        val existing = entries[key]
+        entries[key] = if (existing != null) {
+            existing.copy(names = existing.names + tool.name)
+        } else if (tool.group != null) {
+            McpToolEntry(key, tool.group, tool.groupDescription, listOf(tool.name))
+        } else {
+            McpToolEntry(key, tool.name, tool.description.ifEmpty { null }, listOf(tool.name))
+        }
+    }
+    return entries.values.toList()
+}
+
 @Composable
 private fun McpToolsDialog(
     tools: List<McpTool>,
@@ -1874,13 +1911,13 @@ private fun McpToolsDialog(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
-            tools.forEach { tool ->
+            mcpToolEntries(tools).forEach { entry ->
                 SwitchRow(
-                    title = tool.name,
-                    checked = tool.name !in hidden,
-                    summary = tool.description.ifEmpty { null },
+                    title = entry.title,
+                    checked = entry.names.any { it !in hidden },
+                    summary = entry.summary,
                 ) { enabled ->
-                    hidden = if (enabled) hidden - tool.name else hidden + tool.name
+                    hidden = if (enabled) hidden - entry.names.toSet() else hidden + entry.names
                 }
             }
         }

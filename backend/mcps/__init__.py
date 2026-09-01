@@ -30,14 +30,14 @@ def _tool_summary(tool: Any) -> str:
     return " ".join((match.group(1) if match else text).split())
 
 
-def _discover(context: dict) -> list:
-    collected: list = []
+def _discover(context: dict) -> list[tuple[Any, Any]]:
+    """Every tool a turn with this context exposes, paired with the module providing it."""
+    collected: list[tuple[Any, Any]] = []
     for info in pkgutil.iter_modules(__path__):
         module = importlib.import_module(f"{__name__}.{info.name}")
         make_tools = getattr(module, "make_tools", None)
         tools = make_tools(context) if make_tools else getattr(module, "tools", None)
-        if tools:
-            collected.extend(tools)
+        collected.extend((module, tool) for tool in tools or [])
     return collected
 
 
@@ -48,27 +48,32 @@ def disabled_tools() -> set[str]:
     return {name.strip() for name in raw.split(",") if name.strip()}
 
 
-def tool_specs() -> list[dict]:
-    """Every tool the server can expose, including the ones a real turn would gate out."""
+def tool_specs(capabilities: Iterable[str] = ()) -> list[dict]:
+    """Every tool the server can expose to a client with these capabilities."""
     probe = {
         "request_compact": lambda: None,
         "session_info": lambda: {},
         "emit": lambda *_args, **_kwargs: None,
         "ask_user": lambda *_args, **_kwargs: None,
         "account": None,
-        "capabilities": [components.CAPABILITY],
+        "capabilities": [components.CAPABILITY, *capabilities],
     }
-    summaries: dict[str, str] = {}
-    for tool in _discover(probe):
+    specs: dict[str, dict] = {}
+    for module, tool in _discover(probe):
         name = _tool_name(tool)
-        if name and name not in summaries:
-            summaries[name] = _tool_summary(tool)
-    return [{"name": name, "description": summaries[name]} for name in sorted(summaries)]
+        if name and name not in specs:
+            specs[name] = {
+                "name": name,
+                "description": _tool_summary(tool),
+                "group": getattr(module, "GROUP", None),
+                "group_description": getattr(module, "GROUP_SUMMARY", None),
+            }
+    return [specs[name] for name in sorted(specs)]
 
 
 def build_cconnect_server(context: Optional[dict] = None, exclude: Iterable[str] = ()) -> Any:
     from claude_agent_sdk import create_sdk_mcp_server
 
     hidden = disabled_tools() | set(exclude)
-    collected = [tool for tool in _discover(context or {}) if _tool_name(tool) not in hidden]
+    collected = [tool for _module, tool in _discover(context or {}) if _tool_name(tool) not in hidden]
     return create_sdk_mcp_server(name="cconnect", version="1.0.0", tools=collected)

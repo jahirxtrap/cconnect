@@ -1,12 +1,16 @@
-import { isTouch } from "./index";
+import { isTouch, isTauri, platformName } from "./index";
 
 const MOBILE_MAX_WIDTH = 600;
 const MENU_GAP = 8;
+
+const nativeKeyboardInsets = isTauri && platformName() === "android";
 
 class Layout {
   width = $state(window.innerWidth);
   height = $state(window.innerHeight);
   bottomInset = $state(0);
+  rightInset = $state(0);
+  rightInsetAnimated = $state(true);
   transfersInset = $state(0);
   keyboard = $state(0);
   safeTop = $state(0);
@@ -25,8 +29,11 @@ class Layout {
   });
 
   start() {
-    const keyboard = (navigator as Navigator & { virtualKeyboard?: { overlaysContent: boolean } }).virtualKeyboard;
-    if (keyboard) keyboard.overlaysContent = true;
+    if (!nativeKeyboardInsets) {
+      const keyboard = (navigator as Navigator & { virtualKeyboard?: { overlaysContent: boolean } })
+        .virtualKeyboard;
+      if (keyboard) keyboard.overlaysContent = true;
+    }
 
     $effect(() => {
       const measure = () => {
@@ -41,7 +48,7 @@ class Layout {
 
     $effect(() => {
       const viewport = window.visualViewport;
-      if (!viewport) return;
+      if (!viewport || nativeKeyboardInsets) return;
       const track = () => {
         const hidden = Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop);
         this.keyboard = Math.round(hidden);

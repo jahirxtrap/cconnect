@@ -1,175 +1,60 @@
 <script lang="ts">
   import Plus from "@lucide/svelte/icons/plus";
+  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import X from "@lucide/svelte/icons/x";
   import { Dialog } from "bits-ui";
+  import { navigation } from "$lib/app/navigation.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
+  import { terminalTabs, type TerminalTab } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import { ReorderDrag } from "$lib/ui/reorderDrag.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { tabs } from "./tabs.svelte";
 
-  const LONG_PRESS_MS = 400;
-  const DRAG_THRESHOLD = 8;
-  const RELEASE_MS = 140;
-  const HALF = 2;
+  interface Props {
+    cwd: string[];
+  }
+
+  const { cwd }: Props = $props();
 
   let open = $state(false);
-  let draggingId = $state<string | null>(null);
-  let dragX = $state(0);
-  let dragY = $state(0);
-  let dragTarget = $state(-1);
-  let releasing = $state(false);
+  let closingTerminal = $state<TerminalTab | null>(null);
 
-  const cards = new Map<string, HTMLElement>();
-
-  const register = (element: HTMLElement, id: string) => {
-    cards.set(id, element);
-    return { destroy: () => cards.delete(id) };
+  const showTerminal = (id: string) => {
+    terminalTabs.select(id);
+    navigation.pushLayer();
+    terminalTabs.overlayOpen = true;
+    open = false;
   };
 
-  const centerOf = (id: string) => {
-    const element = cards.get(id);
-    if (!element) return null;
-    return {
-      x: element.offsetLeft + element.offsetWidth / HALF,
-      y: element.offsetTop + element.offsetHeight / HALF,
-    };
+  const newTerminal = async () => {
+    const created = await terminalTabs.create(cwd);
+    if (created) terminalTabs.select(created.id);
+    navigation.pushLayer();
+    terminalTabs.overlayOpen = true;
+    open = false;
   };
 
-  const draggingFrom = $derived(
-    draggingId === null ? -1 : tabs.list.findIndex((tab) => tab.id === draggingId),
+  const closeTerminalTab = async (tab: TerminalTab) => {
+    if (await terminalTabs.needsConfirm(tab)) closingTerminal = tab;
+    else await terminalTabs.drop(tab);
+  };
+
+  const chatDrag = new ReorderDrag(
+    () => tabs.list,
+    (id, to) => tabs.move(id, to),
+    (id) => {
+      tabs.select(id);
+      open = false;
+    },
   );
 
-  const shiftOf = (id: string, index: number) => {
-    if (draggingFrom < 0 || id === draggingId) return { x: 0, y: 0 };
-    const to =
-      dragTarget >= draggingFrom && index > draggingFrom && index <= dragTarget
-        ? index - 1
-        : dragTarget >= 0 && dragTarget < draggingFrom && index < draggingFrom && index >= dragTarget
-          ? index + 1
-          : index;
-    if (to === index) return { x: 0, y: 0 };
-    const from = centerOf(id);
-    const into = centerOf(tabs.list[to]?.id ?? "");
-    if (!from || !into) return { x: 0, y: 0 };
-    return { x: into.x - from.x, y: into.y - from.y };
-  };
-
-  const nearest = (x: number, y: number) => {
-    let best = -1;
-    let bestDistance = Number.MAX_VALUE;
-    tabs.list.forEach((tab, index) => {
-      const center = centerOf(tab.id);
-      if (!center) return;
-      const distance = (center.x - x) ** 2 + (center.y - y) ** 2;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = index;
-      }
-    });
-    return best;
-  };
-
-  const endDrag = () => {
-    draggingId = null;
-    dragX = 0;
-    dragY = 0;
-    dragTarget = -1;
-  };
-
-  const release = (id: string, to: number) => {
-    const from = centerOf(id);
-    const into = centerOf(tabs.list[to]?.id ?? "");
-    if (!from || !into) {
-      tabs.move(id, to);
-      endDrag();
-      return;
-    }
-    releasing = true;
-    dragX = into.x - from.x;
-    dragY = into.y - from.y;
-    setTimeout(() => {
-      tabs.move(id, to);
-      releasing = false;
-      endDrag();
-    }, RELEASE_MS);
-  };
-
-  const onPointerDown = (event: PointerEvent, id: string) => {
-    if (event.button !== 0 || releasing) return;
-    event.preventDefault();
-    const startX = event.clientX;
-    const startY = event.clientY;
-    const touch = event.pointerType === "touch";
-    let started = false;
-    let lastX = startX;
-    let lastY = startY;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const begin = () => {
-      started = true;
-      draggingId = id;
-      dragX = 0;
-      dragY = 0;
-      dragTarget = tabs.list.findIndex((tab) => tab.id === id);
-    };
-
-    const detach = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.removeEventListener("blur", onUp);
-      if (timer !== null) clearTimeout(timer);
-      timer = null;
-    };
-
-    if (touch) timer = setTimeout(begin, LONG_PRESS_MS);
-
-    const onMove = (move: PointerEvent) => {
-      if (move.pointerId !== event.pointerId) return;
-      if (!started) {
-        const dx = move.clientX - startX;
-        const dy = move.clientY - startY;
-        if (touch) {
-          if ((Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD) && timer !== null) {
-            clearTimeout(timer);
-            timer = null;
-            detach();
-          }
-          return;
-        }
-        if (Math.abs(dx) <= DRAG_THRESHOLD && Math.abs(dy) <= DRAG_THRESHOLD) return;
-        begin();
-        lastX = move.clientX;
-        lastY = move.clientY;
-      }
-      dragX += move.clientX - lastX;
-      dragY += move.clientY - lastY;
-      lastX = move.clientX;
-      lastY = move.clientY;
-      const origin = centerOf(id);
-      if (!origin) return;
-      const best = nearest(origin.x + dragX, origin.y + dragY);
-      if (best >= 0) dragTarget = best;
-    };
-
-    const onUp = (up: Event) => {
-      if (up instanceof PointerEvent && up.pointerId !== event.pointerId) return;
-      detach();
-      if (!started) {
-        tabs.select(id);
-        open = false;
-        return;
-      }
-      const from = tabs.list.findIndex((tab) => tab.id === id);
-      if (from >= 0 && dragTarget >= 0 && dragTarget !== from) release(id, dragTarget);
-      else endDrag();
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("blur", onUp);
-  };
+  const terminalDrag = new ReorderDrag(
+    () => terminalTabs.items,
+    (id, to) => terminalTabs.move(id, to),
+    (id) => showTerminal(id),
+  );
 </script>
 
 <TooltipIconButton label={t("TABS")} onclick={() => (open = true)}>
@@ -202,53 +87,111 @@
           <Plus size={24} />
         </TooltipIconButton>
       </div>
-      <div class="grid min-h-0 flex-1 grid-cols-2 content-start gap-1.5 overflow-y-auto px-2 py-1">
-        {#each tabs.list as tab, index (tab.id)}
-          {@const active = tab.id === tabs.activeId}
-          {@const dragging = tab.id === draggingId}
-          {@const shift = dragging ? { x: dragX, y: dragY } : shiftOf(tab.id, index)}
-          <div
-            use:register={tab.id}
-            role="button"
-            tabindex="0"
-            onpointerdown={(event) => onPointerDown(event, tab.id)}
-            onkeydown={(event) => {
-              if (event.key !== "Enter") return;
-              tabs.select(tab.id);
-              open = false;
-            }}
-            style="transform: translate({shift.x}px, {shift.y}px); z-index: {dragging
-              ? 1
-              : 0}; transition: {draggingId !== null && (!dragging || releasing)
-              ? `transform ${RELEASE_MS}ms ease-out`
-              : 'none'}"
-            class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {active
-              ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
-              : 'border-outline-variant text-on-surface-variant'}"
-          >
-            <span
-              class="size-2 shrink-0 rounded-full"
-              style={sessionColorOf(tab.color)
-                ? `background: ${sessionColorOf(tab.color)}`
-                : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
-            ></span>
-            <span class="min-w-0 flex-1 truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
+      <div class="min-h-0 flex-1 overflow-y-auto px-2 py-1">
+        <div class="grid grid-cols-2 content-start gap-1.5">
+          {#each tabs.list as tab, index (tab.id)}
+            {@const active = tab.id === tabs.activeId}
+            {@const shift = chatDrag.shiftOf(tab.id, index)}
+            <div
+              use:chatDrag.register={tab.id}
+              role="button"
+              tabindex="0"
+              onpointerdown={(event) => chatDrag.onPointerDown(event, tab.id)}
+              onkeydown={(event) => {
+                if (event.key !== "Enter") return;
+                tabs.select(tab.id);
+                open = false;
+              }}
+              style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id ===
+              chatDrag.draggingId
+                ? 1
+                : 0}; transition: {chatDrag.transitionOf(tab.id)}"
+              class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {active
+                ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
+                : 'border-outline-variant text-on-surface-variant'}"
+            >
+              <span
+                class="size-2 shrink-0 rounded-full"
+                style={sessionColorOf(tab.color)
+                  ? `background: ${sessionColorOf(tab.color)}`
+                  : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
+              ></span>
+              <span class="min-w-0 flex-1 truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
+              <button
+                type="button"
+                onpointerdown={(event) => event.stopPropagation()}
+                onclick={() => {
+                  const wasActive = tab.id === tabs.activeId;
+                  tabs.close(tab.id);
+                  if (wasActive) open = false;
+                }}
+                aria-label={t("CLOSE_TAB")}
+                class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          {/each}
+        </div>
+
+        <div class="mt-3 border-t border-outline-variant pt-3">
+          <p class="px-1 pb-1.5 text-label-md text-on-surface-variant">{t("TERMINAL")}</p>
+          <div class="flex flex-col gap-1.5">
+            {#each terminalTabs.items as tab, index (tab.id)}
+              {@const shift = terminalDrag.shiftOf(tab.id, index)}
+              <div
+                use:terminalDrag.register={tab.id}
+                role="button"
+                tabindex="0"
+                onpointerdown={(event) => terminalDrag.onPointerDown(event, tab.id)}
+                onkeydown={(event) => event.key === "Enter" && showTerminal(tab.id)}
+                style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id ===
+                terminalDrag.draggingId
+                  ? 1
+                  : 0}; transition: {terminalDrag.transitionOf(tab.id)}"
+                class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
+                terminalTabs.activeId
+                  ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
+                  : 'border-outline-variant text-on-surface-variant'}"
+              >
+                <SquareTerminal size={16} class="shrink-0" />
+                <span class="min-w-0 flex-1 truncate text-label-lg">{tab.title}</span>
+                <button
+                  type="button"
+                  onpointerdown={(event) => event.stopPropagation()}
+                  onclick={() => void closeTerminalTab(tab)}
+                  aria-label={t("CLOSE")}
+                  class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            {/each}
             <button
               type="button"
-              onpointerdown={(event) => event.stopPropagation()}
-              onclick={() => {
-                const wasActive = tab.id === tabs.activeId;
-                tabs.close(tab.id);
-                if (wasActive) open = false;
-              }}
-              aria-label={t("CLOSE_TAB")}
-              class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+              onclick={() => void newTerminal()}
+              class="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-item border border-outline-variant pr-1 pl-2.5 text-on-surface-variant"
             >
-              <X size={18} />
+              <Plus size={16} class="shrink-0" />
+              <span class="min-w-0 flex-1 truncate text-left text-label-lg">{t("NEW_TERMINAL")}</span>
             </button>
           </div>
-        {/each}
+        </div>
       </div>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
+
+{#if closingTerminal}
+  {@const tab = closingTerminal}
+  <ConfirmDialog
+    title={t("CLOSE")}
+    text={t("CLOSE_TERMINAL_CONFIRM", tab.title)}
+    confirmLabel={t("CLOSE")}
+    onConfirm={() => {
+      closingTerminal = null;
+      void terminalTabs.drop(tab);
+    }}
+    onDismiss={() => (closingTerminal = null)}
+  />
+{/if}

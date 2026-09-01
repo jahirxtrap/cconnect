@@ -16,6 +16,9 @@ const DEFAULTS = {
   markdown_preview_formatted: true,
   show_timestamps: false,
   sidebar_expanded: false,
+  sidebar_width: 300,
+  terminal_open: false,
+  terminal_width: 420,
   minimize_to_tray: false,
   cwd: "",
   tabs_state: "",
@@ -137,6 +140,27 @@ class Settings {
   }
   set sidebarExpanded(value: boolean) {
     this.#write("sidebar_expanded", value);
+  }
+
+  get sidebarWidth() {
+    return this.#read("sidebar_width");
+  }
+  set sidebarWidth(value: number) {
+    this.#write("sidebar_width", value);
+  }
+
+  get terminalOpen() {
+    return this.#read("terminal_open");
+  }
+  set terminalOpen(value: boolean) {
+    this.#write("terminal_open", value);
+  }
+
+  get terminalWidth() {
+    return this.#read("terminal_width");
+  }
+  set terminalWidth(value: number) {
+    this.#write("terminal_width", value);
   }
 
   get minimizeToTray() {

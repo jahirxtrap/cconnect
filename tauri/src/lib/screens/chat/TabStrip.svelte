@@ -1,19 +1,45 @@
 <script lang="ts">
   import Plus from "@lucide/svelte/icons/plus";
   import X from "@lucide/svelte/icons/x";
+  import type { Snippet } from "svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
-  import { tabs } from "./tabs.svelte";
+
+  export interface StripTab {
+    id: string;
+    title?: string | null;
+    color?: string | null;
+  }
 
   interface Props {
+    items: StripTab[];
+    activeId: string | null;
     onSelect: (id: string) => void;
     onNew: () => void;
     onClose: (id: string) => void;
+    onMove?: (id: string, index: number) => void;
+    newLabel?: string;
+    emptyTitle?: string;
+    dot?: boolean;
+    focused?: boolean;
+    trailing?: Snippet;
   }
 
-  const { onSelect, onNew, onClose }: Props = $props();
+  const {
+    items,
+    activeId,
+    onSelect,
+    onNew,
+    onClose,
+    onMove,
+    newLabel,
+    emptyTitle,
+    dot = true,
+    focused = false,
+    trailing,
+  }: Props = $props();
 
   const SPACING = 6;
   const DRAG_THRESHOLD = 8;
@@ -41,21 +67,21 @@
   };
 
   const reorder = (id: string) => {
-    const list = tabs.list;
-    const from = list.findIndex((tab) => tab.id === id);
+    if (!onMove) return;
+    const from = items.findIndex((tab) => tab.id === id);
     if (from < 0) return;
-    if (dragDx > 0 && from < list.length - 1) {
-      const width = widthOf(list[from + 1].id);
+    if (dragDx > 0 && from < items.length - 1) {
+      const width = widthOf(items[from + 1].id);
       if (width > 0 && dragDx > width / HALF + SPACING) {
-        tabs.move(id, from + 1);
+        onMove(id, from + 1);
         dragDx -= width + SPACING;
       }
       return;
     }
     if (dragDx < 0 && from > 0) {
-      const width = widthOf(list[from - 1].id);
+      const width = widthOf(items[from - 1].id);
       if (width > 0 && dragDx < -(width / HALF + SPACING)) {
-        tabs.move(id, from - 1);
+        onMove(id, from - 1);
         dragDx += width + SPACING;
       }
     }
@@ -171,9 +197,9 @@
   });
 
   $effect(() => {
-    const id = tabs.activeId;
-    void tabs.list.length;
-    if (!strip || draggingId !== null) return;
+    const id = activeId;
+    void items.length;
+    if (!strip || id === null || draggingId !== null) return;
     const viewport = strip.clientWidth;
     if (viewport <= 0) return;
     const target = centerOf(id) - viewport / HALF;
@@ -185,47 +211,58 @@
 </script>
 
 <div
-  bind:this={strip}
-  use:hscrollbar={{ touchIndicator: false, wheel: true }}
-  role="tablist"
-  class="no-scrollbar flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-outline-variant bg-surface px-1 py-1.5"
+  class="flex shrink-0 items-center border-b bg-surface transition-colors duration-200 {focused
+    ? 'border-accent'
+    : 'border-outline-variant'}"
 >
-  {#each tabs.list as tab (tab.id)}
-    {@const active = tab.id === tabs.activeId}
-    {@const dragging = tab.id === draggingId}
-    <div
-      use:register={tab.id}
-      role="tab"
-      tabindex={active ? 0 : -1}
-      aria-selected={active}
-      onpointerdown={(event) => onPointerDown(event, tab.id)}
-      onkeydown={(event) => event.key === "Enter" && onSelect(tab.id)}
-      style="transform: translateX({dragging ? dragDx : 0}px); z-index: {dragging ? 1 : 0}"
-      class="flex h-8 shrink-0 cursor-pointer touch-none items-center gap-1.5 rounded-item pr-1 pl-2.5 transition-colors select-none {active
-        ? 'bg-surface-variant text-on-surface'
-        : 'text-on-surface-variant hover:bg-on-surface/6'}"
-    >
-      <span
-        class="size-2 shrink-0 rounded-full"
-        style={sessionColorOf(tab.color)
-          ? `background: ${sessionColorOf(tab.color)}`
-          : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
-      ></span>
-      <span class="max-w-[170px] truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
-      <button
-        type="button"
-        onpointerdown={(event) => event.stopPropagation()}
-        onclick={() => onClose(tab.id)}
-        aria-label={t("CLOSE_TAB")}
-        class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+  <div
+    bind:this={strip}
+    use:hscrollbar={{ wheel: true }}
+    role="tablist"
+    class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 py-1.5"
+  >
+    {#each items as tab (tab.id)}
+      {@const active = tab.id === activeId}
+      {@const dragging = tab.id === draggingId}
+      <div
+        use:register={tab.id}
+        role="tab"
+        tabindex={active ? 0 : -1}
+        aria-selected={active}
+        onpointerdown={(event) => onPointerDown(event, tab.id)}
+        onkeydown={(event) => event.key === "Enter" && onSelect(tab.id)}
+        style="transform: translateX({dragging ? dragDx : 0}px); z-index: {dragging ? 1 : 0}"
+        class="flex h-8 shrink-0 cursor-pointer touch-none items-center gap-1.5 rounded-item pr-1 pl-2.5 transition-colors select-none {active
+          ? 'bg-surface-variant text-on-surface'
+          : 'text-on-surface-variant hover:bg-on-surface/6'}"
       >
-        <X size={14} />
-      </button>
+        {#if dot}
+          <span
+            class="size-2 shrink-0 rounded-full"
+            style={sessionColorOf(tab.color)
+              ? `background: ${sessionColorOf(tab.color)}`
+              : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
+          ></span>
+        {/if}
+        <span class="max-w-[170px] truncate text-label-lg">{tab.title ?? emptyTitle ?? t("NEW_CHAT")}</span>
+        <button
+          type="button"
+          onpointerdown={(event) => event.stopPropagation()}
+          onclick={() => onClose(tab.id)}
+          aria-label={t("CLOSE_TAB")}
+          class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+        >
+          <X size={14} />
+        </button>
+      </div>
+    {/each}
+    <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex h-8 shrink-0 items-center">
+      <TooltipIconButton label={newLabel ?? t("NEW_TAB")} onclick={onNew} class="size-8">
+        <Plus size={18} />
+      </TooltipIconButton>
     </div>
-  {/each}
-  <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex h-8 shrink-0 items-center">
-    <TooltipIconButton label={t("NEW_TAB")} onclick={onNew} class="size-8">
-      <Plus size={18} />
-    </TooltipIconButton>
   </div>
+  {#if trailing}
+    <div class="flex shrink-0 items-center pr-1">{@render trailing()}</div>
+  {/if}
 </div>

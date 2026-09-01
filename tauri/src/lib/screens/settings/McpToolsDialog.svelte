@@ -20,10 +20,44 @@
     untrack(() => new Set(disabled.split(",").map((name) => name.trim()).filter(Boolean))),
   );
 
-  const toggle = (name: string, enabled: boolean) => {
+  interface Entry {
+    key: string;
+    title: string;
+    summary: string | null;
+    names: string[];
+  }
+
+  const entries = $derived.by(() => {
+    const list: Entry[] = [];
+    const groups = new Map<string, Entry>();
+    for (const tool of tools) {
+      if (!tool.group) {
+        list.push({ key: tool.name, title: tool.name, summary: tool.description || null, names: [tool.name] });
+        continue;
+      }
+      const existing = groups.get(tool.group);
+      if (existing) {
+        existing.names.push(tool.name);
+        continue;
+      }
+      const entry: Entry = {
+        key: tool.group,
+        title: tool.group,
+        summary: tool.groupDescription || null,
+        names: [tool.name],
+      };
+      groups.set(tool.group, entry);
+      list.push(entry);
+    }
+    return list;
+  });
+
+  const toggle = (names: string[], enabled: boolean) => {
     const next = new Set(hidden);
-    if (enabled) next.delete(name);
-    else next.add(name);
+    for (const name of names) {
+      if (enabled) next.delete(name);
+      else next.add(name);
+    }
     hidden = next;
   };
 </script>
@@ -35,12 +69,12 @@
   {/snippet}
   {#if tools.length}
     <p class="mb-2 text-body-sm text-on-surface-variant">{t("MCP_TOOLS_DESC")}</p>
-    {#each tools as tool (tool.name)}
+    {#each entries as entry (entry.key)}
       <SwitchRow
-        title={tool.name}
-        summary={tool.description || null}
-        checked={!hidden.has(tool.name)}
-        onChange={(value) => toggle(tool.name, value)}
+        title={entry.title}
+        summary={entry.summary}
+        checked={entry.names.some((name) => !hidden.has(name))}
+        onChange={(value) => toggle(entry.names, value)}
       />
     {/each}
   {:else}

@@ -1,5 +1,6 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.CLIENT_CAPABILITIES
 import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.CapabilitiesDefaults
 import com.jahirtrap.cconnect.data.ClaudeModel
@@ -35,7 +36,8 @@ object CapabilitiesApi {
     }
 
     suspend fun capabilities(): Capabilities? {
-        val data = Http.get("/capabilities")?.jsonObject ?: return null
+        val query = mapOf("capabilities" to CLIENT_CAPABILITIES.joinToString(","))
+        val data = Http.get("/capabilities", query)?.jsonObject ?: return null
         val fallback = Capabilities()
         return Capabilities(
             permissionModes = data["permission_modes"]?.jsonArray?.mapNotNull { el ->
@@ -88,7 +90,12 @@ object CapabilitiesApi {
             mcpTools = data["mcp_tools"]?.jsonArray?.mapNotNull { el ->
                 val o = el.jsonObject
                 val name = o["name"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                McpTool(name, o["description"]?.jsonPrimitive?.contentOrNull.orEmpty())
+                McpTool(
+                    name,
+                    o["description"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                    o["group"]?.jsonPrimitive?.contentOrNull,
+                    o["group_description"]?.jsonPrimitive?.contentOrNull,
+                )
             } ?: fallback.mcpTools,
             defaults = data["defaults"]?.jsonObject?.let { o ->
                 CapabilitiesDefaults(

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { navigation } from "$lib/app/navigation.svelte";
+  import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverDefaults } from "$lib/data/serverDefaults.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
@@ -35,6 +36,7 @@
   void desktop.start();
 
   const onKeydown = (event: KeyboardEvent) => {
+    if (event.isComposing) return;
     if (event.defaultPrevented) return;
     if (event.key === "Escape") {
       if (navigation.close()) {
@@ -46,6 +48,11 @@
     }
     const control = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
+    if (!control && !event.altKey && event.key.length === 1 && !isEditing()) {
+      paneFocus.focusActive();
+      return;
+    }
+    if (paneFocus.active !== "chat") return;
     const handled =
       control && key === "tab"
         ? (event.shiftKey ? tabs.selectPrev() : tabs.selectNext(), true)

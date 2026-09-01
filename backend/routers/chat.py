@@ -16,6 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from core.config import AI_WORKDIR, DEFAULT_CWD, permission_modes
 from core.responses import api_response
+from mcps import terminal as terminal_mcp
 from middleware.public_auth import ws_bearer_ok
 from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
 from services import accounts
@@ -280,7 +281,7 @@ async def chat_ws(ws: WebSocket):
                     await send({"type": "error", "message": exc.errors()})
                     continue
                 seen["prefs"] = visibility.resolve(msg.visibility.model_dump() if msg.visibility else None)
-                seen["capabilities"] = list(msg.capabilities)
+                seen["capabilities"] = terminal_mcp.authorize(msg.capabilities, msg.terminal_key)
                 existing = registry.get(msg.channel) if msg.channel else None
                 by_session = None
                 if existing is None and msg.resume:

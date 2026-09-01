@@ -1,3 +1,4 @@
+import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
 import { http, type HttpClient } from "./http";
 
 export interface LabeledOption {
@@ -17,6 +18,8 @@ export interface CommandOption {
 export interface McpTool {
   name: string;
   description: string;
+  group: string | null;
+  groupDescription: string | null;
 }
 
 export interface FastMode {
@@ -99,7 +102,7 @@ interface CapabilitiesWire extends VersionWire {
   }>;
   accounts?: Array<{ id?: string; label?: string }>;
   defaults?: { permission_mode?: string; effort?: string; model?: string; account?: string };
-  mcp_tools?: Array<{ name?: string; description?: string }>;
+  mcp_tools?: Array<{ name?: string; description?: string; group?: string; group_description?: string }>;
 }
 
 const toVersion = (data: VersionWire): VersionInfo => ({
@@ -146,7 +149,9 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
   },
 
   async capabilities(): Promise<Capabilities | null> {
-    const data = await http.get<CapabilitiesWire>("/capabilities");
+    const data = await http.get<CapabilitiesWire>("/capabilities", {
+      capabilities: CLIENT_CAPABILITIES.join(","),
+    });
     if (!data) return null;
     return {
       permissionModes: toOptions(data.permission_modes),
@@ -181,7 +186,12 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
       accounts: toOptions(data.accounts),
       mcpTools: (data.mcp_tools ?? [])
         .filter((tool) => tool.name)
-        .map((tool) => ({ name: tool.name!, description: tool.description ?? "" })),
+        .map((tool) => ({
+          name: tool.name!,
+          description: tool.description ?? "",
+          group: tool.group ?? null,
+          groupDescription: tool.group_description ?? null,
+        })),
       defaults: {
         permissionMode: data.defaults?.permission_mode ?? "",
         effort: data.defaults?.effort ?? "",

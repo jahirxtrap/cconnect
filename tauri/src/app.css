@@ -49,14 +49,14 @@ html[data-theme="dark"] {
 
   ::-webkit-scrollbar-thumb {
     background: var(--c-scrollbar);
-    background-clip: content-box;
+    background-clip: content-box !important;
     border: 4px solid transparent;
     border-radius: 999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     background: var(--c-scrollbar-hover);
-    background-clip: content-box;
+    background-clip: content-box !important;
   }
 }
 
@@ -232,6 +232,50 @@ html.scanning .qr-overlay {
 
 .scrollbar-thin::-webkit-scrollbar-thumb {
   border-width: 2px;
+}
+
+.xterm .xterm-viewport {
+  scrollbar-width: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+  display: none;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar {
+  opacity: 1 !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar.vertical,
+.xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
+  width: 8px !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar.vertical {
+  right: -8px !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar > .slider {
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: var(--c-scrollbar) !important;
+  background-clip: content-box !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar > .slider:hover {
+  background: var(--c-scrollbar-hover) !important;
+  background-clip: content-box !important;
+}
+
+.xterm .xterm-scrollable-element > .scrollbar > .scra {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .xterm .xterm-scrollable-element > .scrollbar {
+    display: none;
+  }
 }
 
 body {
