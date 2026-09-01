@@ -76,7 +76,7 @@ private val SCROLLBAR_HIT = 16.dp
 private val SCROLLBAR_GAP = 2.dp
 
 @Composable
-fun Modifier.horizontalScrollbar(state: ScrollState, thickness: Dp = 4.dp, touchIndicator: Boolean = true, wheelScroll: Boolean = false): Modifier {
+fun Modifier.horizontalScrollbar(state: ScrollState, thickness: Dp = 4.dp, touchIndicator: Boolean = false, wheelScroll: Boolean = false): Modifier {
     val active = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
     val idle = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
     val scope = rememberCoroutineScope()

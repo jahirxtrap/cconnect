@@ -68,7 +68,7 @@
     </button>
   </div>
   <pre
-    use:hscrollbar
+    use:hscrollbar={{ touchIndicator: true }}
     style="line-height: var(--chat-line-code-snap, var(--chat-line-code))"
     class="no-scrollbar overflow-x-auto px-2.5 py-2 font-mono text-body-sm"><code
       >{#if html}{@html html}{:else}{body}{/if}</code

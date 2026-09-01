@@ -63,7 +63,7 @@
       for (const scroller of node.querySelectorAll<HTMLElement>("table, pre")) {
         if (scroller.dataset.scrollbar) continue;
         scroller.dataset.scrollbar = "true";
-        bars.push(hscrollbar(scroller));
+        bars.push(hscrollbar(scroller, { touchIndicator: true }));
       }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;

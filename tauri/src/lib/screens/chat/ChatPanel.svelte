@@ -19,6 +19,7 @@
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { hscrollbar } from "$lib/ui/scrollbar";
   import ConversationRow from "./ConversationRow.svelte";
   import { CategoryDrag } from "./dragCategories.svelte";
   import { ChatDrag } from "./dragChats.svelte";
@@ -319,22 +320,26 @@
   </div>
 
   <div class="flex shrink-0 items-center border-t border-outline-variant px-2 py-1.5">
-    <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
-      <Folder size={17} />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")}>
-      <ClaudeIcon size={17} />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")}>
-      <Activity size={17} />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")}>
-      <SquareTerminal size={17} />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.navigate("/markdown")}>
-      <Type size={17} />
-    </TooltipIconButton>
-    <div class="flex-1"></div>
+    <div
+      use:hscrollbar={{ wheel: true }}
+      class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
+    >
+      <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
+        <Folder size={17} />
+      </TooltipIconButton>
+      <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")}>
+        <ClaudeIcon size={17} />
+      </TooltipIconButton>
+      <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")}>
+        <Activity size={17} />
+      </TooltipIconButton>
+      <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")}>
+        <SquareTerminal size={17} />
+      </TooltipIconButton>
+      <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.navigate("/markdown")}>
+        <Type size={17} />
+      </TooltipIconButton>
+    </div>
     <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
       <Settings size={17} />
     </TooltipIconButton>

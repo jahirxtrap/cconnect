@@ -45,7 +45,7 @@ internal fun CodeBlock(code: String, bg: Color, lang: String) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
-                    .horizontalScrollbar(scroll)
+                    .horizontalScrollbar(scroll, touchIndicator = true)
                     .horizontalScroll(scroll, enabled = scroll.maxValue > 0)
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             )

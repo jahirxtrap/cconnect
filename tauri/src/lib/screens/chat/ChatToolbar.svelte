@@ -129,7 +129,7 @@
 </TooltipWrap>
 
 <div
-  use:hscrollbar={{ touchIndicator: false, wheel: true, gutter: false }}
+  use:hscrollbar={{ wheel: true }}
   class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pr-0.5 pl-1.5"
 >
   {#if disconnected}

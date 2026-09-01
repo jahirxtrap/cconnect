@@ -40,7 +40,7 @@
   labelClass="text-accent"
 >
   <div
-    use:hscrollbar
+    use:hscrollbar={{ touchIndicator: true }}
     class="no-scrollbar w-full overflow-x-auto rounded-sm bg-surface-variant py-1 font-mono text-body-sm leading-[18px]"
   >
     {#each diffLines as line, index (index)}

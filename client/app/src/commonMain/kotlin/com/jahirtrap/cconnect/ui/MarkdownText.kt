@@ -676,7 +676,7 @@ private fun TableView(table: ASTNode, ctx: MdContext) {
         }
     }
     val totalWidth = widths.fold(0.dp) { sum, width -> sum + width }
-    Column(modifier = Modifier.fillMaxWidth().horizontalScrollbar(scroll).horizontalScroll(scroll, enabled = scroll.maxValue > 0)) {
+    Column(modifier = Modifier.fillMaxWidth().horizontalScrollbar(scroll, touchIndicator = true).horizontalScroll(scroll, enabled = scroll.maxValue > 0)) {
         cells.forEachIndexed { row, texts ->
             val header = rows[row].type == GFMElementTypes.HEADER
             Row {

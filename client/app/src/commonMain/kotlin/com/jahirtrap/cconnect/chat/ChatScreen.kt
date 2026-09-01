@@ -1150,7 +1150,7 @@ fun ChatScreen(
                         val attScroll = rememberScrollState()
                         Row(
                             modifier = Modifier.fillMaxWidth()
-                                .horizontalScrollbar(attScroll, touchIndicator = false, wheelScroll = true)
+                                .horizontalScrollbar(attScroll, wheelScroll = true)
                                 .horizontalScroll(attScroll),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -2096,7 +2096,7 @@ private fun ChatToolbar(
         Row(
             modifier = Modifier
                 .weight(1f)
-                .horizontalScrollbar(selectorScroll, touchIndicator = false, wheelScroll = true)
+                .horizontalScrollbar(selectorScroll, wheelScroll = true)
                 .horizontalScroll(selectorScroll)
                 .padding(end = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2651,7 +2651,7 @@ private fun QueueRow(queue: List<QueuedMessage>, scroll: ScrollState, onOpen: (Q
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
+            .horizontalScrollbar(scroll, wheelScroll = true)
             .horizontalScroll(scroll)
             .padding(start = 14.dp, end = 14.dp, top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -2677,7 +2677,7 @@ private fun AttachmentsRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
+            .horizontalScrollbar(scroll, wheelScroll = true)
             .horizontalScroll(scroll)
             .padding(start = 14.dp, end = 14.dp, top = topPadding),
         horizontalArrangement = Arrangement.spacedBy(6.dp),

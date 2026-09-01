@@ -162,7 +162,7 @@ fun TabStrip() {
             }
             .statusBarsPadding()
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.End))
-            .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
+            .horizontalScrollbar(scroll, wheelScroll = true)
             .horizontalScroll(scroll)
             .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,

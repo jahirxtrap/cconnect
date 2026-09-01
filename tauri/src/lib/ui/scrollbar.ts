@@ -32,13 +32,16 @@ const TOUCH_THICKNESS = 2;
 const GAP = 2;
 const IDLE = 35;
 const ACTIVE = 65;
+const SLEEP_MS = 900;
+const FADE_MS = 180;
 
 export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
-  const { touchIndicator = true, wheel = false, gutter = true } = options;
+  const { touchIndicator = false, wheel = false, gutter = false } = options;
 
   const thumb = document.createElement("div");
   thumb.style.cssText =
-    "position:absolute;bottom:0;left:0;border-radius:999px;pointer-events:none;opacity:0";
+    "position:absolute;bottom:0;left:0;border-radius:999px;pointer-events:none;opacity:0;" +
+    `transition:opacity ${FADE_MS}ms linear`;
   node.appendChild(thumb);
 
   if (getComputedStyle(node).position === "static") node.style.position = "relative";
@@ -46,8 +49,10 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
 
   let hovered = false;
   let dragging = false;
+  let awake = false;
   let grab = 0;
   let frame = 0;
+  let sleep: ReturnType<typeof setTimeout> | null = null;
 
   const thickness = isTouch ? TOUCH_THICKNESS : THICKNESS;
 
@@ -86,7 +91,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     const offset = (node.scrollLeft / max) * (viewport - size);
     const alpha = !isTouch && (hovered || dragging) ? ACTIVE : IDLE;
     node.style.cursor = hovered || dragging ? "pointer" : "";
-    thumb.style.opacity = "1";
+    thumb.style.opacity = awake || hovered || dragging ? "1" : "0";
     thumb.style.height = `${thickness}px`;
     thumb.style.width = `${size}px`;
     thumb.style.transform = `translateX(${node.scrollLeft + offset}px)`;
@@ -96,6 +101,17 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   const schedule = () => {
     if (frame) return;
     frame = requestAnimationFrame(render);
+  };
+
+  const wake = () => {
+    awake = true;
+    if (sleep !== null) clearTimeout(sleep);
+    sleep = setTimeout(() => {
+      sleep = null;
+      awake = false;
+      schedule();
+    }, SLEEP_MS);
+    schedule();
   };
 
   const inZone = (event: PointerEvent) => {
@@ -175,7 +191,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   const mutation = new MutationObserver(schedule);
   mutation.observe(node, { childList: true, subtree: true, characterData: true });
 
-  node.addEventListener("scroll", schedule, { passive: true });
+  node.addEventListener("scroll", wake, { passive: true });
   node.addEventListener("pointermove", onPointerMove);
   node.addEventListener("pointerleave", onPointerLeave);
   node.addEventListener("pointerdown", onPointerDown, true);
@@ -186,9 +202,10 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   return {
     destroy() {
       if (frame) cancelAnimationFrame(frame);
+      if (sleep !== null) clearTimeout(sleep);
       resize.disconnect();
       mutation.disconnect();
-      node.removeEventListener("scroll", schedule);
+      node.removeEventListener("scroll", wake);
       node.removeEventListener("pointermove", onPointerMove);
       node.removeEventListener("pointerleave", onPointerLeave);
       node.removeEventListener("pointerdown", onPointerDown, true);

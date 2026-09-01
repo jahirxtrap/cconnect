@@ -222,7 +222,7 @@
       {/if}
     {/each}
   {:else if pages.length > 1}
-    <div use:hscrollbar={{ touchIndicator: false }} class="no-scrollbar flex gap-2 overflow-x-auto">
+    <div use:hscrollbar class="no-scrollbar flex gap-2 overflow-x-auto">
       {#each pages as item, index (index)}
         <SelectChip
           label={item.label?.trim() || String(index + 1)}

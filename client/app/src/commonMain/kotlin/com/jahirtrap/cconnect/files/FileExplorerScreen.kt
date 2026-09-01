@@ -1063,7 +1063,7 @@ private fun PathBar(
             Row(
                 modifier = Modifier
                     .weight(1f)
-                    .horizontalScrollbar(scroll, touchIndicator = false, wheelScroll = true)
+                    .horizontalScrollbar(scroll, wheelScroll = true)
                     .horizontalScroll(scroll),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

@@ -78,7 +78,7 @@
       </button>
       <div
         bind:this={scroller}
-        use:hscrollbar={{ touchIndicator: false, wheel: true, gutter: false }}
+        use:hscrollbar={{ wheel: true }}
         class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
       >
         {#each segments as segment, index (targetAt(index))}

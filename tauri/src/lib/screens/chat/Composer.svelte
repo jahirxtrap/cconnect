@@ -9,6 +9,7 @@
   import type { Snippet } from "svelte";
   import type { QueuedMessage } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
+  import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
@@ -73,6 +74,8 @@
     item.text || item.attachments.map((path) => path.split(/[\\/]/).pop()).join(", ");
 
   let field = $state<HTMLTextAreaElement | null>(null);
+
+  $effect(() => paneFocus.register("chat", () => field?.focus()));
   let picker = $state<HTMLInputElement | null>(null);
 
   const canSubmit = $derived(!!draft.trim() || attachments.length > 0);
@@ -263,7 +266,7 @@
   >
     {#if queue.length}
       <div
-        use:hscrollbar={{ touchIndicator: false, wheel: true }}
+        use:hscrollbar={{ wheel: true }}
         class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3"
       >
         {#each queue as item (item.id)}
@@ -274,7 +277,7 @@
 
     {#if attachments.length}
       <div
-        use:hscrollbar={{ touchIndicator: false, wheel: true }}
+        use:hscrollbar={{ wheel: true }}
         class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}"
       >
         {#each attachments as item (item.id)}
