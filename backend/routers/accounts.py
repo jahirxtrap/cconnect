@@ -59,7 +59,7 @@ def export_account(account_id: str):
 
 @router.post("/accounts/{account_id}/login")
 def start_login(account_id: str):
-    if accounts.config_dir(account_id) is None:
+    if account_id not in accounts.known_ids():
         return api_response(status=404)
     result = account_login.start(account_id)
     if not result["ok"]:

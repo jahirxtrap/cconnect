@@ -21,6 +21,8 @@ export interface SettingsSnapshot {
   trashEnabled: boolean;
   defaultCategory: string;
   retentionDays: number;
+  retentionMin: number;
+  retentionMax: number;
 }
 
 export interface SettingsPatch {
@@ -45,8 +47,11 @@ export interface SettingsPatch {
   retention_days?: number;
 }
 
-type Field = { effective?: unknown };
+type Field = { effective?: unknown; minimum?: unknown; maximum?: unknown };
 type Wire = Record<string, Field | undefined>;
+
+const boundNum = (wire: Wire, key: string, bound: "minimum" | "maximum", fallback: number): number =>
+  typeof wire[key]?.[bound] === "number" ? (wire[key]![bound] as number) : fallback;
 
 const effectiveStr = (wire: Wire, key: string, fallback: string): string =>
   typeof wire[key]?.effective === "string" ? (wire[key]!.effective as string) : fallback;
@@ -77,6 +82,8 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   trashEnabled: effectiveBool(wire, "trash_enabled", false),
   defaultCategory: effectiveStr(wire, "default_category", ""),
   retentionDays: effectiveNum(wire, "retention_days", 30),
+  retentionMin: boundNum(wire, "retention_days", "minimum", 1),
+  retentionMax: boundNum(wire, "retention_days", "maximum", Number.MAX_SAFE_INTEGER),
 });
 
 export const createSettingsApi = (http: HttpClient) => ({

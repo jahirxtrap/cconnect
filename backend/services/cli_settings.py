@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 _SETTINGS_FILE = "settings.json"
 
+MAX_SAFE_INTEGER = 9007199254740991
+
 
 @dataclass(frozen=True)
 class CliSettingDef:
@@ -18,6 +20,7 @@ class CliSettingDef:
     type: type
     description: str
     minimum: Optional[int] = None
+    maximum: Optional[int] = None
 
 
 SETTINGS: dict[str, CliSettingDef] = {
@@ -27,6 +30,7 @@ SETTINGS: dict[str, CliSettingDef] = {
         type=int,
         description="Days a chat is kept before the CLI deletes its transcript",
         minimum=1,
+        maximum=MAX_SAFE_INTEGER,
     ),
 }
 
@@ -81,6 +85,8 @@ def describe() -> dict[str, dict]:
             "default": defn.default,
             "configured": _stored(key) is not None,
             "description": defn.description,
+            "minimum": defn.minimum,
+            "maximum": defn.maximum,
         }
         for key, defn in SETTINGS.items()
     }
@@ -97,6 +103,8 @@ def set(key: str, value: Any) -> None:
             raise ValueError(f"{key} expects {defn.type.__name__}")
         if defn.minimum is not None and value < defn.minimum:
             raise ValueError(f"{key} must be at least {defn.minimum}")
+        if defn.maximum is not None and value > defn.maximum:
+            raise ValueError(f"{key} must be at most {defn.maximum}")
     data = _read()
     if value is None:
         data.pop(defn.json_key, None)

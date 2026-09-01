@@ -8,6 +8,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 // Backend-owned generation settings (the source of truth lives in the backend DB).
@@ -33,7 +34,9 @@ object SettingsApi {
         val chatOrder: String,
         val trashEnabled: Boolean,
         val defaultCategory: String,
-        val retentionDays: Int,
+        val retentionDays: Long,
+        val retentionMin: Long,
+        val retentionMax: Long,
     )
 
     private fun effectiveStr(o: JsonObject, key: String, fallback: String): String =
@@ -44,6 +47,12 @@ object SettingsApi {
 
     private fun effectiveInt(o: JsonObject, key: String, fallback: Int): Int =
         o[key]?.jsonObject?.get("effective")?.jsonPrimitive?.intOrNull ?: fallback
+
+    private fun effectiveLong(o: JsonObject, key: String, fallback: Long): Long =
+        o[key]?.jsonObject?.get("effective")?.jsonPrimitive?.longOrNull ?: fallback
+
+    private fun boundLong(o: JsonObject, key: String, bound: String, fallback: Long): Long =
+        o[key]?.jsonObject?.get(bound)?.jsonPrimitive?.longOrNull ?: fallback
 
     private fun parse(o: JsonObject) = Snapshot(
         account = effectiveStr(o, "account", ""),
@@ -64,7 +73,9 @@ object SettingsApi {
         chatOrder = effectiveStr(o, "chat_order", "auto"),
         trashEnabled = effectiveBool(o, "trash_enabled", false),
         defaultCategory = effectiveStr(o, "default_category", ""),
-        retentionDays = effectiveInt(o, "retention_days", 30),
+        retentionDays = effectiveLong(o, "retention_days", 30),
+        retentionMin = boundLong(o, "retention_days", "minimum", 1),
+        retentionMax = boundLong(o, "retention_days", "maximum", Long.MAX_VALUE),
     )
 
     suspend fun get(): Snapshot? = Http.get("/settings")?.jsonObject?.let(::parse)
@@ -88,7 +99,7 @@ object SettingsApi {
         chatOrder: String? = null,
         trashEnabled: Boolean? = null,
         defaultCategory: String? = null,
-        retentionDays: Int? = null,
+        retentionDays: Long? = null,
     ): Snapshot? = Http.post("/settings", buildJsonObject {
         if (account != null) put("account", account)
         if (model != null) put("model", model)

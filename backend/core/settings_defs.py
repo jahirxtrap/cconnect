@@ -40,5 +40,6 @@ SETTINGS: dict[str, SettingDef] = {
     "simple_mode": SettingDef(False, bool, "Collapse thinking, tools and edits into a single working block, like the quick chat"),
     "chat_order": SettingDef("auto", str, "How chats sort inside their category: by last activity, or as arranged by hand", allowed=("auto", "manual")),
     "trash_enabled": SettingDef(False, bool, "Deleting a chat moves it to a trash it can be restored from, instead of removing it"),
+    "terminal_shell": SettingDef(None, str, "Shell executable the terminal spawns; empty uses the platform default"),
     "default_category": SettingDef("", str, "Category a new chat is filed into; empty leaves it out of every category"),
 }

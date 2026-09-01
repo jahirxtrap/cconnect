@@ -245,8 +245,9 @@
     initial={account.label}
     title={t("ACCOUNT_NAME")}
     onConfirm={(label) => {
+      const target = account;
       renaming = null;
-      void accountsApi.rename(account.id, label).then(refresh);
+      void accountsApi.rename(target.id, label).then(refresh);
     }}
     onDismiss={() => (renaming = null)}
   />
@@ -259,8 +260,9 @@
     text={t("DELETE")}
     confirmLabel={t("DELETE")}
     onConfirm={() => {
+      const target = account;
       deleting = null;
-      void accountsApi.remove(account.id).then(refresh);
+      void accountsApi.remove(target.id).then(refresh);
     }}
     onDismiss={() => (deleting = null)}
   />
