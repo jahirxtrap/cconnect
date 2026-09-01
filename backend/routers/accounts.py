@@ -8,6 +8,8 @@ from schemas.accounts import (
     AccountRenameRequest,
     LoginCodeRequest,
     ProviderAccountRequest,
+    ProviderProbeRequest,
+    ProviderUpdateRequest,
 )
 from services import account_login, accounts, cli_info, providers
 
@@ -18,7 +20,11 @@ router = APIRouter(tags=["accounts"])
 def get_accounts():
     items = accounts.list_accounts()
     known = {item["id"] for item in items}
-    return api_response(data={"accounts": items, "default": accounts.default_account(known)})
+    return api_response(data={
+        "accounts": items,
+        "default": accounts.default_account(known),
+        "provider_url": providers.DEFAULT_BASE_URL,
+    })
 
 
 @router.post("/accounts")
@@ -28,22 +34,49 @@ def create_account(payload: AccountCreateRequest):
     return api_response(data=accounts.create(payload.label))
 
 
-@router.get("/accounts/provider")
-async def detect_provider(base_url: str = ""):
-    return api_response(data=await providers.detect(base_url))
+@router.post("/accounts/provider/probe")
+async def detect_provider(payload: ProviderProbeRequest):
+    headers = accounts.auth_headers(payload.auth.model_dump())
+    return api_response(data=await providers.detect(payload.base_url, headers))
 
 
 @router.post("/accounts/provider")
 async def create_provider_account(payload: ProviderAccountRequest):
+    auth = payload.auth.model_dump()
     model = payload.model.strip()
     if not model:
-        found = await providers.models(payload.base_url)
+        found = await providers.models(payload.base_url, accounts.auth_headers(auth))
         model = found[0]["id"] if found else ""
-    account = accounts.create_provider(payload.label, payload.base_url, model, payload.token)
+    account = accounts.create_provider(payload.label, payload.base_url, model, auth)
     if account is None:
         return api_response(status=400)
     cli_info.invalidate()
     return api_response(data=account)
+
+
+@router.get("/accounts/{account_id}/provider")
+def get_provider_account(account_id: str):
+    provider = accounts.provider_for(account_id)
+    if not provider:
+        return api_response(status=404)
+    return api_response(data={
+        "base_url": provider["base_url"],
+        "model": provider.get("model", ""),
+        "auth": provider.get("auth") or {},
+    })
+
+
+@router.put("/accounts/{account_id}/provider")
+async def update_provider_account(account_id: str, payload: ProviderUpdateRequest):
+    auth = payload.auth.model_dump()
+    model = payload.model.strip()
+    if not model:
+        found = await providers.models(payload.base_url, accounts.auth_headers(auth))
+        model = found[0]["id"] if found else ""
+    if not accounts.update_provider(account_id, payload.base_url, model, auth):
+        return api_response(status=404)
+    cli_info.invalidate()
+    return api_response()
 
 
 @router.put("/accounts/{account_id}")
@@ -65,6 +98,7 @@ async def import_account(request: Request, label: str = ""):
     account = accounts.import_bundle(await request.body(), label)
     if account is None:
         return api_response(status=400)
+    cli_info.invalidate()
     return api_response(data=account)
 
 

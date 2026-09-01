@@ -1,12 +1,16 @@
 <script lang="ts">
   import CircleUser from "@lucide/svelte/icons/circle-user";
+  import Component from "@lucide/svelte/icons/component";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
   import {
     accountsApi,
+    emptyAuth,
     type Account,
     type AccountsSnapshot,
+    type ProviderAuth,
+    type ProviderAuthKind,
     type ProviderProbe,
   } from "$lib/services/accountsApi";
   import { settingsApi } from "$lib/services/settingsApi";
@@ -20,6 +24,7 @@
   import InputField from "$lib/ui/InputField.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
+  import SelectField from "$lib/ui/SelectField.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
 
@@ -29,6 +34,16 @@
   }
 
   const { enabled, onChanged }: Props = $props();
+
+  const PROBE_PREVIEW = 8;
+
+  const AUTH_OPTIONS = [
+    { value: "none", label: t("AUTH_NONE") },
+    { value: "bearer", label: t("AUTH_BEARER") },
+    { value: "api_key", label: t("AUTH_API_KEY") },
+    { value: "basic", label: t("AUTH_BASIC") },
+    { value: "header", label: t("AUTH_HEADER") },
+  ];
 
   let snapshot = $state<AccountsSnapshot | null>(null);
   let adding = $state(false);
@@ -42,8 +57,10 @@
   let newLabel = $state("");
   let importing = $state(false);
   let importFailed = $state(false);
-  let localAdding = $state(false);
-  let localUrl = $state("");
+  let providerAdding = $state(false);
+  let editing = $state<Account | null>(null);
+  let providerUrl = $state("");
+  let auth = $state<ProviderAuth>(emptyAuth());
   let probing = $state(false);
   let probe = $state<ProviderProbe | null>(null);
   let bundlePicker = $state<HTMLInputElement | null>(null);
@@ -98,24 +115,39 @@
 
   const probeProvider = async (url: string) => {
     probing = true;
-    probe = await accountsApi.detectProvider(url);
-    if (probe) localUrl = probe.baseUrl;
+    probe = await accountsApi.detectProvider(url, auth);
+    if (probe) providerUrl = probe.baseUrl;
     probing = false;
   };
 
-  const openLocal = () => {
+  const openProvider = () => {
     adding = false;
     probe = null;
-    localUrl = "";
+    editing = null;
+    providerUrl = snapshot?.providerUrl ?? "";
+    auth = emptyAuth();
     newLabel = "";
-    localAdding = true;
-    void probeProvider("");
+    providerAdding = true;
   };
 
-  const createLocal = async () => {
-    const label = newLabel.trim() || t("ACCOUNT_LOCAL");
-    localAdding = false;
-    await accountsApi.createProvider(label, localUrl);
+  const editProvider = (account: Account) => {
+    probe = null;
+    editing = account;
+    providerUrl = "";
+    auth = emptyAuth();
+    providerAdding = true;
+    void accountsApi.provider(account.id).then((stored) => {
+      if (!stored || editing !== account) return;
+      providerUrl = stored.baseUrl;
+      auth = stored.auth;
+    });
+  };
+
+  const saveProvider = async () => {
+    const target = editing;
+    providerAdding = false;
+    if (target) await accountsApi.updateProvider(target.id, providerUrl, auth);
+    else await accountsApi.createProvider(newLabel.trim() || t("ACCOUNT_PROVIDER"), providerUrl, auth);
     await refresh();
   };
 
@@ -146,7 +178,7 @@
 <SettingsGroup label={t("ACCOUNTS")}>
   {#each accounts as account (account.id)}
     <PreferenceRow
-      icon={CircleUser}
+      icon={account.provider ? Component : CircleUser}
       title={account.label}
       summary={summaryOf(account)}
       alert={loginError === account.id ? t("ACCOUNT_LOGIN_FAILED") : null}
@@ -183,7 +215,17 @@
       <Button onclick={() => (actions = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     <div class="flex flex-col gap-1.5">
-      {#if !account.provider}
+      {#if account.provider}
+        <ActionButton
+          text={t("ACCOUNT_PROVIDER_EDIT")}
+          onclick={() => {
+            const target = account;
+            actions = null;
+            editProvider(target);
+          }}
+          class="w-full"
+        />
+      {:else}
         <ActionButton
           text={account.loggedIn ? t("ACCOUNT_RELOGIN") : t("ACCOUNT_LOGIN")}
           onclick={() => {
@@ -214,7 +256,7 @@
         }}
         class="w-full"
       />
-      {#if account.loggedIn && !account.provider}
+      {#if account.loggedIn}
         <ActionButton
           text={t("ACCOUNT_EXPORT")}
           onclick={() => {
@@ -266,9 +308,9 @@
       class="mt-3 w-full"
     />
     <ActionButton
-      text={t("ACCOUNT_LOCAL")}
+      text={t("ACCOUNT_PROVIDER")}
       enabled={!importing}
-      onclick={openLocal}
+      onclick={openProvider}
       class="mt-1.5 w-full"
     />
     {#if importing}
@@ -287,50 +329,115 @@
   />
 {/if}
 
-{#if localAdding}
-  <CompactDialog title={t("ACCOUNT_LOCAL")} onDismiss={() => (localAdding = false)}>
+{#if providerAdding}
+  <CompactDialog
+    title={editing ? t("ACCOUNT_PROVIDER_EDIT") : t("ACCOUNT_PROVIDER")}
+    onDismiss={() => (providerAdding = false)}
+  >
     {#snippet buttons()}
-      <Button onclick={() => (localAdding = false)} variant="outlined">{t("CANCEL")}</Button>
-      <Button enabled={probe?.found === true && !probing} onclick={() => void createLocal()}>
-        {t("ACCOUNT_ADD")}
+      <Button onclick={() => (providerAdding = false)} variant="outlined">{t("CANCEL")}</Button>
+      <Button enabled={probe?.found === true && !probing} onclick={() => void saveProvider()}>
+        {editing ? t("SAVE") : t("ACCOUNT_ADD")}
       </Button>
     {/snippet}
-    <InputField
-      value={newLabel}
-      oninput={(value) => (newLabel = value)}
-      label={t("ACCOUNT_NAME")}
-      singleLine
-    />
-    <div class="mt-3">
+    {#if !editing}
       <InputField
-        value={localUrl}
-        oninput={(value) => (localUrl = value)}
-        label={t("ACCOUNT_LOCAL_URL")}
+        value={newLabel}
+        oninput={(value) => (newLabel = value)}
+        label={t("ACCOUNT_NAME")}
+        singleLine
+      />
+    {/if}
+    <div class={editing ? "" : "mt-3"}>
+      <InputField
+        value={providerUrl}
+        oninput={(value) => (providerUrl = value)}
+        label={t("ACCOUNT_PROVIDER_URL")}
         singleLine
       />
     </div>
+    <div class="mt-3">
+      <SelectField
+        label={t("ENVIRONMENT_AUTH")}
+        selected={auth.kind}
+        options={AUTH_OPTIONS}
+        onSelect={(value) => (auth.kind = value as ProviderAuthKind)}
+      />
+    </div>
+    {#if auth.kind === "bearer" || auth.kind === "api_key"}
+      <div class="mt-3">
+        <InputField
+          value={auth.token}
+          oninput={(value) => (auth.token = value)}
+          label={auth.kind === "api_key" ? t("AUTH_API_KEY") : t("ENVIRONMENT_TOKEN")}
+          secret
+          singleLine
+        />
+      </div>
+    {:else if auth.kind === "basic"}
+      <div class="mt-3">
+        <InputField
+          value={auth.user}
+          oninput={(value) => (auth.user = value)}
+          label={t("AUTH_USER")}
+          singleLine
+        />
+      </div>
+      <div class="mt-3">
+        <InputField
+          value={auth.password}
+          oninput={(value) => (auth.password = value)}
+          label={t("AUTH_PASSWORD")}
+          secret
+          singleLine
+        />
+      </div>
+    {:else if auth.kind === "header"}
+      <div class="mt-3">
+        <InputField
+          value={auth.headerName}
+          oninput={(value) => (auth.headerName = value)}
+          label={t("AUTH_HEADER_NAME")}
+          singleLine
+        />
+      </div>
+      <div class="mt-3">
+        <InputField
+          value={auth.headerValue}
+          oninput={(value) => (auth.headerValue = value)}
+          label={t("AUTH_HEADER_VALUE")}
+          secret
+          singleLine
+        />
+      </div>
+    {/if}
     {#if probe?.found}
       <OutlinedPanel class="mt-3">
         <p class="text-body-sm text-on-surface-variant">
-          {t("ACCOUNT_LOCAL_FOUND", `${probe.models.length}`)}
+          {t("ACCOUNT_PROVIDER_FOUND", `${probe.models.length}`)}
         </p>
         <div class="mt-1.5 flex flex-col gap-1">
-          {#each probe.models as model (model)}
+          {#each probe.models.slice(0, PROBE_PREVIEW) as model (model)}
             <p class="truncate text-body-sm">{model}</p>
           {/each}
+          {#if probe.models.length > PROBE_PREVIEW}
+            <p class="text-body-sm text-on-surface-variant">
+              {t("ACCOUNT_PROVIDER_MORE", `${probe.models.length - PROBE_PREVIEW}`)}
+            </p>
+          {/if}
         </div>
       </OutlinedPanel>
     {:else if probe && !probing}
-      <p class="mt-3 text-body-sm text-red">{t("ACCOUNT_LOCAL_MISSING")}</p>
+      <p class="mt-3 text-body-sm text-red">{t("ACCOUNT_PROVIDER_MISSING")}</p>
     {/if}
     <div class="mt-3 flex flex-col gap-2.5">
       {#if probing}
         <LinearProgress />
       {/if}
       <ActionButton
-        text={t("ACCOUNT_LOCAL_PROBE")}
-        enabled={!probing && !!localUrl.trim()}
-        onclick={() => void probeProvider(localUrl)}
+        text={t("ACCOUNT_PROVIDER_PROBE")}
+        enabled={!probing && !!providerUrl.trim()}
+        onclick={() => void probeProvider(providerUrl)}
         class="w-full"
       />
     </div>

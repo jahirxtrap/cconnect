@@ -23,6 +23,7 @@
     <string name="environment_token">Token</string>
     <string name="auth_none">None</string>
     <string name="auth_bearer">Bearer token</string>
+    <string name="auth_api_key">API key</string>
     <string name="auth_basic">Basic auth</string>
     <string name="auth_header">Custom header</string>
     <string name="auth_user">User</string>
@@ -467,10 +468,12 @@
     <string name="account_export">Export account</string>
     <string name="account_import">Import from a file</string>
     <string name="account_import_failed">That file is not a valid account export</string>
-    <string name="account_local">Local models</string>
-    <string name="account_local_url">Provider address</string>
-    <string name="account_local_probe">Search for models</string>
-    <string name="account_local_found">%1$d models ready to use</string>
-    <string name="account_local_missing">Nothing answered at that address</string>
+    <string name="account_provider">Model provider</string>
+    <string name="account_provider_edit">Edit provider</string>
+    <string name="account_provider_url">Provider address</string>
+    <string name="account_provider_probe">Search for models</string>
+    <string name="account_provider_found">%1$d models ready to use</string>
+    <string name="account_provider_more">and %1$d more</string>
+    <string name="account_provider_missing">Nothing answered at that address</string>
     <string name="account_relogin">Sign in again</string>
 </resources>

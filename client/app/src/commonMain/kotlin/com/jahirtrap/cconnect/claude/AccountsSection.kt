@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Lucide
+import com.composables.icons.lucide.Component
 import com.jahirtrap.cconnect.data.remote.AccountsApi
 import com.jahirtrap.cconnect.data.remote.SettingsApi
 import com.jahirtrap.cconnect.files.downloadShared
@@ -40,6 +41,8 @@ import com.jahirtrap.cconnect.ui.ActionButton
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.InputField
+import com.jahirtrap.cconnect.ui.SecretTextField
+import com.jahirtrap.cconnect.ui.SelectField
 import com.jahirtrap.cconnect.ui.OutlinedPanel
 import com.jahirtrap.cconnect.ui.RenameDialog
 import com.jahirtrap.cconnect.ui.StatusDot
@@ -49,6 +52,8 @@ import com.jahirtrap.cconnect.ui.theme.palette
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
 
+private const val PROBE_PREVIEW = 8
+
 @Composable
 internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
     val scope = rememberCoroutineScope()
@@ -57,8 +62,9 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
     var snapshot by remember { mutableStateOf<AccountsApi.Snapshot?>(null) }
     var reload by remember { mutableStateOf(0) }
     var adding by remember { mutableStateOf(false) }
-    var localAdding by remember { mutableStateOf(false) }
+    var providerAdding by remember { mutableStateOf(false) }
     var actions by remember { mutableStateOf<AccountsApi.Account?>(null) }
+    var editing by remember { mutableStateOf<AccountsApi.Account?>(null) }
     var renaming by remember { mutableStateOf<AccountsApi.Account?>(null) }
     var deleting by remember { mutableStateOf<AccountsApi.Account?>(null) }
     var busy by remember { mutableStateOf<String?>(null) }
@@ -95,7 +101,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
     SettingsGroup(stringResource(Res.string.accounts)) {
         accounts.forEach { account ->
             PreferenceRow(
-                icon = Lucide.CircleUser,
+                icon = if (account.provider != null) Lucide.Component else Lucide.CircleUser,
                 title = account.label,
                 summary = when {
                     account.provider != null -> account.provider.baseUrl
@@ -134,7 +140,14 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 }
             },
         ) {
-            if (account.provider == null) {
+            if (account.provider != null) {
+                ActionButton(
+                    text = stringResource(Res.string.account_provider_edit),
+                    onClick = { actions = null; editing = account },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+            } else {
                 ActionButton(
                     text = stringResource(if (account.loggedIn) Res.string.account_relogin else Res.string.account_login),
                     onClick = { actions = null; beginLogin(account) },
@@ -161,7 +174,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 onClick = { actions = null; renaming = account },
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (account.loggedIn && account.provider == null) {
+            if (account.loggedIn) {
                 Spacer(Modifier.height(6.dp))
                 ActionButton(
                     text = stringResource(Res.string.account_export),
@@ -236,9 +249,9 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
             }
             Spacer(Modifier.height(6.dp))
             ActionButton(
-                text = stringResource(Res.string.account_local),
+                text = stringResource(Res.string.account_provider),
                 enabled = !importing,
-                onClick = { adding = false; localAdding = true },
+                onClick = { adding = false; providerAdding = true },
                 modifier = Modifier.fillMaxWidth(),
             )
             if (importFailed) {
@@ -252,70 +265,173 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
         }
     }
 
-    if (localAdding) {
-        var label by remember { mutableStateOf("") }
-        var url by remember { mutableStateOf("") }
-        var probing by remember { mutableStateOf(false) }
-        var probe by remember { mutableStateOf<AccountsApi.ProviderProbe?>(null) }
+    val edited = editing
+    if (providerAdding || edited != null) {
+        var label by remember(edited) { mutableStateOf("") }
+        var url by remember(edited) {
+            mutableStateOf(if (edited != null) "" else snapshot?.providerUrl.orEmpty())
+        }
+        var authKind by remember(edited) { mutableStateOf("none") }
+        var authToken by remember(edited) { mutableStateOf("") }
+        var authUser by remember(edited) { mutableStateOf("") }
+        var authPassword by remember(edited) { mutableStateOf("") }
+        var authHeaderName by remember(edited) { mutableStateOf("") }
+        var authHeaderValue by remember(edited) { mutableStateOf("") }
+        var probing by remember(edited) { mutableStateOf(false) }
+        var probe by remember(edited) { mutableStateOf<AccountsApi.ProviderProbe?>(null) }
+
+        fun auth() = AccountsApi.ProviderAuth(
+            kind = authKind,
+            token = authToken,
+            user = authUser,
+            password = authPassword,
+            headerName = authHeaderName,
+            headerValue = authHeaderValue,
+        )
+
+        fun close() {
+            providerAdding = false
+            editing = null
+        }
 
         suspend fun runProbe(target: String) {
             probing = true
-            probe = AccountsApi.detectProvider(target)
+            probe = AccountsApi.detectProvider(target, auth())
             probe?.let { url = it.baseUrl }
             probing = false
         }
 
-        LaunchedEffect(Unit) { runProbe("") }
+        LaunchedEffect(edited) {
+            val stored = edited?.let { runCatching { AccountsApi.provider(it.id) }.getOrNull() } ?: return@LaunchedEffect
+            url = stored.baseUrl
+            authKind = stored.auth.kind
+            authToken = stored.auth.token
+            authUser = stored.auth.user
+            authPassword = stored.auth.password
+            authHeaderName = stored.auth.headerName
+            authHeaderValue = stored.auth.headerValue
+        }
 
-        val localTitle = stringResource(Res.string.account_local)
+        val providerTitle = stringResource(Res.string.account_provider)
         CompactDialog(
-            onDismiss = { localAdding = false },
-            title = localTitle,
+            onDismiss = { close() },
+            title = stringResource(
+                if (edited != null) Res.string.account_provider_edit else Res.string.account_provider
+            ),
             buttons = {
-                Button(onClick = { localAdding = false }, variant = ButtonVariant.Outlined) {
+                Button(onClick = { close() }, variant = ButtonVariant.Outlined) {
                     Text(stringResource(Res.string.cancel))
                 }
                 Button(
                     enabled = probe?.found == true && !probing,
                     onClick = {
-                        val name = label.ifBlank { localTitle }
+                        val name = label.ifBlank { providerTitle }
                         val target = url
-                        localAdding = false
+                        val credentials = auth()
+                        val account = edited
+                        close()
                         scope.launch {
-                            runCatching { AccountsApi.createProvider(name, target) }
+                            runCatching {
+                                if (account != null) AccountsApi.updateProvider(account.id, target, credentials)
+                                else AccountsApi.createProvider(name, target, credentials)
+                            }
                             refresh()
                         }
                     },
-                ) { Text(stringResource(Res.string.account_add)) }
+                ) {
+                    Text(stringResource(if (edited != null) Res.string.save else Res.string.account_add))
+                }
             },
         ) {
-            InputField(
-                value = label,
-                onValueChange = { label = it },
-                singleLine = true,
-                label = { Text(stringResource(Res.string.account_name)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(12.dp))
+            if (edited == null) {
+                InputField(
+                    value = label,
+                    onValueChange = { label = it },
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.account_name)) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(12.dp))
+            }
             InputField(
                 value = url,
                 onValueChange = { url = it },
                 singleLine = true,
-                label = { Text(stringResource(Res.string.account_local_url)) },
+                label = { Text(stringResource(Res.string.account_provider_url)) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            Spacer(Modifier.height(12.dp))
+            SelectField(
+                label = stringResource(Res.string.environment_auth),
+                selected = authKind,
+                options = listOf(
+                    "none" to stringResource(Res.string.auth_none),
+                    "bearer" to stringResource(Res.string.auth_bearer),
+                    "api_key" to stringResource(Res.string.auth_api_key),
+                    "basic" to stringResource(Res.string.auth_basic),
+                    "header" to stringResource(Res.string.auth_header),
+                ),
+                onSelect = { authKind = it },
+            )
+            when (authKind) {
+                "bearer", "api_key" -> {
+                    Spacer(Modifier.height(12.dp))
+                    SecretTextField(
+                        value = authToken,
+                        onValueChange = { authToken = it },
+                        label = stringResource(
+                            if (authKind == "api_key") Res.string.auth_api_key else Res.string.environment_token
+                        ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                "basic" -> {
+                    Spacer(Modifier.height(12.dp))
+                    InputField(
+                        value = authUser,
+                        onValueChange = { authUser = it },
+                        singleLine = true,
+                        label = { Text(stringResource(Res.string.auth_user)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    SecretTextField(
+                        value = authPassword,
+                        onValueChange = { authPassword = it },
+                        label = stringResource(Res.string.auth_password),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                "header" -> {
+                    Spacer(Modifier.height(12.dp))
+                    InputField(
+                        value = authHeaderName,
+                        onValueChange = { authHeaderName = it },
+                        singleLine = true,
+                        label = { Text(stringResource(Res.string.auth_header_name)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    SecretTextField(
+                        value = authHeaderValue,
+                        onValueChange = { authHeaderValue = it },
+                        label = stringResource(Res.string.auth_header_value),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
             probe?.let { found ->
                 Spacer(Modifier.height(12.dp))
                 if (found.found) {
                     OutlinedPanel(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            stringResource(Res.string.account_local_found, found.models.size),
+                            stringResource(Res.string.account_provider_found, found.models.size),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(6.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            found.models.forEach { name ->
+                            found.models.take(PROBE_PREVIEW).forEach { name ->
                                 Text(
                                     name,
                                     style = MaterialTheme.typography.bodySmall,
@@ -323,11 +439,21 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                                     overflow = TextOverflow.Ellipsis,
                                 )
                             }
+                            if (found.models.size > PROBE_PREVIEW) {
+                                Text(
+                                    stringResource(
+                                        Res.string.account_provider_more,
+                                        found.models.size - PROBE_PREVIEW,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                         }
                     }
                 } else if (!probing) {
                     Text(
-                        stringResource(Res.string.account_local_missing),
+                        stringResource(Res.string.account_provider_missing),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -339,7 +465,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 Spacer(Modifier.height(10.dp))
             }
             ActionButton(
-                text = stringResource(Res.string.account_local_probe),
+                text = stringResource(Res.string.account_provider_probe),
                 enabled = !probing && url.isNotBlank(),
                 onClick = { scope.launch { runProbe(url) } },
                 modifier = Modifier.fillMaxWidth(),

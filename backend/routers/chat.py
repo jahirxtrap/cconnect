@@ -21,6 +21,7 @@ from middleware.public_auth import ws_bearer_ok
 from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
 from services import accounts
 from services import blocks
+from services import cli_info
 from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services import settings_store, visibility
@@ -118,7 +119,7 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                         "cwd": state.cwd,
                         "model": _resolve_model(state.model),
                         "account": accounts.resolve(state.account),
-                        "effort": state.effort,
+                        "effort": _effort_sent(state),
                         "permission_mode": state.permission_mode,
                     },
                 ):
@@ -193,6 +194,13 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
     if mid:
         await session.commit_user(mid, text)
     return True
+
+
+def _effort_sent(state: _Session) -> str:
+    if not accounts.provider_for(accounts.resolve(state.account)):
+        return state.effort
+    levels = cli_info.effort_levels_for(_resolve_model(state.model), state.account)
+    return state.effort if state.effort in levels else ""
 
 
 def _side_model(state: _Session) -> str | None:

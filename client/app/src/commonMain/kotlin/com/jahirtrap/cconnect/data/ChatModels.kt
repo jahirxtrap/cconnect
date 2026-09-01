@@ -240,7 +240,7 @@ val InteractionData.pending: Boolean
 
 data class ModelOption(val id: String, val label: String)
 
-data class AccountOption(val id: String, val label: String, val local: Boolean = false)
+data class AccountOption(val id: String, val label: String, val provider: Boolean = false)
 
 data class PermissionMode(val id: String, val label: String)
 

@@ -22,12 +22,15 @@ USAGE = (
 
 
 def make_tools(context: dict) -> list:
+    from services import accounts
+
     tools = []
     request_compact = context.get("request_compact")
     emit = context.get("emit")
     account = context.get("account")
     info = context.get("session_info")
     capabilities = context.get("capabilities") or ()
+    on_provider = bool(accounts.provider_for(account))
 
     if info is not None:
         @tool("session_info", INFO, {})
@@ -50,6 +53,9 @@ def make_tools(context: dict) -> list:
             return {"content": [{"type": "text", "text": "Compaction will start when this turn ends."}]}
 
         tools.append(compact)
+
+    if on_provider:
+        return tools
 
     @tool("usage", USAGE, {})
     async def usage(args):

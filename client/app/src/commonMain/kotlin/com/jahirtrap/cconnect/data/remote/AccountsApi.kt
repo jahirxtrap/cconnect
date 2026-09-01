@@ -21,24 +21,48 @@ object AccountsApi {
         val provider: Provider? = null,
     )
 
-    data class Snapshot(val accounts: List<Account>, val default: String)
+    data class Snapshot(val accounts: List<Account>, val default: String, val providerUrl: String = "")
 
     data class ProviderProbe(val baseUrl: String, val models: List<String>, val found: Boolean)
+
+    data class ProviderSettings(val baseUrl: String, val model: String, val auth: ProviderAuth)
+
+    data class ProviderAuth(
+        val kind: String = "none",
+        val token: String = "",
+        val user: String = "",
+        val password: String = "",
+        val headerName: String = "",
+        val headerValue: String = "",
+    )
+
+    private fun authWire(auth: ProviderAuth) = buildJsonObject {
+        put("kind", auth.kind)
+        put("token", auth.token.trim())
+        put("user", auth.user.trim())
+        put("password", auth.password)
+        put("header_name", auth.headerName.trim())
+        put("header_value", auth.headerValue.trim())
+    }
 
     suspend fun list(): Snapshot? {
         val data = Http.get("/accounts")?.jsonObject ?: return null
         return Snapshot(
             accounts = data["accounts"]?.jsonArray?.map { parse(it.jsonObject) }.orEmpty(),
             default = data["default"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            providerUrl = data["provider_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
         )
     }
 
     suspend fun create(label: String): Account? =
         Http.post("/accounts", buildJsonObject { put("label", label) })?.jsonObject?.let(::parse)
 
-    suspend fun detectProvider(baseUrl: String = ""): ProviderProbe? {
-        val query = if (baseUrl.isBlank()) "" else "?base_url=${UrlCodec.encode(baseUrl)}"
-        val data = Http.get("/accounts/provider$query")?.jsonObject ?: return null
+    suspend fun detectProvider(baseUrl: String = "", auth: ProviderAuth = ProviderAuth()): ProviderProbe? {
+        val body = buildJsonObject {
+            put("base_url", baseUrl)
+            put("auth", authWire(auth))
+        }
+        val data = Http.post("/accounts/provider/probe", body)?.jsonObject ?: return null
         return ProviderProbe(
             baseUrl = data["base_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             models = data["models"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty(),
@@ -46,10 +70,35 @@ object AccountsApi {
         )
     }
 
-    suspend fun createProvider(label: String, baseUrl: String): Account? =
+    suspend fun provider(id: String): ProviderSettings? {
+        val data = Http.get("/accounts/$id/provider")?.jsonObject ?: return null
+        val auth = data["auth"]?.jsonObject
+        fun field(name: String) = auth?.get(name)?.jsonPrimitive?.contentOrNull.orEmpty()
+        return ProviderSettings(
+            baseUrl = data["base_url"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            model = data["model"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            auth = ProviderAuth(
+                kind = field("kind").ifBlank { "none" },
+                token = field("token"),
+                user = field("user"),
+                password = field("password"),
+                headerName = field("header_name"),
+                headerValue = field("header_value"),
+            ),
+        )
+    }
+
+    suspend fun updateProvider(id: String, baseUrl: String, auth: ProviderAuth): Boolean =
+        Http.put("/accounts/$id/provider", buildJsonObject {
+            put("base_url", baseUrl)
+            put("auth", authWire(auth))
+        }) != null
+
+    suspend fun createProvider(label: String, baseUrl: String, auth: ProviderAuth): Account? =
         Http.post("/accounts/provider", buildJsonObject {
             put("label", label)
             put("base_url", baseUrl)
+            put("auth", authWire(auth))
         })?.jsonObject?.let(::parse)
 
     suspend fun rename(id: String, label: String): Boolean =

@@ -7,7 +7,7 @@ export interface LabeledOption {
 }
 
 export interface AccountOption extends LabeledOption {
-  local: boolean;
+  provider: boolean;
 }
 
 export interface CommandOption {
@@ -104,7 +104,7 @@ interface CapabilitiesWire extends VersionWire {
     argument_hint?: string;
     aliases?: string[];
   }>;
-  accounts?: Array<{ id?: string; label?: string; local?: boolean }>;
+  accounts?: Array<{ id?: string; label?: string; provider?: boolean }>;
   defaults?: { permission_mode?: string; effort?: string; model?: string; account?: string };
   mcp_tools?: Array<{ name?: string; description?: string; group?: string; group_description?: string }>;
 }
@@ -193,7 +193,7 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
         .map((option) => ({
           id: option.id!,
           label: option.label ?? option.id!,
-          local: option.local === true,
+          provider: option.provider === true,
         })),
       mcpTools: (data.mcp_tools ?? [])
         .filter((tool) => tool.name)

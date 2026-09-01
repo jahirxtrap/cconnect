@@ -15,6 +15,7 @@ import subprocess
 import zipfile
 
 import sys
+from base64 import b64encode
 from pathlib import Path
 from typing import Optional
 
@@ -26,6 +27,12 @@ _WINDOWS = sys.platform == "win32"
 PRIMARY_ID = "default"
 PRIMARY_LABEL = "Default"
 PROVIDER_TOKEN = "cconnect"
+
+AUTH_NONE = "none"
+AUTH_BEARER = "bearer"
+AUTH_API_KEY = "api_key"
+AUTH_BASIC = "basic"
+AUTH_HEADER = "header"
 
 _MODEL_ALIASES = ("SONNET", "OPUS", "HAIKU")
 
@@ -75,6 +82,35 @@ def model_for(account_id: Optional[str], alias: str) -> str:
     return (provider.get("model") or alias) if provider else alias
 
 
+def auth_headers(auth: dict) -> dict[str, str]:
+    kind = auth.get("kind") or AUTH_NONE
+    token = (auth.get("token") or "").strip()
+    if kind == AUTH_BEARER and token:
+        return {"Authorization": f"Bearer {token}"}
+    if kind == AUTH_API_KEY and token:
+        return {"x-api-key": token}
+    if kind == AUTH_BASIC and auth.get("user"):
+        pair = f"{auth['user']}:{auth.get('password') or ''}".encode()
+        return {"Authorization": f"Basic {b64encode(pair).decode()}"}
+    name = (auth.get("header_name") or "").strip()
+    if kind == AUTH_HEADER and name:
+        return {name: auth.get("header_value") or ""}
+    return {}
+
+
+def _auth_env(auth: dict) -> dict[str, str]:
+    kind = auth.get("kind") or AUTH_NONE
+    token = (auth.get("token") or "").strip()
+    if kind == AUTH_BEARER and token:
+        return {"ANTHROPIC_AUTH_TOKEN": token}
+    if kind == AUTH_API_KEY and token:
+        return {"ANTHROPIC_API_KEY": token}
+    headers = auth_headers(auth)
+    if headers:
+        return {"ANTHROPIC_CUSTOM_HEADERS": "\n".join(f"{name}: {value}" for name, value in headers.items())}
+    return {"ANTHROPIC_AUTH_TOKEN": PROVIDER_TOKEN}
+
+
 def env_for(account_id: Optional[str]) -> dict[str, str]:
     """Environment overrides to run the CLI as this account."""
     path = config_dir(account_id)
@@ -83,7 +119,7 @@ def env_for(account_id: Optional[str]) -> dict[str, str]:
     if not provider:
         return env
     env["ANTHROPIC_BASE_URL"] = provider["base_url"]
-    env["ANTHROPIC_AUTH_TOKEN"] = provider.get("token") or PROVIDER_TOKEN
+    env.update(_auth_env(provider.get("auth") or {}))
     fallback = provider.get("model") or ""
     if fallback:
         for alias in _MODEL_ALIASES:
@@ -233,13 +269,24 @@ def rename(account_id: str, label: str) -> bool:
     return True
 
 
-def create_provider(label: str, base_url: str, model: str = "", token: str = "") -> Optional[dict]:
+def update_provider(account_id: str, base_url: str, model: str = "", auth: Optional[dict] = None) -> bool:
+    path = config_dir(account_id)
+    url = base_url.strip().rstrip("/")
+    if path is None or not url or not provider_for(account_id):
+        return False
+    provider = {"base_url": url, "model": model.strip(), "auth": auth or {}}
+    meta = {**_meta(path), "provider": provider}
+    (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
+    return True
+
+
+def create_provider(label: str, base_url: str, model: str = "", auth: Optional[dict] = None) -> Optional[dict]:
     url = base_url.strip().rstrip("/")
     if not url:
         return None
     account = create(label)
     path = _ACCOUNTS_DIR / account["id"]
-    provider = {"base_url": url, "model": model.strip(), "token": token.strip()}
+    provider = {"base_url": url, "model": model.strip(), "auth": auth or {}}
     (path / _META_FILE).write_text(
         json.dumps({"label": account["label"], "provider": provider}), encoding="utf-8"
     )
@@ -262,14 +309,19 @@ def export_bundle(account_id: str) -> Optional[bytes]:
     if account_id not in known_ids():
         return None
     credentials = credentials_path(account_id)
-    if not credentials.is_file():
+    provider = provider_for(account_id)
+    if not credentials.is_file() and not provider:
         return None
     base = config_dir(account_id) or primary_dir()
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as bundle:
-        bundle.writestr(_CREDENTIALS_FILE, credentials.read_bytes())
+        if credentials.is_file():
+            bundle.writestr(_CREDENTIALS_FILE, credentials.read_bytes())
         fallback = PRIMARY_LABEL if account_id == PRIMARY_ID else account_id
-        bundle.writestr(_META_FILE, json.dumps({"label": _label(base, fallback)}))
+        meta = {"label": _label(base, fallback)}
+        if provider:
+            meta["provider"] = provider
+        bundle.writestr(_META_FILE, json.dumps(meta))
         settings = base / "settings.json"
         if settings.is_file():
             bundle.writestr("settings.json", settings.read_bytes())
@@ -285,13 +337,13 @@ def _read_bundle(data: bytes) -> Optional[dict[str, bytes]]:
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as bundle:
             names = set(bundle.namelist())
-            if _CREDENTIALS_FILE not in names:
-                return None
             if sum(bundle.getinfo(name).file_size for name in names) > _MAX_BUNDLE_BYTES:
                 return None
             payload = {name: bundle.read(name) for name in _BUNDLE_FILES if name in names}
     except (zipfile.BadZipFile, OSError, KeyError):
         return None
+    if _CREDENTIALS_FILE not in payload:
+        return payload if _bundle_provider(payload) else None
     try:
         json.loads(payload[_CREDENTIALS_FILE])
     except json.JSONDecodeError:
@@ -299,11 +351,21 @@ def _read_bundle(data: bytes) -> Optional[dict[str, bytes]]:
     return payload
 
 
-def _bundle_label(payload: dict[str, bytes]) -> str:
+def _bundle_meta(payload: dict[str, bytes]) -> dict:
     try:
-        return (json.loads(payload[_META_FILE]).get("label") or "").strip()
-    except (KeyError, json.JSONDecodeError, AttributeError):
-        return ""
+        stored = json.loads(payload[_META_FILE])
+    except (KeyError, json.JSONDecodeError):
+        return {}
+    return stored if isinstance(stored, dict) else {}
+
+
+def _bundle_provider(payload: dict[str, bytes]) -> dict:
+    provider = _bundle_meta(payload).get("provider")
+    return provider if isinstance(provider, dict) and provider.get("base_url") else {}
+
+
+def _bundle_label(payload: dict[str, bytes]) -> str:
+    return (_bundle_meta(payload).get("label") or "").strip()
 
 
 def _merge_identity(target: Path, raw: Optional[bytes]) -> None:
@@ -331,11 +393,17 @@ def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
         return None
     account = create(label.strip() or _bundle_label(payload) or "Account")
     path = _ACCOUNTS_DIR / account["id"]
-    (path / _CREDENTIALS_FILE).write_bytes(payload[_CREDENTIALS_FILE])
+    if _CREDENTIALS_FILE in payload:
+        (path / _CREDENTIALS_FILE).write_bytes(payload[_CREDENTIALS_FILE])
     if "settings.json" in payload:
         (path / "settings.json").write_bytes(payload["settings.json"])
     _merge_identity(path / _IDENTITY_FILE, payload.get(_IDENTITY_FILE))
-    account["logged_in"] = is_logged_in(account["id"])
+    provider = _bundle_provider(payload)
+    if provider:
+        meta = {"label": account["label"], "provider": provider}
+        (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
+        account["provider"] = {"base_url": provider["base_url"], "model": provider.get("model", "")}
+    account["logged_in"] = bool(provider) or is_logged_in(account["id"])
     return account
 
 

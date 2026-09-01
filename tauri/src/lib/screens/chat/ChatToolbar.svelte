@@ -1,5 +1,6 @@
 <script lang="ts">
   import CircleUser from "@lucide/svelte/icons/circle-user";
+  import Component from "@lucide/svelte/icons/component";
   import Gauge from "@lucide/svelte/icons/gauge";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Eye from "@lucide/svelte/icons/eye";
@@ -105,17 +106,17 @@
   const accountOptions = $derived([
     serverOption,
     ...(capabilities?.accounts ?? [])
-      .filter((item) => !item.local)
+      .filter((item) => !item.provider)
       .map((item) => ({ value: item.id, label: item.label })),
   ]);
-  const localAccounts = $derived(
+  const providerAccounts = $derived(
     (capabilities?.accounts ?? [])
-      .filter((item) => item.local)
+      .filter((item) => item.provider)
       .map((item) => ({ value: item.id, label: item.label })),
   );
-  const accountLabel = $derived(
-    capabilities?.accounts?.find((item) => item.id === account)?.label ?? account,
-  );
+  const activeAccount = $derived(capabilities?.accounts?.find((item) => item.id === account));
+  const accountLabel = $derived(activeAccount?.label ?? account);
+  const AccountIcon = $derived(activeAccount?.provider ? Component : CircleUser);
 
   const modelLabel = $derived(capabilities?.models.find((item) => item.id === model)?.label ?? model);
   const contextWindow = $derived(contextWindowFor(capabilities, model));
@@ -245,7 +246,7 @@
         {#snippet trigger()}
           <TooltipWrap label={t("ACCOUNT")} class={SLOT}>
             <span class={ITEM_CLASS}>
-              <CircleUser size={16} class="shrink-0 text-accent" />
+              <AccountIcon size={16} class="shrink-0 text-accent" />
               <span class="whitespace-nowrap">{accountLabel}</span>
             </span>
           </TooltipWrap>
@@ -260,9 +261,9 @@
             }}
           />
         {/each}
-        {#if localAccounts.length}
+        {#if providerAccounts.length}
           <div class="my-1 h-px bg-outline-variant"></div>
-          {#each localAccounts as option (option.value)}
+          {#each providerAccounts as option (option.value)}
             <MenuItem
               text={option.label}
               selected={option.value === accountSelected}

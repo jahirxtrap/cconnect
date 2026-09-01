@@ -40,6 +40,11 @@ def _plan_label(account: str | None = None) -> str | None:
 
 
 async def _fetch(account: str | None = None) -> dict:
+    from services import accounts
+
+    provider = accounts.provider_for(account)
+    if provider:
+        return {"error": f"This account runs on {provider['base_url']}, not on a Claude plan."}
     token = _oauth("accessToken", account)
     if not token:
         return {"error": "No Claude token found (are you signed in to the CLI?)"}

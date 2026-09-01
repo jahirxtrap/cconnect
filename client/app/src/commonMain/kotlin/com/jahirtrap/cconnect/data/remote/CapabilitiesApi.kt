@@ -92,7 +92,7 @@ object CapabilitiesApi {
                 AccountOption(
                     id,
                     o["label"]?.jsonPrimitive?.contentOrNull ?: id,
-                    o["local"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    o["provider"]?.jsonPrimitive?.booleanOrNull ?: false,
                 )
             } ?: fallback.accounts,
             mcpTools = data["mcp_tools"]?.jsonArray?.mapNotNull { el ->

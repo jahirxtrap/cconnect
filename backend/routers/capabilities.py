@@ -42,7 +42,7 @@ async def get_capabilities(capabilities: str = Query(""), account: str = Query("
         "colors": COLORS,
         "commands": cli_info.commands(info),
         "accounts": [
-            {"id": a["id"], "label": a["label"], "local": a["provider"] is not None}
+            {"id": a["id"], "label": a["label"], "provider": a["provider"] is not None}
             for a in account_list if a["logged_in"]
         ],
         "mcp_tools": mcps.tool_specs(client),

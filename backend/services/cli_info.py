@@ -63,7 +63,11 @@ async def _fetch(account: str) -> dict[str, Any]:
     from services import accounts, providers
 
     provider = accounts.provider_for(account)
-    _provider_models[account] = await providers.models(provider.get("base_url", "")) if provider else []
+    _provider_models[account] = (
+        await providers.models(provider["base_url"], accounts.auth_headers(provider.get("auth") or {}))
+        if provider
+        else []
+    )
     async with ClaudeSDKClient(_options(account=account)) as client:
         return await client.get_server_info() or {}
 
@@ -144,11 +148,32 @@ def _levels(entry: dict) -> list[str]:
     return ["default", *levels, *([ULTRACODE_EFFORT] if "xhigh" in levels else [])]
 
 
+def effort_levels_for(model: Optional[str], account: Optional[str] = None) -> list[str]:
+    from services import accounts
+
+    target = accounts.resolve(account) if account else accounts.default_account()
+    listed = models(_snapshots.get(target) or {}, target)
+    entry = next((item for item in listed if item["id"] == model), None)
+    return entry["effort_levels"] if entry else []
+
+
+def provider_window(model: Optional[str], account: Optional[str] = None) -> Optional[int]:
+    from services import accounts
+
+    listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
+    entry = next((item for item in listed or [] if item["id"] == model), None)
+    return entry["context_window"] if entry else None
+
+
 def provider_model(model: Optional[str], account: Optional[str] = None) -> bool:
     from services import accounts
 
     listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
     return bool(model) and any(entry["id"] == model for entry in listed or [])
+
+
+def _cli_levels(info: dict[str, Any]) -> list[str]:
+    return max((_levels(entry) for entry in _entries(info)), key=len, default=[])
 
 
 def models(info: dict[str, Any], account: Optional[str] = None) -> list[dict]:
@@ -157,7 +182,12 @@ def models(info: dict[str, Any], account: Optional[str] = None) -> list[dict]:
 
     listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
     if listed:
-        return list(listed)
+        levels = _cli_levels(info)
+        return [
+            {**{k: v for k, v in entry.items() if k != "thinking"},
+             "effort_levels": levels if entry.get("thinking") else []}
+            for entry in listed
+        ]
     return [
         {
             "id": entry["value"],
@@ -233,11 +263,19 @@ def known_model(info: dict[str, Any], model: Optional[str]) -> bool:
     return not entries or model is None or any(entry["value"] == model for entry in entries)
 
 
-def effort_for(info: dict[str, Any], model: Optional[str], effort: Optional[str]) -> Optional[str]:
+def effort_for(
+    info: dict[str, Any],
+    model: Optional[str],
+    effort: Optional[str],
+    account: Optional[str] = None,
+) -> Optional[str]:
     """The `--effort` value to send, or None when this model does not list that level."""
     wanted = "xhigh" if effort == ULTRACODE_EFFORT else effort
     if wanted in (None, "", "default"):
         return None
+    if provider_model(model, account):
+        listed = next((entry for entry in models(info, account) if entry["id"] == model), None)
+        return wanted if listed and wanted in listed["effort_levels"] else None
     for entry in _entries(info):
         if entry["value"] == (model or "default"):
             return wanted if wanted in _levels(entry) else None

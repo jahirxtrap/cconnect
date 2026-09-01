@@ -2,9 +2,42 @@ import { transfers } from "$lib/data/transfers.svelte";
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 
+export type ProviderAuthKind = "none" | "bearer" | "api_key" | "basic" | "header";
+
+export interface ProviderAuth {
+  kind: ProviderAuthKind;
+  token: string;
+  user: string;
+  password: string;
+  headerName: string;
+  headerValue: string;
+}
+
+export const emptyAuth = (): ProviderAuth => ({
+  kind: "none",
+  token: "",
+  user: "",
+  password: "",
+  headerName: "",
+  headerValue: "",
+});
+
+const authWire = (auth: ProviderAuth): Wire => ({
+  kind: auth.kind,
+  token: auth.token.trim(),
+  user: auth.user.trim(),
+  password: auth.password,
+  header_name: auth.headerName.trim(),
+  header_value: auth.headerValue.trim(),
+});
+
 export interface AccountProvider {
   baseUrl: string;
   model: string;
+}
+
+export interface ProviderSettings extends AccountProvider {
+  auth: ProviderAuth;
 }
 
 export interface Account {
@@ -24,6 +57,7 @@ export interface ProviderProbe {
 export interface AccountsSnapshot {
   accounts: Account[];
   default: string;
+  providerUrl: string;
 }
 
 type Wire = Record<string, any>;
@@ -48,7 +82,11 @@ export const createAccountsApi = (client: HttpClient) => ({
   async list(): Promise<AccountsSnapshot | null> {
     const data = await client.get<Wire>("/accounts");
     if (!data) return null;
-    return { accounts: (data.accounts ?? []).map(parse), default: data.default ?? "" };
+    return {
+      accounts: (data.accounts ?? []).map(parse),
+      default: data.default ?? "",
+      providerUrl: data.provider_url ?? "",
+    };
   },
 
   async create(label: string): Promise<Account | null> {
@@ -56,15 +94,44 @@ export const createAccountsApi = (client: HttpClient) => ({
     return data && parse(data);
   },
 
-  async detectProvider(baseUrl = ""): Promise<ProviderProbe | null> {
-    const query = baseUrl ? `?base_url=${encodeURIComponent(baseUrl)}` : "";
-    const data = await client.get<Wire>(`/accounts/provider${query}`);
+  async detectProvider(baseUrl = "", auth = emptyAuth()): Promise<ProviderProbe | null> {
+    const data = await client.post<Wire>("/accounts/provider/probe", {
+      base_url: baseUrl,
+      auth: authWire(auth),
+    });
     if (!data) return null;
     return { baseUrl: data.base_url ?? "", models: data.models ?? [], found: data.found === true };
   },
 
-  async createProvider(label: string, baseUrl: string): Promise<Account | null> {
-    const data = await client.post<Wire>("/accounts/provider", { label, base_url: baseUrl });
+  async provider(id: string): Promise<ProviderSettings | null> {
+    const data = await client.get<Wire>(`/accounts/${id}/provider`);
+    if (!data) return null;
+    const auth = data.auth ?? {};
+    return {
+      baseUrl: data.base_url ?? "",
+      model: data.model ?? "",
+      auth: {
+        kind: auth.kind ?? "none",
+        token: auth.token ?? "",
+        user: auth.user ?? "",
+        password: auth.password ?? "",
+        headerName: auth.header_name ?? "",
+        headerValue: auth.header_value ?? "",
+      },
+    };
+  },
+
+  async updateProvider(id: string, baseUrl: string, auth: ProviderAuth): Promise<boolean> {
+    const body = { base_url: baseUrl, auth: authWire(auth) };
+    return (await client.put(`/accounts/${id}/provider`, body)) !== null;
+  },
+
+  async createProvider(label: string, baseUrl: string, auth: ProviderAuth): Promise<Account | null> {
+    const data = await client.post<Wire>("/accounts/provider", {
+      label,
+      base_url: baseUrl,
+      auth: authWire(auth),
+    });
     return data && parse(data);
   },
 

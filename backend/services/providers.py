@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 import httpx
 from loguru import logger
 
@@ -9,13 +11,14 @@ DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 
 _TIMEOUT = 5.0
 _TOOLS = "tools"
+_THINKING = "thinking"
 
 
 def _window(value: object) -> int | None:
     return value if isinstance(value, int) and value > 0 else None
 
 
-def _model(name: str, description: str = "", window: int | None = None) -> dict:
+def _model(name: str, description: str = "", window: int | None = None, thinking: bool = False) -> dict:
     return {
         "id": name,
         "label": name,
@@ -25,21 +28,37 @@ def _model(name: str, description: str = "", window: int | None = None) -> dict:
         "context_window": window,
         "fast_mode": False,
         "auto_mode": False,
+        "thinking": thinking,
     }
 
 
 def _tagged(raw: dict) -> dict | None:
     name = raw.get("name") or raw.get("model")
-    if not name or _TOOLS not in (raw.get("capabilities") or []):
+    capabilities = raw.get("capabilities") or []
+    if not name or _TOOLS not in capabilities:
         return None
     details = raw.get("details") or {}
     parts = (details.get("parameter_size") or "", details.get("quantization_level") or "")
-    return _model(name, " · ".join(p for p in parts if p), _window(details.get("context_length")))
+    return _model(
+        name,
+        " · ".join(p for p in parts if p),
+        _window(details.get("context_length")),
+        _THINKING in capabilities,
+    )
 
 
 def _listed(raw: dict) -> dict | None:
     name = raw.get("id")
-    return _model(name) if name else None
+    if not name:
+        return None
+    capabilities = raw.get("capabilities")
+    if isinstance(capabilities, dict) and not capabilities.get("tool_calling", True):
+        return None
+    label = raw.get("name") or raw.get("owned_by") or ""
+    thinking = bool(raw.get("supportsThinking")) or bool(
+        isinstance(capabilities, dict) and (capabilities.get(_THINKING) or capabilities.get("reasoning"))
+    )
+    return _model(name, label if label != name else "", _window(raw.get("context_length")), thinking)
 
 
 async def _get(client: httpx.AsyncClient, url: str) -> dict | None:
@@ -53,12 +72,12 @@ async def _get(client: httpx.AsyncClient, url: str) -> dict | None:
     return payload if isinstance(payload, dict) else None
 
 
-async def models(base_url: str) -> list[dict]:
+async def models(base_url: str, headers: Optional[dict] = None) -> list[dict]:
     if not base_url:
         return []
     root = base_url.rstrip("/")
     found: list[dict] = []
-    async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+    async with httpx.AsyncClient(timeout=_TIMEOUT, headers=headers or {}) as client:
         tagged = await _get(client, f"{root}/api/tags")
         raw = (tagged or {}).get("models")
         if isinstance(raw, list):
@@ -71,7 +90,7 @@ async def models(base_url: str) -> list[dict]:
     return sorted(found, key=lambda entry: entry["id"])
 
 
-async def detect(base_url: str = "") -> dict:
+async def detect(base_url: str = "", headers: Optional[dict] = None) -> dict:
     url = (base_url or DEFAULT_BASE_URL).strip().rstrip("/")
-    listed = await models(url)
+    listed = await models(url, headers)
     return {"base_url": url, "models": [entry["id"] for entry in listed], "found": bool(listed)}

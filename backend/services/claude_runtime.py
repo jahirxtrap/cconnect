@@ -547,7 +547,7 @@ async def run_prompt(
     info = await cli_info.server_info(account=account)
     if not cli_info.known_model(info, model) and not cli_info.provider_model(model, account):
         model = None
-    effort_level = cli_info.effort_for(info, model, effort)
+    effort_level = cli_info.effort_for(info, model, effort, account)
     extra_args = {"name": name} if name else {}
     if resume and resume_at:
         extra_args["resume-session-at"] = resume_at
@@ -585,6 +585,9 @@ async def run_prompt(
     )
     from services import accounts
     session_env = dict(accounts.env_for(account))
+    window = cli_info.provider_window(model, account)
+    if window:
+        session_env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = str(window)
     if settings_store.get("todo_tools"):
         session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
     if session_env:
