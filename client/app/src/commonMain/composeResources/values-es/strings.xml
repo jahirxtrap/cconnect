@@ -467,5 +467,10 @@
     <string name="account_export">Exportar cuenta</string>
     <string name="account_import">Importar desde un archivo</string>
     <string name="account_import_failed">Ese archivo no es una exportación de cuenta válida</string>
+    <string name="account_local">Modelos locales</string>
+    <string name="account_local_url">Dirección del proveedor</string>
+    <string name="account_local_probe">Buscar modelos</string>
+    <string name="account_local_found">%1$d modelos listos para usar</string>
+    <string name="account_local_missing">Nada respondió en esa dirección</string>
     <string name="account_relogin">Volver a iniciar sesión</string>
 </resources>

@@ -544,8 +544,8 @@ async def run_prompt(
 
     vis = wanted or visibility.defaults
     ultracode = effort == ULTRACODE_EFFORT
-    info = await cli_info.server_info()
-    if not cli_info.known_model(info, model):
+    info = await cli_info.server_info(account=account)
+    if not cli_info.known_model(info, model) and not cli_info.provider_model(model, account):
         model = None
     effort_level = cli_info.effort_for(info, model, effort)
     extra_args = {"name": name} if name else {}
@@ -948,7 +948,7 @@ async def run_prompt(
             watchdog_task.cancel()
 
 
-async def generate_title(transcript: str) -> str:
+async def generate_title(transcript: str, account: Optional[str] = None) -> str:
     """Ask a fast model for a short conversation title and return ONLY the text — the
     caller does the actual rename. Runs in the isolated AI workspace, so its session
     stays a plain SDK session under that project key (never normalized to "cli", never
@@ -958,14 +958,15 @@ async def generate_title(transcript: str) -> str:
     from services import accounts
 
     os.makedirs(AI_WORKDIR, exist_ok=True)
+    target = accounts.resolve(account)
     options = ClaudeAgentOptions(
         cwd=AI_WORKDIR,
         permission_mode="default",
-        model="haiku",
+        model=accounts.model_for(target, "haiku"),
         system_prompt="You write conversation titles. Reply with ONLY the title: 3-6 words, Title Case, no quotes, no trailing punctuation.",
         setting_sources=[],
         cli_path=cli_manager.resolve_cli_path(),
-        env=accounts.env_for(accounts.default_account()),
+        env=accounts.env_for(target),
     )
 
     parts: list[str] = []
@@ -992,6 +993,7 @@ async def ask_side_question(
     capabilities: Optional[list[str]] = None,
     session_info: Optional[Callable[[], dict]] = None,
     base_url: Optional[str] = None,
+    model: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """Quick side question in an isolated, resumable session. ``context`` seeds the first turn,
     ``resume_id`` continues it for memory, ``ask_user`` surfaces permission prompts."""
@@ -1013,7 +1015,7 @@ async def ask_side_question(
     options_kwargs: dict[str, Any] = dict(
         cwd=AI_WORKDIR,
         permission_mode=permission_mode,
-        model="sonnet",
+        model=model or "sonnet",
         system_prompt=None if resume_id else system,
         setting_sources=[],
         include_partial_messages=partial,

@@ -104,8 +104,15 @@
   ]);
   const accountOptions = $derived([
     serverOption,
-    ...(capabilities?.accounts ?? []).map((item) => ({ value: item.id, label: item.label })),
+    ...(capabilities?.accounts ?? [])
+      .filter((item) => !item.local)
+      .map((item) => ({ value: item.id, label: item.label })),
   ]);
+  const localAccounts = $derived(
+    (capabilities?.accounts ?? [])
+      .filter((item) => item.local)
+      .map((item) => ({ value: item.id, label: item.label })),
+  );
   const accountLabel = $derived(
     capabilities?.accounts?.find((item) => item.id === account)?.label ?? account,
   );
@@ -253,6 +260,19 @@
             }}
           />
         {/each}
+        {#if localAccounts.length}
+          <div class="my-1 h-px bg-outline-variant"></div>
+          {#each localAccounts as option (option.value)}
+            <MenuItem
+              text={option.label}
+              selected={option.value === accountSelected}
+              onclick={() => {
+                onAccount(option.value);
+                openMenu = null;
+              }}
+            />
+          {/each}
+        {/if}
       </PopupMenu>
     {/if}
 

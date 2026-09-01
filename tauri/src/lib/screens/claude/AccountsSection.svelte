@@ -3,11 +3,18 @@
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
-  import { accountsApi, type Account, type AccountsSnapshot } from "$lib/services/accountsApi";
+  import {
+    accountsApi,
+    type Account,
+    type AccountsSnapshot,
+    type ProviderProbe,
+  } from "$lib/services/accountsApi";
   import { settingsApi } from "$lib/services/settingsApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
+  import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
@@ -35,6 +42,10 @@
   let newLabel = $state("");
   let importing = $state(false);
   let importFailed = $state(false);
+  let localAdding = $state(false);
+  let localUrl = $state("");
+  let probing = $state(false);
+  let probe = $state<ProviderProbe | null>(null);
   let bundlePicker = $state<HTMLInputElement | null>(null);
 
   const importBundle = async (event: Event) => {
@@ -77,7 +88,36 @@
   };
 
   const summaryOf = (account: Account) =>
-    !account.loggedIn ? t("ACCOUNT_PENDING") : account.id === defaultId ? t("ACCOUNT_IS_DEFAULT") : t("ACCOUNT_CONNECTED");
+    account.provider
+      ? account.provider.baseUrl
+      : !account.loggedIn
+        ? t("ACCOUNT_PENDING")
+        : account.id === defaultId
+          ? t("ACCOUNT_IS_DEFAULT")
+          : t("ACCOUNT_CONNECTED");
+
+  const probeProvider = async (url: string) => {
+    probing = true;
+    probe = await accountsApi.detectProvider(url);
+    if (probe) localUrl = probe.baseUrl;
+    probing = false;
+  };
+
+  const openLocal = () => {
+    adding = false;
+    probe = null;
+    localUrl = "";
+    newLabel = "";
+    localAdding = true;
+    void probeProvider("");
+  };
+
+  const createLocal = async () => {
+    const label = newLabel.trim() || t("ACCOUNT_LOCAL");
+    localAdding = false;
+    await accountsApi.createProvider(label, localUrl);
+    await refresh();
+  };
 
   const cancelLogin = () => {
     const current = login;
@@ -143,15 +183,17 @@
       <Button onclick={() => (actions = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     <div class="flex flex-col gap-1.5">
-      <ActionButton
-        text={account.loggedIn ? t("ACCOUNT_RELOGIN") : t("ACCOUNT_LOGIN")}
-        onclick={() => {
-          const target = account;
-          actions = null;
-          void beginLogin(target);
-        }}
-        class="w-full"
-      />
+      {#if !account.provider}
+        <ActionButton
+          text={account.loggedIn ? t("ACCOUNT_RELOGIN") : t("ACCOUNT_LOGIN")}
+          onclick={() => {
+            const target = account;
+            actions = null;
+            void beginLogin(target);
+          }}
+          class="w-full"
+        />
+      {/if}
       {#if account.loggedIn && account.id !== defaultId}
         <ActionButton
           text={t("ACCOUNT_SET_DEFAULT")}
@@ -172,7 +214,7 @@
         }}
         class="w-full"
       />
-      {#if account.loggedIn}
+      {#if account.loggedIn && !account.provider}
         <ActionButton
           text={t("ACCOUNT_EXPORT")}
           onclick={() => {
@@ -223,6 +265,12 @@
       onclick={() => bundlePicker?.click()}
       class="mt-3 w-full"
     />
+    <ActionButton
+      text={t("ACCOUNT_LOCAL")}
+      enabled={!importing}
+      onclick={openLocal}
+      class="mt-1.5 w-full"
+    />
     {#if importing}
       <LoadingIndicator size={20} class="mt-3" />
     {/if}
@@ -237,6 +285,56 @@
     onchange={importBundle}
     class="hidden"
   />
+{/if}
+
+{#if localAdding}
+  <CompactDialog title={t("ACCOUNT_LOCAL")} onDismiss={() => (localAdding = false)}>
+    {#snippet buttons()}
+      <Button onclick={() => (localAdding = false)} variant="outlined">{t("CANCEL")}</Button>
+      <Button enabled={probe?.found === true && !probing} onclick={() => void createLocal()}>
+        {t("ACCOUNT_ADD")}
+      </Button>
+    {/snippet}
+    <InputField
+      value={newLabel}
+      oninput={(value) => (newLabel = value)}
+      label={t("ACCOUNT_NAME")}
+      singleLine
+    />
+    <div class="mt-3">
+      <InputField
+        value={localUrl}
+        oninput={(value) => (localUrl = value)}
+        label={t("ACCOUNT_LOCAL_URL")}
+        singleLine
+      />
+    </div>
+    {#if probe?.found}
+      <OutlinedPanel class="mt-3">
+        <p class="text-body-sm text-on-surface-variant">
+          {t("ACCOUNT_LOCAL_FOUND", `${probe.models.length}`)}
+        </p>
+        <div class="mt-1.5 flex flex-col gap-1">
+          {#each probe.models as model (model)}
+            <p class="truncate text-body-sm">{model}</p>
+          {/each}
+        </div>
+      </OutlinedPanel>
+    {:else if probe && !probing}
+      <p class="mt-3 text-body-sm text-red">{t("ACCOUNT_LOCAL_MISSING")}</p>
+    {/if}
+    <div class="mt-3 flex flex-col gap-2.5">
+      {#if probing}
+        <LinearProgress />
+      {/if}
+      <ActionButton
+        text={t("ACCOUNT_LOCAL_PROBE")}
+        enabled={!probing && !!localUrl.trim()}
+        onclick={() => void probeProvider(localUrl)}
+        class="w-full"
+      />
+    </div>
+  </CompactDialog>
 {/if}
 
 {#if renaming}

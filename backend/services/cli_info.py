@@ -14,11 +14,11 @@ from core.config import COMMANDS, DEFAULT_CWD, ULTRACODE_EFFORT
 _TTL_SECONDS = 300
 _WINDOWS_FILE = Path(__file__).resolve().parent.parent / "context_windows.json"
 
-_snapshot: dict[str, Any] = {}
-_fetched_at: float = 0.0
-_fetched_for: Optional[str] = None
+_snapshots: dict[str, dict[str, Any]] = {}
+_fetched_at: dict[str, float] = {}
 _windows: dict[str, int] = {}
 _warm_task: Optional[asyncio.Task] = None
+_provider_models: dict[str, list[dict]] = {}
 
 
 def load_windows() -> None:
@@ -42,7 +42,7 @@ def _save_windows() -> None:
         logger.warning("could not persist context windows")
 
 
-def _options(model: Optional[str] = None):
+def _options(model: Optional[str] = None, account: Optional[str] = None):
     from claude_agent_sdk import ClaudeAgentOptions
 
     from services import accounts
@@ -52,15 +52,19 @@ def _options(model: Optional[str] = None):
         cli_path=cli_manager.resolve_cli_path(),
         model=model,
         setting_sources=["user", "project"],
-        env=accounts.env_for(accounts.default_account()),
+        env=accounts.env_for(account or accounts.default_account()),
         max_turns=1,
     )
 
 
-async def _fetch() -> dict[str, Any]:
+async def _fetch(account: str) -> dict[str, Any]:
     from claude_agent_sdk import ClaudeSDKClient
 
-    async with ClaudeSDKClient(_options()) as client:
+    from services import accounts, providers
+
+    provider = accounts.provider_for(account)
+    _provider_models[account] = await providers.models(provider.get("base_url", "")) if provider else []
+    async with ClaudeSDKClient(_options(account=account)) as client:
         return await client.get_server_info() or {}
 
 
@@ -84,28 +88,29 @@ async def warm_windows(listed: list[dict]) -> None:
         if size:
             _windows[model] = size
 
-    missing = [entry["id"] for entry in listed if entry["id"] not in _windows]
+    missing = [
+        entry["id"] for entry in listed
+        if entry["context_window"] is None and entry["id"] not in _windows
+    ]
     if not missing:
         return
     await asyncio.gather(*(load(model) for model in missing))
     _save_windows()
 
 
-async def server_info(refresh: bool = False) -> dict[str, Any]:
-    global _snapshot, _fetched_at, _fetched_for
+async def server_info(refresh: bool = False, account: Optional[str] = None) -> dict[str, Any]:
     from services import accounts
 
-    account = accounts.default_account()
-    fresh = _snapshot and _fetched_for == account and time.monotonic() - _fetched_at < _TTL_SECONDS
-    if not refresh and fresh:
-        return _snapshot
+    target = accounts.resolve(account) if account else accounts.default_account()
+    cached = _snapshots.get(target)
+    if not refresh and cached and time.monotonic() - _fetched_at.get(target, 0.0) < _TTL_SECONDS:
+        return cached
     try:
-        _snapshot = await _fetch()
-        _fetched_at = time.monotonic()
-        _fetched_for = account
+        _snapshots[target] = await _fetch(target)
+        _fetched_at[target] = time.monotonic()
     except Exception as exc:
         logger.warning(f"CLI server info unavailable: {type(exc).__name__}: {exc}")
-    return _snapshot
+    return _snapshots.get(target, {})
 
 
 async def refresh() -> None:
@@ -117,9 +122,9 @@ async def refresh() -> None:
 
 
 def invalidate() -> None:
-    global _snapshot, _fetched_at
-    _snapshot = {}
-    _fetched_at = 0.0
+    _snapshots.clear()
+    _fetched_at.clear()
+    _provider_models.clear()
     _windows.clear()
     load_windows()
 
@@ -139,8 +144,20 @@ def _levels(entry: dict) -> list[str]:
     return ["default", *levels, *([ULTRACODE_EFFORT] if "xhigh" in levels else [])]
 
 
-def models(info: dict[str, Any]) -> list[dict]:
+def provider_model(model: Optional[str], account: Optional[str] = None) -> bool:
+    from services import accounts
+
+    listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
+    return bool(model) and any(entry["id"] == model for entry in listed or [])
+
+
+def models(info: dict[str, Any], account: Optional[str] = None) -> list[dict]:
     """The CLI's model lineup in the capabilities shape."""
+    from services import accounts
+
+    listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
+    if listed:
+        return list(listed)
     return [
         {
             "id": entry["value"],

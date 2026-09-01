@@ -26,6 +26,7 @@ class RenameBody(BaseModel):
 
 class ProjectBody(BaseModel):
     project: str
+    account: str = ""
 
 
 class ColorBody(BaseModel):
@@ -226,7 +227,7 @@ async def move_session(session_id: str, body: MoveBody):
 @router.post("/sessions/{session_id}/auto-rename")
 async def auto_rename_session(session_id: str, body: ProjectBody):
     try:
-        title = await sessions_service.auto_generate_title(body.project, session_id)
+        title = await sessions_service.auto_generate_title(body.project, session_id, body.account)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not title:

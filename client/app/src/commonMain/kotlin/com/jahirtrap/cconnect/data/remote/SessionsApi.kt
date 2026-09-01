@@ -260,9 +260,10 @@ object SessionsApi {
             put("title", title)
         }) != null
 
-    suspend fun autoRenameSession(sessionId: String, project: String): String? =
+    suspend fun autoRenameSession(sessionId: String, project: String, account: String = ""): String? =
         Http.post("/sessions/$sessionId/auto-rename", buildJsonObject {
             put("project", project)
+            put("account", account)
         })?.jsonObject?.get("title")?.jsonPrimitive?.contentOrNull
 
     suspend fun setSessionColor(sessionId: String, project: String, color: String): Boolean =

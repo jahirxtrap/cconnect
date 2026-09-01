@@ -234,6 +234,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.jahirtrap.cconnect.resources.Res
 import com.jahirtrap.cconnect.resources.*
+import com.jahirtrap.cconnect.data.AccountOption
 import com.jahirtrap.cconnect.data.ChatMessage
 import com.jahirtrap.cconnect.data.ClaudeModel
 import com.jahirtrap.cconnect.data.formatTokens
@@ -2037,7 +2038,7 @@ private fun ChatToolbar(
     connecting: Boolean,
     account: String,
     accountSelected: String,
-    accounts: List<com.jahirtrap.cconnect.data.ModelOption>,
+    accounts: List<AccountOption>,
     onAccount: (String) -> Unit,
     model: String,
     modelSelected: String,
@@ -2150,13 +2151,16 @@ private fun ChatToolbar(
                 )
             }
             if (accounts.size > 1) {
+                val localAccounts = accounts.filter { it.local }
+                val sorted = accounts.filterNot { it.local } + localAccounts
                 TooltipWrap(stringResource(Res.string.account)) {
                     SelectorChip(
                         label = accounts.firstOrNull { it.id == account }?.label ?: account,
                         icon = Lucide.CircleUser,
                         tint = accent,
-                        options = listOf("" to defaultLabel) + accounts.map { it.id to it.label },
+                        options = listOf("" to defaultLabel) + sorted.map { it.id to it.label },
                         selected = accountSelected,
+                        dividerBefore = localAccounts.firstOrNull()?.id,
                         onSelect = onAccount,
                     )
                 }
@@ -2287,6 +2291,7 @@ private fun SelectorChip(
     options: List<Pair<String, String>>,
     selected: String,
     optionStyle: ((String) -> Pair<ImageVector, Color>)? = null,
+    dividerBefore: String? = null,
     onSelect: (String) -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
@@ -2311,6 +2316,9 @@ private fun SelectorChip(
             properties = PopupProperties(focusable = !LocalIsTouch.current),
         ) {
             options.forEach { (value, display) ->
+                if (dividerBefore != null && value == dividerBefore) {
+                    HorizontalDivider(Modifier.padding(vertical = 4.dp))
+                }
                 val style = optionStyle?.invoke(value)
                 CompactDropdownItem(
                     text = display,

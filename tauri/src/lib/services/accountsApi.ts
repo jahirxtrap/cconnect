@@ -2,11 +2,23 @@ import { transfers } from "$lib/data/transfers.svelte";
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 
+export interface AccountProvider {
+  baseUrl: string;
+  model: string;
+}
+
 export interface Account {
   id: string;
   label: string;
   loggedIn: boolean;
   primary: boolean;
+  provider: AccountProvider | null;
+}
+
+export interface ProviderProbe {
+  baseUrl: string;
+  models: string[];
+  found: boolean;
 }
 
 export interface AccountsSnapshot {
@@ -21,6 +33,9 @@ const parse = (data: Wire): Account => ({
   label: data.label ?? "",
   loggedIn: data.logged_in === true,
   primary: data.primary === true,
+  provider: data.provider
+    ? { baseUrl: data.provider.base_url ?? "", model: data.provider.model ?? "" }
+    : null,
 });
 
 export const exportUrl = (id: string, profile: Profile = backend.active) =>
@@ -38,6 +53,18 @@ export const createAccountsApi = (client: HttpClient) => ({
 
   async create(label: string): Promise<Account | null> {
     const data = await client.post<Wire>("/accounts", { label });
+    return data && parse(data);
+  },
+
+  async detectProvider(baseUrl = ""): Promise<ProviderProbe | null> {
+    const query = baseUrl ? `?base_url=${encodeURIComponent(baseUrl)}` : "";
+    const data = await client.get<Wire>(`/accounts/provider${query}`);
+    if (!data) return null;
+    return { baseUrl: data.base_url ?? "", models: data.models ?? [], found: data.found === true };
+  },
+
+  async createProvider(label: string, baseUrl: string): Promise<Account | null> {
+    const data = await client.post<Wire>("/accounts/provider", { label, base_url: baseUrl });
     return data && parse(data);
   },
 

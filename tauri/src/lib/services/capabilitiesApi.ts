@@ -6,6 +6,10 @@ export interface LabeledOption {
   label: string;
 }
 
+export interface AccountOption extends LabeledOption {
+  local: boolean;
+}
+
 export interface CommandOption {
   name: string;
   description: string;
@@ -52,7 +56,7 @@ export interface Capabilities {
   fastMode: FastMode;
   colors: string[];
   commands: CommandOption[];
-  accounts: LabeledOption[];
+  accounts: AccountOption[];
   mcpTools: McpTool[];
   defaults: CapabilitiesDefaults;
   serverVersion: string | null;
@@ -100,7 +104,7 @@ interface CapabilitiesWire extends VersionWire {
     argument_hint?: string;
     aliases?: string[];
   }>;
-  accounts?: Array<{ id?: string; label?: string }>;
+  accounts?: Array<{ id?: string; label?: string; local?: boolean }>;
   defaults?: { permission_mode?: string; effort?: string; model?: string; account?: string };
   mcp_tools?: Array<{ name?: string; description?: string; group?: string; group_description?: string }>;
 }
@@ -148,9 +152,10 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
     return data && toVersion(data);
   },
 
-  async capabilities(): Promise<Capabilities | null> {
+  async capabilities(account = ""): Promise<Capabilities | null> {
     const data = await http.get<CapabilitiesWire>("/capabilities", {
       capabilities: CLIENT_CAPABILITIES.join(","),
+      ...(account ? { account } : {}),
     });
     if (!data) return null;
     return {
@@ -183,7 +188,13 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
           argumentHint: command.argument_hint ?? "",
           aliases: command.aliases ?? [],
         })),
-      accounts: toOptions(data.accounts),
+      accounts: (data.accounts ?? [])
+        .filter((option) => option.id)
+        .map((option) => ({
+          id: option.id!,
+          label: option.label ?? option.id!,
+          local: option.local === true,
+        })),
       mcpTools: (data.mcp_tools ?? [])
         .filter((tool) => tool.name)
         .map((tool) => ({

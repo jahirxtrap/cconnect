@@ -1,11 +1,14 @@
 package com.jahirtrap.cconnect.claude
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -20,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.lucide.CircleUser
 import com.composables.icons.lucide.Lucide
@@ -36,6 +40,7 @@ import com.jahirtrap.cconnect.ui.ActionButton
 import com.jahirtrap.cconnect.ui.CompactDialog
 import com.jahirtrap.cconnect.ui.ConfirmDialog
 import com.jahirtrap.cconnect.ui.InputField
+import com.jahirtrap.cconnect.ui.OutlinedPanel
 import com.jahirtrap.cconnect.ui.RenameDialog
 import com.jahirtrap.cconnect.ui.StatusDot
 import com.jahirtrap.cconnect.ui.Button
@@ -52,6 +57,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
     var snapshot by remember { mutableStateOf<AccountsApi.Snapshot?>(null) }
     var reload by remember { mutableStateOf(0) }
     var adding by remember { mutableStateOf(false) }
+    var localAdding by remember { mutableStateOf(false) }
     var actions by remember { mutableStateOf<AccountsApi.Account?>(null) }
     var renaming by remember { mutableStateOf<AccountsApi.Account?>(null) }
     var deleting by remember { mutableStateOf<AccountsApi.Account?>(null) }
@@ -92,6 +98,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 icon = Lucide.CircleUser,
                 title = account.label,
                 summary = when {
+                    account.provider != null -> account.provider.baseUrl
                     !account.loggedIn -> pendingLabel
                     account.id == defaultId -> defaultLabel
                     else -> connectedLabel
@@ -127,12 +134,14 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 }
             },
         ) {
-            ActionButton(
-                text = stringResource(if (account.loggedIn) Res.string.account_relogin else Res.string.account_login),
-                onClick = { actions = null; beginLogin(account) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(6.dp))
+            if (account.provider == null) {
+                ActionButton(
+                    text = stringResource(if (account.loggedIn) Res.string.account_relogin else Res.string.account_login),
+                    onClick = { actions = null; beginLogin(account) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(6.dp))
+            }
             if (account.loggedIn && account.id != defaultId) {
                 ActionButton(
                     text = stringResource(Res.string.account_set_default),
@@ -152,7 +161,7 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 onClick = { actions = null; renaming = account },
                 modifier = Modifier.fillMaxWidth(),
             )
-            if (account.loggedIn) {
+            if (account.loggedIn && account.provider == null) {
                 Spacer(Modifier.height(6.dp))
                 ActionButton(
                     text = stringResource(Res.string.account_export),
@@ -225,6 +234,13 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 LoadingIndicator(modifier = Modifier.size(20.dp))
             }
+            Spacer(Modifier.height(6.dp))
+            ActionButton(
+                text = stringResource(Res.string.account_local),
+                enabled = !importing,
+                onClick = { adding = false; localAdding = true },
+                modifier = Modifier.fillMaxWidth(),
+            )
             if (importFailed) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -233,6 +249,101 @@ internal fun AccountsSection(enabled: Boolean, onChanged: () -> Unit) {
                     color = MaterialTheme.colorScheme.error,
                 )
             }
+        }
+    }
+
+    if (localAdding) {
+        var label by remember { mutableStateOf("") }
+        var url by remember { mutableStateOf("") }
+        var probing by remember { mutableStateOf(false) }
+        var probe by remember { mutableStateOf<AccountsApi.ProviderProbe?>(null) }
+
+        suspend fun runProbe(target: String) {
+            probing = true
+            probe = AccountsApi.detectProvider(target)
+            probe?.let { url = it.baseUrl }
+            probing = false
+        }
+
+        LaunchedEffect(Unit) { runProbe("") }
+
+        val localTitle = stringResource(Res.string.account_local)
+        CompactDialog(
+            onDismiss = { localAdding = false },
+            title = localTitle,
+            buttons = {
+                Button(onClick = { localAdding = false }, variant = ButtonVariant.Outlined) {
+                    Text(stringResource(Res.string.cancel))
+                }
+                Button(
+                    enabled = probe?.found == true && !probing,
+                    onClick = {
+                        val name = label.ifBlank { localTitle }
+                        val target = url
+                        localAdding = false
+                        scope.launch {
+                            runCatching { AccountsApi.createProvider(name, target) }
+                            refresh()
+                        }
+                    },
+                ) { Text(stringResource(Res.string.account_add)) }
+            },
+        ) {
+            InputField(
+                value = label,
+                onValueChange = { label = it },
+                singleLine = true,
+                label = { Text(stringResource(Res.string.account_name)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(12.dp))
+            InputField(
+                value = url,
+                onValueChange = { url = it },
+                singleLine = true,
+                label = { Text(stringResource(Res.string.account_local_url)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            probe?.let { found ->
+                Spacer(Modifier.height(12.dp))
+                if (found.found) {
+                    OutlinedPanel(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            stringResource(Res.string.account_local_found, found.models.size),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            found.models.forEach { name ->
+                                Text(
+                                    name,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                } else if (!probing) {
+                    Text(
+                        stringResource(Res.string.account_local_missing),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (probing) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(10.dp))
+            }
+            ActionButton(
+                text = stringResource(Res.string.account_local_probe),
+                enabled = !probing && url.isNotBlank(),
+                onClick = { scope.launch { runProbe(url) } },
+                modifier = Modifier.fillMaxWidth(),
+            )
         }
     }
 

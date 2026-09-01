@@ -1,5 +1,6 @@
 package com.jahirtrap.cconnect.data.remote
 
+import com.jahirtrap.cconnect.data.AccountOption
 import com.jahirtrap.cconnect.data.CLIENT_CAPABILITIES
 import com.jahirtrap.cconnect.data.Capabilities
 import com.jahirtrap.cconnect.data.CapabilitiesDefaults
@@ -35,8 +36,11 @@ object CapabilitiesApi {
         )
     }
 
-    suspend fun capabilities(): Capabilities? {
-        val query = mapOf("capabilities" to CLIENT_CAPABILITIES.joinToString(","))
+    suspend fun capabilities(account: String = ""): Capabilities? {
+        val query = buildMap {
+            put("capabilities", CLIENT_CAPABILITIES.joinToString(","))
+            if (account.isNotBlank()) put("account", account)
+        }
         val data = Http.get("/capabilities", query)?.jsonObject ?: return null
         val fallback = Capabilities()
         return Capabilities(
@@ -85,7 +89,11 @@ object CapabilitiesApi {
             accounts = data["accounts"]?.jsonArray?.mapNotNull { el ->
                 val o = el.jsonObject
                 val id = o["id"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
-                ModelOption(id, o["label"]?.jsonPrimitive?.contentOrNull ?: id)
+                AccountOption(
+                    id,
+                    o["label"]?.jsonPrimitive?.contentOrNull ?: id,
+                    o["local"]?.jsonPrimitive?.booleanOrNull ?: false,
+                )
             } ?: fallback.accounts,
             mcpTools = data["mcp_tools"]?.jsonArray?.mapNotNull { el ->
                 val o = el.jsonObject

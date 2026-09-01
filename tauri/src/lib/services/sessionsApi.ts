@@ -125,8 +125,11 @@ export const createSessionsApi = (http: HttpClient) => ({
     return (await http.post(`/sessions/${sessionId}/rename`, { project, title })) !== null;
   },
 
-  async autoRename(sessionId: string, project: string): Promise<string | null> {
-    const data = await http.post<{ title?: string }>(`/sessions/${sessionId}/auto-rename`, { project });
+  async autoRename(sessionId: string, project: string, account = ""): Promise<string | null> {
+    const data = await http.post<{ title?: string }>(`/sessions/${sessionId}/auto-rename`, {
+      project,
+      account,
+    });
     return data?.title ?? null;
   },
 

@@ -280,6 +280,14 @@
     settings.sidebarExpanded = value;
   };
 
+  const onKeydown = (event: KeyboardEvent) => {
+    if (event.defaultPrevented || event.altKey || !(event.ctrlKey || event.metaKey)) return;
+    if (event.key.toLowerCase() !== "b") return;
+    event.preventDefault();
+    if (layout.mobile) drawer.open = !drawer.open;
+    else setExpanded(!expanded);
+  };
+
   $effect(() => {
     if (!layout.mobile) drawer.open = false;
   });
@@ -299,7 +307,7 @@
   );
 </script>
 
-<svelte:window onpaste={onPaste} />
+<svelte:window onpaste={onPaste} onkeydown={onKeydown} />
 
 {#if layout.mobile && terminalTabs.overlayOpen}
   <div
@@ -363,9 +371,7 @@
         <div
           role="separator"
           aria-orientation="vertical"
-          class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-accent/40 {sidebarDragging
-            ? 'bg-accent/40'
-            : ''}"
+          class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize"
           use:resizeHandle={{
             axis: "x",
             value: () => sidebarWidth,
@@ -562,9 +568,7 @@
         <div
           role="separator"
           aria-orientation="vertical"
-          class="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-accent/40 {terminalDragging
-            ? 'bg-accent/40'
-            : ''}"
+          class="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize"
           use:resizeHandle={{
             axis: "x",
             invert: true,

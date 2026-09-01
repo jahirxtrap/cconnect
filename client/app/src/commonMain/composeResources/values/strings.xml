@@ -467,5 +467,10 @@
     <string name="account_export">Export account</string>
     <string name="account_import">Import from a file</string>
     <string name="account_import_failed">That file is not a valid account export</string>
+    <string name="account_local">Local models</string>
+    <string name="account_local_url">Provider address</string>
+    <string name="account_local_probe">Search for models</string>
+    <string name="account_local_found">%1$d models ready to use</string>
+    <string name="account_local_missing">Nothing answered at that address</string>
     <string name="account_relogin">Sign in again</string>
 </resources>

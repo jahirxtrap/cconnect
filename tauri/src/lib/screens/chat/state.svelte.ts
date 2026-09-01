@@ -957,6 +957,7 @@ export class ChatState {
     this.#updateEnvironment({ account });
     this.accountOverride = account;
     this.#pushGeneration({ account: account || this.account });
+    void this.refreshServerInfo();
   }
 
   setStreamTokens(value: string) {
@@ -992,7 +993,11 @@ export class ChatState {
 
   async autoRename(session: SessionInfo) {
     if (!session.projectKey) return;
-    const title = await this.#sessions.autoRename(session.sessionId, session.projectKey);
+    const title = await this.#sessions.autoRename(
+      session.sessionId,
+      session.projectKey,
+      this.accountOverride || this.account,
+    );
     if (title) this.#updateHistoryTitle(session.sessionId, title);
   }
 
@@ -1244,7 +1249,7 @@ export class ChatState {
   }
 
   async refreshServerInfo() {
-    const capabilities = await this.#capabilities.capabilities();
+    const capabilities = await this.#capabilities.capabilities(this.accountOverride || this.account);
     if (capabilities) {
       this.capabilities = capabilities;
       this.#dropStaleOverrides(capabilities);
@@ -1255,7 +1260,9 @@ export class ChatState {
     }
     const snapshot = await this.#settings.get();
     if (snapshot) {
-      this.model = snapshot.model;
+      const served = (capabilities ?? this.capabilities)?.models ?? [];
+      const shared = served.some((item) => item.id === snapshot.model);
+      this.model = shared || !served.length ? snapshot.model : this.model;
       this.effort = snapshot.effort;
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;

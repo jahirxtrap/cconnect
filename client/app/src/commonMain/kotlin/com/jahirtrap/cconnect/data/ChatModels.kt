@@ -240,6 +240,8 @@ val InteractionData.pending: Boolean
 
 data class ModelOption(val id: String, val label: String)
 
+data class AccountOption(val id: String, val label: String, val local: Boolean = false)
+
 data class PermissionMode(val id: String, val label: String)
 
 data class CommandOption(
@@ -301,7 +303,7 @@ data class Capabilities(
     val fastMode: FastMode = FastMode(),
     val colors: List<String> = listOf("red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"),
     val commands: List<CommandOption> = emptyList(),
-    val accounts: List<ModelOption> = emptyList(),
+    val accounts: List<AccountOption> = emptyList(),
     val mcpTools: List<McpTool> = emptyList(),
     val defaults: CapabilitiesDefaults = CapabilitiesDefaults(),
     val serverVersion: String? = null,

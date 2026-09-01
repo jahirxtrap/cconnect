@@ -391,9 +391,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     private suspend fun refreshCompat() {
-        val caps = CapabilitiesApi.capabilities()
+        val current = _state.value
+        val caps = CapabilitiesApi.capabilities(current.accountOverride.ifEmpty { current.account })
         if (caps != null) {
-            val current = _state.value
             val staleAccount = current.accountOverride.isNotEmpty() &&
                 caps.accounts.none { it.id == current.accountOverride }
             val staleModel = current.modelOverride.isNotEmpty() &&
@@ -438,12 +438,13 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     private suspend fun refreshServerInfo() {
         refreshCompat()
+        val served = _state.value.capabilities.models
         SettingsApi.get()?.let { s ->
             store()?.applySettings(s.chatOrder, s.defaultCategory, s.trashEnabled)
             _state.update {
                 it.copy(
                     visibility = localVisibility(),
-                    model = s.model,
+                    model = if (served.isEmpty() || served.any { m -> m.id == s.model }) s.model else it.model,
                     effort = s.effort,
                     permissionMode = s.permissionMode,
                     streamTokens = s.streaming,
@@ -794,6 +795,7 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         EnvOverrides.bump()
         _state.update { it.copy(accountOverride = account) }
         pushGeneration(account = account)
+        viewModelScope.launch { refreshServerInfo() }
     }
 
     fun setModel(model: String) {
@@ -1510,8 +1512,10 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
 
     fun autoRenameSession(session: SessionInfo) {
         val projectKey = session.projectKey ?: return
+        val state = _state.value
+        val account = state.accountOverride.ifEmpty { state.account }
         viewModelScope.launch {
-            SessionsApi.autoRenameSession(session.sessionId, projectKey)?.let { title ->
+            SessionsApi.autoRenameSession(session.sessionId, projectKey, account)?.let { title ->
                 updateHistoryTitle(session.sessionId, title)
             }
         }

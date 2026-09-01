@@ -25,6 +25,9 @@ _WINDOWS = sys.platform == "win32"
 
 PRIMARY_ID = "default"
 PRIMARY_LABEL = "Default"
+PROVIDER_TOKEN = "cconnect"
+
+_MODEL_ALIASES = ("SONNET", "OPUS", "HAIKU")
 
 _ACCOUNTS_DIR = Path(__file__).resolve().parent.parent / "accounts"
 _META_FILE = "account.json"
@@ -55,10 +58,37 @@ def config_dir(account_id: Optional[str]) -> Optional[Path]:
     return path if path.is_dir() else None
 
 
+def provider_for(account_id: Optional[str]) -> dict:
+    path = config_dir(account_id)
+    if path is None:
+        return {}
+    try:
+        stored = json.loads((path / _META_FILE).read_text(encoding="utf-8")).get("provider")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return {}
+    return stored if isinstance(stored, dict) and stored.get("base_url") else {}
+
+
+def model_for(account_id: Optional[str], alias: str) -> str:
+    """A Claude alias means nothing to a provider, which only serves its own models."""
+    provider = provider_for(account_id)
+    return (provider.get("model") or alias) if provider else alias
+
+
 def env_for(account_id: Optional[str]) -> dict[str, str]:
     """Environment overrides to run the CLI as this account."""
     path = config_dir(account_id)
-    return {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
+    env = {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
+    provider = provider_for(account_id)
+    if not provider:
+        return env
+    env["ANTHROPIC_BASE_URL"] = provider["base_url"]
+    env["ANTHROPIC_AUTH_TOKEN"] = provider.get("token") or PROVIDER_TOKEN
+    fallback = provider.get("model") or ""
+    if fallback:
+        for alias in _MODEL_ALIASES:
+            env[f"ANTHROPIC_DEFAULT_{alias}_MODEL"] = fallback
+    return env
 
 
 def credentials_path(account_id: Optional[str] = None) -> Path:
@@ -78,11 +108,16 @@ def is_logged_in(account_id: Optional[str]) -> bool:
     return bool((data.get("claudeAiOauth") or {}).get("accessToken"))
 
 
-def _label(path: Path, fallback: str) -> str:
+def _meta(path: Path) -> dict:
     try:
-        return json.loads((path / _META_FILE).read_text(encoding="utf-8")).get("label") or fallback
+        stored = json.loads((path / _META_FILE).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return fallback
+        return {}
+    return stored if isinstance(stored, dict) else {}
+
+
+def _label(path: Path, fallback: str) -> str:
+    return _meta(path).get("label") or fallback
 
 
 def list_accounts() -> list[dict]:
@@ -91,15 +126,18 @@ def list_accounts() -> list[dict]:
         "label": _label(primary_dir(), PRIMARY_LABEL),
         "logged_in": is_logged_in(None),
         "primary": True,
+        "provider": None,
     }]
     if _ACCOUNTS_DIR.is_dir():
         for entry in sorted(_ACCOUNTS_DIR.iterdir()):
             if entry.is_dir() and not entry.name.endswith(".lock"):
+                provider = provider_for(entry.name)
                 items.append({
                     "id": entry.name,
                     "label": _label(entry, entry.name),
-                    "logged_in": is_logged_in(entry.name),
+                    "logged_in": bool(provider) or is_logged_in(entry.name),
                     "primary": False,
+                    "provider": {"base_url": provider["base_url"], "model": provider["model"]} if provider else None,
                 })
     return items
 
@@ -171,7 +209,7 @@ def create(label: str) -> dict:
         if source.is_file():
             shutil.copy2(source, path / name)
     sync_shared_config(account_id)
-    return {"id": account_id, "label": label, "logged_in": False, "primary": False}
+    return {"id": account_id, "label": label, "logged_in": False, "primary": False, "provider": None}
 
 
 def delete(account_id: str) -> bool:
@@ -190,8 +228,24 @@ def rename(account_id: str, label: str) -> bool:
     path = config_dir(account_id) if account_id != PRIMARY_ID else primary_dir()
     if path is None:
         return False
-    (path / _META_FILE).write_text(json.dumps({"label": label.strip() or account_id}), encoding="utf-8")
+    meta = {**_meta(path), "label": label.strip() or account_id}
+    (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
     return True
+
+
+def create_provider(label: str, base_url: str, model: str = "", token: str = "") -> Optional[dict]:
+    url = base_url.strip().rstrip("/")
+    if not url:
+        return None
+    account = create(label)
+    path = _ACCOUNTS_DIR / account["id"]
+    provider = {"base_url": url, "model": model.strip(), "token": token.strip()}
+    (path / _META_FILE).write_text(
+        json.dumps({"label": account["label"], "provider": provider}), encoding="utf-8"
+    )
+    account["logged_in"] = True
+    account["provider"] = {"base_url": url, "model": provider["model"]}
+    return account
 
 
 def _identity(account_id: Optional[str]) -> dict:

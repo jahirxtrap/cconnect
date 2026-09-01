@@ -13,3 +13,10 @@ class AccountRenameRequest(BaseModel):
 
 class LoginCodeRequest(BaseModel):
     code: str
+
+
+class ProviderAccountRequest(BaseModel):
+    label: str
+    base_url: str
+    model: str = ""
+    token: str = ""

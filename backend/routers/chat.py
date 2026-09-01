@@ -195,6 +195,12 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
     return True
 
 
+def _side_model(state: _Session) -> str | None:
+    if not accounts.provider_for(accounts.resolve(state.account)):
+        return None
+    return _resolve_model(state.model)
+
+
 def _build_side_runner(main_state: _Session, side_state: _Session, question: str, resume_id: str | None, capabilities: list[str]):
     """LiveSession runner for one quick-chat turn: runs the isolated side question (with the
     interaction callback for permissions/AskUserQuestion) and records the side SDK session id
@@ -210,6 +216,7 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
                 ask_user=ask_user,
                 account=main_state.account,
                 permission_mode=main_state.permission_mode,
+                model=_side_model(main_state),
                 emit=emit,
                 capabilities=capabilities,
                 base_url=main_state.base_url,

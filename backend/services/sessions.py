@@ -425,7 +425,7 @@ def _transcript_for_title(path: Path, max_chars: int = 2000) -> str:
     return "\n".join(selected)[:max_chars]
 
 
-async def auto_generate_title(project_key: str, session_id: str) -> Optional[str]:
+async def auto_generate_title(project_key: str, session_id: str, account: str = "") -> Optional[str]:
     """Get a short title from the model, then do the rename ourselves (the model only
     returns the text)."""
     file = _session_file(project_key, session_id)
@@ -439,7 +439,7 @@ async def auto_generate_title(project_key: str, session_id: str) -> Optional[str
 
     hub.set_activity(session_id, "renaming")
     try:
-        raw = await generate_title(transcript)
+        raw = await generate_title(transcript, account)
         title = raw.replace("\n", " ").strip().strip("\"'").strip().rstrip(".")[:80]
         if not title:
             return None

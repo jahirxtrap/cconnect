@@ -3,8 +3,13 @@
 from fastapi import APIRouter, Request, Response
 
 from core.responses import api_response
-from schemas.accounts import AccountCreateRequest, AccountRenameRequest, LoginCodeRequest
-from services import account_login, accounts
+from schemas.accounts import (
+    AccountCreateRequest,
+    AccountRenameRequest,
+    LoginCodeRequest,
+    ProviderAccountRequest,
+)
+from services import account_login, accounts, cli_info, providers
 
 router = APIRouter(tags=["accounts"])
 
@@ -21,6 +26,24 @@ def create_account(payload: AccountCreateRequest):
     if not payload.label.strip():
         return api_response(status=400)
     return api_response(data=accounts.create(payload.label))
+
+
+@router.get("/accounts/provider")
+async def detect_provider(base_url: str = ""):
+    return api_response(data=await providers.detect(base_url))
+
+
+@router.post("/accounts/provider")
+async def create_provider_account(payload: ProviderAccountRequest):
+    model = payload.model.strip()
+    if not model:
+        found = await providers.models(payload.base_url)
+        model = found[0]["id"] if found else ""
+    account = accounts.create_provider(payload.label, payload.base_url, model, payload.token)
+    if account is None:
+        return api_response(status=400)
+    cli_info.invalidate()
+    return api_response(data=account)
 
 
 @router.put("/accounts/{account_id}")
