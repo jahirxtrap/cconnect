@@ -14,18 +14,12 @@ any browser, locally over Tailscale or publicly over a Tailscale Funnel.
 ```
 cconnect/
 ├── backend/   # FastAPI bridge (Python) — see backend/CLAUDE.md
-├── client/    # Desktop, web and Android app (Compose Multiplatform) — Windows, Linux, macOS, the browser and Android — see client/CLAUDE.md
-└── tauri/     # The same app built with Svelte + Tauri, published as an alternative line
+└── tauri/     # Desktop, web and Android app (Svelte + Tauri) — Windows, Linux, macOS, the browser and Android — see tauri/CLAUDE.md
 ```
 
-The desktop and web apps are one Compose Multiplatform codebase: the desktop
-build is a native installer per OS, and the web build is the same UI compiled to
-WebAssembly and hosted as a static site (see [Web app](#web-app)).
-
-Every release carries both lines. The Tauri assets are named `cconnect-tauri`
-and its web build lives at https://cconnect-tauri.pages.dev/; either app can
-switch to the other from Settings. They share the backend, so only the interface
-changes.
+The desktop, web and Android apps are one Svelte + Tauri codebase: the desktop
+build is a native installer per OS, and the web build is the same UI hosted as a
+static site (see [Web app](#web-app)). The assets are named `cconnect-tauri`.
 
 ## Run modes
 
@@ -144,9 +138,9 @@ environments list itself stays open, so there's always a way back.
 
 ## Web app
 
-The desktop UI also runs in the browser — the same Compose code compiled to
-**WebAssembly**, nothing to install. It's a plain static site (HTML + WASM +
-assets), so it can be hosted anywhere and opened from any browser.
+The desktop UI also runs in the browser — the same code, nothing to install.
+It's a plain static site, so it can be hosted anywhere and opened from any
+browser.
 
 Because the page is served over HTTPS, the browser only lets it reach a backend
 over **HTTPS/WSS** — so the web app pairs with the public mode: run
@@ -154,7 +148,6 @@ over **HTTPS/WSS** — so the web app pairs with the public mode: run
 `https://<hostname>.<tailnet>.ts.net` URL and token. (For that reason the
 environment form on web offers only HTTPS; the native apps keep plain HTTP for
 local backends.) Updating is just a reload. It is hosted at
-https://cconnect.pages.dev/, with the Tauri line at
 https://cconnect-tauri.pages.dev/.
 
 ## In the chat
@@ -372,9 +365,9 @@ The app and the backend declare which versions of each other — and of the
 Claude CLI — they support. When something falls behind, a notice in the chat
 takes you straight to the right place: the app's own update (with its
 changelog), the server requirement, or the CLI update button. Release notes
-for both CConnect and Claude Code are readable in the app. Next to the update
-button, Settings → About also switches you to the other app line, offering your
-settings to copy first — the chats themselves stay on the server.
+for both CConnect and Claude Code are readable in the app. Settings → About also
+exports your settings to copy them into another install — the chats themselves
+stay on the server.
 
 ## Terminal
 

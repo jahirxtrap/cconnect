@@ -131,19 +131,17 @@ Bundled: `check_progress`, `compact`, `usage`, `show_component`, `ask_component`
 contract is flat: every value travels as a string, an `id` means the element carries a
 value, control labels travel as keys for the client to translate, `show_if` hides an
 element *and* leaves it out of `values`, and validation is client-side. `mcps/media.py` is
-the single table of what each client renders inline.
+the single table of what the app renders inline.
 
-**Adding an element** touches ~10 files and there is no generator, so this is the checklist:
+**Adding an element** touches several files and there is no generator, so this is the checklist:
 
 1. `TYPES` + `LEAF` in `mcps/components.py`, and its line in `DESCRIPTION` / `SHOW_DESCRIPTION`.
-2. `ComponentElement` in `client/.../data/ChatModels.kt` and `toElement` in `.../remote/ChatSocket.kt`.
-3. The `when` in `ComponentElements` (`client/.../chat/ChatBlocks.kt`).
-4. `ComponentElement` in `tauri/.../data/chatModels.ts` and `toElement` in `.../services/chatSocket.ts`.
-5. The `{#if}` chain in `tauri/.../chat/blocks/ComponentBlock.svelte`.
-6. **The summary** (`componentSummary` / the derived `summary`) — the one everybody forgets;
+2. `ComponentElement` in `tauri/.../data/chatModels.ts` and `toElement` in `.../services/chatSocket.ts`.
+3. The `{#if}` chain in `tauri/.../chat/blocks/ComponentBlock.svelte`.
+4. **The summary** (`componentSummary` / the derived `summary`) — the one everybody forgets;
    skipping it is what printed `secret` values into the chat.
-7. The validation (`componentMissing` / `missing`) if it can be required.
-8. The four translation files if it brings text of its own.
+5. The validation (`componentMissing` / `missing`) if it can be required.
+6. The two translation files if it brings text of its own.
 
 ## Configuration
 

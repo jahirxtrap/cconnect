@@ -1,11 +1,7 @@
 # CLAUDE.md — tauri (Svelte + Tauri)
 
-The second app line: same backend contract and the same platforms as `client/`, built with
-Svelte 5 + Tauri 2. Assets and the web build are named `cconnect-tauri`.
-
-**It must match `client/` one to one** — same screens, same wording, same spacing, same
-gestures. A change lands in both or it is a divergence, which counts as a bug. When the two
-disagree, `client/CLAUDE.md` describes the behaviour to copy.
+The app: desktop, web and Android from one Svelte 5 + Tauri 2 codebase, against the backend
+contract. Assets and the web build are named `cconnect-tauri`.
 
 ## Layout
 
@@ -114,9 +110,7 @@ npm run tauri dev | build
 
 ## Conventions
 
-1. **Parity with `client/` first.** If a behaviour exists there, copy it instead of inventing
-   one; if it is missing there, say so before diverging.
-2. **Backend is the source of truth**; mirror its event shapes verbatim.
-3. **No comments.** Self-explanatory names; rationale goes in the answer or the commit.
+1. **Backend is the source of truth**; mirror its event shapes verbatim.
+2. **No comments.** Self-explanatory names; rationale goes in the answer or the commit.
    `<!-- svelte-ignore … -->` is a directive, not a comment, and stays.
-4. **Neutral Spanish** for user-facing text, from the i18n files — no regionalisms.
+3. **Neutral Spanish** for user-facing text, from the i18n files — no regionalisms.
