@@ -105,7 +105,8 @@
     <string name="up_to_date">You have the latest version</string>
     <string name="update_action">Update</string>
     <string name="check_updates">Check for updates</string>
-    <string name="switch_build">Switch to Tauri</string>
+    <string name="end_of_support">This build no longer receives updates. Switch to the new app to keep getting them.</string>
+    <string name="switch_build">Switch to the new app</string>
     <string name="switch_build_hint">Copy your settings before switching: the other build starts empty. Your chats stay on the server.</string>
     <string name="switch_build_continue">Continue</string>
     <string name="claude">Claude</string>

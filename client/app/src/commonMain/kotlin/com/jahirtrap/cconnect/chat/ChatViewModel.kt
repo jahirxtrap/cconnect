@@ -337,7 +337,6 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
         if (!releaseChecked) {
             releaseChecked = true
             AppUpdater.consumeIfInstalled(BuildConfig.VERSION_NAME)
-            viewModelScope.launch { checkForUpdates() }
         }
         viewModelScope.launch {
             refreshServerInfo()

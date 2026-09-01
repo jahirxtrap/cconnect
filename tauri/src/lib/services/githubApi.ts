@@ -7,14 +7,12 @@ const REPO = "cconnect";
 
 export const REPO_URL = `https://github.com/${OWNER}/${REPO}`;
 export const RELEASES_URL = `${REPO_URL}/releases`;
-export const ALT_WEB_URL = "https://cconnect.pages.dev/";
 export const KOFI_URL = "https://ko-fi.com/jahirtrap";
 
 export interface Release {
   tag: string;
   url: string;
   installerUrl: string | null;
-  altInstallerUrl: string | null;
 }
 
 export interface Profile {
@@ -57,11 +55,11 @@ const fetchJson = async <T>(url: string): Promise<T | null> => {
   }
 };
 
-const installerFor = (assets: ReleaseWire["assets"], alt: boolean): string | null => {
+const installerFor = (assets: ReleaseWire["assets"]): string | null => {
   const listed = (assets ?? []).filter((asset) => !!asset.browser_download_url);
   for (const extension of installerExtensions()) {
     const match = listed.find(
-      (asset) => asset.browser_download_url!.endsWith(extension) && (asset.name ?? "").includes(ALT_MARK) === alt,
+      (asset) => asset.browser_download_url!.endsWith(extension) && (asset.name ?? "").includes(ALT_MARK),
     );
     if (match) return match.browser_download_url!;
   }
@@ -74,8 +72,7 @@ export const latestRelease = async (): Promise<Release | null> => {
   return {
     tag: data.tag_name,
     url: data.html_url ?? RELEASES_URL,
-    installerUrl: installerFor(data.assets, true),
-    altInstallerUrl: installerFor(data.assets, false),
+    installerUrl: installerFor(data.assets),
   };
 };
 

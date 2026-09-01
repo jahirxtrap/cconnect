@@ -72,25 +72,90 @@ pub fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String>
         return Err("missing installer".into());
     }
 
-    let spawned = if cfg!(windows) {
-        if path.to_lowercase().ends_with(".msi") {
+    if cfg!(windows) {
+        let spawned = if path.to_lowercase().ends_with(".msi") {
             Command::new("msiexec").args(["/i", &path]).spawn()
         } else {
             Command::new(&path).spawn()
-        }
-    } else if path.ends_with(".deb") {
-        Command::new("pkexec")
-            .args(["apt-get", "install", "-y", &path])
-            .spawn()
-    } else if path.ends_with(".rpm") {
-        Command::new("pkexec")
-            .args(["rpm", "-U", "--force", &path])
-            .spawn()
-    } else {
-        Command::new("xdg-open").arg(&path).spawn()
-    };
+        };
+        spawned.map_err(|error| error.to_string())?;
+        app.exit(0);
+        return Ok(());
+    }
 
-    spawned.map_err(|error| error.to_string())?;
-    app.exit(0);
+    if let Some(command) = package_command(&path) {
+        if detached_install(&command) {
+            app.exit(0);
+            return Ok(());
+        }
+        Command::new(&command[0])
+            .args(&command[1..])
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    Command::new("xdg-open")
+        .arg(&path)
+        .spawn()
+        .map_err(|error| error.to_string())?;
     Ok(())
+}
+
+fn has_command(name: &str) -> bool {
+    Command::new("which")
+        .arg(name)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn package_command(path: &str) -> Option<Vec<String>> {
+    if !has_command("pkexec") {
+        return None;
+    }
+    let owned = path.to_string();
+    let args: Vec<&str> = if path.ends_with(".deb") {
+        vec!["apt-get", "install", "-y"]
+    } else if path.ends_with(".rpm") && has_command("dnf") {
+        vec!["dnf", "install", "-y"]
+    } else if path.ends_with(".rpm") && has_command("zypper") {
+        vec!["zypper", "--non-interactive", "install", "--allow-unsigned-rpm"]
+    } else if path.ends_with(".rpm") {
+        vec!["rpm", "-U", "--force"]
+    } else {
+        return None;
+    };
+    let mut command = vec!["pkexec".to_string()];
+    command.extend(args.into_iter().map(String::from));
+    command.push(owned);
+    Some(command)
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+fn detached_install(command: &[String]) -> bool {
+    if !has_command("setsid") {
+        return false;
+    }
+    let Ok(current) = std::env::current_exe() else {
+        return false;
+    };
+    let script = format!(
+        "{}; exec {}",
+        command
+            .iter()
+            .map(|part| shell_quote(part))
+            .collect::<Vec<_>>()
+            .join(" "),
+        shell_quote(&current.to_string_lossy()),
+    );
+    Command::new("setsid")
+        .args(["sh", "-c", &script])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .is_ok()
 }

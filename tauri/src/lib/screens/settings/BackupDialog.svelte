@@ -5,17 +5,15 @@
   import InputField from "$lib/ui/InputField.svelte";
 
   interface Props {
-    mode: "export" | "import" | "switch";
+    mode: "export" | "import";
     payload?: string;
-    canSwitch?: boolean;
     onImport?: (raw: string) => boolean;
-    onSwitch?: () => void;
     onDismiss: () => void;
   }
 
-  const { mode, payload = "", canSwitch = true, onImport, onSwitch, onDismiss }: Props = $props();
+  const { mode, payload = "", onImport, onDismiss }: Props = $props();
 
-  const TITLES = { export: "EXPORT_SETTINGS", import: "IMPORT_SETTINGS", switch: "SWITCH_BUILD" } as const;
+  const TITLES = { export: "EXPORT_SETTINGS", import: "IMPORT_SETTINGS" } as const;
 
   const LINES = 10;
 
@@ -28,16 +26,6 @@
     {#if mode === "export"}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button onclick={() => void navigator.clipboard.writeText(payload)}>{t("COPY")}</Button>
-    {:else if mode === "switch"}
-      <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-      <Button onclick={() => void navigator.clipboard.writeText(payload)} variant="outlined">{t("COPY")}</Button>
-      <Button
-        enabled={canSwitch}
-        onclick={() => {
-          void navigator.clipboard.writeText(payload);
-          onSwitch?.();
-        }}>{t("SWITCH_BUILD_CONTINUE")}</Button
-      >
     {:else}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button
@@ -52,9 +40,7 @@
 
   <div class="flex w-full flex-col gap-2">
     {#if mode !== "import"}
-      <p class="text-body-sm text-on-surface-variant">
-        {t(mode === "switch" ? "SWITCH_BUILD_HINT" : "EXPORT_SETTINGS_WARNING")}
-      </p>
+      <p class="text-body-sm text-on-surface-variant">{t("EXPORT_SETTINGS_WARNING")}</p>
       <InputField value={payload} oninput={() => {}} minLines={LINES} maxLines={LINES} />
     {:else}
       <p class="text-body-sm text-on-surface-variant">{t("IMPORT_SETTINGS_HINT")}</p>

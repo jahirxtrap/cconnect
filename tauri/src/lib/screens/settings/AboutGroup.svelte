@@ -2,13 +2,10 @@
   import Coffee from "@lucide/svelte/icons/coffee";
 
   import FileText from "@lucide/svelte/icons/file-text";
-  import { exportSettings } from "$lib/data/backup";
   import { APP_VERSION } from "$lib/data/build";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import {
-    ALT_MARK,
-    ALT_WEB_URL,
     contributorProfile,
     KOFI_URL,
     ownerProfile,
@@ -22,7 +19,6 @@
   import { updater } from "$lib/services/updater.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppLogo from "$lib/ui/AppLogo.svelte";
-  import BackupDialog from "./BackupDialog.svelte";
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import ExternalIndicator from "$lib/ui/ExternalIndicator.svelte";
   import GithubIcon from "$lib/ui/GithubIcon.svelte";
@@ -39,17 +35,12 @@
   const { flash = false }: Props = $props();
 
   let changelogOpen = $state(false);
-  let switchOpen = $state(false);
   let owner = $state<Profile | null>(null);
   let contributor = $state<Profile | null>(null);
   let checking = $state(false);
-  let switchChecking = $state(false);
-  let switchDownloading = $state(false);
 
   const release = $derived(serverStatus.release);
   const updateAvailable = $derived(serverStatus.updateAvailable && !!release);
-  const pendingIsSwitch = $derived(!!updater.pending && !updater.pending.path.includes(ALT_MARK));
-  const switchBusy = $derived(switchChecking || switchDownloading);
 
   const open = (url: string) => openExternal(url);
 
@@ -59,12 +50,12 @@
     checking = false;
   };
 
-  const downloadingUpdate = $derived(updater.progress !== null && !switchDownloading);
+  const downloadingUpdate = $derived(updater.progress !== null);
 
   const updateLabel = $derived(
     downloadingUpdate
       ? t("CANCEL")
-      : updater.pending && !pendingIsSwitch
+      : updater.pending
         ? t("INSTALL")
         : updateAvailable
           ? t("UPDATE_ACTION")
@@ -75,27 +66,15 @@
 
   const startUpdate = async (target: Release) => {
     const version = target.tag.replace(/^v/, "");
-    if (!isTauri || !target.installerUrl) {
+    if (!isTauri) {
+      await updater.reload();
+      return;
+    }
+    if (!target.installerUrl) {
       open(target.url);
       return;
     }
     if (!(await updater.download(target.installerUrl, version)) && !updater.cancelled) open(target.url);
-  };
-
-  const startSwitch = async (url: string, target: Release) => {
-    switchDownloading = true;
-    const done = await updater.download(url, target.tag.replace(/^v/, ""));
-    switchDownloading = false;
-    if (!done && !updater.cancelled) open(target.url);
-  };
-
-  const openSwitch = async () => {
-    if (isTauri) {
-      switchChecking = true;
-      await serverStatus.checkRelease(true);
-      switchChecking = false;
-    }
-    switchOpen = true;
   };
 
   $effect(() => {
@@ -124,7 +103,7 @@
   >
       <AppLogo size={28} />
       <div class="min-w-0 flex-1">
-      <p class="truncate text-body-md">{t("APP_NAME")} (Tauri)</p>
+      <p class="truncate text-body-md">{t("APP_NAME")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>
@@ -152,29 +131,17 @@
   {/if}
 
   <div class="px-4 py-3">
-    <div class="flex gap-2">
-      <ActionButton
-        class="min-w-0 flex-1"
-        text={updateLabel}
-        enabled={!checking && !switchBusy}
-        onclick={() => {
-          if (downloadingUpdate) updater.cancel();
-          else if (updater.pending && !pendingIsSwitch) void updater.install();
-          else if (updateAvailable && release) void startUpdate(release);
-          else void check();
-        }}
-      />
-      {#if pendingIsSwitch}
-        <ActionButton class="min-w-0 flex-1" text={t("INSTALL")} onclick={() => void updater.install()} />
-      {:else}
-        <ActionButton
-          class="min-w-0 flex-1"
-          text={switchDownloading ? t("CANCEL") : switchChecking ? t("CHECKING_UPDATES") : t("SWITCH_BUILD")}
-          enabled={!switchChecking}
-          onclick={() => (switchDownloading ? updater.cancel() : void openSwitch())}
-        />
-      {/if}
-    </div>
+    <ActionButton
+      class="w-full"
+      text={updateLabel}
+      enabled={!checking}
+      onclick={() => {
+        if (downloadingUpdate) updater.cancel();
+        else if (updater.pending) void updater.install();
+        else if (updateAvailable && release) void startUpdate(release);
+        else void check();
+      }}
+    />
   </div>
 
   {@render profileRow(owner, t("CREATOR"))}
@@ -202,20 +169,6 @@
     {/snippet}
   </PreferenceRow>
 </SettingsGroup>
-
-{#if switchOpen}
-  <BackupDialog
-    mode="switch"
-    payload={exportSettings()}
-    canSwitch={!isTauri || !!release?.altInstallerUrl}
-    onSwitch={() => {
-      switchOpen = false;
-      if (!isTauri) open(ALT_WEB_URL);
-      else if (release?.altInstallerUrl) void startSwitch(release.altInstallerUrl, release);
-    }}
-    onDismiss={() => (switchOpen = false)}
-  />
-{/if}
 
 {#if changelogOpen}
   <ChangelogDialog load={() => releaseNotes(APP_VERSION)} onDismiss={() => (changelogOpen = false)} />

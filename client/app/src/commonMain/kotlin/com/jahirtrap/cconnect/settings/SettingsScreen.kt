@@ -612,7 +612,7 @@ fun SettingsScreen(
                             Spacer(Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "${stringResource(Res.string.app_name)} (Compose)",
+                                    stringResource(Res.string.app_name),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                 )
@@ -629,14 +629,8 @@ fun SettingsScreen(
                                     stringResource(Res.string.compat_server_outdated),
                                     style = MaterialTheme.typography.bodySmall, color = palette.red,
                                 )
-                                if (chatState.updateAvailable) chatState.latestRelease?.let { release ->
-                                    Text(
-                                        stringResource(Res.string.update_available, release.tag),
-                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary,
-                                    )
-                                }
-                                if (!chatState.appOutdated && !chatState.serverOutdated && !chatState.updateAvailable) Text(
-                                    stringResource(Res.string.up_to_date),
+                                Text(
+                                    stringResource(Res.string.end_of_support),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -645,7 +639,6 @@ fun SettingsScreen(
                                 Icon(Lucide.FileText, contentDescription = null)
                             }
                         }
-                        val release = chatState.latestRelease
                         if (updateProgress != null) {
                             LinearProgressIndicator(
                                 progress = { updateProgress ?: 0f },
@@ -658,49 +651,6 @@ fun SettingsScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             var switchChecking by remember { mutableStateOf(false) }
-                            val switchBusy = switchChecking || downloadingSwitch
-                            Box(modifier = Modifier.weight(1f)) {
-                                when {
-                                    pendingUpdate != null && !pendingIsSwitch -> ActionButton(
-                                        text = stringResource(Res.string.install),
-                                        onClick = { AppUpdater.install() },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    chatState.updateAvailable && release?.installerUrl != null -> {
-                                        val installerUrl = release.installerUrl
-                                        val tag = release.tag
-                                        val downloadingUpdate = updateProgress != null && !downloadingSwitch
-                                        ActionButton(
-                                            text = stringResource(if (downloadingUpdate) Res.string.cancel else Res.string.update_action),
-                                            enabled = !switchBusy,
-                                            onClick = {
-                                                if (downloadingUpdate) downloadJob?.cancel() else startDownload(installerUrl, tag, forSwitch = false)
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                        )
-                                    }
-                                    chatState.updateAvailable && isWebPlatform -> ActionButton(
-                                        text = stringResource(Res.string.update_action),
-                                        onClick = { AppUpdater.reload() },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    )
-                                    else -> {
-                                        var checking by remember { mutableStateOf(false) }
-                                        ActionButton(
-                                            text = stringResource(if (checking) Res.string.checking_updates else Res.string.check_updates),
-                                            enabled = !checking && !switchBusy,
-                                            onClick = {
-                                                scope.launch {
-                                                    checking = true
-                                                    chatVm.checkForUpdates()
-                                                    checking = false
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                        )
-                                    }
-                                }
-                            }
                             if (pendingUpdate != null && pendingIsSwitch) {
                                 ActionButton(
                                     text = stringResource(Res.string.install),
@@ -709,7 +659,10 @@ fun SettingsScreen(
                                 )
                             } else {
                                 ActionButton(
-                                    text = stringResource(if (switchChecking) Res.string.checking_updates else Res.string.switch_build),
+                                    text = stringResource(
+                                        if (switchChecking || downloadingSwitch) Res.string.checking_updates
+                                        else Res.string.switch_build
+                                    ),
                                     enabled = updateProgress == null && !switchChecking,
                                     onClick = {
                                         scope.launch {

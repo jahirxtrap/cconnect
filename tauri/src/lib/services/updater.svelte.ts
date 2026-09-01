@@ -46,6 +46,14 @@ class Updater {
     androidInstaller()?.cancel();
   }
 
+  async reload() {
+    if ("caches" in window) {
+      const keys = await caches.keys().catch(() => [] as string[]);
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }
+    location.reload();
+  }
+
   async download(url: string, version: string): Promise<boolean> {
     if (!isTauri) return false;
     this.cancelled = false;

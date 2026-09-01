@@ -44,7 +44,7 @@ async def _fetch(account: str | None = None) -> dict:
 
     provider = accounts.provider_for(account)
     if provider:
-        return {"error": f"This account runs on {provider['base_url']}, not on a Claude plan."}
+        return {"error": f"This account runs on {provider['base_url']}, not on a Claude plan"}
     token = _oauth("accessToken", account)
     if not token:
         return {"error": "No Claude token found (are you signed in to the CLI?)"}
@@ -209,10 +209,10 @@ def _bar_block(win: dict) -> dict:
 async def usage_blocks(account: str | None = None) -> list[dict]:
     data = await _fetch(account)
     if "error" in data:
-        return [{"type": "text", "value": f"_{data['error']}._"}]
+        return [{"type": "text", "text": f"_{data['error']}._"}]
     windows = _windows(data)
     if not windows:
-        return [{"type": "text", "value": "_The server returned no usage data._"}]
+        return [{"type": "text", "text": "_The server returned no usage data._"}]
     return [_bar_block(win) for win in windows]
 
 
