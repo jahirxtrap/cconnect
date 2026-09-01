@@ -1,15 +1,12 @@
-- The models, their effort levels and the slash commands are read from Claude Code itself, so a new model or a new command shows up without updating the app
-- Typing / opens the command list, tab fills in the closest match before it cycles, and the list stays out of the way while you write the arguments
-- The context ring knows the real window of every model, and the style Claude answers in is chosen next to the model
-- A subagent now closes with what it did — whether it finished, how long it took and what it spent — both while it runs and when the chat is reopened
-- Thinking blocks can report the tokens they spent, off by default and switchable for a single chat from the visibility menu
-- One of your hooks failing now says so in the chat instead of failing in silence
-- Settings gained a Chats section, holding the trash and the days a chat is kept before Claude Code deletes it, which applies to every account at once
-- Deleted chats are kept outside Claude Code's own folder, where its cleanup can no longer reach them
-- Renaming or recolouring a chat no longer sends it to the top of the list, and the list counts only the chats you can actually open
-- Asking about usage warns when Claude says the limit is close instead of at a fixed number, and shows what extra usage has spent when the account has it turned on
-- MCP servers and plugins added on one account are there on all of them, and you choose which built-in tools Claude gets in every chat
-- Smaller fixes across both apps: selected text and its colour, the progress rings and bars, figures that now read 1M instead of 1000K, and a few blocks that could be selected by accident
+- A terminal opens beside the chat: shells on the machine running the backend, each in its own tab, and the SSH hosts you saved, all kept running on the server so you find them where you left them from any device
+- Claude can open a shell and run a command in it when you let it, behind the same key that unlocks the terminal for you
+- Chats can run on a model of your own, from an account pointing at any provider that speaks the Anthropic API, be it Ollama on your machine or a gateway in front of hundreds of models
+- A provider account takes the token, API key or header it asks for, can be edited when any of that changes, and travels between backends like the rest
+- The quick chat now reaches the same built-in tools as the main chat, so asking it what your plan is spending draws the bars instead of describing them
+- A message sent from another Claude session arrives as its own block with the sender's name, instead of raw markup in the middle of the conversation
+- Signing in to the primary account works again, and secondary accounts can be renamed and deleted
+- Horizontal lists no longer show a scrollbar on touch, where it never did anything, while tables, code blocks and diffs keep theirs
+- Smaller fixes across both apps: the chat panels remember their width, the transfers panel stays out of the terminal's way, the days a chat is kept accepts any number, and blocks that opened onto an empty gap now stay shut
 
 > [!NOTE]
 > The web version is available at https://cconnect.pages.dev/  

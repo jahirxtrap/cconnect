@@ -260,6 +260,22 @@ from the Claude screen's header (the usage shown there follows it) or in
 Settings. Accounts you haven't signed into yet are listed too, so you can
 finish later.
 
+### Model providers
+
+An account doesn't have to be a Claude login. A **provider** one points the CLI
+at an address of your own, anything answering the Anthropic API — a model running
+on your machine with [Ollama](https://ollama.com), or a gateway like
+[OmniRoute](https://github.com/diegosouzapw/OmniRoute) standing in front of
+hundreds of them. Give it the address and, if it asks for one, a token, an API
+key or a header of your own; the models it serves are read from there and become
+the list you pick from, effort levels and context window included, for the reply,
+the quick chat and the title the chat writes for itself.
+
+Models that cannot call tools are left out, since Claude Code leans on them for
+everything it does, and a small model tends to describe a tool call instead of
+making one — the system prompt alone is around 17K tokens, which also rules out
+anything with a short context window.
+
 An account can also move between backends. Export it and you get a small zip
 holding its credentials and its own settings — no conversations, no projects,
 nothing tied to the machine it came from. Import it from the same dialog you add
@@ -359,6 +375,19 @@ changelog), the server requirement, or the CLI update button. Release notes
 for both CConnect and Claude Code are readable in the app. Next to the update
 button, Settings → About also switches you to the other app line, offering your
 settings to copy first — the chats themselves stay on the server.
+
+## Terminal
+
+A terminal opens beside the chat, in a panel you can drag as wide as you need:
+shells on the machine running the backend, each in its own tab, and the SSH hosts
+you saved. They run on the server rather than in the app, so closing it — or
+opening the same backend from your phone — finds them where you left them.
+
+Getting in takes the key the server prints on every start (`TERMINAL_ACCESS_KEY`,
+replaced with `python run.py --terminal-key --rotate`). It is the only gate, so
+treat it as a password to the machine. The same key decides whether Claude may
+open a shell and run a command in it, which you can also turn off from
+Settings → Tools.
 
 ## SSH client
 
