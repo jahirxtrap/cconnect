@@ -77,6 +77,7 @@ fun SessionMessage.toRole(): Role = when (type) {
     "thinking" -> Role.THINKING
     "working" -> Role.WORKING
     "notification" -> Role.NOTIFICATION
+    "session_message" -> Role.SESSION_MESSAGE
     "tool_use" -> Role.TOOL
     "tool_result" -> Role.TOOL_RESULT
     "file_change" -> Role.FILE_CHANGE

@@ -4,7 +4,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-enum class Role { USER, ASSISTANT, THINKING, WORKING, TOOL, TOOL_RESULT, SUMMARY, INTERACTION, FILE_CHANGE, COMPACT, SYSTEM, API_ERROR, INTERRUPTED, PLAN, AGENT, NOTIFICATION }
+enum class Role { USER, ASSISTANT, THINKING, WORKING, TOOL, TOOL_RESULT, SUMMARY, INTERACTION, FILE_CHANGE, COMPACT, SYSTEM, API_ERROR, INTERRUPTED, PLAN, AGENT, NOTIFICATION, SESSION_MESSAGE }
 
 enum class SendStatus { SENT, ERROR }
 
@@ -272,7 +272,12 @@ fun List<CommandOption>.resolve(text: String): CommandOption? {
     return if (token.isEmpty()) null else firstOrNull { it.answersTo(token) }
 }
 
-data class McpTool(val name: String, val description: String)
+data class McpTool(
+    val name: String,
+    val description: String,
+    val group: String? = null,
+    val groupDescription: String? = null,
+)
 
 data class FastMode(val state: String = "off", val disabledReason: String? = null)
 
@@ -345,6 +350,7 @@ sealed interface ServerEvent {
     data class ThinkingTokens(val tokens: Int) : ServerEvent
     data class HookFailed(val name: String?, val text: String) : ServerEvent
     data class Notification(val summary: String, val status: String?) : ServerEvent
+    data class SessionMessageEvent(val name: String?, val text: String) : ServerEvent
     data class Todos(val items: List<TodoItem>) : ServerEvent
     data class Task(val id: String, val content: String?, val status: String?) : ServerEvent
     data class Result(val sessionId: String?) : ServerEvent

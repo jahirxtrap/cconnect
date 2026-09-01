@@ -17,6 +17,7 @@ const GROUPED: Role[] = [
   "plan",
   "agent",
   "notification",
+  "session_message",
 ];
 
 const isNotice = (role: Role | null): boolean => role !== null && NOTICE.includes(role);

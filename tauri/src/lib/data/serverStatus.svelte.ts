@@ -1,4 +1,5 @@
 import { APP_VERSION, SUPPORTED_SERVER } from "./build";
+import { chatListFor } from "./chatList.svelte";
 import { compareVersions, satisfies } from "./compat";
 import { backend } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
@@ -41,6 +42,20 @@ class ServerStatus {
       void this.refresh();
       const timer = setInterval(() => void this.refresh(), POLL_MS);
       return () => clearInterval(timer);
+    });
+
+    $effect(() => {
+      const list = chatListFor(backend.active);
+      if (!list) return;
+      let opened = false;
+      $effect(() => {
+        if (list.connected) {
+          opened = true;
+          void this.refresh();
+          return;
+        }
+        if (opened) this.online = false;
+      });
     });
   }
 

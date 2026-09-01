@@ -5,6 +5,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
+  import { keepFocus } from "$lib/ui/keepFocus";
   import { scrollbarWidth } from "$lib/ui/scrollbar";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
@@ -435,6 +436,7 @@
   {#if !follow && visible.length && viewport > 0 && belowFold > viewport / HALF}
     <button
       type="button"
+      use:keepFocus
       onclick={toBottom}
       title={t("SCROLL_TO_BOTTOM")}
       aria-label={t("SCROLL_TO_BOTTOM")}

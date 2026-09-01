@@ -37,9 +37,8 @@ import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import com.jahirtrap.cconnect.data.ComponentCondition
 import com.jahirtrap.cconnect.data.ComponentConfirm
+import com.jahirtrap.cconnect.data.CLIENT_CAPABILITIES
 import com.jahirtrap.cconnect.data.VisibilityPrefs
-
-private val CLIENT_CAPABILITIES = listOf("media.blocks", "media.gallery", "components")
 
 class ChatSocket(private val scope: CoroutineScope, private val config: () -> BackendConfig) {
     private var ws: WsConnection? = null
@@ -76,6 +75,10 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
     fun resetResume() {
         channel = null
         lastSeq = 0
+        forgetSide()
+    }
+
+    fun forgetSide() {
         sideChannel = null
         sideLastSeq = 0
         sideResume = null
@@ -349,6 +352,7 @@ class ChatSocket(private val scope: CoroutineScope, private val config: () -> Ba
             )
             "plan" -> ServerEvent.Plan(str("markdown").orEmpty())
             "notification" -> ServerEvent.Notification(str("text").orEmpty(), str("result"))
+            "session_message" -> ServerEvent.SessionMessageEvent(str("name"), str("text").orEmpty())
             "queued" -> ServerEvent.Queued(str("id"), str("text").orEmpty())
             "queue" -> ServerEvent.Queue(queuedItems(obj["items"]))
             "dequeued" -> ServerEvent.Dequeued(

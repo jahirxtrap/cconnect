@@ -1040,9 +1040,26 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
 
 
 _NOTIFICATION_BLOCK_RE = re.compile(r"<task-notification>(.*?)</task-notification>", re.DOTALL)
+_SESSION_MESSAGE_RE = re.compile(r"<cross-session-message\b([^>]*)>(.*?)</cross-session-message>", re.DOTALL)
+_ATTRIBUTE_RE = re.compile(r'([\w-]+)="([^"]*)"')
+
+
+def _session_message(match: re.Match) -> dict:
+    attributes = dict(_ATTRIBUTE_RE.findall(match.group(1)))
+    return {
+        "type": "session_message",
+        "name": attributes.get("from-name") or "",
+        "text": match.group(2).strip(),
+    }
+
+
+def _session_message_item(text: str) -> dict | None:
+    match = _SESSION_MESSAGE_RE.match(text.strip())
+    return _session_message(match) if match else None
 
 
 def _split_notifications(text: str) -> tuple[str, list[dict]]:
+    """Notifications and cross-session messages the CLI carries inside user text."""
     items = []
     for match in _NOTIFICATION_BLOCK_RE.finditer(text):
         body = match.group(1)
@@ -1052,9 +1069,12 @@ def _split_notifications(text: str) -> tuple[str, list[dict]]:
             return found.group(1).strip() if found else None
 
         items.append({"type": "notification", "text": _tag("summary") or "", "result": _tag("status")})
-    if not items:
-        return text, items
-    return _NOTIFICATION_BLOCK_RE.sub("", text).strip(), items
+    if items:
+        text = _NOTIFICATION_BLOCK_RE.sub("", text).strip()
+    session_items = [_session_message(match) for match in _SESSION_MESSAGE_RE.finditer(text)]
+    if session_items:
+        text = _SESSION_MESSAGE_RE.sub("", text).strip()
+    return text, items + session_items
 
 
 def _notification_item(text: str) -> dict | None:

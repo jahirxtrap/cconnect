@@ -40,6 +40,7 @@ const ROLES: Record<string, Role> = {
   thinking: "thinking",
   working: "working",
   notification: "notification",
+  session_message: "session_message",
   tool_use: "tool",
   tool_result: "tool_result",
   file_change: "file_change",

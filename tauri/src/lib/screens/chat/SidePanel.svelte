@@ -5,6 +5,7 @@
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { keepFocus } from "$lib/ui/keepFocus";
   import MessageItem from "./blocks/MessageItem.svelte";
   import { cubicOut } from "svelte/easing";
 
@@ -262,6 +263,7 @@
     {#if !follow && messages.length && viewport > 0 && belowFold > viewport / HALF}
       <button
         type="button"
+        use:keepFocus
         onclick={toBottom}
         title={t("SCROLL_TO_BOTTOM")}
         aria-label={t("SCROLL_TO_BOTTOM")}

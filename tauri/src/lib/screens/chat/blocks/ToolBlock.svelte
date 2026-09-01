@@ -14,12 +14,15 @@
   }
 
   const { name, input, result, running, expanded = null, onToggle = null }: Props = $props();
+
+  const empty = $derived(!input.trim() && !result?.trim());
 </script>
 
 <Collapsible
   label={name ?? t("TOOLS")}
   icon={SquareTerminal}
   preview={input}
+  labelOnly={empty}
   {running}
   {expanded}
   {onToggle}

@@ -349,7 +349,7 @@
         <item quantity="other">%1$d days</item>
     </plurals>
     <string name="retention_days_hint">Claude Code deletes a chat after this long without activity</string>
-    <string name="retention_days_error">Enter a whole number of %1$d or more</string>
+    <string name="retention_days_error">Enter a whole number between %1$d and %2$d</string>
     <string name="default_category">Default category</string>
     <string name="color_none">None</string>
     <string name="delete">Delete</string>
@@ -373,6 +373,7 @@
     <string name="interrupted">Interrupted</string>
     <string name="plan">Plan</string>
     <string name="agent">Agent</string>
+    <string name="session_message">Message from another session</string>
     <string name="loading">Loading</string>
     <string name="confirm">Confirm</string>
     <string name="visibility">Chat visibility</string>

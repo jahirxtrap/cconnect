@@ -18,6 +18,7 @@ import {
 import type { ChatCategory, ProjectInfo, SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings } from "$lib/data/settings.svelte";
+import { terminalTabs } from "$lib/data/terminalTabs.svelte";
 
 const PREFILLED_TYPES = new Set<ComponentType>(["input", "notes", "path", "file", "color"]);
 
@@ -565,7 +566,9 @@ export class ChatState {
   }
 
   clearSideChat() {
+    this.stopSide();
     this.#sideAssistantId = null;
+    this.#socket.forgetSide();
     this.#sides = { ...this.#sides, [this.#sideKey]: { messages: [], sessionId: null, streaming: false } };
     this.sideOpen = true;
   }
@@ -617,6 +620,25 @@ export class ChatState {
       }
       case "ask_session":
         this.#patchSide(key, { sessionId: event.sessionId });
+        break;
+      case "component":
+        this.#sideAssistantId = null;
+        this.#patchSide(key, {
+          messages: [
+            ...side.messages,
+            newMessage(this.#nextId++, "interaction", {
+              timestamp: null,
+              ephemeral: true,
+              interaction: {
+                ...emptyInteraction("shown", "component"),
+                title: event.title,
+                titleKey: event.titleKey,
+                icon: event.icon,
+                blocks: event.blocks,
+              },
+            }),
+          ],
+        });
         break;
       case "interaction_request":
         this.#sideAssistantId = null;
@@ -1765,6 +1787,11 @@ export class ChatState {
         this.#thinkingId = null;
         this.#append(newMessage(this.#nextId++, "notification", { text: event.summary, result: event.status }));
         break;
+      case "session_message":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(newMessage(this.#nextId++, "session_message", { text: event.text, toolName: event.name }));
+        break;
       case "agent":
         this.#assistantId = null;
         this.#thinkingId = null;
@@ -1862,6 +1889,9 @@ export class ChatState {
         break;
       case "activity":
         this.activity = event.state;
+        break;
+      case "terminal_opened":
+        terminalTabs.openLocal(event.session);
         break;
       case "compact":
         this.#assistantId = null;

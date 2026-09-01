@@ -82,6 +82,7 @@ import com.jahirtrap.cconnect.files.isArchive
 import com.jahirtrap.cconnect.files.previewKindOf
 import com.jahirtrap.cconnect.ui.AttachmentChip
 import com.composables.icons.lucide.Archive
+import com.composables.icons.lucide.Inbox
 import com.composables.icons.lucide.NotepadText
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
@@ -274,7 +275,7 @@ fun ChatMessageItem(
                             if (content.attachments.isNotEmpty()) {
                                 val chipScroll = rememberScrollState()
                                 Row(
-                                    modifier = Modifier.weight(1f).horizontalScrollbar(chipScroll, touchIndicator = false).horizontalScroll(chipScroll, enabled = chipScroll.maxValue > 0),
+                                    modifier = Modifier.weight(1f).horizontalScrollbar(chipScroll).horizontalScroll(chipScroll, enabled = chipScroll.maxValue > 0),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     content.attachments.forEach { (url, name) ->
@@ -390,6 +391,15 @@ fun ChatMessageItem(
             }
 
             Role.NOTIFICATION -> NotificationBlock(message.text)
+
+            Role.SESSION_MESSAGE -> Collapsible(
+                label = message.toolName?.takeIf { it.isNotBlank() } ?: stringResource(Res.string.session_message),
+                text = message.text,
+                icon = Lucide.Inbox,
+                expanded = expanded,
+                onToggle = onToggle,
+                labelColor = MaterialTheme.colorScheme.primary,
+            )
         }
     }
 }
@@ -435,7 +445,7 @@ fun StickyCollapsibleHeader(message: ChatMessage, onCollapse: () -> Unit, modifi
 private fun isNotice(role: Role?): Boolean = role == Role.API_ERROR || role == Role.INTERRUPTED
 
 private fun group(role: Role?): Int = when (role) {
-    Role.THINKING, Role.WORKING, Role.TOOL, Role.TOOL_RESULT, Role.INTERACTION, Role.FILE_CHANGE, Role.COMPACT, Role.PLAN, Role.AGENT, Role.NOTIFICATION -> 0
+    Role.THINKING, Role.WORKING, Role.TOOL, Role.TOOL_RESULT, Role.INTERACTION, Role.FILE_CHANGE, Role.COMPACT, Role.PLAN, Role.AGENT, Role.NOTIFICATION, Role.SESSION_MESSAGE -> 0
     Role.ASSISTANT -> 1
     Role.USER, Role.API_ERROR, Role.INTERRUPTED -> 2
     else -> 3
@@ -498,10 +508,11 @@ private fun SelectableText(text: String, style: TextStyle, color: Color, modifie
 }
 
 @Composable
-private fun Collapsible(label: String, text: String, icon: ImageVector? = null, stat: String? = null, labelOnly: Boolean = false, running: Boolean = false, expanded: Boolean? = null, onToggle: (() -> Unit)? = null) {
+private fun Collapsible(label: String, text: String, icon: ImageVector? = null, stat: String? = null, labelOnly: Boolean = false, running: Boolean = false, expanded: Boolean? = null, onToggle: (() -> Unit)? = null, labelColor: Color? = null) {
     var localExpanded by rememberSaveable { mutableStateOf(false) }
     val isExpanded = expanded ?: localExpanded
     val toggle = onToggle ?: { localExpanded = !localExpanded }
+    val headerColor = labelColor ?: MaterialTheme.colorScheme.onSurfaceVariant
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Row(
             modifier = Modifier
@@ -514,7 +525,7 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = headerColor,
                     modifier = Modifier.size(16.dp),
                 )
                 Spacer(Modifier.size(6.dp))
@@ -523,7 +534,7 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = headerColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
@@ -554,7 +565,7 @@ private fun Collapsible(label: String, text: String, icon: ImageVector? = null, 
                 )
             }
         }
-        if (isExpanded && !labelOnly) {
+        if (isExpanded && !labelOnly && text.isNotBlank()) {
             CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurfaceVariant) {
                 MarkdownText(text, modifier = Modifier.fillMaxWidth().padding(top = 4.dp), selectable = false, dense = true)
             }
@@ -708,6 +719,7 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
     val isExpanded = expanded ?: localExpanded
     val toggle = onToggle ?: { localExpanded = !localExpanded }
     val preview = input.replace("\n", " ").trim()
+    val empty = input.isBlank() && result.isNullOrBlank()
     val nameColor = MaterialTheme.colorScheme.primary
     val previewColor = MaterialTheme.colorScheme.onSurfaceVariant
     val header = buildAnnotatedString {
@@ -723,7 +735,10 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
             .padding(horizontal = 16.dp),
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.sm)).clickable { toggle() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(Radius.sm))
+                .then(if (empty) Modifier else Modifier.clickable { toggle() }),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -748,12 +763,14 @@ private fun ToolBlock(name: String?, input: String, result: String? = null, runn
                 LoadingIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.size(2.dp))
             }
-            Icon(
-                imageVector = if (isExpanded) Lucide.ChevronDown else Lucide.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(18.dp),
-            )
+            if (!empty) {
+                Icon(
+                    imageVector = if (isExpanded) Lucide.ChevronDown else Lucide.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(18.dp),
+                )
+            }
         }
         if (isExpanded) {
             if (input.isNotBlank()) {
@@ -856,7 +873,7 @@ private fun FileChangeBlock(path: String, diffLines: List<DiffLine>, labelOnly: 
             ) {
                 Column(
                     modifier = Modifier
-                        .horizontalScrollbar(scroll)
+                        .horizontalScrollbar(scroll, touchIndicator = true)
                         .horizontalScroll(scroll, enabled = scroll.maxValue > 0)
                         .padding(vertical = 4.dp),
                 ) {
@@ -1830,7 +1847,7 @@ private fun PreviewBox(preview: String) {
             style = MaterialTheme.typography.bodySmall.copy(lineHeight = 14.sp),
             color = MaterialTheme.colorScheme.onSurface,
             softWrap = false,
-            modifier = Modifier.horizontalScrollbar(scroll, touchIndicator = false).horizontalScroll(scroll, enabled = scroll.maxValue > 0),
+            modifier = Modifier.horizontalScrollbar(scroll).horizontalScroll(scroll, enabled = scroll.maxValue > 0),
         )
     }
 }

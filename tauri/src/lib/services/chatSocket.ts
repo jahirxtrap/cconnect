@@ -11,6 +11,9 @@ import {
   type QueuedMessage,
   type TodoItem,
 } from "$lib/data/chatModels";
+import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
+import { terminalKeys } from "$lib/data/terminalKeys.svelte";
+import type { TerminalInfo } from "./terminalApi";
 import { backend, baseUrlOf, socketUrlOf, type Profile } from "./backend.svelte";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
@@ -30,6 +33,7 @@ export type ServerEvent =
       activity: string | null;
     }
   | { type: "activity"; state: string | null }
+  | { type: "terminal_opened"; session: TerminalInfo }
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
   | { type: "working" }
@@ -71,6 +75,7 @@ export type ServerEvent =
   | { type: "thinking_tokens"; tokens: number }
   | { type: "hook_failed"; name: string | null; text: string }
   | { type: "notification"; summary: string; status: string | null }
+  | { type: "session_message"; name: string | null; text: string }
   | { type: "todos"; items: TodoItem[] }
   | { type: "task"; id: string; content: string | null; status: string | null }
   | { type: "result"; sessionId: string | null }
@@ -143,15 +148,6 @@ const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
 const PING_MS = 20_000;
 const STALE_MS = 45_000;
-const CLIENT_CAPABILITIES = [
-  "media.blocks",
-  "media.gallery",
-  "media.video",
-  "media.audio",
-  "media.pdf",
-  "media.html",
-  "components",
-];
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
@@ -374,6 +370,10 @@ export class ChatSocket {
   resetResume() {
     this.#channel = null;
     this.#lastSeq = 0;
+    this.forgetSide();
+  }
+
+  forgetSide() {
     this.#sideChannel = null;
     this.#sideLastSeq = 0;
     this.#sideResume = null;
@@ -395,6 +395,7 @@ export class ChatSocket {
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,
       capabilities: CLIENT_CAPABILITIES,
+      terminal_key: terminalKeys.current || undefined,
       ...(this.#sideChannel ? { side_channel: this.#sideChannel, side_last_seq: this.#sideLastSeq } : {}),
       ...(this.#sideResume ? { side_resume: this.#sideResume } : {}),
     });
@@ -612,6 +613,8 @@ export class ChatSocket {
         return { type: "compacting", trigger: text(wire, "trigger") };
       case "status":
         return { type: "status", kind: text(wire, "kind") ?? "" };
+      case "terminal_opened":
+        return { type: "terminal_opened", session: wire as unknown as TerminalInfo };
       case "activity": {
         const state = text(wire, "state");
         return { type: "activity", state: state === "idle" ? null : state };
@@ -647,6 +650,8 @@ export class ChatSocket {
         return { type: "plan", markdown: text(wire, "markdown") ?? "" };
       case "notification":
         return { type: "notification", summary: text(wire, "text") ?? "", status: text(wire, "result") };
+      case "session_message":
+        return { type: "session_message", name: text(wire, "name"), text: text(wire, "text") ?? "" };
       case "queued":
         return { type: "queued", id: text(wire, "id"), text: text(wire, "text") ?? "" };
       case "queue":

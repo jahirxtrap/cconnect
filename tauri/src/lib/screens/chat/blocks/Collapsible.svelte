@@ -78,7 +78,7 @@
       {/if}
     {/if}
   </button>
-  {#if isExpanded && children}
+  {#if isExpanded && children && !labelOnly}
     <div class={bodyClass}>{@render children()}</div>
   {/if}
 </div>

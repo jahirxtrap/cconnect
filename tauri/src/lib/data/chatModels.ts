@@ -14,7 +14,8 @@ export type Role =
   | "interrupted"
   | "plan"
   | "agent"
-  | "notification";
+  | "notification"
+  | "session_message";
 
 export type SendStatus = "sent" | "error";
 

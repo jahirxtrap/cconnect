@@ -698,6 +698,11 @@ async def run_prompt(
                 seen_users.add(uid)
                 events.append(notif)
                 continue
+            incoming = _q._session_message_item(text)
+            if incoming is not None:
+                seen_users.add(uid)
+                events.append(incoming)
+                continue
             if not chips:
                 continue
             seen_users.add(uid)
@@ -996,9 +1001,10 @@ async def ask_side_question(
     os.makedirs(AI_WORKDIR, exist_ok=True)
     system = (
         "You are a helpful assistant answering a developer's quick questions, concisely and directly. "
-        "<session_context> is recent messages from their current Claude Code session; use it when the "
-        "question relates to that work, otherwise answer as a normal assistant. Never invent files, code, "
-        "commands, or facts: if you don't know, say so plainly instead of guessing."
+        "<session_context> is recent messages from their current Claude Code session, written by a "
+        "different assistant: use it when the question relates to that work, but never present it as "
+        "something you said or already told them. Never invent files, code, commands, or facts: if you "
+        "don't know, say so plainly instead of guessing."
     )
     shared = _system_append(base_url, None, [])
     if shared:

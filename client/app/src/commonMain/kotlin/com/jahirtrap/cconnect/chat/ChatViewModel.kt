@@ -738,7 +738,9 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
     }
 
     fun clearSideChat() {
+        stopSide()
         currentSideAssistantId = null
+        client.forgetSide()
         _state.update { it.withSide(SideChatState(boundSessionId = it.sessionId)).copy(sideChatOpen = true) }
     }
 
@@ -1662,6 +1664,11 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
                 currentThinkingId = null
                 addMessage(Role.NOTIFICATION, event.summary, result = event.status)
             }
+            is ServerEvent.SessionMessageEvent -> {
+                currentAssistantId = null
+                currentThinkingId = null
+                addMessage(Role.SESSION_MESSAGE, event.text, toolName = event.name)
+            }
             is ServerEvent.Agent -> {
                 currentAssistantId = null
                 currentThinkingId = null
@@ -1970,6 +1977,22 @@ class ChatViewModel(private val ctx: TabContext) : ViewModel() {
             }
             is ServerEvent.AskSession -> _state.update { st ->
                 st.updateSide { sc -> sc.copy(sideSessionId = event.sessionId) }
+            }
+            is ServerEvent.Component -> {
+                currentSideAssistantId = null
+                val data = InteractionData(
+                    requestId = "shown",
+                    kind = "component",
+                    title = event.title,
+                    titleKey = event.titleKey,
+                    icon = event.icon,
+                    blocks = event.blocks,
+                )
+                _state.update { st ->
+                    st.updateSide { sc ->
+                        sc.copy(messages = sc.messages + ChatMessage(nextId++, Role.INTERACTION, "", interaction = data, ephemeral = true))
+                    }
+                }
             }
             is ServerEvent.InteractionRequest -> {
                 currentSideAssistantId = null

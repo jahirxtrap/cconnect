@@ -3,6 +3,7 @@
   import Bot from "@lucide/svelte/icons/bot";
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
+  import Inbox from "@lucide/svelte/icons/inbox";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import type { Snippet } from "svelte";
@@ -70,7 +71,7 @@
         <div class="flex w-full items-end">
           {#if content.attachments.length}
             <div
-              use:hscrollbar={{ touchIndicator: false }}
+              use:hscrollbar
               class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
             >
               {#each content.attachments as attachment (attachment.url)}
@@ -170,6 +171,18 @@
     {/if}
   {:else if message.role === "agent"}
     <AgentBlock {message} {running} {labelMode} {expanded} {onToggle} {onSharedLink} />
+  {:else if message.role === "session_message"}
+    <Collapsible
+      label={message.toolName || t("SESSION_MESSAGE")}
+      icon={Inbox}
+      preview={message.text}
+      labelOnly={labelMode || !message.text.trim()}
+      {expanded}
+      {onToggle}
+      labelClass="text-accent"
+    >
+      <MarkdownText text={message.text} dense />
+    </Collapsible>
   {:else if message.role === "notification"}
     <div class="flex w-full items-center gap-1.5 px-4 select-none">
       <Bell size={16} class="shrink-0 text-accent" />
