@@ -1,22 +1,18 @@
 <script lang="ts">
-  import Activity from "@lucide/svelte/icons/activity";
-  import Folder from "@lucide/svelte/icons/folder";
   import Menu from "@lucide/svelte/icons/menu";
   import PanelLeftClose from "@lucide/svelte/icons/panel-left-close";
   import Settings from "@lucide/svelte/icons/settings";
   import SquarePen from "@lucide/svelte/icons/square-pen";
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
-  import Type from "@lucide/svelte/icons/type";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { SCREENS } from "$lib/app/screens";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import type { ChatCategory, SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
@@ -337,21 +333,11 @@
       use:hscrollbar={{ wheel: true }}
       class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
     >
-      <TooltipIconButton label={t("FILES")} onclick={() => navigation.openExplorer()}>
-        <Folder size={17} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")}>
-        <ClaudeIcon size={17} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")}>
-        <Activity size={17} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")}>
-        <SquareTerminal size={17} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("MARKDOWN")} onclick={() => navigation.navigate("/markdown")}>
-        <Type size={17} />
-      </TooltipIconButton>
+      {#each SCREENS as screen (screen.kind)}
+        <TooltipIconButton label={t(screen.label)} onclick={screen.open}>
+          <screen.icon size={17} />
+        </TooltipIconButton>
+      {/each}
     </div>
     <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
       <Settings size={17} />

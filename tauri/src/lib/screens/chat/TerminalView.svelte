@@ -3,6 +3,7 @@
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import X from "@lucide/svelte/icons/x";
   import { tick } from "svelte";
+  import { activeScope } from "$lib/app/activeScope.svelte";
   import { sshAddress, sshStore } from "$lib/data/sshStore.svelte";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -41,7 +42,7 @@
   let rejected = $state(false);
   let closing = $state<TerminalTab | null>(null);
 
-  const focused = $derived(paneFocus.active === "terminal");
+  const focused = $derived(activeScope() === "terminal");
   const online = $derived(serverStatus.online);
   const RESERVED_KEYS = ["t", "w"];
   const panes: Record<string, ReturnType<typeof TerminalSurface> | null> = {};
@@ -180,7 +181,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="flex h-full flex-col bg-surface {layout.mobile ? '' : 'border-l border-outline-variant'}"
+  class="flex h-full flex-col bg-surface"
   onpointerdowncapture={() => paneFocus.set("terminal")}
 >
   <TabStrip

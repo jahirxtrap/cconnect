@@ -1,23 +1,17 @@
 <script lang="ts">
-  import Activity from "@lucide/svelte/icons/activity";
-  import Folder from "@lucide/svelte/icons/folder";
   import MessageSquare from "@lucide/svelte/icons/message-square";
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
-  import Type from "@lucide/svelte/icons/type";
+  import { SCREENS, type ScreenEntry } from "$lib/app/screens";
   import { t } from "$lib/i18n/index.svelte";
-  import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { panes, type RightKind } from "./panes.svelte";
+  import { panes } from "./panes.svelte";
 
-  const VIEWS: { kind: RightKind; label: string; icon: typeof MessageSquare }[] = [
+  type PaneView = Pick<ScreenEntry, "kind" | "label" | "icon">;
+
+  const VIEWS: PaneView[] = [
     { kind: "chat", label: "CHAT", icon: MessageSquare },
-    { kind: "files", label: "FILES", icon: Folder },
-    { kind: "claude", label: "CLAUDE", icon: ClaudeIcon },
-    { kind: "monitor", label: "MONITOR", icon: Activity },
-    { kind: "terminal", label: "TERMINAL", icon: SquareTerminal },
-    { kind: "markdown", label: "MARKDOWN", icon: Type },
+    ...SCREENS,
   ];
 
   let menu = $state(false);

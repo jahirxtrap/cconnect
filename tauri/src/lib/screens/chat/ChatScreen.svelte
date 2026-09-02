@@ -13,7 +13,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { terminalTabs } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { COMPACT_WIDTH, layout } from "$lib/platform/layout.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import ColorDialog from "$lib/ui/ColorDialog.svelte";
@@ -329,7 +329,7 @@
         {:else if panes.kind === "monitor"}
           <div class={PANE_BODY_CLASS}>
             <PaneHeader title={t("MONITOR")} actions={monitorActions} />
-            <MonitorContent compact={rightWidth < COMPACT_WIDTH} />
+            <MonitorContent />
           </div>
         {:else if panes.kind === "claude"}
           <div class={PANE_BODY_CLASS}>
@@ -347,7 +347,9 @@
             {/if}
           </div>
         {:else}
-          <TerminalView cwd={terminalCwd} pane />
+          <div class={PANE_BODY_CLASS}>
+            <TerminalView cwd={terminalCwd} pane />
+          </div>
         {/if}
         {#if panes.dropTarget === "right"}
           {@render dropHint()}
@@ -386,7 +388,7 @@
 {/snippet}
 
 {#snippet monitorActions()}
-  <MonitorActions compact showEnvironment={false} />
+  <MonitorActions compact />
 {/snippet}
 
 {#snippet sideActions()}

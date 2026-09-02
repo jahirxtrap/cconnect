@@ -16,12 +16,10 @@
   import PackageOpen from "@lucide/svelte/icons/package-open";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Save from "@lucide/svelte/icons/save";
-  import Server from "@lucide/svelte/icons/server";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
   import Upload from "@lucide/svelte/icons/upload";
   import X from "@lucide/svelte/icons/x";
-  import { DropdownMenu } from "bits-ui";
   import { untrack } from "svelte";
   import { slide } from "svelte/transition";
   import { navigation } from "$lib/app/navigation.svelte";
@@ -32,8 +30,7 @@
   import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { COMPACT_WIDTH, layout } from "$lib/platform/layout.svelte";
-  import { tabs } from "$lib/screens/chat/tabs.svelte";
-  import { address, backend } from "$lib/services/backend.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import {
     archiveFileUrl,
     downloadUrl,
@@ -50,7 +47,8 @@
   } from "$lib/services/sharedFiles";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
-  import { paneAction } from "$lib/screens/chat/paneChrome";
+  import EnvironmentAction from "$lib/screens/chat/EnvironmentAction.svelte";
+  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -65,16 +63,14 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
-  import MenuScrim from "$lib/ui/MenuScrim.svelte";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
-  import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import PathBar from "./PathBar.svelte";
   import CompressDialog from "./CompressDialog.svelte";
   import { readFilesLocation, syncFilesLocation } from "./filesUrl";
   import ToolbarAction from "./ToolbarAction.svelte";
-  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
   import { pastedName } from "$lib/data/pastedFile";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
 
@@ -103,7 +99,7 @@
 
   const { compact = false }: Props = $props();
 
-  const action = $derived(paneAction(compact));
+  const actionClass = $derived(paneActionClass(compact));
 
   let width = $state(0);
 
@@ -152,7 +148,6 @@
   let searchResults = $state<SharedEntry[] | null>(null);
   let sortField = $state<SortKey>(settings.fileSortField as SortKey);
   let sortAscending = $state(settings.fileSortAscending);
-  let envOpen = $state(false);
   let confirmingDelete = $state(false);
   let renaming = $state<SharedEntry | null>(null);
   let creatingFolder = $state(false);
@@ -634,7 +629,7 @@
   {#snippet selectAllAction()}
     <TooltipIconButton
       label={t("SELECT_ALL")}
-      class={action.class}
+      class={actionClass}
       onclick={() => (selected = allSelected ? [] : entries.map((entry) => entry.name))}
     >
       <SelectionDot selected={allSelected} />
@@ -642,72 +637,55 @@
   {/snippet}
 
   {#snippet cancelAction()}
-    <TooltipIconButton label={t("CANCEL")} class={action.class} onclick={exitSelection}>
-      <X size={action.size} />
+    <TooltipIconButton label={t("CANCEL")} class={actionClass} onclick={exitSelection}>
+      <X />
     </TooltipIconButton>
   {/snippet}
 
   {#snippet browseActions()}
     {#if !transfer && archive === null}
-      <TooltipIconButton label={t("UPLOAD_FILES")} class={action.class} onclick={() => picker?.click()}>
-        <Upload size={action.size} />
+      <TooltipIconButton label={t("UPLOAD_FILES")} class={actionClass} onclick={() => picker?.click()}>
+        <Upload />
       </TooltipIconButton>
     {/if}
-    {#if !compact}
-      <TooltipIconButton
-        label={t("ENVIRONMENT")}
-        enabled={!settings.environmentLocked}
-        onclick={() => (envOpen = true)}
-      >
-        <Server size={action.size} />
-      </TooltipIconButton>
-    {/if}
-    <MenuScrim open={barMenu} onDismiss={() => (barMenu = false)} />
-    <DropdownMenu.Root open={barMenu} onOpenChange={(value) => (barMenu = value)}>
-      <DropdownMenu.Trigger
-        class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 {compact
-          ? 'size-8'
-          : 'size-9 [&_svg]:size-5'}"
-        aria-label={t("MORE_OPTIONS")}
-      >
-        <EllipsisVertical size={action.size} />
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          onOpenAutoFocus={(event) => event.preventDefault()}
-          onCloseAutoFocus={(event) => event.preventDefault()}
-          sideOffset={4}
-          collisionPadding={layout.menuPadding}
-          class={MENU_CONTENT_CLASS}
-        >
-          <MenuSub text={t("SORT_BY")}>
-            {#snippet leading()}
-              <ArrowDownUp size={20} class="shrink-0 text-on-surface-variant" />
-            {/snippet}
-            {#each SORT_KEYS as key (key)}
-              <MenuItem
-                text={t(SORT_LABELS[key])}
-                selected={key === sortField}
-                closeOnSelect={false}
-                onclick={() => selectSort(key)}
-              />
-            {/each}
-            <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
-              {#snippet trailing()}
-                <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
-              {/snippet}
-            </MenuItem>
-          </MenuSub>
-          {#if archive === null}
-            <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
-              {#snippet leading()}
-                <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
-              {/snippet}
-            </MenuItem>
-          {/if}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+    <EnvironmentAction {compact} />
+    <PopupMenu
+      open={barMenu}
+      onOpenChange={(value) => (barMenu = value)}
+      label={t("MORE_OPTIONS")}
+      align="center"
+    >
+      {#snippet triggerChild(props)}
+        <TooltipIconButton label={t("MORE_OPTIONS")} class={actionClass} {...props}>
+          <EllipsisVertical />
+        </TooltipIconButton>
+      {/snippet}
+      <MenuSub text={t("SORT_BY")}>
+        {#snippet leading()}
+          <ArrowDownUp size={20} class="shrink-0 text-on-surface-variant" />
+        {/snippet}
+        {#each SORT_KEYS as key (key)}
+          <MenuItem
+            text={t(SORT_LABELS[key])}
+            selected={key === sortField}
+            closeOnSelect={false}
+            onclick={() => selectSort(key)}
+          />
+        {/each}
+        <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
+          {#snippet trailing()}
+            <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
+          {/snippet}
+        </MenuItem>
+      </MenuSub>
+      {#if archive === null}
+        <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
+          {#snippet leading()}
+            <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
+          {/snippet}
+        </MenuItem>
+      {/if}
+    </PopupMenu>
   {/snippet}
 
   {#if compact}
@@ -925,27 +903,22 @@
         label={t("DELETE")}
         onclick={() => (confirmingDelete = true)}
       />
-      <MenuScrim open={actionsMenu} onDismiss={() => (actionsMenu = false)} />
-      <DropdownMenu.Root open={actionsMenu} onOpenChange={(value) => (actionsMenu = value)}>
-        <DropdownMenu.Trigger
-          class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {narrow
-            ? 'w-8'
-            : 'px-3 text-label-lg'}"
-          aria-label={t("MORE")}
-        >
+      <PopupMenu
+        open={actionsMenu}
+        onOpenChange={(value) => (actionsMenu = value)}
+        label={t("MORE")}
+        side="top"
+        align="center"
+        triggerClass="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {narrow
+          ? 'w-8'
+          : 'px-3 text-label-lg'}"
+      >
+        {#snippet trigger()}
           <EllipsisVertical size={narrow ? 20 : 18} class="shrink-0" />
           {#if !narrow}
             <span class="truncate">{t("MORE")}</span>
           {/if}
-        </DropdownMenu.Trigger>
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            onOpenAutoFocus={(event) => event.preventDefault()}
-            onCloseAutoFocus={(event) => event.preventDefault()}
-            side="top"
-            sideOffset={4}
-            class={MENU_CONTENT_CLASS}
-          >
+        {/snippet}
             {#if single && !single.isDir && isPreviewable(single.name)}
               <MenuItem
                 text={t("VIEW")}
@@ -1053,9 +1026,7 @@
                 {/snippet}
               </MenuItem>
             {/if}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+      </PopupMenu>
     </div>
   {/if}
   </div>
@@ -1081,20 +1052,6 @@
   }}
   class="hidden"
 />
-
-{#if envOpen}
-  <SelectDialog
-    title={t("ENVIRONMENT")}
-    options={backend.environments.map((profile) => ({
-      value: profile.id,
-      label: profile.name,
-      subtitle: address(profile),
-    }))}
-    selected={tabs.state.environmentId ?? ""}
-    onSelect={(id) => tabs.state.selectEnvironment(id)}
-    onDismiss={() => (envOpen = false)}
-  />
-{/if}
 
 {#if pendingUploads.length}
   {@const files = pendingUploads}

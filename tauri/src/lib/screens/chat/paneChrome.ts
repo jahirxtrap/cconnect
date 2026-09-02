@@ -5,7 +5,4 @@ export const PANE_HEADER_CLASS =
 
 export const paneFocusBorder = (focused: boolean) => (focused ? "border-accent" : "border-outline-variant");
 
-export const paneAction = (compact: boolean) => ({
-  class: compact ? "size-8" : "",
-  size: compact ? 18 : 20,
-});
+export const paneActionClass = (compact: boolean) => (compact ? "size-8" : "");

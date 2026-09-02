@@ -4,13 +4,12 @@
   import Save from "@lucide/svelte/icons/save";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Type from "@lucide/svelte/icons/type";
-  import { DropdownMenu } from "bits-ui";
   import { t } from "$lib/i18n/index.svelte";
+  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { saveTextAs, saveTextToDownloads, shareText } from "$lib/services/sharedFiles";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import MenuScrim from "$lib/ui/MenuScrim.svelte";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
   import { scratch } from "./scratch.svelte";
 
   interface Props {
@@ -22,49 +21,40 @@
   let menu = $state(false);
 
   const filename = $derived(t("MARKDOWN_FILENAME"));
-  const buttonClass = $derived(compact ? "size-8" : "");
-  const iconSize = $derived(compact ? 18 : 20);
+  const actionClass = $derived(paneActionClass(compact));
 </script>
 
 <TooltipIconButton
   label={t("FORMATTED_VIEW")}
-  class={buttonClass}
+  class={actionClass}
   onclick={() => (scratch.formatted = !scratch.formatted)}
 >
-  <Type size={iconSize} class={scratch.formatted ? "text-accent" : ""} />
+  <Type class={scratch.formatted ? "text-accent" : ""} />
 </TooltipIconButton>
-<MenuScrim open={menu} onDismiss={() => (menu = false)} />
-<DropdownMenu.Root open={menu} onOpenChange={(open) => (menu = open)}>
-  <DropdownMenu.Trigger
-    class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 {compact
-      ? 'size-8'
-      : 'size-9'}"
-    aria-label={t("FILES")}
-  >
-    <EllipsisVertical size={iconSize} />
-  </DropdownMenu.Trigger>
-  <DropdownMenu.Portal>
-    <DropdownMenu.Content
-      onOpenAutoFocus={(event) => event.preventDefault()}
-      onCloseAutoFocus={(event) => event.preventDefault()}
-      sideOffset={4}
-      class={MENU_CONTENT_CLASS}
-    >
-      <MenuItem text={t("SAVE")} onclick={() => saveTextToDownloads(filename, scratch.text)}>
-        {#snippet leading()}
-          <Download size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
-      <MenuItem text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, scratch.text)}>
-        {#snippet leading()}
-          <Save size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
-      <MenuItem text={t("SHARE")} onclick={() => void shareText(filename, scratch.text)}>
-        {#snippet leading()}
-          <Share2 size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
-    </DropdownMenu.Content>
-  </DropdownMenu.Portal>
-</DropdownMenu.Root>
+<PopupMenu
+  open={menu}
+  onOpenChange={(open) => (menu = open)}
+  label={t("MORE_OPTIONS")}
+  align="center"
+>
+  {#snippet triggerChild(props)}
+    <TooltipIconButton label={t("MORE_OPTIONS")} class={actionClass} {...props}>
+      <EllipsisVertical />
+    </TooltipIconButton>
+  {/snippet}
+  <MenuItem text={t("SAVE")} onclick={() => saveTextToDownloads(filename, scratch.text)}>
+    {#snippet leading()}
+      <Download size={20} class="shrink-0 text-on-surface-variant" />
+    {/snippet}
+  </MenuItem>
+  <MenuItem text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, scratch.text)}>
+    {#snippet leading()}
+      <Save size={20} class="shrink-0 text-on-surface-variant" />
+    {/snippet}
+  </MenuItem>
+  <MenuItem text={t("SHARE")} onclick={() => void shareText(filename, scratch.text)}>
+    {#snippet leading()}
+      <Share2 size={20} class="shrink-0 text-on-surface-variant" />
+    {/snippet}
+  </MenuItem>
+</PopupMenu>

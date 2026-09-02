@@ -18,7 +18,7 @@
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Store from "@lucide/svelte/icons/store";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { paneAction } from "$lib/screens/chat/paneChrome";
+  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
@@ -66,7 +66,7 @@
 
   const { kind, onClose, compact = false }: Props = $props();
 
-  const action = $derived(paneAction(compact));
+  const actionClass = $derived(paneActionClass(compact));
 
   const STATUS_PAGE = "https://status.claude.com";
   const ROW_PADDING = "py-2 pr-4 pl-4";
@@ -267,22 +267,22 @@
     {#if kind === "plugins"}
       <TooltipIconButton
         label={t("INSTALL")}
-        class={action.class}
+        class={actionClass}
         onclick={() => {
           const market = extensions?.marketplaces[0];
           if (market) void openCatalog(market.name);
         }}
       >
-        <CirclePlus size={action.size} />
+        <CirclePlus />
       </TooltipIconButton>
     {:else if kind === "marketplaces"}
-      <TooltipIconButton label={t("ADD")} class={action.class} onclick={() => (addingMarket = true)}>
-        <CirclePlus size={action.size} />
+      <TooltipIconButton label={t("ADD")} class={actionClass} onclick={() => (addingMarket = true)}>
+        <CirclePlus />
       </TooltipIconButton>
     {:else if kind === "mcp"}
       <TooltipIconButton
         label={t("ADD")}
-        class={action.class}
+        class={actionClass}
         onclick={() => {
           mcpName = "";
           mcpTarget = "";
@@ -290,25 +290,25 @@
           addingMcp = true;
         }}
       >
-        <CirclePlus size={action.size} />
+        <CirclePlus />
       </TooltipIconButton>
     {:else if kind === "status"}
       <TooltipIconButton
         label={t("STATUS_OPEN_PAGE")}
-        class={action.class}
+        class={actionClass}
         onclick={() => openExternal(STATUS_PAGE)}
       >
-        <ExternalLink size={action.size} />
+        <ExternalLink />
       </TooltipIconButton>
     {/if}
     {#if kind === "status" && !isTouch}
       <TooltipIconButton
         label={t("REFRESH")}
-        class={action.class}
+        class={actionClass}
         shortcut="window.refresh"
         onclick={() => void refresh()}
       >
-        <RotateCw size={action.size} />
+        <RotateCw />
       </TooltipIconButton>
     {/if}
   {/snippet}

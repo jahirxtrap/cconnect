@@ -3,6 +3,7 @@
   import { formatLogTime } from "$lib/data/time";
   import { osColor, osIconPath } from "$lib/design/osIcons";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { COMPACT_WIDTH } from "$lib/platform/layout.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
@@ -13,12 +14,6 @@
   import { monitor } from "./monitor.svelte";
   import NetworkPage from "./NetworkPage.svelte";
 
-  interface Props {
-    compact?: boolean;
-  }
-
-  const { compact = false }: Props = $props();
-
   const FOLLOW_SLACK_PX = 24;
   const SECONDS_PER_DAY = 86_400;
   const SECONDS_PER_HOUR = 3_600;
@@ -26,10 +21,12 @@
   const MILLIS_PER_SECOND = 1000;
 
   let page = $state(0);
+  let width = $state(0);
   let logBox = $state<HTMLDivElement | null>(null);
   let pager = $state<HTMLDivElement | null>(null);
   let followLogs = true;
 
+  const narrow = $derived(width < COMPACT_WIDTH);
   const hasNetwork = $derived(monitor.network?.supported === true);
   const labels = $derived(
     hasNetwork ? [t("RESOURCES"), t("NETWORK"), t("SERVER_LOGS")] : [t("RESOURCES"), t("SERVER_LOGS")],
@@ -74,11 +71,12 @@
   });
 </script>
 
-{#if !monitor.info && monitor.failed}
-  <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
-{:else if !monitor.info}
-  <CenteredProgress class="flex-1" />
-{:else}
+<div bind:clientWidth={width} class="flex min-h-0 flex-1 flex-col">
+  {#if !monitor.info && monitor.failed}
+    <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
+  {:else if !monitor.info}
+    <CenteredProgress class="flex-1" />
+  {:else}
   {@const current = monitor.info}
   {@const gpu = monitor.gpu}
   <div class="px-4 py-1.5">
@@ -92,7 +90,7 @@
   >
     <div class="flex w-full shrink-0 snap-center flex-col">
       <div class="min-h-0 flex-1 overflow-y-auto pb-4">
-        <div class="flex gap-3 px-4 py-2 {compact ? 'flex-col' : ''}">
+        <div class="flex gap-3 px-4 py-2 {narrow ? 'flex-col' : ''}">
           {@render graph("CPU", plural("CORES_COUNT", current.cpuCores), current.cpuPercent, monitor.cpuHistory)}
           {#if gpu}
             {@render graph(
@@ -228,7 +226,8 @@
       </div>
     </div>
   </div>
-{/if}
+  {/if}
+</div>
 
 {#snippet graph(title: string, subtitle: string, percent: number, history: number[])}
   <div class="min-w-0 flex-1">
