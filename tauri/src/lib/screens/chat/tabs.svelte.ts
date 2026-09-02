@@ -1,3 +1,4 @@
+import { ROUTES } from "$lib/app/navigation.svelte";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 import type { SessionInfo } from "$lib/data/models";
 import { backend } from "$lib/services/backend.svelte";
@@ -30,9 +31,10 @@ interface StoredTab {
 
 const SESSION_ID_PREVIEW = 8;
 
-const CHAT_ROUTES = ["/settings", "/claude", "/monitor", "/files", "/terminal", "/markdown"];
-
-const onChatRoute = () => !CHAT_ROUTES.includes(window.location.pathname);
+const onChatRoute = () => {
+  const path = window.location.pathname;
+  return !ROUTES.some((route) => path === route || path.startsWith(`${route}/`));
+};
 
 export interface ChatLink {
   sessionId: string;

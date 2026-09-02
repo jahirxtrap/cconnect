@@ -21,6 +21,7 @@
   import FileExplorerScreen from "$lib/screens/files/FileExplorerScreen.svelte";
   import MarkdownScreen from "$lib/screens/markdown/MarkdownScreen.svelte";
   import MonitorScreen from "$lib/screens/monitor/MonitorScreen.svelte";
+  import SettingsDialog from "$lib/screens/settings/SettingsDialog.svelte";
   import SettingsScreen from "$lib/screens/settings/SettingsScreen.svelte";
   import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
@@ -50,6 +51,8 @@
   useShortcut("window.refresh", () => {
     desktop.refreshTick++;
   });
+
+  const settingsAsDialog = $derived(!layout.mobile);
 
   const scopeChain = (): ShortcutScope[] => {
     if (dismissOpen()) return ["global"];
@@ -110,7 +113,9 @@
   class="safe-area bg-background text-on-background"
   style="height: calc(100% - var(--keyboard, 0px))"
 >
-  {#if navigation.route === "/settings"}
+  {#if navigation.route === "/settings" && settingsAsDialog}
+    <ChatScreen />
+  {:else if navigation.route === "/settings"}
     <SettingsScreen />
   {:else if navigation.route === "/monitor"}
     <MonitorScreen />
@@ -126,6 +131,10 @@
     <ChatScreen />
   {/if}
 </div>
+
+{#if navigation.route === "/settings" && settingsAsDialog}
+  <SettingsDialog onDismiss={() => navigation.navigate("/")} />
+{/if}
 
 <TransfersPanel />
 

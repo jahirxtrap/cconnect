@@ -20,7 +20,7 @@
     <div class="h-4"></div>
   {/if}
   <div
-    class="w-full divide-y divide-outline-variant overflow-hidden rounded-group border-2 border-outline-variant bg-surface"
+    class="w-full divide-y overflow-hidden rounded-group border-2 border-outline-variant bg-surface [&>*]:border-outline-variant"
   >
     {@render children()}
   </div>
