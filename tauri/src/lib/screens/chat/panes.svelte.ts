@@ -25,12 +25,12 @@ class Panes {
       : null,
   );
 
-  readonly focusedTab = $derived(
-    this.focused === "right" && this.rightTab ? this.rightTab : tabs.active,
+  readonly target = $derived<PaneRole>(
+    this.open && this.focused === "right" && this.kind === "chat" ? "right" : "center",
   );
 
-  readonly target = $derived<PaneRole>(
-    this.focused === "right" && this.kind === "chat" ? "right" : "center",
+  readonly focusedTab = $derived(
+    this.target === "right" && this.rightTab ? this.rightTab : tabs.active,
   );
 
   constructor() {
@@ -43,7 +43,7 @@ class Panes {
       this.rightTabId = tabs.right[0]?.id ?? null;
     }
 
-    this.focused = readFocusedPane();
+    this.focused = this.open ? readFocusedPane() : "center";
     const link = readRightLocation();
     if (link) {
       const known = tabs.right.find((tab) => tab.sessionId === link.sessionId);
@@ -58,7 +58,7 @@ class Panes {
       this.open = true;
     }
     tabs.rightActiveId = this.rightTabId;
-    tabs.rightFocused = this.focused === "right" && this.kind === "chat";
+    tabs.rightFocused = this.target === "right";
   }
 
   swap() {
@@ -110,6 +110,7 @@ class Panes {
   close(id: string) {
     if (id === this.rightTabId) this.rightTabId = null;
     tabs.close(id);
+    if (this.kind === "chat" && !tabs.right.length) this.rightTabId = tabs.newTab(null, "right").id;
     this.commit();
   }
 
@@ -158,11 +159,7 @@ class Panes {
   }
 
   closeFocused() {
-    const target = this.focusedTab;
-    if (!target) return;
-    if (target.id === this.rightTabId) this.rightTabId = null;
-    tabs.close(target.id);
-    this.commit();
+    if (this.focusedTab) this.close(this.focusedTab.id);
   }
 
   focus(role: PaneRole) {
@@ -170,7 +167,7 @@ class Panes {
     paneFocus.set(role === "right" && this.kind === "terminal" ? "terminal" : "chat");
     const environmentId = this.focusedTab?.environmentId;
     if (environmentId && backend.activeId !== environmentId) backend.select(environmentId);
-    tabs.rightFocused = role === "right" && this.kind === "chat";
+    tabs.rightFocused = this.target === "right";
     tabs.rightActiveId = this.rightTab?.id ?? null;
     tabs.syncUrl();
   }

@@ -34,6 +34,7 @@ const DEFAULTS = {
   local_server_mode: "local",
   local_server_public_host: "",
   window_maximized: true,
+  window_bounds: "",
   dynamic_color: false,
   environment_locked: false,
   project_locked: false,
@@ -245,6 +246,13 @@ class Settings {
   }
   set windowMaximized(value: boolean) {
     this.#write("window_maximized", value);
+  }
+
+  get windowBounds() {
+    return this.#read("window_bounds");
+  }
+  set windowBounds(value: string) {
+    this.#write("window_bounds", value);
   }
 
   get dynamicColor() {

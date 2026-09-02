@@ -17,9 +17,9 @@
         "width": 1280,
         "height": 800,
         "minWidth": 400,
-        "minHeight": 400,
+        "minHeight": 500,
         "resizable": true,
-        "maximized": true,
+        "visible": false,
         "decorations": true,
         "dragDropEnabled": false,
         "backgroundColor": "#000000"

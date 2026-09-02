@@ -80,7 +80,7 @@ class Tabs {
   rightFocused = $state(false);
 
   #counter = 0;
-  #states = new Map<string, ChatState>();
+  #states = new Map<string, { chat: ChatState; stop: () => void }>();
 
   readonly center = $derived(this.list.filter((tab) => tab.pane === "center"));
   readonly right = $derived(this.list.filter((tab) => tab.pane === "right"));
@@ -127,8 +127,8 @@ class Tabs {
       if (!anchor || !this.list.some((tab) => tab.environmentId === null)) return;
       for (const tab of this.list) {
         if (tab.environmentId !== null) continue;
-        const state = this.#states.get(tab.id);
-        if (state) state.environmentId = anchor;
+        const entry = this.#states.get(tab.id);
+        if (entry) entry.chat.environmentId = anchor;
       }
       this.list = this.list.map((tab) =>
         tab.environmentId === null ? { ...tab, environmentId: anchor } : tab,
@@ -164,19 +164,23 @@ class Tabs {
     return `tab${this.#counter++}`;
   }
 
+  /** Owns its reactive scope: a state built inside a component derived dies with it. */
   stateFor(tab: Tab): ChatState {
     const existing = this.#states.get(tab.id);
-    if (existing) return existing;
-    const created = new ChatState({
-      environmentId: tab.environmentId,
-      sessionId: tab.sessionId,
-      projectKey: tab.projectKey,
-      cwd: tab.cwd,
-      color: tab.color,
+    if (existing) return existing.chat;
+    let created!: ChatState;
+    const stop = $effect.root(() => {
+      created = new ChatState({
+        environmentId: tab.environmentId,
+        sessionId: tab.sessionId,
+        projectKey: tab.projectKey,
+        cwd: tab.cwd,
+        color: tab.color,
+      });
     });
     created.tabId = tab.id;
     created.onContextChange = () => this.#syncContext(tab.id, created);
-    this.#states.set(tab.id, created);
+    this.#states.set(tab.id, { chat: created, stop });
     return created;
   }
 
@@ -190,16 +194,16 @@ class Tabs {
   }
 
   reconnectAll() {
-    for (const state of this.#states.values()) state.reconnect();
+    for (const entry of this.#states.values()) entry.chat.reconnect();
   }
 
   refreshDefaults() {
-    for (const state of this.#states.values()) void state.refreshServerInfo();
+    for (const entry of this.#states.values()) void entry.chat.refreshServerInfo();
   }
 
   applyVisibility(prefs: VisibilityPrefs) {
     settings.visibility = prefs;
-    for (const state of this.#states.values()) state.syncVisibility();
+    for (const entry of this.#states.values()) entry.chat.syncVisibility();
   }
 
   #blank(environmentId: string | null, cwd: string, pane: PaneRole = "center"): Tab {
@@ -332,7 +336,9 @@ class Tabs {
     if (!target) return;
     const group = this.list.filter((tab) => tab.pane === target.pane);
     const index = group.findIndex((tab) => tab.id === id);
-    this.#states.get(id)?.dispose();
+    const entry = this.#states.get(id);
+    entry?.chat.dispose();
+    entry?.stop();
     this.#states.delete(id);
     let next = this.list.filter((tab) => tab.id !== id);
     if (!next.some((tab) => tab.pane === "center")) next = [...next, this.#default()];
@@ -343,10 +349,6 @@ class Tabs {
     }
     this.#syncEnvironment();
     this.#persist();
-  }
-
-  closeActive() {
-    this.close(this.activeId);
   }
 
   move(id: string, toIndex: number) {
