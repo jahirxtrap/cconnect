@@ -4,6 +4,7 @@
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
   import { t } from "$lib/i18n/index.svelte";
+  import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -11,9 +12,10 @@
 
   const VIEWS: { kind: RightKind; label: string; icon: typeof MessageSquare }[] = [
     { kind: "chat", label: "CHAT", icon: MessageSquare },
+    { kind: "claude", label: "CLAUDE", icon: ClaudeIcon },
+    { kind: "monitor", label: "MONITOR", icon: Activity },
     { kind: "terminal", label: "TERMINAL", icon: SquareTerminal },
     { kind: "markdown", label: "MARKDOWN", icon: Type },
-    { kind: "monitor", label: "MONITOR", icon: Activity },
   ];
 
   let menu = $state(false);

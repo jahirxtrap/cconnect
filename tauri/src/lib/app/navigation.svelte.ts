@@ -102,6 +102,11 @@ class Navigation {
     this.navigate("/claude");
   }
 
+  openClaudeSub(sub: string) {
+    this.navigate("/claude");
+    this.openSub(sub);
+  }
+
   openExplorer(archive: string | null = null) {
     this.explorerArchive = archive;
     this.navigate("/files");

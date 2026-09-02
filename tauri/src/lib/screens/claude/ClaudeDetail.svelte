@@ -18,6 +18,8 @@
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Store from "@lucide/svelte/icons/store";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { paneAction } from "$lib/screens/chat/paneChrome";
+  import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
@@ -59,9 +61,12 @@
   interface Props {
     kind: ClaudeKind;
     onClose: () => void;
+    compact?: boolean;
   }
 
-  const { kind, onClose }: Props = $props();
+  const { kind, onClose, compact = false }: Props = $props();
+
+  const action = $derived(paneAction(compact));
 
   const STATUS_PAGE = "https://status.claude.com";
   const ROW_PADDING = "py-2 pr-4 pl-4";
@@ -238,59 +243,75 @@
 {/snippet}
 
 <div class="flex h-full flex-col">
-  <AppTopBar
-    {title}
-    subtitle={kind === "memories" && memoriesProject
-      ? projectNameOf(chat.historyProjects, memoriesProject, chat.cwd)
-      : null}
-  >
-    {#snippet navigationIcon()}
-      <TooltipIconButton label={t("BACK")} onclick={onClose}>
-        <ArrowLeft size={20} />
+  {#if compact}
+    <PaneHeader {title} onBack={onClose} actions={headerActions} />
+  {:else}
+    <AppTopBar
+      {title}
+      subtitle={kind === "memories" && memoriesProject
+        ? projectNameOf(chat.historyProjects, memoriesProject, chat.cwd)
+        : null}
+    >
+      {#snippet navigationIcon()}
+        <TooltipIconButton label={t("BACK")} onclick={onClose}>
+          <ArrowLeft size={20} />
+        </TooltipIconButton>
+      {/snippet}
+      {#snippet actions()}
+        {@render headerActions()}
+      {/snippet}
+    </AppTopBar>
+  {/if}
+
+  {#snippet headerActions()}
+    {#if kind === "plugins"}
+      <TooltipIconButton
+        label={t("INSTALL")}
+        class={action.class}
+        onclick={() => {
+          const market = extensions?.marketplaces[0];
+          if (market) void openCatalog(market.name);
+        }}
+      >
+        <CirclePlus size={action.size} />
       </TooltipIconButton>
-    {/snippet}
-    {#snippet actions()}
-      {#if kind === "plugins"}
-        <TooltipIconButton
-          label={t("INSTALL")}
-          onclick={() => {
-            const market = extensions?.marketplaces[0];
-            if (market) void openCatalog(market.name);
-          }}
-        >
-          <CirclePlus size={20} />
-        </TooltipIconButton>
-      {:else if kind === "marketplaces"}
-        <TooltipIconButton label={t("ADD")} onclick={() => (addingMarket = true)}>
-          <CirclePlus size={20} />
-        </TooltipIconButton>
-      {:else if kind === "mcp"}
-        <TooltipIconButton
-          label={t("ADD")}
-          onclick={() => {
-            mcpName = "";
-            mcpTarget = "";
-            mcpTransport = TRANSPORTS[0];
-            addingMcp = true;
-          }}
-        >
-          <CirclePlus size={20} />
-        </TooltipIconButton>
-      {:else if kind === "status"}
-        <TooltipIconButton
-          label={t("STATUS_OPEN_PAGE")}
-          onclick={() => openExternal(STATUS_PAGE)}
-        >
-          <ExternalLink size={20} />
-        </TooltipIconButton>
-      {/if}
-      {#if kind === "status" && !isTouch}
-        <TooltipIconButton label={t("REFRESH")} shortcut="window.refresh" onclick={() => void refresh()}>
-          <RotateCw size={20} />
-        </TooltipIconButton>
-      {/if}
-    {/snippet}
-  </AppTopBar>
+    {:else if kind === "marketplaces"}
+      <TooltipIconButton label={t("ADD")} class={action.class} onclick={() => (addingMarket = true)}>
+        <CirclePlus size={action.size} />
+      </TooltipIconButton>
+    {:else if kind === "mcp"}
+      <TooltipIconButton
+        label={t("ADD")}
+        class={action.class}
+        onclick={() => {
+          mcpName = "";
+          mcpTarget = "";
+          mcpTransport = TRANSPORTS[0];
+          addingMcp = true;
+        }}
+      >
+        <CirclePlus size={action.size} />
+      </TooltipIconButton>
+    {:else if kind === "status"}
+      <TooltipIconButton
+        label={t("STATUS_OPEN_PAGE")}
+        class={action.class}
+        onclick={() => openExternal(STATUS_PAGE)}
+      >
+        <ExternalLink size={action.size} />
+      </TooltipIconButton>
+    {/if}
+    {#if kind === "status" && !isTouch}
+      <TooltipIconButton
+        label={t("REFRESH")}
+        class={action.class}
+        shortcut="window.refresh"
+        onclick={() => void refresh()}
+      >
+        <RotateCw size={action.size} />
+      </TooltipIconButton>
+    {/if}
+  {/snippet}
 
   {#if kind === "memories" && chat.historyProjects.length}
     <div class="px-4 py-1.5">

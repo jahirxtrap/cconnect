@@ -23,6 +23,8 @@
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
+  import ClaudeDetail, { type ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
+  import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import MarkdownActions from "$lib/screens/markdown/MarkdownActions.svelte";
   import MarkdownEditor from "$lib/screens/markdown/MarkdownEditor.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
@@ -67,6 +69,8 @@
   let leftWidth = $state(settings.leftWidth);
   let rightWidth = $state(settings.rightWidth);
   let rightDragging = $state(false);
+  let claudeTick = $state(0);
+  let claudeDetail = $state<ClaudeKind | null>(null);
 
   const chatFocused = $derived(layout.mobile || panes.focused === "center");
 
@@ -317,6 +321,27 @@
             <PaneHeader title={t("MONITOR")} actions={monitorActions} />
             <MonitorContent compact={rightWidth < COMPACT_WIDTH} />
           </div>
+        {:else if panes.kind === "claude"}
+          <div class="flex h-full flex-col border-l border-outline-variant">
+            {#if claudeDetail}
+              <ClaudeDetail
+                kind={claudeDetail}
+                compact
+                focused={panes.focused === "right"}
+                headerTrailing={paneTrailing}
+                onClose={() => (claudeDetail = null)}
+              />
+            {:else}
+              <PaneHeader title={t("CLAUDE")} />
+              <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+                <ClaudeSections
+                  tick={claudeTick}
+                  onOpen={(kind) => (claudeDetail = kind)}
+                  onAccountsChanged={() => claudeTick++}
+                />
+              </div>
+            {/if}
+          </div>
         {:else}
           <TerminalView cwd={terminalCwd} viewMenu={paneViewMenu} onClose={() => panes.setOpen(false)} />
         {/if}
@@ -354,6 +379,18 @@
 
 {#snippet paneViewMenu()}
   <PaneViewMenu />
+{/snippet}
+
+{#snippet paneTrailing()}
+  <PaneViewMenu />
+  <TooltipIconButton
+    label={t("PANEL_RIGHT")}
+    shortcut="panel.right"
+    class="size-8"
+    onclick={() => panes.setOpen(false)}
+  >
+    <PanelRightClose />
+  </TooltipIconButton>
 {/snippet}
 
 {#snippet markdownActions()}

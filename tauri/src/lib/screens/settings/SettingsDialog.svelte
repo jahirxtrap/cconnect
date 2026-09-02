@@ -7,7 +7,6 @@
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
@@ -17,6 +16,7 @@
   import AccountsSection from "$lib/screens/claude/AccountsSection.svelte";
   import ClaudeCliSection from "$lib/screens/claude/ClaudeCliSection.svelte";
   import ClaudeUsageSection from "$lib/screens/claude/ClaudeUsageSection.svelte";
+  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import AboutGroup from "./AboutGroup.svelte";
   import BackgroundSection from "./BackgroundSection.svelte";
   import ClientSection from "./ClientSection.svelte";
@@ -63,12 +63,15 @@
   let refreshing = $state(false);
 
   const tick = $derived(refreshTick);
+  const serverReady = $derived(backend.configured && tabs.state.connected);
+  const claudePending = $derived(
+    tabs.state.connection === "disconnected" ? t("SERVER_UNAVAILABLE") : t("LOADING"),
+  );
 
   useRefreshTick(() => void refresh());
   const showsServer = $derived(
     section === "general" || section === "server" || section === "claude",
   );
-  const serverReady = $derived(backend.configured && tabs.state.connected);
 
   const sections = $derived<{ id: Section; label: string }[]>([
     { id: "general", label: t("SETTINGS_GENERAL") },
@@ -174,10 +177,10 @@
               <ClaudeCliSection
                 enabled={serverReady}
                 {tick}
-                pending={t("LOADING")}
+                pending={claudePending}
                 flash={highlight.is("cli")}
               />
-              <ClaudeUsageSection {tick} pending={t("LOADING")} />
+              <ClaudeUsageSection {tick} pending={claudePending} />
               <AccountsSection enabled={serverReady} onChanged={() => void refresh()} />
             {:else if section === "recovery"}
               <RecoverySection onChanged={() => refreshTick++} />
