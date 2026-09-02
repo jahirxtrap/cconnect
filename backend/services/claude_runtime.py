@@ -504,6 +504,47 @@ async def _block_background(input_data, tool_use_id, context):
     return {}
 
 
+_NO_SECRETS = (
+    "The CConnect server's own .env holds its credentials and is off limits. Ask the user for "
+    "the value you need, or read the documented variable names in README.md instead."
+)
+
+_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
+_ENV_KEY = os.path.normcase(str(_ENV_FILE))
+_ENV_RULE = f"Read({str(_ENV_FILE).replace(os.sep, '/')})"
+_ENV_TOKEN = re.compile(r"(?<![\w.-])([^\s\"';|&<>]*\.env)(?![\w.-])")
+
+
+def _is_env_file(candidate: str, cwd: str) -> bool:
+    try:
+        return os.path.normcase(str(Path(cwd, candidate).resolve())) == _ENV_KEY
+    except (OSError, ValueError):
+        return False
+
+
+def _mentions_env_file(value: Any, cwd: str) -> bool:
+    if isinstance(value, str):
+        return any(_is_env_file(match.group(1), cwd) for match in _ENV_TOKEN.finditer(value))
+    if isinstance(value, dict):
+        return any(_mentions_env_file(item, cwd) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_mentions_env_file(item, cwd) for item in value)
+    return False
+
+
+async def _block_secrets(input_data, tool_use_id, context):
+    data = input_data or {}
+    if _mentions_env_file(data.get("tool_input"), data.get("cwd") or os.getcwd()):
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": _NO_SECRETS,
+            }
+        }
+    return {}
+
+
 async def run_prompt(
     prompt: str,
     cwd: str,
@@ -592,14 +633,17 @@ async def run_prompt(
         session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
     if session_env:
         options_kwargs["env"] = session_env
-    overrides: dict[str, Any] = {"ultracode": True} if ultracode else {}
+    overrides: dict[str, Any] = {"permissions": {"deny": [_ENV_RULE]}}
+    if ultracode:
+        overrides["ultracode"] = True
     style = settings_store.get("output_style")
     if style:
         overrides["outputStyle"] = style
-    if overrides:
-        options_kwargs["settings"] = json.dumps(overrides)
+    options_kwargs["settings"] = json.dumps(overrides)
     status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}
-    hooks_map: dict[str, Any] = {"PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background])]}
+    hooks_map: dict[str, Any] = {
+        "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets])]
+    }
     loop = asyncio.get_running_loop() if emit is not None else None
     if ask_user is not None:
         base_can_use_tool = _build_can_use_tool(ask_user)
@@ -1025,6 +1069,7 @@ async def ask_side_question(
         cli_path=cli_manager.resolve_cli_path(),
         resume=resume_id,
         env=accounts.env_for(accounts.resolve(account)),
+        settings=json.dumps({"permissions": {"deny": [_ENV_RULE]}}),
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
         mcp_servers={"cconnect": build_cconnect_server({
             "ask_user": ask_user,
@@ -1034,7 +1079,7 @@ async def ask_side_question(
             "capabilities": list(capabilities or ()),
         }, exclude=("ask_component", "show_component"))},
     )
-    hooks = [HookMatcher(matcher=None, hooks=[_block_background])]
+    hooks = [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
         hooks.append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))
