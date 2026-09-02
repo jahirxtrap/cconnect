@@ -326,7 +326,9 @@
           actionLabel={t("SETTINGS")}
           onAction={() => {
             dismissed = [...dismissed, notice];
-            navigation.openSettings(notice === "cli_outdated" ? "cli" : "about");
+            if (notice !== "cli_outdated") navigation.openSettings("about");
+            else if (layout.mobile) navigation.openClaude("cli");
+            else navigation.openSettings("cli");
           }}
           onDismiss={() => (dismissed = [...dismissed, notice])}
         />

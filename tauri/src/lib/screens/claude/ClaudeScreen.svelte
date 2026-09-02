@@ -5,115 +5,111 @@
   import Brain from "@lucide/svelte/icons/brain";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import CircleUser from "@lucide/svelte/icons/circle-user";
-  import FilePen from "@lucide/svelte/icons/file-pen";
-  import FileText from "@lucide/svelte/icons/file-text";
-  import FolderPen from "@lucide/svelte/icons/folder-pen";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Server from "@lucide/svelte/icons/server";
   import Store from "@lucide/svelte/icons/store";
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { isTouch } from "$lib/platform";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { projectNameOf, type ProjectInfo } from "$lib/data/models";
-  import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import { accountsApi, type AccountsSnapshot } from "$lib/services/accountsApi";
-  import { claudeApi, type Extensions, type McpServer, type ServiceStatus, type Skill, type Usage } from "$lib/services/claudeApi";
-  import { cliApi, type CliInfo } from "$lib/services/cliApi";
-  import { claudeChangelog } from "$lib/services/githubApi";
+  import { claudeApi, type Extensions, type McpServer, type ServiceStatus, type Skill } from "$lib/services/claudeApi";
   import { settingsApi } from "$lib/services/settingsApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
-  import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
-  import MetricBar from "$lib/ui/MetricBar.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import AccountsSection from "./AccountsSection.svelte";
+  import ClaudeCliSection from "./ClaudeCliSection.svelte";
   import ClaudeDetail, { CLAUDE_KINDS, type ClaudeKind } from "./ClaudeDetail.svelte";
-  import CliControls from "./CliControls.svelte";
-  import PromptDialog from "./PromptDialog.svelte";
-  import ProjectPromptDialog from "./ProjectPromptDialog.svelte";
+  import ClaudeUsageSection from "./ClaudeUsageSection.svelte";
   import { indicatorLabel, indicatorTone } from "./serviceStatus";
 
-  const SUMMARY_LENGTH = 80;
-  const MILLIS_PER_HOUR = 3_600_000;
-  const MILLIS_PER_MINUTE = 60_000;
-  const HOURS_PER_DAY = 24;
-
-  let cli = $state<CliInfo | null>(null);
   let extensions = $state<Extensions | null>(null);
   let skills = $state<Skill[] | null>(null);
   let mcpServers = $state<McpServer[] | null>(null);
-  let userPrompt = $state<string | null>(null);
-  let usage = $state<Usage | null>(null);
-  let accounts = $state<AccountsSnapshot | null>(null);
   let service = $state<ServiceStatus | null>(null);
+  let accounts = $state<AccountsSnapshot | null>(null);
   let projects = $state<ProjectInfo[]>([]);
   let loaded = $state(false);
   let refreshing = $state(false);
+  let refreshStarted = 0;
+  let serviceLoading = $state(true);
   const detail = $derived(
     (CLAUDE_KINDS as readonly string[]).includes(navigation.sub ?? "") ? (navigation.sub as ClaudeKind) : null,
   );
   let envOpen = $state(false);
   let accountOpen = $state(false);
-  let promptOpen = $state(false);
-  let projectPromptOpen = $state(false);
-  let cliChangelog = $state<string | null | undefined>(undefined);
+  const highlight = useHighlight();
 
   const chat = $derived(tabs.state);
   const environment = $derived(backend.active);
   const serverReady = $derived(backend.configured && chat.connected);
 
+  const LOAD_DEBOUNCE_MS = 60;
+
+  let sequence = 0;
+  let tick = $state(0);
+  let pendingLoad: ReturnType<typeof setTimeout> | null = null;
+
+  const scheduleLoad = () => {
+    if (pendingLoad !== null) clearTimeout(pendingLoad);
+    pendingLoad = setTimeout(() => {
+      pendingLoad = null;
+      tick++;
+      void load();
+    }, LOAD_DEBOUNCE_MS);
+  };
+
+  const MIN_REFRESH_MS = 600;
+
+  const refresh = () => {
+    if (refreshing) return;
+    refreshing = true;
+    refreshStarted = Date.now();
+    scheduleLoad();
+  };
+
   const load = async () => {
-    cli = await cliApi.status();
-    extensions = await claudeApi.extensions();
-    skills = await claudeApi.skills();
-    mcpServers = await claudeApi.mcp();
-    userPrompt = await claudeApi.userPrompt();
+    const current = ++sequence;
+    serviceLoading = true;
     projects = chatListFor(backend.active)?.projects ?? [];
-    accounts = await accountsApi.list();
-    usage = await claudeApi.usage(accounts?.default ?? null);
-    service = await claudeApi.status();
+    await Promise.all([
+      claudeApi.extensions().then((value) => (extensions = value)),
+      claudeApi.skills().then((value) => (skills = value)),
+      claudeApi.mcp().then((value) => (mcpServers = value)),
+      claudeApi.status().then((value) => {
+        service = value;
+        serviceLoading = false;
+      }),
+      accountsApi.list().then((value) => (accounts = value)),
+    ]);
+    if (current !== sequence) return;
     loaded = true;
+    if (refreshing) {
+      const elapsed = Date.now() - refreshStarted;
+      if (elapsed < MIN_REFRESH_MS) await new Promise((done) => setTimeout(done, MIN_REFRESH_MS - elapsed));
+      if (current !== sequence) return;
+    }
     refreshing = false;
   };
 
-  const usageWindowLabel = (id: string) =>
-    id === "session" ? t("USAGE_SESSION") : id === "weekly_all" ? t("USAGE_ALL_MODELS") : id;
-
-  const resetsLabel = (resetsAt: string | null) => {
-    const millis = resetsAt === null ? null : parseIsoMillis(resetsAt);
-    if (millis === null) return "—";
-    const remaining = millis - Date.now();
-    if (remaining <= 0) return "—";
-    if (remaining < HOURS_PER_DAY * MILLIS_PER_HOUR) {
-      const hours = Math.floor(remaining / MILLIS_PER_HOUR);
-      const minutes = Math.floor((remaining % MILLIS_PER_HOUR) / MILLIS_PER_MINUTE);
-      return t("RESETS_IN", hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`);
-    }
-    return t("RESETS_ON", formatDayTime(millis));
-  };
-
-  const promptSummary = $derived(
-    userPrompt
-      ?.split("\n")
-      .find((line) => line.trim())
-      ?.slice(0, SUMMARY_LENGTH) || t("USER_PROMPT_SUMMARY"),
-  );
+  const pending = $derived(loaded && !serverReady ? t("SERVER_UNAVAILABLE") : t("LOADING"));
 
   const serviceSummary = $derived(
-    !service ? "—" : service.error !== null ? t("STATUS_UNKNOWN") : indicatorLabel(service.indicator),
+    !service ? pending : service.error !== null ? t("STATUS_UNKNOWN") : indicatorLabel(service.indicator),
   );
 
   const loggedAccounts = $derived((accounts?.accounts ?? []).filter((account) => account.loggedIn));
@@ -121,25 +117,26 @@
   $effect(() => {
     void backend.activeId;
     loaded = false;
-    void load();
+    scheduleLoad();
   });
 
   $effect(() => {
-    if (chat.connected) void load();
+    if (chat.connected) scheduleLoad();
   });
 
   $effect(() => {
-    if (desktop.refreshTick > 0) {
-      refreshing = true;
-      void load();
-    }
+    if (desktop.refreshTick > 0) refresh();
   });
 
   let lastDetail: ClaudeKind | null = null;
   $effect(() => {
     const current = detail;
-    if (lastDetail !== null && current === null) void load();
+    if (lastDetail !== null && current === null) scheduleLoad();
     lastDetail = current;
+  });
+
+  $effect(() => () => {
+    if (pendingLoad !== null) clearTimeout(pendingLoad);
   });
 </script>
 
@@ -174,10 +171,7 @@
           <TooltipIconButton
             label={t("REFRESH")}
             shortcut="window.refresh"
-            onclick={() => {
-              refreshing = true;
-              void load();
-            }}
+            onclick={refresh}
           >
             <RotateCw size={20} />
           </TooltipIconButton>
@@ -185,24 +179,21 @@
       {/snippet}
     </AppTopBar>
 
-    <PullToRefresh
-      {refreshing}
-      onRefresh={() => {
-        refreshing = true;
-        void load();
-      }}
-    >
-      {#if !loaded}
-        <CenteredProgress class="h-full" />
-      {:else}
-        <div class="px-4 pb-4">
+    <PullToRefresh {refreshing} onRefresh={refresh}>
+      <div class="px-4 pb-4">
         <SettingsGroup label={t("SERVICE_STATUS")}>
           {#snippet labelTrailing()}
-            <StatusDot
-              class={service && service.error === null ? indicatorTone(service.indicator) : "bg-gray"}
-              box={20}
-              dot={12}
-            />
+            {#if serviceLoading}
+              <LoadingIndicator size={20} />
+            {:else if !service}
+              <StatusDot class="bg-gray" box={20} dot={12} />
+            {:else}
+              <StatusDot
+                class={service.error === null ? indicatorTone(service.indicator) : "bg-gray"}
+                box={20}
+                dot={12}
+              />
+            {/if}
           {/snippet}
           <PreferenceRow
             icon={Activity}
@@ -217,97 +208,38 @@
           </PreferenceRow>
         </SettingsGroup>
 
-        <SettingsGroup label={t("CLI")}>
-          <PreferenceRow
-            icon={ClaudeIcon}
-            title={t("CLI")}
-            summary={cli?.activeVersion ?? "—"}
-            enabled={serverReady}
-          >
-            {#snippet trailing()}
-              <TooltipIconButton
-                label={t("CHANGELOG")}
-                enabled={serverReady}
-                onclick={() => (cliChangelog = cli?.activeVersion ?? null)}
-              >
-                <FileText size={18} />
-              </TooltipIconButton>
-            {/snippet}
-          </PreferenceRow>
-          {#if cli}
-            <CliControls info={cli} enabled={serverReady} onChanged={(value) => (cli = value)} />
-          {/if}
-          <PreferenceRow
-            icon={FilePen}
-            title={t("USER_PROMPT")}
-            summary={promptSummary}
-            enabled={serverReady}
-            onclick={() => (promptOpen = true)}
-          />
-          {#if projects.length}
-            <PreferenceRow
-              icon={FolderPen}
-              title={t("PROJECT_PROMPT")}
-              summary={t("PROJECT_PROMPT_SUMMARY")}
-              enabled={serverReady}
-              onclick={() => (projectPromptOpen = true)}
-            />
-          {/if}
-        </SettingsGroup>
+        <ClaudeCliSection enabled={serverReady} {tick} {pending} flash={highlight.is("cli")} />
 
-        {#if usage && usage.error === null && usage.windows.length}
-          {@const accountLabel =
-            (accounts?.accounts.length ?? 0) > 1
-              ? (accounts?.accounts.find((item) => item.id === accounts?.default)?.label ?? null)
-              : null}
-          {@const usageLabel = [accountLabel, usage.plan].filter(Boolean).join(" • ")}
-          <SettingsGroup label={t("USAGE")}>
-            {#snippet labelTrailing()}
-              {#if usageLabel}
-                <p class="text-label-lg text-on-surface-variant">{usageLabel}</p>
-              {/if}
-            {/snippet}
-            <div class="flex flex-col gap-3.5 p-4">
-              {#each usage.windows as window (window.id)}
-                <MetricBar
-                  title={usageWindowLabel(window.id)}
-                  subtitle={window.unused ? t("USAGE_UNUSED") : resetsLabel(window.resetsAt)}
-                  percent={window.percent}
-                />
-              {/each}
-            </div>
-          </SettingsGroup>
-        {/if}
+        <ClaudeUsageSection {tick} {pending} />
 
-        <AccountsSection enabled={serverReady} onChanged={() => void load()} />
+        <AccountsSection enabled={serverReady} onChanged={refresh} />
 
         <SettingsGroup label={t("EXTENSIONS")}>
           {@const enabledPlugins = extensions?.plugins.filter((item) => item.enabled).length ?? 0}
           {@render link(
             Blocks,
             t("PLUGINS"),
-            extensions ? t("ENABLED_COUNT", enabledPlugins, extensions.plugins.length) : "—",
+            extensions ? t("ENABLED_COUNT", enabledPlugins, extensions.plugins.length) : pending,
             "plugins",
           )}
-          {@render link(Wand, t("SKILLS"), skills ? String(skills.length) : "—", "skills")}
+          {@render link(Wand, t("SKILLS"), skills ? String(skills.length) : pending, "skills")}
           {@const enabledServers = mcpServers?.filter((item) => item.enabled).length ?? 0}
           {@render link(
             Unplug,
             t("MCP_SERVERS"),
-            mcpServers ? t("ENABLED_COUNT", enabledServers, mcpServers.length) : "—",
+            mcpServers ? t("ENABLED_COUNT", enabledServers, mcpServers.length) : pending,
             "mcp",
           )}
-          {@render link(Store, t("MARKETPLACES"), extensions ? String(extensions.marketplaces.length) : "—", "marketplaces")}
+          {@render link(Store, t("MARKETPLACES"), extensions ? String(extensions.marketplaces.length) : pending, "marketplaces")}
           {@const memoryProject = chat.defaultProjectKey(projects) ?? chat.projectKey}
           {@render link(
             Brain,
             t("MEMORIES"),
-            memoryProject ? projectNameOf(projects, memoryProject, chat.cwd) : "—",
+            memoryProject ? projectNameOf(projects, memoryProject, chat.cwd) : loaded ? "—" : pending,
             "memories",
           )}
         </SettingsGroup>
       </div>
-      {/if}
     </PullToRefresh>
   </div>
 {/if}
@@ -347,39 +279,3 @@
   />
 {/if}
 
-{#if promptOpen}
-  <PromptDialog
-    initial={userPrompt ?? ""}
-    title={t("USER_PROMPT")}
-    summary={t("USER_PROMPT_SUMMARY")}
-    onConfirm={(text) => {
-      promptOpen = false;
-      void claudeApi.setUserPrompt(text).then((ok) => {
-        if (ok) userPrompt = text;
-      });
-    }}
-    onDismiss={() => (promptOpen = false)}
-  />
-{/if}
-
-{#if projectPromptOpen && projects.length}
-  {@const options = chat.withDefaultProject(projects)}
-  <ProjectPromptDialog
-    projects={options}
-    initialProject={chat.defaultProjectKey(projects) ?? chat.projectKey ?? options[0].projectKey}
-    onSave={(project, text) => {
-      projectPromptOpen = false;
-      void claudeApi.setProjectPrompt(project, text);
-    }}
-    onDismiss={() => (projectPromptOpen = false)}
-  />
-{/if}
-
-{#if cliChangelog !== undefined}
-  {@const version = cliChangelog}
-  <ChangelogDialog
-    load={() => claudeChangelog(version)}
-    limitHeight={false}
-    onDismiss={() => (cliChangelog = undefined)}
-  />
-{/if}

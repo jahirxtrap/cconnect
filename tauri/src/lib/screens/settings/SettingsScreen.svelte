@@ -1,6 +1,6 @@
 <script lang="ts">
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
-  import { navigation } from "$lib/app/navigation.svelte";
+  import { useHighlight } from "$lib/app/useHighlight.svelte";
   import Screen from "$lib/app/Screen.svelte";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -31,23 +31,10 @@
 
   let serverSection = $state<HTMLDivElement | null>(null);
   let aboutSection = $state<HTMLDivElement | null>(null);
-  let flashed = $state<string | null>(null);
 
-  const FLASH_MS = 880;
-
-  $effect(() => {
-    const target = navigation.settingsHighlight;
-    if (!target) return;
-    const section = target === "cli" ? serverSection : aboutSection;
-    if (!section) return;
-    section.scrollIntoView({ block: "start", behavior: "smooth" });
-    flashed = target;
-    const timer = setTimeout(() => {
-      flashed = null;
-      navigation.settingsHighlight = null;
-    }, FLASH_MS);
-    return () => clearTimeout(timer);
-  });
+  const highlight = useHighlight((target) =>
+    (target === "cli" ? serverSection : aboutSection)?.scrollIntoView({ block: "start", behavior: "smooth" }),
+  );
 </script>
 
 <Screen title={t("SETTINGS")} {refreshing} onRefresh={refresh}>
@@ -68,7 +55,6 @@
     <div bind:this={serverSection}>
       <ServerSection
         {tick}
-        flash={flashed === "cli"}
         onLoadingChange={(value) => {
           if (!value) refreshing = false;
         }}
@@ -78,7 +64,7 @@
     <RecoverySection onChanged={() => refreshTick++} />
 
     <div bind:this={aboutSection}>
-      <AboutGroup flash={flashed === "about"} />
+      <AboutGroup flash={highlight.is("about")} />
     </div>
   </div>
 </Screen>

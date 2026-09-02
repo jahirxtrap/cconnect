@@ -97,6 +97,11 @@ class Navigation {
     this.navigate("/settings");
   }
 
+  openClaude(highlight: string | null = null) {
+    this.settingsHighlight = highlight;
+    this.navigate("/claude");
+  }
+
   openExplorer(archive: string | null = null) {
     this.explorerArchive = archive;
     this.navigate("/files");

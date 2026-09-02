@@ -4,14 +4,19 @@
   import { Dialog } from "bits-ui";
   import { pushDismiss } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
   import { desktop } from "$lib/platform/desktop.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import AccountsSection from "$lib/screens/claude/AccountsSection.svelte";
+  import ClaudeCliSection from "$lib/screens/claude/ClaudeCliSection.svelte";
+  import ClaudeUsageSection from "$lib/screens/claude/ClaudeUsageSection.svelte";
   import AboutGroup from "./AboutGroup.svelte";
   import BackgroundSection from "./BackgroundSection.svelte";
   import ClientSection from "./ClientSection.svelte";
@@ -25,9 +30,26 @@
 
   const { onDismiss }: Props = $props();
 
-  type Section = "general" | "client" | "background" | "connectivity" | "server" | "recovery" | "about";
+  type Section =
+    | "general"
+    | "client"
+    | "background"
+    | "connectivity"
+    | "server"
+    | "claude"
+    | "recovery"
+    | "about";
 
-  const SECTION_IDS = ["general", "client", "background", "connectivity", "server", "recovery", "about"];
+  const SECTION_IDS = [
+    "general",
+    "client",
+    "background",
+    "connectivity",
+    "server",
+    "claude",
+    "recovery",
+    "about",
+  ];
 
   const sectionOf = (value: string | null): Section =>
     value && SECTION_IDS.includes(value)
@@ -41,7 +63,10 @@
   let refreshing = $state(false);
 
   const tick = $derived(refreshTick + desktop.refreshTick);
-  const showsServer = $derived(section === "general" || section === "server");
+  const showsServer = $derived(
+    section === "general" || section === "server" || section === "claude",
+  );
+  const serverReady = $derived(backend.configured && tabs.state.connected);
 
   const sections = $derived<{ id: Section; label: string }[]>([
     { id: "general", label: t("SETTINGS_GENERAL") },
@@ -49,18 +74,21 @@
     { id: "background", label: t("BACKGROUND_GROUP") },
     { id: "connectivity", label: t("SETTINGS_CONNECTIVITY") },
     { id: "server", label: t("SETTINGS_SERVER") },
+    { id: "claude", label: t("CLAUDE") },
     { id: "recovery", label: t("SETTINGS_RECOVERY") },
     { id: "about", label: t("ABOUT") },
   ]);
 
-  const refresh = () => {
+  const MIN_REFRESH_MS = 600;
+
+  const refresh = async () => {
+    if (refreshing) return;
     refreshing = true;
     refreshTick++;
+    await new Promise((done) => setTimeout(done, MIN_REFRESH_MS));
+    refreshing = false;
   };
 
-  const onServerLoading = (loading: boolean) => {
-    if (!loading) refreshing = false;
-  };
 
   $effect(() => {
     if (tick === 0) return;
@@ -79,12 +107,7 @@
     section = sectionOf(navigation.sub);
   });
 
-  $effect(() => {
-    const target = navigation.settingsHighlight;
-    if (!target) return;
-    select(target === "cli" ? "server" : "about");
-    navigation.settingsHighlight = null;
-  });
+  const highlight = useHighlight((target) => select(target === "cli" ? "claude" : "about"));
 </script>
 
 <Dialog.Root open onOpenChange={(value) => !value && onDismiss()}>
@@ -119,7 +142,7 @@
               label={t("REFRESH")}
               shortcut="window.refresh"
               class="size-9 [&_svg]:size-5"
-              onclick={refresh}
+              onclick={() => void refresh()}
             >
               <RotateCw />
             </TooltipIconButton>
@@ -128,13 +151,13 @@
             <X />
           </TooltipIconButton>
         </div>
-        <PullToRefresh {refreshing} onRefresh={refresh}>
+        <PullToRefresh {refreshing} onRefresh={() => void refresh()}>
           <div class="px-4 pb-4">
             {#if section === "general"}
               <ClientSection />
               <BackgroundSection />
               <ConnectivitySection />
-              <ServerSection {tick} onLoadingChange={onServerLoading} />
+              <ServerSection {tick} />
               <RecoverySection onChanged={() => refreshTick++} />
               <AboutGroup />
             {:else if section === "client"}
@@ -144,7 +167,16 @@
             {:else if section === "connectivity"}
               <ConnectivitySection />
             {:else if section === "server"}
-              <ServerSection {tick} onLoadingChange={onServerLoading} />
+              <ServerSection {tick} />
+            {:else if section === "claude"}
+              <ClaudeCliSection
+                enabled={serverReady}
+                {tick}
+                pending={t("LOADING")}
+                flash={highlight.is("cli")}
+              />
+              <ClaudeUsageSection {tick} pending={t("LOADING")} />
+              <AccountsSection enabled={serverReady} onChanged={() => void refresh()} />
             {:else if section === "recovery"}
               <RecoverySection onChanged={() => refreshTick++} />
             {:else}

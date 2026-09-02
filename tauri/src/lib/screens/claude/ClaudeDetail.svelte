@@ -15,12 +15,14 @@
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import CirclePlus from "@lucide/svelte/icons/circle-plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
+  import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Store from "@lucide/svelte/icons/store";
   import { navigation } from "$lib/app/navigation.svelte";
   import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
-  import { openExternal } from "$lib/platform";
+  import { isTouch, openExternal } from "$lib/platform";
+  import { desktop } from "$lib/platform/desktop.svelte";
   import {
     claudeApi,
     type CatalogPlugin,
@@ -38,6 +40,7 @@
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
+  import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -73,6 +76,7 @@
   let memories = $state<Memories | null>(null);
   let service = $state<ServiceStatus | null>(null);
   let loaded = $state(false);
+  let refreshing = $state(false);
   let busy = $state(false);
   let dialogBusy = $state<string | null>(null);
   let actionError = $state<string | null>(null);
@@ -120,6 +124,18 @@
     else if (kind === "memories") memories = await claudeApi.memories(memoriesProject);
     else if (kind === "status") service = await claudeApi.status();
     loaded = true;
+  };
+
+  const MIN_REFRESH_MS = 600;
+
+  const refresh = async () => {
+    if (refreshing) return;
+    refreshing = true;
+    const started = Date.now();
+    await load();
+    const elapsed = Date.now() - started;
+    if (elapsed < MIN_REFRESH_MS) await new Promise((done) => setTimeout(done, MIN_REFRESH_MS - elapsed));
+    refreshing = false;
   };
 
   let actionRun = 0;
@@ -205,6 +221,10 @@
   });
 
   $effect(() => {
+    if (desktop.refreshTick > 0 && kind === "status") void refresh();
+  });
+
+  $effect(() => {
     const skill = skillSheet;
     skillFiles = null;
     if (skill) void claudeApi.skillFiles(skill.plugin, skill.id).then((files) => (skillFiles = files));
@@ -264,6 +284,11 @@
           <ExternalLink size={20} />
         </TooltipIconButton>
       {/if}
+      {#if kind === "status" && !isTouch}
+        <TooltipIconButton label={t("REFRESH")} shortcut="window.refresh" onclick={() => void refresh()}>
+          <RotateCw size={20} />
+        </TooltipIconButton>
+      {/if}
     {/snippet}
   </AppTopBar>
 
@@ -296,7 +321,8 @@
   {#if !loaded}
     <CenteredProgress class="flex-1" />
   {:else}
-    <div class="min-h-0 flex-1 overflow-y-auto pb-4">
+    <PullToRefresh {refreshing} onRefresh={kind === "status" ? () => void refresh() : null}>
+    <div class="pb-4">
       {#if kind === "plugins"}
         {#each extensions?.plugins ?? [] as plugin (pluginKey(plugin))}
           <ListRow
@@ -413,6 +439,7 @@
         {/if}
       {/if}
     </div>
+    </PullToRefresh>
   {/if}
 </div>
 
