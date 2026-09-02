@@ -6,7 +6,8 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Unplug from "@lucide/svelte/icons/unplug";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
-  import { plural, t } from "$lib/i18n/index.svelte";
+  import { formatDays } from "$lib/data/format";
+  import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
@@ -96,7 +97,7 @@
   const chatsSummary = $derived(
     [
       t(snapshot?.trashEnabled ? "TRASH_ON" : "TRASH_OFF"),
-      plural("RETENTION_DAYS_SUMMARY", snapshot?.retentionDays ?? 30),
+      formatDays(snapshot?.retentionDays ?? 30),
     ].join(" • "),
   );
 

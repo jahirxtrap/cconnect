@@ -72,6 +72,7 @@
   import ToolbarAction from "./ToolbarAction.svelte";
   import { MENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
   import { pastedName } from "$lib/data/pastedFile";
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
 
   type SortKey = "name" | "date" | "type" | "size";
   type TransferKind = "move" | "copy" | "extract";
@@ -469,20 +470,23 @@
       }
       return;
     }
-    if (event.key === "Delete" && selected.length) {
-      confirmingDelete = true;
-      return;
-    }
-    if (!(event.ctrlKey || event.metaKey) || !shortcutsEnabled) return;
-    const key = event.key.toLowerCase();
-    if ((key === "c" || key === "x") && archive === null && selected.length) {
-      startTransfer(key === "c" ? "copy" : "move");
-      event.preventDefault();
-    } else if (key === "v" && transfer && transferAllowed) {
-      void runTransfer();
-      event.preventDefault();
-    }
   };
+
+  const startIfAllowed = (mode: "copy" | "move") => {
+    if (!shortcutsEnabled || archive !== null || !selected.length) return false;
+    startTransfer(mode);
+  };
+
+  useShortcut("files.copy", () => startIfAllowed("copy"));
+  useShortcut("files.cut", () => startIfAllowed("move"));
+  useShortcut("files.paste", () => {
+    if (!shortcutsEnabled || !transfer || !transferAllowed) return false;
+    void runTransfer();
+  });
+  useShortcut("files.delete", () => {
+    if (!selected.length) return false;
+    confirmingDelete = true;
+  });
 
   const onPaste = (event: ClipboardEvent) => {
     if (!shortcutsEnabled || archive !== null || transfer) return;

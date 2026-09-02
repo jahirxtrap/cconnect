@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { dismissOpen } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverDefaults } from "$lib/data/serverDefaults.svelte";
@@ -7,6 +8,8 @@
   import { theme } from "$lib/design/theme.svelte";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { shortcuts, type ShortcutScope } from "$lib/platform/shortcuts.svelte";
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { notifier } from "$lib/services/notifier.svelte";
   import { updater } from "$lib/services/updater.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
@@ -35,6 +38,25 @@
   });
   void desktop.start();
 
+  useShortcut("tab.new", () => void tabs.newTab());
+  useShortcut("tab.close", () => tabs.closeActive());
+  useShortcut("tab.next", () => tabs.selectNext());
+  useShortcut("tab.previous", () => tabs.selectPrev());
+  useShortcut("tab.moveNext", () => tabs.moveActive(1));
+  useShortcut("tab.movePrevious", () => tabs.moveActive(-1));
+  useShortcut("window.fullscreen", () => void desktop.toggleFullscreen());
+  useShortcut("window.refresh", () => {
+    desktop.refreshTick++;
+  });
+
+  const scopeChain = (): ShortcutScope[] => {
+    if (dismissOpen()) return ["global"];
+    if (navigation.route === "/files") return ["files", "global"];
+    if (navigation.route === "/terminal") return ["terminal", "global"];
+    if (navigation.route === "/") return [paneFocus.active, "global"];
+    return ["global"];
+  };
+
   const onKeydown = (event: KeyboardEvent) => {
     if (event.isComposing) return;
     if (event.defaultPrevented) return;
@@ -47,25 +69,12 @@
       return;
     }
     const control = event.ctrlKey || event.metaKey;
-    const key = event.key.toLowerCase();
     if (!control && !event.altKey && event.key.length === 1 && !isEditing()) {
       paneFocus.focusActive();
       return;
     }
-    if (paneFocus.active !== "chat") return;
-    const handled =
-      control && key === "tab"
-        ? (event.shiftKey ? tabs.selectPrev() : tabs.selectNext(), true)
-        : control && key === "t"
-          ? (tabs.newTab(), true)
-          : control && key === "w"
-            ? (tabs.closeActive(), true)
-            : event.altKey && event.key === "ArrowRight"
-              ? (tabs.selectNext(), true)
-              : event.altKey && event.key === "ArrowLeft"
-                ? (tabs.selectPrev(), true)
-                : false;
-    if (handled) event.preventDefault();
+    if (!control && !event.altKey && isEditing()) return;
+    if (shortcuts.handle(event, scopeChain())) event.preventDefault();
   };
 
   const blockFileOpen = (event: DragEvent) => {

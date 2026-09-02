@@ -8,6 +8,7 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { terminalKeys } from "$lib/data/terminalKeys.svelte";
   import { terminalTabs, type TerminalTab } from "$lib/data/terminalTabs.svelte";
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
@@ -119,20 +120,12 @@
     void drop(tab);
   };
 
-  const onKeydown = (event: KeyboardEvent) => {
-    if (paneFocus.active !== "terminal" || event.defaultPrevented) return;
-    if (!event.ctrlKey && !event.metaKey) return;
-    const key = event.key.toLowerCase();
-    const handled =
-      key === "tab"
-        ? (event.shiftKey ? terminalTabs.selectPrev() : terminalTabs.selectNext(), true)
-        : key === "t"
-          ? (void create(), true)
-          : key === "w" && terminalTabs.activeId !== null
-            ? (closeTab(terminalTabs.activeId), true)
-            : false;
-    if (handled) event.preventDefault();
-  };
+  useShortcut("terminal.tab.new", () => void create());
+  useShortcut("terminal.tab.close", () => {
+    if (terminalTabs.activeId !== null) closeTab(terminalTabs.activeId);
+  });
+  useShortcut("terminal.tab.next", () => terminalTabs.selectNext());
+  useShortcut("terminal.tab.previous", () => terminalTabs.selectPrev());
 
   $effect(() => paneFocus.register("terminal", focusActive));
 
@@ -140,8 +133,6 @@
     void refresh();
   });
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 {#snippet headerActions()}
   {#if hasExtras}
@@ -172,7 +163,7 @@
       {/if}
     </PopupMenu>
   {/if}
-  <TooltipIconButton label={t("CLOSE")} onclick={onClose} class="size-8">
+  <TooltipIconButton label={t("CLOSE")} shortcut="panel.right" onclick={onClose} class="size-8">
     <PanelRightClose />
   </TooltipIconButton>
 {/snippet}
@@ -190,6 +181,7 @@
     onClose={(id) => void closeTab(id)}
     onMove={(id, index) => terminalTabs.move(id, index)}
     newLabel={t("NEW_TERMINAL")}
+    newShortcut="terminal.tab.new"
     emptyTitle={t("TERMINAL")}
     dot={false}
     {focused}

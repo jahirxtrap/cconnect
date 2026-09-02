@@ -290,20 +290,6 @@
     return true;
   };
 
-  const onKeydown = (event: KeyboardEvent) => {
-    if (!(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== "a") return;
-    const active = document.activeElement;
-    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
-    if (!container) return;
-    event.preventDefault();
-    const selection = window.getSelection();
-    if (!selection) return;
-    const range = document.createRange();
-    range.selectNodeContents(container);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  };
-
   const stopFollowing = () => {
     follow = false;
   };
@@ -379,8 +365,6 @@
     if (settleTimer !== null) clearTimeout(settleTimer);
   });
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 <div class="relative h-full">
   <!-- svelte-ignore a11y_no_static_element_interactions -->

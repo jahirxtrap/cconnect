@@ -11,6 +11,18 @@ class Desktop {
 
   #trayActive = false;
 
+  async toggleFullscreen() {
+    if (!isTauri) {
+      const root = document.documentElement;
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await root.requestFullscreen();
+      return;
+    }
+    const { getCurrentWindow } = await import("@tauri-apps/api/window");
+    const current = getCurrentWindow();
+    await current.setFullscreen(!(await current.isFullscreen()));
+  }
+
   async start() {
     if (!isTauri) return;
     await this.#window();
@@ -32,18 +44,6 @@ class Desktop {
 
     void current.onResized(async () => {
       settings.windowMaximized = await current.isMaximized();
-    });
-
-    window.addEventListener("keydown", (event) => {
-      if (event.key === "F11") {
-        event.preventDefault();
-        void current.isFullscreen().then((value) => current.setFullscreen(!value));
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "r") {
-        event.preventDefault();
-        this.refreshTick++;
-      }
     });
 
     const SIDE_BACK = 3;

@@ -25,6 +25,7 @@
   import { terminalTabs } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { onNativePaste } from "$lib/platform/pastedContent";
   import { backend } from "$lib/services/backend.svelte";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
@@ -94,7 +95,7 @@
     const project = selected
       ? chatListFor(backend.active)?.projects.find((item) => item.projectKey === selected)
       : null;
-    return [settings.cwd, project?.path ?? ""].filter(Boolean);
+    return [backend.active?.directory ?? "", project?.path ?? ""].filter(Boolean);
   });
   let renameTarget = $state<SessionInfo | null>(null);
   let deleteTarget = $state<SessionInfo | null>(null);
@@ -280,13 +281,20 @@
     settings.sidebarExpanded = value;
   };
 
-  const onKeydown = (event: KeyboardEvent) => {
-    if (event.defaultPrevented || event.altKey || !(event.ctrlKey || event.metaKey)) return;
-    if (event.key.toLowerCase() !== "b") return;
-    event.preventDefault();
+  useShortcut("panel.left", () => {
     if (layout.mobile) drawer.open = !drawer.open;
     else setExpanded(!expanded);
+  });
+
+  const setTerminalOpen = (open: boolean) => {
+    terminalTabs.setPanelOpen(open);
+    paneFocus.set(open ? "terminal" : "chat");
   };
+
+  useShortcut("panel.right", () => {
+    if (layout.mobile) terminalTabs.overlayOpen = !terminalTabs.overlayOpen;
+    else setTerminalOpen(!terminalTabs.panelOpen);
+  });
 
   $effect(() => {
     if (!layout.mobile) drawer.open = false;
@@ -307,7 +315,7 @@
   );
 </script>
 
-<svelte:window onpaste={onPaste} onkeydown={onKeydown} />
+<svelte:window onpaste={onPaste} />
 
 {#if layout.mobile && terminalTabs.overlayOpen}
   <div
@@ -340,7 +348,7 @@
         />
       {:else}
         <div class="flex h-full flex-col items-center border-r border-outline-variant py-2">
-          <TooltipIconButton label={t("MENU")} onclick={() => setExpanded(true)}>
+          <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => setExpanded(true)}>
             <PanelLeftOpen size={20} />
           </TooltipIconButton>
           <TooltipIconButton label={t("NEW_SESSION")} onclick={() => chat.newSession()}>
@@ -396,6 +404,7 @@
         activeId={tabs.activeId}
         onSelect={(id) => selectTab(id)}
         onNew={() => tabs.newTab()}
+        newShortcut="tab.new"
         onClose={(id) => tabs.close(id)}
         onMove={(id, index) => tabs.move(id, index)}
         focused={chatFocused}
@@ -582,13 +591,7 @@
             },
           }}
         ></div>
-        <TerminalPanel
-          cwd={terminalCwd}
-          onClose={() => {
-            terminalTabs.setPanelOpen(false);
-            paneFocus.set("chat");
-          }}
-        />
+        <TerminalPanel cwd={terminalCwd} onClose={() => setTerminalOpen(false)} />
       </div>
     </div>
   {/if}
@@ -597,18 +600,16 @@
 {#snippet terminalToggle()}
   <TooltipIconButton
     label={t("TERMINAL")}
+    shortcut="panel.right"
     class="size-8"
-    onclick={() => {
-      terminalTabs.setPanelOpen(true);
-      paneFocus.set("terminal");
-    }}
+    onclick={() => setTerminalOpen(true)}
   >
     <PanelRightOpen />
   </TooltipIconButton>
 {/snippet}
 
 {#snippet menuButton()}
-  <TooltipIconButton label={t("MENU")} onclick={() => (drawer.open = true)}>
+  <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => (drawer.open = true)}>
     <Menu size={20} />
   </TooltipIconButton>
 {/snippet}

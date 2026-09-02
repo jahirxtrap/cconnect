@@ -84,15 +84,13 @@
 
   const submit = () => {
     if (!canSubmit) return;
-    typed = null;
     onSend(draft);
     onDraft("");
   };
 
-  let typed = $state<string | null>(null);
+  let dismissed = $state(false);
   let highlighted = $state(0);
   let previewed = $state(false);
-  let argumentFor = $state<CommandOption | null>(null);
 
   const write = (value: string) => {
     onDraft(value);
@@ -101,7 +99,7 @@
 
   const openCommands = () => {
     if (!draft.trimStart().startsWith("/")) write("/");
-    typed = commandToken(field?.value ?? draft);
+    dismissed = false;
     highlighted = 0;
     previewed = false;
     field?.focus();
@@ -124,37 +122,39 @@
     );
   };
 
+  const typed = $derived(dismissed ? null : commandToken(draft));
+
+  const argumentFor = $derived.by(() => {
+    if (dismissed || typed !== null) return null;
+    const command = resolve(draft);
+    return command?.argumentHint ? command : null;
+  });
+
   const suggestions = $derived.by(() => {
     if (!commandsReady) return [];
     if (argumentFor) return [argumentFor];
-    const token = typed;
-    if (token === null) return [];
-    return commands.filter((command) => matches(command, token.toLowerCase()));
+    if (typed === null) return [];
+    return commands.filter((command) => matches(command, typed.toLowerCase()));
   });
 
+  const active = $derived(suggestions.length ? highlighted % suggestions.length : 0);
+
   const oninput = (event: Event) => {
-    const value = (event.currentTarget as HTMLTextAreaElement).value;
-    onDraft(value);
-    const token = commandToken(value);
-    typed = token;
-    const command = token === null ? resolve(value) : null;
-    argumentFor = command?.argumentHint ? command : null;
+    onDraft((event.currentTarget as HTMLTextAreaElement).value);
+    dismissed = false;
     highlighted = 0;
     previewed = false;
   };
 
   const cycle = (step: number, keepFirst = false) => {
     if (!suggestions.length) return;
-    if (!keepFirst || previewed) {
-      highlighted = (highlighted + step + suggestions.length) % suggestions.length;
-    }
+    highlighted = !keepFirst || previewed ? (active + step + suggestions.length) % suggestions.length : active;
     previewed = true;
     const command = suggestions[highlighted];
     write(command.argumentHint ? `/${command.name} ` : `/${command.name}`);
   };
 
   const complete = (command: CommandOption) => {
-    typed = null;
     write(command.argumentHint ? `/${command.name} ` : "");
     field?.focus();
     if (!command.argumentHint) onCommand(command);
@@ -185,6 +185,7 @@
   };
 
   const onkeydown = (event: KeyboardEvent) => {
+    if (event.isComposing) return;
     if (suggestions.length && !argumentFor) {
       if (event.key === "Tab") {
         event.preventDefault();
@@ -198,12 +199,12 @@
       }
       if (event.key === "Enter" && !isTouch && !event.shiftKey) {
         event.preventDefault();
-        complete(suggestions[highlighted]);
+        complete(suggestions[active]);
         return;
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        typed = null;
+        dismissed = true;
         return;
       }
     }
@@ -242,7 +243,7 @@
           onclick={() => complete(command)}
           onmouseenter={() => (highlighted = index)}
           class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start px-3.5 py-2 text-left {index ===
-          highlighted
+          active
             ? 'bg-on-surface/8'
             : ''}"
         >

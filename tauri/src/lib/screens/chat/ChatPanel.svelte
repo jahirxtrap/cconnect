@@ -149,7 +149,7 @@
       <SquarePen size={18} />
     </TooltipIconButton>
     {#if onClose}
-      <TooltipIconButton label={t("MENU")} onclick={onClose}>
+      <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={onClose}>
         {#if drawerMode}
           <Menu size={18} />
         {:else}

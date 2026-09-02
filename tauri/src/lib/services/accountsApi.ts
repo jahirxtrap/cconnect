@@ -1,3 +1,4 @@
+import { serverDefaults } from "$lib/data/serverDefaults.svelte";
 import { transfers } from "$lib/data/transfers.svelte";
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
@@ -91,6 +92,7 @@ export const createAccountsApi = (client: HttpClient) => ({
 
   async create(label: string): Promise<Account | null> {
     const data = await client.post<Wire>("/accounts", { label });
+    if (data) serverDefaults.bump();
     return data && parse(data);
   },
 
@@ -123,7 +125,9 @@ export const createAccountsApi = (client: HttpClient) => ({
 
   async updateProvider(id: string, baseUrl: string, auth: ProviderAuth): Promise<boolean> {
     const body = { base_url: baseUrl, auth: authWire(auth) };
-    return (await client.put(`/accounts/${id}/provider`, body)) !== null;
+    const done = (await client.put(`/accounts/${id}/provider`, body)) !== null;
+    if (done) serverDefaults.bump();
+    return done;
   },
 
   async createProvider(label: string, baseUrl: string, auth: ProviderAuth): Promise<Account | null> {
@@ -132,15 +136,20 @@ export const createAccountsApi = (client: HttpClient) => ({
       base_url: baseUrl,
       auth: authWire(auth),
     });
+    if (data) serverDefaults.bump();
     return data && parse(data);
   },
 
   async rename(id: string, label: string): Promise<boolean> {
-    return (await client.put(`/accounts/${id}`, { label })) !== null;
+    const done = (await client.put(`/accounts/${id}`, { label })) !== null;
+    if (done) serverDefaults.bump();
+    return done;
   },
 
   async remove(id: string): Promise<boolean> {
-    return (await client.delete(`/accounts/${id}`)) !== null;
+    const done = (await client.delete(`/accounts/${id}`)) !== null;
+    if (done) serverDefaults.bump();
+    return done;
   },
 
   async startLogin(id: string): Promise<string | null> {
@@ -149,7 +158,9 @@ export const createAccountsApi = (client: HttpClient) => ({
   },
 
   async submitCode(id: string, code: string): Promise<boolean> {
-    return (await client.post(`/accounts/${id}/login/code`, { code })) !== null;
+    const done = (await client.post(`/accounts/${id}/login/code`, { code })) !== null;
+    if (done) serverDefaults.bump();
+    return done;
   },
 
   async cancelLogin(id: string): Promise<void> {
@@ -167,6 +178,7 @@ export const createAccountsApi = (client: HttpClient) => ({
           body: file,
           signal,
         });
+        if (response.ok) serverDefaults.bump();
         return response.ok;
       } catch {
         return false;

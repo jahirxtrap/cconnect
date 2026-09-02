@@ -170,6 +170,7 @@
         {#if !isTouch}
           <TooltipIconButton
             label={t("REFRESH")}
+            shortcut="window.refresh"
             onclick={() => {
               refreshing = true;
               void load();

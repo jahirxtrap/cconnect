@@ -20,7 +20,6 @@ const DEFAULTS = {
   terminal_open: false,
   terminal_width: 420,
   minimize_to_tray: false,
-  cwd: "",
   tabs_state: "",
   collapsed_categories: "",
   hidden_categories: "",
@@ -168,13 +167,6 @@ class Settings {
   }
   set minimizeToTray(value: boolean) {
     this.#write("minimize_to_tray", value);
-  }
-
-  get cwd() {
-    return this.#read("cwd");
-  }
-  set cwd(value: string) {
-    this.#write("cwd", value);
   }
 
   get tabsState() {

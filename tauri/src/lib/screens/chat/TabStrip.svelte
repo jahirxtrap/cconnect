@@ -18,6 +18,7 @@
     activeId: string | null;
     onSelect: (id: string) => void;
     onNew: () => void;
+    newShortcut?: string;
     onClose: (id: string) => void;
     onMove?: (id: string, index: number) => void;
     newLabel?: string;
@@ -32,6 +33,7 @@
     activeId,
     onSelect,
     onNew,
+    newShortcut,
     onClose,
     onMove,
     newLabel,
@@ -257,7 +259,7 @@
       </div>
     {/each}
     <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex h-8 shrink-0 items-center">
-      <TooltipIconButton label={newLabel ?? t("NEW_TAB")} onclick={onNew} class="size-8">
+      <TooltipIconButton label={newLabel ?? t("NEW_TAB")} shortcut={newShortcut} onclick={onNew} class="size-8">
         <Plus size={18} />
       </TooltipIconButton>
     </div>

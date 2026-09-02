@@ -2,11 +2,13 @@
   import { Tooltip } from "bits-ui";
   import type { Snippet } from "svelte";
   import { isTouch } from "$lib/platform";
+  import { shortcuts } from "$lib/platform/shortcuts.svelte";
   import { keyboardNavigation } from "./keyboardNavigation.svelte";
   import TouchTip from "./TouchTip.svelte";
 
   interface Props {
     label: string;
+    shortcut?: string;
     onclick?: () => void;
     enabled?: boolean;
     tooltip?: boolean;
@@ -17,6 +19,7 @@
 
   const {
     label,
+    shortcut,
     onclick,
     enabled = true,
     tooltip = true,
@@ -44,6 +47,9 @@
   const TRIGGER_CLASS = $derived(
     `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
   );
+
+  const hint = $derived(shortcut ? shortcuts.hint(shortcut) : "");
+  const keyshortcuts = $derived(shortcut ? shortcuts.aria(shortcut) : undefined);
 
   let open = $state(false);
   let touchTip = $state<{ x: number; top: number; bottom: number } | null>(null);
@@ -129,7 +135,15 @@
 </script>
 
 {#if !tooltip}
-  <button type="button" disabled={!enabled} aria-label={label} onclick={activate} class={TRIGGER_CLASS} {...rest}>
+  <button
+    type="button"
+    disabled={!enabled}
+    aria-label={label}
+    aria-keyshortcuts={keyshortcuts}
+    onclick={activate}
+    class={TRIGGER_CLASS}
+    {...rest}
+  >
     {@render children()}
   </button>
 {:else if isTouch}
@@ -137,6 +151,7 @@
     type="button"
     disabled={!enabled}
     aria-label={label}
+    aria-keyshortcuts={keyshortcuts}
     onclick={activate}
     ontouchstart={pressStart}
     ontouchmove={pressMove}
@@ -155,6 +170,7 @@
       <Tooltip.Trigger
         disabled={!enabled}
         aria-label={label}
+        aria-keyshortcuts={keyshortcuts}
         onclick={activate}
         onpointermove={show}
         onpointerleave={leave}
@@ -167,8 +183,14 @@
       </Tooltip.Trigger>
       {#if open}
         <Tooltip.Portal>
-          <Tooltip.Content sideOffset={4} class="z-75 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg">
-            {label}
+          <Tooltip.Content
+            sideOffset={4}
+            class="z-75 flex items-center gap-1.5 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg"
+          >
+            <span>{label}</span>
+            {#if hint}
+              <span class="text-on-surface-variant">{hint}</span>
+            {/if}
           </Tooltip.Content>
         </Tooltip.Portal>
       {/if}

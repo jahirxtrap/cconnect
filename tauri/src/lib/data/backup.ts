@@ -1,7 +1,8 @@
 import { i18n, type Locale } from "$lib/i18n/index.svelte";
 import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
 import { backend, type AuthKind, type EnvironmentProfile } from "$lib/services/backend.svelte";
-import { settings } from "./settings.svelte";
+import { shortcuts } from "$lib/platform/shortcuts.svelte";
+import { settings, type VisibilityPrefs } from "./settings.svelte";
 import { sshStore, type SshProfile } from "./sshStore.svelte";
 import { terminalKeys } from "./terminalKeys.svelte";
 
@@ -37,10 +38,8 @@ export const exportSettings = (): string =>
         markdown_preview_formatted: settings.markdownPreviewFormatted,
         notify_task_done: settings.notifyTaskDone,
         notify_interaction: settings.notifyInteraction,
-        sidebar_expanded: settings.sidebarExpanded,
         minimize_to_tray: settings.minimizeToTray,
         window_maximized: settings.windowMaximized,
-        cwd: settings.cwd,
         environment_locked: settings.environmentLocked,
         project_locked: settings.projectLocked,
         collapsed_categories: settings.collapsedCategories,
@@ -54,7 +53,11 @@ export const exportSettings = (): string =>
         local_server_python_path: settings.localServerPythonPath,
         local_server_mode: settings.localServerMode,
         local_server_public_host: settings.localServerPublicHost,
+        sidebar_width: settings.sidebarWidth,
+        terminal_width: settings.terminalWidth,
+        visibility: settings.visibility,
       },
+      shortcuts: shortcuts.custom,
       ...(backend.activeId ? { active_environment: backend.activeId } : {}),
       environments: backend.environments.map((profile) => ({
         id: profile.id,
@@ -108,7 +111,6 @@ const applySettings = (values: Wire) => {
     ["markdown_preview_formatted", (value) => (settings.markdownPreviewFormatted = value)],
     ["notify_task_done", (value) => (settings.notifyTaskDone = value)],
     ["notify_interaction", (value) => (settings.notifyInteraction = value)],
-    ["sidebar_expanded", (value) => (settings.sidebarExpanded = value)],
     ["minimize_to_tray", (value) => (settings.minimizeToTray = value)],
     ["window_maximized", (value) => (settings.windowMaximized = value)],
     ["file_sort_ascending", (value) => (settings.fileSortAscending = value)],
@@ -122,7 +124,6 @@ const applySettings = (values: Wire) => {
   }
 
   const strings: Array<[string, (value: string) => void]> = [
-    ["cwd", (value) => (settings.cwd = value)],
     ["file_sort_field", (value) => (settings.fileSortField = value)],
     ["local_server_dir", (value) => (settings.localServerDir = value)],
     ["local_server_python", (value) => (settings.localServerPython = value)],
@@ -133,6 +134,20 @@ const applySettings = (values: Wire) => {
   for (const [key, apply] of strings) {
     const value = text(values, key);
     if (value !== null) apply(value);
+  }
+
+  const numbers: Array<[string, (value: number) => void]> = [
+    ["sidebar_width", (value) => (settings.sidebarWidth = value)],
+    ["terminal_width", (value) => (settings.terminalWidth = value)],
+  ];
+  for (const [key, apply] of numbers) {
+    const value = number(values, key);
+    if (value !== null) apply(value);
+  }
+
+  const visibility = values.visibility;
+  if (visibility && typeof visibility === "object") {
+    settings.visibility = { ...settings.visibility, ...(visibility as VisibilityPrefs) };
   }
 
   const idLists: Array<[string, (value: string[]) => void]> = [
@@ -207,6 +222,13 @@ export const importSettings = (raw: string): boolean => {
     const profile = toEnvironment(raw);
     const key = text(raw, "terminal_key");
     if (profile && key) terminalKeys.setFor(profile, key);
+  }
+
+  const bindings = root.shortcuts;
+  if (bindings && typeof bindings === "object") {
+    for (const [id, keys] of Object.entries(bindings as Wire)) {
+      if (typeof keys === "string") shortcuts.set(id, keys);
+    }
   }
 
   const active = text(root, "active_environment");

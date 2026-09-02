@@ -1,3 +1,5 @@
+import { plural } from "$lib/i18n/index.svelte";
+
 const SIZE_UNITS = ["KB", "MB", "GB", "TB"];
 
 const ARCHIVE_SUFFIXES = [
@@ -15,6 +17,7 @@ const ARCHIVE_SUFFIXES = [
 
 const THOUSAND = 1000;
 const MILLION = 1_000_000;
+const DAYS_IN_YEAR = 365;
 
 export const formatTokens = (value: number): string => {
   if (value < THOUSAND) return `${value}`;
@@ -29,6 +32,15 @@ export const formatDuration = (millis: number): string => {
   const minutes = Math.floor(millis / 60_000);
   const seconds = Math.round((millis % 60_000) / 1000);
   return seconds > 0 ? `${minutes} min ${seconds} s` : `${minutes} min`;
+};
+
+export const formatDays = (days: number): string => {
+  const years = Math.floor(days / DAYS_IN_YEAR);
+  const rest = days % DAYS_IN_YEAR;
+  const parts: string[] = [];
+  if (years) parts.push(plural("DURATION_YEARS", years));
+  if (rest || !years) parts.push(plural("DURATION_DAYS", rest));
+  return parts.join(" ");
 };
 
 export const formatDecimal = (value: number, decimals: number): string =>

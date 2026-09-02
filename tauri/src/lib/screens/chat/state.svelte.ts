@@ -274,7 +274,7 @@ export class ChatState {
     this.sessionId = context.sessionId;
     this.projectKey = context.projectKey;
     this.sessionColor = context.color ?? null;
-    this.cwd = context.cwd || this.environment?.directory || settings.cwd;
+    this.cwd = context.cwd || this.environment?.directory || "";
     this.#initial =
       context.sessionId && context.projectKey
         ? {

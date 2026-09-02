@@ -4,6 +4,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Clock from "@lucide/svelte/icons/clock";
   import History from "@lucide/svelte/icons/history";
+  import Keyboard from "@lucide/svelte/icons/keyboard";
   import Languages from "@lucide/svelte/icons/languages";
   import Minimize2 from "@lucide/svelte/icons/minimize-2";
   import Moon from "@lucide/svelte/icons/moon";
@@ -45,6 +46,7 @@
   import LocalServerGroup from "./LocalServerGroup.svelte";
   import NotificationsDialog from "./NotificationsDialog.svelte";
   import ServerGroup from "./ServerGroup.svelte";
+  import ShortcutsDialog from "./ShortcutsDialog.svelte";
 
   type Dialog =
     | "theme"
@@ -55,7 +57,8 @@
     | "notifications"
     | "reset"
     | "export"
-    | "import";
+    | "import"
+    | "shortcuts";
 
   let cliChangelog = $state<string | null | undefined>(undefined);
 
@@ -146,7 +149,6 @@
   });
 
   const reset = () => {
-    settings.cwd = "";
     theme.setMode("system");
     theme.setDynamicColor(false);
     theme.setAccent(DEFAULT_ACCENT_INDEX);
@@ -161,13 +163,13 @@
 <Screen title={t("SETTINGS")} {refreshing} onRefresh={refresh}>
   {#snippet actions()}
     {#if !isTouch}
-      <TooltipIconButton label={t("REFRESH")} onclick={refresh}>
+      <TooltipIconButton label={t("REFRESH")} shortcut="window.refresh" onclick={refresh}>
         <RotateCw size={20} />
       </TooltipIconButton>
     {/if}
   {/snippet}
   <div class="flex w-full flex-col px-4 pb-4">
-    <SettingsGroup label={t("SETTINGS_APPEARANCE")}>
+    <SettingsGroup label={t("SETTINGS_CLIENT")}>
       <PreferenceRow
         icon={themeIcon}
         title={t("THEME")}
@@ -200,6 +202,12 @@
           <span class="flex h-7 w-9 items-center justify-center text-[22px]" data-font={theme.fontStyle}>😃</span>
         {/snippet}
       </PreferenceRow>
+      <PreferenceRow
+        icon={Keyboard}
+        title={t("SHORTCUTS")}
+        summary={t("SHORTCUTS_SUMMARY")}
+        onclick={() => (dialog = "shortcuts")}
+      />
       <PreferenceRow
         icon={Clock}
         title={t("SHOW_TIMESTAMPS")}
@@ -361,6 +369,8 @@
     }}
     onDismiss={() => (dialog = null)}
   />
+{:else if dialog === "shortcuts"}
+  <ShortcutsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "environments"}
   <EnvironmentsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "notifications"}
