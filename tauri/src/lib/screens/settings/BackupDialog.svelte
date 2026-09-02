@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from "$lib/i18n/index.svelte";
+  import { copyText } from "$lib/platform/clipboard";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
@@ -25,7 +26,7 @@
   {#snippet buttons()}
     {#if mode === "export"}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-      <Button onclick={() => void navigator.clipboard.writeText(payload)}>{t("COPY")}</Button>
+      <Button onclick={() => void copyText(payload)}>{t("COPY")}</Button>
     {:else}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button

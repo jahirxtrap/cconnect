@@ -2,6 +2,7 @@
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import Component from "@lucide/svelte/icons/component";
   import { t } from "$lib/i18n/index.svelte";
+  import { copyText } from "$lib/platform/clipboard";
   import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
   import {
@@ -490,7 +491,7 @@
     <div class="mt-2 flex flex-col gap-1.5">
       <ActionButton
         text={t("ACCOUNT_COPY_LINK")}
-        onclick={() => void navigator.clipboard.writeText(current.url)}
+        onclick={() => void copyText(current.url)}
         class="w-full"
       />
       <ActionButton

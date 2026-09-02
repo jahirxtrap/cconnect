@@ -2,6 +2,7 @@
   import Check from "@lucide/svelte/icons/check";
   import Copy from "@lucide/svelte/icons/copy";
   import { theme } from "$lib/design/theme.svelte";
+  import { copyText } from "$lib/platform/clipboard";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
   import { hscrollbar } from "./scrollbar";
 
@@ -43,7 +44,7 @@
   });
 
   const copy = () => {
-    void navigator.clipboard.writeText(body);
+    void copyText(body);
     copied = true;
   };
 </script>

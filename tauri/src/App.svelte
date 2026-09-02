@@ -7,6 +7,7 @@
   import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { desktop } from "$lib/platform/desktop.svelte";
+  import { mirrorNativeCopy } from "$lib/platform/clipboard";
   import { layout } from "$lib/platform/layout.svelte";
   import { shortcuts, type ShortcutScope } from "$lib/platform/shortcuts.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
@@ -86,12 +87,19 @@
   });
 
   $effect(() => {
+    void navigation.route;
+    getSelection()?.removeAllRanges();
+  });
+
+  $effect(() => {
     if (serverDefaults.revision > 0) tabs.refreshDefaults();
   });
 </script>
 
 <svelte:window
   onkeydown={onKeydown}
+  oncopy={mirrorNativeCopy}
+  oncut={mirrorNativeCopy}
   ondragover={blockFileOpen}
   ondrop={blockFileOpen}
   onresize={() => refreshPixelGrid()}

@@ -2,6 +2,7 @@
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ArrowDownUp from "@lucide/svelte/icons/arrow-down-up";
   import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
+  import { copyText } from "$lib/platform/clipboard";
   import Copy from "@lucide/svelte/icons/copy";
   import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
@@ -946,7 +947,7 @@
               onclick={() => {
                 void sharedApi
                   .absolutePaths(selectedEntries.map((entry) => child(entry.name)))
-                  .then((paths) => paths && navigator.clipboard.writeText(paths.join("\n")));
+                  .then((paths) => paths && copyText(paths.join("\n")));
                 exitSelection();
               }}
             >

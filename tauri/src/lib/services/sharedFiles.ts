@@ -1,6 +1,7 @@
 import { transfers } from "$lib/data/transfers.svelte";
 import { isTauri, openExternal } from "$lib/platform";
 import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDownloads";
+import { copyText } from "$lib/platform/clipboard";
 import { authHeadersOf, backend, type Profile } from "./backend.svelte";
 
 export interface SharedItem {
@@ -182,7 +183,7 @@ export const saveAllShared = async (items: SharedItem[]) => {
 };
 
 export const openAllSharedExternally = async (items: SharedItem[]) => {
-  await navigator.clipboard.writeText(items.map((item) => item.url).join("\n"));
+  await copyText(items.map((item) => item.url).join("\n"));
 };
 
 export const openSharedExternally = async (url: string, filename: string) => {
