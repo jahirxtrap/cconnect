@@ -7,8 +7,7 @@ export interface Highlight {
   is: (target: string) => boolean;
 }
 
-/** Flashes whatever `navigation.settingsHighlight` points at, then clears it. */
-export const useHighlight = (onTarget?: (target: string) => void): Highlight => {
+export const useHighlight =(onTarget?: (target: string) => void): Highlight => {
   let flashed = $state<string | null>(null);
 
   $effect(() => {

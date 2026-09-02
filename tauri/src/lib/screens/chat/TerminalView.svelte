@@ -1,10 +1,9 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Keyboard from "@lucide/svelte/icons/keyboard";
-  import MessageSquare from "@lucide/svelte/icons/message-square";
   import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
   import X from "@lucide/svelte/icons/x";
-  import { tick } from "svelte";
+  import { tick, type Snippet } from "svelte";
   import { sshAddress, sshStore } from "$lib/data/sshStore.svelte";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -31,10 +30,10 @@
   interface Props {
     cwd: string[];
     onClose: () => void;
-    onChat?: (() => void) | null;
+    viewMenu?: Snippet;
   }
 
-  const { cwd, onClose, onChat = null }: Props = $props();
+  const { cwd, onClose, viewMenu }: Props = $props();
 
   let sessions = $state<TerminalInfo[]>([]);
   let menuOpen = $state(false);
@@ -166,11 +165,7 @@
       {/if}
     </PopupMenu>
   {/if}
-  {#if onChat}
-    <TooltipIconButton label={t("CHAT")} onclick={onChat} class="size-8">
-      <MessageSquare />
-    </TooltipIconButton>
-  {/if}
+  {@render viewMenu?.()}
   <TooltipIconButton
     label={layout.mobile ? t("CLOSE") : t("PANEL_RIGHT")}
     shortcut="panel.right"

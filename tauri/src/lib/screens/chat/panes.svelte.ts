@@ -4,7 +4,9 @@ import { settings } from "$lib/data/settings.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
-export type RightKind = "terminal" | "chat";
+export type RightKind = "terminal" | "chat" | "markdown";
+
+const KINDS: RightKind[] = ["terminal", "chat", "markdown"];
 
 interface StoredRight {
   open?: boolean;
@@ -36,7 +38,7 @@ class Panes {
   constructor() {
     try {
       const stored = JSON.parse(settings.rightPane || "{}") as StoredRight;
-      this.kind = stored.kind === "chat" ? "chat" : "terminal";
+      this.kind = stored.kind && KINDS.includes(stored.kind) ? stored.kind : "terminal";
       this.open = stored.open === true;
       this.rightTabId = tabs.right[stored.tab ?? 0]?.id ?? tabs.right[0]?.id ?? null;
     } catch {

@@ -3,7 +3,6 @@
   import Menu from "@lucide/svelte/icons/menu";
   import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
   import PanelRightOpen from "@lucide/svelte/icons/panel-right-open";
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { accentAt } from "$lib/design/accents";
@@ -24,7 +23,11 @@
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
+  import MarkdownActions from "$lib/screens/markdown/MarkdownActions.svelte";
+  import MarkdownEditor from "$lib/screens/markdown/MarkdownEditor.svelte";
   import ChatView from "./ChatView.svelte";
+  import PaneHeader from "./PaneHeader.svelte";
+  import PaneViewMenu from "./PaneViewMenu.svelte";
   import ChatList from "./ChatList.svelte";
   import { panes } from "./panes.svelte";
   import LeftPane from "./LeftPane.svelte";
@@ -302,12 +305,13 @@
             />
             <ChatView tab={panes.rightTab} focused={panes.focused === "right"} />
           </div>
+        {:else if panes.kind === "markdown"}
+          <div class="flex h-full flex-col border-l border-outline-variant">
+            <PaneHeader title={t("MARKDOWN")} actions={markdownActions} />
+            <MarkdownEditor />
+          </div>
         {:else}
-          <TerminalView
-            cwd={terminalCwd}
-            onChat={() => panes.setKind("chat")}
-            onClose={() => panes.setOpen(false)}
-          />
+          <TerminalView cwd={terminalCwd} viewMenu={paneViewMenu} onClose={() => panes.setOpen(false)} />
         {/if}
         {#if panes.dropTarget === "right"}
           {@render dropHint()}
@@ -341,14 +345,16 @@
   <div class="drop-overlay pointer-events-none absolute inset-0 z-40 border-2 border-accent"></div>
 {/snippet}
 
+{#snippet paneViewMenu()}
+  <PaneViewMenu />
+{/snippet}
+
+{#snippet markdownActions()}
+  <MarkdownActions compact />
+{/snippet}
+
 {#snippet sideActions()}
-  <TooltipIconButton
-    label={t("TERMINAL")}
-    class="size-8"
-    onclick={() => panes.setKind("terminal")}
-  >
-    <SquareTerminal />
-  </TooltipIconButton>
+  <PaneViewMenu />
   <TooltipIconButton
     label={t("PANEL_RIGHT")}
     shortcut="panel.right"
