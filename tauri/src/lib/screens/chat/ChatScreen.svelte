@@ -204,7 +204,7 @@
   };
 
   $effect(() => {
-    layout.bottomInset = Math.max(0, composerHeight - layout.menuPadding.bottom);
+    layout.bottomInset = composerHeight;
     return () => (layout.bottomInset = 0);
   });
 
@@ -214,7 +214,9 @@
     return () => (layout.rightInset = 0);
   });
 
-  const transfersLift = $derived(Math.max(0, layout.transfersInset - composerHeight));
+  const transfersLift = $derived(
+    Math.max(0, layout.transfersInset - composerHeight - layout.safeBottom),
+  );
 
   $effect(() => {
     const environmentIds = [...new Set(tabs.list.map((tab) => tab.environmentId))];

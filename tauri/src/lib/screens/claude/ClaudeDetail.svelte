@@ -6,7 +6,6 @@
     "marketplaces",
     "memories",
     "status",
-    "changelog",
   ] as const;
 
   export type ClaudeKind = (typeof CLAUDE_KINDS)[number];
@@ -33,7 +32,6 @@
     type ServiceStatus,
     type Skill,
   } from "$lib/services/claudeApi";
-  import { claudeChangelog, type ReleaseNotes } from "$lib/services/githubApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
@@ -46,7 +44,6 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
-  import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
@@ -75,8 +72,6 @@
   let mcpServers = $state<McpServer[] | null>(null);
   let memories = $state<Memories | null>(null);
   let service = $state<ServiceStatus | null>(null);
-  let notes = $state<ReleaseNotes[] | null>(null);
-  let notesFailed = $state(false);
   let loaded = $state(false);
   let busy = $state(false);
   let dialogBusy = $state<string | null>(null);
@@ -115,9 +110,7 @@
             ? t("MARKETPLACES")
             : kind === "memories"
               ? t("MEMORIES")
-              : kind === "changelog"
-                ? t("CHANGELOG")
-                : t("SERVICE_STATUS"),
+              : t("SERVICE_STATUS"),
   );
 
   const load = async () => {
@@ -126,11 +119,6 @@
     else if (kind === "mcp") mcpServers = await claudeApi.mcp();
     else if (kind === "memories") memories = await claudeApi.memories(memoriesProject);
     else if (kind === "status") service = await claudeApi.status();
-    else if (kind === "changelog") {
-      const result = await claudeChangelog(null);
-      if (result) notes = result;
-      else notesFailed = true;
-    }
     loaded = true;
   };
 
@@ -376,21 +364,6 @@
             {/snippet}
           </ListRow>
         {/each}
-      {:else if kind === "changelog"}
-        {#if notesFailed}
-          <EmptyState text={t("CONNECTION_ERROR")} class="h-full" />
-        {:else if !notes}
-          <CenteredProgress class="h-full" />
-        {:else}
-          <div class="selectable flex flex-col gap-4 px-4">
-            {#each notes as release (release.tag)}
-              <div>
-                <p class="text-title-md text-accent">{release.tag}</p>
-                <MarkdownText text={release.body} class="mt-1" />
-              </div>
-            {/each}
-          </div>
-        {/if}
       {:else if !service || service.error !== null}
         <EmptyState text={t("STATUS_UNKNOWN")} class="h-full" />
       {:else}

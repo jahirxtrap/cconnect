@@ -25,10 +25,12 @@
   import { accountsApi, type AccountsSnapshot } from "$lib/services/accountsApi";
   import { claudeApi, type Extensions, type McpServer, type ServiceStatus, type Skill, type Usage } from "$lib/services/claudeApi";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
+  import { claudeChangelog } from "$lib/services/githubApi";
   import { settingsApi } from "$lib/services/settingsApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -67,6 +69,7 @@
   let accountOpen = $state(false);
   let promptOpen = $state(false);
   let projectPromptOpen = $state(false);
+  let cliChangelog = $state<string | null | undefined>(undefined);
 
   const chat = $derived(tabs.state);
   const environment = $derived(backend.active);
@@ -225,7 +228,7 @@
               <TooltipIconButton
                 label={t("CHANGELOG")}
                 enabled={serverReady}
-                onclick={() => navigation.openSub("changelog")}
+                onclick={() => (cliChangelog = cli?.activeVersion ?? null)}
               >
                 <FileText size={18} />
               </TooltipIconButton>
@@ -369,5 +372,14 @@
       void claudeApi.setProjectPrompt(project, text);
     }}
     onDismiss={() => (projectPromptOpen = false)}
+  />
+{/if}
+
+{#if cliChangelog !== undefined}
+  {@const version = cliChangelog}
+  <ChangelogDialog
+    load={() => claudeChangelog(version)}
+    limitHeight={false}
+    onDismiss={() => (cliChangelog = undefined)}
   />
 {/if}
