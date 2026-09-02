@@ -1,6 +1,6 @@
 import { isTouch, isTauri, platformName } from "./index";
 
-const MOBILE_MAX_WIDTH = 600;
+export const COMPACT_WIDTH = 600;
 const MENU_GAP = 8;
 
 const nativeKeyboardInsets = isTauri && platformName() === "android";
@@ -18,7 +18,7 @@ class Layout {
   safeLeft = $state(0);
   safeRight = $state(0);
 
-  readonly mobile = $derived(this.height > this.width || this.width < MOBILE_MAX_WIDTH);
+  readonly mobile = $derived(this.height > this.width || this.width < COMPACT_WIDTH);
   readonly touch = isTouch;
 
   readonly menuPadding = $derived({

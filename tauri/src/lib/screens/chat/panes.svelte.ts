@@ -4,9 +4,9 @@ import { settings } from "$lib/data/settings.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
-export type RightKind = "terminal" | "chat" | "markdown";
+export type RightKind = "terminal" | "chat" | "markdown" | "monitor";
 
-const KINDS: RightKind[] = ["terminal", "chat", "markdown"];
+const KINDS: RightKind[] = ["terminal", "chat", "markdown", "monitor"];
 
 interface StoredRight {
   open?: boolean;

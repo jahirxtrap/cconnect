@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Activity from "@lucide/svelte/icons/activity";
   import MessageSquare from "@lucide/svelte/icons/message-square";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
@@ -12,6 +13,7 @@
     { kind: "chat", label: "CHAT", icon: MessageSquare },
     { kind: "terminal", label: "TERMINAL", icon: SquareTerminal },
     { kind: "markdown", label: "MARKDOWN", icon: Type },
+    { kind: "monitor", label: "MONITOR", icon: Activity },
   ];
 
   let menu = $state(false);

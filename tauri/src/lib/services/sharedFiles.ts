@@ -78,7 +78,7 @@ export const downloadShared = (url: string, filename: string) => {
 export const saveTextToDownloads = async (filename: string, text: string) => {
   const bridge = androidDownloads();
   if (bridge) return bridge.saveText(filename, text);
-  return saveBlob(new Blob([text], { type: TEXT_TYPE }), filename);
+  return transfers.download(filename, () => saveBlob(new Blob([text], { type: TEXT_TYPE }), filename));
 };
 
 export const saveTextAs = async (filename: string, text: string) => {

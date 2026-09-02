@@ -6,6 +6,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
+  import { PANE_HEADER_CLASS, paneFocusBorder } from "./paneChrome";
 
   export interface StripTab {
     id: string;
@@ -244,9 +245,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   onpointerdown={onPaneDown}
-  class="flex shrink-0 cursor-pointer items-center border-b bg-surface transition-colors duration-200 {focused
-    ? 'border-accent'
-    : 'border-outline-variant'}"
+  class="{PANE_HEADER_CLASS} {paneFocusBorder(focused)}"
 >
   <div
     bind:this={strip}

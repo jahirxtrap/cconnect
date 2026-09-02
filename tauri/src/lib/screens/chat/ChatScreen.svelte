@@ -13,7 +13,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { terminalTabs } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { layout } from "$lib/platform/layout.svelte";
+  import { COMPACT_WIDTH, layout } from "$lib/platform/layout.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import ColorDialog from "$lib/ui/ColorDialog.svelte";
@@ -25,6 +25,8 @@
   import { resizeHandle } from "$lib/ui/resizeHandle";
   import MarkdownActions from "$lib/screens/markdown/MarkdownActions.svelte";
   import MarkdownEditor from "$lib/screens/markdown/MarkdownEditor.svelte";
+  import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
+  import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneHeader from "./PaneHeader.svelte";
   import PaneViewMenu from "./PaneViewMenu.svelte";
@@ -310,6 +312,11 @@
             <PaneHeader title={t("MARKDOWN")} actions={markdownActions} />
             <MarkdownEditor />
           </div>
+        {:else if panes.kind === "monitor"}
+          <div class="flex h-full flex-col border-l border-outline-variant">
+            <PaneHeader title={t("MONITOR")} actions={monitorActions} />
+            <MonitorContent compact={rightWidth < COMPACT_WIDTH} />
+          </div>
         {:else}
           <TerminalView cwd={terminalCwd} viewMenu={paneViewMenu} onClose={() => panes.setOpen(false)} />
         {/if}
@@ -351,6 +358,10 @@
 
 {#snippet markdownActions()}
   <MarkdownActions compact />
+{/snippet}
+
+{#snippet monitorActions()}
+  <MonitorActions compact showEnvironment={false} />
 {/snippet}
 
 {#snippet sideActions()}

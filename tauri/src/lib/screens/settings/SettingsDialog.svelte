@@ -10,7 +10,7 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
-  import { desktop } from "$lib/platform/desktop.svelte";
+  import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -62,7 +62,9 @@
   let refreshTick = $state(0);
   let refreshing = $state(false);
 
-  const tick = $derived(refreshTick + desktop.refreshTick);
+  const tick = $derived(refreshTick);
+
+  useRefreshTick(() => void refresh());
   const showsServer = $derived(
     section === "general" || section === "server" || section === "claude",
   );

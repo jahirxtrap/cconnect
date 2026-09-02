@@ -13,7 +13,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { isTouch } from "$lib/platform";
-  import { desktop } from "$lib/platform/desktop.svelte";
+  import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { projectNameOf, type ProjectInfo } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
@@ -86,14 +86,14 @@
     const current = ++sequence;
     serviceLoading = true;
     projects = chatListFor(backend.active)?.projects ?? [];
-    await Promise.all([
+    await Promise.allSettled([
       claudeApi.extensions().then((value) => (extensions = value)),
       claudeApi.skills().then((value) => (skills = value)),
       claudeApi.mcp().then((value) => (mcpServers = value)),
-      claudeApi.status().then((value) => {
-        service = value;
-        serviceLoading = false;
-      }),
+      claudeApi
+        .status()
+        .then((value) => (service = value))
+        .finally(() => (serviceLoading = false)),
       accountsApi.list().then((value) => (accounts = value)),
     ]);
     if (current !== sequence) return;
@@ -124,9 +124,7 @@
     if (chat.connected) scheduleLoad();
   });
 
-  $effect(() => {
-    if (desktop.refreshTick > 0) refresh();
-  });
+  useRefreshTick(refresh);
 
   let lastDetail: ClaudeKind | null = null;
   $effect(() => {

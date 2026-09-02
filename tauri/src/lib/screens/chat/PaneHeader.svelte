@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { panes } from "./panes.svelte";
+  import { PANE_HEADER_CLASS, paneFocusBorder } from "./paneChrome";
   import PaneViewMenu from "./PaneViewMenu.svelte";
 
   interface Props {
@@ -12,9 +13,11 @@
   }
 
   const { title, actions }: Props = $props();
+
+  const focused = $derived(panes.focused === "right");
 </script>
 
-<div class="flex h-11 shrink-0 items-center gap-1 border-b border-outline-variant pr-1 pl-3">
+<div class="gap-1 pr-1 pl-3 {PANE_HEADER_CLASS} {paneFocusBorder(focused)}">
   <p class="min-w-0 flex-1 truncate text-label-lg">{title}</p>
   {@render actions?.()}
   <PaneViewMenu />

@@ -22,7 +22,7 @@
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, openExternal } from "$lib/platform";
-  import { desktop } from "$lib/platform/desktop.svelte";
+  import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import {
     claudeApi,
     type CatalogPlugin,
@@ -220,8 +220,8 @@
     void load();
   });
 
-  $effect(() => {
-    if (desktop.refreshTick > 0 && kind === "status") void refresh();
+  useRefreshTick(() => {
+    if (kind === "status") void refresh();
   });
 
   $effect(() => {

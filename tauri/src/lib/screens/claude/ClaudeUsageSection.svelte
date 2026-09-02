@@ -52,11 +52,13 @@
     void tick;
     void backend.activeId;
     loading = true;
-    void accountsApi.list().then(async (value) => {
-      accounts = value;
-      usage = await claudeApi.usage(value?.default ?? null);
-      loading = false;
-    });
+    void accountsApi
+      .list()
+      .then(async (value) => {
+        accounts = value;
+        usage = await claudeApi.usage(value?.default ?? null);
+      })
+      .finally(() => (loading = false));
   });
 </script>
 

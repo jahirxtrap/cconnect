@@ -2,7 +2,7 @@
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import Screen from "$lib/app/Screen.svelte";
-  import { desktop } from "$lib/platform/desktop.svelte";
+  import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
@@ -17,12 +17,14 @@
   let refreshTick = $state(0);
   let refreshing = $state(false);
 
-  const tick = $derived(refreshTick + desktop.refreshTick);
+  const tick = $derived(refreshTick);
 
   const refresh = () => {
     refreshing = true;
     refreshTick++;
   };
+
+  useRefreshTick(refresh);
 
   $effect(() => {
     if (tick === 0) return;

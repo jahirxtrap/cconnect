@@ -21,6 +21,7 @@
   import FileExplorerScreen from "$lib/screens/files/FileExplorerScreen.svelte";
   import MarkdownScreen from "$lib/screens/markdown/MarkdownScreen.svelte";
   import MonitorScreen from "$lib/screens/monitor/MonitorScreen.svelte";
+  import { monitor } from "$lib/screens/monitor/monitor.svelte";
   import SettingsDialog from "$lib/screens/settings/SettingsDialog.svelte";
   import SettingsScreen from "$lib/screens/settings/SettingsScreen.svelte";
   import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
@@ -91,6 +92,13 @@
   });
 
   $effect(() => {
+    void backend.activeId;
+    monitor.setActive(
+      navigation.route === "/monitor" || (panes.open && panes.kind === "monitor" && !layout.mobile),
+    );
+  });
+
+  $effect(() => {
     void navigation.route;
     getSelection()?.removeAllRanges();
   });
@@ -113,9 +121,7 @@
   class="safe-area bg-background text-on-background"
   style="height: calc(100% - var(--keyboard, 0px))"
 >
-  {#if navigation.route === "/settings" && settingsAsDialog}
-    <ChatScreen />
-  {:else if navigation.route === "/settings"}
+  {#if navigation.route === "/settings" && !settingsAsDialog}
     <SettingsScreen />
   {:else if navigation.route === "/monitor"}
     <MonitorScreen />
