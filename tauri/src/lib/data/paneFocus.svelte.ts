@@ -1,4 +1,6 @@
-export type Pane = "chat" | "terminal";
+import type { ShortcutScope } from "$lib/platform/shortcuts.svelte";
+
+export type Pane = Exclude<ShortcutScope, "global">;
 
 class PaneFocus {
   active = $state<Pane>("chat");

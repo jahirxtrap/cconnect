@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { layout } from "$lib/platform/layout.svelte";
   import type { IconSource } from "$lib/ui/icons";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
@@ -8,13 +7,22 @@
     label: string;
     onclick: () => void;
     enabled?: boolean;
+    narrow?: boolean;
+    shortcut?: string;
   }
 
-  const { icon: IconComponent, label, onclick, enabled = true }: Props = $props();
+  const {
+    icon: IconComponent,
+    label,
+    onclick,
+    enabled = true,
+    narrow = false,
+    shortcut,
+  }: Props = $props();
 </script>
 
-{#if layout.mobile}
-  <TooltipIconButton {label} {onclick} {enabled} class="size-8 [&_svg]:size-5">
+{#if narrow}
+  <TooltipIconButton {label} {shortcut} {onclick} {enabled} class="size-8 [&_svg]:size-5">
     <IconComponent />
   </TooltipIconButton>
 {:else}

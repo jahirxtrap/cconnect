@@ -31,7 +31,7 @@
   import { formatDateShort } from "$lib/data/time";
   import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
-  import { layout } from "$lib/platform/layout.svelte";
+  import { COMPACT_WIDTH, layout } from "$lib/platform/layout.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import {
@@ -49,6 +49,9 @@
     saveSharedAs,
   } from "$lib/services/sharedFiles";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
+  import { activeScope } from "$lib/app/activeScope.svelte";
+  import { paneAction } from "$lib/screens/chat/paneChrome";
+  import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -93,6 +96,18 @@
     base: string;
     stem: string;
   }
+
+  interface Props {
+    compact?: boolean;
+  }
+
+  const { compact = false }: Props = $props();
+
+  const action = $derived(paneAction(compact));
+
+  let width = $state(0);
+
+  const narrow = $derived(width < COMPACT_WIDTH);
 
   const SEARCH_DELAY_MS = 300;
   const MILLIS_PER_SECOND = 1000;
@@ -430,8 +445,11 @@
     if (files.length) pendingUploads = files;
   };
 
+  const engaged = $derived(activeScope() === "files");
+
   const shortcutsEnabled = $derived(
-    !searching &&
+    engaged &&
+      !searching &&
       renaming === null &&
       !creatingFolder &&
       !confirmingDelete &&
@@ -462,6 +480,7 @@
   };
 
   const onKeydown = (event: KeyboardEvent) => {
+    if (!engaged) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
     if (event.key === "Escape") {
@@ -506,7 +525,7 @@
     };
   });
 
-  $effect(() => navigation.intercept(stepBack));
+  $effect(() => (engaged ? navigation.intercept(stepBack) : undefined));
 
   $effect(() => {
     watcher.connect();
@@ -514,6 +533,7 @@
   });
 
   $effect(() => {
+    if (compact) return;
     const visible = transfer !== null || (selecting && selected.length > 0);
     layout.bottomInset = visible ? bottomBar : 0;
     return () => (layout.bottomInset = 0);
@@ -605,21 +625,104 @@
 </script>
 
 
-<div class="flex h-full flex-col" role="application" aria-label={t("FILES")}>
-  {#if selecting}
+<div
+  bind:clientWidth={width}
+  class="flex h-full flex-col"
+  role="application"
+  aria-label={t("FILES")}
+>
+  {#snippet selectAllAction()}
+    <TooltipIconButton
+      label={t("SELECT_ALL")}
+      class={action.class}
+      onclick={() => (selected = allSelected ? [] : entries.map((entry) => entry.name))}
+    >
+      <SelectionDot selected={allSelected} />
+    </TooltipIconButton>
+  {/snippet}
+
+  {#snippet cancelAction()}
+    <TooltipIconButton label={t("CANCEL")} class={action.class} onclick={exitSelection}>
+      <X size={action.size} />
+    </TooltipIconButton>
+  {/snippet}
+
+  {#snippet browseActions()}
+    {#if !transfer && archive === null}
+      <TooltipIconButton label={t("UPLOAD_FILES")} class={action.class} onclick={() => picker?.click()}>
+        <Upload size={action.size} />
+      </TooltipIconButton>
+    {/if}
+    {#if !compact}
+      <TooltipIconButton
+        label={t("ENVIRONMENT")}
+        enabled={!settings.environmentLocked}
+        onclick={() => (envOpen = true)}
+      >
+        <Server size={action.size} />
+      </TooltipIconButton>
+    {/if}
+    <MenuScrim open={barMenu} onDismiss={() => (barMenu = false)} />
+    <DropdownMenu.Root open={barMenu} onOpenChange={(value) => (barMenu = value)}>
+      <DropdownMenu.Trigger
+        class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 {compact
+          ? 'size-8'
+          : 'size-9 [&_svg]:size-5'}"
+        aria-label={t("MORE_OPTIONS")}
+      >
+        <EllipsisVertical size={action.size} />
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          sideOffset={4}
+          collisionPadding={layout.menuPadding}
+          class={MENU_CONTENT_CLASS}
+        >
+          <MenuSub text={t("SORT_BY")}>
+            {#snippet leading()}
+              <ArrowDownUp size={20} class="shrink-0 text-on-surface-variant" />
+            {/snippet}
+            {#each SORT_KEYS as key (key)}
+              <MenuItem
+                text={t(SORT_LABELS[key])}
+                selected={key === sortField}
+                closeOnSelect={false}
+                onclick={() => selectSort(key)}
+              />
+            {/each}
+            <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
+              {#snippet trailing()}
+                <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
+              {/snippet}
+            </MenuItem>
+          </MenuSub>
+          {#if archive === null}
+            <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
+              {#snippet leading()}
+                <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
+              {/snippet}
+            </MenuItem>
+          {/if}
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  {/snippet}
+
+  {#if compact}
+    <PaneHeader
+      title={selecting ? plural("ITEM_COUNT", selected.length) : t("FILES")}
+      leading={selecting ? selectAllAction : undefined}
+      actions={selecting ? cancelAction : browseActions}
+    />
+  {:else if selecting}
     <AppTopBar title={plural("ITEM_COUNT", selected.length)}>
       {#snippet navigationIcon()}
-        <TooltipIconButton
-          label={t("SELECT_ALL")}
-          onclick={() => (selected = allSelected ? [] : entries.map((entry) => entry.name))}
-        >
-          <SelectionDot selected={allSelected} />
-        </TooltipIconButton>
+        {@render selectAllAction()}
       {/snippet}
       {#snippet actions()}
-        <TooltipIconButton label={t("CANCEL")} onclick={exitSelection}>
-          <X size={20} />
-        </TooltipIconButton>
+        {@render cancelAction()}
       {/snippet}
     </AppTopBar>
   {:else}
@@ -630,58 +733,7 @@
         </TooltipIconButton>
       {/snippet}
       {#snippet actions()}
-        {#if !transfer && archive === null}
-          <TooltipIconButton label={t("UPLOAD_FILES")} onclick={() => picker?.click()}>
-            <Upload size={20} />
-          </TooltipIconButton>
-        {/if}
-        <TooltipIconButton label={t("ENVIRONMENT")} enabled={!settings.environmentLocked} onclick={() => (envOpen = true)}>
-          <Server size={20} />
-        </TooltipIconButton>
-        <MenuScrim open={barMenu} onDismiss={() => (barMenu = false)} />
-        <DropdownMenu.Root open={barMenu} onOpenChange={(value) => (barMenu = value)}>
-          <DropdownMenu.Trigger
-            class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8 [&_svg]:size-5"
-            aria-label={t("MORE_OPTIONS")}
-          >
-            <EllipsisVertical size={20} />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              onOpenAutoFocus={(event) => event.preventDefault()}
-              onCloseAutoFocus={(event) => event.preventDefault()}
-              sideOffset={4}
-              collisionPadding={layout.menuPadding}
-              class={MENU_CONTENT_CLASS}
-            >
-              <MenuSub text={t("SORT_BY")}>
-                {#snippet leading()}
-                  <ArrowDownUp size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-                {#each SORT_KEYS as key (key)}
-                  <MenuItem
-                    text={t(SORT_LABELS[key])}
-                    selected={key === sortField}
-                    closeOnSelect={false}
-                    onclick={() => selectSort(key)}
-                  />
-                {/each}
-                <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
-                  {#snippet trailing()}
-                    <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
-                  {/snippet}
-                </MenuItem>
-              </MenuSub>
-              {#if archive === null}
-                <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
-                  {#snippet leading()}
-                    <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
-                  {/snippet}
-                </MenuItem>
-              {/if}
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+        {@render browseActions()}
       {/snippet}
     </AppTopBar>
   {/if}
@@ -795,6 +847,7 @@
       class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
     >
       <ToolbarAction
+        {narrow}
         icon={PackageOpen}
         label={t("EXTRACT")}
         onclick={() =>
@@ -806,6 +859,7 @@
           })}
       />
       <ToolbarAction
+        {narrow}
         icon={Eye}
         label={t("VIEW")}
         enabled={!!single && !single.isDir && isPreviewable(single.name)}
@@ -820,6 +874,7 @@
         }}
       />
       <ToolbarAction
+        {narrow}
         icon={Download}
         label={t("SAVE")}
         enabled={canShare}
@@ -837,9 +892,22 @@
       bind:clientHeight={bottomBar}
       class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
     >
-      <ToolbarAction icon={FolderInput} label={t("MOVE")} onclick={() => startTransfer("move")} />
-      <ToolbarAction icon={Copy} label={t("COPY")} onclick={() => startTransfer("copy")} />
       <ToolbarAction
+        {narrow}
+        shortcut="files.cut"
+        icon={FolderInput}
+        label={t("MOVE")}
+        onclick={() => startTransfer("move")}
+      />
+      <ToolbarAction
+        {narrow}
+        shortcut="files.copy"
+        icon={Copy}
+        label={t("COPY")}
+        onclick={() => startTransfer("copy")}
+      />
+      <ToolbarAction
+        {narrow}
         icon={Share2}
         label={t("SHARE")}
         enabled={canShare}
@@ -850,17 +918,23 @@
           exitSelection();
         }}
       />
-      <ToolbarAction icon={Trash} label={t("DELETE")} onclick={() => (confirmingDelete = true)} />
+      <ToolbarAction
+        {narrow}
+        shortcut="files.delete"
+        icon={Trash}
+        label={t("DELETE")}
+        onclick={() => (confirmingDelete = true)}
+      />
       <MenuScrim open={actionsMenu} onDismiss={() => (actionsMenu = false)} />
       <DropdownMenu.Root open={actionsMenu} onOpenChange={(value) => (actionsMenu = value)}>
         <DropdownMenu.Trigger
-          class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {layout.mobile
+          class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {narrow
             ? 'w-8'
             : 'px-3 text-label-lg'}"
           aria-label={t("MORE")}
         >
-          <EllipsisVertical size={layout.mobile ? 20 : 18} class="shrink-0" />
-          {#if !layout.mobile}
+          <EllipsisVertical size={narrow ? 20 : 18} class="shrink-0" />
+          {#if !narrow}
             <span class="truncate">{t("MORE")}</span>
           {/if}
         </DropdownMenu.Trigger>

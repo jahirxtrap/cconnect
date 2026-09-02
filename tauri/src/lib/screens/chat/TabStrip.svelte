@@ -295,6 +295,6 @@
     </div>
   </div>
   {#if trailing}
-    <div class="flex shrink-0 items-center pr-1">{@render trailing()}</div>
+    <div class="flex min-w-0 shrink items-center pr-1">{@render trailing()}</div>
   {/if}
 </div>

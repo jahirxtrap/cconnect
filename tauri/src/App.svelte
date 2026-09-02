@@ -1,5 +1,6 @@
 <script lang="ts">
   import { dismissOpen } from "$lib/app/dismissStack";
+  import { activeScope } from "$lib/app/activeScope.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverDefaults } from "$lib/data/serverDefaults.svelte";
@@ -57,10 +58,8 @@
 
   const scopeChain = (): ShortcutScope[] => {
     if (dismissOpen()) return ["global"];
-    if (navigation.route === "/files") return ["files", "global"];
-    if (navigation.route === "/terminal") return ["terminal", "global"];
-    if (navigation.route === "/") return [paneFocus.active, "global"];
-    return ["global"];
+    const scope = activeScope();
+    return scope === "global" ? ["global"] : [scope, "global"];
   };
 
   const onKeydown = (event: KeyboardEvent) => {

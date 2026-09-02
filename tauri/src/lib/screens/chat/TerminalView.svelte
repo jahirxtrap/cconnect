@@ -1,9 +1,8 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Keyboard from "@lucide/svelte/icons/keyboard";
-  import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
   import X from "@lucide/svelte/icons/x";
-  import { tick, type Snippet } from "svelte";
+  import { tick } from "svelte";
   import { sshAddress, sshStore } from "$lib/data/sshStore.svelte";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -25,15 +24,16 @@
   import { TERMINAL_BACKGROUND } from "$lib/screens/terminal/theme";
   import TerminalSurface from "$lib/screens/terminal/TerminalSurface.svelte";
   import TerminalUnlockDialog from "$lib/screens/terminal/TerminalUnlockDialog.svelte";
+  import PaneActions from "./PaneActions.svelte";
   import TabStrip from "./TabStrip.svelte";
 
   interface Props {
     cwd: string[];
-    onClose: () => void;
-    viewMenu?: Snippet;
+    pane?: boolean;
+    onClose?: () => void;
   }
 
-  const { cwd, onClose, viewMenu }: Props = $props();
+  const { cwd, pane = false, onClose }: Props = $props();
 
   let sessions = $state<TerminalInfo[]>([]);
   let menuOpen = $state(false);
@@ -137,6 +137,17 @@
 </script>
 
 {#snippet headerActions()}
+  {#if pane}
+    <PaneActions actions={terminalActions} />
+  {:else}
+    {@render terminalActions()}
+    <TooltipIconButton label={t("CLOSE")} onclick={onClose} class="size-8">
+      <X />
+    </TooltipIconButton>
+  {/if}
+{/snippet}
+
+{#snippet terminalActions()}
   {#if hasExtras}
     <PopupMenu
       open={menuOpen}
@@ -165,19 +176,6 @@
       {/if}
     </PopupMenu>
   {/if}
-  {@render viewMenu?.()}
-  <TooltipIconButton
-    label={layout.mobile ? t("CLOSE") : t("PANEL_RIGHT")}
-    shortcut="panel.right"
-    onclick={onClose}
-    class="size-8"
-  >
-    {#if layout.mobile}
-      <X />
-    {:else}
-      <PanelRightClose />
-    {/if}
-  </TooltipIconButton>
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->

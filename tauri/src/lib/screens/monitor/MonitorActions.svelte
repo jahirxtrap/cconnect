@@ -3,6 +3,7 @@
   import ServerCog from "@lucide/svelte/icons/server-cog";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { paneAction } from "$lib/screens/chat/paneChrome";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
   import { systemApi } from "$lib/services/systemApi";
@@ -21,26 +22,25 @@
   let envOpen = $state(false);
   let restartOpen = $state(false);
 
-  const buttonClass = $derived(compact ? "size-8" : "");
-  const iconSize = $derived(compact ? 18 : 20);
+  const action = $derived(paneAction(compact));
 </script>
 
 <TooltipIconButton
   label={t("RESTART_SERVER")}
-  class={buttonClass}
+  class={action.class}
   enabled={!monitor.failed && monitor.info !== null}
   onclick={() => (restartOpen = true)}
 >
-  <ServerCog size={iconSize} />
+  <ServerCog size={action.size} />
 </TooltipIconButton>
 {#if showEnvironment}
   <TooltipIconButton
     label={t("ENVIRONMENT")}
-    class={buttonClass}
+    class={action.class}
     enabled={!settings.environmentLocked}
     onclick={() => (envOpen = true)}
   >
-    <Server size={iconSize} />
+    <Server size={action.size} />
   </TooltipIconButton>
 {/if}
 

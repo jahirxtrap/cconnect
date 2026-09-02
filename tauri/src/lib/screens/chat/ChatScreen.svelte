@@ -25,13 +25,15 @@
   import { resizeHandle } from "$lib/ui/resizeHandle";
   import ClaudeDetail, { type ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
+  import FileExplorerScreen from "$lib/screens/files/FileExplorerScreen.svelte";
   import MarkdownActions from "$lib/screens/markdown/MarkdownActions.svelte";
   import MarkdownEditor from "$lib/screens/markdown/MarkdownEditor.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import ChatView from "./ChatView.svelte";
+  import PaneActions from "./PaneActions.svelte";
+  import { PANE_BODY_CLASS } from "./paneChrome";
   import PaneHeader from "./PaneHeader.svelte";
-  import PaneViewMenu from "./PaneViewMenu.svelte";
   import ChatList from "./ChatList.svelte";
   import { panes } from "./panes.svelte";
   import LeftPane from "./LeftPane.svelte";
@@ -136,6 +138,10 @@
   };
 
   const swappable = $derived(panes.open && panes.kind === "chat");
+
+  $effect(() => {
+    if (panes.kind !== "claude") claudeDetail = null;
+  });
 
   const dragPanes = (pointerX: number, done: boolean, origin: PaneRole) => {
     const overRight = pointerX >= layout.width - rightWidth;
@@ -295,7 +301,7 @@
           }}
         ></div>
         {#if panes.kind === "chat" && panes.rightTab}
-          <div class="flex h-full flex-col border-l border-outline-variant">
+          <div class={PANE_BODY_CLASS}>
             <TabStrip
               items={tabs.right}
               activeId={panes.rightTab?.id ?? null}
@@ -312,25 +318,23 @@
             <ChatView tab={panes.rightTab} focused={panes.focused === "right"} />
           </div>
         {:else if panes.kind === "markdown"}
-          <div class="flex h-full flex-col border-l border-outline-variant">
+          <div class={PANE_BODY_CLASS}>
             <PaneHeader title={t("MARKDOWN")} actions={markdownActions} />
             <MarkdownEditor />
           </div>
+        {:else if panes.kind === "files"}
+          <div class={PANE_BODY_CLASS}>
+            <FileExplorerScreen compact />
+          </div>
         {:else if panes.kind === "monitor"}
-          <div class="flex h-full flex-col border-l border-outline-variant">
+          <div class={PANE_BODY_CLASS}>
             <PaneHeader title={t("MONITOR")} actions={monitorActions} />
             <MonitorContent compact={rightWidth < COMPACT_WIDTH} />
           </div>
         {:else if panes.kind === "claude"}
-          <div class="flex h-full flex-col border-l border-outline-variant">
+          <div class={PANE_BODY_CLASS}>
             {#if claudeDetail}
-              <ClaudeDetail
-                kind={claudeDetail}
-                compact
-                focused={panes.focused === "right"}
-                headerTrailing={paneTrailing}
-                onClose={() => (claudeDetail = null)}
-              />
+              <ClaudeDetail kind={claudeDetail} compact onClose={() => (claudeDetail = null)} />
             {:else}
               <PaneHeader title={t("CLAUDE")} />
               <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
@@ -343,7 +347,7 @@
             {/if}
           </div>
         {:else}
-          <TerminalView cwd={terminalCwd} viewMenu={paneViewMenu} onClose={() => panes.setOpen(false)} />
+          <TerminalView cwd={terminalCwd} pane />
         {/if}
         {#if panes.dropTarget === "right"}
           {@render dropHint()}
@@ -377,22 +381,6 @@
   <div class="drop-overlay pointer-events-none absolute inset-0 z-40 border-2 border-accent"></div>
 {/snippet}
 
-{#snippet paneViewMenu()}
-  <PaneViewMenu />
-{/snippet}
-
-{#snippet paneTrailing()}
-  <PaneViewMenu />
-  <TooltipIconButton
-    label={t("PANEL_RIGHT")}
-    shortcut="panel.right"
-    class="size-8"
-    onclick={() => panes.setOpen(false)}
-  >
-    <PanelRightClose />
-  </TooltipIconButton>
-{/snippet}
-
 {#snippet markdownActions()}
   <MarkdownActions compact />
 {/snippet}
@@ -402,33 +390,22 @@
 {/snippet}
 
 {#snippet sideActions()}
-  <PaneViewMenu />
+  <PaneActions />
+{/snippet}
+
+{#snippet sideToggle()}
   <TooltipIconButton
     label={t("PANEL_RIGHT")}
     shortcut="panel.right"
     class="size-8"
-    onclick={() => panes.setOpen(false)}
+    onclick={() => panes.setOpen(!panes.open)}
   >
-    <PanelRightClose />
-  </TooltipIconButton>
-{/snippet}
-
-{#snippet sideToggle()}
-  <div
-    inert={panes.open}
-    class="overflow-hidden transition-[width,opacity] duration-200 {panes.open
-      ? 'w-0 opacity-0'
-      : 'w-8 opacity-100'}"
-  >
-    <TooltipIconButton
-      label={t("PANEL_RIGHT")}
-      shortcut="panel.right"
-      class="size-8"
-      onclick={() => panes.setOpen(true)}
-    >
+    {#if panes.open}
+      <PanelRightClose />
+    {:else}
       <PanelRightOpen />
-    </TooltipIconButton>
-  </div>
+    {/if}
+  </TooltipIconButton>
 {/snippet}
 
 {#snippet menuButton()}

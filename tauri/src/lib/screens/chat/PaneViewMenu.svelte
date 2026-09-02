@@ -1,5 +1,6 @@
 <script lang="ts">
   import Activity from "@lucide/svelte/icons/activity";
+  import Folder from "@lucide/svelte/icons/folder";
   import MessageSquare from "@lucide/svelte/icons/message-square";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Type from "@lucide/svelte/icons/type";
@@ -12,6 +13,7 @@
 
   const VIEWS: { kind: RightKind; label: string; icon: typeof MessageSquare }[] = [
     { kind: "chat", label: "CHAT", icon: MessageSquare },
+    { kind: "files", label: "FILES", icon: Folder },
     { kind: "claude", label: "CLAUDE", icon: ClaudeIcon },
     { kind: "monitor", label: "MONITOR", icon: Activity },
     { kind: "terminal", label: "TERMINAL", icon: SquareTerminal },

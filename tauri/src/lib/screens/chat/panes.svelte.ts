@@ -1,12 +1,21 @@
 import type { SessionInfo } from "$lib/data/models";
-import { paneFocus } from "$lib/data/paneFocus.svelte";
+import { paneFocus, type Pane } from "$lib/data/paneFocus.svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
-export type RightKind = "terminal" | "chat" | "markdown" | "monitor" | "claude";
+export type RightKind = "terminal" | "chat" | "markdown" | "monitor" | "claude" | "files";
 
-const KINDS: RightKind[] = ["terminal", "chat", "markdown", "monitor", "claude"];
+const KINDS: RightKind[] = ["terminal", "chat", "markdown", "monitor", "claude", "files"];
+
+const SCOPE: Record<RightKind, Pane> = {
+  terminal: "terminal",
+  chat: "chat",
+  markdown: "chat",
+  monitor: "chat",
+  claude: "chat",
+  files: "files",
+};
 
 interface StoredRight {
   open?: boolean;
@@ -166,7 +175,7 @@ class Panes {
 
   focus(role: PaneRole) {
     this.focused = role;
-    paneFocus.set(role === "right" && this.kind === "terminal" ? "terminal" : "chat");
+    paneFocus.set(role === "right" ? SCOPE[this.kind] : "chat");
     const environmentId = this.focusedTab?.environmentId;
     if (environmentId && backend.activeId !== environmentId) backend.select(environmentId);
     tabs.rightFocused = this.target === "right";
