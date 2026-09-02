@@ -33,6 +33,7 @@
     onFollowChange: (following: boolean) => void;
     onSharedLink: (url: string, filename: string) => void;
     tabId: string;
+    expandedIds: Record<number, boolean>;
     savedScroll: { top: number; follow: boolean };
     onScrollTop: (top: number, following: boolean) => void;
     component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
@@ -51,6 +52,7 @@
     onFollowChange,
     onSharedLink,
     tabId,
+    expandedIds,
     savedScroll,
     onScrollTop,
     component,
@@ -144,8 +146,6 @@
     if (distanceToBottom() <= AT_BOTTOM_PX) follow = true;
   };
 
-  const expandedState = $state<Record<number, boolean>>({});
-
   let stickyHeight = $state(0);
   let sticky = $state<{ message: ChatMessage; gap: number; push: number } | null>(null);
 
@@ -189,7 +189,7 @@
       const gap = message ? gapAbove(visible[index - 1]?.role ?? null, message.role) : 0;
       const top = topOf(node) - distanceToTop();
       if (top + gap >= 0) break;
-      if (message && expandedState[id] && hasCollapsibleContent(message, modeFor(message.role) === "label")) {
+      if (message && expandedIds[id] && hasCollapsibleContent(message, modeFor(message.role) === "label")) {
         const height = stickyHeight > 0 ? stickyHeight : STICKY_FALLBACK;
         candidate = { message, gap, push: Math.min(0, top + node.offsetHeight - height) };
       }
@@ -202,7 +202,7 @@
     const current = sticky;
     if (!current || !container) return;
     follow = false;
-    expandedState[current.message.id] = false;
+    expandedIds[current.message.id] = false;
     await tick();
     const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
     if (node) scrollFromTop(topOf(node) + current.gap);
@@ -249,7 +249,7 @@
 
   const toggleExpanded = (id: number) =>
     anchorGrowth(container?.querySelector<HTMLElement>(`[data-mid="${id}"]`) ?? null, () => {
-      expandedState[id] = !expandedState[id];
+      expandedIds[id] = !expandedIds[id];
     });
 
   const measureScrollbar = () => {
@@ -390,7 +390,7 @@
           running={runningAt(item, index)}
           gluedTop={separated}
           labelMode={modeFor(item.role) === "label"}
-          expanded={expandedState[item.id] ?? false}
+          expanded={expandedIds[item.id] ?? false}
           onToggle={() => toggleExpanded(item.id)}
           onGrow={(grow, node) => anchorGrowth(node, grow)}
           {onAnswer}

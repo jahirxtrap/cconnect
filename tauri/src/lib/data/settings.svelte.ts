@@ -15,12 +15,13 @@ const DEFAULTS = {
   notify_interaction: true,
   markdown_preview_formatted: true,
   show_timestamps: false,
-  sidebar_expanded: false,
-  sidebar_width: 300,
+  left_expanded: false,
+  left_width: 300,
   terminal_open: false,
-  terminal_width: 420,
+  right_width: 420,
   minimize_to_tray: false,
   tabs_state: "",
+  right_pane: "",
   collapsed_categories: "",
   hidden_categories: "",
   hidden_projects: "",
@@ -134,18 +135,18 @@ class Settings {
     this.#write("hidden_projects", value.join(","));
   }
 
-  get sidebarExpanded() {
-    return this.#read("sidebar_expanded");
+  get leftExpanded() {
+    return this.#read("left_expanded");
   }
-  set sidebarExpanded(value: boolean) {
-    this.#write("sidebar_expanded", value);
+  set leftExpanded(value: boolean) {
+    this.#write("left_expanded", value);
   }
 
-  get sidebarWidth() {
-    return this.#read("sidebar_width");
+  get leftWidth() {
+    return this.#read("left_width");
   }
-  set sidebarWidth(value: number) {
-    this.#write("sidebar_width", value);
+  set leftWidth(value: number) {
+    this.#write("left_width", value);
   }
 
   get terminalOpen() {
@@ -155,11 +156,11 @@ class Settings {
     this.#write("terminal_open", value);
   }
 
-  get terminalWidth() {
-    return this.#read("terminal_width");
+  get rightWidth() {
+    return this.#read("right_width");
   }
-  set terminalWidth(value: number) {
-    this.#write("terminal_width", value);
+  set rightWidth(value: number) {
+    this.#write("right_width", value);
   }
 
   get minimizeToTray() {
@@ -174,6 +175,13 @@ class Settings {
   }
   set tabsState(value: string) {
     this.#write("tabs_state", value);
+  }
+
+  get rightPane() {
+    return this.#read("right_pane");
+  }
+  set rightPane(value: string) {
+    this.#write("right_pane", value);
   }
 
   get fileSortField() {

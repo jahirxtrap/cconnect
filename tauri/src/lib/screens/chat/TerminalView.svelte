@@ -1,7 +1,9 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Keyboard from "@lucide/svelte/icons/keyboard";
+  import MessageSquare from "@lucide/svelte/icons/message-square";
   import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
+  import X from "@lucide/svelte/icons/x";
   import { tick } from "svelte";
   import { sshAddress, sshStore } from "$lib/data/sshStore.svelte";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
@@ -22,16 +24,17 @@
   import { sshLink } from "$lib/screens/terminal/sshLink";
   import SoftKeys from "$lib/screens/terminal/SoftKeys.svelte";
   import { TERMINAL_BACKGROUND } from "$lib/screens/terminal/theme";
-  import TerminalPane from "$lib/screens/terminal/TerminalPane.svelte";
+  import TerminalSurface from "$lib/screens/terminal/TerminalSurface.svelte";
   import TerminalUnlockDialog from "$lib/screens/terminal/TerminalUnlockDialog.svelte";
   import TabStrip from "./TabStrip.svelte";
 
   interface Props {
     cwd: string[];
     onClose: () => void;
+    onChat?: (() => void) | null;
   }
 
-  const { cwd, onClose }: Props = $props();
+  const { cwd, onClose, onChat = null }: Props = $props();
 
   let sessions = $state<TerminalInfo[]>([]);
   let menuOpen = $state(false);
@@ -42,7 +45,7 @@
   const focused = $derived(paneFocus.active === "terminal");
   const online = $derived(serverStatus.online);
   const RESERVED_KEYS = ["t", "w"];
-  const panes: Record<string, ReturnType<typeof TerminalPane> | null> = {};
+  const panes: Record<string, ReturnType<typeof TerminalSurface> | null> = {};
 
   const focusActive = () => {
     const id = terminalTabs.activeId;
@@ -163,8 +166,22 @@
       {/if}
     </PopupMenu>
   {/if}
-  <TooltipIconButton label={t("CLOSE")} shortcut="panel.right" onclick={onClose} class="size-8">
-    <PanelRightClose />
+  {#if onChat}
+    <TooltipIconButton label={t("CHAT")} onclick={onChat} class="size-8">
+      <MessageSquare />
+    </TooltipIconButton>
+  {/if}
+  <TooltipIconButton
+    label={layout.mobile ? t("CLOSE") : t("PANEL_RIGHT")}
+    shortcut="panel.right"
+    onclick={onClose}
+    class="size-8"
+  >
+    {#if layout.mobile}
+      <X />
+    {:else}
+      <PanelRightClose />
+    {/if}
   </TooltipIconButton>
 {/snippet}
 
@@ -193,7 +210,7 @@
       {@const connect = terminalTabs.connectorOf(tab.id)}
       {#if connect}
         <div class="absolute inset-0 {tab.id === terminalTabs.activeId ? '' : 'pointer-events-none invisible'}">
-          <TerminalPane
+          <TerminalSurface
             bind:this={panes[tab.id]}
             {connect}
             autofocus={false}

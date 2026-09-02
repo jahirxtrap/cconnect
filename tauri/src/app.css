@@ -299,6 +299,11 @@ textarea:focus,
   -webkit-touch-callout: default;
 }
 
+[data-unfocused] .selectable {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 @layer base {
   input,
   textarea,

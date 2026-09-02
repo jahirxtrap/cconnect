@@ -15,6 +15,7 @@
   import { updater } from "$lib/services/updater.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
   import FilePreview from "$lib/screens/files/FilePreview.svelte";
+  import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import ClaudeScreen from "$lib/screens/claude/ClaudeScreen.svelte";
   import FileExplorerScreen from "$lib/screens/files/FileExplorerScreen.svelte";
@@ -35,16 +36,16 @@
   serverStatus.start();
   void updater.consumeIfInstalled();
   notifier.start((tabId) => {
-    if (tabId) tabs.select(tabId);
+    if (tabId) panes.reveal(tabId);
   });
   void desktop.start();
 
-  useShortcut("tab.new", () => void tabs.newTab());
-  useShortcut("tab.close", () => tabs.closeActive());
-  useShortcut("tab.next", () => tabs.selectNext());
-  useShortcut("tab.previous", () => tabs.selectPrev());
-  useShortcut("tab.moveNext", () => tabs.moveActive(1));
-  useShortcut("tab.movePrevious", () => tabs.moveActive(-1));
+  useShortcut("tab.new", () => void panes.newTab());
+  useShortcut("tab.close", () => panes.closeFocused());
+  useShortcut("tab.next", () => panes.selectSibling(1));
+  useShortcut("tab.previous", () => panes.selectSibling(-1));
+  useShortcut("tab.moveNext", () => panes.moveFocused(1));
+  useShortcut("tab.movePrevious", () => panes.moveFocused(-1));
   useShortcut("window.fullscreen", () => void desktop.toggleFullscreen());
   useShortcut("window.refresh", () => {
     desktop.refreshTick++;

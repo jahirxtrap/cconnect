@@ -19,6 +19,7 @@
     onAutoRename: () => void;
     onColor: () => void;
     onOpenNewTab: () => void;
+    onOpenRight?: (() => void) | null;
     onMove: (preset: string | null) => void;
     onDelete: () => void;
     categories?: ChatCategory[];
@@ -38,6 +39,7 @@
     onAutoRename,
     onColor,
     onOpenNewTab,
+    onOpenRight = null,
     onMove,
     onDelete,
     categories = [],
@@ -110,6 +112,9 @@
       <MenuItem text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
       <MenuItem text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
       <MenuItem text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
+      {#if onOpenRight}
+        <MenuItem text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
+      {/if}
       <MenuSub text={t("CATEGORY")}>
         {#if categories.length}
           <MenuItem

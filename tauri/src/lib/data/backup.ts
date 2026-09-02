@@ -53,8 +53,8 @@ export const exportSettings = (): string =>
         local_server_python_path: settings.localServerPythonPath,
         local_server_mode: settings.localServerMode,
         local_server_public_host: settings.localServerPublicHost,
-        sidebar_width: settings.sidebarWidth,
-        terminal_width: settings.terminalWidth,
+        left_width: settings.leftWidth,
+        right_width: settings.rightWidth,
         visibility: settings.visibility,
       },
       shortcuts: shortcuts.custom,
@@ -137,8 +137,8 @@ const applySettings = (values: Wire) => {
   }
 
   const numbers: Array<[string, (value: number) => void]> = [
-    ["sidebar_width", (value) => (settings.sidebarWidth = value)],
-    ["terminal_width", (value) => (settings.terminalWidth = value)],
+    ["left_width", (value) => (settings.leftWidth = value)],
+    ["right_width", (value) => (settings.rightWidth = value)],
   ];
   for (const [key, apply] of numbers) {
     const value = number(values, key);

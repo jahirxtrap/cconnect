@@ -208,6 +208,7 @@ export class ChatState {
   transcriptLoading = $state(false);
   transcriptPaging = $state(false);
   scrollTop = $state(0);
+  expandedIds = $state<Record<number, boolean>>({});
   transcriptExhausted = $state(false);
   followBottom = $state(true);
 
@@ -1145,6 +1146,7 @@ export class ChatState {
       visible.map((message, index) => this.#fromSession(message, index, item.sessionId, item.projectKey)),
     );
     this.#nextId = visible.length;
+    this.expandedIds = {};
     this.oldestLoadedIndex = page && page.items.length ? page.startIndex : null;
     this.transcriptExhausted = !page?.hasMore;
     this.contextTokens = page?.contextTokens ?? null;
@@ -1322,6 +1324,7 @@ export class ChatState {
 
   #resetTranscript() {
     this.messages = [];
+    this.expandedIds = {};
     this.todos = [];
     this.queue = [];
     this.contextTokens = null;
@@ -1352,6 +1355,7 @@ export class ChatState {
       visible.map((item, index) => this.#fromSession(item, index, session.sessionId, project)),
     );
     this.#nextId = visible.length;
+    this.expandedIds = {};
     this.#assistantId = null;
     this.#thinkingId = null;
     this.#optimisticChipId = null;
@@ -1391,6 +1395,7 @@ export class ChatState {
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
     this.#nextId = visible.length;
+    this.expandedIds = {};
     if (!keepLive) {
       this.#assistantId = null;
       this.#thinkingId = null;

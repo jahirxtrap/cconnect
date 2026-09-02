@@ -25,12 +25,16 @@
   import { ChatDrag } from "./dragChats.svelte";
   import EnvironmentSelector from "./EnvironmentSelector.svelte";
   import ProjectSelector from "./ProjectSelector.svelte";
-  import { tabs } from "./tabs.svelte";
+  import type { ChatState } from "./state.svelte";
 
   interface Props {
+    chat: ChatState;
     drawerMode: boolean;
     onClose: (() => void) | null;
     onAfterSelect: () => void;
+    onNewTab: (categoryId: string | null) => void;
+    onOpenSession: (session: SessionInfo) => void;
+    onOpenRight?: ((session: SessionInfo) => void) | null;
     onRename: (session: SessionInfo) => void;
     onColor: (session: SessionInfo) => void;
     onDelete: (session: SessionInfo) => void;
@@ -40,9 +44,13 @@
   }
 
   const {
+    chat,
     drawerMode,
     onClose,
     onAfterSelect,
+    onNewTab,
+    onOpenSession,
+    onOpenRight = null,
     onRename,
     onColor,
     onDelete,
@@ -77,7 +85,6 @@
     return loose.length ? [...result, { category: null, sessions: loose }] : result;
   });
 
-  const chat = $derived(tabs.state);
 
   const visibleProjects = $derived(
     chat.historyProjects.filter(
@@ -242,7 +249,7 @@
               class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
               onpointerdown={(event) => event.stopPropagation()}
               onclick={() => {
-                tabs.newTab(category.id);
+                onNewTab(category.id);
                 onAfterSelect();
               }}
             >
@@ -294,9 +301,15 @@
               onAutoRename={() => void chat.autoRename(session)}
               onColor={() => onColor(session)}
               onOpenNewTab={() => {
-                tabs.openSessionTab(session, tabs.active?.environmentId ?? null);
+                onOpenSession(session);
                 onAfterSelect();
               }}
+              onOpenRight={onOpenRight
+                ? () => {
+                    onOpenRight(session);
+                    onAfterSelect();
+                  }
+                : null}
               onDelete={() => onDelete(session)}
               onMove={(preset) => onMove(session, preset)}
               categories={chat.categories}

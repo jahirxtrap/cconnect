@@ -7,6 +7,15 @@ export type FontStyle = "flat" | "color" | "system";
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
+const SELECTION_ALPHA = 0.32;
+const QUOTE_ALPHA = 0.6;
+
+export const accentVars = (color: string): string =>
+  `--c-accent: ${color};` +
+  `--color-accent: ${color};` +
+  `--c-accent-selection: ${withAlpha(color, SELECTION_ALPHA)};` +
+  `--c-accent-quote: ${withAlpha(color, QUOTE_ALPHA)};`;
+
 const androidSystemBars = () =>
   (window as unknown as { AndroidSystemBars?: { setAppearance: (dark: boolean) => void } }).AndroidSystemBars;
 
@@ -22,12 +31,13 @@ class Theme {
   environmentAccent = $state<number | null>(null);
 
   readonly dark = $derived(this.mode === "system" ? this.systemDark : this.mode === "dark");
+
+  readonly appAccent = $derived(
+    this.dynamicColor ? (this.systemAccent ?? accentAt(this.accentIndex)) : accentAt(this.accentIndex),
+  );
+
   readonly accent = $derived(
-    this.environmentAccent !== null
-      ? accentAt(this.environmentAccent)
-      : this.dynamicColor
-        ? (this.systemAccent ?? accentAt(this.accentIndex))
-        : accentAt(this.accentIndex),
+    this.environmentAccent !== null ? accentAt(this.environmentAccent) : this.appAccent,
   );
 
   start() {
@@ -40,8 +50,8 @@ class Theme {
       const root = document.documentElement;
       root.dataset.theme = this.dark ? "dark" : "light";
       root.style.setProperty("--c-accent", this.accent);
-      root.style.setProperty("--c-accent-selection", withAlpha(this.accent, 0.32));
-      root.style.setProperty("--c-accent-quote", withAlpha(this.accent, 0.6));
+      root.style.setProperty("--c-accent-selection", withAlpha(this.accent, SELECTION_ALPHA));
+      root.style.setProperty("--c-accent-quote", withAlpha(this.accent, QUOTE_ALPHA));
       root.dataset.font = this.fontStyle;
       this.#applySystemBars(this.dark);
     });

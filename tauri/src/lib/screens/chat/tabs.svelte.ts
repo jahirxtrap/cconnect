@@ -3,8 +3,11 @@ import type { SessionInfo } from "$lib/data/models";
 import { backend } from "$lib/services/backend.svelte";
 import { ChatState } from "./state.svelte";
 
+export type PaneRole = "center" | "right";
+
 export interface Tab {
   id: string;
+  pane: PaneRole;
   environmentId: string | null;
   cwd: string;
   sessionId: string | null;
@@ -22,6 +25,7 @@ interface StoredTab {
   proj?: string;
   title?: string;
   color?: string;
+  side?: boolean;
 }
 
 const SESSION_ID_PREVIEW = 8;
@@ -30,12 +34,29 @@ const CHAT_ROUTES = ["/settings", "/claude", "/monitor", "/files", "/terminal", 
 
 const onChatRoute = () => !CHAT_ROUTES.includes(window.location.pathname);
 
+export interface ChatLink {
+  sessionId: string;
+  projectKey: string;
+}
+
 export interface ChatLocation {
   tab: number;
   sessionId: string;
   projectKey: string;
   view: boolean;
+  right: ChatLink | null;
 }
+
+export const readRightLocation = (): ChatLink | null => {
+  if (!onChatRoute()) return null;
+  const query = new URLSearchParams(window.location.search);
+  const sessionId = query.get("r");
+  const projectKey = query.get("rp");
+  return sessionId && projectKey ? { sessionId, projectKey } : null;
+};
+
+export const readFocusedPane = (): PaneRole =>
+  onChatRoute() && new URLSearchParams(window.location.search).get("f") === "r" ? "right" : "center";
 
 export const readChatLocation = (): ChatLocation | null => {
   if (!onChatRoute()) return null;
@@ -48,39 +69,49 @@ export const readChatLocation = (): ChatLocation | null => {
     sessionId,
     projectKey,
     view: query.get("v") === "1",
+    right: readRightLocation(),
   };
 };
 
 class Tabs {
   list = $state<Tab[]>([]);
   activeId = $state("");
+  rightActiveId = $state<string | null>(null);
+  rightFocused = $state(false);
 
   #counter = 0;
   #states = new Map<string, ChatState>();
 
-  readonly active = $derived(this.list.find((tab) => tab.id === this.activeId) ?? this.list[0]);
+  readonly center = $derived(this.list.filter((tab) => tab.pane === "center"));
+  readonly right = $derived(this.list.filter((tab) => tab.pane === "right"));
+  readonly active = $derived(this.center.find((tab) => tab.id === this.activeId) ?? this.center[0]);
   readonly state = $derived(this.stateFor(this.active));
 
   constructor() {
     const restored = this.#restore();
     this.list = restored.tabs;
-    let active = restored.active;
+    const opened = this.list.filter((tab) => tab.pane === "center");
+    let activeId = opened[Math.min(Math.max(restored.active, 0), opened.length - 1)]?.id ?? this.list[0].id;
 
     const location = readChatLocation();
     if (location && !location.view) {
-      const known = this.list.findIndex((tab) => tab.sessionId === location.sessionId);
-      if (known >= 0) {
-        active = known;
+      const known = opened.find((tab) => tab.sessionId === location.sessionId);
+      if (known) {
+        activeId = known.id;
       } else {
-        const index = Math.min(Math.max(location.tab, 0), this.list.length - 1);
-        this.list = this.list.map((tab, i) =>
-          i === index ? { ...tab, sessionId: location.sessionId, projectKey: location.projectKey } : tab,
-        );
-        active = index;
+        const target = opened[Math.min(Math.max(location.tab, 0), opened.length - 1)];
+        if (target) {
+          this.list = this.list.map((tab) =>
+            tab.id === target.id
+              ? { ...tab, sessionId: location.sessionId, projectKey: location.projectKey }
+              : tab,
+          );
+          activeId = target.id;
+        }
       }
     }
 
-    this.activeId = this.list[active]?.id ?? this.list[0].id;
+    this.activeId = activeId;
   }
 
   start() {
@@ -90,6 +121,20 @@ class Tabs {
       this.activeId = target.id;
       void this.stateFor(target).openTrashed(opening.sessionId, opening.projectKey);
     }
+
+    $effect(() => {
+      const anchor = backend.active?.id;
+      if (!anchor || !this.list.some((tab) => tab.environmentId === null)) return;
+      for (const tab of this.list) {
+        if (tab.environmentId !== null) continue;
+        const state = this.#states.get(tab.id);
+        if (state) state.environmentId = anchor;
+      }
+      this.list = this.list.map((tab) =>
+        tab.environmentId === null ? { ...tab, environmentId: anchor } : tab,
+      );
+      this.#persist();
+    });
 
     $effect(() => {
       const onPopState = () => {
@@ -157,9 +202,10 @@ class Tabs {
     for (const state of this.#states.values()) state.syncVisibility();
   }
 
-  #blank(environmentId: string | null, cwd: string): Tab {
+  #blank(environmentId: string | null, cwd: string, pane: PaneRole = "center"): Tab {
     return {
       id: this.#nextId(),
+      pane,
       environmentId,
       cwd,
       sessionId: null,
@@ -181,6 +227,7 @@ class Tabs {
       const stored = JSON.parse(raw) as { active?: number; tabs?: StoredTab[] };
       const tabs = (stored.tabs ?? []).map((item) => ({
         id: this.#nextId(),
+        pane: (item.side ? "right" : "center") as PaneRole,
         environmentId: item.env ?? null,
         cwd: item.cwd ?? "",
         sessionId: item.sid ?? null,
@@ -196,26 +243,30 @@ class Tabs {
     }
   }
 
-  openTab(environmentId: string | null, cwd: string): Tab {
-    const tab = this.#blank(environmentId, cwd);
+  openTab(environmentId: string | null, cwd: string, pane: PaneRole = "center"): Tab {
+    const tab = this.#blank(environmentId, cwd, pane);
     this.list = [...this.list, tab];
-    this.activeId = tab.id;
-    this.#syncEnvironment();
+    if (pane === "center") {
+      this.activeId = tab.id;
+      this.#syncEnvironment();
+    }
     this.#persist();
     return tab;
   }
 
-  newTab(categoryId: string | null = null): Tab {
-    const environmentId = this.active?.environmentId ?? backend.active?.id ?? null;
+  newTab(categoryId: string | null = null, pane: PaneRole = "center"): Tab {
+    const source = pane === "right" ? (this.right.at(-1) ?? this.active) : this.active;
+    const environmentId = source?.environmentId ?? backend.active?.id ?? null;
     const directory = backend.environments.find((item) => item.id === environmentId)?.directory ?? "";
-    const tab = this.openTab(environmentId, directory);
+    const tab = this.openTab(environmentId, directory, pane);
     if (categoryId) this.stateFor(tab).pendingCategoryId = categoryId;
     return tab;
   }
 
-  openSessionTab(session: SessionInfo, environmentId: string | null): Tab {
+  openSessionTab(session: SessionInfo, environmentId: string | null, pane: PaneRole = "center"): Tab {
     const tab: Tab = {
       id: this.#nextId(),
+      pane,
       environmentId,
       cwd: session.path ?? "",
       sessionId: session.sessionId,
@@ -225,14 +276,20 @@ class Tabs {
       running: false,
     };
     this.list = [...this.list, tab];
-    this.activeId = tab.id;
-    this.#syncEnvironment();
+    if (pane === "center") {
+      this.activeId = tab.id;
+      this.#syncEnvironment();
+    }
     this.#persist();
     return tab;
   }
 
   updateActive(patch: Partial<Omit<Tab, "id">>) {
-    const current = this.active;
+    if (this.active) this.update(this.active.id, patch);
+  }
+
+  update(id: string, patch: Partial<Omit<Tab, "id">>) {
+    const current = this.list.find((tab) => tab.id === id);
     if (!current) return;
     const next = { ...current, ...patch };
     if (next.sessionId === null) {
@@ -264,21 +321,26 @@ class Tabs {
   }
 
   select(id: string) {
-    if (id === this.activeId || !this.list.some((tab) => tab.id === id)) return;
+    if (id === this.activeId || !this.center.some((tab) => tab.id === id)) return;
     this.activeId = id;
     this.#syncEnvironment();
     this.#persist();
   }
 
   close(id: string) {
-    const index = this.list.findIndex((tab) => tab.id === id);
-    if (index < 0) return;
+    const target = this.list.find((tab) => tab.id === id);
+    if (!target) return;
+    const group = this.list.filter((tab) => tab.pane === target.pane);
+    const index = group.findIndex((tab) => tab.id === id);
     this.#states.get(id)?.dispose();
     this.#states.delete(id);
     let next = this.list.filter((tab) => tab.id !== id);
-    if (!next.length) next = [this.#default()];
+    if (!next.some((tab) => tab.pane === "center")) next = [...next, this.#default()];
     this.list = next;
-    if (this.activeId === id) this.activeId = next[Math.min(index, next.length - 1)].id;
+    if (this.activeId === id) {
+      const siblings = next.filter((tab) => tab.pane === target.pane);
+      this.activeId = siblings[Math.min(index, siblings.length - 1)]?.id ?? this.center[0].id;
+    }
     this.#syncEnvironment();
     this.#persist();
   }
@@ -287,31 +349,35 @@ class Tabs {
     this.close(this.activeId);
   }
 
-  selectNext() {
-    const index = this.list.findIndex((tab) => tab.id === this.activeId);
-    if (index < 0 || this.list.length < 2) return;
-    this.select(this.list[(index + 1) % this.list.length].id);
-  }
-
-  selectPrev() {
-    const index = this.list.findIndex((tab) => tab.id === this.activeId);
-    if (index < 0 || this.list.length < 2) return;
-    this.select(this.list[(index - 1 + this.list.length) % this.list.length].id);
-  }
-
-  moveActive(delta: number) {
-    this.move(this.activeId, this.list.findIndex((tab) => tab.id === this.activeId) + delta);
-  }
-
   move(id: string, toIndex: number) {
-    const from = this.list.findIndex((tab) => tab.id === id);
-    if (from < 0) return;
-    const to = Math.min(Math.max(toIndex, 0), this.list.length - 1);
-    if (from === to) return;
-    const next = [...this.list];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    this.list = next;
+    const target = this.list.find((tab) => tab.id === id);
+    if (!target) return;
+    const group = this.list.filter((tab) => tab.pane === target.pane);
+    const from = group.findIndex((tab) => tab.id === id);
+    const to = Math.min(Math.max(toIndex, 0), group.length - 1);
+    if (from < 0 || from === to) return;
+    const [moved] = group.splice(from, 1);
+    group.splice(to, 0, moved);
+    const others = this.list.filter((tab) => tab.pane !== target.pane);
+    this.list = target.pane === "center" ? [...group, ...others] : [...others, ...group];
+  }
+
+  swapPanes() {
+    this.list = this.list.map((tab) => ({
+      ...tab,
+      pane: tab.pane === "center" ? ("right" as PaneRole) : ("center" as PaneRole),
+    }));
+  }
+
+  commit() {
+    this.#persist();
+  }
+
+  moveToPane(id: string, pane: PaneRole) {
+    const target = this.list.find((tab) => tab.id === id);
+    if (!target || target.pane === pane) return;
+    this.list = this.list.map((tab) => (tab.id === id ? { ...tab, pane } : tab));
+    if (pane === "center" && !this.center.some((tab) => tab.id === this.activeId)) this.activeId = id;
     this.#persist();
   }
 
@@ -322,7 +388,7 @@ class Tabs {
 
   #persist() {
     const index = Math.max(
-      this.list.findIndex((tab) => tab.id === this.activeId),
+      this.center.findIndex((tab) => tab.id === this.activeId),
       0,
     );
     this.syncUrl();
@@ -335,6 +401,7 @@ class Tabs {
         ...(tab.projectKey ? { proj: tab.projectKey } : {}),
         ...(tab.title ? { title: tab.title } : {}),
         ...(tab.color ? { color: tab.color } : {}),
+        ...(tab.pane === "right" ? { side: true } : {}),
       })),
     });
   }
@@ -343,15 +410,26 @@ class Tabs {
     if (!onChatRoute()) return;
     const current = this.active;
     const index = Math.max(
-      this.list.findIndex((tab) => tab.id === this.activeId),
+      this.center.findIndex((tab) => tab.id === this.activeId),
       0,
     );
     const view = current ? this.stateFor(current).viewOnly : null;
     const chat = view ?? (current?.sessionId && current.projectKey ? current : null);
-    const target = chat
-      ? `/?t=${index}&c=${encodeURIComponent(chat.sessionId!)}&p=${encodeURIComponent(chat.projectKey!)}` +
-        (view ? "&v=1" : "")
-      : "/";
+    const query = new URLSearchParams();
+    if (chat) {
+      query.set("t", String(index));
+      query.set("c", chat.sessionId!);
+      query.set("p", chat.projectKey!);
+      if (view) query.set("v", "1");
+    }
+    const beside = this.right.find((tab) => tab.id === this.rightActiveId);
+    if (beside?.sessionId && beside.projectKey) {
+      query.set("r", beside.sessionId);
+      query.set("rp", beside.projectKey);
+    }
+    if (this.rightFocused && query.size) query.set("f", "r");
+    const search = query.toString();
+    const target = search ? `/?${search}` : "/";
     if (target !== window.location.pathname + window.location.search) {
       window.history.pushState(null, "", target);
     }

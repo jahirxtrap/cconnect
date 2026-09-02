@@ -1,5 +1,6 @@
 <script lang="ts">
   import Plus from "@lucide/svelte/icons/plus";
+  import Square from "@lucide/svelte/icons/square";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import X from "@lucide/svelte/icons/x";
   import { Dialog } from "bits-ui";
@@ -10,7 +11,8 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import { ReorderDrag } from "$lib/ui/reorderDrag.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { tabs } from "./tabs.svelte";
+  import { panes } from "./panes.svelte";
+  import { tabs, type Tab } from "./tabs.svelte";
 
   interface Props {
     cwd: string[];
@@ -41,14 +43,27 @@
     else await terminalTabs.drop(tab);
   };
 
-  const chatDrag = new ReorderDrag(
-    () => tabs.list,
-    (id, to) => tabs.move(id, to),
-    (id) => {
-      tabs.select(id);
+  const paneDrag = (items: () => Tab[]) =>
+    new ReorderDrag(items, (id, to) => tabs.move(id, to), (id) => {
+      panes.reveal(id);
       open = false;
-    },
+    });
+
+  const centerDrag = paneDrag(() => tabs.center);
+  const rightDrag = paneDrag(() => tabs.right);
+
+  const groups = $derived(
+    [
+      { label: t("PANEL_CENTER"), items: tabs.center, drag: centerDrag },
+      { label: t("PANEL_RIGHT"), items: tabs.right, drag: rightDrag },
+    ].filter((group) => group.items.length),
   );
+
+  const closeTab = (id: string) => {
+    const shown = id === panes.focusedTab?.id;
+    panes.close(id);
+    if (shown) open = false;
+  };
 
   const terminalDrag = new ReorderDrag(
     () => terminalTabs.items,
@@ -58,10 +73,11 @@
 </script>
 
 <TooltipIconButton label={t("TABS")} onclick={() => (open = true)}>
-  <span
-    class="inline-flex size-[22px] items-center justify-center rounded-sm border-[1.5px] border-current text-label-md"
-  >
-    {tabs.list.length}
+  <span class="relative inline-flex">
+    <Square />
+    <span class="absolute inset-0 flex items-center justify-center text-label-sm leading-none">
+      {tabs.list.length}
+    </span>
   </span>
 </TooltipIconButton>
 
@@ -80,7 +96,7 @@
         <TooltipIconButton
           label={t("NEW_TAB")}
           onclick={() => {
-            tabs.newTab();
+            panes.newTab();
             open = false;
           }}
         >
@@ -88,51 +104,16 @@
         </TooltipIconButton>
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto px-2 py-1">
-        <div class="grid grid-cols-2 content-start gap-1.5">
-          {#each tabs.list as tab, index (tab.id)}
-            {@const active = tab.id === tabs.activeId}
-            {@const shift = chatDrag.shiftOf(tab.id, index)}
-            <div
-              use:chatDrag.register={tab.id}
-              role="button"
-              tabindex="0"
-              onpointerdown={(event) => chatDrag.onPointerDown(event, tab.id)}
-              onkeydown={(event) => {
-                if (event.key !== "Enter") return;
-                tabs.select(tab.id);
-                open = false;
-              }}
-              style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id ===
-              chatDrag.draggingId
-                ? 1
-                : 0}; transition: {chatDrag.transitionOf(tab.id)}"
-              class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {active
-                ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
-                : 'border-outline-variant text-on-surface-variant'}"
-            >
-              <span
-                class="size-2 shrink-0 rounded-full"
-                style={sessionColorOf(tab.color)
-                  ? `background: ${sessionColorOf(tab.color)}`
-                  : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
-              ></span>
-              <span class="min-w-0 flex-1 truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
-              <button
-                type="button"
-                onpointerdown={(event) => event.stopPropagation()}
-                onclick={() => {
-                  const wasActive = tab.id === tabs.activeId;
-                  tabs.close(tab.id);
-                  if (wasActive) open = false;
-                }}
-                aria-label={t("CLOSE_TAB")}
-                class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          {/each}
-        </div>
+        {#each groups as group (group.label)}
+          {#if groups.length > 1}
+            <p class="px-1 pt-1 pb-1.5 text-label-md text-on-surface-variant">{group.label}</p>
+          {/if}
+          <div class="grid grid-cols-2 content-start gap-1.5">
+            {#each group.items as tab, index (tab.id)}
+              {@render chatCard(tab, index, group.drag)}
+            {/each}
+          </div>
+        {/each}
 
         <div class="mt-3 border-t border-outline-variant pt-3">
           <p class="px-1 pb-1.5 text-label-md text-on-surface-variant">{t("TERMINAL")}</p>
@@ -181,6 +162,45 @@
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
+
+{#snippet chatCard(tab: Tab, index: number, drag: ReorderDrag)}
+  {@const shift = drag.shiftOf(tab.id, index)}
+  <div
+    use:drag.register={tab.id}
+    role="button"
+    tabindex="0"
+    onpointerdown={(event) => drag.onPointerDown(event, tab.id)}
+    onkeydown={(event) => {
+      if (event.key !== "Enter") return;
+      panes.reveal(tab.id);
+      open = false;
+    }}
+    style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id === drag.draggingId
+      ? 1
+      : 0}; transition: {drag.transitionOf(tab.id)}"
+    class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
+    panes.focusedTab?.id
+      ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
+      : 'border-outline-variant text-on-surface-variant'}"
+  >
+    <span
+      class="size-2 shrink-0 rounded-full"
+      style={sessionColorOf(tab.color)
+        ? `background: ${sessionColorOf(tab.color)}`
+        : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
+    ></span>
+    <span class="min-w-0 flex-1 truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
+    <button
+      type="button"
+      onpointerdown={(event) => event.stopPropagation()}
+      onclick={() => closeTab(tab.id)}
+      aria-label={t("CLOSE_TAB")}
+      class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+    >
+      <X size={18} />
+    </button>
+  </div>
+{/snippet}
 
 {#if closingTerminal}
   {@const tab = closingTerminal}

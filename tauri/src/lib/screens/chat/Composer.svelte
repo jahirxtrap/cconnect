@@ -24,6 +24,7 @@
   import { keepFocus } from "$lib/ui/keepFocus";
 
   interface Props {
+    focused: boolean;
     streaming: boolean;
     draft: string;
     onDraft: (value: string) => void;
@@ -45,6 +46,7 @@
   }
 
   const {
+    focused,
     streaming,
     draft,
     onDraft,
@@ -75,7 +77,10 @@
 
   let field = $state<HTMLTextAreaElement | null>(null);
 
-  $effect(() => paneFocus.register("chat", () => field?.focus()));
+  $effect(() => {
+    if (focused) return paneFocus.register("chat", () => field?.focus());
+    if (field && document.activeElement === field) field.blur();
+  });
   let picker = $state<HTMLInputElement | null>(null);
 
   const canSubmit = $derived(!!draft.trim() || attachments.length > 0);

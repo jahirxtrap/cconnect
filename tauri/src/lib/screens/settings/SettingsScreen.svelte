@@ -189,7 +189,7 @@
         onclick={() => (dialog = "accent")}
       >
         {#snippet trailing()}
-          <span class="flex h-7 w-9 items-center justify-center"><span class="size-5 rounded-full" style="background: {theme.accent}"></span></span>
+          <span class="flex h-7 w-9 items-center justify-center"><span class="size-5 rounded-full" style="background: {theme.appAccent}"></span></span>
         {/snippet}
       </PreferenceRow>
       <PreferenceRow

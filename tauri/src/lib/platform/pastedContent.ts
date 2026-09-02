@@ -16,7 +16,7 @@ type Host = { __cconnectPaste?: (payload: string) => void };
 
 export const onNativePaste = (handler: (files: File[]) => void): (() => void) => {
   const host = window as unknown as Host;
-  host.__cconnectPaste = (payload: string) => {
+  const listener = (payload: string) => {
     let items: PastedFile[];
     try {
       items = JSON.parse(payload) as PastedFile[];
@@ -28,7 +28,8 @@ export const onNativePaste = (handler: (files: File[]) => void): (() => void) =>
     );
     if (files.length) handler(files);
   };
+  host.__cconnectPaste = listener;
   return () => {
-    delete host.__cconnectPaste;
+    if (host.__cconnectPaste === listener) delete host.__cconnectPaste;
   };
 };

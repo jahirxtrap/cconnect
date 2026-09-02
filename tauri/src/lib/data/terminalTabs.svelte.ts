@@ -7,7 +7,6 @@ import {
   type TerminalInfo,
 } from "$lib/services/terminalApi";
 import { localLink } from "$lib/services/terminalSocket";
-import { settings } from "./settings.svelte";
 import { terminalKeys } from "./terminalKeys.svelte";
 import type { TerminalConnector } from "./terminalLink";
 
@@ -31,7 +30,6 @@ const connectors = new Map<string, TerminalConnector>();
 const empty = (): EnvironmentTabs => ({ items: [], activeId: null });
 
 class TerminalTabs {
-  panelOpen = $state(settings.terminalOpen);
   overlayOpen = $state(false);
 
   #byEnvironment = $state<Record<string, EnvironmentTabs>>({});
@@ -39,11 +37,6 @@ class TerminalTabs {
   readonly environment = $derived(backend.active?.id ?? "");
   readonly items = $derived(this.#byEnvironment[this.environment]?.items ?? []);
   readonly activeId = $derived(this.#byEnvironment[this.environment]?.activeId ?? null);
-
-  setPanelOpen(open: boolean) {
-    this.panelOpen = open;
-    settings.terminalOpen = open;
-  }
 
   connectorOf(id: string) {
     return connectors.get(this.#key(id)) ?? null;

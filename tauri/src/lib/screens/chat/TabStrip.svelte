@@ -21,6 +21,8 @@
     newShortcut?: string;
     onClose: (id: string) => void;
     onMove?: (id: string, index: number) => void;
+    onDrop?: () => void;
+    onPaneDrag?: (pointerX: number, done: boolean) => void;
     newLabel?: string;
     emptyTitle?: string;
     dot?: boolean;
@@ -36,6 +38,8 @@
     newShortcut,
     onClose,
     onMove,
+    onDrop,
+    onPaneDrag,
     newLabel,
     emptyTitle,
     dot = true,
@@ -54,6 +58,30 @@
   let plus = $state<HTMLDivElement | null>(null);
   let draggingId = $state<string | null>(null);
   let dragDx = $state(0);
+
+  const onPaneDown = (event: PointerEvent) => {
+    if (event.button !== 0 || !onPaneDrag) return;
+    if ((event.target as HTMLElement | null)?.closest('[role="tab"], button')) return;
+    event.preventDefault();
+    const startX = event.clientX;
+
+    const onMovePointer = (move: PointerEvent) => {
+      if (move.pointerId !== event.pointerId) return;
+      onPaneDrag(move.clientX, false);
+    };
+
+    const onUp = (up: Event) => {
+      if (up instanceof PointerEvent && up.pointerId !== event.pointerId) return;
+      window.removeEventListener("pointermove", onMovePointer);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      onPaneDrag(up instanceof PointerEvent ? up.clientX : startX, true);
+    };
+
+    window.addEventListener("pointermove", onMovePointer);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
 
   const chips = new Map<string, HTMLElement>();
 
@@ -123,6 +151,7 @@
   };
 
   const endDrag = () => {
+    if (draggingId !== null) onDrop?.();
     draggingId = null;
     dragDx = 0;
   };
@@ -212,8 +241,10 @@
   });
 </script>
 
+<!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="flex shrink-0 items-center border-b bg-surface transition-colors duration-200 {focused
+  onpointerdown={onPaneDown}
+  class="flex shrink-0 cursor-pointer items-center border-b bg-surface transition-colors duration-200 {focused
     ? 'border-accent'
     : 'border-outline-variant'}"
 >

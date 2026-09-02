@@ -61,7 +61,7 @@
     onChange={setDynamic}
   >
     {#snippet leading()}
-      <span class="size-5 rounded-full" style="background: {theme.systemAccent ?? theme.accent}"></span>
+      <span class="size-5 rounded-full" style="background: {theme.systemAccent ?? theme.appAccent}"></span>
     {/snippet}
   </SwitchRow>
 
