@@ -23,7 +23,7 @@
 
   const MIN_REFRESH_MS = 600;
 
-  let tick = $state(0);
+  let manualTick = $state(0);
   let refreshing = $state(false);
   let accounts = $state<AccountsSnapshot | null>(null);
   let envOpen = $state(false);
@@ -37,11 +37,12 @@
     (CLAUDE_KINDS as readonly string[]).includes(navigation.sub ?? "") ? (navigation.sub as ClaudeKind) : null,
   );
   const loggedAccounts = $derived((accounts?.accounts ?? []).filter((account) => account.loggedIn));
+  const tick = $derived(manualTick + (chat.connected ? 1 : 0));
 
   const refresh = async () => {
     if (refreshing) return;
     refreshing = true;
-    tick++;
+    manualTick++;
     await new Promise((done) => setTimeout(done, MIN_REFRESH_MS));
     refreshing = false;
   };
@@ -52,10 +53,6 @@
     void tick;
     void backend.activeId;
     void accountsApi.list().then((value) => (accounts = value));
-  });
-
-  $effect(() => {
-    if (chat.connected) tick++;
   });
 </script>
 

@@ -33,13 +33,22 @@ export const keepCaretInView = (node: HTMLTextAreaElement) => {
 };
 
 const fit = (node: HTMLTextAreaElement) => {
-  if (!node.isConnected) return;
+  if (!node.isConnected || node.clientWidth === 0) return;
   node.style.height = "auto";
   node.style.height = `${node.scrollHeight}px`;
 };
 
+const widths = new ResizeObserver((entries) => {
+  for (const entry of entries) fit(entry.target as HTMLTextAreaElement);
+});
+
+const watch = (node: HTMLTextAreaElement) => {
+  widths.observe(node);
+  fit(node);
+};
+
 const fitAll = (root: ParentNode) => {
-  for (const node of root.querySelectorAll<HTMLTextAreaElement>(SELECTOR)) fit(node);
+  for (const node of root.querySelectorAll<HTMLTextAreaElement>(SELECTOR)) watch(node);
 };
 
 export function polyfillFieldSizing() {
@@ -79,7 +88,7 @@ export function polyfillFieldSizing() {
     for (const record of records) {
       for (const node of record.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
-        if (node.matches(SELECTOR)) fit(node as HTMLTextAreaElement);
+        if (node.matches(SELECTOR)) watch(node as HTMLTextAreaElement);
         else fitAll(node);
       }
     }

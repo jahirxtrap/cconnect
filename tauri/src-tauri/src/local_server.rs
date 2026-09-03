@@ -120,7 +120,7 @@ pub fn local_server_status(state: State<'_, LocalServerState>) -> LocalServerInf
     state.inner.lock().unwrap().info.clone()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn local_server_start(
     app: AppHandle,
     state: State<'_, LocalServerState>,
@@ -256,14 +256,13 @@ fn kill_tree(child: &mut Child) {
         let _ = Command::new("taskkill")
             .args(["/PID", &pid.to_string(), "/T", "/F"])
             .creation_flags(CREATE_NO_WINDOW)
-            .status();
+            .spawn();
     }
     #[cfg(not(windows))]
     {
-        let _ = Command::new("pkill").args(["-TERM", "-P", &pid.to_string()]).status();
+        let _ = Command::new("pkill").args(["-TERM", "-P", &pid.to_string()]).spawn();
     }
     let _ = child.kill();
-    let _ = child.wait();
 }
 
 pub fn shutdown(state: &LocalServerState) {
@@ -274,7 +273,7 @@ pub fn shutdown(state: &LocalServerState) {
     inner.info = LocalServerInfo::default();
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn local_server_stop(app: AppHandle, state: State<'_, LocalServerState>) -> LocalServerInfo {
     let mut inner = state.inner.lock().unwrap();
     if let Some(mut child) = inner.child.take() {

@@ -1,4 +1,9 @@
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::process::Command;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 #[cfg(target_os = "macos")]
 const MAC_ACCENTS: [&str; 8] = [
@@ -6,7 +11,11 @@ const MAC_ACCENTS: [&str; 8] = [
 ];
 
 fn run(program: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(program).args(args).output().ok()?;
+    let mut command = Command::new(program);
+    command.args(args);
+    #[cfg(windows)]
+    command.creation_flags(CREATE_NO_WINDOW);
+    let output = command.output().ok()?;
     if !output.status.success() {
         return None;
     }
@@ -65,7 +74,7 @@ pub fn system_accent() -> Option<String> {
     read_accent()
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String> {
     let file = std::path::PathBuf::from(&path);
     if !file.is_file() {
