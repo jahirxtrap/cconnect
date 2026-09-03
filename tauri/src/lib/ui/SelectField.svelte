@@ -29,23 +29,36 @@
     trailing,
   }: Props = $props();
 
-  let open = $state(false);
-  const display = $derived(shown ?? options.find((option) => option.value === selected)?.label ?? selected);
+  const ACTIONS_GAP = 8;
 
-  const FIELD_CLASS = "flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors";
+  let open = $state(false);
+  let actionsWidth = $state(0);
+
+  const display = $derived(shown ?? options.find((option) => option.value === selected)?.label ?? selected);
+  const actionsReserve = $derived(
+    actionsWidth ? `margin-right: ${actionsWidth + ACTIONS_GAP}px` : "",
+  );
+
+  const FIELD_CLASS =
+    "relative flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors";
 </script>
 
 <div class={className}>
   <p class="mb-1.5 text-label-lg">{label}</p>
   {#snippet field(active: boolean)}
     <span class="{FIELD_CLASS} {enabled ? 'cursor-pointer' : ''} {active ? 'border-accent' : 'border-outline-variant'}">
-      <span class="min-w-0 flex-1 truncate text-left text-body-md">{display}</span>
-      {#if trailing}
-        <span class="ml-2 flex shrink-0 items-center">{@render trailing()}</span>
-      {/if}
-      {#if enabled}
-        <ChevronDown size={24} class="ml-2 shrink-0 text-on-surface-variant" />
-      {/if}
+      <span style={actionsReserve} class="min-w-0 flex-1 truncate text-left text-body-md">
+        {display}
+      </span>
+      <span
+        bind:clientWidth={actionsWidth}
+        class="absolute inset-y-0 right-3 flex items-center gap-2"
+      >
+        {@render trailing?.()}
+        {#if enabled}
+          <ChevronDown size={24} class="shrink-0 text-on-surface-variant" />
+        {/if}
+      </span>
     </span>
   {/snippet}
   {#if onclick}

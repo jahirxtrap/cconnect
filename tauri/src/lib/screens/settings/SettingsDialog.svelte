@@ -22,6 +22,7 @@
   import ClientSection from "./ClientSection.svelte";
   import ConnectivitySection from "./ConnectivitySection.svelte";
   import RecoverySection from "./RecoverySection.svelte";
+  import { isSettingsSection, SETTINGS_SECTIONS, type SettingsSection } from "./sections";
   import ServerSection from "./ServerSection.svelte";
 
   interface Props {
@@ -30,35 +31,10 @@
 
   const { onDismiss }: Props = $props();
 
-  type Section =
-    | "general"
-    | "client"
-    | "background"
-    | "connectivity"
-    | "server"
-    | "claude"
-    | "recovery"
-    | "about";
+  const sectionOf = (value: string | null): SettingsSection =>
+    isSettingsSection(value) ? value : backend.configured ? "general" : "connectivity";
 
-  const SECTION_IDS = [
-    "general",
-    "client",
-    "background",
-    "connectivity",
-    "server",
-    "claude",
-    "recovery",
-    "about",
-  ];
-
-  const sectionOf = (value: string | null): Section =>
-    value && SECTION_IDS.includes(value)
-      ? (value as Section)
-      : backend.configured
-        ? "general"
-        : "connectivity";
-
-  let section = $state<Section>(sectionOf(navigation.sub));
+  let section = $state<SettingsSection>(sectionOf(navigation.sub));
   let refreshTick = $state(0);
   let refreshing = $state(false);
 
@@ -72,17 +48,6 @@
   const showsServer = $derived(
     section === "general" || section === "server" || section === "claude",
   );
-
-  const sections = $derived<{ id: Section; label: string }[]>([
-    { id: "general", label: t("SETTINGS_GENERAL") },
-    { id: "client", label: t("SETTINGS_CLIENT") },
-    { id: "background", label: t("BACKGROUND_GROUP") },
-    { id: "connectivity", label: t("SETTINGS_CONNECTIVITY") },
-    { id: "server", label: t("SETTINGS_SERVER") },
-    { id: "claude", label: t("CLAUDE") },
-    { id: "recovery", label: t("SETTINGS_RECOVERY") },
-    { id: "about", label: t("ABOUT") },
-  ]);
 
   const MIN_REFRESH_MS = 600;
 
@@ -102,7 +67,7 @@
 
   $effect(() => pushDismiss(() => onDismiss()));
 
-  const select = (id: Section) => {
+  const select = (id: SettingsSection) => {
     section = id;
     if (id === "general") navigation.closeSub();
     else navigation.openSub(id);
@@ -126,7 +91,7 @@
         <Dialog.Title class="flex h-14 shrink-0 items-center truncate px-2 text-dialog-title">
           {t("SETTINGS")}
         </Dialog.Title>
-        {#each sections as item (item.id)}
+        {#each SETTINGS_SECTIONS as item (item.id)}
           <Pressable
             onclick={() => select(item.id)}
             hover={false}
@@ -135,7 +100,7 @@
               ? 'bg-accent/14 font-semibold text-accent hover:bg-accent/21'
               : 'hover:bg-on-surface/8'}"
           >
-            <span class="min-w-0 flex-1 truncate text-left">{item.label}</span>
+            <span class="min-w-0 flex-1 truncate text-left">{t(item.label)}</span>
           </Pressable>
         {/each}
       </div>

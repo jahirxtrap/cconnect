@@ -34,8 +34,8 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "tab.previous", label: "SHORTCUT_TAB_PREVIOUS", scope: "chat", keys: "Ctrl+Shift+Tab" },
   { id: "tab.moveNext", label: "SHORTCUT_TAB_MOVE_NEXT", scope: "chat", keys: "Alt+ArrowRight" },
   { id: "tab.movePrevious", label: "SHORTCUT_TAB_MOVE_PREVIOUS", scope: "chat", keys: "Alt+ArrowLeft" },
-  { id: "panel.left", label: "SHORTCUT_PANEL_LEFT", scope: "chat", keys: "Mod+KeyB" },
-  { id: "panel.right", label: "SHORTCUT_PANEL_RIGHT", scope: "chat", keys: "" },
+  { id: "panel.left", label: "PANEL_LEFT", scope: "chat", keys: "Mod+KeyB" },
+  { id: "panel.right", label: "PANEL_RIGHT", scope: "chat", keys: "" },
   { id: "terminal.tab.new", label: "SHORTCUT_TERMINAL_TAB_NEW", scope: "terminal", keys: "Mod+KeyT" },
   { id: "terminal.tab.close", label: "SHORTCUT_TERMINAL_TAB_CLOSE", scope: "terminal", keys: "Mod+KeyW" },
   { id: "terminal.tab.next", label: "SHORTCUT_TERMINAL_TAB_NEXT", scope: "terminal", keys: "Ctrl+Tab" },
@@ -53,6 +53,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     web: "",
   },
   { id: "window.refresh", label: "REFRESH", scope: "global", keys: "Mod+KeyR", web: "" },
+  { id: "window.commands", label: "COMMANDS", scope: "global", keys: "Mod+KeyK" },
 ];
 
 const BY_ID = new Map(SHORTCUTS.map((shortcut) => [shortcut.id, shortcut]));
@@ -149,9 +150,18 @@ class Shortcuts {
   }
 
   handle(event: KeyboardEvent, scopes: ShortcutScope[]): boolean {
-    const id = this.idFor(signature(event), scopes);
+    return this.run(this.idFor(signature(event), scopes));
+  }
+
+  run(id: string | null): boolean {
     const handler = id ? this.#handlers.get(id)?.at(-1) : null;
     return handler ? handler() !== false : false;
+  }
+
+  available(scopes: ShortcutScope[]): ShortcutDef[] {
+    return SHORTCUTS.filter(
+      (shortcut) => scopes.includes(shortcut.scope) && this.#handlers.has(shortcut.id),
+    );
   }
 
   keys(id: string): string {

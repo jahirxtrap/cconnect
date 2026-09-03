@@ -1,6 +1,7 @@
 <script lang="ts">
   import { dismissOpen } from "$lib/app/dismissStack";
   import { activeScope } from "$lib/app/activeScope.svelte";
+  import CommandPalette from "$lib/app/CommandPalette.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverDefaults } from "$lib/data/serverDefaults.svelte";
@@ -53,8 +54,14 @@
   useShortcut("window.refresh", () => {
     desktop.refreshTick++;
   });
+  useShortcut("window.commands", () => {
+    if (layout.mobile) return false;
+    commandsOpen = !commandsOpen;
+  });
 
   const settingsAsDialog = $derived(!layout.mobile);
+
+  let commandsOpen = $state(false);
 
   const scopeChain = (): ShortcutScope[] => {
     if (dismissOpen()) return ["global"];
@@ -136,6 +143,10 @@
     <ChatScreen />
   {/if}
 </div>
+
+{#if commandsOpen && !layout.mobile}
+  <CommandPalette onDismiss={() => (commandsOpen = false)} />
+{/if}
 
 {#if navigation.route === "/settings" && settingsAsDialog}
   <SettingsDialog onDismiss={() => navigation.navigate("/")} />

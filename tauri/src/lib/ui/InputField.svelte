@@ -47,6 +47,7 @@
   }: Props = $props();
 
   const LINE_HEIGHT = 20;
+  const ACTIONS_GAP = 8;
 
   const showClear = $derived(onClear !== null && (clearAlways || value.length > 0));
 
@@ -54,6 +55,11 @@
     "min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant";
 
   let field = $state<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  let actionsWidth = $state(0);
+
+  const actionsReserve = $derived(
+    actionsWidth ? `margin-right: ${actionsWidth + ACTIONS_GAP}px` : "",
+  );
   let revealed = $state(false);
 
   const handle = (event: Event) => oninput((event.currentTarget as HTMLInputElement).value);
@@ -70,7 +76,7 @@
     </p>
   {/if}
   <div
-    class="flex w-full items-center gap-2 rounded-md border-2 px-3 py-2 transition-colors {error
+    class="relative flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors {error
       ? 'border-error'
       : 'border-outline-variant focus-within:border-accent'}"
   >
@@ -83,10 +89,11 @@
         {placeholder}
         {onkeydown}
         oninput={handle}
+        style={actionsReserve}
         class={FIELD_CLASS}
       />
     {:else}
-      <div class="relative flex min-w-0 flex-1">
+      <div style={actionsReserve} class="relative flex min-w-0 flex-1">
         {#if placeholder && !value}
           <span
             style="line-height: {LINE_HEIGHT}px"
@@ -108,34 +115,41 @@
         ></textarea>
       </div>
     {/if}
-    {#if onClear}
-      <span class="shrink-0" class:invisible={!showClear}>
-        <TooltipIconButton
-          label={t("CANCEL")}
-          tooltip={false}
-          enabled={showClear}
-          onclick={() => onClear?.()}
-          class="size-6 [&_svg]:size-[18px]"
-        >
-          <X size={18} class="text-on-surface-variant" />
-        </TooltipIconButton>
+    {#if onClear || secret || trailing}
+      <span
+        bind:clientWidth={actionsWidth}
+        class="absolute inset-y-0 right-3 flex items-center gap-2"
+      >
+        {#if onClear}
+          <span class:invisible={!showClear}>
+            <TooltipIconButton
+              label={t("CANCEL")}
+              tooltip={false}
+              enabled={showClear}
+              onclick={() => onClear?.()}
+              class="size-6 [&_svg]:size-[18px]"
+            >
+              <X size={18} class="text-on-surface-variant" />
+            </TooltipIconButton>
+          </span>
+        {/if}
+        {#if secret}
+          <TooltipIconButton
+            label={t(revealed ? "HIDE" : "SHOW")}
+            tooltip={false}
+            onclick={() => (revealed = !revealed)}
+            class="size-6 [&_svg]:size-[18px]"
+          >
+            {#if revealed}
+              <EyeOff size={18} class="text-on-surface-variant" />
+            {:else}
+              <Eye size={18} class="text-on-surface-variant" />
+            {/if}
+          </TooltipIconButton>
+        {/if}
+        {@render trailing?.()}
       </span>
     {/if}
-    {#if secret}
-      <TooltipIconButton
-        label={t(revealed ? "HIDE" : "SHOW")}
-        tooltip={false}
-        onclick={() => (revealed = !revealed)}
-        class="size-6 [&_svg]:size-[18px]"
-      >
-        {#if revealed}
-          <EyeOff size={18} class="text-on-surface-variant" />
-        {:else}
-          <Eye size={18} class="text-on-surface-variant" />
-        {/if}
-      </TooltipIconButton>
-    {/if}
-    {@render trailing?.()}
   </div>
   {#if error}
     <p class="mt-1 text-body-sm text-error">{error}</p>

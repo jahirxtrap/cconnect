@@ -17,6 +17,7 @@
   import InputField from "$lib/ui/InputField.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
@@ -244,7 +245,7 @@
     >
       {#snippet trailing()}
         {#if accentIndex !== null}
-          <span class="size-5 rounded-full" style="background: {accentAt(accentIndex)}"></span>
+          <StatusDot color={accentAt(accentIndex)} box={20} dot={20} />
         {/if}
       {/snippet}
     </SelectField>
