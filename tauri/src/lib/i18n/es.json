@@ -45,6 +45,7 @@
   "UNLOCK": "Desbloquear",
   "SSH_HOSTS": "Hosts SSH",
   "SSH_HOSTS_SUMMARY": "Conexiones SSH guardadas a otras máquinas",
+  "MANAGE_SSH_HOSTS": "Administrar hosts",
   "ADD_SSH_HOST": "Agregar host SSH",
   "EDIT_SSH_HOST": "Editar host SSH",
   "DELETE_SSH_HOST_CONFIRM": "¿Eliminar el host SSH «{1}»?",

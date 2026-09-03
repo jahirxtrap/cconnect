@@ -1,9 +1,11 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Keyboard from "@lucide/svelte/icons/keyboard";
+  import Network from "@lucide/svelte/icons/network";
   import X from "@lucide/svelte/icons/x";
   import { tick } from "svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
+  import { navigation } from "$lib/app/navigation.svelte";
   import { sshAddress, sshStore } from "$lib/data/sshStore.svelte";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -24,6 +26,7 @@
   import SoftKeys from "$lib/screens/terminal/SoftKeys.svelte";
   import { TERMINAL_BACKGROUND } from "$lib/screens/terminal/theme";
   import TerminalSurface from "$lib/screens/terminal/TerminalSurface.svelte";
+  import SshHostsList from "$lib/screens/terminal/SshHostsList.svelte";
   import TerminalUnlockDialog from "$lib/screens/terminal/TerminalUnlockDialog.svelte";
   import PaneActions from "./PaneActions.svelte";
   import TabStrip from "./TabStrip.svelte";
@@ -41,6 +44,7 @@
   let unlocking = $state(false);
   let rejected = $state(false);
   let closing = $state<TerminalTab | null>(null);
+  let managing = $state(false);
 
   const focused = $derived(activeScope() === "terminal");
   const online = $derived(serverStatus.online);
@@ -59,7 +63,6 @@
   };
 
   const unlocked = $derived(!!terminalKeys.current);
-  const hasExtras = $derived(isTauri && sshStore.profiles.length > 0);
 
   const refresh = async () => {
     if (!online || !terminalKeys.current) return;
@@ -132,6 +135,14 @@
 
   $effect(() => paneFocus.register("terminal", focusActive));
 
+  $effect(() =>
+    navigation.intercept(() => {
+      if (!managing) return false;
+      managing = false;
+      return true;
+    }),
+  );
+
   $effect(() => {
     void refresh();
   });
@@ -149,7 +160,7 @@
 {/snippet}
 
 {#snippet terminalActions()}
-  {#if hasExtras}
+  {#if isTauri}
     <PopupMenu
       open={menuOpen}
       onOpenChange={(value) => {
@@ -164,7 +175,7 @@
           <EllipsisVertical />
         </TooltipIconButton>
       {/snippet}
-      {#if isTauri && sshStore.profiles.length}
+      {#if sshStore.profiles.length}
         <MenuSub text={t("SSH_HOSTS")}>
           {#each sshStore.profiles as profile (profile.id)}
             <MenuItem
@@ -175,13 +186,18 @@
           {/each}
         </MenuSub>
       {/if}
+      <MenuItem text={t("MANAGE_SSH_HOSTS")} onclick={() => (managing = true)}>
+        {#snippet trailing()}
+          <Network size={16} class="shrink-0 text-on-surface-variant" />
+        {/snippet}
+      </MenuItem>
     </PopupMenu>
   {/if}
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="flex h-full flex-col bg-surface"
+  class="relative flex h-full flex-col bg-surface"
   onpointerdowncapture={() => paneFocus.set("terminal")}
 >
   <TabStrip
@@ -245,6 +261,19 @@
       >
         <Keyboard />
       </TooltipIconButton>
+    </div>
+  {/if}
+
+  {#if managing}
+    <div class="absolute inset-0 z-10">
+      <SshHostsList
+        compact={pane}
+        onSelect={(profile) => {
+          managing = false;
+          connectSsh(profile);
+        }}
+        onBack={() => (managing = false)}
+      />
     </div>
   {/if}
 </div>

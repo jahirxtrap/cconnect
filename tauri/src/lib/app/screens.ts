@@ -1,5 +1,6 @@
 import Activity from "@lucide/svelte/icons/activity";
 import Folder from "@lucide/svelte/icons/folder";
+import Network from "@lucide/svelte/icons/network";
 import SquareTerminal from "@lucide/svelte/icons/square-terminal";
 import Type from "@lucide/svelte/icons/type";
 import type { RightKind } from "$lib/screens/chat/panes.svelte";
@@ -12,6 +13,8 @@ export interface ScreenEntry {
   label: string;
   icon: IconSource;
   open: () => void;
+  screenLabel?: string;
+  screenIcon?: IconSource;
 }
 
 export const SCREENS: ScreenEntry[] = [
@@ -22,7 +25,9 @@ export const SCREENS: ScreenEntry[] = [
     kind: "terminal",
     label: "TERMINAL",
     icon: SquareTerminal,
-    open: () => navigation.navigate("/terminal"),
+    open: () => navigation.openSshHosts(),
+    screenLabel: "SSH_HOSTS",
+    screenIcon: Network,
   },
   { kind: "markdown", label: "MARKDOWN", icon: Type, open: () => navigation.navigate("/markdown") },
 ];

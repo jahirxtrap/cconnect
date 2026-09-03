@@ -45,6 +45,7 @@
   "UNLOCK": "Unlock",
   "SSH_HOSTS": "SSH hosts",
   "SSH_HOSTS_SUMMARY": "Saved SSH connections to other machines",
+  "MANAGE_SSH_HOSTS": "Manage hosts",
   "ADD_SSH_HOST": "Add SSH host",
   "EDIT_SSH_HOST": "Edit SSH host",
   "DELETE_SSH_HOST_CONFIRM": "Delete the SSH host \"{1}\"?",

@@ -143,6 +143,14 @@
     if (panes.kind !== "claude") claudeDetail = null;
   });
 
+  $effect(() =>
+    navigation.intercept(() => {
+      if (claudeDetail === null) return false;
+      claudeDetail = null;
+      return true;
+    }),
+  );
+
   const dragPanes = (pointerX: number, done: boolean, origin: PaneRole) => {
     const overRight = pointerX >= layout.width - rightWidth;
     const target: PaneRole = overRight ? "right" : "center";

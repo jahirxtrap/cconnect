@@ -334,8 +334,9 @@
       class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
     >
       {#each SCREENS as screen (screen.kind)}
-        <TooltipIconButton label={t(screen.label)} onclick={screen.open}>
-          <screen.icon size={17} />
+        {@const Icon = screen.screenIcon ?? screen.icon}
+        <TooltipIconButton label={t(screen.screenLabel ?? screen.label)} onclick={screen.open}>
+          <Icon size={17} />
         </TooltipIconButton>
       {/each}
     </div>

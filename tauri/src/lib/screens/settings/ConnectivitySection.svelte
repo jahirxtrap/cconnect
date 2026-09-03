@@ -1,7 +1,7 @@
 <script lang="ts">
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Server from "@lucide/svelte/icons/server";
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
+  import Network from "@lucide/svelte/icons/network";
   import { navigation } from "$lib/app/navigation.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
@@ -20,7 +20,7 @@
     onclick={() => (dialogOpen = true)}
   />
   <PreferenceRow
-    icon={SquareTerminal}
+    icon={Network}
     title={t("SSH_HOSTS")}
     summary={t("SSH_HOSTS_SUMMARY")}
     onclick={() => navigation.openSshHosts()}
