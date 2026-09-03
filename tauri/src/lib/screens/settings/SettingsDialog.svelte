@@ -65,7 +65,7 @@
   const tick = $derived(refreshTick);
   const serverReady = $derived(backend.configured && tabs.state.connected);
   const claudePending = $derived(
-    tabs.state.connection === "disconnected" ? t("SERVER_UNAVAILABLE") : t("LOADING"),
+    tabs.state.link === "disconnected" ? t("SERVER_UNAVAILABLE") : t("LOADING"),
   );
 
   useRefreshTick(() => void refresh());

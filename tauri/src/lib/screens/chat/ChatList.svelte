@@ -12,6 +12,7 @@
   import { sessionColorOf } from "$lib/design/sessionColors";
   import type { ChatCategory, SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTauri } from "$lib/platform";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -170,7 +171,12 @@
         onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
       />
     </div>
-    <TooltipIconButton label={t("ORGANIZE")} class="size-8 [&_svg]:size-4" onclick={onOrganize}>
+    <TooltipIconButton
+      label={t("ORGANIZE")}
+      class="size-8 [&_svg]:size-4"
+      enabled={!chat.historyUnavailable}
+      onclick={onOrganize}
+    >
       <Settings2 />
     </TooltipIconButton>
   </div>
@@ -324,7 +330,7 @@
     {:else if chat.historyLoading}
       <CenteredProgress class="h-full" />
     {:else}
-      <EmptyState text={t("NO_CHATS")} class="h-full" />
+      <EmptyState text={chat.historyUnavailable ? t("SERVER_UNAVAILABLE") : t("NO_CHATS")} class="h-full" />
     {/if}
   </div>
 
@@ -333,7 +339,7 @@
       use:hscrollbar={{ wheel: true }}
       class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
     >
-      {#each SCREENS as screen (screen.kind)}
+      {#each SCREENS.filter((screen) => isTauri || !screen.nativeScreen) as screen (screen.kind)}
         {@const Icon = screen.screenIcon ?? screen.icon}
         <TooltipIconButton label={t(screen.screenLabel ?? screen.label)} onclick={screen.open}>
           <Icon size={17} />

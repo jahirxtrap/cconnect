@@ -4,6 +4,7 @@
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
   import DialogSelectItem from "./DialogSelectItem.svelte";
+  import EmptyState from "./EmptyState.svelte";
 
   export interface SelectOption {
     value: string;
@@ -20,9 +21,10 @@
     onSelect?: (value: string) => void;
     onConfirm?: (value: string) => void;
     optionTrailing?: Snippet<[SelectOption]>;
+    empty?: string;
   }
 
-  const { title, options, selected, onDismiss, onSelect, onConfirm, optionTrailing }: Props =
+  const { title, options, selected, onDismiss, onSelect, onConfirm, optionTrailing, empty }: Props =
     $props();
 
   let choice = $state(untrack(() => selected));
@@ -58,5 +60,7 @@
     {:else}
       <DialogSelectItem {...props} />
     {/if}
+  {:else}
+    <EmptyState text={empty ?? t("NO_RESULTS")} class="py-8" />
   {/each}
 </CompactDialog>

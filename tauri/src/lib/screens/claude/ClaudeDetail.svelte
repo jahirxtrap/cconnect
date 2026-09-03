@@ -19,6 +19,7 @@
   import Store from "@lucide/svelte/icons/store";
   import { navigation } from "$lib/app/navigation.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
+  import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
@@ -61,12 +62,12 @@
   interface Props {
     kind: ClaudeKind;
     onClose: () => void;
-    compact?: boolean;
   }
 
-  const { kind, onClose, compact = false }: Props = $props();
+  const { kind, onClose }: Props = $props();
 
-  const actionClass = $derived(paneActionClass(compact));
+  const compact = inPane();
+  const actionClass = paneActionClass(compact);
 
   const STATUS_PAGE = "https://status.claude.com";
   const ROW_PADDING = "py-2 pr-4 pl-4";

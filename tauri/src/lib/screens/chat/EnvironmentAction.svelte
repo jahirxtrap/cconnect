@@ -5,13 +5,10 @@
   import { address, backend } from "$lib/services/backend.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { inPane } from "./paneSurface";
   import { tabs } from "./tabs.svelte";
 
-  interface Props {
-    compact?: boolean;
-  }
-
-  const { compact = false }: Props = $props();
+  const compact = inPane();
 
   let open = $state(false);
 </script>
@@ -28,6 +25,7 @@
   {#if open}
     <SelectDialog
       title={t("ENVIRONMENT")}
+      empty={t("NO_ENVIRONMENTS")}
       options={backend.environments.map((profile) => ({
         value: profile.id,
         label: profile.name,

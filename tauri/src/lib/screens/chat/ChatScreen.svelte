@@ -32,8 +32,8 @@
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneActions from "./PaneActions.svelte";
-  import { PANE_BODY_CLASS } from "./paneChrome";
   import PaneHeader from "./PaneHeader.svelte";
+  import PaneSurface from "./PaneSurface.svelte";
   import ChatList from "./ChatList.svelte";
   import { panes } from "./panes.svelte";
   import LeftPane from "./LeftPane.svelte";
@@ -309,7 +309,7 @@
           }}
         ></div>
         {#if panes.kind === "chat" && panes.rightTab}
-          <div class={PANE_BODY_CLASS}>
+          <PaneSurface>
             <TabStrip
               items={tabs.right}
               activeId={panes.rightTab?.id ?? null}
@@ -324,25 +324,25 @@
               trailing={sideActions}
             />
             <ChatView tab={panes.rightTab} focused={panes.focused === "right"} />
-          </div>
+          </PaneSurface>
         {:else if panes.kind === "markdown"}
-          <div class={PANE_BODY_CLASS}>
+          <PaneSurface>
             <PaneHeader title={t("MARKDOWN")} actions={markdownActions} />
             <MarkdownEditor />
-          </div>
+          </PaneSurface>
         {:else if panes.kind === "files"}
-          <div class={PANE_BODY_CLASS}>
-            <FileExplorerScreen compact />
-          </div>
+          <PaneSurface>
+            <FileExplorerScreen />
+          </PaneSurface>
         {:else if panes.kind === "monitor"}
-          <div class={PANE_BODY_CLASS}>
+          <PaneSurface>
             <PaneHeader title={t("MONITOR")} actions={monitorActions} />
             <MonitorContent />
-          </div>
+          </PaneSurface>
         {:else if panes.kind === "claude"}
-          <div class={PANE_BODY_CLASS}>
+          <PaneSurface>
             {#if claudeDetail}
-              <ClaudeDetail kind={claudeDetail} compact onClose={() => (claudeDetail = null)} />
+              <ClaudeDetail kind={claudeDetail} onClose={() => (claudeDetail = null)} />
             {:else}
               <PaneHeader title={t("CLAUDE")} />
               <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
@@ -353,11 +353,11 @@
                 />
               </div>
             {/if}
-          </div>
+          </PaneSurface>
         {:else}
-          <div class={PANE_BODY_CLASS}>
-            <TerminalView cwd={terminalCwd} pane />
-          </div>
+          <PaneSurface>
+            <TerminalView cwd={terminalCwd} />
+          </PaneSurface>
         {/if}
         {#if panes.dropTarget === "right"}
           {@render dropHint()}
@@ -392,11 +392,11 @@
 {/snippet}
 
 {#snippet markdownActions()}
-  <MarkdownActions compact />
+  <MarkdownActions />
 {/snippet}
 
 {#snippet monitorActions()}
-  <MonitorActions compact />
+  <MonitorActions />
 {/snippet}
 
 {#snippet sideActions()}

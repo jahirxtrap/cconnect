@@ -29,15 +29,17 @@
   import SshHostsList from "$lib/screens/terminal/SshHostsList.svelte";
   import TerminalUnlockDialog from "$lib/screens/terminal/TerminalUnlockDialog.svelte";
   import PaneActions from "./PaneActions.svelte";
+  import { inPane } from "./paneSurface";
   import TabStrip from "./TabStrip.svelte";
 
   interface Props {
     cwd: string[];
-    pane?: boolean;
     onClose?: () => void;
   }
 
-  const { cwd, pane = false, onClose }: Props = $props();
+  const { cwd, onClose }: Props = $props();
+
+  const pane = inPane();
 
   let sessions = $state<TerminalInfo[]>([]);
   let menuOpen = $state(false);
@@ -234,7 +236,7 @@
     {#if !terminalTabs.items.length}
       <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6">
         <p class="text-body-md text-on-surface-variant">
-          {!online ? t("DISCONNECTED") : unlocked ? t("NO_TERMINALS") : t("TERMINAL_LOCKED")}
+          {!online ? t("SERVER_UNAVAILABLE") : unlocked ? t("NO_TERMINALS") : t("TERMINAL_LOCKED")}
         </p>
         {#if online && !unlocked}
           <Button
@@ -267,7 +269,6 @@
   {#if managing}
     <div class="absolute inset-0 z-10">
       <SshHostsList
-        compact={pane}
         onSelect={(profile) => {
           managing = false;
           connectSsh(profile);

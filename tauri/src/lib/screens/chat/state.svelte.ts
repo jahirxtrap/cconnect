@@ -1,4 +1,5 @@
 import { chatListFor } from "$lib/data/chatList.svelte";
+import { serverStatus } from "$lib/data/serverStatus.svelte";
 import {
   componentValues,
   emptyInteraction,
@@ -70,6 +71,7 @@ import {
   type RewindPreview,
   type TrashedSession,
 } from "$lib/services/sessionsApi";
+import type { SharedFile } from "$lib/app/dragPayload.svelte";
 import { uploadAttachment, UPLOAD_DIR } from "$lib/services/uploadApi";
 
 const DEFAULTS = {
@@ -98,13 +100,16 @@ const MILLIS_PER_SECOND = 1000;
 
 const projectKeyOf = (path: string) => path.replace(PROJECT_KEY_SEPARATOR, "-");
 
-export interface Attachment {
+interface AttachmentBase {
   id: number;
-  file: File;
   name: string;
   size: number;
   progress: number;
 }
+
+export type Attachment =
+  | (AttachmentBase & { file: File; path?: undefined })
+  | (AttachmentBase & { path: string; file?: undefined });
 
 export interface ChatContext {
   environmentId: string | null;
@@ -227,12 +232,18 @@ export class ChatState {
 
   readonly environment = $derived(backend.find(this.environmentId));
   readonly list = $derived(chatListFor(this.environment));
-  readonly historyLoading = $derived((this.list?.loading ?? true) || !(this.list?.settingsReady ?? false));
+  readonly historyUnavailable = $derived(this.list === null || serverStatus.unavailable);
+  readonly historyLoading = $derived(
+    this.list !== null && !serverStatus.unavailable && (this.list.loading || !this.list.settingsReady),
+  );
   readonly chatOrder = $derived(this.list?.chatOrder ?? "auto");
   readonly defaultCategory = $derived(this.list?.defaultCategory ?? "");
   readonly trashEnabled = $derived(this.list?.trashEnabled ?? false);
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProjectKey) ?? []);
   readonly historyProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
+  readonly link = $derived<ConnectionState>(
+    serverStatus.unavailable ? "disconnected" : this.connection,
+  );
   readonly connected = $derived(this.connection === "connected");
   readonly queueView = $derived(this.#frozen?.queue ?? this.queue);
   readonly contextView = $derived(this.#frozen ? this.#frozen.contextTokens : this.contextTokens);
@@ -394,6 +405,22 @@ export class ChatState {
     ];
   }
 
+  addSharedAttachments(files: SharedFile[]) {
+    if (this.uploading) return;
+    const known = new Set(this.attachments.map((item) => item.path));
+    const fresh = files.filter((file) => !known.has(file.path));
+    this.attachments = [
+      ...this.attachments,
+      ...fresh.map((file) => ({
+        id: this.#attachmentId++,
+        path: file.path,
+        name: file.name,
+        size: file.size,
+        progress: 1,
+      })),
+    ];
+  }
+
   uploadComponentFile(file: File, onProgress: (value: number) => void) {
     return uploadAttachment(file, onProgress, this.environment, `${UPLOAD_DIR}/${file.name}`);
   }
@@ -425,6 +452,10 @@ export class ChatState {
     const uploaded: string[] = [];
 
     for (const item of pending) {
+      if (item.path !== undefined) {
+        uploaded.push(item.path);
+        continue;
+      }
       const path = await uploadAttachment(
         item.file,
         (progress) => {

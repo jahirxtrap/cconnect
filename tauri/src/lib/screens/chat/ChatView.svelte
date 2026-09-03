@@ -23,6 +23,7 @@
   import Chip from "$lib/ui/Chip.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import { dragTransfer, dropZone } from "$lib/app/dragPayload.svelte";
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
@@ -81,6 +82,7 @@
   let sideHeight = $state(SIDE_PEEK);
   let sideDragging = $state(false);
   let dropOver = $state(false);
+  let dropRoot = $state<HTMLElement | null>(null);
   let composerHeight = $state(0);
   let opening = $state(false);
 
@@ -174,8 +176,8 @@
 
   const status = $derived.by(() => {
     if (chat.viewOnly) return { dot: "bg-gray", spinner: false, text: t("TRASH") };
-    if (chat.connection === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
-    if (chat.connection === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
+    if (chat.link === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
+    if (chat.link === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
     if (activity === "waiting") return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
     if (activity === "compacting") return { dot: "bg-gray", spinner: true, tone: "text-blue", text: t("COMPACTING") };
     if (activity === "slow") return { dot: "bg-gray", spinner: true, tone: "text-yellow", text: t("WORKING") };
@@ -248,6 +250,11 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+  bind:this={dropRoot}
+  use:dropZone={{
+    accepts: (payload) => payload.files.length > 0 && !chat.viewOnly && canAttach,
+    drop: (payload) => chat.addSharedAttachments(payload.files),
+  }}
   class="relative flex min-h-0 flex-1 flex-col"
   ondragover={(event) => {
     if (chat.viewOnly || !hasFiles(event)) return;
@@ -259,7 +266,7 @@
   }}
   ondrop={onDrop}
 >
-  <DropOverlay visible={dropOver} />
+  <DropOverlay visible={dropOver || dragTransfer.over === dropRoot} />
   <div class="relative min-h-0 flex-1 overflow-hidden">
     {#if opening}
       <CenteredProgress class="absolute inset-0 z-10" />
@@ -320,6 +327,7 @@
     <div class="shrink-0" bind:clientHeight={composerHeight}>
       <Composer
         {focused}
+        blocked={chat.link === "disconnected"}
         streaming={chat.sideOpen ? chat.sideStreaming : busy}
         draft={chat.sideOpen ? chat.sideDraft : chat.draft}
         onDraft={(value) => (chat.sideOpen ? (chat.sideDraft = value) : (chat.draft = value))}
@@ -348,8 +356,8 @@
   <ChatToolbar
     capabilities={chat.capabilities}
     ready={chat.capabilitiesReady}
-    connecting={chat.connection === "connecting"}
-    disconnected={chat.connection === "disconnected"}
+    connecting={chat.link === "connecting"}
+    disconnected={chat.link === "disconnected"}
     model={chat.effectiveModel}
     modelSelected={chat.modelOverride}
     effort={chat.effectiveEffort}

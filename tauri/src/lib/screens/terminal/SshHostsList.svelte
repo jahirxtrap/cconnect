@@ -9,6 +9,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
+  import { inPane } from "$lib/screens/chat/paneSurface";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -19,10 +20,11 @@
   interface Props {
     onSelect: (profile: SshProfile) => void;
     onBack: () => void;
-    compact?: boolean;
   }
 
-  const { onSelect, onBack, compact = false }: Props = $props();
+  const { onSelect, onBack }: Props = $props();
+
+  const compact = inPane();
 
   let editing = $state<SshProfile | null>(null);
   let adding = $state(false);

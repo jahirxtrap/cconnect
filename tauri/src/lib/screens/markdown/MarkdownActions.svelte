@@ -6,22 +6,17 @@
   import Type from "@lucide/svelte/icons/type";
   import { t } from "$lib/i18n/index.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
+  import { inPane } from "$lib/screens/chat/paneSurface";
   import { saveTextAs, saveTextToDownloads, shareText } from "$lib/services/sharedFiles";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { scratch } from "./scratch.svelte";
 
-  interface Props {
-    compact?: boolean;
-  }
-
-  const { compact = false }: Props = $props();
-
   let menu = $state(false);
 
   const filename = $derived(t("MARKDOWN_FILENAME"));
-  const actionClass = $derived(paneActionClass(compact));
+  const actionClass = paneActionClass(inPane());
 </script>
 
 <TooltipIconButton

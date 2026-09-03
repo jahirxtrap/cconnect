@@ -4,6 +4,7 @@
   import Network from "@lucide/svelte/icons/network";
   import { navigation } from "$lib/app/navigation.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTauri } from "$lib/platform";
   import { address, backend } from "$lib/services/backend.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -19,16 +20,18 @@
     summary={backend.active ? `${backend.active.name} • ${address(backend.active)}` : t("NO_ENVIRONMENTS")}
     onclick={() => (dialogOpen = true)}
   />
-  <PreferenceRow
-    icon={Network}
-    title={t("SSH_HOSTS")}
-    summary={t("SSH_HOSTS_SUMMARY")}
-    onclick={() => navigation.openSshHosts()}
-  >
-    {#snippet trailing()}
-      <ChevronRight size={24} class="text-on-surface-variant" />
-    {/snippet}
-  </PreferenceRow>
+  {#if isTauri}
+    <PreferenceRow
+      icon={Network}
+      title={t("SSH_HOSTS")}
+      summary={t("SSH_HOSTS_SUMMARY")}
+      onclick={() => navigation.openSshHosts()}
+    >
+      {#snippet trailing()}
+        <ChevronRight size={24} class="text-on-surface-variant" />
+      {/snippet}
+    </PreferenceRow>
+  {/if}
 </SettingsGroup>
 
 {#if dialogOpen}

@@ -9,7 +9,9 @@
   import { isTauri } from "$lib/platform";
   import { systemApi, type DirListing } from "$lib/services/systemApi";
   import Button from "./Button.svelte";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import CenteredProgress from "./CenteredProgress.svelte";
+  import EmptyState from "./EmptyState.svelte";
   import CompactDialog from "./CompactDialog.svelte";
   import Pressable from "./Pressable.svelte";
   import TooltipIconButton from "./TooltipIconButton.svelte";
@@ -88,6 +90,11 @@
           <span class="min-w-0 flex-1 truncate text-body-md">{entry.name}</span>
         </Pressable>
       {/each}
+    {:else}
+      <EmptyState
+        text={serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("CONNECTION_ERROR")}
+        class="h-full"
+      />
     {/if}
   </div>
 </CompactDialog>

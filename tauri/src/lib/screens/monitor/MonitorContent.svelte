@@ -2,7 +2,9 @@
   import { formatSize } from "$lib/data/format";
   import { formatLogTime } from "$lib/data/time";
   import { osColor, osIconPath } from "$lib/design/osIcons";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { inPane } from "$lib/screens/chat/paneSurface";
   import { COMPACT_WIDTH } from "$lib/platform/layout.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -13,6 +15,8 @@
   import { animateScrollLeft } from "$lib/ui/animateScroll";
   import { monitor } from "./monitor.svelte";
   import NetworkPage from "./NetworkPage.svelte";
+
+  const pane = inPane();
 
   const FOLLOW_SLACK_PX = 24;
   const SECONDS_PER_DAY = 86_400;
@@ -72,8 +76,11 @@
 </script>
 
 <div bind:clientWidth={width} class="flex min-h-0 flex-1 flex-col">
-  {#if !monitor.info && monitor.failed}
-    <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
+  {#if !monitor.info && monitor.offline}
+    <EmptyState
+      text={pane && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("CONNECTION_ERROR")}
+      class="flex-1"
+    />
   {:else if !monitor.info}
     <CenteredProgress class="flex-1" />
   {:else}

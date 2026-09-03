@@ -32,7 +32,7 @@
   const highlight = useHighlight();
   const chat = $derived(tabs.state);
   const environment = $derived(backend.active);
-  const offline = $derived(chat.connection === "disconnected");
+  const offline = $derived(chat.link === "disconnected");
   const detail = $derived(
     (CLAUDE_KINDS as readonly string[]).includes(navigation.sub ?? "") ? (navigation.sub as ClaudeKind) : null,
   );

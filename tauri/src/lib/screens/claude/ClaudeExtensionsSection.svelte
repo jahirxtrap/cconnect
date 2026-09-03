@@ -6,6 +6,7 @@
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
   import { chatListFor } from "$lib/data/chatList.svelte";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { projectNameOf } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -69,7 +70,11 @@
   {@render link(
     Brain,
     t("MEMORIES"),
-    memoryProject ? projectNameOf(projects, memoryProject, chat.cwd) : loaded ? "—" : pending,
+    memoryProject
+      ? projectNameOf(projects, memoryProject, chat.cwd)
+      : loaded && !serverStatus.unavailable
+        ? t("NO_PROJECT")
+        : pending,
     "memories",
   )}
 </SettingsGroup>

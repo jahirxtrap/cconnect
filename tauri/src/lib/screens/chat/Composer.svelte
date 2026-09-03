@@ -42,6 +42,7 @@
     onRemoveAttachment: (id: number) => void;
     onCloseSide?: (() => void) | null;
     sessionColor?: string | null;
+    blocked?: boolean;
     controls?: Snippet;
   }
 
@@ -64,6 +65,7 @@
     onRemoveAttachment,
     onCloseSide = null,
     sessionColor = null,
+    blocked = false,
     controls,
   }: Props = $props();
 
@@ -83,7 +85,7 @@
   });
   let picker = $state<HTMLInputElement | null>(null);
 
-  const canSubmit = $derived(!!draft.trim() || attachments.length > 0);
+  const canSubmit = $derived(!blocked && (!!draft.trim() || attachments.length > 0));
   const busy = $derived(streaming || uploading);
   const commandsReady = $derived(commands.length > 0 && !streaming);
 

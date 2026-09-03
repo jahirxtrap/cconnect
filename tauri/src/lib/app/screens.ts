@@ -15,6 +15,7 @@ export interface ScreenEntry {
   open: () => void;
   screenLabel?: string;
   screenIcon?: IconSource;
+  nativeScreen?: boolean;
 }
 
 export const SCREENS: ScreenEntry[] = [
@@ -28,6 +29,7 @@ export const SCREENS: ScreenEntry[] = [
     open: () => navigation.openSshHosts(),
     screenLabel: "SSH_HOSTS",
     screenIcon: Network,
+    nativeScreen: true,
   },
   { kind: "markdown", label: "MARKDOWN", icon: Type, open: () => navigation.navigate("/markdown") },
 ];

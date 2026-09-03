@@ -19,6 +19,8 @@ class ServerStatus {
 
   #releaseRequested = false;
 
+  readonly unavailable = $derived(!this.checking && !this.online);
+
   readonly appOutdated = $derived(!satisfies(APP_VERSION, this.version?.supportedApp));
   readonly serverOutdated = $derived(!satisfies(this.version?.serverVersion, SUPPORTED_SERVER));
   readonly cliOutdated = $derived(

@@ -14,6 +14,7 @@
   import FolderInput from "@lucide/svelte/icons/folder-input";
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
   import PackageOpen from "@lucide/svelte/icons/package-open";
+  import Paperclip from "@lucide/svelte/icons/paperclip";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Save from "@lucide/svelte/icons/save";
   import Share2 from "@lucide/svelte/icons/share-2";
@@ -27,6 +28,7 @@
   import { isPreviewable, previewKindOf } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
   import { formatDateShort } from "$lib/data/time";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { COMPACT_WIDTH, layout } from "$lib/platform/layout.svelte";
@@ -46,9 +48,13 @@
     saveSharedAs,
   } from "$lib/services/sharedFiles";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
+  import { dragTransfer, type SharedFile } from "$lib/app/dragPayload.svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
   import EnvironmentAction from "$lib/screens/chat/EnvironmentAction.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
+  import { inPane } from "$lib/screens/chat/paneSurface";
+  import { panes } from "$lib/screens/chat/panes.svelte";
+  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -66,6 +72,7 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import PathBar from "./PathBar.svelte";
   import CompressDialog from "./CompressDialog.svelte";
@@ -93,13 +100,9 @@
     stem: string;
   }
 
-  interface Props {
-    compact?: boolean;
-  }
+  const compact = inPane();
 
-  const { compact = false }: Props = $props();
-
-  const actionClass = $derived(paneActionClass(compact));
+  const actionClass = paneActionClass(compact);
 
   let width = $state(0);
 
@@ -161,6 +164,7 @@
   let dropOver = $state(false);
   let dropTarget = $state<string | null>(null);
   let dragging = $state<string[] | null>(null);
+  let pendingFiles: SharedFile[] = [];
   let dragPoint = $state<{ x: number; y: number } | null>(null);
   let marking = $state(false);
   let list = $state<HTMLElement | null>(null);
@@ -349,6 +353,13 @@
     else if (y < box.top + EDGE_ZONE) list.scrollBy(0, -EDGE_STEP);
   };
 
+  const filesOf = (items: SharedEntry[]): SharedFile[] =>
+    items
+      .filter((entry) => !entry.isDir)
+      .map((entry) => ({ path: child(entry.name), name: entry.name, size: entry.size }));
+
+  const sharedSelection = (): SharedFile[] => filesOf(selectedEntries);
+
   const moved = (event: PointerEvent) =>
     !!pressOrigin && Math.hypot(event.clientX - pressOrigin.x, event.clientY - pressOrigin.y) > DRAG_SLOP;
 
@@ -363,6 +374,7 @@
     pressTimer = null;
     pressOrigin = null;
     pendingDrag = null;
+    pendingFiles = [];
     captured = null;
     anchor = -1;
     markBase = [];
@@ -379,12 +391,22 @@
     if (!row) return;
     pressOrigin = { x: event.clientX, y: event.clientY };
     if (selected.includes(row.name)) {
-      if (archive === null) pendingDrag = selectedEntries.map((entry) => child(entry.name));
+      if (archive === null) {
+        pendingDrag = selectedEntries.map((entry) => child(entry.name));
+        pendingFiles = sharedSelection();
+      }
       return;
+    }
+    const entry = ordered.find((item) => item.name === row.name);
+    if (archive === null && event.pointerType !== "touch" && entry) {
+      pendingDrag = [child(entry.name)];
+      pendingFiles = filesOf([entry]);
     }
     const pointerId = event.pointerId;
     pressTimer = setTimeout(() => {
       pressTimer = null;
+      pendingDrag = null;
+      pendingFiles = [];
       anchor = row.index;
       markBase = selecting ? selected : [];
       marking = true;
@@ -398,14 +420,16 @@
     if (pressTimer !== null && moved(event)) {
       clearTimeout(pressTimer);
       pressTimer = null;
-      pressOrigin = null;
+      if (!pendingDrag) pressOrigin = null;
     }
     if (pendingDrag && !dragging && moved(event)) {
       dragging = pendingDrag;
+      dragTransfer.begin({ kind: "shared-files", files: pendingFiles });
       capture(event.pointerId);
     }
     if (dragging) {
-      const row = rowAt(event.clientX, event.clientY);
+      dragTransfer.track(event.clientX, event.clientY);
+      const row = dragTransfer.over ? null : rowAt(event.clientX, event.clientY);
       const entry = row ? ordered.find((item) => item.name === row.name) : null;
       dropTarget = entry?.isDir && !dragging.includes(child(entry.name)) ? entry.name : null;
       dragPoint = { x: event.clientX, y: event.clientY };
@@ -425,7 +449,12 @@
     const sources = dragging;
     const target = dropTarget;
     swallowClick = marking || dragging !== null;
+    const handed = dragTransfer.release();
     endGesture();
+    if (handed) {
+      exitSelection();
+      return;
+    }
     if (!sources?.length || !target) return;
     exitSelection();
     void sharedApi.move(sources, child(target)).then(reload);
@@ -644,11 +673,16 @@
 
   {#snippet browseActions()}
     {#if !transfer && archive === null}
-      <TooltipIconButton label={t("UPLOAD_FILES")} class={actionClass} onclick={() => picker?.click()}>
+      <TooltipIconButton
+        label={t("UPLOAD_FILES")}
+        class={actionClass}
+        enabled={!serverStatus.unavailable}
+        onclick={() => picker?.click()}
+      >
         <Upload />
       </TooltipIconButton>
     {/if}
-    <EnvironmentAction {compact} />
+    <EnvironmentAction />
     <PopupMenu
       open={barMenu}
       onOpenChange={(value) => (barMenu = value)}
@@ -679,7 +713,11 @@
         </MenuItem>
       </MenuSub>
       {#if archive === null}
-        <MenuItem text={t("NEW_FOLDER")} onclick={() => (creatingFolder = true)}>
+        <MenuItem
+          text={t("NEW_FOLDER")}
+          enabled={!serverStatus.unavailable}
+          onclick={() => (creatingFolder = true)}
+        >
           {#snippet leading()}
             <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
           {/snippet}
@@ -704,11 +742,19 @@
       {/snippet}
     </AppTopBar>
   {:else}
-    <AppTopBar title={t("FILES")} subtitle={environment?.name ?? null}>
+    <AppTopBar
+      title={t("FILES")}
+      subtitle={serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : (environment?.name ?? null)}
+    >
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
           <ArrowLeft size={20} />
         </TooltipIconButton>
+      {/snippet}
+      {#snippet subtitleLeading()}
+        {#if serverStatus.unavailable}
+          <StatusDot class="bg-red" box={8} />
+        {/if}
       {/snippet}
       {#snippet actions()}
         {@render browseActions()}
@@ -798,10 +844,13 @@
           </div>
         {/each}
       </div>
-    {:else if !loaded}
+    {:else if !loaded && !serverStatus.unavailable}
       <CenteredProgress class="h-full" />
     {:else}
-      <EmptyState text={t("NO_FILES")} class="h-full" />
+      <EmptyState
+        text={compact && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("NO_FILES")}
+        class="h-full"
+      />
     {/if}
 
   </div>
@@ -986,6 +1035,20 @@
               >
                 {#snippet leading()}
                   <Save size={20} class="shrink-0 text-on-surface-variant" />
+                {/snippet}
+              </MenuItem>
+            {/if}
+            {#if sharedSelection().length}
+              <MenuItem
+                text={t("ATTACH_TO_CHAT")}
+                onclick={() => {
+                  const target = panes.focusedTab;
+                  if (target) tabs.stateFor(target).addSharedAttachments(sharedSelection());
+                  exitSelection();
+                }}
+              >
+                {#snippet leading()}
+                  <Paperclip size={20} class="shrink-0 text-on-surface-variant" />
                 {/snippet}
               </MenuItem>
             {/if}

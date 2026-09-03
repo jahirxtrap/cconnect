@@ -1,5 +1,6 @@
 import { backend } from "$lib/services/backend.svelte";
 import { dismissTop } from "$lib/app/dismissStack";
+import { isTauri } from "$lib/platform";
 
 export const ROUTES = ["/settings", "/claude", "/monitor", "/files", "/terminal", "/markdown"] as const;
 
@@ -21,7 +22,12 @@ export interface PreviewRequest {
   onDelete: (() => void) | null;
 }
 
-const currentRoute = (): Route => baseOf(window.location.pathname);
+const NATIVE_ROUTES: Route[] = ["/terminal"];
+
+const currentRoute = (): Route => {
+  const route = baseOf(window.location.pathname);
+  return !isTauri && NATIVE_ROUTES.includes(route) ? "/" : route;
+};
 
 class Navigation {
   route = $state<Route>(currentRoute());
@@ -31,6 +37,9 @@ class Navigation {
   preview = $state<PreviewRequest | null>(null);
 
   start() {
+    if (!isTauri && NATIVE_ROUTES.includes(baseOf(window.location.pathname))) {
+      window.history.replaceState(null, "", "/");
+    }
     if (!backend.configured) {
       if (window.location.pathname === "/") window.history.pushState(null, "", "/settings");
       this.route = "/settings";

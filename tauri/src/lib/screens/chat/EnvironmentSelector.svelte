@@ -55,6 +55,7 @@
 {#if open}
   <SelectDialog
     title={t("ENVIRONMENT")}
+    empty={t("NO_ENVIRONMENTS")}
     {options}
     selected={profile?.id ?? ""}
     {onSelect}

@@ -16,7 +16,7 @@
 <div class="flex h-full flex-col">
   <AppTopBar
     title={t("MONITOR")}
-    subtitle={monitor.failed ? t("SERVER_UNAVAILABLE") : (environment?.name ?? null)}
+    subtitle={monitor.offline ? t("SERVER_UNAVAILABLE") : (environment?.name ?? null)}
   >
     {#snippet navigationIcon()}
       <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
@@ -24,7 +24,7 @@
       </TooltipIconButton>
     {/snippet}
     {#snippet subtitleLeading()}
-      {#if monitor.failed}
+      {#if monitor.offline}
         <StatusDot class="bg-red" box={8} />
       {/if}
     {/snippet}

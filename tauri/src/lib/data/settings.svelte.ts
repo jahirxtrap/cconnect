@@ -15,7 +15,7 @@ const DEFAULTS = {
   notify_interaction: true,
   markdown_preview_formatted: true,
   show_timestamps: false,
-  left_expanded: false,
+  left_expanded: true,
   left_width: 300,
   terminal_open: false,
   right_width: 420,

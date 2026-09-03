@@ -1,3 +1,4 @@
+import { serverStatus } from "$lib/data/serverStatus.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { networkApi, type NetworkStatus } from "$lib/services/networkApi";
 import { systemApi, type GpuInfo, type LogEntry, type SystemInfo } from "$lib/services/systemApi";
@@ -13,6 +14,8 @@ class Monitor {
   info = $state<SystemInfo | null>(null);
   gpu = $state<GpuInfo | null>(null);
   failed = $state(false);
+
+  readonly offline = $derived(this.failed || serverStatus.unavailable);
   cpuHistory = $state<number[]>([]);
   gpuHistory = $state<number[]>([]);
   memHistory = $state<number[]>([]);

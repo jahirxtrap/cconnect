@@ -20,7 +20,7 @@
 
   const chat = $derived(tabs.state);
   const serverReady = $derived(backend.configured && chat.connected);
-  const pending = $derived(chat.connection === "disconnected" ? t("SERVER_UNAVAILABLE") : t("LOADING"));
+  const pending = $derived(chat.link === "disconnected" ? t("SERVER_UNAVAILABLE") : t("LOADING"));
 </script>
 
 <ClaudeStatusSection enabled={serverReady} {pending} {tick} onOpen={() => onOpen("status")} />
