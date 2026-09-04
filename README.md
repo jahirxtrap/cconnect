@@ -354,10 +354,14 @@ required for a plain local run.
 | `DEFAULT_MODEL` | `opus` | Model used when the app doesn't override it |
 | `DEFAULT_EFFORT` | `max` | Same, for the effort level |
 | `DEFAULT_PERMISSION_MODE` | `default` | Same, for the permission mode |
-| `AUTO_UPDATE_SDK` | `1` | Upgrades `claude-agent-sdk` on startup; set `0` to pin it |
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `--expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
 | `TERMINAL_ACCESS_KEY` | — | Unlocks the terminal. Generated and saved on first start, then printed on every start; `--terminal-key --rotate` replaces it. It is the only gate |
+| `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
+| `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
+| `BROWSER_HEADLESS` | `1` | Runs it without a window; set `0` to watch the real browser on the server |
+| `BROWSER_QUALITY` | `70` | JPEG quality of the streamed frames. Lower it on a slow link — the pane stays sharp because the resolution does not change |
+| `BROWSER_PROFILE_DIR` | `backend/.browser` | Its own profile, so it never touches the one you browse with |
 
 ## Staying current
 

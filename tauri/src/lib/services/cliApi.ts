@@ -11,6 +11,11 @@ export interface CliInfo {
   customPath: string | null;
 }
 
+export interface SdkInfo {
+  package: string;
+  version: string | null;
+}
+
 type Wire = Record<string, any>;
 
 const DEFAULT_SOURCES = ["system", "custom", "bundled"];
@@ -38,6 +43,16 @@ export const createCliApi = (client: HttpClient) => ({
       ...(customPath === null ? {} : { custom_path: customPath }),
     });
     return data && parse(data);
+  },
+
+  async sdkStatus(): Promise<SdkInfo | null> {
+    const data = await client.get<Wire>("/cli/sdk");
+    return data && { package: data.package ?? "", version: data.version ?? null };
+  },
+
+  async updateSdk(): Promise<SdkInfo | null> {
+    const data = await client.post<Wire>("/cli/sdk/update");
+    return data && { package: data.package ?? "", version: data.version ?? null };
   },
 
   async update(source?: string, customPath?: string): Promise<{ ok: boolean; message: string }> {

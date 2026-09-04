@@ -40,6 +40,7 @@ SHARED_DIR = str(Path(__file__).resolve().parent.parent / "shared")
 # Restart contract between run.py (supervisor) and POST /api/system/restart.
 RESTART_EXIT_CODE = 42
 RESTART_FLAG = Path(__file__).resolve().parent.parent / ".restart"
+RUNTIME_FILE = Path(__file__).resolve().parent.parent / ".runtime"
 
 # Fallback cwd when the mobile starts a chat without picking a directory and the
 # active connection has none. Defaults to the parent of the backend folder.
@@ -92,9 +93,6 @@ def permission_modes() -> tuple[str, ...]:
         return _FALLBACK_PERMISSION_MODES
 
 
-# Pull the latest claude-agent-sdk on startup. Disable for faster dev reloads.
-AUTO_UPDATE_SDK = os.environ.get("AUTO_UPDATE_SDK", "1") not in ("0", "false", "False")
-
 # Gated by CCONNECT_AUTH_ACTIVE so a token left in .env from a previous --expose run
 # doesn't auth-gate plain `python run.py`.
 PUBLIC_ACCESS_TOKEN: str | None = (
@@ -103,8 +101,20 @@ PUBLIC_ACCESS_TOKEN: str | None = (
 
 TERMINAL_ACCESS_KEY: str | None = os.environ.get("TERMINAL_ACCESS_KEY") or None
 
+# Chromium driven over CDP for the browser pane. Its own profile, so it never touches
+# the user's real one, and a debug port of its own so it can coexist with other tooling.
+BROWSER_EXECUTABLE = os.environ.get("BROWSER_EXECUTABLE", "")
+BROWSER_DEBUG_PORT = int(os.environ.get("BROWSER_DEBUG_PORT", "9333"))
+BROWSER_HEADLESS = os.environ.get("BROWSER_HEADLESS", "1") not in ("0", "false", "False")
+BROWSER_QUALITY = max(20, min(95, int(os.environ.get("BROWSER_QUALITY", "70"))))
+BROWSER_PROFILE_DIR = os.environ.get(
+    "BROWSER_PROFILE_DIR",
+    str(Path(__file__).resolve().parent.parent / ".browser"),
+)
+
 __all__ = [
     "PORT",
+    "RUNTIME_FILE",
     "SERVER_VERSION",
     "SUPPORTED_APP",
     "SUPPORTED_CLI",
@@ -117,7 +127,11 @@ __all__ = [
     "DEFAULT_MODEL",
     "COLORS",
     "permission_modes",
-    "AUTO_UPDATE_SDK",
     "PUBLIC_ACCESS_TOKEN",
     "TERMINAL_ACCESS_KEY",
+    "BROWSER_EXECUTABLE",
+    "BROWSER_DEBUG_PORT",
+    "BROWSER_HEADLESS",
+    "BROWSER_QUALITY",
+    "BROWSER_PROFILE_DIR",
 ]

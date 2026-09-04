@@ -1,6 +1,7 @@
 """CConnect — FastAPI application entry point."""
 
 import importlib
+import os
 import pkgutil
 
 from contextlib import asynccontextmanager
@@ -10,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
+from core.config import PORT, RUNTIME_FILE
 from core.db import init_db
 from core.rate_limit import limiter
 from core.responses import api_response
@@ -25,6 +27,7 @@ import routers as routers_pkg
 async def lifespan(app: FastAPI):
     init_db()
     settings_store.load()
+    RUNTIME_FILE.write_text(f"PORT={PORT}\nPID={os.getpid()}\n", encoding="utf-8")
     system_monitor.setup_log_capture()
     ensure_subscription_auth()
     await ensure_sdk_installed()
@@ -40,6 +43,7 @@ async def lifespan(app: FastAPI):
     chat_list.hub.stop()
     shared_watch.hub.stop()
     network.watchdog.stop()
+    RUNTIME_FILE.unlink(missing_ok=True)
 
 
 app = FastAPI(

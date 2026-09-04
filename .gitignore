@@ -33,5 +33,14 @@ backend/trash/
 # Shared drop folder (quick PC -> phone file sharing, served download-only)
 backend/shared/
 
+# Where a running server declares its port and pid for the desktop app
+backend/.runtime
+
+# Chromium profile for the browser pane
+backend/.browser/
+
+# Session output a Playwright MCP attached to that browser leaves behind
+backend/.playwright-mcp/
+
 # Serena (project config, cache and memories)
 .serena/

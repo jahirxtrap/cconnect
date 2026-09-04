@@ -32,6 +32,42 @@ SETTINGS: dict[str, CliSettingDef] = {
         minimum=1,
         maximum=MAX_SAFE_INTEGER,
     ),
+    "chat_language": CliSettingDef(
+        json_key="language",
+        default="",
+        type=str,
+        description="Language Claude replies in, by name; empty follows the conversation",
+    ),
+    "always_thinking": CliSettingDef(
+        json_key="alwaysThinkingEnabled",
+        default=False,
+        type=bool,
+        description="Think before every reply instead of only when the task calls for it",
+    ),
+    "auto_compact": CliSettingDef(
+        json_key="autoCompactEnabled",
+        default=True,
+        type=bool,
+        description="Compact a conversation on its own when it fills the context window",
+    ),
+    "remote_control": CliSettingDef(
+        json_key="remoteControlAtStartup",
+        default=None,
+        type=bool,
+        description="Let a session started here be taken over from claude.ai",
+    ),
+    "co_authored": CliSettingDef(
+        json_key="includeCoAuthoredBy",
+        default=None,
+        type=bool,
+        description="Add the Co-Authored-By trailer to the commits and pull requests Claude writes",
+    ),
+    "session_upload": CliSettingDef(
+        json_key="autoUploadSessions",
+        default=None,
+        type=bool,
+        description="Upload session transcripts to Anthropic",
+    ),
 }
 
 
@@ -65,10 +101,14 @@ def _write(data: dict) -> None:
         raise
 
 
+def _valid(value: Any, expected: type) -> bool:
+    return isinstance(value, expected) and (expected is bool or not isinstance(value, bool))
+
+
 def _stored(key: str) -> Any:
     defn = SETTINGS[key]
     value = _read().get(defn.json_key)
-    return value if isinstance(value, defn.type) and not isinstance(value, bool) else None
+    return value if _valid(value, defn.type) else None
 
 
 def get(key: str) -> Any:
@@ -98,15 +138,16 @@ def set(key: str, value: Any) -> None:
     if key not in SETTINGS:
         raise KeyError(key)
     defn = SETTINGS[key]
-    if value is not None:
-        if not isinstance(value, defn.type) or isinstance(value, bool):
+    blank = value is None or (defn.type is str and value == "")
+    if not blank:
+        if not _valid(value, defn.type):
             raise ValueError(f"{key} expects {defn.type.__name__}")
         if defn.minimum is not None and value < defn.minimum:
             raise ValueError(f"{key} must be at least {defn.minimum}")
         if defn.maximum is not None and value > defn.maximum:
             raise ValueError(f"{key} must be at most {defn.maximum}")
     data = _read()
-    if value is None:
+    if blank:
         data.pop(defn.json_key, None)
     else:
         data[defn.json_key] = value

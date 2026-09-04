@@ -41,5 +41,7 @@ SETTINGS: dict[str, SettingDef] = {
     "chat_order": SettingDef("auto", str, "How chats sort inside their category: by last activity, or as arranged by hand", allowed=("auto", "manual")),
     "trash_enabled": SettingDef(False, bool, "Deleting a chat moves it to a trash it can be restored from, instead of removing it"),
     "terminal_shell": SettingDef(None, str, "Shell executable the terminal spawns; empty uses the platform default"),
+    "browser_view": SettingDef(False, bool, "Give Claude a browser in the panel: its own tools plus any CDP client (Playwright, Puppeteer, Selenium), so you see what it does and can take over"),
+    "sdk_auto_update": SettingDef(True, bool, "Install the latest Claude Agent SDK every time the server starts"),
     "default_category": SettingDef("", str, "Category a new chat is filed into; empty leaves it out of every category"),
 }

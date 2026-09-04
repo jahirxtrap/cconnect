@@ -1,5 +1,4 @@
 import { settings } from "$lib/data/settings.svelte";
-import { backend } from "./backend.svelte";
 import { isTauri } from "$lib/platform";
 
 export type LocalServerError = "bad_dir" | "no_python" | "launch_failed" | "crashed";
@@ -7,32 +6,28 @@ export type LocalServerError = "bad_dir" | "no_python" | "launch_failed" | "cras
 export interface LocalServerInfo {
   managed: boolean;
   ready: boolean;
+  port: number;
   error: LocalServerError | null;
   errorDetail: string | null;
   publicUrl: string | null;
   token: string | null;
 }
 
-export type LocalServerState = "stopped" | "starting" | "running" | "external" | "failed";
+export type LocalServerState = "stopped" | "starting" | "running" | "manual" | "failed";
 
-export const localServerStateOf = (
-  info: LocalServerInfo,
-  reachable: boolean,
-  connecting: boolean,
-): LocalServerState => {
+export const localServerStateOf = (info: LocalServerInfo): LocalServerState => {
   if (info.error !== null) return "failed";
-  if ((info.ready || reachable) && info.managed) return "running";
-  if (info.ready || reachable) return "external";
-  if (info.managed || connecting) return "starting";
+  if (info.ready) return info.managed ? "running" : "manual";
+  if (info.managed) return "starting";
   return "stopped";
 };
 
-const DEFAULT_PORT = 8723;
 const STATUS_EVENT = "local-server://status";
 
 const empty: LocalServerInfo = {
   managed: false,
   ready: false,
+  port: 0,
   error: null,
   errorDetail: null,
   publicUrl: null,
@@ -44,7 +39,6 @@ const config = () => ({
   python: settings.localServerPython,
   pythonPath: settings.localServerPythonPath,
   mode: settings.localServerMode,
-  probePort: backend.active?.port ?? DEFAULT_PORT,
   publicHost: settings.localServerPublicHost,
 });
 
@@ -56,17 +50,21 @@ class LocalServer {
   }
 
   stop() {
-    void this.#call("local_server_stop");
+    void this.#call("local_server_stop", { config: config() });
   }
 
   restart() {
-    void this.#call("local_server_stop").then(() => this.start());
+    void this.#call("local_server_restart", { config: config() });
+  }
+
+  async refresh() {
+    await this.#call<LocalServerInfo>("local_server_status", { config: config() });
   }
 
   async watch() {
     if (!isTauri) return () => {};
     const { listen } = await import("@tauri-apps/api/event");
-    this.info = (await this.#call<LocalServerInfo>("local_server_status")) ?? empty;
+    await this.refresh();
     return listen<LocalServerInfo>(STATUS_EVENT, (event) => (this.info = event.payload));
   }
 

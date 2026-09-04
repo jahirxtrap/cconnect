@@ -77,15 +77,25 @@ def _blocks_guide(capabilities: list[str]) -> str:
     return guide.replace("{{BLOCK_TYPES}}", types)
 
 
+def _browser_guide(capabilities: list[str]) -> str:
+    if "browser" not in capabilities or not settings_store.get("browser_view"):
+        return ""
+    try:
+        return (_PROMPTS_DIR / "BROWSER.md").read_text(encoding="utf-8")
+    except OSError:
+        return ""
+
+
 def _system_append(base_url: Optional[str], cwd: Optional[str] = None, capabilities: Optional[list[str]] = None) -> str:
     """Read on every call so the markdown can be edited without restarting the server."""
     try:
         text = (_PROMPTS_DIR / "CCONNECT.md").read_text(encoding="utf-8")
     except OSError:
         text = ""
-    guide = _blocks_guide(list(capabilities or ()))
-    if guide:
-        text = f"{text.strip()}\n\n{guide.strip()}" if text.strip() else guide
+    caps = list(capabilities or ())
+    for guide in (_blocks_guide(caps), _browser_guide(caps)):
+        if guide:
+            text = f"{text.strip()}\n\n{guide.strip()}" if text.strip() else guide
     try:
         user = (_PROMPTS_DIR / "USER.md").read_text(encoding="utf-8").strip()
     except OSError:
@@ -631,6 +641,12 @@ async def run_prompt(
         session_env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = str(window)
     if settings_store.get("todo_tools"):
         session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
+    if settings_store.get("browser_view"):
+        from services import browser
+        attach = await browser.ready_endpoint()
+        if attach:
+            session_env["CCONNECT_BROWSER_CDP"] = browser.http_endpoint()
+            session_env["PLAYWRIGHT_MCP_CDP_ENDPOINT"] = attach
     if session_env:
         options_kwargs["env"] = session_env
     overrides: dict[str, Any] = {"permissions": {"deny": [_ENV_RULE]}}

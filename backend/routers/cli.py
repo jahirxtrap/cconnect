@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from core import cli_manager
 from core.responses import api_response
+from core.sdk import sdk_status, update_sdk
 
 router = APIRouter(tags=["CLI"])
 
@@ -39,3 +40,13 @@ def set_cli(body: CliSourceBody):
 def update_cli(body: Optional[CliUpdateBody] = None):
     body = body or CliUpdateBody()
     return api_response(data=cli_manager.update_cli(body.source, body.custom_path))
+
+
+@router.get("/cli/sdk")
+def get_sdk():
+    return api_response(data=sdk_status())
+
+
+@router.post("/cli/sdk/update")
+async def update_agent_sdk():
+    return api_response(data=await update_sdk())

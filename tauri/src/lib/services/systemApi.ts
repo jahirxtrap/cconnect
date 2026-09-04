@@ -62,6 +62,18 @@ export interface LogEntry {
   message: string;
 }
 
+export interface ServerUpdate {
+  ok: boolean;
+  message: string;
+  tracked: boolean;
+  changed: boolean;
+  revision: string;
+  behind: number;
+  ahead: number;
+  dirty: boolean;
+  reloads: boolean;
+}
+
 export interface SystemHandlers {
   onInfo: (info: SystemInfo) => void;
   onLogs: (items: LogEntry[]) => void;
@@ -111,6 +123,18 @@ const parseInfo = (raw: Wire): SystemInfo => ({
   netTx: raw.network?.tx ?? 0,
 });
 
+const parseUpdate = (raw: Wire): ServerUpdate => ({
+  ok: raw.ok !== false,
+  message: raw.message ?? "",
+  tracked: raw.tracked === true,
+  changed: raw.changed === true,
+  revision: raw.revision ?? "",
+  behind: raw.behind ?? 0,
+  ahead: raw.ahead ?? 0,
+  dirty: raw.dirty === true,
+  reloads: raw.reloads === true,
+});
+
 const parseLog = (raw: Wire): LogEntry => ({
   ts: raw.ts ?? 0,
   level: raw.level ?? "",
@@ -120,6 +144,21 @@ const parseLog = (raw: Wire): LogEntry => ({
 export const createSystemApi = (client: HttpClient, profile: () => Profile) => ({
   async restart(): Promise<boolean> {
     return (await client.post("/system/restart")) !== null;
+  },
+
+  async updateStatus(): Promise<ServerUpdate | null> {
+    const data = await client.get<Wire>("/system/update");
+    return data && parseUpdate(data);
+  },
+
+  async checkUpdate(): Promise<ServerUpdate | null> {
+    const data = await client.post<Wire>("/system/update/check");
+    return data && parseUpdate(data);
+  },
+
+  async update(): Promise<ServerUpdate | null> {
+    const data = await client.post<Wire>("/system/update");
+    return data && parseUpdate(data);
   },
 
   async dirs(path: string, files = false): Promise<DirListing | null> {

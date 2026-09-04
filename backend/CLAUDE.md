@@ -3,8 +3,8 @@
 FastAPI bridge between the CConnect apps and Claude Code, running on the user's PC.
 Drives the CLI through `claude-agent-sdk` using the **subscription** (the logged-in
 CLI's OAuth): `core/sdk.ensure_subscription_auth()` drops `ANTHROPIC_API_KEY`, because
-an exported key silently wins and bills API credits. The SDK is upgraded on startup
-(`AUTO_UPDATE_SDK=1`), which is why its import is deferred inside `claude_runtime`.
+an exported key silently wins and bills API credits. The SDK is upgraded on startup while
+the `sdk_auto_update` setting is on, which is why its import is deferred inside `claude_runtime`.
 
 ```
 [app] ──WS  /api/chat/ws──> chat router ──> live_sessions ──> claude_runtime ──> SDK query()

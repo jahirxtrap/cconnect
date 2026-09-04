@@ -8,10 +8,28 @@ import httpx
 from loguru import logger
 
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
+ANTHROPIC_BASE_URL = "https://api.anthropic.com"
+
+PRESETS = (
+    {"id": "anthropic", "label": "Anthropic", "base_url": ANTHROPIC_BASE_URL, "pin_model": False},
+    {"id": "omniroute", "label": "OmniRoute", "base_url": "http://127.0.0.1:20128", "pin_model": True},
+    {"id": "ollama", "label": "Ollama", "base_url": DEFAULT_BASE_URL, "pin_model": True},
+)
 
 _TIMEOUT = 5.0
 _TOOLS = "tools"
 _THINKING = "thinking"
+_VERSION_HEADER = {"anthropic-version": "2023-06-01"}
+
+
+def preset_for(base_url: str) -> dict:
+    url = (base_url or "").strip().rstrip("/")
+    return next((preset for preset in PRESETS if preset["base_url"] == url), {})
+
+
+def pins_model(base_url: str) -> bool:
+    """A provider serving its own models needs one pinned; an Anthropic endpoint knows the aliases."""
+    return preset_for(base_url).get("pin_model", True)
 
 
 def _window(value: object) -> int | None:
@@ -77,7 +95,7 @@ async def models(base_url: str, headers: Optional[dict] = None) -> list[dict]:
         return []
     root = base_url.rstrip("/")
     found: list[dict] = []
-    async with httpx.AsyncClient(timeout=_TIMEOUT, headers=headers or {}) as client:
+    async with httpx.AsyncClient(timeout=_TIMEOUT, headers={**_VERSION_HEADER, **(headers or {})}) as client:
         tagged = await _get(client, f"{root}/api/tags")
         raw = (tagged or {}).get("models")
         if isinstance(raw, list):

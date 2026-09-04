@@ -24,6 +24,7 @@ def get_accounts():
         "accounts": items,
         "default": accounts.default_account(known),
         "provider_url": providers.DEFAULT_BASE_URL,
+        "provider_presets": providers.PRESETS,
     })
 
 
@@ -44,7 +45,7 @@ async def detect_provider(payload: ProviderProbeRequest):
 async def create_provider_account(payload: ProviderAccountRequest):
     auth = payload.auth.model_dump()
     model = payload.model.strip()
-    if not model:
+    if not model and providers.pins_model(payload.base_url):
         found = await providers.models(payload.base_url, accounts.auth_headers(auth))
         model = found[0]["id"] if found else ""
     account = accounts.create_provider(payload.label, payload.base_url, model, auth)
@@ -70,7 +71,7 @@ def get_provider_account(account_id: str):
 async def update_provider_account(account_id: str, payload: ProviderUpdateRequest):
     auth = payload.auth.model_dump()
     model = payload.model.strip()
-    if not model:
+    if not model and providers.pins_model(payload.base_url):
         found = await providers.models(payload.base_url, accounts.auth_headers(auth))
         model = found[0]["id"] if found else ""
     if not accounts.update_provider(account_id, payload.base_url, model, auth):
