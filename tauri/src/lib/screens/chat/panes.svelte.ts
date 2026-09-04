@@ -4,9 +4,9 @@ import { settings } from "$lib/data/settings.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
-export type RightKind = "terminal" | "chat" | "markdown" | "monitor" | "claude" | "files";
+export type RightKind = "terminal" | "chat" | "markdown" | "monitor" | "claude" | "files" | "browser";
 
-const KINDS: RightKind[] = ["terminal", "chat", "markdown", "monitor", "claude", "files"];
+const KINDS: RightKind[] = ["terminal", "chat", "markdown", "monitor", "claude", "files", "browser"];
 
 const SCOPE: Record<RightKind, Pane> = {
   terminal: "terminal",
@@ -15,6 +15,7 @@ const SCOPE: Record<RightKind, Pane> = {
   monitor: "chat",
   claude: "chat",
   files: "files",
+  browser: "browser",
 };
 
 interface StoredRight {

@@ -1,7 +1,7 @@
 import { isTauri, isTouch, platformName } from "./index";
 import { store } from "./storage";
 
-export type ShortcutScope = "global" | "chat" | "terminal" | "files";
+export type ShortcutScope = "global" | "chat" | "terminal" | "files" | "browser";
 
 export interface ShortcutDef {
   id: string;
@@ -40,6 +40,23 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "terminal.tab.close", label: "SHORTCUT_TERMINAL_TAB_CLOSE", scope: "terminal", keys: "Mod+KeyW" },
   { id: "terminal.tab.next", label: "SHORTCUT_TERMINAL_TAB_NEXT", scope: "terminal", keys: "Ctrl+Tab" },
   { id: "terminal.tab.previous", label: "SHORTCUT_TERMINAL_TAB_PREVIOUS", scope: "terminal", keys: "Ctrl+Shift+Tab" },
+  { id: "browser.tab.new", label: "SHORTCUT_BROWSER_TAB_NEW", scope: "browser", keys: "Mod+KeyT" },
+  { id: "browser.tab.close", label: "SHORTCUT_BROWSER_TAB_CLOSE", scope: "browser", keys: "Mod+KeyW" },
+  { id: "browser.tab.next", label: "SHORTCUT_BROWSER_TAB_NEXT", scope: "browser", keys: "Ctrl+Tab" },
+  {
+    id: "browser.tab.previous",
+    label: "SHORTCUT_BROWSER_TAB_PREVIOUS",
+    scope: "browser",
+    keys: "Ctrl+Shift+Tab",
+  },
+  { id: "browser.reload", label: "SHORTCUT_BROWSER_RELOAD", scope: "browser", keys: "Mod+KeyR", web: "" },
+  { id: "browser.back", label: "SHORTCUT_BROWSER_BACK", scope: "browser", keys: "Alt+ArrowLeft" },
+  { id: "browser.forward", label: "SHORTCUT_BROWSER_FORWARD", scope: "browser", keys: "Alt+ArrowRight" },
+  { id: "browser.address", label: "SHORTCUT_BROWSER_ADDRESS", scope: "browser", keys: "Mod+KeyL" },
+  { id: "browser.pick", label: "SHORTCUT_BROWSER_PICK", scope: "browser", keys: "Mod+Shift+KeyE" },
+  { id: "browser.copy", label: "SHORTCUT_BROWSER_COPY", scope: "browser", keys: "Mod+KeyC" },
+  { id: "browser.cut", label: "SHORTCUT_BROWSER_CUT", scope: "browser", keys: "Mod+KeyX" },
+  { id: "browser.paste", label: "SHORTCUT_BROWSER_PASTE", scope: "browser", keys: "Mod+KeyV" },
   { id: "files.copy", label: "SHORTCUT_FILES_COPY", scope: "files", keys: "Mod+KeyC" },
   { id: "files.cut", label: "SHORTCUT_FILES_CUT", scope: "files", keys: "Mod+KeyX" },
   { id: "files.paste", label: "SHORTCUT_FILES_PASTE", scope: "files", keys: "Mod+KeyV" },
