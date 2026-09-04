@@ -33,6 +33,26 @@ export const copyText = async (text: string): Promise<boolean> => {
   }
 };
 
+const nativePaste = async (): Promise<string | null> => {
+  if (!isDesktop) return null;
+  try {
+    const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
+    return await readText();
+  } catch {
+    return null;
+  }
+};
+
+export const pasteText = async (): Promise<string> => {
+  const native = await nativePaste();
+  if (native !== null) return native;
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    return "";
+  }
+};
+
 const selectionText = (): string => {
   const field = document.activeElement;
   if (field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement) {

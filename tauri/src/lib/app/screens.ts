@@ -1,8 +1,10 @@
 import Activity from "@lucide/svelte/icons/activity";
+import Compass from "@lucide/svelte/icons/compass";
 import Folder from "@lucide/svelte/icons/folder";
 import Network from "@lucide/svelte/icons/network";
 import SquareTerminal from "@lucide/svelte/icons/square-terminal";
 import Type from "@lucide/svelte/icons/type";
+import { isTauri } from "$lib/platform";
 import type { RightKind } from "$lib/screens/chat/panes.svelte";
 import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
 import type { IconSource } from "$lib/ui/icons";
@@ -16,6 +18,7 @@ export interface ScreenEntry {
   screenLabel?: string;
   screenIcon?: IconSource;
   nativeScreen?: boolean;
+  paneOnly?: boolean;
 }
 
 export const SCREENS: ScreenEntry[] = [
@@ -32,4 +35,15 @@ export const SCREENS: ScreenEntry[] = [
     nativeScreen: true,
   },
   { kind: "markdown", label: "MARKDOWN", icon: Type, open: () => navigation.navigate("/markdown") },
+  {
+    kind: "browser",
+    label: "BROWSER",
+    icon: Compass,
+    open: () => navigation.navigate("/browser"),
+    paneOnly: true,
+  },
 ];
+
+export const NAV_SCREENS = SCREENS.filter(
+  (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),
+);

@@ -15,6 +15,7 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { notifier } from "$lib/services/notifier.svelte";
   import { updater } from "$lib/services/updater.svelte";
+  import BrowserScreen from "$lib/screens/browser/BrowserScreen.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
   import FilePreview from "$lib/screens/files/FilePreview.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
@@ -139,6 +140,8 @@
     <FileExplorerScreen />
   {:else if navigation.route === "/terminal"}
     <TerminalScreen />
+  {:else if navigation.route === "/browser"}
+    <BrowserScreen />
   {:else}
     <ChatScreen />
   {/if}

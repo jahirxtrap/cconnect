@@ -8,7 +8,7 @@
   import SunMoon from "@lucide/svelte/icons/sun-moon";
   import Type from "@lucide/svelte/icons/type";
   import { settings } from "$lib/data/settings.svelte";
-  import { ACCENTS, DYNAMIC_ACCENT } from "$lib/design/accents";
+  import { DYNAMIC_ACCENT } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
@@ -16,59 +16,44 @@
   import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
+  import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
+  import { useSettingsDialog } from "./useSettingsDialog.svelte";
+  import { fontOptions, localeOptions, themeOptions } from "./settingsValues";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
 
-  type Dialog = "theme" | "language" | "font" | "accent" | "shortcuts";
+  let dialog = $state<SettingsDialog | null>(null);
 
-  let dialog = $state<Dialog | null>(null);
-
-  const themeOptions = $derived([
-    { value: "system", label: t("THEME_SYSTEM") },
-    { value: "light", label: t("THEME_LIGHT") },
-    { value: "dark", label: t("THEME_DARK") },
-  ]);
-
-  const localeOptions = $derived([
-    { value: "system", label: t("LANGUAGE_SYSTEM") },
-    { value: "en", label: "English" },
-    { value: "es", label: "Español" },
-  ]);
-
-  const FONT_FAMILIES: Record<FontStyle, string> = {
-    system: "system-ui, sans-serif",
-    flat: '"CConnect Flat", system-ui, sans-serif',
-    color: '"CConnect Color", system-ui, sans-serif',
-  };
-
-  const fontOptions = $derived([
-    { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.system },
-    { value: "flat", label: t("FONT_FLAT"), font: FONT_FAMILIES.flat },
-    { value: "color", label: t("FONT_COLOR"), font: FONT_FAMILIES.color },
-  ]);
+  const themes = $derived(themeOptions());
+  const locales = $derived(localeOptions());
+  const fonts = $derived(fontOptions());
 
   const themeIcon = $derived(theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : SunMoon);
 
-  const label = (options: { value: string; label: string }[], value: string) =>
-    options.find((option) => option.value === value)?.label ?? value;
+  const rowSummary = (id: string) => {
+    const entry = entryFor(id);
+    return entry ? entryHint(entry) : "";
+  };
+
+  useSettingsDialog("client", (target) => (dialog = target));
 </script>
 
 <SettingsGroup label={t("SETTINGS_CLIENT")}>
   <PreferenceRow
     icon={themeIcon}
     title={t("THEME")}
-    summary={label(themeOptions, theme.mode)}
+    summary={rowSummary("theme")}
     onclick={() => (dialog = "theme")}
   />
   <PreferenceRow
     icon={Languages}
     title={t("LANGUAGE")}
-    summary={label(localeOptions, i18n.locale)}
+    summary={rowSummary("language")}
     onclick={() => (dialog = "language")}
   />
   <PreferenceRow
     icon={Palette}
     title={t("ACCENT")}
-    summary={theme.dynamicColor && theme.systemAccent ? t("ACCENT_DYNAMIC") : ACCENTS[theme.accentIndex]?.name}
+    summary={rowSummary("accent")}
     onclick={() => (dialog = "accent")}
   >
     {#snippet trailing()}
@@ -78,7 +63,7 @@
   <PreferenceRow
     icon={Type}
     title={t("FONT")}
-    summary={label(fontOptions, theme.fontStyle)}
+    summary={rowSummary("font")}
     onclick={() => (dialog = "font")}
   >
     {#snippet trailing()}
@@ -88,13 +73,13 @@
   <PreferenceRow
     icon={Keyboard}
     title={t("SHORTCUTS")}
-    summary={t("SHORTCUTS_SUMMARY")}
+    summary={rowSummary("shortcuts")}
     onclick={() => (dialog = "shortcuts")}
   />
   <PreferenceRow
     icon={Clock}
     title={t("SHOW_TIMESTAMPS")}
-    summary={t("SHOW_TIMESTAMPS_SUMMARY")}
+    summary={rowSummary("timestamps")}
     onclick={() => (settings.showTimestamps = !settings.showTimestamps)}
   >
     {#snippet trailing()}
@@ -109,7 +94,7 @@
 {#if dialog === "theme"}
   <SelectDialog
     title={t("THEME")}
-    options={themeOptions}
+    options={themes}
     selected={theme.mode}
     onSelect={(value) => theme.setMode(value as ThemeMode)}
     onDismiss={() => (dialog = null)}
@@ -117,7 +102,7 @@
 {:else if dialog === "language"}
   <SelectDialog
     title={t("LANGUAGE")}
-    options={localeOptions}
+    options={locales}
     selected={i18n.locale}
     onSelect={(value) => i18n.set(value as Locale)}
     onDismiss={() => (dialog = null)}
@@ -130,7 +115,7 @@
   {/snippet}
   <SelectDialog
     title={t("FONT")}
-    options={fontOptions}
+    options={fonts}
     selected={theme.fontStyle}
     onSelect={(value) => theme.setFontStyle(value as FontStyle)}
     onDismiss={() => (dialog = null)}

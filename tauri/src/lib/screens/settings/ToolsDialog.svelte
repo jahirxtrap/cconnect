@@ -10,11 +10,14 @@
   interface Props {
     tools: McpTool[];
     disabled: string;
-    onConfirm: (disabled: string) => void;
+    browserView: boolean;
+    onConfirm: (disabled: string, browserView: boolean) => void;
     onDismiss: () => void;
   }
 
-  const { tools, disabled, onConfirm, onDismiss }: Props = $props();
+  const { tools, disabled, browserView, onConfirm, onDismiss }: Props = $props();
+
+  let browser = $state(untrack(() => browserView));
 
   let hidden = $state(
     untrack(() => new Set(disabled.split(",").map((name) => name.trim()).filter(Boolean))),
@@ -62,11 +65,18 @@
   };
 </script>
 
-<CompactDialog title={t("MCP_TOOLS")} onDismiss={onDismiss}>
+<CompactDialog title={t("TOOLS")} onDismiss={onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm([...hidden].join(","))}>{t("SAVE")}</Button>
+    <Button onclick={() => onConfirm([...hidden].join(","), browser)}>{t("SAVE")}</Button>
   {/snippet}
+  <SwitchRow
+    title={t("BROWSER_VIEW")}
+    summary={t("BROWSER_VIEW_DESC")}
+    checked={browser}
+    onChange={(value) => (browser = value)}
+  />
+  <div class="my-2 h-px bg-outline-variant"></div>
   {#if tools.length}
     <p class="mb-2 text-body-sm text-on-surface-variant">{t("MCP_TOOLS_DESC")}</p>
     {#each entries as entry (entry.key)}

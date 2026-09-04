@@ -1,10 +1,9 @@
 import { activeScope } from "$lib/app/activeScope.svelte";
 import { navigation } from "$lib/app/navigation.svelte";
-import { SCREENS } from "$lib/app/screens";
+import { NAV_SCREENS } from "$lib/app/screens";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { projectLabel, projectNameOf, type SessionInfo } from "$lib/data/models";
 import { t } from "$lib/i18n/index.svelte";
-import { isTauri } from "$lib/platform";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { panes } from "$lib/screens/chat/panes.svelte";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -29,6 +28,8 @@ const strip = (value: string) =>
     .toLocaleLowerCase()
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "");
+
+export const rankLabel = (label: string, query: string): number => rank(label, strip(query.trim()));
 
 const rank = (label: string, query: string): number => {
   const haystack = strip(label);
@@ -56,15 +57,13 @@ export const collectCommands = (): Command[] => {
     run: () => shortcuts.run(shortcut.id),
   }));
 
-  const screens: Command[] = SCREENS.filter((screen) => isTauri || !screen.nativeScreen).map(
-    (screen) => ({
-      id: `screen:${screen.kind}`,
-      group: "screen",
-      label: t(screen.screenLabel ?? screen.label),
-      icon: screen.screenIcon ?? screen.icon,
-      run: screen.open,
-    }),
-  );
+  const screens: Command[] = NAV_SCREENS.map((screen) => ({
+    id: `screen:${screen.kind}`,
+    group: "screen",
+    label: t(screen.screenLabel ?? screen.label),
+    icon: screen.screenIcon ?? screen.icon,
+    run: screen.open,
+  }));
 
   const settings: Command[] = SETTINGS_SECTIONS.map((section) => ({
     id: `settings:${section.id}`,

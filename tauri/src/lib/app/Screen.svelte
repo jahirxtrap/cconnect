@@ -13,10 +13,19 @@
     refreshing?: boolean;
     onRefresh?: (() => void) | null;
     actions?: Snippet;
+    toolbar?: Snippet;
     children?: Snippet;
   }
 
-  const { title, subtitle, refreshing = false, onRefresh = null, actions, children }: Props = $props();
+  const {
+    title,
+    subtitle,
+    refreshing = false,
+    onRefresh = null,
+    actions,
+    toolbar,
+    children,
+  }: Props = $props();
 </script>
 
 <div class="flex h-full flex-col">
@@ -27,6 +36,7 @@
       </TooltipIconButton>
     {/snippet}
   </AppTopBar>
+  {@render toolbar?.()}
   <PullToRefresh {refreshing} {onRefresh}>
     {@render children?.()}
   </PullToRefresh>

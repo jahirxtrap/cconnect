@@ -6,18 +6,23 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { androidBackground } from "$lib/platform/androidBackground";
-  import { notifier } from "$lib/services/notifier.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import NotificationsDialog from "./NotificationsDialog.svelte";
+  import { entryFor, entryHint } from "./settingsIndex";
+  import { useSettingsDialog } from "./useSettingsDialog.svelte";
 
   let dialogOpen = $state(false);
+
+  useSettingsDialog("background", () => (dialogOpen = true));
+
   let batteryIgnored = $state(androidBackground()?.batteryOptimizationIgnored() ?? false);
 
-  const activeNotifications = $derived(
-    [settings.notifyInteraction, settings.notifyTaskDone].filter(Boolean).length,
-  );
+  const rowSummary = (id: string) => {
+    const entry = entryFor(id);
+    return entry ? entryHint(entry) : "";
+  };
 
   $effect(() => {
     const bridge = androidBackground();
@@ -39,7 +44,7 @@
   <PreferenceRow
     icon={Bell}
     title={t("NOTIFICATIONS")}
-    summary={notifier.granted ? t("NOTIFICATIONS_STATE", activeNotifications) : t("NOTIFICATIONS_DISABLED")}
+    summary={rowSummary("notifications")}
     onclick={() => (dialogOpen = true)}
   />
   {#if androidBackground()}
@@ -61,7 +66,7 @@
     <PreferenceRow
       icon={Minimize2}
       title={t("MINIMIZE_TO_TRAY")}
-      summary={t("MINIMIZE_TO_TRAY_SUMMARY")}
+      summary={rowSummary("tray")}
       onclick={() => (settings.minimizeToTray = !settings.minimizeToTray)}
     >
       {#snippet trailing()}

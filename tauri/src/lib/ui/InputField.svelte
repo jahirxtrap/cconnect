@@ -121,7 +121,7 @@
         class="absolute inset-y-0 right-3 flex items-center gap-2"
       >
         {#if onClear}
-          <span class:invisible={!showClear}>
+          <span class="flex" class:invisible={!showClear}>
             <TooltipIconButton
               label={t("CANCEL")}
               tooltip={false}

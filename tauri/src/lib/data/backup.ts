@@ -3,6 +3,7 @@ import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte"
 import { backend, type AuthKind, type EnvironmentProfile } from "$lib/services/backend.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { settings, type VisibilityPrefs } from "./settings.svelte";
+import { BACKED_UP } from "./settingsRegistry";
 import { sshStore, type SshProfile } from "./sshStore.svelte";
 import { terminalKeys } from "./terminalKeys.svelte";
 
@@ -34,26 +35,7 @@ export const exportSettings = (): string =>
         font_style: theme.fontStyle,
         // The Compose client stores "" for "follow the system".
         language: i18n.locale === "system" ? "" : i18n.locale,
-        show_timestamps: settings.showTimestamps,
-        markdown_preview_formatted: settings.markdownPreviewFormatted,
-        notify_task_done: settings.notifyTaskDone,
-        notify_interaction: settings.notifyInteraction,
-        minimize_to_tray: settings.minimizeToTray,
-        environment_locked: settings.environmentLocked,
-        project_locked: settings.projectLocked,
-        collapsed_categories: settings.collapsedCategories,
-        hidden_categories: settings.hiddenCategories,
-        hidden_projects: settings.hiddenProjects,
-        file_sort_field: settings.fileSortField,
-        file_sort_ascending: settings.fileSortAscending,
-        local_server_enabled: settings.localServerEnabled,
-        local_server_dir: settings.localServerDir,
-        local_server_python: settings.localServerPython,
-        local_server_python_path: settings.localServerPythonPath,
-        local_server_mode: settings.localServerMode,
-        local_server_public_host: settings.localServerPublicHost,
-        left_width: settings.leftWidth,
-        right_width: settings.rightWidth,
+        ...Object.fromEntries(BACKED_UP.map(({ key }) => [key, settings.exported(key)])),
         visibility: settings.visibility,
       },
       shortcuts: shortcuts.custom,
@@ -105,57 +87,15 @@ const applySettings = (values: Wire) => {
   const language = text(values, "language");
   if (language !== null) i18n.set((language || "system") as Locale);
 
-  const booleans: Array<[string, (value: boolean) => void]> = [
-    ["show_timestamps", (value) => (settings.showTimestamps = value)],
-    ["markdown_preview_formatted", (value) => (settings.markdownPreviewFormatted = value)],
-    ["notify_task_done", (value) => (settings.notifyTaskDone = value)],
-    ["notify_interaction", (value) => (settings.notifyInteraction = value)],
-    ["minimize_to_tray", (value) => (settings.minimizeToTray = value)],
-    ["file_sort_ascending", (value) => (settings.fileSortAscending = value)],
-    ["local_server_enabled", (value) => (settings.localServerEnabled = value)],
-    ["environment_locked", (value) => (settings.environmentLocked = value)],
-    ["project_locked", (value) => (settings.projectLocked = value)],
-  ];
-  for (const [key, apply] of booleans) {
-    const value = flag(values, key);
-    if (value !== null) apply(value);
-  }
-
-  const strings: Array<[string, (value: string) => void]> = [
-    ["file_sort_field", (value) => (settings.fileSortField = value)],
-    ["local_server_dir", (value) => (settings.localServerDir = value)],
-    ["local_server_python", (value) => (settings.localServerPython = value)],
-    ["local_server_python_path", (value) => (settings.localServerPythonPath = value)],
-    ["local_server_mode", (value) => (settings.localServerMode = value)],
-    ["local_server_public_host", (value) => (settings.localServerPublicHost = value)],
-  ];
-  for (const [key, apply] of strings) {
-    const value = text(values, key);
-    if (value !== null) apply(value);
-  }
-
-  const numbers: Array<[string, (value: number) => void]> = [
-    ["left_width", (value) => (settings.leftWidth = value)],
-    ["right_width", (value) => (settings.rightWidth = value)],
-  ];
-  for (const [key, apply] of numbers) {
-    const value = number(values, key);
-    if (value !== null) apply(value);
+  const readers = { boolean: flag, number, string: text, strings: texts } as const;
+  for (const { key, kind } of BACKED_UP) {
+    const value = readers[kind](values, key);
+    if (value !== null) settings.adopt(key, value);
   }
 
   const visibility = values.visibility;
   if (visibility && typeof visibility === "object") {
     settings.visibility = { ...settings.visibility, ...(visibility as VisibilityPrefs) };
-  }
-
-  const idLists: Array<[string, (value: string[]) => void]> = [
-    ["collapsed_categories", (value) => (settings.collapsedCategories = value)],
-    ["hidden_categories", (value) => (settings.hiddenCategories = value)],
-    ["hidden_projects", (value) => (settings.hiddenProjects = value)],
-  ];
-  for (const [key, apply] of idLists) {
-    const value = texts(values, key);
-    if (value !== null) apply(value);
   }
 };
 

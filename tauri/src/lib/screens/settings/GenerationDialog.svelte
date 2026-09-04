@@ -4,6 +4,7 @@
   import { effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import InputField from "$lib/ui/InputField.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
 
@@ -14,18 +15,44 @@
     outputStyle: string;
     streaming: boolean;
     todoTools: boolean;
-    onConfirm: (model: string, effort: string, outputStyle: string, streaming: boolean, todoTools: boolean) => void;
+    chatLanguage: string;
+    alwaysThinking: boolean;
+    autoCompact: boolean;
+    onConfirm: (values: {
+      model: string;
+      effort: string;
+      outputStyle: string;
+      streaming: boolean;
+      todoTools: boolean;
+      chatLanguage: string;
+      alwaysThinking: boolean;
+      autoCompact: boolean;
+    }) => void;
     onDismiss: () => void;
   }
 
-  const { capabilities, model, effort, outputStyle, streaming, todoTools, onConfirm, onDismiss }: Props =
-    $props();
+  const {
+    capabilities,
+    model,
+    effort,
+    outputStyle,
+    streaming,
+    todoTools,
+    chatLanguage,
+    alwaysThinking,
+    autoCompact,
+    onConfirm,
+    onDismiss,
+  }: Props = $props();
 
   let selectedModel = $state(untrack(() => model));
   let selectedEffort = $state(untrack(() => effort));
   let selectedStyle = $state(untrack(() => outputStyle));
   let streamTokens = $state(untrack(() => streaming));
   let taskTools = $state(untrack(() => todoTools));
+  let language = $state(untrack(() => chatLanguage));
+  let thinkAlways = $state(untrack(() => alwaysThinking));
+  let compactAuto = $state(untrack(() => autoCompact));
 
   const styleOptions = $derived(capabilities.outputStyles.map((value) => ({ value, label: value })));
 
@@ -41,7 +68,19 @@
 <CompactDialog title={t("GENERATION")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onConfirm(selectedModel, selectedEffort, selectedStyle, streamTokens, taskTools)}>
+    <Button
+      onclick={() =>
+        onConfirm({
+          model: selectedModel,
+          effort: selectedEffort,
+          outputStyle: selectedStyle,
+          streaming: streamTokens,
+          todoTools: taskTools,
+          chatLanguage: language.trim(),
+          alwaysThinking: thinkAlways,
+          autoCompact: compactAuto,
+        })}
+    >
       {t("SAVE")}
     </Button>
   {/snippet}
@@ -71,6 +110,14 @@
         onSelect={(value) => (selectedStyle = value)}
       />
     {/if}
+    <InputField
+      label={t("CHAT_LANGUAGE")}
+      value={language}
+      placeholder={t("CHAT_LANGUAGE_PLACEHOLDER")}
+      singleLine
+      oninput={(value) => (language = value)}
+      onClear={() => (language = "")}
+    />
     {#if capabilities.models.some((item) => item.fastMode)}
       <SwitchRow
         class="-mt-2"
@@ -94,6 +141,20 @@
       summary={t("TASK_TOOLS_DESC")}
       checked={taskTools}
       onChange={(value) => (taskTools = value)}
+    />
+    <SwitchRow
+      class="-mt-2"
+      title={t("ALWAYS_THINKING")}
+      summary={t("ALWAYS_THINKING_DESC")}
+      checked={thinkAlways}
+      onChange={(value) => (thinkAlways = value)}
+    />
+    <SwitchRow
+      class="-mt-2"
+      title={t("AUTO_COMPACT")}
+      summary={t("AUTO_COMPACT_DESC")}
+      checked={compactAuto}
+      onChange={(value) => (compactAuto = value)}
     />
   </div>
 </CompactDialog>

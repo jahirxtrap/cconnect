@@ -55,10 +55,17 @@ export interface ProviderProbe {
   found: boolean;
 }
 
+export interface ProviderPreset {
+  id: string;
+  label: string;
+  baseUrl: string;
+}
+
 export interface AccountsSnapshot {
   accounts: Account[];
   default: string;
   providerUrl: string;
+  presets: ProviderPreset[];
 }
 
 type Wire = Record<string, any>;
@@ -87,6 +94,11 @@ export const createAccountsApi = (client: HttpClient) => ({
       accounts: (data.accounts ?? []).map(parse),
       default: data.default ?? "",
       providerUrl: data.provider_url ?? "",
+      presets: (data.provider_presets ?? []).map((preset: Wire) => ({
+        id: preset.id ?? "",
+        label: preset.label ?? "",
+        baseUrl: preset.base_url ?? "",
+      })),
     };
   },
 

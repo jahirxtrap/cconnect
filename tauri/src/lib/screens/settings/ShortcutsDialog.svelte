@@ -15,6 +15,7 @@
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
@@ -27,10 +28,11 @@
     chat: "SCOPE_CHAT",
     terminal: "SCOPE_TERMINAL",
     files: "SCOPE_FILES",
+    browser: "BROWSER",
     global: "SCOPE_GENERAL",
   };
 
-  const ORDER: ShortcutScope[] = ["chat", "terminal", "files", "global"];
+  const ORDER: ShortcutScope[] = ["chat", "terminal", "files", "browser", "global"];
 
   const MODIFIER_CODES = [
     "ControlLeft",
@@ -107,10 +109,10 @@
     <Button onclick={save}>{t("SAVE")}</Button>
   {/snippet}
 
-  <div class="flex w-full flex-col gap-1">
-    <p class="text-body-sm text-on-surface-variant">{t("SHORTCUTS_HINT")}</p>
-    {#each groups as group (group.scope)}
-      <p class="mt-1 mb-1.5 text-label-lg">{t(SCOPE_LABELS[group.scope])}</p>
+  <div class="flex w-full flex-col">
+    <p class="px-2 text-body-sm text-on-surface-variant">{t("SHORTCUTS_HINT")}</p>
+    {#each groups as group, index (group.scope)}
+      <SectionHeader label={t(SCOPE_LABELS[group.scope])} divider={index > 0} />
       {#each group.items as shortcut (shortcut.id)}
         <div class="flex items-center pr-1">
           <Pressable
@@ -140,7 +142,7 @@
       {/each}
     {/each}
     {#if clash.length}
-      <p class="text-body-sm text-red">
+      <p class="px-2 text-body-sm text-red">
         {t("SHORTCUTS_CONFLICT", clash.map((shortcut) => t(shortcut.label)).join(", "))}
       </p>
     {/if}

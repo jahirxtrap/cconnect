@@ -25,10 +25,10 @@
 
 <ClaudeStatusSection enabled={serverReady} {pending} {tick} onOpen={() => onOpen("status")} />
 
-<ClaudeCliSection enabled={serverReady} {tick} {pending} flash={flashCli} />
-
 <ClaudeUsageSection {tick} {pending} />
 
 <AccountsSection enabled={serverReady} onChanged={onAccountsChanged} />
+
+<ClaudeCliSection enabled={serverReady} {tick} {pending} flash={flashCli} />
 
 <ClaudeExtensionsSection enabled={serverReady} {pending} {tick} {onOpen} />

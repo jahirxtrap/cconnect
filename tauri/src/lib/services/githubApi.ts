@@ -103,6 +103,9 @@ export interface ReleaseNotes {
 const CHANGELOG_SECTIONS = 30;
 const CLAUDE_CHANGELOG_URL = "https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md";
 const CLAUDE_CACHE_KEY = "claude.changelog";
+const SDK_CHANGELOG_URL =
+  "https://raw.githubusercontent.com/anthropics/claude-agent-sdk-python/main/CHANGELOG.md";
+const SDK_CACHE_KEY = "sdk.changelog";
 
 interface ChangelogCache {
   version: string;
@@ -137,16 +140,26 @@ export const releaseNotes = async (appVersion: string): Promise<ReleaseNotes[] |
   return items;
 };
 
-export const claudeChangelog = async (cliVersion: string | null): Promise<ReleaseNotes[] | null> => {
-  const cached = store.get<ChangelogCache | null>(CLAUDE_CACHE_KEY, null);
-  if (cliVersion && cached?.version === cliVersion) return cached.items;
+const markdownChangelog = async (
+  url: string,
+  cacheKey: string,
+  version: string | null,
+): Promise<ReleaseNotes[] | null> => {
+  const cached = store.get<ChangelogCache | null>(cacheKey, null);
+  if (version && cached?.version === version) return cached.items;
   try {
-    const response = await fetch(CLAUDE_CHANGELOG_URL);
+    const response = await fetch(url);
     if (!response.ok) return cached?.items ?? null;
     const items = parseChangelog(await response.text());
-    store.set(CLAUDE_CACHE_KEY, { version: cliVersion ?? "", items });
+    store.set(cacheKey, { version: version ?? "", items });
     return items;
   } catch {
     return cached?.items ?? null;
   }
 };
+
+export const claudeChangelog = (cliVersion: string | null): Promise<ReleaseNotes[] | null> =>
+  markdownChangelog(CLAUDE_CHANGELOG_URL, CLAUDE_CACHE_KEY, cliVersion);
+
+export const sdkChangelog = (sdkVersion: string | null): Promise<ReleaseNotes[] | null> =>
+  markdownChangelog(SDK_CHANGELOG_URL, SDK_CACHE_KEY, sdkVersion);

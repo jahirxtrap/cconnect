@@ -29,6 +29,7 @@
   import MarkdownActions from "$lib/screens/markdown/MarkdownActions.svelte";
   import MarkdownEditor from "$lib/screens/markdown/MarkdownEditor.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
+  import BrowserView from "$lib/screens/browser/BrowserView.svelte";
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneActions from "./PaneActions.svelte";
@@ -339,6 +340,10 @@
             <PaneHeader title={t("MONITOR")} actions={monitorActions} />
             <MonitorContent />
           </PaneSurface>
+        {:else if panes.kind === "browser"}
+          <PaneSurface>
+            <BrowserView trailing={sideActions} focused={panes.focused === "right"} />
+          </PaneSurface>
         {:else if panes.kind === "claude"}
           <PaneSurface>
             {#if claudeDetail}
@@ -376,7 +381,8 @@
           actionLabel={t("SETTINGS")}
           onAction={() => {
             dismissed = [...dismissed, notice];
-            if (notice !== "cli_outdated") navigation.openSettings("about");
+            if (notice === "server_outdated") navigation.openSettings("server");
+            else if (notice !== "cli_outdated") navigation.openSettings("about");
             else if (layout.mobile) navigation.openClaude("cli");
             else navigation.openSettings("cli");
           }}

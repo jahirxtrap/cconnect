@@ -6,7 +6,6 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
-  import { systemApi } from "$lib/services/systemApi";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -15,22 +14,23 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import LocalServerDialog from "./LocalServerDialog.svelte";
-
-  interface Props {
-    serverReady: boolean;
-  }
-
-  const { serverReady }: Props = $props();
+  import { useSettingsDialog } from "./useSettingsDialog.svelte";
+  import { localServerValue } from "./settingsValues";
 
   let confirm = $state<"restart" | "stop" | null>(null);
   let dialog = $state(false);
+
+  useSettingsDialog("server", (target) => {
+    if (target === "local_server") dialog = true;
+  });
   let autoStart = $state(settings.localServerEnabled);
 
   const info = $derived(localServer.info);
-  const phase = $derived(localServerStateOf(info, serverReady, false));
+  const phase = $derived(localServerStateOf(info));
+  const live = $derived(phase === "running" || phase === "manual");
 
   const tone = $derived(
-    phase === "running" || phase === "external"
+    live
       ? "bg-green"
       : phase === "failed"
         ? "bg-red"
@@ -39,13 +39,7 @@
           : "bg-outline-variant",
   );
 
-  const summary = $derived.by(() => {
-    if (phase === "starting") return t("SERVER_STARTING");
-    if (phase === "running") return t("SERVER_RUNNING");
-    if (phase === "external") return t("SERVER_RUNNING_EXTERNAL");
-    if (phase === "failed") return t("SERVER_FAILED");
-    return null;
-  });
+  const summary = $derived(localServerValue() || null);
 
   $effect(() => {
     let stop: (() => void) | null = null;
@@ -65,14 +59,10 @@
 
   <PreferenceRow icon={Server} title={t("LOCAL_SERVER")} {summary} onclick={() => (dialog = true)}>
     {#snippet trailing()}
-      <TooltipIconButton
-        label={t("RESTART")}
-        enabled={serverReady || info.managed}
-        onclick={() => (confirm = "restart")}
-      >
+      <TooltipIconButton label={t("RESTART")} enabled={live} onclick={() => (confirm = "restart")}>
         <ServerCog size={20} />
       </TooltipIconButton>
-      <TooltipIconButton label={t("STOP")} enabled={info.managed} onclick={() => (confirm = "stop")}>
+      <TooltipIconButton label={t("STOP")} enabled={live} onclick={() => (confirm = "stop")}>
         <Power size={20} />
       </TooltipIconButton>
       <TooltipIconButton
@@ -106,18 +96,17 @@
 </SettingsGroup>
 
 {#if dialog}
-  <LocalServerDialog {serverReady} onDismiss={() => (dialog = false)} />
+  <LocalServerDialog onDismiss={() => (dialog = false)} />
 {/if}
 
 {#if confirm === "restart"}
   <ConfirmDialog
     title={t("RESTART_SERVER")}
-    text={t("RESTART_SERVER_CONFIRM")}
+    text={phase === "manual" ? t("RESTART_SERVER_MANUAL_CONFIRM") : t("RESTART_SERVER_CONFIRM")}
     confirmLabel={t("CONFIRM")}
     onConfirm={() => {
       confirm = null;
-      if (serverReady) void systemApi.restart();
-      else localServer.restart();
+      localServer.restart();
     }}
     onDismiss={() => (confirm = null)}
   />

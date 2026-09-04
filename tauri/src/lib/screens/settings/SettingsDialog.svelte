@@ -11,6 +11,7 @@
   import { isTouch } from "$lib/platform";
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import SearchBar from "$lib/ui/SearchBar.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import AccountsSection from "$lib/screens/claude/AccountsSection.svelte";
@@ -23,6 +24,8 @@
   import ConnectivitySection from "./ConnectivitySection.svelte";
   import RecoverySection from "./RecoverySection.svelte";
   import { isSettingsSection, SETTINGS_SECTIONS, type SettingsSection } from "./sections";
+  import { entryFor, type SettingsEntry } from "./settingsIndex";
+  import SettingsResults from "./SettingsResults.svelte";
   import ServerSection from "./ServerSection.svelte";
 
   interface Props {
@@ -69,7 +72,7 @@
 
   const select = (id: SettingsSection) => {
     section = id;
-    if (id === "general") navigation.closeSub();
+    if (id === "general") navigation.clearSub();
     else navigation.openSub(id);
   };
 
@@ -77,7 +80,16 @@
     section = sectionOf(navigation.sub);
   });
 
-  const highlight = useHighlight((target) => select(target === "cli" ? "claude" : "about"));
+  const highlight = useHighlight((target) => select(entryFor(target)?.section ?? "about"));
+
+  let query = $state("");
+  let hosting = $state<SettingsSection | null>(null);
+
+  const reveal = (entry: SettingsEntry) => {
+    hosting = entry.dialog ? entry.section : null;
+    if (!entry.dialog) query = "";
+    navigation.openSettings(entry.id);
+  };
 </script>
 
 <Dialog.Root open onOpenChange={(value) => !value && onDismiss()}>
@@ -106,7 +118,16 @@
       </div>
 
       <div class="flex min-w-0 flex-1 flex-col">
-        <div class="flex h-14 shrink-0 items-center justify-end px-2">
+        <div class="flex h-14 shrink-0 items-center px-2">
+          <SearchBar
+            value={query}
+            oninput={(value) => {
+              query = value;
+              hosting = null;
+            }}
+            placeholder={t("SETTINGS_SEARCH")}
+            class="mr-1 flex-1"
+          />
           {#if !isTouch && showsServer}
             <TooltipIconButton
               label={t("REFRESH")}
@@ -123,34 +144,45 @@
         </div>
         <PullToRefresh {refreshing} onRefresh={() => void refresh()}>
           <div class="px-4 pb-4">
-            {#if section === "general"}
-              <ClientSection />
-              <BackgroundSection />
-              <ConnectivitySection />
-              <ServerSection {tick} />
-              <RecoverySection onChanged={() => refreshTick++} />
-              <AboutGroup />
-            {:else if section === "client"}
-              <ClientSection />
-            {:else if section === "background"}
-              <BackgroundSection />
-            {:else if section === "connectivity"}
-              <ConnectivitySection />
-            {:else if section === "server"}
-              <ServerSection {tick} />
-            {:else if section === "claude"}
-              <ClaudeCliSection
-                enabled={serverReady}
-                {tick}
-                pending={claudePending}
-                flash={highlight.is("cli")}
-              />
-              <ClaudeUsageSection {tick} pending={claudePending} />
-              <AccountsSection enabled={serverReady} onChanged={() => void refresh()} />
-            {:else if section === "recovery"}
-              <RecoverySection onChanged={() => refreshTick++} />
+            {#snippet sectionView(id: SettingsSection)}
+              {#if id === "general"}
+                <ClientSection />
+                <BackgroundSection />
+                <ConnectivitySection />
+                <ServerSection {tick} flash={highlight.is("server")} />
+                <RecoverySection onChanged={() => refreshTick++} />
+                <AboutGroup flash={highlight.is("about")} />
+              {:else if id === "client"}
+                <ClientSection />
+              {:else if id === "background"}
+                <BackgroundSection />
+              {:else if id === "connectivity"}
+                <ConnectivitySection />
+              {:else if id === "server"}
+                <ServerSection {tick} flash={highlight.is("server")} />
+              {:else if id === "claude"}
+                <ClaudeUsageSection {tick} pending={claudePending} />
+                <AccountsSection enabled={serverReady} onChanged={() => void refresh()} />
+                <ClaudeCliSection
+                  enabled={serverReady}
+                  {tick}
+                  pending={claudePending}
+                  flash={highlight.is("cli")}
+                />
+              {:else if id === "recovery"}
+                <RecoverySection onChanged={() => refreshTick++} />
+              {:else}
+                <AboutGroup flash={highlight.is("about")} />
+              {/if}
+            {/snippet}
+
+            {#if query.trim()}
+              <SettingsResults {query} onSelect={reveal} />
+              {#if hosting}
+                <div class="hidden">{@render sectionView(hosting)}</div>
+              {/if}
             {:else}
-              <AboutGroup />
+              {@render sectionView(section)}
             {/if}
           </div>
         </PullToRefresh>

@@ -1,14 +1,15 @@
 <script lang="ts">
   import Activity from "@lucide/svelte/icons/activity";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { claudeApi, type ServiceStatus } from "$lib/services/claudeApi";
+  import { entryFor, entryHint } from "$lib/screens/settings/settingsIndex";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
-  import { indicatorLabel, indicatorTone } from "./serviceStatus";
+  import { indicatorTone } from "./serviceStatus";
 
   interface Props {
     enabled: boolean;
@@ -19,21 +20,20 @@
 
   const { enabled, pending, tick = 0, onOpen }: Props = $props();
 
-  let service = $state<ServiceStatus | null>(null);
-  let loading = $state(true);
+  const service = $derived(claudeStatus.service);
+  const loading = $derived(claudeStatus.loading);
 
   const summary = $derived(
-    !service ? pending : service.error !== null ? t("STATUS_UNKNOWN") : indicatorLabel(service.indicator),
+    (() => {
+      const entry = entryFor("service_status");
+      return (entry ? entryHint(entry) : "") || pending;
+    })(),
   );
 
   $effect(() => {
     void tick;
     void backend.activeId;
-    loading = true;
-    void claudeApi
-      .status()
-      .then((value) => (service = value))
-      .finally(() => (loading = false));
+    void claudeStatus.loadService();
   });
 </script>
 

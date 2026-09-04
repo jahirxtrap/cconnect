@@ -7,4 +7,5 @@ export const CLIENT_CAPABILITIES = [
   "media.html",
   "components",
   "terminal",
+  "browser",
 ];

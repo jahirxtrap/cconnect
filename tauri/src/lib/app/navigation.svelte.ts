@@ -2,7 +2,15 @@ import { backend } from "$lib/services/backend.svelte";
 import { dismissTop } from "$lib/app/dismissStack";
 import { isTauri } from "$lib/platform";
 
-export const ROUTES = ["/settings", "/claude", "/monitor", "/files", "/terminal", "/markdown"] as const;
+export const ROUTES = [
+  "/settings",
+  "/claude",
+  "/monitor",
+  "/files",
+  "/terminal",
+  "/markdown",
+  "/browser",
+] as const;
 
 export type Route = (typeof ROUTES)[number] | "/";
 
@@ -22,11 +30,13 @@ export interface PreviewRequest {
   onDelete: (() => void) | null;
 }
 
-const NATIVE_ROUTES: Route[] = ["/terminal"];
+const WEB_BLOCKED: Route[] = ["/terminal", "/browser"];
+
+const blocked = (route: Route) => !isTauri && WEB_BLOCKED.includes(route);
 
 const currentRoute = (): Route => {
   const route = baseOf(window.location.pathname);
-  return !isTauri && NATIVE_ROUTES.includes(route) ? "/" : route;
+  return blocked(route) ? "/" : route;
 };
 
 class Navigation {
@@ -37,7 +47,7 @@ class Navigation {
   preview = $state<PreviewRequest | null>(null);
 
   start() {
-    if (!isTauri && NATIVE_ROUTES.includes(baseOf(window.location.pathname))) {
+    if (blocked(baseOf(window.location.pathname))) {
       window.history.replaceState(null, "", "/");
     }
     if (!backend.configured) {
@@ -99,6 +109,12 @@ class Navigation {
 
   closeSub() {
     if (this.sub !== null) window.history.back();
+  }
+
+  clearSub() {
+    if (this.sub === null) return;
+    this.sub = null;
+    window.history.replaceState(null, "", this.route);
   }
 
   openSettings(highlight: string | null = null) {

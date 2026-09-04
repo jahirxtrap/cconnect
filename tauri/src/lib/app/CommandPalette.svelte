@@ -5,8 +5,9 @@
   import { pushDismiss } from "$lib/app/dismissStack";
   import { t } from "$lib/i18n/index.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import InputField from "$lib/ui/InputField.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import SearchBar from "$lib/ui/SearchBar.svelte";
+  import SectionHeader from "$lib/ui/SectionHeader.svelte";
 
   interface Props {
     onDismiss: () => void;
@@ -73,26 +74,17 @@
     >
       <Dialog.Title class="sr-only">{t("COMMANDS")}</Dialog.Title>
       <div class="shrink-0 p-2">
-        <InputField
+        <SearchBar
           value={query}
           oninput={(value) => (query = value)}
           placeholder={t("COMMANDS_SEARCH")}
-          singleLine
           autofocus
-          onClear={() => (query = "")}
           onkeydown={onKeydown}
         />
       </div>
       <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {#each groups as section, index (section.group)}
-          {#if index > 0}
-            <div class="my-1 mx-2 h-px bg-outline-variant"></div>
-          {/if}
-          <p
-            class="flex h-7 items-center truncate px-2 text-label-md tracking-[0.6px] text-on-surface-variant uppercase"
-          >
-            {t(GROUP_LABELS[section.group])}
-          </p>
+          <SectionHeader label={t(GROUP_LABELS[section.group])} divider={index > 0} />
           {#each section.items as command (command.id)}
             {@const index = matches.indexOf(command)}
             <Pressable

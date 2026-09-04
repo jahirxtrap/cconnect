@@ -25,6 +25,8 @@ export { default as PopupMenu } from "./PopupMenu.svelte";
 export { default as PreferenceRow } from "./PreferenceRow.svelte";
 export { default as Pressable } from "./Pressable.svelte";
 export { default as RenameDialog } from "./RenameDialog.svelte";
+export { default as SearchBar } from "./SearchBar.svelte";
+export { default as SectionHeader } from "./SectionHeader.svelte";
 export { default as SelectDialog } from "./SelectDialog.svelte";
 export { default as SelectField } from "./SelectField.svelte";
 export { default as SelectionDot } from "./SelectionDot.svelte";

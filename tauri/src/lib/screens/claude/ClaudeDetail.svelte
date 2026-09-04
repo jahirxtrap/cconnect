@@ -52,6 +52,7 @@
   import ListRow from "$lib/ui/ListRow.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
+  import SearchBar from "$lib/ui/SearchBar.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -330,12 +331,10 @@
 
   {#if kind === "skills" && loaded}
     <div class="px-4 py-1.5">
-      <InputField
+      <SearchBar
         value={skillQuery}
         oninput={(value) => (skillQuery = value)}
-        onClear={() => (skillQuery = "")}
-        label={t("SEARCH")}
-        singleLine
+        placeholder={t("SEARCH")}
       />
     </div>
   {/if}
@@ -592,12 +591,10 @@
       <Button onclick={() => (catalogMarket = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#snippet header()}
-      <InputField
+      <SearchBar
         value={catalogQuery}
         oninput={(value) => (catalogQuery = value)}
-        onClear={() => (catalogQuery = "")}
-        label={t("SEARCH")}
-        singleLine
+        placeholder={t("SEARCH")}
       />
       {#if busy}
         <LinearProgress class="mt-2" />

@@ -2,6 +2,7 @@
   import Folder from "@lucide/svelte/icons/folder";
   import { t } from "$lib/i18n/index.svelte";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
+  import { cliSourceLabel } from "$lib/screens/settings/settingsValues";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
@@ -24,19 +25,10 @@
 
   const pick = () => (browsing = true);
 
-  const labelFor = (value: string) =>
-    value === "system"
-      ? t("CLI_SOURCE_SYSTEM")
-      : value === "custom"
-        ? t("CUSTOM_PATH")
-        : value === "bundled"
-          ? t("CLI_SOURCE_BUNDLED")
-          : value;
-
   const options = $derived(
     info.sources.map((value) => {
       const version = value === "system" ? info.systemVersion : value === "bundled" ? info.bundledVersion : null;
-      return { value, label: labelFor(value) + (version ? ` - ${version}` : "") };
+      return { value, label: cliSourceLabel(value) + (version ? ` - ${version}` : "") };
     }),
   );
 

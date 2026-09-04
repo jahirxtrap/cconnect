@@ -3,6 +3,7 @@ import { backend, socketUrlOf, type Profile } from "./backend.svelte";
 export interface SocketHandlers {
   onOpen?: () => void;
   onMessage: (data: Record<string, unknown>) => void;
+  onBinary?: (data: ArrayBuffer) => void;
   onDrop?: () => void;
 }
 
@@ -63,6 +64,7 @@ export class ReconnectingSocket {
     const generation = ++this.#generation;
     this.#socket?.close();
     const socket = new WebSocket(url);
+    socket.binaryType = "arraybuffer";
     this.#socket = socket;
 
     socket.onopen = () => {
@@ -73,8 +75,12 @@ export class ReconnectingSocket {
     };
     socket.onmessage = (event) => {
       if (generation !== this.#generation) return;
+      if (typeof event.data !== "string") {
+        this.handlers.onBinary?.(event.data as ArrayBuffer);
+        return;
+      }
       try {
-        this.handlers.onMessage(JSON.parse(event.data as string));
+        this.handlers.onMessage(JSON.parse(event.data));
       } catch {
         return;
       }

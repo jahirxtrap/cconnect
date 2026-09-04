@@ -1,19 +1,19 @@
 <script lang="ts">
   import { isDesktop } from "$lib/platform";
-  import { backend } from "$lib/services/backend.svelte";
   import LocalServerGroup from "./LocalServerGroup.svelte";
   import ServerGroup from "./ServerGroup.svelte";
 
   interface Props {
     tick: number;
+    flash?: boolean;
     onLoadingChange?: (loading: boolean) => void;
   }
 
-  const { tick, onLoadingChange }: Props = $props();
+  const { tick, flash = false, onLoadingChange }: Props = $props();
 </script>
 
-<ServerGroup {tick} onLoadingChange={(value) => onLoadingChange?.(value)} />
+<ServerGroup {tick} {flash} onLoadingChange={(value) => onLoadingChange?.(value)} />
 
 {#if isDesktop}
-  <LocalServerGroup serverReady={backend.configured} />
+  <LocalServerGroup />
 {/if}

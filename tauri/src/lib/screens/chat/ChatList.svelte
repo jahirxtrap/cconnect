@@ -8,11 +8,10 @@
   import Plus from "@lucide/svelte/icons/plus";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { SCREENS } from "$lib/app/screens";
+  import { NAV_SCREENS } from "$lib/app/screens";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import type { ChatCategory, SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
-  import { isTauri } from "$lib/platform";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -339,7 +338,7 @@
       use:hscrollbar={{ wheel: true }}
       class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
     >
-      {#each SCREENS.filter((screen) => isTauri || !screen.nativeScreen) as screen (screen.kind)}
+      {#each NAV_SCREENS as screen (screen.kind)}
         {@const Icon = screen.screenIcon ?? screen.icon}
         <TooltipIconButton label={t(screen.screenLabel ?? screen.label)} onclick={screen.open}>
           <Icon size={17} />

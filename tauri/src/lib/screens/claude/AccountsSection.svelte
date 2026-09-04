@@ -114,6 +114,20 @@
           ? t("ACCOUNT_IS_DEFAULT")
           : t("ACCOUNT_CONNECTED");
 
+  const presetOptions = $derived([
+    { value: "", label: t("ACCOUNT_PROVIDER_CUSTOM") },
+    ...(snapshot?.presets ?? []).map((preset) => ({ value: preset.id, label: preset.label })),
+  ]);
+  const presetId = $derived(
+    (snapshot?.presets ?? []).find((preset) => preset.baseUrl === providerUrl.trim().replace(/\/$/, ""))
+      ?.id ?? "",
+  );
+
+  const pickPreset = (id: string) => {
+    providerUrl = (snapshot?.presets ?? []).find((item) => item.id === id)?.baseUrl ?? "";
+    probe = null;
+  };
+
   const probeProvider = async (url: string) => {
     probing = true;
     probe = await accountsApi.detectProvider(url, auth);
@@ -125,7 +139,7 @@
     adding = false;
     probe = null;
     editing = null;
-    providerUrl = snapshot?.providerUrl ?? "";
+    providerUrl = snapshot?.presets[0]?.baseUrl ?? snapshot?.providerUrl ?? "";
     auth = emptyAuth();
     newLabel = "";
     providerAdding = true;
@@ -135,6 +149,7 @@
     probe = null;
     editing = account;
     providerUrl = "";
+    newLabel = account.label;
     auth = emptyAuth();
     providerAdding = true;
     void accountsApi.provider(account.id).then((stored) => {
@@ -146,9 +161,14 @@
 
   const saveProvider = async () => {
     const target = editing;
+    const label = newLabel.trim();
     providerAdding = false;
-    if (target) await accountsApi.updateProvider(target.id, providerUrl, auth);
-    else await accountsApi.createProvider(newLabel.trim() || t("ACCOUNT_PROVIDER"), providerUrl, auth);
+    if (target) {
+      await accountsApi.updateProvider(target.id, providerUrl, auth);
+      if (label && label !== target.label) await accountsApi.rename(target.id, label);
+    } else {
+      await accountsApi.createProvider(label || t("ACCOUNT_PROVIDER"), providerUrl, auth);
+    }
     await refresh();
   };
 
@@ -337,19 +357,25 @@
   >
     {#snippet buttons()}
       <Button onclick={() => (providerAdding = false)} variant="outlined">{t("CANCEL")}</Button>
-      <Button enabled={probe?.found === true && !probing} onclick={() => void saveProvider()}>
+      <Button enabled={providerUrl.trim() !== "" && !probing} onclick={() => void saveProvider()}>
         {editing ? t("SAVE") : t("ACCOUNT_ADD")}
       </Button>
     {/snippet}
-    {#if !editing}
-      <InputField
-        value={newLabel}
-        oninput={(value) => (newLabel = value)}
-        label={t("ACCOUNT_NAME")}
-        singleLine
+    <InputField
+      value={newLabel}
+      oninput={(value) => (newLabel = value)}
+      label={t("ACCOUNT_NAME")}
+      singleLine
+    />
+    <div class="mt-3">
+      <SelectField
+        label={t("ACCOUNT_PROVIDER_PRESET")}
+        selected={presetId}
+        options={presetOptions}
+        onSelect={pickPreset}
       />
-    {/if}
-    <div class={editing ? "" : "mt-3"}>
+    </div>
+    <div class="mt-3">
       <InputField
         value={providerUrl}
         oninput={(value) => (providerUrl = value)}

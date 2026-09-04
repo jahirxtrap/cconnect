@@ -779,6 +779,7 @@
   <PathBar
     path={archive === null ? path : [archive, archiveDir].filter(Boolean).join("/")}
     {searching}
+    {narrow}
     query={searchQuery}
     searchable={archive === null}
     onQueryChange={(value) => (searchQuery = value)}

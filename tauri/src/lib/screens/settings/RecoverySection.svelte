@@ -11,6 +11,7 @@
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import BackupDialog from "./BackupDialog.svelte";
+  import { useSettingsDialog } from "./useSettingsDialog.svelte";
 
   interface Props {
     onChanged: () => void;
@@ -22,6 +23,11 @@
 
   let dialog = $state<Dialog | null>(null);
   let backup = $state("");
+
+  useSettingsDialog("recovery", (target) => {
+    if (target === "export") backup = exportSettings();
+    dialog = target as Dialog;
+  });
 
   const reset = () => {
     theme.setMode("system");

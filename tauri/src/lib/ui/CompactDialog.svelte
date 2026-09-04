@@ -51,9 +51,9 @@
       {/if}
       {#if children}
         <div
-          class="scrollbar-thin min-h-0 shrink overflow-x-clip overflow-y-auto {header ? 'mt-1.5' : 'mt-4'} {padded
-            ? ''
-            : '-mx-5'}"
+          class="scrollbar-thin -mx-5 min-h-0 shrink overflow-x-clip overflow-y-auto {header
+            ? 'mt-1.5'
+            : 'mt-4'} {padded ? 'px-5' : ''}"
         >
           {@render children()}
         </div>
