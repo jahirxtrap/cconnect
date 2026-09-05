@@ -516,7 +516,7 @@ export class ChatState {
         this.#append(
           newMessage(messageId, "user", {
             text: body,
-            attachments: attachments.length ? attachments.map((item) => item.replace(/^uploads\//, "")) : null,
+            attachments: attachments.length ? attachments : null,
           }),
         );
         this.#optimisticChipId = id;

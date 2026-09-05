@@ -3,7 +3,9 @@
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import Hourglass from "@lucide/svelte/icons/hourglass";
+  import Mic from "@lucide/svelte/icons/mic";
   import Paperclip from "@lucide/svelte/icons/paperclip";
+  import Plus from "@lucide/svelte/icons/plus";
   import SquareSlash from "@lucide/svelte/icons/square-slash";
   import X from "@lucide/svelte/icons/x";
   import type { Snippet } from "svelte";
@@ -13,8 +15,11 @@
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
+  import { startDictation, voiceAvailable } from "$lib/platform/voice";
   import { commandToken, type CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
+  import MenuItem from "$lib/ui/MenuItem.svelte";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar } from "$lib/ui/scrollbar";
@@ -110,6 +115,35 @@
     highlighted = 0;
     previewed = false;
     field?.focus();
+  };
+
+  let actionsOpen = $state(false);
+  let listening = $state(false);
+  let heard = $state("");
+  let stopDictation: (() => void) | null = null;
+
+  const joined = (base: string, addition: string) =>
+    base && !base.endsWith(" ") ? `${base} ${addition}` : `${base}${addition}`;
+
+  const toggleVoice = () => {
+    if (listening) {
+      stopDictation?.();
+      return;
+    }
+    listening = true;
+    heard = "";
+    stopDictation = startDictation({
+      onPartial: (text) => (heard = text),
+      onFinal: (text) => {
+        if (text) write(joined(draft, text));
+        heard = "";
+      },
+      onEnd: () => {
+        listening = false;
+        heard = "";
+        stopDictation = null;
+      },
+    });
   };
 
   const matches = (command: CommandOption, token: string) =>
@@ -318,9 +352,12 @@
         {onpaste}
         {ondragenter}
         rows="1"
-        placeholder={t("TYPE_MESSAGE")}
+        placeholder={t(listening ? "VOICE_LISTENING" : "TYPE_MESSAGE")}
         class="field-auto no-scrollbar block max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant"
       ></textarea>
+      {#if heard}
+        <p class="pt-1 text-body-md wrap-anywhere text-on-surface-variant">{heard}</p>
+      {/if}
     </div>
 
     <div class="flex items-center gap-1 px-2.5 pt-1.5 pb-2.5">
@@ -336,27 +373,32 @@
           <X size={18} />
         </button>
       {:else}
-        <button
-          type="button"
-          disabled={uploading}
-          use:keepFocus
-          onclick={() => picker?.click()}
-          aria-label={t("ATTACH_FILES")}
-          title={t("ATTACH_FILES")}
-          class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant disabled:cursor-default"
+        <PopupMenu
+          open={actionsOpen}
+          side="top"
+          triggerClass="shrink-0"
+          onOpenChange={(open) => (actionsOpen = open)}
         >
-          <Paperclip size={18} />
-        </button>
-        <button
-          type="button"
-          use:keepFocus
-          onclick={openCommands}
-          aria-label={t("COMMANDS")}
-          title={t("COMMANDS")}
-          class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant"
-        >
-          <SquareSlash size={18} />
-        </button>
+          {#snippet trigger()}
+            <span
+              aria-label={t("ACTIONS")}
+              title={t("ACTIONS")}
+              class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant"
+            >
+              <Plus size={18} />
+            </span>
+          {/snippet}
+          <MenuItem text={t("ATTACH_FILES")} enabled={!uploading} onclick={() => picker?.click()}>
+            {#snippet leading()}
+              <Paperclip size={16} class="shrink-0 text-on-surface-variant" />
+            {/snippet}
+          </MenuItem>
+          <MenuItem text={t("COMMANDS")} onclick={openCommands}>
+            {#snippet leading()}
+              <SquareSlash size={16} class="shrink-0 text-on-surface-variant" />
+            {/snippet}
+          </MenuItem>
+        </PopupMenu>
       {/if}
 
       {#if controls}
@@ -365,6 +407,20 @@
         <div class="flex-1"></div>
       {/if}
 
+      {#if voiceAvailable()}
+        <button
+          type="button"
+          use:keepFocus
+          onclick={toggleVoice}
+          aria-label={t(listening ? "VOICE_STOP" : "VOICE_START")}
+          title={t(listening ? "VOICE_STOP" : "VOICE_START")}
+          class="{ROUND_CLASS} {listening
+            ? 'bg-accent text-on-accent'
+            : 'bg-surface-variant text-on-surface-variant'}"
+        >
+          <Mic size={18} />
+        </button>
+      {/if}
       {#if busy}
         <button
           type="button"

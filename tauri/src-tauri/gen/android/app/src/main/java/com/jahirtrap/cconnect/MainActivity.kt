@@ -23,6 +23,7 @@ class MainActivity : TauriActivity() {
 
   private lateinit var downloads: Downloads
   private val installer by lazy { Installer(this) }
+  private val dictation by lazy { Dictation(this) { content } }
   private var pendingSave: Triple<String, String, String>? = null
   private var content: WebView? = null
 
@@ -86,6 +87,7 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(Background(), "AndroidBackground")
     webView.addJavascriptInterface(CodeScanner(), "AndroidQrScan")
     webView.addJavascriptInterface(installer, "AndroidInstaller")
+    webView.addJavascriptInterface(Voice(), "AndroidVoice")
     PastedContent(webView).install()
   }
 
@@ -97,6 +99,27 @@ class MainActivity : TauriActivity() {
 
     @JavascriptInterface
     fun scan() = scanner.scan()
+  }
+
+  override fun onRequestPermissionsResult(
+    requestCode: Int,
+    permissions: Array<out String>,
+    grantResults: IntArray,
+  ) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    if (requestCode != Dictation.PERMISSION_REQUEST) return
+    dictation.onPermissionResult(grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED)
+  }
+
+  inner class Voice {
+    @JavascriptInterface
+    fun isAvailable(): Boolean = dictation.available()
+
+    @JavascriptInterface
+    fun start(language: String) = dictation.start(language)
+
+    @JavascriptInterface
+    fun stop() = dictation.stop()
   }
 
   inner class Background {

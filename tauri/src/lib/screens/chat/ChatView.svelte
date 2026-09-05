@@ -490,7 +490,7 @@
               icon={isArchive(name) ? FolderArchive : FileIcon}
               onclick={() => {
                 queuedId = null;
-                navigation.openPreview({ url: downloadUrl(`uploads/${name}`), name, onDelete: null });
+                navigation.openPreview({ url: downloadUrl(attachment), name, onDelete: null });
               }}
             />
           {/each}
