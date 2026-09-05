@@ -179,6 +179,13 @@ preview exactly what would change on disk (`+added −removed • files`), and
 choose whether to roll back the conversation alone or code and conversation
 together.
 
+**Dictate instead of typing.** The microphone next to Send writes what you say
+into the composer — words appear as you speak and each finished sentence lands
+in the message. On Android it goes through the phone's own recogniser, which
+works offline once the language is downloaded; on the desktop app and the
+browser it uses the engine they ship. Attach and the slash commands moved into
+the **+** menu beside it, so the bar keeps two buttons.
+
 Model, effort, permission mode, how much of each turn you see, and which Claude
 CLI the backend drives are all set from the app. The server holds the defaults
 and every client follows them, but each device can decide for itself how much of
@@ -363,6 +370,14 @@ required for a plain local run.
 | `BROWSER_QUALITY` | `70` | JPEG quality of the streamed frames. Lower it on a slow link — the pane stays sharp because the resolution does not change |
 | `BROWSER_PROFILE_DIR` | `backend/.browser` | Its own profile, so it never touches the one you browse with |
 
+## Settings
+
+A search box finds any option by name or by its value, wherever it lives, and
+takes you to it. A **Privacy** section decides what leaves the machine: remote
+control from claude.ai, commit co-authorship, and session upload. The backend
+also updates itself from here, and on desktop the local server is started,
+restarted or stopped from the same place.
+
 ## Staying current
 
 The app and the backend declare which versions of each other — and of the
@@ -372,6 +387,20 @@ changelog), the server requirement, or the CLI update button. Release notes
 for both CConnect and Claude Code are readable in the app. Settings → About also
 exports your settings to copy them into another install — the chats themselves
 stay on the server.
+
+## Browser
+
+A browser opens in the same panel, driven by Claude and watched by you. It
+carries its own tabs, back and forward, a reload, a device picker for a phone
+or tablet viewport, and a pick-an-element mode that hands Claude whatever you
+click. Claude reaches it through three tools — open a page, read what is on it,
+take a screenshot — so it can check its own work on a site instead of guessing;
+the tools appear only while the panel is enabled in Settings → Tools, and you
+can take the mouse and the keyboard back at any moment.
+
+It runs on the machine hosting the backend, in a Chrome or Edge already
+installed there, so a page that needs your session stays logged in. The panel
+is the only way in: there is no browser screen to open on its own.
 
 ## Terminal
 
