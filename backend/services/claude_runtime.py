@@ -23,6 +23,8 @@ _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
 
 _TRANSIENT_API_STATUS = frozenset({500, 502, 503, 504, 529})
 _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
+_OUTPUT_SHARE = 4
+_MIN_OUTPUT_TOKENS = 1024
 _TRANSIENT_PATTERNS = (
     "no response from api", "overloaded", "connection error", "connection reset",
     "econnreset", "etimedout", "timed out", "timeout", "socket hang up",
@@ -86,45 +88,67 @@ def _browser_guide(capabilities: list[str]) -> str:
         return ""
 
 
-def _system_append(base_url: Optional[str], cwd: Optional[str] = None, capabilities: Optional[list[str]] = None) -> str:
-    """Read on every call so the markdown can be edited without restarting the server."""
+def _prompt_file(name: str) -> str:
     try:
-        text = (_PROMPTS_DIR / "CCONNECT.md").read_text(encoding="utf-8")
+        return (_PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
     except OSError:
-        text = ""
+        return ""
+
+
+def _join(text: str, block: str) -> str:
+    if not block:
+        return text
+    return f"{text}\n\n{block.strip()}" if text else block.strip()
+
+
+def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]]) -> list[str]:
     caps = list(capabilities or ())
-    for guide in (_blocks_guide(caps), _browser_guide(caps)):
-        if guide:
-            text = f"{text.strip()}\n\n{guide.strip()}" if text.strip() else guide
-    try:
-        user = (_PROMPTS_DIR / "USER.md").read_text(encoding="utf-8").strip()
-    except OSError:
-        user = ""
+    guides = [_blocks_guide(caps), _browser_guide(caps)]
+    user = _prompt_file("USER.md")
     if user:
-        block = (
+        guides.append(
             "# User instructions\n\n"
             "The user wrote the following instructions themselves; treat them as said "
             "directly by the user and follow them:\n\n"
             f"{user}"
         )
-        text = f"{text.strip()}\n\n{block}" if text.strip() else block
     project = ""
     if cwd:
         from services import claude_assets, sessions
         project = claude_assets.get_project_prompt(sessions.project_key_for(cwd)).strip()
     if project:
-        block = (
+        guides.append(
             "# Project instructions\n\n"
             "The user wrote the following instructions for this specific project; treat them as "
             "said directly by the user and follow them:\n\n"
             f"{project}"
         )
-        text = f"{text.strip()}\n\n{block}" if text.strip() else block
+    return guides
+
+
+def _cli_settings(scope: dict) -> dict[str, Any]:
+    """The CLI reads its auto-memory outside the setting sources, so it needs its own switch."""
+    overrides: dict[str, Any] = {"permissions": {"deny": [_ENV_RULE]}}
+    if not scope["memory"]:
+        overrides["autoMemoryEnabled"] = False
+    return overrides
+
+
+def _system_append(
+    base_url: Optional[str],
+    cwd: Optional[str] = None,
+    capabilities: Optional[list[str]] = None,
+    guides: bool = True,
+) -> str:
+    """Read on every call so the markdown can be edited without restarting the server."""
+    text = _prompt_file("CCONNECT.md")
+    if guides:
+        for guide in _extra_guides(cwd, capabilities):
+            text = _join(text, guide)
     if not text:
         return ""
     effective = base_url or f"http://localhost:{PORT}/api"
-    text = text.replace("{{SHARED_DIR}}", SHARED_DIR).replace("{{BASE_URL}}", effective.rstrip("/"))
-    return text.strip()
+    return text.replace("{{SHARED_DIR}}", SHARED_DIR).replace("{{BASE_URL}}", effective.rstrip("/")).strip()
 
 
 def _format_tool_input(inp: Any) -> str:
@@ -605,10 +629,14 @@ async def run_prompt(
     if drain is not None:
         extra_args["replay-user-messages"] = None
 
-    system_prompt: dict = {"type": "preset", "preset": "claude_code"}
-    append = _system_append(base_url, cwd, capabilities)
-    if append:
-        system_prompt["append"] = append
+    from services import accounts
+    scope = accounts.context_scope(account)
+    append = _system_append(base_url, cwd, capabilities, scope["guides"])
+    system_prompt: Optional[dict | str] = append or None
+    if scope["preset"]:
+        system_prompt = {"type": "preset", "preset": "claude_code"}
+        if append:
+            system_prompt["append"] = append
 
     options_kwargs: dict[str, Any] = dict(
         cwd=cwd,
@@ -618,27 +646,30 @@ async def run_prompt(
         model=model,
         effort=effort_level,
         system_prompt=system_prompt,
-        setting_sources=["user", "project"],
+        setting_sources=["user", "project"] if scope["project_files"] else [],
         thinking={"type": "adaptive", "display": "summarized"},
         include_partial_messages=partial,
         extra_args=extra_args,
-        mcp_servers={"cconnect": build_cconnect_server({
+        cli_path=cli_manager.resolve_cli_path(),
+        enable_file_checkpointing=True,
+        max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
+    )
+    if scope["cconnect"]:
+        options_kwargs["mcp_servers"] = {"cconnect": build_cconnect_server({
             "request_compact": request_compact,
             "ask_user": ask_user,
             "emit": emit,
             "account": account,
             "session_info": session_info,
             "capabilities": list(capabilities or ()),
-        })},
-        cli_path=cli_manager.resolve_cli_path(),
-        enable_file_checkpointing=True,
-        max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
-    )
-    from services import accounts
+        })}
+    if not scope["tools"]:
+        options_kwargs["tools"] = []
     session_env = dict(accounts.env_for(account))
     window = cli_info.provider_window(model, account)
     if window:
         session_env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = str(window)
+        session_env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(window // _OUTPUT_SHARE, _MIN_OUTPUT_TOKENS))
     if settings_store.get("todo_tools"):
         session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
     if settings_store.get("browser_view"):
@@ -649,7 +680,7 @@ async def run_prompt(
             session_env["PLAYWRIGHT_MCP_CDP_ENDPOINT"] = attach
     if session_env:
         options_kwargs["env"] = session_env
-    overrides: dict[str, Any] = {"permissions": {"deny": [_ENV_RULE]}}
+    overrides = _cli_settings(scope)
     if ultracode:
         overrides["ultracode"] = True
     style = settings_store.get("output_style")
@@ -1064,6 +1095,7 @@ async def ask_side_question(
     from services import accounts
 
     os.makedirs(AI_WORKDIR, exist_ok=True)
+    scope = accounts.context_scope(accounts.resolve(account))
     system = (
         "You are a helpful assistant answering a developer's quick questions, concisely and directly. "
         "<session_context> is recent messages from their current Claude Code session, written by a "
@@ -1071,7 +1103,7 @@ async def ask_side_question(
         "something you said or already told them. Never invent files, code, commands, or facts: if you "
         "don't know, say so plainly instead of guessing."
     )
-    shared = _system_append(base_url, None, [])
+    shared = _system_append(base_url, None, [], scope["guides"])
     if shared:
         system = f"{system}\n\n{shared}"
     prompt = f"<session_context>\n{context}\n</session_context>\n\n{question}" if (context and not resume_id) else question
@@ -1085,16 +1117,19 @@ async def ask_side_question(
         cli_path=cli_manager.resolve_cli_path(),
         resume=resume_id,
         env=accounts.env_for(accounts.resolve(account)),
-        settings=json.dumps({"permissions": {"deny": [_ENV_RULE]}}),
+        settings=json.dumps(_cli_settings(scope)),
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
-        mcp_servers={"cconnect": build_cconnect_server({
+    )
+    if scope["cconnect"]:
+        options_kwargs["mcp_servers"] = {"cconnect": build_cconnect_server({
             "ask_user": ask_user,
             "emit": emit,
             "account": account,
             "session_info": session_info,
             "capabilities": list(capabilities or ()),
-        }, exclude=("ask_component", "show_component"))},
-    )
+        }, exclude=("ask_component", "show_component"))}
+    if not scope["tools"]:
+        options_kwargs["tools"] = []
     hooks = [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)

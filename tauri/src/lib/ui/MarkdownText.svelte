@@ -11,7 +11,7 @@
   import { isArchive } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
-  import { segments, type Segment } from "$lib/markdown/render";
+  import { createSegmenter, type Segment } from "$lib/markdown/render";
   import { backend } from "$lib/services/backend.svelte";
   import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
@@ -30,6 +30,7 @@
 
   const ALERT_KINDS = ["note", "tip", "important", "warning", "caution"];
 
+  const segments = createSegmenter();
   const parts = $derived(segments(text));
   const sharedPrefix = $derived(`${backend.baseUrl}/shared/`);
 

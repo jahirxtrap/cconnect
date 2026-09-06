@@ -4,8 +4,18 @@ from http import HTTPStatus
 from math import ceil
 from typing import Any, Iterable, Optional
 
+import orjson
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+
+
+class ORJSONResponse(JSONResponse):
+    """orjson serializes plain payloads; jsonable_encoder covers the types it rejects."""
+
+    media_type = "application/json"
+
+    def render(self, content: Any) -> bytes:
+        return orjson.dumps(content, default=jsonable_encoder)
 
 
 def _default_message_for(status: int) -> str:
@@ -20,7 +30,7 @@ def api_response(
     message: Optional[str] = None,
     status: int = 200,
     success: Optional[bool] = None,
-) -> JSONResponse:
+) -> ORJSONResponse:
     """Standardized envelope: {success, status, message, data}. data omitted when None."""
     resolved_success = success if success is not None else (200 <= status < 300)
     resolved_message = message if message is not None else _default_message_for(status)
@@ -31,7 +41,7 @@ def api_response(
     }
     if data is not None:
         body["data"] = data
-    return JSONResponse(content=jsonable_encoder(body), status_code=status)
+    return ORJSONResponse(content=body, status_code=status)
 
 
 def paginated_response(
@@ -40,7 +50,7 @@ def paginated_response(
     page: int,
     per_page: int,
     message: Optional[str] = None,
-) -> JSONResponse:
+) -> ORJSONResponse:
     """Wrap a paginated list in the standard envelope. Data payload shape:
     {items, total, page, per_page, total_pages}."""
     return api_response(

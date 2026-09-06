@@ -11,7 +11,7 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import SoftKeys from "./SoftKeys.svelte";
-  import TerminalSurface from "./TerminalSurface.svelte";
+  import type TerminalSurface from "./TerminalSurface.svelte";
   import { TERMINAL_BACKGROUND } from "./theme";
 
   interface Props {
@@ -25,6 +25,12 @@
 
   let status = $state<TerminalStatus>("connecting");
   let pane = $state<ReturnType<typeof TerminalSurface> | null>(null);
+  let Surface = $state<typeof TerminalSurface | null>(null);
+
+  $effect(() => {
+    if (unavailable || Surface) return;
+    void import("./TerminalSurface.svelte").then((module) => (Surface = module.default));
+  });
 
   const statusLabel = $derived(
     status === "connecting"
@@ -77,7 +83,9 @@
     <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
   {:else}
     <div class="min-h-0 flex-1" style="background: {TERMINAL_BACKGROUND}">
-      <TerminalSurface bind:this={pane} {connect} onStatus={(next) => (status = next)} />
+      {#if Surface}
+        <Surface bind:this={pane} {connect} onStatus={(next) => (status = next)} />
+      {/if}
     </div>
     {#if isTouch}
       <div class="flex shrink-0 items-center gap-2 border-t border-outline-variant bg-surface px-3 py-2">

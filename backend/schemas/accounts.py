@@ -33,6 +33,7 @@ class ProviderUpdateRequest(BaseModel):
     base_url: str
     model: str = ""
     auth: ProviderAuth = Field(default_factory=ProviderAuth)
+    context_scope: str = ""
 
 
 class ProviderAccountRequest(ProviderUpdateRequest):

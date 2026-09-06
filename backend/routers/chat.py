@@ -16,6 +16,7 @@ from pydantic import BaseModel, ValidationError
 
 from core.config import AI_WORKDIR, DEFAULT_CWD, permission_modes
 from core.responses import api_response
+from core.ws import send_event
 from mcps import terminal as terminal_mcp
 from middleware.public_auth import ws_bearer_ok
 from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
@@ -270,7 +271,7 @@ async def chat_ws(ws: WebSocket):
 
     async def send(payload: dict):
         async with send_lock:
-            await ws.send_json(payload)
+            await send_event(ws, payload)
 
     seen = {"prefs": visibility.defaults(), "capabilities": []}
     sink = visibility.sink_for(send, seen)

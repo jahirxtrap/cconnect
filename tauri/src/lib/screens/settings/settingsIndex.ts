@@ -19,6 +19,7 @@ import {
   fontValue,
   generationValue,
   hasProjects,
+  hasProviderAccount,
   localeValue,
   localServerValue,
   marketplacesValue,
@@ -144,6 +145,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
 
   { id: "usage", label: "USAGE", section: "claude", group: "USAGE" },
   { id: "accounts", label: "ACCOUNTS", section: "claude", group: "ACCOUNTS" },
+  { id: "account_context", label: "ACCOUNT_CONTEXT", summary: "ACCOUNT_CONTEXT_SUMMARY", available: hasProviderAccount, section: "claude", group: "ACCOUNTS" },
 
   { id: "export", label: "EXPORT_SETTINGS", summary: "EXPORT_SETTINGS_SUMMARY", section: "recovery", group: "SETTINGS_RECOVERY", dialog: "export" },
   { id: "import", label: "IMPORT_SETTINGS", summary: "IMPORT_SETTINGS_SUMMARY", section: "recovery", group: "SETTINGS_RECOVERY", dialog: "import" },

@@ -16,9 +16,27 @@ PRESETS = (
     {"id": "ollama", "label": "Ollama", "base_url": DEFAULT_BASE_URL, "pin_model": True},
 )
 
+CONTEXT_SCOPES = (
+    {"id": "full", "preset": True, "guides": True, "project_files": True, "memory": True, "cconnect": True, "tools": True},
+    {"id": "light", "preset": True, "guides": False, "project_files": False, "memory": False, "cconnect": False, "tools": True},
+    {"id": "minimal", "preset": False, "guides": False, "project_files": False, "memory": False, "cconnect": False, "tools": False},
+)
+
+SCOPE_IDS = tuple(scope["id"] for scope in CONTEXT_SCOPES)
+DEFAULT_SCOPE = SCOPE_IDS[0]
+
+
+def scope_for(scope_id: str | None) -> dict:
+    """A model with a small window cannot afford Claude Code's full preamble."""
+    wanted = (scope_id or "").strip()
+    return next((scope for scope in CONTEXT_SCOPES if scope["id"] == wanted), CONTEXT_SCOPES[0])
+
+
 _TIMEOUT = 5.0
 _TOOLS = "tools"
 _THINKING = "thinking"
+_CTX_FLAG = "--ctx-size"
+_WINDOW_KEYS = ("context_length", "max_context_length", "max_model_len", "n_ctx")
 _VERSION_HEADER = {"anthropic-version": "2023-06-01"}
 
 
@@ -34,6 +52,28 @@ def pins_model(base_url: str) -> bool:
 
 def _window(value: object) -> int | None:
     return value if isinstance(value, int) and value > 0 else None
+
+
+def _from_args(raw: dict) -> int | None:
+    args = (raw.get("status") or {}).get("args")
+    if not isinstance(args, list):
+        return None
+    for index, arg in enumerate(args):
+        if not isinstance(arg, str) or not arg.startswith(_CTX_FLAG):
+            continue
+        value = arg[len(_CTX_FLAG) + 1:] if arg.startswith(f"{_CTX_FLAG}=") else args[index + 1: index + 2]
+        text = value if isinstance(value, str) else (value[0] if value else "")
+        if isinstance(text, str) and text.isdigit():
+            return _window(int(text))
+    return None
+
+
+def _declared_window(raw: dict) -> int | None:
+    for key in _WINDOW_KEYS:
+        found = _window(raw.get(key))
+        if found:
+            return found
+    return _from_args(raw)
 
 
 def _model(name: str, description: str = "", window: int | None = None, thinking: bool = False) -> dict:
@@ -76,7 +116,7 @@ def _listed(raw: dict) -> dict | None:
     thinking = bool(raw.get("supportsThinking")) or bool(
         isinstance(capabilities, dict) and (capabilities.get(_THINKING) or capabilities.get("reasoning"))
     )
-    return _model(name, label if label != name else "", _window(raw.get("context_length")), thinking)
+    return _model(name, label if label != name else "", _declared_window(raw), thinking)
 
 
 async def _get(client: httpx.AsyncClient, url: str) -> dict | None:

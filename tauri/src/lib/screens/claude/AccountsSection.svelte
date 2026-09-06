@@ -9,6 +9,7 @@
     accountsApi,
     emptyAuth,
     type Account,
+    type AccountProvider,
     type AccountsSnapshot,
     type ProviderAuth,
     type ProviderAuthKind,
@@ -62,6 +63,7 @@
   let editing = $state<Account | null>(null);
   let providerUrl = $state("");
   let auth = $state<ProviderAuth>(emptyAuth());
+  let contextScope = $state("");
   let probing = $state(false);
   let probe = $state<ProviderProbe | null>(null);
   let bundlePicker = $state<HTMLInputElement | null>(null);
@@ -105,9 +107,20 @@
     }
   };
 
+  const scopeLabel = (id: string) => t(`ACCOUNT_CONTEXT_${id.toUpperCase()}`);
+  const scopes = $derived(snapshot?.scopes ?? []);
+  const scopeOptions = $derived(scopes.map((id) => ({ value: id, label: scopeLabel(id) })));
+  const scopeId = $derived(scopes.includes(contextScope) ? contextScope : (scopes[0] ?? ""));
+  const trimmedScope = (scope: string) => (scope && scope !== scopes[0] ? scopeLabel(scope) : "");
+
+  const providerSummary = (provider: AccountProvider) => {
+    const trimmed = trimmedScope(provider.contextScope);
+    return trimmed ? `${provider.baseUrl} • ${trimmed}` : provider.baseUrl;
+  };
+
   const summaryOf = (account: Account) =>
     account.provider
-      ? account.provider.baseUrl
+      ? providerSummary(account.provider)
       : !account.loggedIn
         ? t("ACCOUNT_PENDING")
         : account.id === defaultId
@@ -141,6 +154,7 @@
     editing = null;
     providerUrl = snapshot?.presets[0]?.baseUrl ?? snapshot?.providerUrl ?? "";
     auth = emptyAuth();
+    contextScope = "";
     newLabel = "";
     providerAdding = true;
   };
@@ -151,23 +165,26 @@
     providerUrl = "";
     newLabel = account.label;
     auth = emptyAuth();
+    contextScope = "";
     providerAdding = true;
     void accountsApi.provider(account.id).then((stored) => {
       if (!stored || editing !== account) return;
       providerUrl = stored.baseUrl;
       auth = stored.auth;
+      contextScope = stored.contextScope;
     });
   };
 
   const saveProvider = async () => {
     const target = editing;
     const label = newLabel.trim();
+    const scope = scopeId;
     providerAdding = false;
     if (target) {
-      await accountsApi.updateProvider(target.id, providerUrl, auth);
+      await accountsApi.updateProvider(target.id, providerUrl, auth, scope);
       if (label && label !== target.label) await accountsApi.rename(target.id, label);
     } else {
-      await accountsApi.createProvider(label || t("ACCOUNT_PROVIDER"), providerUrl, auth);
+      await accountsApi.createProvider(label || t("ACCOUNT_PROVIDER"), providerUrl, auth, scope);
     }
     await refresh();
   };
@@ -436,6 +453,19 @@
           secret
           singleLine
         />
+      </div>
+    {/if}
+    {#if scopeOptions.length > 1}
+      <div class="mt-3">
+        <SelectField
+          label={t("ACCOUNT_CONTEXT")}
+          selected={scopeId}
+          options={scopeOptions}
+          onSelect={(value) => (contextScope = value)}
+        />
+        <p class="mt-1.5 text-body-sm text-on-surface-variant">
+          {t(`ACCOUNT_CONTEXT_${scopeId.toUpperCase()}_HINT`)}
+        </p>
       </div>
     {/if}
     {#if probe?.found}

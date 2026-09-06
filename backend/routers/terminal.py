@@ -6,6 +6,7 @@ import json
 from fastapi import APIRouter, Body, Header, WebSocket, WebSocketDisconnect
 
 from core.responses import api_response
+from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services import terminal
 
@@ -73,11 +74,11 @@ async def terminal_ws(ws: WebSocket, session_id: str):
         while True:
             chunk = await queue.get()
             if chunk is None:
-                await ws.send_json({"type": "exit", "status": term.exit_status})
+                await send_event(ws, {"type": "exit", "status": term.exit_status})
                 return
             await ws.send_bytes(chunk)
 
-    await ws.send_json({"type": "attached", **terminal.meta(term)})
+    await send_event(ws, {"type": "attached", **terminal.meta(term)})
     if scrollback:
         await ws.send_bytes(scrollback)
     pump = asyncio.create_task(outgoing())

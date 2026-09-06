@@ -3,6 +3,7 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.responses import api_response
+from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from schemas.network import SudoRequest, WifiConnectRequest, InterfaceRequest, RadioRequest
 from services import network, speedtest
@@ -94,7 +95,7 @@ async def speedtest_ws(ws: WebSocket):
     await ws.accept()
     try:
         async for event in speedtest.run():
-            await ws.send_json(event)
+            await send_event(ws, event)
     except (WebSocketDisconnect, RuntimeError):
         pass
     finally:

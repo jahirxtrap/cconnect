@@ -11,6 +11,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
 
+from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services.chat_list import hub
 
@@ -26,9 +27,9 @@ async def list_ws(ws: WebSocket):
     queue = hub.subscribe()
 
     async def pump():
-        await ws.send_json(hub.snapshot())
+        await send_event(ws, hub.snapshot())
         while True:
-            await ws.send_json(await queue.get())
+            await send_event(ws, await queue.get())
 
     pump_task = asyncio.create_task(pump())
     try:

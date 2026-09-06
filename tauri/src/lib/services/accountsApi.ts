@@ -35,6 +35,7 @@ const authWire = (auth: ProviderAuth): Wire => ({
 export interface AccountProvider {
   baseUrl: string;
   model: string;
+  contextScope: string;
 }
 
 export interface ProviderSettings extends AccountProvider {
@@ -66,6 +67,7 @@ export interface AccountsSnapshot {
   default: string;
   providerUrl: string;
   presets: ProviderPreset[];
+  scopes: string[];
 }
 
 type Wire = Record<string, any>;
@@ -76,7 +78,11 @@ const parse = (data: Wire): Account => ({
   loggedIn: data.logged_in === true,
   primary: data.primary === true,
   provider: data.provider
-    ? { baseUrl: data.provider.base_url ?? "", model: data.provider.model ?? "" }
+    ? {
+        baseUrl: data.provider.base_url ?? "",
+        model: data.provider.model ?? "",
+        contextScope: data.provider.context_scope ?? "",
+      }
     : null,
 });
 
@@ -99,6 +105,7 @@ export const createAccountsApi = (client: HttpClient) => ({
         label: preset.label ?? "",
         baseUrl: preset.base_url ?? "",
       })),
+      scopes: data.provider_scopes ?? [],
     };
   },
 
@@ -124,6 +131,7 @@ export const createAccountsApi = (client: HttpClient) => ({
     return {
       baseUrl: data.base_url ?? "",
       model: data.model ?? "",
+      contextScope: data.context_scope ?? "",
       auth: {
         kind: auth.kind ?? "none",
         token: auth.token ?? "",
@@ -135,18 +143,29 @@ export const createAccountsApi = (client: HttpClient) => ({
     };
   },
 
-  async updateProvider(id: string, baseUrl: string, auth: ProviderAuth): Promise<boolean> {
-    const body = { base_url: baseUrl, auth: authWire(auth) };
+  async updateProvider(
+    id: string,
+    baseUrl: string,
+    auth: ProviderAuth,
+    contextScope: string,
+  ): Promise<boolean> {
+    const body = { base_url: baseUrl, auth: authWire(auth), context_scope: contextScope };
     const done = (await client.put(`/accounts/${id}/provider`, body)) !== null;
     if (done) serverDefaults.bump();
     return done;
   },
 
-  async createProvider(label: string, baseUrl: string, auth: ProviderAuth): Promise<Account | null> {
+  async createProvider(
+    label: string,
+    baseUrl: string,
+    auth: ProviderAuth,
+    contextScope: string,
+  ): Promise<Account | null> {
     const data = await client.post<Wire>("/accounts/provider", {
       label,
       base_url: baseUrl,
       auth: authWire(auth),
+      context_scope: contextScope,
     });
     if (data) serverDefaults.bump();
     return data && parse(data);

@@ -10,6 +10,7 @@ from loguru import logger
 from pydantic import BaseModel
 
 from core.responses import api_response
+from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services import shared as shared_service
 from services.shared_watch import hub as watch_hub
@@ -27,7 +28,7 @@ async def shared_ws(ws: WebSocket):
 
     async def pump():
         while True:
-            await ws.send_json(await queue.get())
+            await send_event(ws, await queue.get())
 
     pump_task = asyncio.create_task(pump())
     try:

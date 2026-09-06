@@ -25,6 +25,7 @@ def get_accounts():
         "default": accounts.default_account(known),
         "provider_url": providers.DEFAULT_BASE_URL,
         "provider_presets": providers.PRESETS,
+        "provider_scopes": providers.SCOPE_IDS,
     })
 
 
@@ -48,7 +49,7 @@ async def create_provider_account(payload: ProviderAccountRequest):
     if not model and providers.pins_model(payload.base_url):
         found = await providers.models(payload.base_url, accounts.auth_headers(auth))
         model = found[0]["id"] if found else ""
-    account = accounts.create_provider(payload.label, payload.base_url, model, auth)
+    account = accounts.create_provider(payload.label, payload.base_url, model, auth, payload.context_scope)
     if account is None:
         return api_response(status=400)
     cli_info.invalidate()
@@ -64,6 +65,7 @@ def get_provider_account(account_id: str):
         "base_url": provider["base_url"],
         "model": provider.get("model", ""),
         "auth": provider.get("auth") or {},
+        "context_scope": providers.scope_for(provider.get("context_scope"))["id"],
     })
 
 
@@ -74,7 +76,7 @@ async def update_provider_account(account_id: str, payload: ProviderUpdateReques
     if not model and providers.pins_model(payload.base_url):
         found = await providers.models(payload.base_url, accounts.auth_headers(auth))
         model = found[0]["id"] if found else ""
-    if not accounts.update_provider(account_id, payload.base_url, model, auth):
+    if not accounts.update_provider(account_id, payload.base_url, model, auth, payload.context_scope):
         return api_response(status=404)
     cli_info.invalidate()
     return api_response()

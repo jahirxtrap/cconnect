@@ -5,13 +5,22 @@ keeping reads off the event loop without an async driver."""
 from pathlib import Path
 
 from loguru import logger
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, event, inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 _DB_PATH = Path(__file__).resolve().parent.parent / "cconnect.db"
 
 engine = create_engine(f"sqlite:///{_DB_PATH}", echo=False)
 Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+
+@event.listens_for(engine, "connect")
+def _apply_pragmas(connection, _record) -> None:
+    cursor = connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
 
 
 class Base(DeclarativeBase):

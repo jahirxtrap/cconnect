@@ -157,19 +157,20 @@ def effort_levels_for(model: Optional[str], account: Optional[str] = None) -> li
     return entry["effort_levels"] if entry else []
 
 
-def provider_window(model: Optional[str], account: Optional[str] = None) -> Optional[int]:
+def _provider_entry(model: Optional[str], account: Optional[str] = None) -> Optional[dict]:
     from services import accounts
 
     listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
-    entry = next((item for item in listed or [] if item["id"] == model), None)
+    return next((item for item in listed or [] if item["id"] == model), None) if model else None
+
+
+def provider_window(model: Optional[str], account: Optional[str] = None) -> Optional[int]:
+    entry = _provider_entry(model, account)
     return entry["context_window"] if entry else None
 
 
 def provider_model(model: Optional[str], account: Optional[str] = None) -> bool:
-    from services import accounts
-
-    listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
-    return bool(model) and any(entry["id"] == model for entry in listed or [])
+    return _provider_entry(model, account) is not None
 
 
 def _cli_levels(info: dict[str, Any]) -> list[str]:

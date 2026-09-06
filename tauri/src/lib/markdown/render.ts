@@ -126,7 +126,8 @@ const merged = (list: Segment[]): Segment[] =>
   list.reduce<Segment[]>((acc, segment) => {
     const last = acc[acc.length - 1];
     if (segment.kind === "images" && last?.kind === "images") last.items.push(...segment.items);
-    else acc.push(segment.kind === "images" ? { ...segment, items: [...segment.items] } : segment);
+    else if (segment.kind === "html" && last?.kind === "html") last.html += segment.html;
+    else acc.push(segment.kind === "images" ? { ...segment, items: [...segment.items] } : { ...segment });
     return acc;
   }, []);
 
@@ -174,4 +175,62 @@ export const segments = (markdown: string): Segment[] => {
     { kind: "details", summary, children: segments(body.replace(SUMMARY_RE, "").trim()) },
     ...segments(markdown.slice(start + match[0].length)),
   ];
+};
+
+const BLANK_LINE_RE = /\n[ \t]*\r?\n/g;
+const CONTINUATION_RE = /[ \t>]/;
+const OPEN_ITEM_RE = /^\s*(?:[-*+]|\d+[.)])\s|^\s*>/;
+const FENCE = "```";
+const DETAILS_OPEN = "<details";
+const DETAILS_CLOSE = "</details>";
+
+const occurrences = (text: string, needle: string) => text.split(needle).length - 1;
+
+const endsBlock = (chunk: string) => {
+  const lines = chunk.split("\n").filter((line) => line.trim());
+  return !OPEN_ITEM_RE.test(lines[lines.length - 1] ?? "");
+};
+
+export const createSegmenter = () => {
+  let prefix = "";
+  let head: Segment[] = [];
+  let fences = 0;
+  let details = 0;
+
+  return (markdown: string): Segment[] => {
+    if (!markdown.startsWith(prefix)) {
+      prefix = "";
+      head = [];
+      fences = 0;
+      details = 0;
+    }
+    const tail = markdown.slice(prefix.length);
+    let cut = 0;
+    let cutFences = fences;
+    let cutDetails = details;
+    let seenFences = fences;
+    let seenDetails = details;
+    let from = 0;
+    BLANK_LINE_RE.lastIndex = 0;
+    for (let match = BLANK_LINE_RE.exec(tail); match; match = BLANK_LINE_RE.exec(tail)) {
+      const chunk = tail.slice(from, match.index);
+      seenFences += occurrences(chunk, FENCE);
+      seenDetails += occurrences(chunk, DETAILS_OPEN) - occurrences(chunk, DETAILS_CLOSE);
+      from = match.index + match[0].length;
+      const settled = seenFences % 2 === 0 && seenDetails === 0 && endsBlock(chunk);
+      if (settled && from < tail.length && !CONTINUATION_RE.test(tail[from])) {
+        cut = from;
+        cutFences = seenFences;
+        cutDetails = seenDetails;
+      }
+    }
+    if (cut > 0) {
+      head = [...head, ...segments(tail.slice(0, cut))];
+      prefix = markdown.slice(0, prefix.length + cut);
+      fences = cutFences;
+      details = cutDetails;
+    }
+    const pending = segments(markdown.slice(prefix.length));
+    return head.length ? merged([...head, ...pending]) : pending;
+  };
 };

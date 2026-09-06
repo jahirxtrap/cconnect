@@ -65,6 +65,9 @@ export const fastModeAvailable = (): boolean =>
 export const multipleAccounts = (): boolean =>
   (serverSettings.capabilities?.accounts.length ?? 0) > 1;
 
+export const hasProviderAccount = (): boolean =>
+  serverSettings.capabilities?.accounts.some((account) => account.provider) === true;
+
 export const hasProjects = (): boolean => (chatListFor(backend.active)?.projects.length ?? 0) > 0;
 
 export const modelValue = (): string => {

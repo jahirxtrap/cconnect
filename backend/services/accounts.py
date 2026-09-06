@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 from core.config import CLAUDE_PROJECTS_DIR
-from services import cli_settings, settings_store
+from services import cli_settings, providers, settings_store
 
 _WINDOWS = sys.platform == "win32"
 
@@ -74,6 +74,11 @@ def provider_for(account_id: Optional[str]) -> dict:
     except (OSError, json.JSONDecodeError, AttributeError):
         return {}
     return stored if isinstance(stored, dict) and stored.get("base_url") else {}
+
+
+def context_scope(account_id: Optional[str]) -> dict:
+    """A provider account can trade Claude Code's prompt and tools for context room."""
+    return providers.scope_for(provider_for(account_id).get("context_scope"))
 
 
 def model_for(account_id: Optional[str], alias: str) -> str:
@@ -173,7 +178,11 @@ def list_accounts() -> list[dict]:
                     "label": _label(entry, entry.name),
                     "logged_in": bool(provider) or is_logged_in(entry.name),
                     "primary": False,
-                    "provider": {"base_url": provider["base_url"], "model": provider["model"]} if provider else None,
+                    "provider": {
+                        "base_url": provider["base_url"],
+                        "model": provider["model"],
+                        "context_scope": providers.scope_for(provider.get("context_scope"))["id"],
+                    } if provider else None,
                 })
     return items
 
@@ -269,29 +278,53 @@ def rename(account_id: str, label: str) -> bool:
     return True
 
 
-def update_provider(account_id: str, base_url: str, model: str = "", auth: Optional[dict] = None) -> bool:
+def _provider(base_url: str, model: str, auth: Optional[dict], scope: str) -> dict:
+    return {
+        "base_url": base_url,
+        "model": model.strip(),
+        "auth": auth or {},
+        "context_scope": providers.scope_for(scope)["id"],
+    }
+
+
+def update_provider(
+    account_id: str,
+    base_url: str,
+    model: str = "",
+    auth: Optional[dict] = None,
+    scope: str = "",
+) -> bool:
     path = config_dir(account_id)
     url = base_url.strip().rstrip("/")
     if path is None or not url or not provider_for(account_id):
         return False
-    provider = {"base_url": url, "model": model.strip(), "auth": auth or {}}
-    meta = {**_meta(path), "provider": provider}
+    meta = {**_meta(path), "provider": _provider(url, model, auth, scope)}
     (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
     return True
 
 
-def create_provider(label: str, base_url: str, model: str = "", auth: Optional[dict] = None) -> Optional[dict]:
+def create_provider(
+    label: str,
+    base_url: str,
+    model: str = "",
+    auth: Optional[dict] = None,
+    scope: str = "",
+) -> Optional[dict]:
     url = base_url.strip().rstrip("/")
     if not url:
         return None
     account = create(label)
     path = _ACCOUNTS_DIR / account["id"]
-    provider = {"base_url": url, "model": model.strip(), "auth": auth or {}}
+    provider = _provider(url, model, auth, scope)
     (path / _META_FILE).write_text(
         json.dumps({"label": account["label"], "provider": provider}), encoding="utf-8"
     )
     account["logged_in"] = True
-    account["provider"] = {"base_url": url, "model": provider["model"]}
+    account["provider"] = {
+        "base_url": url,
+        "model": provider["model"],
+        "context_scope": provider["context_scope"],
+    }
     return account
 
 

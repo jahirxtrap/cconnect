@@ -8,6 +8,7 @@ from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 from core.config import RESTART_EXIT_CODE, RESTART_FLAG
 from core.responses import api_response
+from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services import directories, repo, system_monitor
 
@@ -88,11 +89,11 @@ async def system_ws(ws: WebSocket):
             if now >= next_snapshot:
                 next_snapshot = now + _SNAPSHOT_INTERVAL
                 snapshot = await asyncio.to_thread(system_monitor.snapshot)
-                await ws.send_json({"type": "system", **snapshot})
+                await send_event(ws, {"type": "system", **snapshot})
             chunk = await asyncio.to_thread(system_monitor.logs, offset)
             offset = chunk["offset"]
             if chunk["items"]:
-                await ws.send_json({"type": "logs", "items": chunk["items"]})
+                await send_event(ws, {"type": "logs", "items": chunk["items"]})
             await asyncio.sleep(_LOG_TAIL_INTERVAL)
     except (WebSocketDisconnect, RuntimeError):
         pass

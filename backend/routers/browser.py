@@ -6,6 +6,7 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.responses import api_response
+from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services import browser
 from services.browser import BrowserSession
@@ -85,7 +86,7 @@ async def browser_ws(ws: WebSocket):
             if kind == "frame":
                 await ws.send_bytes(body)
             else:
-                await ws.send_json({"type": kind, **body})
+                await send_event(ws, {"type": kind, **body})
 
     pump = asyncio.create_task(outgoing())
     try:
@@ -95,8 +96,8 @@ async def browser_ws(ws: WebSocket):
             float(opening.get("scale") or 1.0),
         )
     except (RuntimeError, OSError) as exc:
-        await ws.send_json({"type": "error", "reason": str(exc)})
-    await ws.send_json({"type": "state", **session.status()})
+        await send_event(ws, {"type": "error", "reason": str(exc)})
+    await send_event(ws, {"type": "state", **session.status()})
 
     try:
         while True:
@@ -104,8 +105,8 @@ async def browser_ws(ws: WebSocket):
             try:
                 await _dispatch(session, payload)
             except (RuntimeError, OSError, AttributeError, KeyError) as exc:
-                await ws.send_json({"type": "error", "reason": str(exc)})
-                await ws.send_json({"type": "state", **session.status()})
+                await send_event(ws, {"type": "error", "reason": str(exc)})
+                await send_event(ws, {"type": "state", **session.status()})
     except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
         pass
     finally:
