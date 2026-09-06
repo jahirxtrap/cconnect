@@ -196,11 +196,7 @@
           />
           {#if selected && option.preview?.trim()}
             <OutlinedPanel class="w-full">
-              <pre
-                class="overflow-x-auto font-mono text-body-sm leading-snug whitespace-pre">{option.preview.replace(
-                  /\n+$/,
-                  "",
-                )}</pre>
+              <MarkdownText text={option.preview.replace(/\n+$/, "")} dense />
             </OutlinedPanel>
           {/if}
         {/each}

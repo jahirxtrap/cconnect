@@ -42,6 +42,7 @@
     pendingInput: string | null;
     onConsumePending: () => string | null;
     onSend: (text: string) => void;
+    history: () => string[];
     onInterrupt: () => void;
     onAttach: (files: File[]) => void;
     onRemoveAttachment: (id: number) => void;
@@ -65,6 +66,7 @@
     pendingInput,
     onConsumePending,
     onSend,
+    history,
     onInterrupt,
     onAttach,
     onRemoveAttachment,
@@ -94,10 +96,60 @@
   const busy = $derived(streaming || uploading);
   const commandsReady = $derived(commands.length > 0 && !streaming);
 
+  let recalled: string[] = [];
+  let recalledAt = $state(-1);
+  let savedDraft = "";
+  let applied = "";
+
+  const leaveHistory = () => {
+    recalledAt = -1;
+    recalled = [];
+  };
+
+  $effect(() => {
+    if (recalledAt >= 0 && draft !== applied) leaveHistory();
+  });
+
   const submit = () => {
     if (!canSubmit) return;
     onSend(draft);
     onDraft("");
+    leaveHistory();
+  };
+
+  const caretLine = (before: boolean) => {
+    if (!field || field.selectionStart !== field.selectionEnd) return false;
+    const at = field.selectionStart;
+    return before ? !draft.slice(0, at).includes("\n") : !draft.slice(at).includes("\n");
+  };
+
+  const recall = (index: number) => {
+    const text = index < 0 ? savedDraft : (recalled[index] ?? "");
+    recalledAt = index;
+    applied = text;
+    onDraft(text);
+    if (!field) return;
+    field.value = text;
+    field.setSelectionRange(text.length, text.length);
+  };
+
+  const recallOlder = () => {
+    if (recalledAt < 0) {
+      recalled = history();
+      if (!recalled.length) return false;
+      savedDraft = draft;
+      recall(recalled.length - 1);
+      return true;
+    }
+    if (recalledAt > 0) recall(recalledAt - 1);
+    return true;
+  };
+
+  const recallNewer = () => {
+    if (recalledAt < 0) return false;
+    const next = recalledAt + 1;
+    recall(next >= recalled.length ? -1 : next);
+    return true;
   };
 
   let dismissed = $state(false);
@@ -248,6 +300,14 @@
         dismissed = true;
         return;
       }
+    }
+    if (event.key === "ArrowUp" && caretLine(true) && recallOlder()) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "ArrowDown" && caretLine(false) && recallNewer()) {
+      event.preventDefault();
+      return;
     }
     if (event.key !== "Enter" || isTouch) return;
     event.preventDefault();

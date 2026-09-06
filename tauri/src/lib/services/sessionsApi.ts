@@ -18,6 +18,7 @@ export interface MessagesPage {
   startIndex: number;
   hasMore: boolean;
   contextTokens: number | null;
+  prompts: string[] | null;
 }
 
 export interface RewindPoint {
@@ -65,6 +66,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       start_index?: number;
       has_more?: boolean | string;
       context_tokens?: number;
+      prompts?: string[] | null;
     }>(`/sessions/${sessionId}/messages`, {
       project,
       limit,
@@ -83,6 +85,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       startIndex: data.start_index ?? 0,
       hasMore: data.has_more === true || data.has_more === "true",
       contextTokens: data.context_tokens ?? null,
+      prompts: Array.isArray(data.prompts) ? data.prompts : null,
     };
   },
 

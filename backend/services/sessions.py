@@ -1097,6 +1097,19 @@ def _working(messages, vis) -> None:
     messages.append({"type": "working"})
 
 
+def user_prompts(messages: list[dict], limit: int = 100) -> list[str]:
+    """The composer's history, taken from the transcript already normalized for this request."""
+    prompts: list[str] = []
+    for message in messages:
+        if message.get("role") != "user" or message.get("type") != "text":
+            continue
+        text = (message.get("text") or "").strip()
+        if not text or (prompts and prompts[-1] == text):
+            continue
+        prompts.append(text)
+    return prompts[-limit:]
+
+
 def get_session_messages(
     project_key: str,
     session_id: str,

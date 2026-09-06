@@ -355,6 +355,7 @@
         pendingInput={chat.pendingInput}
         onConsumePending={() => chat.consumePendingInput()}
         onSend={(text) => (chat.sideOpen ? chat.sendSideQuestion(text) : chat.submit(text))}
+        history={() => chat.userHistory()}
         onCommand={(command) =>
           command.requireConfirmation ? (confirmCommand = command) : chat.runCommand(command)}
         onInterrupt={() => (chat.sideOpen ? chat.stopSide() : chat.interrupt())}

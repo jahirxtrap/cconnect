@@ -347,4 +347,5 @@ def get_session_messages(
         "start_index": start,
         "has_more": start > 0,
         "context_tokens": sessions_service.last_context_tokens(project, session_id, trashed),
+        "prompts": None if before_index is not None else sessions_service.user_prompts(items),
     })

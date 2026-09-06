@@ -96,6 +96,7 @@ const optionNotificationLabel = (option: InteractionOption): string | null => {
 };
 const MESSAGE_TAIL_CAP = 500;
 const MESSAGE_INITIAL_CAP = 100;
+const HISTORY_LIMIT = 100;
 const MILLIS_PER_SECOND = 1000;
 
 const projectKeyOf = (path: string) => path.replace(PROJECT_KEY_SEPARATOR, "-");
@@ -278,6 +279,7 @@ export class ChatState {
   #interrupting = false;
   #pendingTrim: ((list: ChatMessage[]) => ChatMessage[]) | null = null;
   #uploadAbort: AbortController | null = null;
+  #history: string[] = [];
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
 
@@ -430,6 +432,16 @@ export class ChatState {
     this.attachments = this.attachments.filter((item) => item.id !== id);
   }
 
+  userHistory(): string[] {
+    return this.#history;
+  }
+
+  #rememberPrompt(text: string) {
+    const body = text.trim();
+    if (!body || body === this.#history[this.#history.length - 1]) return;
+    this.#history = [...this.#history, body].slice(-HISTORY_LIMIT);
+  }
+
   submit(text: string) {
     const command = commandFor(this.capabilities, text);
     if (command && command.kind !== "prompt") this.runCommand(command);
@@ -494,6 +506,8 @@ export class ChatState {
       this.#optimisticMessageId = null;
       this.queue = this.queue.filter((item) => item.uploading);
     }
+
+    this.#rememberPrompt(body);
 
     const silent = !this.streaming && !this.queue.length && !this.#sent.size;
     const id = `q${this.#outgoingTag}-${this.#outgoing++}`;
@@ -1354,6 +1368,7 @@ export class ChatState {
 
   #resetTranscript() {
     this.messages = [];
+    this.#history = [];
     this.expandedIds = {};
     this.todos = [];
     this.queue = [];
@@ -1410,6 +1425,7 @@ export class ChatState {
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
     this.contextTokens = page.contextTokens;
+    this.#history = page.prompts ?? [];
     return true;
   }
 
@@ -1446,6 +1462,7 @@ export class ChatState {
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
+    this.#history = page.prompts ?? [];
   }
 
   #imageUrls(item: SessionMessage, sessionId: string, projectKey: string | null): string[] | null {
@@ -1949,6 +1966,7 @@ export class ChatState {
           }),
         ];
         this.compacting = false;
+        this.#history = [];
         break;
       case "compact_summary":
         this.messages = this.messages.map((item) =>
