@@ -15,11 +15,7 @@ export interface TerminalTab {
   title: string;
   local: boolean;
   pty?: PtyInfo | null;
-}
-
-interface EnvironmentTabs {
-  items: TerminalTab[];
-  activeId: string | null;
+  environment: string | null;
 }
 
 const NEW_COLS = 80;
@@ -27,29 +23,29 @@ const NEW_ROWS = 24;
 
 const connectors = new Map<string, TerminalConnector>();
 
-const empty = (): EnvironmentTabs => ({ items: [], activeId: null });
-
 class TerminalTabs {
   overlayOpen = $state(false);
 
-  #byEnvironment = $state<Record<string, EnvironmentTabs>>({});
+  #items = $state<TerminalTab[]>([]);
+  #activeId = $state<string | null>(null);
 
   readonly environment = $derived(backend.active?.id ?? "");
-  readonly items = $derived(this.#byEnvironment[this.environment]?.items ?? []);
-  readonly activeId = $derived(this.#byEnvironment[this.environment]?.activeId ?? null);
+  readonly items = $derived(this.#items.filter((tab) => this.#reachable(tab)));
+  readonly activeId = $derived(
+    this.items.some((tab) => tab.id === this.#activeId) ? this.#activeId : (this.items[0]?.id ?? null),
+  );
 
   connectorOf(id: string) {
-    return connectors.get(this.#key(id)) ?? null;
+    const tab = this.#find(id);
+    return tab ? (connectors.get(this.#key(tab)) ?? null) : null;
   }
 
-  open(tab: TerminalTab, connect: TerminalConnector) {
-    const key = this.#key(tab.id);
+  open(tab: Omit<TerminalTab, "environment">, connect: TerminalConnector) {
+    const opened = { ...tab, environment: tab.local ? this.environment : null };
+    const key = this.#key(opened);
     if (!connectors.has(key)) connectors.set(key, connect);
-    const current = this.#current();
-    const items = current.items.some((item) => item.id === tab.id)
-      ? current.items
-      : [...current.items, tab];
-    this.#write({ items, activeId: tab.id });
+    if (!this.#find(opened.id)) this.#items = [...this.#items, opened];
+    this.#activeId = opened.id;
   }
 
   openLocal(session: TerminalInfo) {
@@ -67,26 +63,26 @@ class TerminalTabs {
   }
 
   sync(sessions: TerminalInfo[]) {
+    const environment = this.environment;
     const alive = new Set(sessions.filter((session) => session.alive).map((session) => session.id));
-    const current = this.#current();
-    const kept = current.items.filter((tab) => !tab.local || alive.has(tab.id));
-    const known = new Set(kept.map((tab) => tab.id));
+    const kept = this.#items.filter(
+      (tab) => !tab.local || tab.environment !== environment || alive.has(tab.id),
+    );
+    const known = new Set(kept.filter((tab) => tab.environment === environment).map((tab) => tab.id));
     for (const session of sessions) {
       if (!session.alive || known.has(session.id)) continue;
-      kept.push({ id: session.id, title: session.title, local: true, pty: session.pty });
-      connectors.set(this.#key(session.id), (hooks, cols, rows) =>
+      const tab = { id: session.id, title: session.title, local: true, pty: session.pty, environment };
+      kept.push(tab);
+      connectors.set(this.#key(tab), (hooks, cols, rows) =>
         localLink(session.id, terminalKeys.current, hooks, cols, rows),
       );
     }
-    const activeId = kept.some((tab) => tab.id === current.activeId)
-      ? current.activeId
-      : (kept[0]?.id ?? null);
-    if (kept.length === current.items.length && activeId === current.activeId) return;
-    this.#write({ items: kept, activeId });
+    if (kept.length === this.#items.length) return;
+    this.#items = kept;
   }
 
   select(id: string) {
-    this.#write({ ...this.#current(), activeId: id });
+    this.#activeId = id;
   }
 
   selectNext() {
@@ -98,12 +94,12 @@ class TerminalTabs {
   }
 
   move(id: string, index: number) {
-    const current = this.#current();
-    const from = current.items.findIndex((tab) => tab.id === id);
-    if (from < 0 || index < 0 || index >= current.items.length) return;
-    const items = [...current.items];
-    items.splice(index, 0, ...items.splice(from, 1));
-    this.#write({ ...current, items });
+    const shown = this.items;
+    const from = shown.findIndex((tab) => tab.id === id);
+    if (from < 0 || index < 0 || index >= shown.length) return;
+    const reordered = [...shown];
+    reordered.splice(index, 0, ...reordered.splice(from, 1));
+    this.#items = [...this.#items.filter((tab) => !this.#reachable(tab)), ...reordered];
   }
 
   has(id: string) {
@@ -122,34 +118,33 @@ class TerminalTabs {
   }
 
   close(id: string) {
-    const current = this.#current();
-    const index = current.items.findIndex((tab) => tab.id === id);
-    if (index < 0) return;
-    connectors.delete(this.#key(id));
-    const items = current.items.filter((tab) => tab.id !== id);
-    const activeId =
-      current.activeId === id ? (items[Math.min(index, items.length - 1)]?.id ?? null) : current.activeId;
-    this.#write({ items, activeId });
+    const tab = this.#find(id);
+    if (!tab) return;
+    const index = this.items.indexOf(tab);
+    connectors.delete(this.#key(tab));
+    this.#items = this.#items.filter((item) => item !== tab);
+    if (this.#activeId !== id) return;
+    const shown = this.items;
+    this.#activeId = shown[Math.min(index, shown.length - 1)]?.id ?? null;
   }
 
-  #key(id: string) {
-    return `${this.environment}:${id}`;
+  #reachable(tab: TerminalTab) {
+    return tab.environment === null || tab.environment === this.environment;
   }
 
-  #current() {
-    return this.#byEnvironment[this.environment] ?? empty();
+  #find(id: string) {
+    return this.items.find((tab) => tab.id === id) ?? null;
   }
 
-  #write(value: EnvironmentTabs) {
-    this.#byEnvironment = { ...this.#byEnvironment, [this.environment]: value };
+  #key(tab: TerminalTab) {
+    return tab.environment === null ? tab.id : `${tab.environment}:${tab.id}`;
   }
 
   #step(delta: number) {
-    const current = this.#current();
-    if (current.items.length < 2) return;
-    const from = current.items.findIndex((tab) => tab.id === current.activeId);
-    const next = (from + delta + current.items.length) % current.items.length;
-    this.#write({ ...current, activeId: current.items[next].id });
+    const shown = this.items;
+    if (shown.length < 2) return;
+    const from = shown.findIndex((tab) => tab.id === this.activeId);
+    this.#activeId = shown[(from + delta + shown.length) % shown.length].id;
   }
 }
 
