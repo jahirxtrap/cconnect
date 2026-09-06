@@ -60,6 +60,7 @@ export interface ProviderPreset {
   id: string;
   label: string;
   baseUrl: string;
+  defaultScope: string;
 }
 
 export interface AccountsSnapshot {
@@ -68,6 +69,7 @@ export interface AccountsSnapshot {
   providerUrl: string;
   presets: ProviderPreset[];
   scopes: string[];
+  scopeDefault: string;
 }
 
 type Wire = Record<string, any>;
@@ -104,8 +106,10 @@ export const createAccountsApi = (client: HttpClient) => ({
         id: preset.id ?? "",
         label: preset.label ?? "",
         baseUrl: preset.base_url ?? "",
+        defaultScope: preset.default_scope ?? "",
       })),
       scopes: data.provider_scopes ?? [],
+      scopeDefault: data.provider_scope_default ?? "",
     };
   },
 

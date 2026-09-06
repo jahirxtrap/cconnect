@@ -11,25 +11,35 @@ DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 
 PRESETS = (
-    {"id": "anthropic", "label": "Anthropic", "base_url": ANTHROPIC_BASE_URL, "pin_model": False},
-    {"id": "omniroute", "label": "OmniRoute", "base_url": "http://127.0.0.1:20128", "pin_model": True},
-    {"id": "ollama", "label": "Ollama", "base_url": DEFAULT_BASE_URL, "pin_model": True},
+    {"id": "anthropic", "label": "Anthropic", "base_url": ANTHROPIC_BASE_URL, "pin_model": False, "default_scope": "full"},
+    {"id": "omniroute", "label": "OmniRoute", "base_url": "http://127.0.0.1:20128", "pin_model": True, "default_scope": "standard"},
+    {"id": "ollama", "label": "Ollama", "base_url": DEFAULT_BASE_URL, "pin_model": True, "default_scope": "light"},
 )
+
+_CLI_TOOLS = ["Read", "Write", "Edit", "MultiEdit", "NotebookEdit", "Bash", "Glob", "Grep", "TodoWrite", "Task"]
+_FILE_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep"]
 
 CONTEXT_SCOPES = (
     {"id": "full", "preset": True, "guides": True, "project_files": True, "memory": True, "cconnect": True, "tools": True},
-    {"id": "light", "preset": True, "guides": False, "project_files": False, "memory": False, "cconnect": False, "tools": True},
+    {"id": "standard", "preset": True, "guides": True, "project_files": True, "memory": True, "cconnect": True, "tools": _CLI_TOOLS},
+    {"id": "light", "preset": False, "guides": True, "project_files": False, "memory": False, "cconnect": False, "tools": _FILE_TOOLS},
     {"id": "minimal", "preset": False, "guides": False, "project_files": False, "memory": False, "cconnect": False, "tools": False},
 )
 
 SCOPE_IDS = tuple(scope["id"] for scope in CONTEXT_SCOPES)
-DEFAULT_SCOPE = SCOPE_IDS[0]
+FULL_SCOPE = SCOPE_IDS[0]
+DEFAULT_SCOPE = "light"
 
 
 def scope_for(scope_id: str | None) -> dict:
     """A model with a small window cannot afford Claude Code's full preamble."""
-    wanted = (scope_id or "").strip()
-    return next((scope for scope in CONTEXT_SCOPES if scope["id"] == wanted), CONTEXT_SCOPES[0])
+    wanted = (scope_id or "").strip() or DEFAULT_SCOPE
+    fallback = next(scope for scope in CONTEXT_SCOPES if scope["id"] == DEFAULT_SCOPE)
+    return next((scope for scope in CONTEXT_SCOPES if scope["id"] == wanted), fallback)
+
+
+def default_scope_for(base_url: str) -> str:
+    return preset_for(base_url).get("default_scope", DEFAULT_SCOPE)
 
 
 _TIMEOUT = 5.0

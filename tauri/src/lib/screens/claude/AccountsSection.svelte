@@ -111,19 +111,22 @@
   const presets = $derived(accountsStore.snapshot?.presets ?? []);
   const scopes = $derived(accountsStore.snapshot?.scopes ?? []);
   const scopeOptions = $derived(scopes.map((id) => ({ value: id, label: scopeLabel(id) })));
-  const scopeId = $derived(scopes.includes(contextScope) ? contextScope : (scopes[0] ?? ""));
 
   const presetOptions = $derived([
     { value: "", label: t("ACCOUNT_PROVIDER_CUSTOM") },
     ...presets.map((preset) => ({ value: preset.id, label: preset.label })),
   ]);
-  const presetId = $derived(
-    presets.find((preset) => preset.baseUrl === providerUrl.trim().replace(/\/$/, ""))
-      ?.id ?? "",
+  const presetFor = (url: string) =>
+    presets.find((preset) => preset.baseUrl === url.trim().replace(/\/$/, "")) ?? null;
+  const presetId = $derived(presetFor(providerUrl)?.id ?? "");
+  const suggestedScope = $derived(
+    presetFor(providerUrl)?.defaultScope || accountsStore.snapshot?.scopeDefault || scopes[0] || "",
   );
+  const scopeId = $derived(scopes.includes(contextScope) ? contextScope : suggestedScope);
 
   const pickPreset = (id: string) => {
     providerUrl = presets.find((item) => item.id === id)?.baseUrl ?? "";
+    contextScope = "";
     probe = null;
   };
 

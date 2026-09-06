@@ -663,8 +663,9 @@ async def run_prompt(
             "session_info": session_info,
             "capabilities": list(capabilities or ()),
         })}
-    if not scope["tools"]:
-        options_kwargs["tools"] = []
+    tools = scope["tools"]
+    if tools is not True:
+        options_kwargs["tools"] = tools if isinstance(tools, list) else []
     session_env = dict(accounts.env_for(account))
     window = cli_info.provider_window(model, account)
     if window:
@@ -1128,8 +1129,9 @@ async def ask_side_question(
             "session_info": session_info,
             "capabilities": list(capabilities or ()),
         }, exclude=("ask_component", "show_component"))}
-    if not scope["tools"]:
-        options_kwargs["tools"] = []
+    tools = scope["tools"]
+    if tools is not True:
+        options_kwargs["tools"] = tools if isinstance(tools, list) else []
     hooks = [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)

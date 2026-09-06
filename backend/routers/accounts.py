@@ -26,6 +26,7 @@ def get_accounts():
         "provider_url": providers.DEFAULT_BASE_URL,
         "provider_presets": providers.PRESETS,
         "provider_scopes": providers.SCOPE_IDS,
+        "provider_scope_default": providers.DEFAULT_SCOPE,
     })
 
 

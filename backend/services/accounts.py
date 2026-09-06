@@ -77,8 +77,8 @@ def provider_for(account_id: Optional[str]) -> dict:
 
 
 def context_scope(account_id: Optional[str]) -> dict:
-    """A provider account can trade Claude Code's prompt and tools for context room."""
-    return providers.scope_for(provider_for(account_id).get("context_scope"))
+    provider = provider_for(account_id)
+    return providers.scope_for(provider.get("context_scope") if provider else providers.FULL_SCOPE)
 
 
 def model_for(account_id: Optional[str], alias: str) -> str:
@@ -279,11 +279,12 @@ def rename(account_id: str, label: str) -> bool:
 
 
 def _provider(base_url: str, model: str, auth: Optional[dict], scope: str) -> dict:
+    wanted = scope.strip() or providers.default_scope_for(base_url)
     return {
         "base_url": base_url,
         "model": model.strip(),
         "auth": auth or {},
-        "context_scope": providers.scope_for(scope)["id"],
+        "context_scope": providers.scope_for(wanted)["id"],
     }
 
 
