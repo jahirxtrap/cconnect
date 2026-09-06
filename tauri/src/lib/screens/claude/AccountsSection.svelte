@@ -5,12 +5,14 @@
   import { copyText } from "$lib/platform/clipboard";
   import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
+  import { accountsStore } from "$lib/data/accountsStore.svelte";
+  import { accountIdOf } from "$lib/screens/settings/settingsIndex";
+  import { useSettingsDialog } from "$lib/screens/settings/useSettingsDialog.svelte";
+  import { accountSummary, scopeLabel } from "$lib/screens/settings/settingsValues";
   import {
     accountsApi,
     emptyAuth,
     type Account,
-    type AccountProvider,
-    type AccountsSnapshot,
     type ProviderAuth,
     type ProviderAuthKind,
     type ProviderProbe,
@@ -47,7 +49,6 @@
     { value: "header", label: t("AUTH_HEADER") },
   ];
 
-  let snapshot = $state<AccountsSnapshot | null>(null);
   let adding = $state(false);
   let actions = $state<Account | null>(null);
   let renaming = $state<Account | null>(null);
@@ -82,11 +83,11 @@
     await refresh();
   };
 
-  const accounts = $derived(snapshot?.accounts ?? []);
-  const defaultId = $derived(snapshot?.default ?? "");
+  const accounts = $derived(accountsStore.items);
+  const defaultId = $derived(accountsStore.defaultId);
 
   const reload = async () => {
-    if (enabled) snapshot = await accountsApi.list();
+    if (enabled) await accountsStore.load();
   };
 
   const refresh = async () => {
@@ -107,37 +108,22 @@
     }
   };
 
-  const scopeLabel = (id: string) => t(`ACCOUNT_CONTEXT_${id.toUpperCase()}`);
-  const scopes = $derived(snapshot?.scopes ?? []);
+  const presets = $derived(accountsStore.snapshot?.presets ?? []);
+  const scopes = $derived(accountsStore.snapshot?.scopes ?? []);
   const scopeOptions = $derived(scopes.map((id) => ({ value: id, label: scopeLabel(id) })));
   const scopeId = $derived(scopes.includes(contextScope) ? contextScope : (scopes[0] ?? ""));
-  const trimmedScope = (scope: string) => (scope && scope !== scopes[0] ? scopeLabel(scope) : "");
-
-  const providerSummary = (provider: AccountProvider) => {
-    const trimmed = trimmedScope(provider.contextScope);
-    return trimmed ? `${provider.baseUrl} • ${trimmed}` : provider.baseUrl;
-  };
-
-  const summaryOf = (account: Account) =>
-    account.provider
-      ? providerSummary(account.provider)
-      : !account.loggedIn
-        ? t("ACCOUNT_PENDING")
-        : account.id === defaultId
-          ? t("ACCOUNT_IS_DEFAULT")
-          : t("ACCOUNT_CONNECTED");
 
   const presetOptions = $derived([
     { value: "", label: t("ACCOUNT_PROVIDER_CUSTOM") },
-    ...(snapshot?.presets ?? []).map((preset) => ({ value: preset.id, label: preset.label })),
+    ...presets.map((preset) => ({ value: preset.id, label: preset.label })),
   ]);
   const presetId = $derived(
-    (snapshot?.presets ?? []).find((preset) => preset.baseUrl === providerUrl.trim().replace(/\/$/, ""))
+    presets.find((preset) => preset.baseUrl === providerUrl.trim().replace(/\/$/, ""))
       ?.id ?? "",
   );
 
   const pickPreset = (id: string) => {
-    providerUrl = (snapshot?.presets ?? []).find((item) => item.id === id)?.baseUrl ?? "";
+    providerUrl = presets.find((item) => item.id === id)?.baseUrl ?? "";
     probe = null;
   };
 
@@ -152,7 +138,7 @@
     adding = false;
     probe = null;
     editing = null;
-    providerUrl = snapshot?.presets[0]?.baseUrl ?? snapshot?.providerUrl ?? "";
+    providerUrl = presets[0]?.baseUrl ?? accountsStore.snapshot?.providerUrl ?? "";
     auth = emptyAuth();
     contextScope = "";
     newLabel = "";
@@ -207,6 +193,12 @@
     await refresh();
   };
 
+  useSettingsDialog("claude", (dialog, entry) => {
+    if (dialog !== "account_actions") return;
+    const found = accountsStore.find(accountIdOf(entry.id));
+    if (found) actions = found;
+  });
+
   $effect(() => {
     void enabled;
     void reload();
@@ -218,7 +210,7 @@
     <PreferenceRow
       icon={account.provider ? Component : CircleUser}
       title={account.label}
-      summary={summaryOf(account)}
+      summary={accountSummary(account)}
       alert={loginError === account.id ? t("ACCOUNT_LOGIN_FAILED") : null}
       {enabled}
       onclick={enabled ? () => (actions = account) : undefined}

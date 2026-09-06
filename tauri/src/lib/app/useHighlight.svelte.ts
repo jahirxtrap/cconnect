@@ -15,11 +15,17 @@ export const useHighlight =(onTarget?: (target: string) => void): Highlight => {
     if (!target) return;
     onTarget?.(target);
     flashed = target;
+    const forget = () => {
+      if (navigation.settingsHighlight === target) navigation.settingsHighlight = null;
+    };
     const timer = setTimeout(() => {
       flashed = null;
-      navigation.settingsHighlight = null;
+      forget();
     }, FLASH_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      forget();
+    };
   });
 
   return {

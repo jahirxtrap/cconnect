@@ -1,4 +1,5 @@
 import { rankLabel } from "$lib/app/commands.svelte";
+import { accountsStore } from "$lib/data/accountsStore.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { t } from "$lib/i18n/index.svelte";
 import { isDesktop, isTauri } from "$lib/platform";
@@ -7,6 +8,7 @@ import { describe, shortcuts, SHORTCUTS } from "$lib/platform/shortcuts.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
 import { SETTINGS_SECTIONS, type SettingsSection } from "./sections";
 import {
+  accountSummary,
   accountValue,
   accentValue,
   chatLanguageValue,
@@ -57,6 +59,7 @@ export type SettingsDialog =
   | "permissions"
   | "visibility"
   | "account"
+  | "account_actions"
   | "tools"
   | "chats"
   | "privacy";
@@ -202,6 +205,21 @@ const accountEntries = (): SettingsEntry[] =>
     dialog: "account",
   }));
 
+export const ACCOUNT_PREFIX = "claude_account.";
+
+export const accountIdOf = (target: string | null): string =>
+  target?.startsWith(ACCOUNT_PREFIX) ? target.slice(ACCOUNT_PREFIX.length) : "";
+
+const claudeAccountEntries = (): SettingsEntry[] =>
+  accountsStore.items.map((account) => ({
+    id: `${ACCOUNT_PREFIX}${account.id}`,
+    label: account.label,
+    value: () => accountSummary(account),
+    section: "claude",
+    group: "ACCOUNTS",
+    dialog: "account_actions",
+  }));
+
 const permissionEntries = (): SettingsEntry[] =>
   (serverSettings.capabilities?.permissionModes ?? []).map((mode) => ({
     id: `permission.${mode.id}`,
@@ -217,6 +235,7 @@ const allEntries = (): SettingsEntry[] => [
   ...toolEntries(),
   ...environmentEntries(),
   ...accountEntries(),
+  ...claudeAccountEntries(),
   ...permissionEntries(),
 ];
 

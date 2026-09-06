@@ -1,3 +1,4 @@
+import { accountsStore } from "$lib/data/accountsStore.svelte";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { claudeStatus } from "$lib/data/claudeStatus.svelte";
 import { projectNameOf } from "$lib/data/models";
@@ -9,6 +10,7 @@ import { theme, type FontStyle } from "$lib/design/theme.svelte";
 import { i18n, t } from "$lib/i18n/index.svelte";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
+import type { Account } from "$lib/services/accountsApi";
 import { address, backend } from "$lib/services/backend.svelte";
 import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
@@ -67,6 +69,22 @@ export const multipleAccounts = (): boolean =>
 
 export const hasProviderAccount = (): boolean =>
   serverSettings.capabilities?.accounts.some((account) => account.provider) === true;
+
+export const scopeLabel = (id: string): string => t(`ACCOUNT_CONTEXT_${id.toUpperCase()}`);
+
+export const trimmedScope = (scope: string): string => {
+  const scopes = accountsStore.snapshot?.scopes ?? [];
+  return scope && scope !== scopes[0] ? scopeLabel(scope) : "";
+};
+
+export const accountSummary = (account: Account): string => {
+  if (account.provider) {
+    const trimmed = trimmedScope(account.provider.contextScope);
+    return trimmed ? `${account.provider.baseUrl} • ${trimmed}` : account.provider.baseUrl;
+  }
+  if (!account.loggedIn) return t("ACCOUNT_PENDING");
+  return account.id === accountsStore.defaultId ? t("ACCOUNT_IS_DEFAULT") : t("ACCOUNT_CONNECTED");
+};
 
 export const hasProjects = (): boolean => (chatListFor(backend.active)?.projects.length ?? 0) > 0;
 

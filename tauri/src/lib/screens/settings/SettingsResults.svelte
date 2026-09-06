@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { accountsStore } from "$lib/data/accountsStore.svelte";
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -17,6 +18,7 @@
   $effect(() => {
     serverSettings.ensure();
     claudeStatus.ensure();
+    accountsStore.ensure();
   });
 
   const results = $derived(searchSettings(query));

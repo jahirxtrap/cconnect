@@ -4,8 +4,9 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -18,8 +19,10 @@ class Dictation(private val activity: Activity, private val webView: () -> WebVi
 
     companion object {
         const val PERMISSION_REQUEST = 4711
+        private const val RESTART_DELAY_MS = 300L
     }
 
+    private val handler = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
     private var listening = false
     private var language = ""
@@ -46,6 +49,7 @@ class Dictation(private val activity: Activity, private val webView: () -> WebVi
 
     fun stop() {
         listening = false
+        handler.removeCallbacksAndMessages(null)
         activity.runOnUiThread { recognizer?.stopListening() }
     }
 
@@ -62,9 +66,7 @@ class Dictation(private val activity: Activity, private val webView: () -> WebVi
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            }
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, activity.packageName)
         }
         runCatching { engine.startListening(intent) }
             .onFailure { deliver("end", error = "start") }
@@ -72,6 +74,7 @@ class Dictation(private val activity: Activity, private val webView: () -> WebVi
 
     private fun release() {
         listening = false
+        handler.removeCallbacksAndMessages(null)
         recognizer?.destroy()
         recognizer = null
     }
@@ -90,18 +93,27 @@ class Dictation(private val activity: Activity, private val webView: () -> WebVi
 
         override fun onResults(results: Bundle?) {
             deliver("final", text = first(results))
-            if (listening) listen() else finish(null)
+            if (listening) restart() else finish(null)
         }
 
         override fun onError(error: Int) {
             val transient = error == SpeechRecognizer.ERROR_NO_MATCH ||
-                error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+                error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT ||
+                error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY
             if (transient && listening) {
-                listen()
+                restart()
                 return
             }
             finish(if (transient) null else "recognizer")
         }
+    }
+
+    private fun restart() {
+        handler.postDelayed({
+            if (!listening) return@postDelayed
+            recognizer?.cancel()
+            listen()
+        }, RESTART_DELAY_MS)
     }
 
     private fun finish(error: String?) {
