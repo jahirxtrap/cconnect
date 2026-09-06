@@ -60,10 +60,9 @@
   const panel = $derived.by(() => {
     if (failure) return failure;
     const lines = [`${t("LOCAL_URL")}: http://localhost:${info.port}`];
-    if (mode !== "local") {
-      if (info.publicUrl) lines.push(`${t("PUBLIC_URL")}: ${info.publicUrl}`);
-      if (info.token) lines.push(`${t("TOKEN")}: ${info.token}`);
-    }
+    if (info.publicUrl) lines.push(`${t("PUBLIC_URL")}: ${info.publicUrl}`);
+    if (info.token) lines.push(`${t("TOKEN")}: ${info.token}`);
+    if (info.terminalKey) lines.push(`${t("TERMINAL_KEY")}: ${info.terminalKey}`);
     return lines.join("\n");
   });
 
@@ -126,7 +125,7 @@
 
     {#if panel}
       <p
-        class="mt-1 rounded-md border-2 px-2.5 py-2 font-mono text-body-sm whitespace-pre-wrap {failure
+        class="selectable mt-1 rounded-md border-2 px-2.5 py-2 font-mono text-body-sm wrap-anywhere whitespace-pre-wrap {failure
           ? 'border-red text-red'
           : 'border-outline-variant text-on-surface'}"
       >{panel}</p>

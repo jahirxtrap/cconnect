@@ -216,6 +216,7 @@ def _expose(
     else:
         _abort(f"unknown --expose provider: {provider}")
         return  # unreachable, satisfies static checkers
+    os.environ["PUBLIC_URL"] = public_url
     token = os.environ[_TOKEN_VAR]
     parsed = urlparse(public_url)
     pub_port = parsed.port or (443 if parsed.scheme == "https" else 80)

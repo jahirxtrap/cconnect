@@ -18,6 +18,7 @@
     maxLines?: number;
     autofocus?: boolean;
     numeric?: boolean;
+    enabled?: boolean;
     error?: string | null;
     onClear?: (() => void) | null;
     clearAlways?: boolean;
@@ -38,6 +39,7 @@
     maxLines,
     autofocus = false,
     numeric = false,
+    enabled = true,
     error = null,
     onClear = null,
     clearAlways = false,
@@ -48,6 +50,7 @@
 
   const LINE_HEIGHT = 20;
   const ACTIONS_GAP = 8;
+  const MASKABLE = typeof CSS !== "undefined" && CSS.supports("-webkit-text-security", "disc");
 
   const showClear = $derived(onClear !== null && (clearAlways || value.length > 0));
 
@@ -62,6 +65,8 @@
   );
   let revealed = $state(false);
 
+  const masked = $derived(secret && !revealed);
+
   const handle = (event: Event) => oninput((event.currentTarget as HTMLInputElement).value);
 
   $effect(() => {
@@ -69,7 +74,7 @@
   });
 </script>
 
-<div class={className}>
+<div class="{enabled ? '' : 'opacity-40'} {className}">
   {#if label}
     <p class="mb-1.5 text-label-lg">
       {label}{#if required}<span class="text-error">&nbsp;*</span>{/if}
@@ -83,14 +88,15 @@
     {#if singleLine}
       <input
         bind:this={field}
-        type={secret && !revealed ? "password" : "text"}
+        type={masked && !MASKABLE ? "password" : "text"}
         inputmode={numeric ? "decimal" : undefined}
+        disabled={!enabled}
         {value}
         {placeholder}
         {onkeydown}
         oninput={handle}
         style={actionsReserve}
-        class={FIELD_CLASS}
+        class="{FIELD_CLASS} {masked && MASKABLE ? 'masked' : ''}"
       />
     {:else}
       <div style={actionsReserve} class="relative flex min-w-0 flex-1">

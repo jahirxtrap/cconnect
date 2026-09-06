@@ -62,19 +62,31 @@
 <CompactDialog title={t("CLI")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => void save()}>{t("SAVE")}</Button>
+    <Button onclick={() => void save()} enabled={!updating}>{t("SAVE")}</Button>
   {/snippet}
-  <SelectField label={t("CLI_SOURCE")} selected={source} {options} onSelect={(value) => (source = value)} />
+  <SelectField
+    label={t("CLI_SOURCE")}
+    selected={source}
+    {options}
+    enabled={!updating}
+    onSelect={(value) => (source = value)}
+  />
   {#if source === "custom"}
     <InputField
       value={customPath}
       oninput={(value) => (customPath = value)}
       label={t("CLI_CUSTOM_PATH")}
+      enabled={!updating}
       singleLine
       class="mt-2.5"
     >
       {#snippet trailing()}
-        <TooltipIconButton label={t("CHOOSE")} onclick={pick} class="size-6 [&_svg]:size-[18px]">
+        <TooltipIconButton
+          label={t("CHOOSE")}
+          enabled={!updating}
+          onclick={pick}
+          class="size-6 [&_svg]:size-[18px]"
+        >
           <Folder />
         </TooltipIconButton>
       {/snippet}

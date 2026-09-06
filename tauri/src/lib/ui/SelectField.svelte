@@ -43,7 +43,7 @@
     "relative flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors";
 </script>
 
-<div class={className}>
+<div class="{enabled ? '' : 'opacity-40'} {className}">
   <p class="mb-1.5 text-label-lg">{label}</p>
   {#snippet field(active: boolean)}
     <span class="{FIELD_CLASS} {enabled ? 'cursor-pointer' : ''} {active ? 'border-accent' : 'border-outline-variant'}">
@@ -65,6 +65,8 @@
     <button type="button" disabled={!enabled} {onclick} class="w-full">
       {@render field(false)}
     </button>
+  {:else if !enabled}
+    {@render field(false)}
   {:else}
     <PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
       {#snippet trigger()}

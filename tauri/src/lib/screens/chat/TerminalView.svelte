@@ -64,11 +64,13 @@
     focusActive();
   };
 
-  const unlocked = $derived(!!terminalKeys.current);
+  let unlocked = $state(false);
 
   const refresh = async () => {
-    if (!online || !terminalKeys.current) return;
-    const listed = (await listTerminals()) ?? [];
+    if (!online) return;
+    const listed = await listTerminals();
+    unlocked = listed !== null;
+    if (!listed) return;
     sessions = listed;
     terminalTabs.sync(listed);
   };

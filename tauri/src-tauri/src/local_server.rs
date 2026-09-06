@@ -1,5 +1,5 @@
 use std::collections::{HashMap, VecDeque};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::net::{SocketAddr, TcpStream};
@@ -26,6 +26,8 @@ const ENV_FILE: &str = ".env";
 const PORT_KEY: &str = "PORT";
 const PID_KEY: &str = "PID";
 const TOKEN_KEY: &str = "PUBLIC_ACCESS_TOKEN";
+const TERMINAL_KEY_KEY: &str = "TERMINAL_ACCESS_KEY";
+const HEALTH_PATH: &str = "/api/health";
 const STOP_PATH: &str = "/api/system/stop";
 const RESTART_PATH: &str = "/api/system/restart";
 
@@ -49,6 +51,7 @@ pub struct LocalServerInfo {
     pub error_detail: Option<String>,
     pub public_url: Option<String>,
     pub token: Option<String>,
+    pub terminal_key: Option<String>,
 }
 
 #[derive(Default)]
@@ -108,11 +111,69 @@ fn resolve_port(dir: &Path) -> u16 {
     port_in(RUNTIME_FILE).or_else(|| port_in(ENV_FILE)).unwrap_or(DEFAULT_PORT)
 }
 
-fn access_token(dir: &Path) -> Option<String> {
+fn env_secret(dir: &Path, key: &str) -> Option<String> {
     read_pairs(&dir.join(ENV_FILE))
-        .get(TOKEN_KEY)
+        .get(key)
         .map(|value| value.to_string())
         .filter(|value| !value.is_empty())
+}
+
+fn access_token(dir: &Path) -> Option<String> {
+    env_secret(dir, TOKEN_KEY)
+}
+
+fn sync_credentials(config: &LocalServerConfig, info: &mut LocalServerInfo, ready: bool) {
+    let exposure = ready.then(|| running_exposure(info.port)).flatten();
+    let Some((gated, public_url)) = exposure else {
+        info.public_url = None;
+        info.token = None;
+        info.terminal_key = None;
+        return;
+    };
+    info.public_url = public_url.or_else(|| info.public_url.take());
+    if !gated {
+        info.token = None;
+        info.terminal_key = None;
+        return;
+    }
+    let dir = PathBuf::from(&config.dir);
+    if info.token.is_none() {
+        info.token = env_secret(&dir, TOKEN_KEY);
+    }
+    if info.terminal_key.is_none() {
+        info.terminal_key = env_secret(&dir, TERMINAL_KEY_KEY);
+    }
+}
+
+fn running_exposure(port: u16) -> Option<(bool, Option<String>)> {
+    let body = get(port, HEALTH_PATH)?;
+    let exposure = serde_json::from_str::<serde_json::Value>(&body)
+        .ok()?
+        .get("data")?
+        .get("exposure")?
+        .clone();
+    let gated = exposure.get("gated")?.as_bool()?;
+    let public_url = exposure
+        .get("public_url")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim_end_matches('/').to_string());
+    Some((gated, public_url))
+}
+
+fn get(port: u16, path: &str) -> Option<String> {
+    let address = SocketAddr::from(([127, 0, 0, 1], port));
+    let timeout = Duration::from_millis(PROBE_TIMEOUT_MS);
+    let mut stream = TcpStream::connect_timeout(&address, timeout).ok()?;
+    let _ = stream.set_write_timeout(Some(timeout));
+    let _ = stream.set_read_timeout(Some(timeout));
+    let request = format!(
+        "GET {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nAccept: application/json\r\nConnection: close\r\n\r\n"
+    );
+    stream.write_all(request.as_bytes()).ok()?;
+    let mut response = String::new();
+    BufReader::new(stream).read_to_string(&mut response).ok()?;
+    let (head, body) = response.split_once("\r\n\r\n")?;
+    head.lines().next()?.contains(" 200").then(|| body.to_string())
 }
 
 fn recorded_pid(dir: &Path) -> Option<u32> {
@@ -184,14 +245,23 @@ fn parse_line(line: &str, info: &mut LocalServerInfo) {
         }
     }
     if line.contains("Token") {
-        let token = line
-            .split_once(':')
-            .map(|(_, rest)| rest.split("[Auto]").next().unwrap_or(rest).trim())
-            .unwrap_or_default();
-        if !token.is_empty() {
-            info.token = Some(token.to_string());
+        if let Some(token) = secret_in(line) {
+            info.token = Some(token);
         }
     }
+    if line.contains("Terminal key") {
+        if let Some(key) = secret_in(line) {
+            info.terminal_key = Some(key);
+        }
+    }
+}
+
+fn secret_in(line: &str) -> Option<String> {
+    let value = line
+        .split_once(':')
+        .map(|(_, rest)| rest.split("[Auto]").next().unwrap_or(rest).trim())
+        .unwrap_or_default();
+    (!value.is_empty()).then(|| value.to_string())
 }
 
 #[tauri::command(async)]
@@ -218,6 +288,7 @@ pub fn local_server_status(
         inner.info.error = None;
         inner.info.error_detail = None;
     }
+    sync_credentials(&config, &mut inner.info, ready);
     inner.info.clone()
 }
 
@@ -299,18 +370,23 @@ fn start_inner(
     emit(app, &info);
 
     let ready_app = app.clone();
+    let ready_config = config.clone();
     std::thread::spawn(move || {
-        if wait_port(port, true, READY_ATTEMPTS) {
-            let _ = ready_app.emit(
-                STATUS_EVENT,
-                LocalServerInfo {
-                    managed: true,
-                    ready: true,
-                    port,
-                    ..LocalServerInfo::default()
-                },
-            );
+        if !wait_port(port, true, READY_ATTEMPTS) {
+            return;
         }
+        let state = ready_app.state::<LocalServerState>();
+        let mut inner = state.inner.lock().unwrap();
+        if inner.generation != generation {
+            return;
+        }
+        inner.info.managed = true;
+        inner.info.ready = true;
+        inner.info.port = port;
+        sync_credentials(&ready_config, &mut inner.info, true);
+        let info = inner.info.clone();
+        drop(inner);
+        let _ = ready_app.emit(STATUS_EVENT, info);
     });
 
     if let Some(stdout) = stdout {
@@ -326,9 +402,18 @@ fn start_inner(
                 while tail.len() > TAIL_LINES {
                     tail.pop_front();
                 }
-                let before = (current.public_url.clone(), current.token.clone());
+                let before = (
+                    current.public_url.clone(),
+                    current.token.clone(),
+                    current.terminal_key.clone(),
+                );
                 parse_line(&line, &mut current);
-                if before != (current.public_url.clone(), current.token.clone()) {
+                let after = (
+                    current.public_url.clone(),
+                    current.token.clone(),
+                    current.terminal_key.clone(),
+                );
+                if before != after {
                     emit(&reader_app, &current);
                 }
             }
@@ -339,8 +424,7 @@ fn start_inner(
                 port,
                 error: Some("crashed".into()),
                 error_detail: Some(detail.join("\n")).filter(|text| !text.trim().is_empty()),
-                public_url: current.public_url.clone(),
-                token: current.token.clone(),
+                ..LocalServerInfo::default()
             };
             let state = reader_app.state::<LocalServerState>();
             let mut inner = state.inner.lock().unwrap();

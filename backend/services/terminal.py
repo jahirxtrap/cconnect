@@ -18,6 +18,7 @@ from typing import Optional
 
 import psutil
 
+from core import config
 from core.config import DEFAULT_CWD, TERMINAL_ACCESS_KEY
 from services import settings_store
 
@@ -213,8 +214,13 @@ def meta(term: Terminal) -> dict:
 
 
 def key_matches(candidate: str) -> bool:
-    """False while no key exists, which leaves the terminal locked."""
+    if not gated():
+        return True
     return bool(TERMINAL_ACCESS_KEY) and hmac.compare_digest(candidate or "", TERMINAL_ACCESS_KEY)
+
+
+def gated() -> bool:
+    return config.PUBLIC_ACCESS_TOKEN is not None
 
 
 def _root(candidates: Optional[list[str]]) -> str:
