@@ -159,7 +159,7 @@
 
 <QrCameraOverlay />
 
-{#if navigation.preview}
+{#if navigation.previewOverlay && navigation.preview}
   {@const request = navigation.preview}
   <FilePreview
     url={request.url}

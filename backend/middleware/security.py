@@ -7,18 +7,22 @@ from core.responses import api_response
 
 MAX_BODY_SIZE = 500 * 1_048_576
 
+FRAMEABLE_PATHS = ("/api/shared/", "/api/shared-archive-file")
+
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
 
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["Server"] = "."
-        response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
+
+        if not request.url.path.startswith(FRAMEABLE_PATHS):
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'"
 
         return response
 

@@ -279,7 +279,7 @@
   "OPEN_EXTERNAL_LINK": "Abrir enlace externo",
   "OPEN_EXTERNAL_LINK_MESSAGE": "Se abrirá un enlace externo:\n{1}",
   "HTML_PREVIEW_UNAVAILABLE": "La vista previa de HTML no está disponible aquí",
-  "OPEN_IN_BROWSER": "Abrir en el navegador",
+  "OPEN_EXTERNALLY": "Abrir externamente",
   "NO_FILES": "Sin archivos",
   "DELETE_FILE_CONFIRM": "¿Eliminar «{1}»?",
   "UPLOAD_FILES": "Subir archivos",

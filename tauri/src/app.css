@@ -291,8 +291,8 @@ body {
   cursor: default;
 }
 
-input:focus,
-textarea:focus,
+input,
+textarea,
 .selectable {
   user-select: text;
   -webkit-user-select: text;
@@ -334,8 +334,8 @@ textarea:focus,
 
 .selectable::selection,
 .selectable ::selection,
-input:focus::selection,
-textarea:focus::selection {
+input::selection,
+textarea::selection {
   background: var(--c-accent-selection);
 }
 

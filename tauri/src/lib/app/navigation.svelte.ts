@@ -45,6 +45,9 @@ class Navigation {
   settingsHighlight = $state<string | null>(null);
   explorerArchive = $state<string | null>(null);
   preview = $state<PreviewRequest | null>(null);
+  previewPane = $state(false);
+
+  readonly previewOverlay = $derived(this.preview !== null && !this.previewPane);
 
   start() {
     if (blocked(baseOf(window.location.pathname))) {
@@ -57,7 +60,7 @@ class Navigation {
 
     (window as unknown as { __cconnectBack?: () => boolean }).__cconnectBack = () => {
       if (dismissTop()) return true;
-      if (this.#layers > 0 || this.preview) {
+      if (this.#layers > 0 || this.previewOverlay) {
         window.history.back();
         return true;
       }
@@ -74,7 +77,7 @@ class Navigation {
           window.history.pushState(null, "", window.location.href);
           return;
         }
-        if (this.preview) {
+        if (this.previewOverlay) {
           this.preview = null;
           return;
         }
@@ -143,11 +146,12 @@ class Navigation {
 
   openPreview(request: PreviewRequest) {
     this.preview = request;
+    this.previewPane = false;
     window.history.pushState({ overlay: "preview" }, "", window.location.href);
   }
 
   closePreview() {
-    if (this.preview) window.history.back();
+    if (this.previewOverlay) window.history.back();
   }
 
   pushLayer() {
@@ -167,7 +171,7 @@ class Navigation {
   }
 
   close(): boolean {
-    if (this.preview) {
+    if (this.previewOverlay) {
       this.closePreview();
       return true;
     }

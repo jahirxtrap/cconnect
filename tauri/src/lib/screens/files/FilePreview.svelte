@@ -3,6 +3,7 @@
   import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import ExternalLink from "@lucide/svelte/icons/external-link";
+  import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Save from "@lucide/svelte/icons/save";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
@@ -27,6 +28,7 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
@@ -37,9 +39,18 @@
     filename: string;
     onClose: () => void;
     onDelete?: (() => void) | null;
+    embedded?: boolean;
+    onExpand?: (() => void) | null;
   }
 
-  const { url, filename, onClose, onDelete = null }: Props = $props();
+  const {
+    url,
+    filename,
+    onClose,
+    onDelete = null,
+    embedded = false,
+    onExpand = null,
+  }: Props = $props();
 
   let text = $state<string | null>(null);
   let failed = $state(false);
@@ -48,6 +59,11 @@
   let formatted = $state(settings.markdownPreviewFormatted);
   let menu = $state(false);
   let confirmingDelete = $state(false);
+  let pdfWidth = $state(0);
+
+  const PDF_RESIZE_STEP = 96;
+
+  const pdfStep = $derived(Math.round(pdfWidth / PDF_RESIZE_STEP));
 
   const kind = $derived(previewKindOf(filename));
   const relative = $derived(relativeFromUrl(url));
@@ -74,6 +90,7 @@
   });
 
   $effect(() => {
+    if (embedded) return;
     const onKeydown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
     };
@@ -110,66 +127,81 @@
   });
 </script>
 
-<div class="safe-area fixed inset-0 z-50 flex flex-col bg-background text-on-background">
-  <AppTopBar title={t("VIEW")} subtitle={filename}>
-    {#snippet navigationIcon()}
-      <TooltipIconButton label={t("BACK")} onclick={onClose}>
-        <ArrowLeft size={20} />
+{#snippet toolbar()}
+  {#if onExpand}
+    <TooltipIconButton label={t("EXPAND")} class={embedded ? "size-8" : ""} onclick={onExpand}>
+      <Maximize2 size={embedded ? 18 : 20} />
+    </TooltipIconButton>
+  {/if}
+  {#if kind === "markdown"}
+    <TooltipIconButton
+      label={t("FORMATTED_VIEW")}
+      class={embedded ? "size-8" : ""}
+      onclick={() => {
+        formatted = !formatted;
+        settings.markdownPreviewFormatted = formatted;
+      }}
+    >
+      <Type size={embedded ? 18 : 20} class={formatted ? "text-accent" : ""} />
+    </TooltipIconButton>
+  {/if}
+  <PopupMenu
+    open={menu}
+    onOpenChange={(value) => (menu = value)}
+    label={t("MORE_OPTIONS")}
+    align="center"
+  >
+    {#snippet triggerChild(props)}
+      <TooltipIconButton label={t("MORE_OPTIONS")} class={embedded ? "size-8" : ""} {...props}>
+        <EllipsisVertical size={embedded ? 18 : 24} />
       </TooltipIconButton>
     {/snippet}
-    {#snippet actions()}
-      {#if kind === "markdown"}
-        <TooltipIconButton
-          label={t("FORMATTED_VIEW")}
-          onclick={() => {
-            formatted = !formatted;
-            settings.markdownPreviewFormatted = formatted;
-          }}
-        >
-          <Type size={20} class={formatted ? "text-accent" : ""} />
-        </TooltipIconButton>
-      {/if}
-      <PopupMenu
-        open={menu}
-        onOpenChange={(value) => (menu = value)}
-        label={t("MORE_OPTIONS")}
-        align="center"
-      >
-        {#snippet triggerChild(props)}
-          <TooltipIconButton label={t("MORE_OPTIONS")} {...props}>
-            <EllipsisVertical />
-          </TooltipIconButton>
+    <MenuItem text={t("SAVE")} onclick={() => void downloadShared(url, filename)}>
+      {#snippet leading()}
+        <Download size={20} class="shrink-0 text-on-surface-variant" />
+      {/snippet}
+    </MenuItem>
+    <MenuItem text={t("SAVE_AS")} onclick={() => void saveSharedAs(url, filename)}>
+      {#snippet leading()}
+        <Save size={20} class="shrink-0 text-on-surface-variant" />
+      {/snippet}
+    </MenuItem>
+    <MenuItem text={t("OPEN_EXTERNALLY")} onclick={() => void openSharedInBrowser(url, filename)}>
+      {#snippet leading()}
+        <ExternalLink size={20} class="shrink-0 text-on-surface-variant" />
+      {/snippet}
+    </MenuItem>
+    <MenuItem text={t("SHARE")} onclick={() => void openSharedExternally(url, filename)}>
+      {#snippet leading()}
+        <Share2 size={20} class="shrink-0 text-on-surface-variant" />
+      {/snippet}
+    </MenuItem>
+    {#if onDelete}
+      <MenuItem text={t("DELETE")} onclick={() => (confirmingDelete = true)}>
+        {#snippet leading()}
+          <Trash size={20} class="shrink-0 text-on-surface-variant" />
         {/snippet}
-        <MenuItem text={t("SAVE")} onclick={() => void downloadShared(url, filename)}>
-          {#snippet leading()}
-            <Download size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
-        <MenuItem text={t("SAVE_AS")} onclick={() => void saveSharedAs(url, filename)}>
-          {#snippet leading()}
-            <Save size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
-        <MenuItem text={t("OPEN_IN_BROWSER")} onclick={() => void openSharedInBrowser(url, filename)}>
-          {#snippet leading()}
-            <ExternalLink size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
-        <MenuItem text={t("SHARE")} onclick={() => void openSharedExternally(url, filename)}>
-          {#snippet leading()}
-            <Share2 size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
-        {#if onDelete}
-          <MenuItem text={t("DELETE")} onclick={() => (confirmingDelete = true)}>
-            {#snippet leading()}
-              <Trash size={20} class="shrink-0 text-on-surface-variant" />
-            {/snippet}
-          </MenuItem>
-        {/if}
-      </PopupMenu>
-    {/snippet}
-  </AppTopBar>
+      </MenuItem>
+    {/if}
+  </PopupMenu>
+{/snippet}
+
+<div
+  class={embedded
+    ? "flex h-full min-h-0 flex-col bg-surface"
+    : "safe-area fixed inset-0 z-50 flex flex-col bg-background text-on-background"}
+>
+  {#if embedded}
+    <PaneHeader title={filename} onBack={onClose} actions={toolbar} />
+  {:else}
+    <AppTopBar title={t("VIEW")} subtitle={filename} actions={toolbar}>
+      {#snippet navigationIcon()}
+        <TooltipIconButton label={t("BACK")} onclick={onClose}>
+          <ArrowLeft size={20} />
+        </TooltipIconButton>
+      {/snippet}
+    </AppTopBar>
+  {/if}
 
   {#if kind === "image"}
     <ZoomPane class="min-h-0 flex-1">
@@ -212,18 +244,22 @@
     {:else if platformName() === "android"}
       <PdfView url={source} onerror={() => (failed = true)} />
     {:else}
-      <iframe
-        use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
-        title={filename}
-        class="min-h-0 flex-1 border-0 bg-white"
-      ></iframe>
+      <div bind:clientWidth={pdfWidth} class="flex min-h-0 w-full flex-1">
+        {#key pdfStep}
+          <iframe
+            use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+            title={filename}
+            class="min-h-0 w-full flex-1 border-0 bg-white"
+          ></iframe>
+        {/key}
+      </div>
     {/if}
   {:else if kind === "html"}
     <iframe
       src={htmlSource}
       title={filename}
       sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-      class="min-h-0 flex-1 border-0 bg-white"
+      class="min-h-0 w-full flex-1 border-0 bg-white"
     ></iframe>
   {:else if failed}
     <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />

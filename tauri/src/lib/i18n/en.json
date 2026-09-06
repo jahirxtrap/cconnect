@@ -279,7 +279,7 @@
   "OPEN_EXTERNAL_LINK": "Open external link",
   "OPEN_EXTERNAL_LINK_MESSAGE": "This will open an external link:\n{1}",
   "HTML_PREVIEW_UNAVAILABLE": "HTML preview is not available here",
-  "OPEN_IN_BROWSER": "Open in browser",
+  "OPEN_EXTERNALLY": "Open externally",
   "NO_FILES": "No files",
   "DELETE_FILE_CONFIRM": "Delete \"{1}\"?",
   "UPLOAD_FILES": "Upload files",

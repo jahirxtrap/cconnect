@@ -37,6 +37,7 @@
     onGrow?: (grow: () => void, anchor: HTMLElement | null) => void;
     onAnswer?: (requestId: string, optionId: string) => void;
     onSharedLink?: (url: string, filename: string) => void;
+    onSuggest?: ((text: string) => void) | null;
     component?: Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
   }
 
@@ -52,6 +53,7 @@
     onGrow = (grow) => grow(),
     onAnswer,
     onSharedLink,
+    onSuggest = null,
     component,
   }: Props = $props();
 
@@ -98,7 +100,7 @@
     </div>
   {:else if message.role === "assistant"}
     <div class="w-full px-4">
-      <MarkdownText text={message.text} {onSharedLink} />
+      <MarkdownText text={message.text} {onSharedLink} {onSuggest} />
     </div>
   {:else if message.role === "thinking"}
     <Collapsible

@@ -4,7 +4,15 @@ import { settings } from "$lib/data/settings.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
-export type RightKind = "terminal" | "chat" | "markdown" | "monitor" | "claude" | "files" | "browser";
+export type RightKind =
+  | "terminal"
+  | "chat"
+  | "markdown"
+  | "monitor"
+  | "claude"
+  | "files"
+  | "browser"
+  | "preview";
 
 const KINDS: RightKind[] = ["terminal", "chat", "markdown", "monitor", "claude", "files", "browser"];
 
@@ -16,6 +24,7 @@ const SCOPE: Record<RightKind, Pane> = {
   claude: "chat",
   files: "files",
   browser: "browser",
+  preview: "files",
 };
 
 interface StoredRight {
@@ -30,6 +39,8 @@ class Panes {
   rightTabId = $state<string | null>(null);
   focused = $state<PaneRole>("center");
   dropTarget = $state<PaneRole | null>(null);
+
+  #beforePreview: RightKind | null = null;
 
   readonly rightTab = $derived(
     this.kind === "chat"
@@ -92,8 +103,25 @@ class Panes {
   }
 
   setKind(kind: RightKind) {
+    if (this.kind === "preview" && kind !== "preview") this.#beforePreview = null;
     this.kind = kind;
     if (kind === "chat" && !this.rightTab) this.rightTabId = tabs.newTab(null, "right").id;
+    this.focus("right");
+    this.commit();
+  }
+
+  showPreview() {
+    if (this.kind !== "preview") this.#beforePreview = this.kind;
+    this.open = true;
+    this.kind = "preview";
+    this.focus("right");
+    this.commit();
+  }
+
+  closePreview() {
+    if (this.kind !== "preview") return;
+    this.kind = this.#beforePreview ?? "terminal";
+    this.#beforePreview = null;
     this.focus("right");
     this.commit();
   }

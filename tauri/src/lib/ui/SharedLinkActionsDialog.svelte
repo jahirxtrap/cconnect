@@ -46,7 +46,7 @@
   <DialogActionItem text={t("SAVE")} icon={Download} onclick={() => run(() => void downloadShared(url, filename))} />
   <DialogActionItem text={t("SAVE_AS")} icon={Save} onclick={() => run(() => void saveSharedAs(url, filename))} />
   <DialogActionItem
-    text={t("OPEN_IN_BROWSER")}
+    text={t("OPEN_EXTERNALLY")}
     icon={ExternalLink}
     onclick={() => run(() => void openSharedInBrowser(url, filename))}
   />

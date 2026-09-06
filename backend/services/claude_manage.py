@@ -81,6 +81,11 @@ def mcp_add(name: str, target: str, transport: str = "stdio") -> dict:
 def mcp_remove(name: str) -> dict:
     if not name:
         return {"ok": False, "message": "name is required"}
+    store = _disabled_store()
+    if name in store:
+        store.pop(name)
+        _MCP_DISABLED.write_text(json.dumps(store, indent=2), encoding="utf-8")
+        return {"ok": True, "message": ""}
     return _shared(_run(["mcp", "remove", name]))
 
 

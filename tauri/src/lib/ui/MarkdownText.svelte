@@ -22,11 +22,18 @@
   interface Props {
     text: string;
     onSharedLink?: ((url: string, filename: string) => void) | null;
+    onSuggest?: ((text: string) => void) | null;
     dense?: boolean;
     class?: string;
   }
 
-  const { text, onSharedLink = null, dense = false, class: className = "" }: Props = $props();
+  const {
+    text,
+    onSharedLink = null,
+    onSuggest = null,
+    dense = false,
+    class: className = "",
+  }: Props = $props();
 
   const ALERT_KINDS = ["note", "tip", "important", "warning", "caution"];
 
@@ -133,7 +140,7 @@
         {/each}
       </div>
     {:else if part.kind === "block"}
-      <CconnectBlockView data={part.data} onOpen={open} />
+      <CconnectBlockView data={part.data} onOpen={open} {onSuggest} />
     {:else if part.kind === "details"}
       <details class="w-full">
         <summary

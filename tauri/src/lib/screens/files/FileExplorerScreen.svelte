@@ -23,6 +23,7 @@
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
   import { slide } from "svelte/transition";
+  import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { formatSize, isArchive } from "$lib/data/format";
   import { isPreviewable, previewKindOf } from "$lib/data/previewKind";
@@ -267,7 +268,7 @@
     }
     if (archive !== null) {
       if (isPreviewable(entry.name)) {
-        navigation.openPreview({
+        openFilePreview({
           url: archiveFileUrl(archive, innerChild(entry.name)),
           name: entry.name,
           onDelete: null,
@@ -287,7 +288,7 @@
     }
     if (isPreviewable(entry.name)) {
       const relative = child(entry.name);
-      navigation.openPreview({
+      openFilePreview({
         url: downloadUrl(relative),
         name: entry.name,
         onDelete: () => void sharedApi.remove(relative).then(reload),
@@ -479,7 +480,7 @@
       !confirmingDelete &&
       extractRequest === null &&
       compressing === null &&
-      navigation.preview === null,
+      !navigation.previewOverlay,
   );
 
   const stepBack = () => {
@@ -893,7 +894,7 @@
         enabled={!!single && !single.isDir && isPreviewable(single.name)}
         onclick={() => {
           if (!single) return;
-          navigation.openPreview({
+          openFilePreview({
             url: archiveFileUrl(current, innerChild(single.name)),
             name: single.name,
             onDelete: null,
@@ -974,7 +975,7 @@
                 text={t("VIEW")}
                 onclick={() => {
                   const relative = child(single.name);
-                  navigation.openPreview({
+                  openFilePreview({
                     url: downloadUrl(relative),
                     name: single.name,
                     onDelete: () => void sharedApi.remove(relative).then(reload),
@@ -989,7 +990,7 @@
             {/if}
             {#if single && !single.isDir && previewKindOf(single.name) === "html"}
               <MenuItem
-                text={t("OPEN_IN_BROWSER")}
+                text={t("OPEN_EXTERNALLY")}
                 onclick={() => {
                   const name = single.name;
                   void openSharedInBrowser(downloadUrl(child(name)), name);

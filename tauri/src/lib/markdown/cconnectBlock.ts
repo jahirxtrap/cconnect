@@ -1,5 +1,7 @@
 export const CCONNECT_LANG = "cconnect";
 
+const MAX_SUGGESTIONS = 3;
+
 export interface GalleryItem {
   url: string;
   alt?: string;
@@ -16,7 +18,8 @@ export type CconnectBlock =
   | { type: "gallery"; items: GalleryItem[] }
   | { type: "playlist"; items: PlaylistItem[] }
   | { type: "pdf"; url: string; title?: string }
-  | { type: "html"; url: string; title?: string };
+  | { type: "html"; url: string; title?: string }
+  | { type: "suggestions"; items: string[] };
 
 const str = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value : undefined;
@@ -59,6 +62,15 @@ export function parseCconnectBlock(source: string): CconnectBlock | null {
     case "html": {
       const url = str(data.url);
       return url ? { type: "html", url, title: str(data.title) } : null;
+    }
+    case "suggestions": {
+      const list = Array.isArray(data.items)
+        ? data.items.flatMap((item) => {
+            const label = str(item);
+            return label ? [label.trim()] : [];
+          })
+        : [];
+      return list.length ? { type: "suggestions", items: list.slice(0, MAX_SUGGESTIONS) } : null;
     }
     default:
       return null;

@@ -37,6 +37,7 @@ AUTH_HEADER = "header"
 _MODEL_ALIASES = ("SONNET", "OPUS", "HAIKU")
 
 _ACCOUNTS_DIR = Path(__file__).resolve().parent.parent / "accounts"
+_synced: dict[str, tuple[int, ...]] = {}
 _META_FILE = "account.json"
 _SHARED_DIRS = ("projects", "plugins", "skills")
 _COPIED_FILES = ("settings.json",)
@@ -117,8 +118,10 @@ def _auth_env(auth: dict) -> dict[str, str]:
 
 
 def env_for(account_id: Optional[str]) -> dict[str, str]:
-    """Environment overrides to run the CLI as this account."""
+    """Environment overrides to run the CLI as this account, with its shared config brought up to date."""
     path = config_dir(account_id)
+    if path is not None:
+        sync_shared_config(account_id)
     env = {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
     provider = provider_for(account_id)
     if not provider:
@@ -450,13 +453,23 @@ def _merge_shared(source: Path, target: Path, keys: tuple[str, ...]) -> None:
         current = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         current = {}
+    before = {key: current.get(key) for key in keys}
     for key in keys:
         if key in primary:
             current[key] = primary[key]
         else:
             current.pop(key, None)
+    if target.is_file() and before == {key: current.get(key) for key in keys}:
+        return
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(current, indent=2), encoding="utf-8")
+
+
+def _mtime(path: Path) -> int:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return 0
 
 
 def sync_shared_config(account_id: str) -> None:
@@ -464,8 +477,17 @@ def sync_shared_config(account_id: str) -> None:
     path = config_dir(account_id)
     if path is None:
         return
-    _merge_shared(_claude_json(None), _claude_json(account_id), _SHARED_KEYS)
-    _merge_shared(primary_dir() / "settings.json", path / "settings.json", _SHARED_SETTINGS_KEYS)
+    files = (
+        _claude_json(None),
+        primary_dir() / "settings.json",
+        _claude_json(account_id),
+        path / "settings.json",
+    )
+    if _synced.get(account_id) == tuple(_mtime(item) for item in files):
+        return
+    _merge_shared(files[0], files[2], _SHARED_KEYS)
+    _merge_shared(files[1], files[3], _SHARED_SETTINGS_KEYS)
+    _synced[account_id] = tuple(_mtime(item) for item in files)
 
 
 def sync_all_shared_config() -> None:

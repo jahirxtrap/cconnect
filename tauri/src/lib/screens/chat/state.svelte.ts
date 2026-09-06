@@ -508,15 +508,14 @@ export class ChatState {
       this.streaming = true;
       this.compacting = compacting;
       this.streamStatus = null;
-      const isCommand = !attachments.length && commandFor(this.capabilities, body) !== null;
-      if (isCommand) {
-        if (!compacting) this.#append(newMessage(this.#nextId++, "user", { text: body, ephemeral: true }));
-      } else {
+      if (!compacting) {
+        const isCommand = !attachments.length && commandFor(this.capabilities, body) !== null;
         const messageId = this.#nextId++;
         this.#append(
           newMessage(messageId, "user", {
             text: body,
             attachments: attachments.length ? attachments : null,
+            ephemeral: isCommand,
           }),
         );
         this.#optimisticChipId = id;

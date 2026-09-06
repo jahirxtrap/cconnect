@@ -3,6 +3,7 @@
   import Menu from "@lucide/svelte/icons/menu";
   import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
   import PanelRightOpen from "@lucide/svelte/icons/panel-right-open";
+  import { closeFilePreview, expandFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { accentAt } from "$lib/design/accents";
@@ -26,6 +27,7 @@
   import ClaudeDetail, { type ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import FileExplorerScreen from "$lib/screens/files/FileExplorerScreen.svelte";
+  import FilePreview from "$lib/screens/files/FilePreview.svelte";
   import MarkdownActions from "$lib/screens/markdown/MarkdownActions.svelte";
   import MarkdownEditor from "$lib/screens/markdown/MarkdownEditor.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
@@ -343,6 +345,18 @@
         {:else if panes.kind === "browser"}
           <PaneSurface>
             <BrowserView trailing={sideActions} focused={panes.focused === "right"} />
+          </PaneSurface>
+        {:else if panes.kind === "preview" && navigation.previewPane && navigation.preview}
+          {@const request = navigation.preview}
+          <PaneSurface>
+            <FilePreview
+              embedded
+              url={request.url}
+              filename={request.name}
+              onDelete={request.onDelete}
+              onClose={closeFilePreview}
+              onExpand={expandFilePreview}
+            />
           </PaneSurface>
         {:else if panes.kind === "claude"}
           <PaneSurface>

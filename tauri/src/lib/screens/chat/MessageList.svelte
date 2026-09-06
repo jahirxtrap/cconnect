@@ -32,6 +32,7 @@
     onLoadOlder: () => void;
     onFollowChange: (following: boolean) => void;
     onSharedLink: (url: string, filename: string) => void;
+    onSuggest?: ((text: string) => void) | null;
     tabId: string;
     expandedIds: Record<number, boolean>;
     savedScroll: { top: number; follow: boolean };
@@ -51,6 +52,7 @@
     onLoadOlder,
     onFollowChange,
     onSharedLink,
+    onSuggest = null,
     tabId,
     expandedIds,
     savedScroll,
@@ -71,6 +73,10 @@
             : "full";
 
   const visible = $derived(messages.filter((item) => modeFor(item.role) !== "off"));
+
+  const lastUserAt = $derived(
+    visible.reduce((last, item, index) => (item.role === "user" ? index : last), -1),
+  );
 
   const runningAt = (item: ChatMessage, index: number) =>
     item.role === "thinking" || item.role === "working" || item.role === "assistant"
@@ -395,6 +401,7 @@
           onGrow={(grow, node) => anchorGrowth(node, grow)}
           {onAnswer}
           {onSharedLink}
+          onSuggest={index > lastUserAt ? onSuggest : null}
           {component}
         />
       </div>

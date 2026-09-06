@@ -59,7 +59,7 @@
         </div>
       {/if}
       {#if buttons}
-        <div class="mt-5 flex justify-end gap-2">{@render buttons()}</div>
+        <div class="mt-5 flex flex-wrap justify-end gap-2">{@render buttons()}</div>
       {/if}
     </Dialog.Content>
   </Dialog.Portal>

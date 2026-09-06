@@ -6,10 +6,12 @@
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import Trash from "@lucide/svelte/icons/trash";
   import type { Snippet } from "svelte";
+  import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
+  import { isPreviewable } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
@@ -107,7 +109,7 @@
       queuedId !== null ||
       sharedLink !== null ||
       visibilityOpen ||
-      navigation.preview !== null ||
+      navigation.previewOverlay ||
       (layout.mobile && drawer.open),
   );
 
@@ -134,6 +136,19 @@
     if (!focused) return;
     return onNativePaste((files) => canAttach && !dialogOpen && chat.addAttachments(files));
   });
+
+  const openShared = (url: string, filename: string) => {
+    if (!isPreviewable(filename)) {
+      sharedLink = { url, filename };
+      return;
+    }
+    const relative = relativeFromUrl(url);
+    openFilePreview({
+      url,
+      name: filename,
+      onDelete: relative ? () => void sharedApi.remove(relative) : null,
+    });
+  };
 
   const onDrop = (event: DragEvent) => {
     if (!hasFiles(event)) return;
@@ -292,7 +307,8 @@
         onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
         onLoadOlder={() => chat.loadOlder()}
         onFollowChange={(following) => (chat.followBottom = following)}
-        onSharedLink={(url, filename) => (sharedLink = { url, filename })}
+        onSharedLink={openShared}
+        onSuggest={chat.viewOnly ? null : (text) => chat.submit(text)}
         tabId={tab.id}
         expandedIds={chat.expandedIds}
         savedScroll={{ top: chat.scrollTop, follow: chat.followBottom }}
@@ -391,7 +407,7 @@
     onSubmit={(action) => chat.submitComponent(data.requestId, action)}
     onDismiss={(via) => chat.declineQuestions(data.requestId, via)}
     onPage={(index) => chat.setActivePage(data.requestId, index)}
-    onPreviewOpen={(url, filename) => (sharedLink = { url, filename })}
+    onPreviewOpen={openShared}
     onUpload={(file, onProgress) => chat.uploadComponentFile(file, onProgress)}
   />
 {/snippet}
@@ -459,7 +475,7 @@
     url={target.url}
     filename={target.filename}
     onView={() =>
-      navigation.openPreview({
+      openFilePreview({
         url: target.url,
         name: target.filename,
         onDelete: relative ? () => void sharedApi.remove(relative) : null,
@@ -490,7 +506,7 @@
               icon={isArchive(name) ? FolderArchive : FileIcon}
               onclick={() => {
                 queuedId = null;
-                navigation.openPreview({ url: downloadUrl(attachment), name, onDelete: null });
+                openFilePreview({ url: downloadUrl(attachment), name, onDelete: null });
               }}
             />
           {/each}

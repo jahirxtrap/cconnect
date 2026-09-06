@@ -17,6 +17,7 @@
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Store from "@lucide/svelte/icons/store";
+  import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
@@ -209,7 +210,7 @@
 
   const openMemory = (scope: string, name: string) => {
     const project = scope === "global" ? null : memoriesProject;
-    navigation.openPreview({
+    openFilePreview({
       url: claudeApi.memoryUrl(scope, project, name),
       name,
       onDelete: () => void claudeApi.deleteMemory(scope, project, name).then(load),
@@ -217,7 +218,7 @@
   };
 
   const openSkillFile = (skill: Skill, file: string, name: string) => {
-    navigation.openPreview({ url: claudeApi.skillFileUrl(skill.plugin, skill.id, file), name, onDelete: null });
+    openFilePreview({ url: claudeApi.skillFileUrl(skill.plugin, skill.id, file), name, onDelete: null });
   };
 
   $effect(() => {

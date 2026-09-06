@@ -178,4 +178,6 @@
   });
 </script>
 
-<div bind:this={host} class="h-full w-full touch-none p-2" style="background: {TERMINAL_BACKGROUND}"></div>
+<div class="h-full w-full p-2" style="background: {TERMINAL_BACKGROUND}">
+  <div bind:this={host} class="h-full w-full touch-none"></div>
+</div>

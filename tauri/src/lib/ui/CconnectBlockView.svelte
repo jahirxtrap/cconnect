@@ -1,21 +1,23 @@
 <script lang="ts">
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
-  import Ellipsis from "@lucide/svelte/icons/ellipsis";
+  import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import { isVideo } from "$lib/data/previewKind";
   import type { CconnectBlock } from "$lib/markdown/cconnectBlock";
   import { mediaSrc } from "$lib/services/mediaSource";
   import PdfView from "$lib/screens/files/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import OutlinedPanel from "./OutlinedPanel.svelte";
+  import SuggestionChips from "./SuggestionChips.svelte";
 
   interface Props {
     data: CconnectBlock;
     onOpen: (url: string, filename: string) => void;
     compact?: boolean;
+    onSuggest?: ((text: string) => void) | null;
   }
 
-  const { data, onOpen, compact = false }: Props = $props();
+  const { data, onOpen, compact = false, onSuggest = null }: Props = $props();
 
   const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
   const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
@@ -63,7 +65,7 @@
     aria-label={fileName(url)}
     class="absolute top-2 right-2 z-10 inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface opacity-90 transition-opacity hover:opacity-100"
   >
-    <Ellipsis size={16} />
+    <Maximize2 size={16} />
   </button>
 {/snippet}
 
@@ -148,6 +150,8 @@
       </div>
     {/each}
   </OutlinedPanel>
+{:else if data.type === "suggestions"}
+  <SuggestionChips items={data.items} onSelect={onSuggest} />
 {:else if data.type === "pdf"}
   {#if pdfFailed}
     <a href={data.url} target="_blank" rel="noreferrer" class="text-accent underline">
