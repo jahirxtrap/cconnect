@@ -51,7 +51,7 @@ def disabled_tools() -> set[str]:
 def tool_specs(capabilities: Iterable[str] = ()) -> list[dict]:
     """Every tool the server can expose to a client with these capabilities."""
     probe = {
-        "request_compact": lambda: None,
+        "request_compact": lambda *_args: None,
         "session_info": lambda: {},
         "emit": lambda *_args, **_kwargs: None,
         "ask_user": lambda *_args, **_kwargs: None,

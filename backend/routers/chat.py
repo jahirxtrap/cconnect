@@ -161,15 +161,16 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                         yield {"type": "command", "markdown": md}
 
         async def gen():
-            pending = {"compact": False}
+            pending: dict = {"compact": False, "instructions": ""}
 
-            def request_compact():
+            def request_compact(instructions: str = ""):
                 pending["compact"] = True
+                pending["instructions"] = instructions
 
             async for event in one(text, attachments, seed_id, drain, request_compact):
                 yield event
             if pending["compact"]:
-                async for event in one("/compact", None, None, None, None):
+                async for event in one(f"/compact {pending['instructions']}".strip(), None, None, None, None):
                     yield event
 
         return gen()

@@ -598,7 +598,7 @@ async def run_prompt(
     drain: Optional[AsyncIterator[dict]] = None,
     seed_id: Optional[str] = None,
     wanted: Optional[Callable[[], dict]] = None,
-    request_compact: Optional[Callable[[], None]] = None,
+    request_compact: Optional[Callable[[str], None]] = None,
     capabilities: Optional[list[str]] = None,
     session_info: Optional[Callable[[], dict]] = None,
     on_transport: Optional[Callable[[Any], None]] = None,

@@ -5,8 +5,19 @@ from mcps.components import CAPABILITY as COMPONENTS
 COMPACT = (
     "Compact this conversation: condense the history into a summary so the context window frees up."
     " Compaction starts as soon as the current turn ends, so call it and keep going — there is"
-    " nothing to wait for. Use it when the user asks you to compact, and only then."
+    " nothing to wait for. Use it when the user asks you to compact, and only then. Whatever else"
+    " they asked for along with it goes in `instructions`."
 )
+
+COMPACT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "instructions": {
+            "type": "string",
+            "description": "What the user asked for along with the compaction, in their own words.",
+        },
+    },
+}
 
 INFO = (
     "What this very conversation is running on: its session id, working directory and project,"
@@ -47,9 +58,9 @@ def make_tools(context: dict) -> list:
         tools.append(session_info)
 
     if request_compact is not None:
-        @tool("compact", COMPACT, {})
+        @tool("compact", COMPACT, COMPACT_SCHEMA)
         async def compact(args):
-            request_compact()
+            request_compact(" ".join((args.get("instructions") or "").split()))
             return {"content": [{"type": "text", "text": "Compaction will start when this turn ends."}]}
 
         tools.append(compact)
