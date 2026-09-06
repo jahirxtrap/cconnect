@@ -1,6 +1,6 @@
 [package]
 name = "cconnect"
-version = "1.7.1"
+version = "1.7.2"
 description = "CConnect"
 authors = ["jahirtrap"]
 edition = "2021"
