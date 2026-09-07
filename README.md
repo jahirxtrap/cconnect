@@ -179,6 +179,10 @@ preview exactly what would change on disk (`+added −removed • files`), and
 choose whether to roll back the conversation alone or code and conversation
 together.
 
+**Arrow up walks back** through what you already sent in this chat, straight
+from the composer, and arrow down comes forward again — with what you were
+writing kept aside and handed back at the end.
+
 **Dictate instead of typing.** The microphone next to Send writes what you say
 into the composer — words appear as you speak and each finished sentence lands
 in the message. On Android it goes through the phone's own recogniser, which
@@ -211,6 +215,12 @@ to multi-select — then move, copy, share, delete, save to Downloads, or copy a
 file's PC path. Open a file to preview it in place — images with zoom, SVG,
 Markdown, and source code, and HTML in a web view on mobile or your browser on
 desktop — and delete it right from the preview if it's no longer needed.
+
+With the side panel open the preview lands there instead of covering the chat,
+so you can watch a file while Claude rewrites it — it reloads on its own when it
+changes on disk. A button blows it up to full screen, and closing it gives you
+back the panel you had. The same goes for a file Claude links in the chat: one
+tap opens it, and the rest of the actions stay in the viewer's menu.
 
 It works in both directions: drop a file into `backend/shared/` on the PC — or
 just ask Claude to write one there — and you get a tap-to-download link in the
@@ -324,6 +334,16 @@ agent so they're available out of the box from the phone:
   every chat — that's where the file-sharing and progress-check conventions
   live. Your personal additions go in `USER.md`, edited straight from the
   Claude screen.
+
+## Discord
+
+The desktop app can show on your Discord profile what you are working on: the
+action, the elapsed time of the turn, the model, the environment, the project
+folder or the chat title. Each piece is a switch of its own and everything is
+off until you turn the integration on — the content of the messages never goes
+out, at any setting. It talks to the Discord desktop client over its local
+socket, so nothing leaves the machine and there is nothing to publish while it
+is off.
 
 ## Optional tools
 

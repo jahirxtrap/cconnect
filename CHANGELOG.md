@@ -1,9 +1,10 @@
-- An account on your own provider chooses how much context travels with it: everything, Claude Code without the project files, or the bare model
-- The window of a provider model is read from the provider, so the context ring works with it and the conversation no longer compacts itself on every message
-- Asking Claude to compact now carries your instructions about what the summary should keep
-- A terminal on an SSH host survives switching chat tabs and environments
-- The local server panel lists the public address, the token and the terminal key, ready to copy, and a server that is not exposed no longer asks for that key
-- Your accounts appear in the settings search, signed in or not, and open their dialog from there
+- A file opens in the side panel instead of covering the chat, with a button to blow it up to full screen, and a link Claude shares gets there in one tap
+- Arrow up and down walk back through what you already sent in this chat, from the composer
+- Your Discord profile can show what you are working on, piece by piece, and never the messages themselves
+- Claude can close a turn with buttons for the obvious next step, and tapping one sends it as your next message
+- An MCP server added to your main account reaches the other accounts on its own
+- How much context an account carries now also decides which tools travel with it, with a new middle grade, and the dialog preselects the one that fits the provider
+- Markdown renders in the preview of an option, menus and dialog buttons fit on a phone, a password can be copied while shown, and the terminal no longer cuts off at the bottom
 
 > [!NOTE]
 > The web version is available at https://cconnect-tauri.pages.dev/
