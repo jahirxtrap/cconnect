@@ -44,3 +44,13 @@ backend/.playwright-mcp/
 
 # Serena (project config, cache and memories)
 .serena/
+
+# Claude Code workspace (agents, skills and local settings)
+.claude/
+
+# CodeGraph index
+.codegraph/
+
+# Local working notes
+backend/docs/
+client/docs/
