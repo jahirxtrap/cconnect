@@ -9,6 +9,7 @@
   import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { desktop } from "$lib/platform/desktop.svelte";
+  import { watchPresence } from "$lib/platform/discordPresence.svelte";
   import { mirrorNativeCopy } from "$lib/platform/clipboard";
   import { layout } from "$lib/platform/layout.svelte";
   import { shortcuts, type ShortcutScope } from "$lib/platform/shortcuts.svelte";
@@ -113,6 +114,8 @@
   $effect(() => {
     if (serverDefaults.revision > 0) tabs.refreshDefaults();
   });
+
+  watchPresence();
 </script>
 
 <svelte:window

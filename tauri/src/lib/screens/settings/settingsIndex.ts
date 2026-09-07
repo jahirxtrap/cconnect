@@ -14,6 +14,7 @@ import {
   chatLanguageValue,
   chatsValue,
   cliSourceValue,
+  discordValue,
   cliValue,
   effortValue,
   environmentValue,
@@ -55,6 +56,7 @@ export type SettingsDialog =
   | "font"
   | "accent"
   | "shortcuts"
+  | "discord"
   | "generation"
   | "permissions"
   | "visibility"
@@ -82,6 +84,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
+  { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
 
   { id: "notifications", label: "NOTIFICATIONS", value: notificationsValue, section: "background", group: "BACKGROUND_GROUP", dialog: "notifications" },
   { id: "battery", label: "BATTERY_OPTIMIZATION", summary: "BATTERY_OPTIMIZATION_SUMMARY", available: () => androidBackground() !== null, section: "background", group: "BACKGROUND_GROUP" },

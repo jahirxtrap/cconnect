@@ -11,6 +11,28 @@ export interface VisibilityPrefs {
   working: string | null;
 }
 
+export interface DiscordPrefs {
+  enabled: boolean;
+  status: boolean;
+  time: boolean;
+  model: boolean;
+  environment: boolean;
+  project: boolean;
+  chatTitle: boolean;
+  hideIdle: boolean;
+}
+
+const DISCORD_KEYS: Record<keyof DiscordPrefs, string> = {
+  enabled: "discord_presence",
+  status: "discord_status",
+  time: "discord_time",
+  model: "discord_model",
+  environment: "discord_environment",
+  project: "discord_project",
+  chatTitle: "discord_chat_title",
+  hideIdle: "discord_hide_idle",
+};
+
 const KINDS = new Map(CLIENT_SETTINGS.map((setting) => [setting.key, setting.kind]));
 
 class Settings {
@@ -140,6 +162,23 @@ class Settings {
   }
   set minimizeToTray(value: boolean) {
     this.#write("minimize_to_tray", value);
+  }
+
+  get discord(): DiscordPrefs {
+    return {
+      enabled: this.#read<boolean>("discord_presence"),
+      status: this.#read<boolean>("discord_status"),
+      time: this.#read<boolean>("discord_time"),
+      model: this.#read<boolean>("discord_model"),
+      environment: this.#read<boolean>("discord_environment"),
+      project: this.#read<boolean>("discord_project"),
+      chatTitle: this.#read<boolean>("discord_chat_title"),
+      hideIdle: this.#read<boolean>("discord_hide_idle"),
+    };
+  }
+
+  setDiscord<K extends keyof DiscordPrefs>(field: K, value: boolean) {
+    this.#write(DISCORD_KEYS[field], value);
   }
 
   get tabsState() {

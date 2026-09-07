@@ -1,4 +1,5 @@
 mod local_server;
+mod presence;
 mod secret;
 mod ssh;
 mod system;
@@ -127,6 +128,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .manage(ssh::SshState::default())
         .manage(local_server::LocalServerState::default())
+        .manage(presence::Presence::default())
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_connect,
             ssh::ssh_send,
@@ -140,7 +142,9 @@ pub fn run() {
             system::install_update,
             secret::secret_protect,
             secret::secret_unprotect,
-            secret::secret_available
+            secret::secret_available,
+            presence::presence_set,
+            presence::presence_clear
         ])
         .build(tauri::generate_context!())
         .expect("error while running CConnect")
@@ -161,10 +165,14 @@ pub fn run() {
             } if label == MAIN_WINDOW => {
                 #[cfg(desktop)]
                 let _ = app.remove_tray_by_id(TRAY_ID);
+                #[cfg(desktop)]
+                presence::shutdown(&app.state::<presence::Presence>());
                 local_server::shutdown(&app.state::<local_server::LocalServerState>());
                 std::process::exit(0);
             }
             tauri::RunEvent::Exit => {
+                #[cfg(desktop)]
+                presence::shutdown(&app.state::<presence::Presence>());
                 local_server::shutdown(&app.state::<local_server::LocalServerState>());
             }
             _ => {}

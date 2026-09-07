@@ -37,6 +37,7 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+discord-rich-presence = "0.2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-window-state = "2"
 

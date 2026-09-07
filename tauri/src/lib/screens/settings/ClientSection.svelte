@@ -11,11 +11,14 @@
   import { DYNAMIC_ACCENT } from "$lib/design/accents";
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
+  import { isDesktop } from "$lib/platform";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
+  import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
+  import DiscordDialog from "./DiscordDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
   import { fontOptions, localeOptions, themeOptions } from "./settingsValues";
@@ -89,6 +92,14 @@
       />
     {/snippet}
   </PreferenceRow>
+  {#if isDesktop}
+    <PreferenceRow
+      icon={DiscordIcon}
+      title={t("DISCORD_PRESENCE")}
+      summary={rowSummary("discord")}
+      onclick={() => (dialog = "discord")}
+    />
+  {/if}
 </SettingsGroup>
 
 {#if dialog === "theme"}
@@ -136,4 +147,6 @@
   />
 {:else if dialog === "shortcuts"}
   <ShortcutsDialog onDismiss={() => (dialog = null)} />
+{:else if dialog === "discord"}
+  <DiscordDialog onDismiss={() => (dialog = null)} />
 {/if}

@@ -1425,7 +1425,7 @@ export class ChatState {
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
     this.contextTokens = page.contextTokens;
-    this.#history = page.prompts ?? [];
+    if (page.prompts) this.#history = page.prompts;
     return true;
   }
 
@@ -1462,7 +1462,7 @@ export class ChatState {
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
-    this.#history = page.prompts ?? [];
+    if (page.prompts) this.#history = page.prompts;
   }
 
   #imageUrls(item: SessionMessage, sessionId: string, projectKey: string | null): string[] | null {

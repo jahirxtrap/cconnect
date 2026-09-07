@@ -58,6 +58,9 @@ export const notificationsValue = (): string =>
     ? t("NOTIFICATIONS_STATE", [settings.notifyInteraction, settings.notifyTaskDone].filter(Boolean).length)
     : t("NOTIFICATIONS_DISABLED");
 
+export const discordValue = (): string =>
+  settings.discord.enabled ? t("OPTION_ON") : t("OPTION_OFF");
+
 export const environmentValue = (): string =>
   backend.active ? `${backend.active.name} • ${address(backend.active)}` : t("NO_ENVIRONMENTS");
 
