@@ -67,10 +67,12 @@ class _Session:
         self.partial: bool = False
 
 
-def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None):
+def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
+    state: _Session = session.state
+    drain = session.drain
 
     def factory(ask_user, emit):
         async def one(text, attachments, seed_id, drain, request_compact):
@@ -126,7 +128,6 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
                     if event.get("type") == "session_started":
                         state.session_id = event["session_id"]
                         state.fork = False
-                        continue
                     if event.get("type") == "compact":
                         compacted = True
                     if event.get("type") == "result" and event.get("session_id"):
@@ -181,6 +182,10 @@ def _build_turn_runner(state: _Session, drain, text: str, attachments: list[str]
             if pending["compact"]:
                 async for event in one(f"/compact {pending['instructions']}".strip(), None, None, None, None):
                     yield sized(event)
+            while (item := await session.take_queued()) is not None:
+                await session.commit_user(item["id"], item["text"])
+                async for event in one(item["text"], item.get("attachments"), item["id"], drain, request_compact):
+                    yield sized(event)
 
         return gen()
 
@@ -196,7 +201,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
         except Exception:
             turn_start = 0
     if not session.start(
-        _build_turn_runner(session.state, session.drain, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport),
+        _build_turn_runner(session, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport),
         seed_id=mid,
         compacting=(text or "").strip().startswith("/compact"),
     ):

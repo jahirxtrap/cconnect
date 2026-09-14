@@ -153,7 +153,8 @@ class Tabs {
         if (!onChatRoute()) return;
         const location = readChatLocation();
         if (!location) {
-          this.stateFor(this.active).newSession();
+          const chat = this.stateFor(this.active);
+          if (chat.sessionId !== null || chat.viewOnly) chat.newSession();
           return;
         }
         if (location.view) {

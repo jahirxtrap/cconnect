@@ -78,6 +78,7 @@ export type ServerEvent =
   | { type: "session_message"; name: string | null; text: string }
   | { type: "todos"; items: TodoItem[] }
   | { type: "task"; id: string; content: string | null; status: string | null }
+  | { type: "session_started"; sessionId: string | null }
   | { type: "result"; sessionId: string | null }
   | { type: "context"; contextTokens: number | null; requestBytes: number | null; mediaBytes: number | null }
   | { type: "done"; replay: boolean }
@@ -697,6 +698,8 @@ export class ChatSocket {
         };
       case "task":
         return { type: "task", id: text(wire, "id") ?? "", content: text(wire, "content"), status: text(wire, "status") };
+      case "session_started":
+        return { type: "session_started", sessionId: text(wire, "session_id") };
       case "result":
         return { type: "result", sessionId: text(wire, "session_id") };
       case "context":

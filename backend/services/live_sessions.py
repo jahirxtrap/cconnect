@@ -275,6 +275,27 @@ class LiveSession:
             self._inbox.put_nowait(_CLOSE)
         return True
 
+    async def take_queued(self):
+        """Take the next queued item out of the queue so it can run as a fresh turn."""
+        item = next((it for it in self._queued if it.get("id") not in self._seen_ids), None)
+        if item is None:
+            return None
+        self._queued.remove(item)
+        carried = []
+        while not self._inbox.empty():
+            try:
+                pending = self._inbox.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+            if pending is not _CLOSE and pending is not item:
+                carried.append(pending)
+        for pending in carried:
+            self._inbox.put_nowait(pending)
+        self._stopping = False
+        self._drained.set()
+        self._publish_queue()
+        return item
+
     def already_consumed(self, mid):
         return bool(mid) and mid in self._seen_ids
 

@@ -612,6 +612,28 @@ export class ChatState {
     this.#sides = { ...rest, [sessionId]: pending };
   }
 
+  #bindSession(sessionId: string | null) {
+    if (!sessionId) return;
+    const born = this.sessionId === null;
+    const list = this.list;
+    if (list && !list.sessions.some((item) => item.sessionId === sessionId)) {
+      list.upsertSession({
+        sessionId,
+        projectKey: this.projectKey,
+        path: this.cwd,
+        lastActive: Date.now() / MILLIS_PER_SECOND,
+        size: 0,
+        preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
+        title: null,
+        color: this.sessionColor,
+        activity: null,
+      });
+    }
+    this.sessionId = sessionId;
+    if (born) this.#claimPendingCategory(sessionId);
+    this.#promoteSide(sessionId);
+  }
+
   #claimPendingCategory(sessionId: string | null) {
     const wanted = this.pendingCategoryId || this.defaultCategory;
     this.pendingCategoryId = null;
@@ -2074,30 +2096,14 @@ export class ChatState {
         this.requestBytes = event.requestBytes;
         this.mediaBytes = event.mediaBytes;
         break;
-      case "result": {
+      case "session_started":
+        this.#bindSession(event.sessionId);
+        break;
+      case "result":
         this.#assistantId = null;
         this.#thinkingId = null;
-        const born = this.sessionId === null;
-        const sessionId = event.sessionId ?? this.sessionId;
-        const list = this.list;
-        if (sessionId && list && !list.sessions.some((item) => item.sessionId === sessionId)) {
-          list.upsertSession({
-            sessionId,
-            projectKey: this.projectKey,
-            path: this.cwd,
-            lastActive: Date.now() / MILLIS_PER_SECOND,
-            size: 0,
-            preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
-            title: null,
-            color: this.sessionColor,
-            activity: null,
-          });
-        }
-        this.sessionId = sessionId;
-        if (born) this.#claimPendingCategory(sessionId);
-        this.#promoteSide(sessionId);
+        this.#bindSession(event.sessionId ?? this.sessionId);
         break;
-      }
       case "done":
         if (this.streaming && settings.notifyTaskDone && !event.replay) {
           void notifier.notify(
