@@ -1,12 +1,13 @@
 <script lang="ts">
-  import ChevronsDown from "@lucide/svelte/icons/chevrons-down";
   import Eraser from "@lucide/svelte/icons/eraser";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
+  import { tick } from "svelte";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { keepFocus } from "$lib/ui/keepFocus";
+  import ChatScroller from "./ChatScroller.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
+  import StickyHeader from "./blocks/StickyHeader.svelte";
   import { cubicOut } from "svelte/easing";
 
   interface Props {
@@ -44,7 +45,6 @@
   const FULL_ABOVE = (PEEK + MAX) / 2;
   const PERCENT = 100;
 
-  let list = $state<HTMLDivElement | null>(null);
   let panel = $state<HTMLDivElement | null>(null);
   let dragging = $state(false);
 
@@ -95,84 +95,30 @@
     TOP_CORNER * (1 - Math.min(1, Math.max(0, (height - PEEK) / (MAX - PEEK)))),
   );
 
-  const AT_BOTTOM_PX = 4;
-  const SETTLE_MS = 120;
-  const OWN_TOP_PX = 1;
-  const SCROLL_END = "onscrollend" in window;
-  const HALF = 2;
-  const SCROLL_BUTTON_GAP = 12;
-
   let follow = $state(true);
-  let belowFold = $state(0);
-  let viewport = $state(0);
-  let horizontalScrollbar = $state(0);
-  let verticalScrollbar = $state(0);
-  let ownTop = -1;
-  let lastTop = 0;
-  let smooth = false;
-  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  let scroller = $state<ChatScroller | null>(null);
+
+  const messageOf = (node: HTMLElement) => messages.find((item) => item.id === Number(node.dataset.mid)) ?? null;
+
+  const collapseHeader = async (node: HTMLElement) => {
+    const toggle = node.querySelector<HTMLElement>("[data-block] > button");
+    if (!toggle || !scroller) return;
+    toggle.click();
+    await tick();
+    const block = node.querySelector<HTMLElement>("[data-block]") ?? node;
+    scroller.bringToTop(block);
+    scroller.refreshHeader();
+  };
   let lastPrompt: number | null = null;
   let exitFrom = 0;
 
   const shown = $derived(Math.min(MAX, Math.max(PEEK, height)));
   const hiddenFraction = $derived(Math.max(0, (PEEK - Math.max(MIN, height)) / PEEK));
 
-  const distanceToBottom = () => (list ? Math.abs(list.scrollTop) : 0);
-
-  const scrollToEnd = () => {
-    if (!list) return;
-    list.scrollTop = 0;
-    ownTop = list.scrollTop;
-    lastTop = list.scrollTop;
-  };
-
-  const smoothToEnd = () => {
-    if (!list) return;
-    smooth = true;
-    list.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const stopFollowing = () => {
-    follow = false;
-  };
-
-  const onwheel = (event: WheelEvent) => {
-    if (event.deltaY < 0) stopFollowing();
-  };
-
-  const settle = () => {
-    settleTimer = null;
-    smooth = false;
-    if (distanceToBottom() <= AT_BOTTOM_PX) follow = true;
-  };
-
-  const onscroll = () => {
-    if (!list) return;
-    const top = list.scrollTop;
-    const movedUp = Math.abs(top) > Math.abs(lastTop) + OWN_TOP_PX;
-    lastTop = top;
-    belowFold = distanceToBottom();
-    viewport = list.clientHeight;
-    verticalScrollbar = list.offsetWidth - list.clientWidth;
-    horizontalScrollbar = list.offsetHeight - list.clientHeight;
-    const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
-    ownTop = -1;
-    if (!ours && movedUp && belowFold > AT_BOTTOM_PX) follow = false;
-    if (!SCROLL_END) {
-      if (settleTimer !== null) clearTimeout(settleTimer);
-      settleTimer = setTimeout(settle, SETTLE_MS);
-    }
-  };
-
-  const toBottom = () => {
-    follow = true;
-    smoothToEnd();
-  };
-
   $effect(() => {
     void messages.at(-1)?.text;
     void messages.length;
-    if (follow) scrollToEnd();
+    if (follow) scroller?.scrollToEnd();
   });
 
   $effect(() => {
@@ -181,12 +127,7 @@
     if (id === lastPrompt) return;
     lastPrompt = id;
     if (!last || last.role !== "interaction" || !last.interaction || !isPending(last.interaction)) return;
-    follow = true;
-    smoothToEnd();
-  });
-
-  $effect(() => () => {
-    if (settleTimer !== null) clearTimeout(settleTimer);
+    scroller?.scrollToEnd();
   });
 
   const PANEL_MS = 350;
@@ -237,17 +178,9 @@
   <div class="h-px shrink-0 bg-outline-variant"></div>
 
   <div class="relative min-h-0 flex-1">
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div
-      bind:this={list}
-      {onscroll}
-      {onwheel}
-      onscrollend={settle}
-      ontouchmove={stopFollowing}
-      class="selectable flex h-full flex-col-reverse overflow-x-hidden overflow-y-auto"
-    >
-      <div class="mb-auto shrink-0">
-        {#each messages as item, index (item.id)}
+    <ChatScroller bind:this={scroller} bind:follow hasContent={messages.length > 0} {bottomInset}>
+      {#each messages as item, index (item.id)}
+        <div data-mid={item.id}>
           <MessageItem
             message={item}
             prevRole={messages[index - 1]?.role ?? null}
@@ -256,23 +189,14 @@
             {onAnswer}
             {component}
           />
-        {/each}
-      </div>
-    </div>
-
-    {#if !follow && messages.length && viewport > 0 && belowFold > viewport / HALF}
-      <button
-        type="button"
-        use:keepFocus
-        onclick={toBottom}
-        title={t("SCROLL_TO_BOTTOM")}
-        aria-label={t("SCROLL_TO_BOTTOM")}
-        style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar + bottomInset}px; right: {SCROLL_BUTTON_GAP +
-          verticalScrollbar}px"
-        class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
-      >
-        <ChevronsDown size={24} />
-      </button>
-    {/if}
+        </div>
+      {/each}
+      {#snippet header(node: HTMLElement)}
+        {@const message = messageOf(node)}
+        {#if message}
+          <StickyHeader {message} onCollapse={() => collapseHeader(node)} />
+        {/if}
+      {/snippet}
+    </ChatScroller>
   </div>
 </div>

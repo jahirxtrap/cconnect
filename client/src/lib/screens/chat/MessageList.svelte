@@ -1,19 +1,14 @@
 <script lang="ts">
-  import ChevronsDown from "@lucide/svelte/icons/chevrons-down";
   import { tick, untrack } from "svelte";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
-  import { t } from "$lib/i18n/index.svelte";
-  import { keepFocus } from "$lib/ui/keepFocus";
-  import { scrollbarWidth } from "$lib/ui/scrollbar";
+  import ChatScroller from "./ChatScroller.svelte";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
   import StatusProgress from "./blocks/StatusProgress.svelte";
   import StickyHeader from "./blocks/StickyHeader.svelte";
-  import { gapAbove } from "./blocks/gaps";
-  import { hasCollapsibleContent } from "./blocks/sticky";
 
   interface Visibility {
     thinking: string;
@@ -31,19 +26,19 @@
     visibility: Visibility;
     onAnswer: (requestId: string, optionId: string) => void;
     onLoadOlder: () => void;
-    onFollowChange: (following: boolean) => void;
+    follow?: boolean;
     onSharedLink: (url: string, filename: string) => void;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
     onSuggest?: ((item: SuggestionItem) => void) | null;
-    tabId: string;
+    sessionId: string | null;
     expandedIds: Record<number, boolean>;
-    savedScroll: { top: number; follow: boolean };
-    onScrollTop: (top: number, following: boolean) => void;
+    savedTop: number;
+    onScrollTop: (top: number) => void;
     component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     bottomInset?: number;
   }
 
-  const {
+  let {
     messages,
     pendingToolIds,
     streaming,
@@ -52,13 +47,13 @@
     visibility,
     onAnswer,
     onLoadOlder,
-    onFollowChange,
+    follow = $bindable(true),
     onSharedLink,
     onSharedMenu = null,
     onSuggest = null,
-    tabId,
+    sessionId,
     expandedIds,
-    savedScroll,
+    savedTop,
     onScrollTop,
     component,
     bottomInset = 0,
@@ -86,230 +81,27 @@
       ? index === visible.length - 1 && streaming
       : !!item.toolUseId && pendingToolIds.includes(item.toolUseId);
 
-  const AT_BOTTOM_PX = 4;
-  const SETTLE_MS = 120;
-  const OWN_TOP_PX = 1;
-  const LOAD_OLDER_PX = 200;
-  const SCROLL_END = "onscrollend" in window;
-  const SCROLL_BUTTON_GAP = 12;
-  const STICKY_FALLBACK = 40;
-  const HALF = 2;
-
-  let horizontalScrollbar = $state(0);
-  let verticalScrollbar = $state(0);
-
-  let container = $state<HTMLDivElement | null>(null);
-  let content = $state<HTMLDivElement | null>(null);
-  let follow = $state(true);
-  let restoredTab: string | null = null;
-  let belowFold = $state(0);
-  let viewport = $state(0);
-  let ownTop = -1;
-  let lastTop = 0;
-  let smooth = false;
-  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+  let scroller = $state<ChatScroller | null>(null);
   let lastId: number | null = null;
+  let headId: number | null = null;
+  let shownSession: string | null = untrack(() => sessionId);
+  let heldFromEnd: number | null = null;
 
-  let scrollSign = 0;
-  let carry = 0;
+  const messageOf = (node: HTMLElement) => visible.find((item) => item.id === Number(node.dataset.mid)) ?? null;
 
-  const detectScrollSign = () => {
-    if (!container || container.scrollHeight <= container.clientHeight) return;
-    const previous = container.scrollTop;
-    container.scrollTop = -1;
-    scrollSign = container.scrollTop < 0 ? -1 : 1;
-    container.scrollTop = previous;
-  };
-
-  const distanceToBottom = () => (container ? Math.abs(container.scrollTop) : 0);
-
-  const atBottom = () =>
-    !container || container.scrollHeight <= container.clientHeight || distanceToBottom() <= AT_BOTTOM_PX;
-
-  const distanceToTop = () =>
-    container ? container.scrollHeight - container.clientHeight - Math.abs(container.scrollTop) : 0;
-
-  const scrollTo = (top: number) => {
-    if (!container) return;
-    if (!scrollSign) detectScrollSign();
-    container.scrollTop = (scrollSign || -1) * Math.abs(top);
-    ownTop = container.scrollTop;
-    lastTop = container.scrollTop;
-  };
-
-  const scrollFromTop = (fromTop: number) => {
-    if (!container) return;
-    const max = container.scrollHeight - container.clientHeight;
-    scrollTo(Math.max(0, max - fromTop));
-  };
-
-  const smoothToEnd = () => {
-    if (!container) return;
-    smooth = true;
-    container.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const settle = () => {
-    settleTimer = null;
-    smooth = false;
-    if (distanceToBottom() <= AT_BOTTOM_PX) follow = true;
-  };
-
-  let stickyHeight = $state(0);
-  let sticky = $state<{ message: ChatMessage; gap: number; push: number } | null>(null);
-
-  const topOf = (node: HTMLElement) => node.offsetTop - (content?.offsetTop ?? 0);
-
-  const firstVisible = (): HTMLElement | null => {
-    if (!container || !content) return null;
-    const items = content.children;
-    let low = 0;
-    let high = items.length - 1;
-    let found: HTMLElement | null = null;
-    while (low <= high) {
-      const middle = (low + high) >> 1;
-      const node = items[middle] as HTMLElement;
-      if (topOf(node) + node.offsetHeight > distanceToTop()) {
-        found = node;
-        high = middle - 1;
-      } else {
-        low = middle + 1;
-      }
-    }
-    return found;
-  };
-
-  const updateSticky = () => {
-    if (!container || !content) {
-      sticky = null;
-      return;
-    }
-    const start = firstVisible();
-    if (!start) {
-      sticky = null;
-      return;
-    }
-    let candidate: { message: ChatMessage; gap: number; push: number } | null = null;
-    let node: HTMLElement | null = start;
-    while (node) {
-      const id = Number(node.dataset.mid);
-      const index = node.dataset.mid ? visible.findIndex((item) => item.id === id) : -1;
-      const message = index >= 0 ? visible[index] : null;
-      const gap = message ? gapAbove(visible[index - 1]?.role ?? null, message.role) : 0;
-      const top = topOf(node) - distanceToTop();
-      if (top + gap >= 0) break;
-      if (message && expandedIds[id] && hasCollapsibleContent(message, modeFor(message.role) === "label")) {
-        const height = stickyHeight > 0 ? stickyHeight : STICKY_FALLBACK;
-        candidate = { message, gap, push: Math.min(0, top + node.offsetHeight - height) };
-      }
-      node = node.nextElementSibling as HTMLElement | null;
-    }
-    sticky = candidate;
-  };
-
-  const collapseSticky = async () => {
-    const current = sticky;
-    if (!current || !container) return;
-    follow = false;
-    expandedIds[current.message.id] = false;
+  const collapseSticky = async (id: number) => {
+    if (!scroller) return;
+    expandedIds[id] = false;
     await tick();
-    const node = container.querySelector<HTMLElement>(`[data-mid="${current.message.id}"]`);
-    if (node) scrollFromTop(topOf(node) + current.gap);
-    updateSticky();
+    const node = scroller.find(`[data-mid="${id}"]`);
+    const block = node?.querySelector<HTMLElement>("[data-block]") ?? node;
+    if (block) scroller.bringToTop(block);
+    scroller.refreshHeader();
   };
-
-  const shiftBy = (delta: number) => {
-    if (!container) return;
-    const wanted = delta + carry;
-    if (!wanted) return;
-    if (!scrollSign) detectScrollSign();
-    const previous = container.scrollTop;
-    container.scrollTop += -(scrollSign || -1) * wanted;
-    carry = wanted + (scrollSign || -1) * (container.scrollTop - previous);
-    ownTop = container.scrollTop;
-    lastTop = container.scrollTop;
-  };
-
-  const anchorGrowth = async (node: HTMLElement | null, grow: () => void) => {
-    if (follow || atBottom()) {
-      follow = true;
-      grow();
-      return;
-    }
-    if (!node || !container) {
-      grow();
-      return;
-    }
-    container.style.overflowAnchor = "none";
-    const previousTop = node.getBoundingClientRect().top;
-    const hold = () => shiftBy(node.getBoundingClientRect().top - previousTop);
-    const observer = new ResizeObserver(hold);
-    if (content) observer.observe(content);
-    grow();
-    await tick();
-    hold();
-    requestAnimationFrame(() =>
-      requestAnimationFrame(() => {
-        observer.disconnect();
-        if (container) container.style.overflowAnchor = "";
-      }),
-    );
-  };
-
-  let heldNode: HTMLElement | null = null;
-
-  const releaseHeight = () => {
-    if (!heldNode) return;
-    heldNode.style.height = "";
-    heldNode = null;
-  };
-
-  $effect(() => {
-    void visible.length;
-    if (!streaming || follow) {
-      releaseHeight();
-      return;
-    }
-    const nodes = container?.querySelectorAll<HTMLElement>("[data-mid]");
-    const last = nodes?.length ? nodes[nodes.length - 1] : null;
-    if (!last || last === heldNode) return;
-    releaseHeight();
-    last.style.height = `${last.getBoundingClientRect().height}px`;
-    heldNode = last;
-  });
 
   const toggleExpanded = (id: number) => {
-    releaseHeight();
-    anchorGrowth(container?.querySelector<HTMLElement>(`[data-mid="${id}"]`) ?? null, () => {
-      expandedIds[id] = !expandedIds[id];
-    });
-  };
-
-  const measureScrollbar = () => {
-    if (!container) return;
-    verticalScrollbar = scrollbarWidth(container);
-    horizontalScrollbar = container.offsetHeight - container.clientHeight;
-  };
-
-  const onscroll = () => {
-    if (!container) return;
-    measureScrollbar();
-    const top = container.scrollTop;
-    const movedUp = Math.abs(top) > Math.abs(lastTop) + OWN_TOP_PX;
-    lastTop = top;
-    onScrollTop(top, follow);
-    belowFold = distanceToBottom();
-    viewport = container.clientHeight;
-    const ours = smooth || Math.abs(top - ownTop) <= OWN_TOP_PX;
-    ownTop = -1;
-    if (!ours) carry = 0;
-    if (!ours && movedUp && belowFold > AT_BOTTOM_PX) follow = false;
-    if (!SCROLL_END) {
-      if (settleTimer !== null) clearTimeout(settleTimer);
-      settleTimer = setTimeout(settle, SETTLE_MS);
-    }
-    updateSticky();
-    if (distanceToTop() < LOAD_OLDER_PX) onLoadOlder();
+    if (scroller?.atBottom()) follow = true;
+    expandedIds[id] = !expandedIds[id];
   };
 
   const separatorAt = (index: number) => {
@@ -323,34 +115,27 @@
     return true;
   };
 
-  const stopFollowing = () => {
-    follow = false;
-  };
-
-  const onwheel = (event: WheelEvent) => {
-    if (event.deltaY < 0) stopFollowing();
-  };
-
-  const toBottom = () => {
-    follow = true;
-    smoothToEnd();
-  };
+  $effect.pre(() => {
+    const head = messages[0]?.id ?? null;
+    const previous = headId;
+    headId = head;
+    if (previous === null || head === null || head === previous) return;
+    heldFromEnd = scroller?.distanceToBottom() ?? null;
+  });
 
   $effect(() => {
-    const element = container;
-    const inner = content;
-    if (!element || !inner) return;
-    measureScrollbar();
-    const observer = new ResizeObserver(() => {
-      measureScrollbar();
-      if (follow) scrollTo(0);
-      belowFold = distanceToBottom();
-      viewport = element.clientHeight;
-      updateSticky();
-    });
-    observer.observe(element);
-    observer.observe(inner);
-    return () => observer.disconnect();
+    void messages;
+    if (heldFromEnd === null) return;
+    const distance = heldFromEnd;
+    heldFromEnd = null;
+    scroller?.scrollFromEnd(distance);
+  });
+
+  $effect(() => {
+    const id = sessionId;
+    if (id === shownSession) return;
+    shownSession = id;
+    scroller?.scrollToEnd();
   });
 
   $effect(() => {
@@ -358,9 +143,7 @@
     void messages.length;
     void compacting;
     void streamStatus;
-    if (!container) return;
-    measureScrollbar();
-    if (follow) scrollTo(0);
+    if (follow) scroller?.scrollToEnd();
   });
 
   $effect(() => {
@@ -369,47 +152,33 @@
     if (id === lastId) return;
     lastId = id;
     if (!last || last.role !== "interaction" || !last.interaction || !isPending(last.interaction)) return;
-    follow = true;
-    smoothToEnd();
+    scroller?.scrollToEnd();
   });
 
   $effect(() => {
     void visible;
-    void stickyHeight;
-    updateSticky();
+    void expandedIds;
+    scroller?.refreshHeader();
   });
-
-  $effect(() => onFollowChange(follow));
 
   $effect(() => {
-    const id = tabId;
-    if (id === restoredTab) return;
-    restoredTab = id;
-    const target = untrack(() => savedScroll);
-    follow = target.follow;
+    const top = untrack(() => savedTop);
+    const following = untrack(() => follow);
     void tick().then(() => {
-      if (!container) return;
-      detectScrollSign();
-      scrollTo(target.follow ? 0 : target.top);
+      if (following) scroller?.scrollToEnd();
+      else scroller?.holdAt(top);
     });
-  });
-
-  $effect(() => () => {
-    if (settleTimer !== null) clearTimeout(settleTimer);
   });
 </script>
 
-<div class="relative h-full">
-  <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div
-    bind:this={container}
-    {onscroll}
-    {onwheel}
-    onscrollend={settle}
-    ontouchmove={stopFollowing}
-    class="selectable flex h-full flex-col-reverse overflow-x-hidden overflow-y-auto"
-  >
-    <div bind:this={content} class="mb-auto shrink-0">
+<ChatScroller
+  bind:this={scroller}
+  bind:follow
+  hasContent={visible.length > 0}
+  {bottomInset}
+  onScroll={onScrollTop}
+  onNearTop={onLoadOlder}
+>
     {#each visible as item, index (item.id)}
       {@const separated = separatorAt(index)}
       <div data-mid={item.id}>
@@ -425,7 +194,6 @@
           labelMode={modeFor(item.role) === "label"}
           expanded={expandedIds[item.id] ?? false}
           onToggle={() => toggleExpanded(item.id)}
-          onGrow={(grow, node) => anchorGrowth(node, grow)}
           {onAnswer}
           {onSharedLink}
           {onSharedMenu}
@@ -434,36 +202,15 @@
         />
       </div>
     {/each}
-      {#if compacting}
-        <StatusProgress kind="compacting" />
-      {:else if streamStatus === "slow" || streamStatus === "failed"}
-        <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
-      {/if}
-    </div>
-  </div>
-
-  {#if sticky}
-    <div
-      bind:clientHeight={stickyHeight}
-      style="transform: translateY({sticky.push}px); right: {verticalScrollbar}px"
-      class="absolute top-0 left-0 z-10"
-    >
-      <StickyHeader message={sticky.message} onCollapse={collapseSticky} />
-    </div>
-  {/if}
-
-  {#if !follow && visible.length && viewport > 0 && belowFold > viewport / HALF}
-    <button
-      type="button"
-      use:keepFocus
-      onclick={toBottom}
-      title={t("SCROLL_TO_BOTTOM")}
-      aria-label={t("SCROLL_TO_BOTTOM")}
-      style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar + bottomInset}px; right: {SCROLL_BUTTON_GAP +
-        verticalScrollbar}px"
-      class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
-    >
-      <ChevronsDown size={24} />
-    </button>
-  {/if}
-</div>
+    {#if compacting}
+      <StatusProgress kind="compacting" />
+    {:else if streamStatus === "slow" || streamStatus === "failed"}
+      <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
+    {/if}
+  {#snippet header(node: HTMLElement)}
+    {@const message = messageOf(node)}
+    {#if message}
+      <StickyHeader {message} onCollapse={() => collapseSticky(message.id)} />
+    {/if}
+  {/snippet}
+</ChatScroller>

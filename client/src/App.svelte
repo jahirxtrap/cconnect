@@ -33,9 +33,7 @@
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
   import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
-  import { refreshPixelGrid } from "$lib/ui/pixelGrid";
 
-  refreshPixelGrid();
   theme.start();
   layout.start();
   navigation.start();
@@ -129,7 +127,6 @@
   oncut={mirrorNativeCopy}
   ondragover={blockFileOpen}
   ondrop={blockFileOpen}
-  onresize={() => refreshPixelGrid()}
 />
 
 <div

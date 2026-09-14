@@ -15,7 +15,6 @@
     type InteractionData,
   } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
-  import { ceilPx, gridHeight } from "$lib/ui/pixelGrid";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -82,7 +81,7 @@
     const low = heights[Math.floor(spot)] ?? heights[current];
     const high = heights[Math.ceil(spot)] ?? low;
     if (low === undefined) return null;
-    return ceilPx(low + (high - low) * (spot - Math.floor(spot)));
+    return low + (high - low) * (spot - Math.floor(spot));
   });
 
   const offsetOf = (node: HTMLDivElement, index: number) => {
@@ -237,12 +236,12 @@
         bind:this={pager}
         onscroll={onPagerScroll}
         onscrollend={stopSliding}
-        style="gap: var(--chat-pager-gap-snap, var(--chat-pager-gap))"
+        style="gap: var(--chat-pager-gap)"
         class="no-scrollbar flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
       >
         {#each pages as item, index (index)}
           <div class="w-full shrink-0 snap-center self-start">
-            <div use:gridHeight={(value) => (heights[index] = value)} class="chat-gap flex flex-col">
+            <div bind:clientHeight={heights[index]} class="chat-gap flex flex-col">
               {@render fields(item.blocks)}
             </div>
           </div>

@@ -276,36 +276,35 @@
         : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
       style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
     >
-      <MessageList
-        messages={chat.view}
-        pendingToolIds={chat.pendingToolIds}
-        streaming={chat.streaming}
-        compacting={chat.compacting || activity === "compacting"}
-        streamStatus={chat.streamStatus}
-        visibility={{
-          thinking: chat.showThinking,
-          toolUse: chat.showToolUse,
-          fileChange: chat.showFileChange,
-          compact: chat.showCompact,
-        }}
-        onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
-        onLoadOlder={() => chat.loadOlder()}
-        onFollowChange={(following) => (chat.followBottom = following)}
-        onSharedLink={openShared}
-        onSharedMenu={(url, filename) => (sharedLink = { url, filename })}
-        onSuggest={chat.viewOnly
-          ? null
-          : (item) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text))}
-        tabId={tab.id}
-        expandedIds={chat.expandedIds}
-        savedScroll={{ top: chat.scrollTop, follow: chat.followBottom }}
-        onScrollTop={(top, following) => {
-          chat.scrollTop = top;
-          chat.followBottom = following;
-        }}
-        {component}
-        bottomInset={transfersLift}
-      />
+      {#key tab.id}
+        <MessageList
+          messages={chat.view}
+          pendingToolIds={chat.pendingToolIds}
+          streaming={chat.streaming}
+          compacting={chat.compacting || activity === "compacting"}
+          streamStatus={chat.streamStatus}
+          visibility={{
+            thinking: chat.showThinking,
+            toolUse: chat.showToolUse,
+            fileChange: chat.showFileChange,
+            compact: chat.showCompact,
+          }}
+          onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
+          onLoadOlder={() => chat.loadOlder()}
+          bind:follow={chat.followBottom}
+          onSharedLink={openShared}
+          onSharedMenu={(url, filename) => (sharedLink = { url, filename })}
+          onSuggest={chat.viewOnly
+            ? null
+            : (item) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text))}
+          sessionId={chat.sessionId}
+          expandedIds={chat.expandedIds}
+          savedTop={chat.scrollTop}
+          onScrollTop={(top) => (chat.scrollTop = top)}
+          {component}
+          bottomInset={transfersLift}
+        />
+      {/key}
     </div>
     {#if chat.sideOpen}
       <SidePanel

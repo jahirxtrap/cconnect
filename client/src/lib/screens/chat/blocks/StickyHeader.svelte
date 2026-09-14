@@ -1,13 +1,13 @@
 <script lang="ts">
   import Archive from "@lucide/svelte/icons/archive";
   import Bot from "@lucide/svelte/icons/bot";
-  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import FilePen from "@lucide/svelte/icons/file-pen";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import type { ChatMessage } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import type { IconSource } from "$lib/ui/icons";
+  import CollapsibleHead from "./CollapsibleHead.svelte";
 
   interface Props {
     message: ChatMessage;
@@ -44,22 +44,18 @@
         return { icon: null, label: "", accent: false };
     }
   });
+
+  const tone = $derived(spec.accent ? "text-accent" : "text-on-surface-variant");
 </script>
 
 <div class="w-full bg-background shadow-sm">
-  <button
-    type="button"
+  <CollapsibleHead
+    label={spec.label}
+    icon={spec.icon ?? undefined}
+    labelClass={tone}
+    iconClass={tone}
+    expanded
+    wide
     onclick={onCollapse}
-    class="flex w-full cursor-pointer items-center gap-[6px] px-4 text-left transition-colors select-none hover:bg-on-surface/8"
-  >
-    {#if spec.icon}
-      <spec.icon size={16} class="shrink-0 {spec.accent ? 'text-accent' : 'text-on-surface-variant'}" />
-    {/if}
-    <span
-      class="min-w-0 flex-1 truncate text-label-lg {spec.accent ? 'text-accent' : 'text-on-surface-variant'}"
-    >
-      {spec.label}
-    </span>
-    <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
-  </button>
+  />
 </div>

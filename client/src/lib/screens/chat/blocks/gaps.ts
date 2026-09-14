@@ -1,8 +1,12 @@
 import type { Role } from "$lib/data/chatModels";
-import { snappedToken } from "$lib/ui/pixelGrid";
 
-const BIG = () => snappedToken("--chat-gap-lg", 16);
-const SMALL = () => snappedToken("--chat-gap-sm", 6);
+const token = (name: string, fallback: number) => {
+  const raw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
+  return Number.isFinite(raw) ? raw : fallback;
+};
+
+const BIG = () => token("--chat-gap-lg", 16);
+const SMALL = () => token("--chat-gap-sm", 6);
 
 const NOTICE: Role[] = ["api_error", "interrupted"];
 

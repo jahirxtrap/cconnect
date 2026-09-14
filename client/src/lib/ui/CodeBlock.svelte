@@ -52,7 +52,7 @@
 <div class="w-full overflow-hidden rounded-panel bg-surface-variant">
   <div
     class="flex items-center pr-0.5 pl-2.5"
-    style="padding-top: var(--chat-pad-xs-snap, var(--chat-pad-xs))"
+    style="padding-top: var(--chat-pad-xs)"
   >
     <span class="flex-1 text-label-md text-on-surface-variant select-none">{lang || "code"}</span>
     <button
@@ -70,7 +70,7 @@
   </div>
   <pre
     use:hscrollbar={{ touchIndicator: true }}
-    style="line-height: var(--chat-line-code-snap, var(--chat-line-code))"
+    style="line-height: var(--chat-line-code)"
     class="no-scrollbar overflow-x-auto px-2.5 py-2 font-mono text-body-sm"><code
       >{#if html}{@html html}{:else}{body}{/if}</code
     ></pre>

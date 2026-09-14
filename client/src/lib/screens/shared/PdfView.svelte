@@ -3,7 +3,6 @@
   import { tick, untrack } from "svelte";
   import { authHeadersOf, backend } from "$lib/services/backend.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import { pixelGrid } from "$lib/ui/pixelGrid";
 
   interface Props {
     url: string;
@@ -43,7 +42,7 @@
 
   const clamp = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
-  const density = () => 1 / pixelGrid();
+  const density = () => window.devicePixelRatio || 1;
 
   const paint = async (index: number, available: number, factor: number) => {
     const page = pages[index];

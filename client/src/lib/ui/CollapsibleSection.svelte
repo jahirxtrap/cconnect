@@ -2,7 +2,6 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import type { Snippet } from "svelte";
-  import { gridHeight } from "./pixelGrid";
 
   interface Props {
     label: string;
@@ -31,6 +30,6 @@
     </span>
   </button>
   {#if open}
-    <div use:gridHeight class="chat-gap flex flex-col">{@render children()}</div>
+    <div class="chat-gap flex flex-col">{@render children()}</div>
   {/if}
 </div>
