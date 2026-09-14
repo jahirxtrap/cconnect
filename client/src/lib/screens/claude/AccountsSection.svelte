@@ -1,8 +1,9 @@
 <script lang="ts">
   import CircleUser from "@lucide/svelte/icons/circle-user";
+  import ClipboardPaste from "@lucide/svelte/icons/clipboard-paste";
   import Component from "@lucide/svelte/icons/component";
   import { t } from "$lib/i18n/index.svelte";
-  import { copyText } from "$lib/platform/clipboard";
+  import { copyText, pasteText } from "$lib/platform/clipboard";
   import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
   import { accountsStore } from "$lib/data/accountsStore.svelte";
@@ -31,6 +32,7 @@
   import SelectField from "$lib/ui/SelectField.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
     enabled: boolean;
@@ -64,6 +66,11 @@
   let editing = $state<Account | null>(null);
   let providerUrl = $state("");
   let auth = $state<ProviderAuth>(emptyAuth());
+
+  const pasteCode = async () => {
+    const text = (await pasteText()).trim();
+    if (text) code = text;
+  };
   let contextScope = $state("");
   let probing = $state(false);
   let probe = $state<ProviderProbe | null>(null);
@@ -552,7 +559,13 @@
       />
     </div>
     <div class="mt-3">
-      <InputField value={code} oninput={(value) => (code = value)} label={t("ACCOUNT_CODE")} singleLine />
+      <InputField value={code} oninput={(value) => (code = value)} label={t("ACCOUNT_CODE")} singleLine>
+        {#snippet trailing()}
+          <TooltipIconButton label={t("PASTE")} tooltip={false} onclick={pasteCode} class="size-6 [&_svg]:size-[18px]">
+            <ClipboardPaste class="text-on-surface-variant" />
+          </TooltipIconButton>
+        {/snippet}
+      </InputField>
     </div>
   </CompactDialog>
 {/if}

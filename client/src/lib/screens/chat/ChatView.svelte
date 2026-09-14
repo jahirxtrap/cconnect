@@ -502,6 +502,10 @@
                 queuedId = null;
                 openFilePreview({ url: downloadUrl(attachment), name, onDelete: null });
               }}
+              onmenu={() => {
+                queuedId = null;
+                sharedLink = { url: downloadUrl(attachment), filename: name };
+              }}
             />
           {/each}
         </div>

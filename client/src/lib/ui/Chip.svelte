@@ -6,10 +6,17 @@
     name: string;
     icon?: IconSource;
     onclick?: () => void;
+    onmenu?: (() => void) | null;
     trailing?: Snippet;
   }
 
-  const { name, icon: IconComponent, onclick, trailing }: Props = $props();
+  const { name, icon: IconComponent, onclick, onmenu = null, trailing }: Props = $props();
+
+  const contextMenu = (event: MouseEvent) => {
+    if (!onmenu) return;
+    event.preventDefault();
+    onmenu();
+  };
 
   const BASE_CLASS =
     "flex max-w-60 shrink-0 items-center gap-1.5 rounded-panel border-2 border-outline-variant px-2 py-1 select-none";
@@ -23,11 +30,12 @@
   {@render trailing?.()}
 {/snippet}
 
-{#if onclick}
+{#if onclick || onmenu}
   <button
     type="button"
-    {onclick}
-    class="{BASE_CLASS} cursor-pointer transition-colors hover:bg-on-surface/8"
+    onclick={() => onclick?.()}
+    oncontextmenu={contextMenu}
+    class="{BASE_CLASS} {onclick ? 'cursor-pointer transition-colors hover:bg-on-surface/8' : 'cursor-default'}"
   >
     {@render body()}
   </button>

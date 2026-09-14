@@ -83,6 +83,7 @@
                   name={attachment.name}
                   icon={fileIcon(attachment.name)}
                   onclick={() => onSharedLink?.(attachment.url, attachment.name)}
+                  onmenu={onSharedMenu ? () => onSharedMenu(attachment.url, attachment.name) : null}
                 />
               {/each}
             </div>
