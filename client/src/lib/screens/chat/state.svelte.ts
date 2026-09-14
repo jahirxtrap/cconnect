@@ -1026,11 +1026,17 @@ export class ChatState {
     this.#pushGeneration({ effort: effort || this.effort });
   }
 
+  #usesProvider(id: string) {
+    return (this.capabilities?.accounts ?? []).some((item) => item.id === id && item.provider);
+  }
+
   setAccount(account: string) {
+    const previous = this.effectiveAccount;
+    const next = account || this.account;
     this.onOverrides?.({ account });
     this.accountOverride = account;
-    this.#pushGeneration({ account: account || this.account });
-    this.switchingAccount = true;
+    this.#pushGeneration({ account: next });
+    this.switchingAccount = this.#usesProvider(previous) || this.#usesProvider(next);
     void this.refreshServerInfo();
   }
 

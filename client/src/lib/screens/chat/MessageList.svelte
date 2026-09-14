@@ -99,10 +99,16 @@
     scroller.refreshHeader();
   };
 
-  const toggleExpanded = (id: number) => {
-    if (scroller?.atBottom()) follow = true;
-    expandedIds[id] = !expandedIds[id];
+  const anchorGrowth = async (grow: () => void) => {
+    const pinnedToEnd = scroller?.atBottom() ?? false;
+    grow();
+    if (!pinnedToEnd) return;
+    await tick();
+    follow = true;
+    scroller?.scrollToEnd();
   };
+
+  const toggleExpanded = (id: number) => void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
 
   const separatorAt = (index: number) => {
     if (!settings.showTimestamps) return false;
@@ -194,6 +200,7 @@
           labelMode={modeFor(item.role) === "label"}
           expanded={expandedIds[item.id] ?? false}
           onToggle={() => toggleExpanded(item.id)}
+          onGrow={anchorGrowth}
           {onAnswer}
           {onSharedLink}
           {onSharedMenu}

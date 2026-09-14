@@ -9,6 +9,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import { openSharedExternally } from "$lib/services/sharedFiles";
+  import { snapToDevicePixel } from "./gridHeight";
   import ProgressRing from "./ProgressRing.svelte";
   import { borderWidth, scrollableUnder, scrollbarWidth } from "./scrollbar";
   import TooltipIconButton from "./TooltipIconButton.svelte";
@@ -48,16 +49,16 @@
 
 {#if items.length}
   <div
-    style="padding: {layout.menuPadding.top}px {layout.menuPadding.right +
-      scrollbar +
-      layout.rightInset}px {layout.menuPadding.bottom}px {layout.menuPadding.left}px"
+    style="padding: {snapToDevicePixel(layout.menuPadding.top)}px {snapToDevicePixel(
+      layout.menuPadding.right + scrollbar + layout.rightInset,
+    )}px {snapToDevicePixel(layout.menuPadding.bottom)}px {layout.menuPadding.left}px"
     class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-end {layout.rightInsetAnimated
       ? 'transition-[padding-right] duration-200'
       : ''}"
   >
     <div
       bind:clientHeight={panelHeight}
-      style="margin-bottom: {layout.bottomInset}px"
+      style="margin-bottom: {snapToDevicePixel(layout.bottomInset)}px"
       class="menu-surface pointer-events-auto w-full overflow-hidden rounded-lg border border-outline-variant bg-surface-variant shadow-lg sm:w-90"
     >
       <div class="flex items-center gap-1 py-1 pr-1 pl-3.5">
@@ -91,21 +92,16 @@
               {:else}
                 <ArrowDown size={16} class="shrink-0 text-on-surface-variant" />
               {/if}
-              {#if openable}
-                <button
-                  type="button"
-                  onclick={() => void openSharedExternally(item.url, item.name)}
-                  class="min-w-0 flex-1 cursor-pointer truncate text-left text-body-md text-on-surface-variant transition-colors hover:text-accent"
-                >
-                  {item.name}
-                </button>
-              {:else}
-                <span
-                  class="min-w-0 flex-1 truncate text-body-md {item.status === 'done' ? 'text-on-surface-variant' : ''}"
-                >
-                  {item.name}
-                </span>
-              {/if}
+              <button
+                type="button"
+                disabled={!openable}
+                onclick={() => void openSharedExternally(item.url, item.name)}
+                class="block min-w-0 flex-1 truncate text-left text-body-md {item.status === 'done'
+                  ? 'text-on-surface-variant'
+                  : ''} {openable ? 'cursor-pointer hover:text-accent' : 'cursor-default'}"
+              >
+                {item.name}
+              </button>
               {#if item.status === "active"}
                 <ProgressRing value={item.progress} size={20} stroke={2.5} />
                 <button

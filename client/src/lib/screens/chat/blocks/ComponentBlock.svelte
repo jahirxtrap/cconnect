@@ -3,7 +3,7 @@
   import CornerDownRight from "@lucide/svelte/icons/corner-down-right";
   import Play from "@lucide/svelte/icons/play";
   import X from "@lucide/svelte/icons/x";
-  import { untrack } from "svelte";
+  import { flushSync, untrack } from "svelte";
   import {
     componentAnswerable,
     componentBlocked,
@@ -83,6 +83,21 @@
     if (low === undefined) return null;
     return low + (high - low) * (spot - Math.floor(spot));
   });
+
+  const measurePages = () => {
+    if (!pager) return;
+    for (const [index, slot] of [...pager.children].entries()) {
+      const page = slot.firstElementChild;
+      if (page) heights[index] = page.clientHeight;
+    }
+  };
+
+  const growPage = (grow: () => void, anchor: HTMLElement | null) =>
+    onGrow(() => {
+      grow();
+      flushSync();
+      measurePages();
+    }, anchor);
 
   const offsetOf = (node: HTMLDivElement, index: number) => {
     const child = node.children[index] as HTMLElement | undefined;
@@ -197,7 +212,7 @@
 {/if}
 
 {#snippet fields(list: ComponentElement[])}
-  <ComponentElements {list} {data} {colors} {onGrow} {onValue} {onPick} {onPreviewOpen} {onUpload} />
+  <ComponentElements {list} {data} {colors} onGrow={growPage} {onValue} {onPick} {onPreviewOpen} {onUpload} />
 {/snippet}
 
 {#snippet body()}

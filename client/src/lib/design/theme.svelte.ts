@@ -44,6 +44,7 @@ class Theme {
     const media = prefersDark();
     this.systemDark = media.matches;
     media.addEventListener("change", (event) => (this.systemDark = event.matches));
+    this.#publishPixelGrid();
     void this.#loadSystemAccent();
 
     $effect(() => {
@@ -80,6 +81,14 @@ class Theme {
 
   #applySystemBars(dark: boolean) {
     androidSystemBars()?.setAppearance(dark);
+  }
+
+  #publishPixelGrid() {
+    const density = window.devicePixelRatio || 1;
+    document.documentElement.style.setProperty("--px-grid", `${1 / density}px`);
+    window
+      .matchMedia(`(resolution: ${density}dppx)`)
+      .addEventListener("change", () => this.#publishPixelGrid(), { once: true });
   }
 
   setFontStyle(style: FontStyle) {
