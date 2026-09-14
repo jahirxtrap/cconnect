@@ -83,6 +83,9 @@ const DEFAULTS = {
 
 const HISTORY_PAGE = 100;
 const COMPACT_COMMAND = "/compact";
+
+const withoutLiveCompact = (items: ChatMessage[]) =>
+  items.filter((item) => !(item.role === "compact" && item.sourceIndex < 0));
 const PREVIEW_LENGTH = 120;
 const NOTIFICATION_BODY_LENGTH = 120;
 
@@ -1498,9 +1501,7 @@ export class ChatState {
     this.#silent.clear();
     this.#interrupting = false;
     this.#pendingTrim = null;
-    const live = loaded.some((item) => item.role === "compact")
-      ? carried.filter((item) => item.role !== "compact")
-      : carried;
+    const live = loaded.some((item) => item.role === "compact") ? withoutLiveCompact(carried) : carried;
     this.messages = live.length ? [...loaded, ...live] : loaded;
     this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
@@ -1701,7 +1702,10 @@ export class ChatState {
       older.map((item, index) => this.#fromSession(item, this.#nextId + index, sessionId, this.projectKey)),
     );
     this.#nextId += older.length;
-    this.messages = [...prepended, ...this.messages];
+    const kept = prepended.some((item) => item.role === "compact")
+      ? withoutLiveCompact(this.messages)
+      : this.messages;
+    this.messages = [...prepended, ...kept];
     this.oldestLoadedIndex = startIndex;
     this.transcriptLoading = false;
     this.transcriptPaging = false;

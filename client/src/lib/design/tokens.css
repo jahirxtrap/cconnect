@@ -67,12 +67,12 @@
   --color-purple: var(--c-purple);
   --color-gray: var(--c-gray);
 
-  --chat-gap-lg: round(16px, var(--px-grid, 1px));
-  --chat-gap-sm: round(6px, var(--px-grid, 1px));
-  --chat-line-dense: round(19px, var(--px-grid, 1px));
-  --chat-line-code: round(16.5px, var(--px-grid, 1px));
-  --chat-pad-xs: round(2px, var(--px-grid, 1px));
-  --chat-pager-gap: round(14px, var(--px-grid, 1px));
+  --chat-gap-lg: 16px;
+  --chat-gap-sm: 6px;
+  --chat-line-dense: 19px;
+  --chat-line-code: 16.5px;
+  --chat-pad-xs: 2px;
+  --chat-pager-gap: 14px;
 
   --radius-xs: 6px;
   --radius-sm: 6px;
@@ -126,6 +126,17 @@
   --c-accent: #3f51b5;
   --c-accent-selection: rgba(63, 81, 181, 0.32);
   --c-accent-quote: rgba(63, 81, 181, 0.6);
+}
+
+@supports (width: round(1px, 1px)) {
+  :root {
+    --chat-gap-lg: round(16px, var(--px-grid, 1px));
+    --chat-gap-sm: round(6px, var(--px-grid, 1px));
+    --chat-line-dense: round(19px, var(--px-grid, 1px));
+    --chat-line-code: round(16.5px, var(--px-grid, 1px));
+    --chat-pad-xs: round(2px, var(--px-grid, 1px));
+    --chat-pager-gap: round(14px, var(--px-grid, 1px));
+  }
 }
 
 [data-font="flat"] {

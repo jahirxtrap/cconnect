@@ -100,13 +100,26 @@
 
   const messageOf = (node: HTMLElement) => messages.find((item) => item.id === Number(node.dataset.mid)) ?? null;
 
-  const collapseHeader = async (node: HTMLElement) => {
-    const toggle = node.querySelector<HTMLElement>("[data-block] > button");
-    if (!toggle || !scroller) return;
-    toggle.click();
+  const expandedIds = $state<Record<number, boolean>>({});
+
+  const anchorGrowth = async (grow: () => void) => {
+    const pinnedToEnd = scroller?.atBottom() ?? false;
+    grow();
+    if (!pinnedToEnd) return;
     await tick();
-    const block = node.querySelector<HTMLElement>("[data-block]") ?? node;
-    scroller.bringToTop(block);
+    follow = true;
+    scroller?.scrollToEnd();
+  };
+
+  const toggleExpanded = (id: number) => void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
+
+  const collapseSticky = async (id: number) => {
+    if (!scroller) return;
+    expandedIds[id] = false;
+    await tick();
+    const node = scroller.find(`[data-mid="${id}"]`);
+    const block = node?.querySelector<HTMLElement>("[data-block]") ?? node;
+    if (block) scroller.bringToTop(block);
     scroller.refreshHeader();
   };
   let lastPrompt: number | null = null;
@@ -186,6 +199,9 @@
             prevRole={messages[index - 1]?.role ?? null}
             nextRole={messages[index + 1]?.role ?? null}
             running={item.role === "working" && index === messages.length - 1 && streaming}
+            expanded={expandedIds[item.id] ?? false}
+            onToggle={() => toggleExpanded(item.id)}
+            onGrow={anchorGrowth}
             {onAnswer}
             {component}
           />
@@ -194,7 +210,7 @@
       {#snippet header(node: HTMLElement)}
         {@const message = messageOf(node)}
         {#if message}
-          <StickyHeader {message} onCollapse={() => collapseHeader(node)} />
+          <StickyHeader {message} onCollapse={() => collapseSticky(message.id)} />
         {/if}
       {/snippet}
     </ChatScroller>
