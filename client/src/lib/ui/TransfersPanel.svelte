@@ -8,6 +8,7 @@
   import { transfers } from "$lib/data/transfers.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { openSharedExternally } from "$lib/services/sharedFiles";
   import ProgressRing from "./ProgressRing.svelte";
   import { borderWidth, scrollableUnder, scrollbarWidth } from "./scrollbar";
   import TooltipIconButton from "./TooltipIconButton.svelte";
@@ -83,17 +84,28 @@
       {#if !transfers.collapsed}
         <div class="scrollbar-thin max-h-64 overflow-y-auto border-t border-outline-variant py-1">
           {#each items as item (item.id)}
+            {@const openable = item.status === "done" && item.url.length > 0}
             <div class="flex items-center gap-2.5 px-3.5 py-1.5">
               {#if item.kind === "upload"}
                 <ArrowUp size={16} class="shrink-0 text-on-surface-variant" />
               {:else}
                 <ArrowDown size={16} class="shrink-0 text-on-surface-variant" />
               {/if}
-              <span
-                class="min-w-0 flex-1 truncate text-body-md {item.status === 'done' ? 'text-on-surface-variant' : ''}"
-              >
-                {item.name}
-              </span>
+              {#if openable}
+                <button
+                  type="button"
+                  onclick={() => void openSharedExternally(item.url, item.name)}
+                  class="min-w-0 flex-1 cursor-pointer truncate text-left text-body-md text-on-surface-variant transition-colors hover:text-accent"
+                >
+                  {item.name}
+                </button>
+              {:else}
+                <span
+                  class="min-w-0 flex-1 truncate text-body-md {item.status === 'done' ? 'text-on-surface-variant' : ''}"
+                >
+                  {item.name}
+                </span>
+              {/if}
               {#if item.status === "active"}
                 <ProgressRing value={item.progress} size={20} stroke={2.5} />
                 <button

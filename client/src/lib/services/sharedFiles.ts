@@ -63,16 +63,24 @@ const saveBlob = async (blob: Blob, filename: string): Promise<boolean> => {
 export const downloadShared = (url: string, filename: string) => {
   const bridge = androidDownloads();
   if (bridge) {
-    return transfers.download(filename, (onProgress, signal) => {
-      const id = bridge.enqueue(url, filename, headersJson());
-      if (!id) return Promise.resolve(false);
-      return trackAndroidDownload(bridge, id, onProgress, signal);
-    });
+    return transfers.download(
+      filename,
+      (onProgress, signal) => {
+        const id = bridge.enqueue(url, filename, headersJson());
+        if (!id) return Promise.resolve(false);
+        return trackAndroidDownload(bridge, id, onProgress, signal);
+      },
+      url,
+    );
   }
-  return transfers.download(filename, async (onProgress, signal) => {
-    const blob = await fetchTracked(url, onProgress, signal);
-    return blob !== null && (await saveBlob(blob, filename));
-  });
+  return transfers.download(
+    filename,
+    async (onProgress, signal) => {
+      const blob = await fetchTracked(url, onProgress, signal);
+      return blob !== null && (await saveBlob(blob, filename));
+    },
+    url,
+  );
 };
 
 export const saveTextToDownloads = async (filename: string, text: string) => {

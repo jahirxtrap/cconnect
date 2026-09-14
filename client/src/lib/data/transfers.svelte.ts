@@ -10,6 +10,7 @@ export interface Transfer {
   kind: TransferKind;
   name: string;
   dir: string;
+  url: string;
   progress: number;
   status: TransferStatus;
 }
@@ -54,8 +55,9 @@ class TransferManager {
     kind: TransferKind,
     name: string,
     run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>,
+    url = "",
   ) {
-    const id = this.#start(kind, name, "");
+    const id = this.#start(kind, name, "", url);
     const abort = new AbortController();
     this.#aborts.set(id, abort);
     try {
@@ -68,8 +70,12 @@ class TransferManager {
     }
   }
 
-  download(name: string, run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>) {
-    return this.task("download", name, run);
+  download(
+    name: string,
+    run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>,
+    url = "",
+  ) {
+    return this.task("download", name, run, url);
   }
 
   cancel(id: number) {
@@ -89,9 +95,9 @@ class TransferManager {
     this.collapsed = false;
   }
 
-  #start(kind: TransferKind, name: string, dir: string) {
+  #start(kind: TransferKind, name: string, dir: string, url = "") {
     const id = ++this.#nextId;
-    this.items = [...this.items, { id, kind, name, dir, progress: 0, status: "active" }];
+    this.items = [...this.items, { id, kind, name, dir, url, progress: 0, status: "active" }];
     this.collapsed = false;
     return id;
   }

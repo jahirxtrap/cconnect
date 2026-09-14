@@ -1,11 +1,10 @@
 <script lang="ts">
   import Archive from "@lucide/svelte/icons/archive";
-  import ChevronDown from "@lucide/svelte/icons/chevron-down";
-  import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import type { CompactData } from "$lib/data/chatModels";
   import { formatTokens } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
+  import Collapsible from "./Collapsible.svelte";
 
   interface Props {
     compact: CompactData;
@@ -26,41 +25,17 @@
     }
     return parts.join(" • ");
   });
-
-  let localExpanded = $state(false);
-
-  const isExpanded = $derived(expanded ?? localExpanded);
-
-  const toggle = () => {
-    if (onToggle) onToggle();
-    else localExpanded = !localExpanded;
-  };
 </script>
 
-<div class="w-full px-4">
-  <button
-    type="button"
-    disabled={!hasSummary}
-    onclick={toggle}
-    class="flex w-full items-center rounded-sm text-left transition-colors select-none {hasSummary
-      ? 'cursor-pointer hover:bg-on-surface/8'
-      : 'cursor-default'}"
-  >
-    <Archive size={16} class="shrink-0 text-accent" />
-    <span class="ml-1.5 shrink-0 text-label-lg text-accent">{t("COMPACTED")}</span>
-    <span class="flex-1"></span>
-    {#if stats}
-      <span class="truncate text-body-sm text-on-surface-variant">{stats}</span>
-    {/if}
-    {#if hasSummary}
-      {#if isExpanded}
-        <ChevronDown size={18} class="ml-1.5 shrink-0 text-on-surface-variant" />
-      {:else}
-        <ChevronRight size={18} class="ml-1.5 shrink-0 text-on-surface-variant" />
-      {/if}
-    {/if}
-  </button>
-  {#if isExpanded && hasSummary}
-    <div><MarkdownText text={compact.summary} dense /></div>
-  {/if}
-</div>
+<Collapsible
+  label={t("COMPACTED")}
+  icon={Archive}
+  stat={stats}
+  labelOnly={!hasSummary}
+  labelClass="text-accent"
+  bodyClass=""
+  {expanded}
+  {onToggle}
+>
+  <MarkdownText text={compact.summary} dense />
+</Collapsible>

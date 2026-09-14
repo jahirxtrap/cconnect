@@ -1030,9 +1030,7 @@ export class ChatState {
     this.onOverrides?.({ account });
     this.accountOverride = account;
     this.#pushGeneration({ account: account || this.account });
-    this.switchingAccount = (this.capabilities?.accounts ?? []).some(
-      (item) => item.id === account && item.provider,
-    );
+    this.switchingAccount = true;
     void this.refreshServerInfo();
   }
 
