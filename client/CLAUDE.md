@@ -28,8 +28,8 @@ src/
   component that calls back into it.
 - **Reuse the toolkit.** `PopupMenu`, `MenuSub`, `MenuItem`, `InputField`, `ListRow`,
   `CompactDialog`, `ConfirmDialog`, `ZoomPane`, `DropOverlay`, `MarkdownText`, `CodeBlock`,
-  `scrollbar`, `pixelGrid`, `fileDrop`, `keepFocus`. New screens compose these; forking a
-  variant is how the two apps drift.
+  `SelectionDot`, `scrollbar`, `gridHeight`, `fileDrop`, `keepFocus`. New screens compose
+  these; forking a variant is how the two apps drift.
 - **Tailwind is concatenated by hand — there is no twMerge.** Two conflicting utilities both
   end up in `class`, and the winner is whatever CSS order decides. Resolve conflicts with a
   prop or a conditional, never by appending another class.
@@ -38,30 +38,39 @@ src/
   animation is `.menu-surface[data-state="closed"]` in `app.css`.
 - Every string goes through `t()` and lives in `lib/i18n/en.json` + `es.json`.
 
-## The pixel grid (`lib/ui/pixelGrid.ts`)
+## The pixel grid (`lib/ui/gridHeight.ts` + `design/tokens.css`)
 
 Scroll positions only land on whole **device** pixels (0.8 CSS px at dPR 1.25), so anything
 that grows inside the message list must be a multiple of that or the content shifts by a
-fraction of a pixel on every open/close. `gridHeight` measures a node and pads it up to the
-grid; `ceilPx` ignores differences below Blink's layout unit (1/64 px) — an arbitrary
-epsilon there is wrong and unstable. Tokens listed in `SNAPPED` get a `-snap` variant
-resolved at runtime; a 14px gap that was half a device pixel is what clipped the rounded
-edge of the bars inside a pager.
+fraction of a pixel on every open/close. It takes two halves and neither is enough alone:
 
-## Chat list (`screens/chat/MessageList.svelte`)
+- `theme` publishes `--px-grid` (`1 / devicePixelRatio`) and the chat tokens are rounded to
+  it inside `@supports (width: round(1px, 1px))` — a 14px gap that was half a device pixel
+  is what clipped the rounded edge of the bars inside a pager. A hardcoded list of snapped
+  values is the wrong shape for this; let CSS do the rounding.
+- `gridHeight` pads a node up to the next device pixel from a `ResizeObserver`, which is
+  what a collapsible body needs. It floors the padding to Blink's layout unit (1/64 px) and
+  ignores anything below it — an arbitrary epsilon there is wrong and unstable.
 
-- The container is `flex-col-reverse`, so `scrollTop = 0` is the bottom and its **sign
-  differs per engine**: reads use `Math.abs`, writes a sign detected at runtime.
+## Chat scroller (`screens/chat/ChatScroller.svelte`)
+
+One component owns the viewport and the chat list, the quick chat and the side panel all
+mount it; the API is exported (`atBottom`, `scrollToEnd`, `holdAt`, `scrollFromEnd`,
+`bringToTop`, `refreshHeader`).
+
+- `follow` is the stick-to-the-end state. The `ResizeObserver` re-pins to the end while it
+  is on, or to `pendingTop` when a hold is in place, which is what stops a block growing
+  above you from moving what you are reading.
+- `ownTop` tells our own scroll writes apart from the user's, or every programmatic scroll
+  would clear `follow` on the scroll event it causes.
 - `atBottom()` must also be true when there is no scroll at all
   (`scrollHeight <= clientHeight`), or expanding a block in a short chat grows downward
   instead of following the end.
-- Growth is anchored with `overflow-anchor: none` + `shiftBy`/`carry` around a
-  `ResizeObserver`, so opening a block does not move what you are reading.
-- `updateSticky()` runs on scroll, on content resize **and** right after collapsing from the
-  sticky header itself: collapsing may leave `scrollTop` untouched, no scroll event fires,
-  and the ghost header stays pinned over the real one. The 40px fallback height, used until
-  the header measures itself, is load-bearing — replacing it with "invisible until measured"
-  produces a blank frame, which reads as a flicker.
+- The pinned header is recomputed on scroll and on resize, walking forward from
+  `firstVisible()` (a binary search over `offsetTop`); its push is snapped to the device
+  pixel. The 40px fallback height, used until the header measures itself, is load-bearing —
+  replacing it with "invisible until measured" produces a blank frame, which reads as a
+  flicker.
 
 ## Image preview (`lib/ui/ZoomPane.svelte`)
 

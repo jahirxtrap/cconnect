@@ -242,6 +242,19 @@ next. A toggle folds the tree down to only what changed. From a file you can
 mention its full path in the chat or copy it. What git ignores stays hidden
 until you unlock it with the security key.
 
+With that changed view open, a bar at the bottom carries the branch, how far
+ahead or behind it is, and everything a commit takes: tick the files that go in,
+write the message — or have Claude write it from what you marked, following a
+prompt of your own kept in the Claude screen — choose the author among the
+identities the repository knows, amend the last commit, and pull or push. Every
+repository under the project is listed, not only the one at its root, so each
+file is committed to the one it belongs to.
+
+Throwing away the changes of what you ticked, pushing a branch that has no
+remote yet, and forcing a push are each one confirmation away. The security key
+gates all of it: without it the bar shows the branch you are on and nothing
+else.
+
 ## Notes
 
 A built-in Markdown editor doubles as a scratchpad: jot things down with a live
@@ -404,7 +417,7 @@ required for a plain local run.
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `--expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
 | `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `run.py` when it exposes the server, so you rarely write it yourself |
-| `SECURITY_KEY` | — | Unlocks the terminal and the files git ignores. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
+| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores and committing from the project panel. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
 | `WEB_CONCURRENCY` | `2` | Uvicorn workers with `run.py --production`. Ignored on Windows, which always runs one |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
@@ -455,7 +468,8 @@ Getting in takes the key the server prints on every start (`SECURITY_KEY`,
 replaced with `python run.py --security-key --rotate`). It is the only gate, so
 treat it as a password to the machine. The same key decides whether Claude may
 open a shell and run a command in it, which you can also turn off from
-Settings → Tools, and whether the project explorer shows the files git ignores.
+Settings → Tools, and whether the project explorer shows the files git ignores
+and lets you commit them.
 
 ## SSH client
 

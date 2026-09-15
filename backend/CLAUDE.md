@@ -26,7 +26,8 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 - `services/` — all the logic. `live_sessions` (turn decoupled from the socket), `claude_runtime`
   (SDK stream → normalized events), `sessions` (transcripts, checkpoints, images), `chat_list`,
   `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
-  `system_monitor`, `network`, `usage`, `accounts`, `shared`.
+  `system_monitor`, `network`, `usage`, `accounts`, `shared`, `git_ops` (the commit panel,
+  on top of the single runner in `services/git`, one lock per repository).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
 - `prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
   substituted per request), `BLOCKS.md`, `BROWSER.md` and `SUGGESTIONS.md`. Versioned, so
@@ -43,6 +44,13 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 `.env` never locks down a plain local run. `PublicAuthMiddleware` gates every `/api/*`
 except `/api/health`; the WS handshake checks the same header via `ws_bearer_ok`.
 
+`SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
+the `X-Security-Key` header and guards what belongs to the **machine** rather than to
+Claude — the shells, the files git ignores and every git write. It only gates while the
+Bearer gate is on (`gated()`), so a plain local run is open. Each route checks it for
+itself; there is no middleware for it, and a read that the panel needs before it can ask
+for anything (`repos`) is deliberately outside it.
+
 `--expose caddy` only advertises an exposure someone else terminates, so `--stop` must not
 close a Funnel it never opened (`.detached.provider`). Its default hostname aborts when no
 globally routable IPv4 exists, or the QR would point nowhere.
@@ -54,7 +62,8 @@ Everything returns `api_response()`. Route groups: `/api/health`, `/api/capabili
 rename/color/move/delete, trash, categories, transcript images), `/api/shared/*` (file
 manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompt, plugins,
 marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`, `/api/system/*`,
-`/api/network/*`. Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list),
+`/api/network/*`, `/api/git/*` (repositories under a project, identities, the written
+message, commit, revert, pull, push). Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list),
 `WS /api/system/ws`, `WS /api/shared/ws`, `WS /api/network/speedtest/ws`.
 
 Transcript slices are cursor-based (`before_index`), and while a live session still has
