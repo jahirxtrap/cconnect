@@ -1,5 +1,6 @@
 """Git operations the commit panel performs, on top of the single git runner."""
 
+import re
 import threading
 from pathlib import Path
 from typing import Optional
@@ -10,8 +11,11 @@ _TIMEOUT = 30
 _NETWORK_TIMEOUT = 300
 _LOG_SUBJECTS = 15
 _LOG_IDENTITIES = 50
+_LOG_ENTRIES = 75
 _DIFF_BUDGET = 60_000
 _UNTRACKED_LINES = 40
+_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+_COMMIT_HASH = re.compile(r"[0-9a-fA-F]{4,40}")
 _FIELD = "\x00"
 _FIELD_FORMAT = "%x00"
 
@@ -132,15 +136,39 @@ def last_message(repo: Path) -> str:
     return _read(repo, "log", "-1", "--format=%B") or ""
 
 
-def subjects(repo: Path) -> list[str]:
-    reported = _read(repo, "log", f"-n{_LOG_SUBJECTS}", "--format=%s")
+def log(repo: Path, limit: int = _LOG_ENTRIES, before: str = "") -> list[dict]:
+    """The commits behind HEAD, newest first, starting after the one named by `before`."""
+    count = max(1, min(limit, _LOG_ENTRIES))
+    fields = _FIELD_FORMAT.join(("%h", "%an", "%ct", "%s"))
+    start = [f"{before}~1"] if _COMMIT_HASH.fullmatch(before) else []
+    reported = _read(repo, "log", f"-n{count}", f"--format={fields}", *start)
+    listed = []
+    for line in (reported or "").splitlines():
+        parts = line.split(_FIELD)
+        if len(parts) != 4 or not parts[2].isdigit():
+            continue
+        listed.append({"hash": parts[0], "author": parts[1], "date": int(parts[2]), "subject": parts[3]})
+    return listed
+
+
+def subjects(repo: Path, skip: int = 0) -> list[str]:
+    listed = log(repo, _LOG_SUBJECTS + skip)[skip:]
+    return [entry["subject"] for entry in listed if entry["subject"]]
+
+
+def _amend_base(repo: Path) -> str:
+    return _read(repo, "rev-parse", "--verify", "--quiet", "HEAD~1") or _EMPTY_TREE
+
+
+def _head_files(repo: Path) -> list[str]:
+    reported = _read(repo, "show", "--pretty=", "--name-only", "HEAD")
     return [line for line in (reported or "").splitlines() if line]
 
 
-def diff_context(repo: Path, paths: list[str]) -> dict:
+def diff_context(repo: Path, paths: list[str], base: str = "HEAD") -> dict:
     """Everything a commit message can be written from, inside a size budget."""
-    stat = _read(repo, "diff", "--stat", "HEAD", "--", *paths) or ""
-    patch = _read(repo, "diff", "HEAD", "--", *paths) or ""
+    stat = _read(repo, "diff", "--stat", base, "--", *paths) or ""
+    patch = _read(repo, "diff", base, "--", *paths) or ""
     truncated = len(patch) > _DIFF_BUDGET
     if truncated:
         patch = patch[:_DIFF_BUDGET].rsplit("\n", 1)[0]
@@ -154,14 +182,18 @@ def diff_context(repo: Path, paths: list[str]) -> dict:
     return {"stat": stat, "patch": patch, "truncated": truncated, "added": added}
 
 
-def message_context(repo: Path, paths: list[str], note: str = "") -> str:
+def message_context(repo: Path, paths: list[str], note: str = "", amend: bool = False) -> str:
     """The prompt a commit subject is written from: recent style, then what changed."""
     branch = _read(repo, "rev-parse", "--abbrev-ref", "HEAD") or ""
-    context = diff_context(repo, paths)
+    targets = sorted(set(paths) | set(_head_files(repo))) if amend else paths
+    context = diff_context(repo, targets, _amend_base(repo) if amend else "HEAD")
     sections = [f"Repository: {repo.name}", f"Branch: {branch}"]
-    recent = subjects(repo)
+    recent = subjects(repo, skip=1 if amend else 0)
     if recent:
         sections.append("Recent subjects in this repository:\n" + "\n".join(f"- {line}" for line in recent))
+    if amend:
+        current = last_message(repo).strip()
+        sections.append(f"Current message being rewritten:\n{current or '(none)'}")
     if note:
         sections.append(f"What was asked for:\n{note}")
     sections.append("Files changed:\n" + (context["stat"] or "(none)"))
@@ -178,7 +210,7 @@ def message_context(repo: Path, paths: list[str], note: str = "") -> str:
 def commit(repo: Path, paths: list[str], message: str, author: str = "", amend: bool = False) -> dict:
     """Commit exactly the paths given, leaving the index alone for everything else."""
     with lock_for(repo):
-        new = _untracked(repo, paths)
+        new = _untracked(repo, paths) if paths else []
         if new:
             staged = _write(repo, "add", "--", *new)
             if not staged["ok"]:
@@ -188,7 +220,11 @@ def commit(repo: Path, paths: list[str], message: str, author: str = "", amend: 
             args.append("--amend")
         if author:
             args += [f"--author={author}"]
-        result = _write(repo, *args, "--", *paths)
+        if paths:
+            args += ["--", *paths]
+        elif amend:
+            args.append("--only")
+        result = _write(repo, *args)
     if result["ok"]:
         result["head"] = _read(repo, "log", "-1", f"--format=%h{_FIELD_FORMAT}%s") or ""
     return result

@@ -7,6 +7,9 @@ export interface ProjectPosition {
   path: string | null;
   changed: ProjectEntry[] | null;
   repos: GitRepo[] | null;
+  repoRoot: string | null;
+  tracked: boolean;
+  locked: boolean;
 }
 
 const positions = new Map<string, ProjectPosition>();

@@ -25,9 +25,9 @@ def _repo(project_key: str, repo: str) -> Path:
     return resolved
 
 
-def _paths(body: dict) -> list[str]:
+def _paths(body: dict, required: bool = True) -> list[str]:
     listed = [str(item) for item in (body.get("paths") or []) if str(item).strip()]
-    if not listed:
+    if not listed and required:
         raise HTTPException(status_code=400, detail="no paths given")
     return listed
 
@@ -42,6 +42,11 @@ def git_identities(project_key: str, repo: str = Query("")):
     return api_response(data=git_ops.identities(_repo(project_key, repo)))
 
 
+@router.get("/git/{project_key}/log")
+def git_log(project_key: str, repo: str = Query(""), limit: int = Query(75), before: str = Query("")):
+    return api_response(data=git_ops.log(_repo(project_key, repo), limit, before))
+
+
 @router.get("/git/{project_key}/last-message")
 def git_last_message(project_key: str, repo: str = Query("")):
     return api_response(data={"message": git_ops.last_message(_repo(project_key, repo))})
@@ -52,7 +57,8 @@ async def git_message(project_key: str, body: dict = Body(default={}), x_securit
     if not key_matches(x_security_key):
         return api_response(status=403)
     repo = _repo(project_key, str(body.get("repo") or ""))
-    context = git_ops.message_context(repo, _paths(body), str(body.get("note") or ""))
+    amend = body.get("amend") is True
+    context = git_ops.message_context(repo, _paths(body, not amend), str(body.get("note") or ""), amend)
     written = await claude_runtime.generate_commit_message(context, body.get("account"))
     if not written:
         return api_response(status=502, message="the model returned no subject")
@@ -66,12 +72,13 @@ def git_commit(project_key: str, body: dict = Body(default={}), x_security_key: 
     message = str(body.get("message") or "").strip()
     if not message:
         raise HTTPException(status_code=400, detail="no message given")
+    amend = body.get("amend") is True
     result = git_ops.commit(
         _repo(project_key, str(body.get("repo") or "")),
-        _paths(body),
+        _paths(body, not amend),
         message,
         author=str(body.get("author") or ""),
-        amend=body.get("amend") is True,
+        amend=amend,
     )
     return api_response(data=result, status=200 if result["ok"] else 409, message=result["output"])
 

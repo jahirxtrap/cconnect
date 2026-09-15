@@ -199,8 +199,9 @@ export const createSessionsApi = (http: HttpClient) => ({
     return (await http.delete("/sessions/trash")) !== null;
   },
 
-  async addProject(path: string, name: string | null = null): Promise<boolean> {
-    return (await http.post("/sessions/projects", { path, name })) !== null;
+  async addProject(path: string, name: string | null = null): Promise<string | null> {
+    const data = await http.post<{ project_key?: string }>("/sessions/projects", { path, name });
+    return data?.project_key ?? null;
   },
 
   async renameProject(projectKey: string, name: string, path: string | null = null): Promise<boolean> {

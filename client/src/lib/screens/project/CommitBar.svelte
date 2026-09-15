@@ -10,11 +10,11 @@
   import { plural, t } from "$lib/i18n/index.svelte";
   import { gitApi, type GitIdentity, type GitRepo } from "$lib/services/gitApi";
   import Button from "$lib/ui/Button.svelte";
-  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
+  import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -25,12 +25,22 @@
     paths: string[];
     note?: string;
     locked?: boolean;
+    instant?: boolean;
     onDone: () => void;
   }
 
-  const { projectKey, repo, paths, note = "", locked = false, onDone }: Props = $props();
+  const {
+    projectKey,
+    repo,
+    paths,
+    note = "",
+    locked = false,
+    instant = false,
+    onDone,
+  }: Props = $props();
 
   const ACTION_CLASS = "size-8";
+  const DOT_SIZE = 18;
   const PANEL_MS = 350;
   const LINE_HEIGHT = 20;
   const MIN_HEIGHT = LINE_HEIGHT * 2;
@@ -38,6 +48,7 @@
 
   let message = $state("");
   let amend = $state(false);
+  let last = $state<string | null>(null);
   let author = $state("");
   let identities = $state<GitIdentity[]>([]);
   let effective = $state<GitIdentity | null>(null);
@@ -51,7 +62,9 @@
 
   const options = $derived(identities.map((identity) => ({ value: label(identity), label: label(identity) })));
   const idle = $derived(running === "");
-  const ready = $derived(paths.length > 0 && message.trim() !== "" && idle);
+  const written = $derived(message.trim());
+  const rewrites = $derived(paths.length > 0 || (last !== null && written !== last.trim()));
+  const ready = $derived(idle && written !== "" && (amend ? rewrites : paths.length > 0));
   const shown = $derived(author || (effective ? label(effective) : t("GIT_AUTHOR_DEFAULT")));
   const commitLabel = $derived(amend ? t("GIT_AMEND") : t("GIT_COMMIT"));
   const pushLabel = $derived(amend ? t("GIT_AMEND_PUSH") : t("GIT_COMMIT_PUSH"));
@@ -72,9 +85,12 @@
   $effect(() => {
     const key = projectKey;
     const target = repo.path;
+    last = null;
     if (!amend) return;
     void gitApi.lastMessage(key, target).then((found) => {
-      if (projectKey === key && repo.path === target && found && !message.trim()) message = found;
+      if (projectKey !== key || repo.path !== target) return;
+      last = found;
+      if (found && !message.trim()) message = found;
     });
   });
 
@@ -92,15 +108,15 @@
     if (writing) return;
     writing = true;
     failure = "";
-    const written = await gitApi.suggestMessage(projectKey, repo.path, paths, note);
+    const suggestion = await gitApi.suggestMessage(projectKey, repo.path, paths, note, amend);
     writing = false;
-    if (written) message = written;
-    else failure = t("GIT_NO_SUGGESTION");
+    if (suggestion) message = suggestion;
+    else failure = t("GIT_GENERATE_FAILED");
   };
 
   const commit = async () => {
     const done = await guard("commit", () =>
-      gitApi.commit(projectKey, { repo: repo.path, paths, message: message.trim(), author, amend }),
+      gitApi.commit(projectKey, { repo: repo.path, paths, message: written, author, amend }),
     );
     if (done) {
       message = "";
@@ -159,7 +175,11 @@
         enabled={idle}
         onclick={() => void guard("pull", () => gitApi.pull(projectKey, repo.path))}
       >
-        <ArrowDown />
+        {#if running === "pull"}
+          <LoadingIndicator />
+        {:else}
+          <ArrowDown />
+        {/if}
       </TooltipIconButton>
       <TooltipIconButton
         label={t("GIT_PUSH")}
@@ -168,7 +188,7 @@
         onclick={() => (asking = "push")}
       >
         {#if running === "push"}
-          <LoadingIndicator size={16} />
+          <LoadingIndicator />
         {:else}
           <ArrowUp />
         {/if}
@@ -185,7 +205,7 @@
   </div>
 
   {#if open}
-    <div class="chat-gap flex flex-col px-3 pb-3" transition:slide={{ duration: PANEL_MS }}>
+    <div class="chat-gap flex flex-col px-3 pb-3" transition:slide={{ duration: instant ? 0 : PANEL_MS }}>
       <InputField
         value={message}
         oninput={(value) => (message = value)}
@@ -205,12 +225,20 @@
       />
 
       <div class="flex items-center">
-        <CompactSwitch checked={amend} onCheckedChange={(next) => (amend = next)} enabled={running === ""} />
-        <span class="flex-1 pl-2 text-body-sm text-on-surface-variant">{t("GIT_AMEND_LAST")}</span>
+        <button
+          type="button"
+          data-press="off"
+          disabled={running !== ""}
+          onclick={() => (amend = !amend)}
+          class="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left disabled:cursor-default disabled:opacity-40"
+        >
+          <SelectionDot selected={amend} size={DOT_SIZE} />
+          <span class="truncate text-body-md text-on-surface-variant">{t("GIT_AMEND_LAST")}</span>
+        </button>
         <TooltipIconButton
-          label={t("GIT_SUGGEST")}
+          label={t("GIT_GENERATE_MESSAGE")}
           class={ACTION_CLASS}
-          enabled={paths.length > 0}
+          enabled={amend || paths.length > 0}
           onclick={() => void suggest()}
         >
           {#if writing}

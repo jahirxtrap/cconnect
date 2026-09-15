@@ -25,6 +25,7 @@ export interface Tab {
   color: string | null;
   running: boolean;
   overrides: TabOverrides;
+  panelProject: string | null;
   viewTitle?: string | null;
 }
 
@@ -37,6 +38,7 @@ interface StoredTab {
   color?: string;
   side?: boolean;
   over?: Partial<TabOverrides>;
+  pproj?: string;
 }
 
 const SESSION_ID_PREVIEW = 8;
@@ -233,6 +235,7 @@ class Tabs {
       color: null,
       running: false,
       overrides: { ...(this.active?.overrides ?? this.#environmentOverrides(environmentId)) },
+      panelProject: this.active?.panelProject ?? null,
     };
   }
 
@@ -245,6 +248,15 @@ class Tabs {
       permissionMode: profile?.permissionMode ?? "",
       streaming: profile?.streaming ?? null,
     };
+  }
+
+  setPanelProject(projectKey: string | null) {
+    const current = this.active;
+    if (!current || current.panelProject === projectKey) return;
+    this.list = this.list.map((tab) =>
+      tab.id === current.id ? { ...tab, panelProject: projectKey } : tab,
+    );
+    this.#persist();
   }
 
   setOverrides(id: string, patch: Partial<TabOverrides>) {
@@ -276,6 +288,7 @@ class Tabs {
         color: item.color ?? null,
         running: false,
         overrides: { ...this.#environmentOverrides(item.env ?? null), ...(item.over ?? {}) },
+        panelProject: item.pproj ?? null,
       }));
       if (!tabs.length) return { tabs: [this.#default()], active: 0 };
       return { tabs, active: Math.min(Math.max(stored.active ?? 0, 0), tabs.length - 1) };
@@ -316,6 +329,7 @@ class Tabs {
       color: session.color,
       running: false,
       overrides: { ...(this.active?.overrides ?? this.#environmentOverrides(environmentId)) },
+      panelProject: this.active?.panelProject ?? null,
     };
     this.list = [...this.list, tab];
     if (pane === "center") {
@@ -449,6 +463,7 @@ class Tabs {
         ...(tab.title ? { title: tab.title } : {}),
         ...(tab.color ? { color: tab.color } : {}),
         ...(tab.pane === "right" ? { side: true } : {}),
+        ...(tab.panelProject === null ? {} : { pproj: tab.panelProject }),
         over: tab.overrides,
       })),
     });

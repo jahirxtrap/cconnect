@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { snapToDevicePixel } from "$lib/ui/gridHeight";
   import { keepFocus } from "$lib/ui/keepFocus";
+  import { LOAD_MORE_PX } from "$lib/ui/paging";
   import { scrollbarWidth } from "$lib/ui/scrollbar";
 
   interface Props {
@@ -32,7 +33,6 @@
 
   const AT_BOTTOM_PX = 4;
   const OWN_TOP_PX = 1;
-  const LOAD_OLDER_PX = 200;
   const SCROLL_BUTTON_GAP = 12;
   const HALF = 2;
   const HEADER_FALLBACK = 40;
@@ -168,7 +168,7 @@
     if (!ours) follow = belowFold <= AT_BOTTOM_PX;
     updatePinned();
     onMove?.();
-    if (distanceToTop() < LOAD_OLDER_PX) onNearTop?.();
+    if (distanceToTop() < LOAD_MORE_PX) onNearTop?.();
   };
 
   $effect(() => {

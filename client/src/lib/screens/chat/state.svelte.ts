@@ -1305,8 +1305,8 @@ export class ChatState {
 
   async addProject(path: string, name: string | null = null) {
     const clean = path.trim();
-    if (!clean) return;
-    await this.#sessions.addProject(clean, name?.trim() || null);
+    if (!clean) return null;
+    return await this.#sessions.addProject(clean, name?.trim() || null);
   }
 
   async renameProject(project: ProjectInfo, name: string) {

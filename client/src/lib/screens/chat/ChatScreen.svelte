@@ -368,7 +368,7 @@
           </PaneSurface>
         {:else if panes.kind === "project"}
           <PaneSurface>
-            <ProjectFilesScreen />
+            <ProjectFilesScreen instant={instantLayout} />
           </PaneSurface>
         {:else if panes.kind === "monitor"}
           <PaneSurface>

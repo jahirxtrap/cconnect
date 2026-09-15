@@ -22,12 +22,15 @@
 <div
   class="gap-1 pr-1 {leading || onBack ? 'pl-1' : 'pl-3'} {PANE_HEADER_CLASS} {paneFocusBorder(focused)}"
 >
-  {#if leading}
-    {@render leading()}
-  {:else if onBack}
-    <TooltipIconButton label={t("BACK")} class="size-8" onclick={onBack}>
-      <ArrowLeft />
-    </TooltipIconButton>
+  {#if onBack || leading}
+    <div class="flex shrink-0 items-center">
+      {#if onBack}
+        <TooltipIconButton label={t("BACK")} class="size-8" onclick={onBack}>
+          <ArrowLeft />
+        </TooltipIconButton>
+      {/if}
+      {@render leading?.()}
+    </div>
   {/if}
   <p class="min-w-0 flex-1 truncate text-label-lg">{title}</p>
   <PaneActions {actions} />

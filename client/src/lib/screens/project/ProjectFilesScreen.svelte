@@ -1,19 +1,19 @@
 <script module lang="ts">
-  const opened = $state<{ project: string | null; path: string | null; full: boolean }>({
-    project: null,
-    path: null,
-    full: false,
-  });
+  const opened = $state<{ path: string | null; full: boolean }>({ path: null, full: false });
 </script>
 
 <script lang="ts">
+  import ArrowDown from "@lucide/svelte/icons/arrow-down";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import AtSign from "@lucide/svelte/icons/at-sign";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import FileDiff from "@lucide/svelte/icons/file-diff";
+  import FolderClosed from "@lucide/svelte/icons/folder-closed";
   import GitCompare from "@lucide/svelte/icons/git-compare";
+  import History from "@lucide/svelte/icons/history";
   import Lock from "@lucide/svelte/icons/lock";
   import Search from "@lucide/svelte/icons/search";
   import { untrack } from "svelte";
@@ -23,11 +23,13 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { projectFilePath } from "$lib/data/models";
+  import { projectFilePath, projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
+  import { formatDateShort } from "$lib/data/time";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { isTouch } from "$lib/platform";
   import { copyText } from "$lib/platform/clipboard";
   import { backend } from "$lib/services/backend.svelte";
   import {
@@ -36,7 +38,7 @@
     type ProjectDiff,
     type ProjectEntry,
   } from "$lib/services/projectFilesApi";
-  import { gitApi, type GitRepo } from "$lib/services/gitApi";
+  import { gitApi, type GitCommit, type GitRepo } from "$lib/services/gitApi";
   import { ProjectWatch } from "$lib/services/projectWatch.svelte";
   import { recallProject, rememberProject } from "./projectMemory";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
@@ -44,6 +46,7 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import { nearEdge } from "$lib/ui/paging";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
@@ -56,9 +59,21 @@
   import { inPane } from "$lib/screens/chat/paneSurface";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
 
+  interface Props {
+    instant?: boolean;
+  }
+
+  const { instant = false }: Props = $props();
+
   const INDENT = 14;
   const BASE_INDENT = 8;
   const SEARCH_DELAY_MS = 200;
+  const MILLIS_PER_SECOND = 1000;
+  const RAIL_X = 20;
+  const RAIL_GAP = 12;
+  const HEAD_SIZE = 16;
+  const DOT_SIZE = 9;
+  const HALF = 2;
 
   const compact = inPane();
   const watch = new ProjectWatch();
@@ -77,24 +92,89 @@
   let fileDiff = $state<ProjectDiff | null>(null);
   let showChanged = $state(settings.projectChangedOnly);
   let changed = $state<ProjectEntry[] | null>(null);
+  let showLog = $state(false);
+  let commits = $state<GitCommit[] | null>(null);
+  let logDone = $state(false);
+  let logPaging = $state(false);
   let repos = $state<GitRepo[] | null>(null);
+  let repoRoot = $state<string | null>(null);
   let gitTick = $state(0);
   let picked = $state<Record<string, boolean>>({});
 
-  const files = $derived((changed ?? []).filter((entry) => !entry.isDir && entry.repoPath));
-  const chosen = $derived(files.filter((entry) => picked[entry.path] === true));
-  const committing = $derived(showChanged && settings.projectCommitOpen && !locked);
-  const outsideGit = $derived(!tracked && repos !== null && repos.length === 0);
+  const repoList = $derived(repos ?? []);
+  const activeRepo = $derived(
+    repoList.find((item) => item.path === repoRoot) ?? (repoList.length === 1 ? repoList[0] : null),
+  );
+  const insideRepo = $derived(activeRepo !== null && repoList.length > 1);
 
-  const commitRepo = $derived.by(() => {
-    const listed = repos ?? [];
-    const wanted = chosen[0]?.repoRoot ?? files[0]?.repoRoot ?? "";
-    return listed.find((item) => item.path === wanted) ?? listed[0] ?? null;
+  const files = $derived(
+    activeRepo
+      ? (changed ?? []).filter(
+          (entry) => !entry.isDir && entry.repoPath && entry.repoRoot === activeRepo.path,
+        )
+      : [],
+  );
+  const chosen = $derived(files.filter((entry) => picked[entry.path] === true));
+  const committing = $derived(
+    showChanged && !showLog && activeRepo !== null && settings.projectCommitOpen && !locked,
+  );
+
+  const repoCounts = $derived.by(() => {
+    const counted: Record<string, number> = {};
+    for (const entry of changed ?? []) {
+      if (entry.isDir || !entry.repoPath) continue;
+      counted[entry.repoRoot] = (counted[entry.repoRoot] ?? 0) + 1;
+    }
+    return counted;
   });
 
-  const commitPaths = $derived(
-    commitRepo ? chosen.filter((entry) => entry.repoRoot === commitRepo.path).map((entry) => entry.repoPath) : [],
+  const repoRows = $derived(
+    [...repoList].sort(
+      (first, second) =>
+        Number((repoCounts[second.path] ?? 0) > 0) - Number((repoCounts[first.path] ?? 0) > 0) ||
+        first.name.localeCompare(second.name),
+    ),
   );
+
+  const commitPaths = $derived(chosen.map((entry) => entry.repoPath));
+
+  const unpushed = $derived(
+    activeRepo ? (activeRepo.upstream ? activeRepo.ahead : (commits?.length ?? 0)) : 0,
+  );
+
+  const loadOlderCommits = () => {
+    const key = projectKey;
+    const target = activeRepo?.path ?? "";
+    const cursor = commits?.at(-1)?.hash ?? "";
+    if (!key || !target || !cursor || !showLog || logDone || logPaging) return;
+    logPaging = true;
+    void gitApi.log(key, target, cursor).then((found) => {
+      logPaging = false;
+      if (projectKey !== key || activeRepo?.path !== target || !showLog || !found) return;
+      if (!found.length) {
+        logDone = true;
+        return;
+      }
+      commits = [...(commits ?? []), ...found];
+    });
+  };
+
+  const onListScroll = (event: UIEvent) => {
+    if (!showLog) return;
+    if (nearEdge(event.currentTarget as HTMLElement)) loadOlderCommits();
+  };
+
+  const enterRepo = (repo: GitRepo) => {
+    repoRoot = repo.path;
+    picked = {};
+  };
+
+  const leaveRepo = () => {
+    if (!insideRepo) return false;
+    repoRoot = null;
+    picked = {};
+    return true;
+  };
 
   const selectAll = () => {
     const turningOn = chosen.length < files.length;
@@ -106,7 +186,10 @@
     selectAll();
   });
 
-  const clearMode = () => {
+  const engaged = $derived(activeScope() === "project");
+
+  const cancelMode = () => {
+    if (opened.path !== null) return false;
     if (chosen.length) {
       picked = {};
       return true;
@@ -116,12 +199,32 @@
       query = "";
       return true;
     }
+    if (showLog) {
+      showLog = false;
+      return true;
+    }
     return false;
   };
 
+  const leaveProject = () => {
+    if (!pinned) return false;
+    tabs.setPanelProject("");
+    return true;
+  };
+
+  const stepUp = () => {
+    if (opened.path !== null) {
+      closeFile();
+      return true;
+    }
+    return leaveRepo() || leaveProject();
+  };
+
+  const stepBack = () => (isTouch ? cancelMode() || stepUp() : stepUp() || cancelMode());
+
   const onKeydown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || activeScope() !== "project" || isEditing()) return;
-    if (!clearMode()) return;
+    if (event.key !== "Escape" || !engaged || isEditing()) return;
+    if (!cancelMode() && !stepUp()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
   };
@@ -134,11 +237,17 @@
   const showChanges = (value: boolean) => {
     showChanged = value;
     settings.projectChangedOnly = value;
+    if (!value) showLog = false;
+  };
+
+  const toggleChanges = () => {
+    if (showLog) showLog = false;
+    else showChanges(!showChanged);
   };
 
   useShortcut("project.changes", () => {
     if (activeScope() !== "project" || !projectKey) return false;
-    showChanges(!showChanged);
+    toggleChanges();
   });
 
   useShortcut("project.commit", () => {
@@ -151,9 +260,12 @@
     settings.projectCommitOpen = !settings.projectCommitOpen;
   });
 
+  const inFolder = (entry: ProjectEntry, item: ProjectEntry) =>
+    item.repoPath.startsWith(`${entry.path}/`);
+
   const togglePick = (entry: ProjectEntry) => {
     const targets = entry.isDir
-      ? files.filter((item) => item.path.startsWith(`${entry.path}/`))
+      ? files.filter((item) => inFolder(entry, item))
       : files.filter((item) => item.path === entry.path);
     const turningOn = targets.some((item) => picked[item.path] !== true);
     for (const item of targets) picked[item.path] = turningOn;
@@ -161,17 +273,16 @@
 
   const marked = (entry: ProjectEntry) =>
     entry.isDir
-      ? files.some((item) => item.path.startsWith(`${entry.path}/`) && picked[item.path] === true)
+      ? files.some((item) => inFolder(entry, item) && picked[item.path] === true)
       : picked[entry.path] === true;
   let anchorAt = $state<number | null>(null);
   let unlocking = $state(false);
   let rejected = $state(false);
   let loading = $state(false);
 
-  const projectKey = $derived(
-    settings.lockedProject ||
-      (opened.project ?? chat.historyProject ?? tabs.active?.projectKey ?? projects[0]?.projectKey ?? null),
-  );
+  const followed = $derived(chat.historyProject);
+  const pinned = $derived(tabs.active?.panelProject ?? null);
+  const projectKey = $derived(settings.lockedProject || (pinned === null ? followed : pinned || null));
 
   const project = $derived(projects.find((item) => item.projectKey === projectKey) ?? null);
 
@@ -219,23 +330,12 @@
     anchorAt = Math.min(Math.max(at, 0), anchors.length - 1);
   };
 
-  $effect(() => {
-    void chat.historyProject;
-    opened.project = null;
-  });
-
   const closeFile = () => {
     opened.path = null;
     opened.full = false;
   };
 
-  $effect(() =>
-    navigation.intercept(() => {
-      if (opened.path === null) return false;
-      closeFile();
-      return true;
-    }),
-  );
+  $effect(() => (engaged ? navigation.intercept(stepBack) : undefined));
 
   const unlock = (key: string) => {
     securityKeys.set(key);
@@ -269,7 +369,7 @@
     items: 0,
     status: "",
     ignored: false,
-    repo: (repos ?? []).some((item) => item.relative === path),
+    repo: false,
     repoRoot: "",
     repoPath: "",
   });
@@ -293,8 +393,8 @@
 
   const changedTree = $derived.by(() => {
     const root: Branch = { name: "", path: "", entry: null, folders: new Map() };
-    for (const entry of changed ?? []) {
-      const segments = entry.path.split("/");
+    for (const entry of files) {
+      const segments = entry.repoPath.split("/");
       let branch = root;
       for (const segment of segments.slice(0, -1)) branch = branchOf(branch, segment);
       branchOf(branch, segments[segments.length - 1]).entry = entry;
@@ -353,7 +453,6 @@
   };
 
   const open = (entry: ProjectEntry) => {
-    opened.project = projectKey;
     anchorAt = null;
     opened.path = entry.path;
   };
@@ -371,15 +470,26 @@
 
   let placed = "";
   let diffed = "";
+  let logged = "";
+  let synced = "";
 
   const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
 
   $effect(() => {
     const target = slot;
-    if (target === placed) return;
+    if (!projectKey || target === placed) return;
     untrack(() => {
       if (compact && placed) {
-        rememberProject(placed, { children, expanded, path: opened.path, changed, repos });
+        rememberProject(placed, {
+          children,
+          expanded,
+          path: opened.path,
+          changed,
+          repos,
+          repoRoot,
+          tracked,
+          locked,
+        });
       }
       placed = target;
       results = null;
@@ -389,6 +499,9 @@
       expanded = saved?.expanded ?? {};
       changed = saved?.changed ?? null;
       repos = saved?.repos ?? null;
+      repoRoot = saved?.repoRoot ?? null;
+      tracked = saved?.tracked ?? false;
+      locked = saved?.locked ?? false;
       if (saved?.path) opened.path = saved.path;
       else closeFile();
     });
@@ -396,6 +509,7 @@
 
   $effect(() => {
     const key = projectKey;
+    const environment = backend.activeId;
     const burst = watch.burst;
     const known = untrack(() => Object.keys(children));
     if (!key) {
@@ -412,7 +526,7 @@
     void Promise.all(
       targets.map((path) => projectFilesApi.tree(key, path).then((listing) => [path, listing] as const)),
     ).then((loaded) => {
-      if (projectKey !== key) return;
+      if (projectKey !== key || backend.activeId !== environment) return;
       loading = false;
       const root = loaded.find(([path]) => path === "")?.[1];
       children = {
@@ -461,10 +575,11 @@
   $effect(() => {
     const key = projectKey;
     const burst = watch.burst;
-    if (!key || !showChanged) {
+    if (!showChanged) {
       changed = null;
       return;
     }
+    if (!key) return;
     if (!burst.truncated && !burst.paths.length && untrack(() => changed) !== null) return;
     void projectFilesApi.changes(key).then((found) => {
       if (projectKey !== key || !showChanged) return;
@@ -474,11 +589,38 @@
 
   $effect(() => {
     const key = projectKey;
-    void gitTick;
-    if (!key || !showChanged) {
+    const target = activeRepo?.path ?? "";
+    const burst = watch.burst;
+    if (!showLog) {
+      logged = "";
+      commits = null;
+      return;
+    }
+    if (!key || !target) return;
+    const moved = burst.truncated || burst.paths.some((path) => path.includes(".git/"));
+    if (logged === `${key}|${target}` && !moved) return;
+    logged = `${key}|${target}`;
+    logDone = false;
+    void gitApi.log(key, target).then((found) => {
+      if (projectKey !== key || activeRepo?.path !== target || !showLog) return;
+      commits = found;
+      logDone = found !== null && found.length === 0;
+    });
+  });
+
+  $effect(() => {
+    const key = projectKey;
+    const burst = watch.burst;
+    const stamp = `${key}|${gitTick}`;
+    if (!showChanged) {
+      synced = "";
       repos = null;
       return;
     }
+    if (!key) return;
+    const moved = burst.truncated || burst.paths.some((path) => path.includes(".git/"));
+    if (synced === stamp && !moved) return;
+    synced = stamp;
     void gitApi.repos(key).then((found) => {
       if (projectKey === key && showChanged) repos = found;
     });
@@ -525,14 +667,23 @@
       <Lock />
     </TooltipIconButton>
   {/if}
+  {#if projectKey && showChanged && activeRepo}
+    <TooltipIconButton
+      label={t("GIT_HISTORY")}
+      class={paneActionClass(compact)}
+      onclick={() => (showLog = !showLog)}
+    >
+      <History class={showLog ? "text-accent" : ""} />
+    </TooltipIconButton>
+  {/if}
   {#if projectKey}
     <TooltipIconButton
       label={t("CHANGED_FILES")}
       class={paneActionClass(compact)}
       shortcut="project.changes"
-      onclick={() => showChanges(!showChanged)}
+      onclick={toggleChanges}
     >
-      <GitCompare class={showChanged ? "text-accent" : ""} />
+      <GitCompare class={showChanged && !showLog ? "text-accent" : ""} />
     </TooltipIconButton>
   {/if}
 {/snippet}
@@ -574,6 +725,71 @@
       <AtSign size={20} class="shrink-0 text-on-surface-variant" />
     {/snippet}
   </MenuItem>
+{/snippet}
+
+{#snippet commitRow(commit: GitCommit, index: number, last: boolean)}
+  {@const local = index < unpushed}
+  {@const head = index === 0}
+  {@const dot = local ? "bg-green" : "bg-accent"}
+  {@const ring = local ? "border-green" : "border-accent"}
+  <div class="relative py-1.5 pr-4" style="padding-left: {RAIL_X + RAIL_GAP}px">
+    <span
+      style="left: {RAIL_X}px; top: {head ? `calc(50% + ${HEAD_SIZE / HALF}px)` : '0px'}; bottom: {last
+        ? '50%'
+        : '0px'}"
+      class="absolute w-0.5 -translate-x-1/2 {dot}"
+    ></span>
+    {#if head}
+      <span
+        style="left: {RAIL_X}px; width: {HEAD_SIZE}px; height: {HEAD_SIZE}px"
+        class="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 {ring}"
+      >
+        <span style="width: {DOT_SIZE}px; height: {DOT_SIZE}px" class="rounded-full {dot}"></span>
+      </span>
+    {:else}
+      <span
+        style="left: {RAIL_X}px; width: {DOT_SIZE}px; height: {DOT_SIZE}px"
+        class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full {dot}"
+      ></span>
+    {/if}
+    <span class="block truncate text-body-md">{commit.subject}</span>
+    <span class="block truncate text-body-sm text-on-surface-variant">
+      {commit.hash} • {commit.author} • {formatDateShort(commit.date * MILLIS_PER_SECOND)}
+    </span>
+  </div>
+{/snippet}
+
+{#snippet projectRow(item: ProjectInfo)}
+  <Pressable
+    onclick={() => tabs.setPanelProject(item.projectKey)}
+    class="flex w-full items-center gap-2 px-4 py-1.5 text-left"
+  >
+    <FolderClosed size={16} class="shrink-0 text-on-surface-variant" />
+    <span class="min-w-0 flex-1 truncate text-body-md">{projectLabel(item)}</span>
+  </Pressable>
+{/snippet}
+
+{#snippet repoRow(item: GitRepo)}
+  {@const count = repoCounts[item.path] ?? 0}
+  {@const Icon = projectIcon(item.path, true, true)}
+  <Pressable onclick={() => enterRepo(item)} class="flex w-full items-center gap-1.5 px-4 py-1.5 text-left">
+    <Icon size={16} class="shrink-0 text-on-surface-variant" />
+    <span class="min-w-0 flex-1 truncate text-body-md">{item.name}</span>
+    {#if item.behind}
+      <span class="flex shrink-0 items-center text-label-md text-on-surface-variant">
+        <ArrowDown size={13} />{item.behind}
+      </span>
+    {/if}
+    {#if item.ahead}
+      <span class="flex shrink-0 items-center text-label-md text-accent"><ArrowUp size={13} />{item.ahead}</span>
+    {/if}
+    <span class="shrink-0 truncate text-label-md text-on-surface-variant">
+      {item.branch || t("GIT_DETACHED")}
+    </span>
+    {#if count}
+      <span class="shrink-0 text-label-md text-accent">{count}</span>
+    {/if}
+  </Pressable>
 {/snippet}
 
 {#snippet pathRow(entry: ProjectEntry)}
@@ -651,20 +867,25 @@
 >
   {#if compact}
     <PaneHeader
-      title={t("PROJECT_FILES")}
+      title={insideRepo && activeRepo ? activeRepo.name : t("PROJECT_FILES")}
       leading={committing ? selectAllAction : undefined}
+      onBack={insideRepo || pinned ? stepUp : undefined}
       actions={headerActions}
     />
   {:else}
-    <AppTopBar title={t("PROJECT_FILES")} subtitle={project?.name ?? null}>
+    <AppTopBar
+      title={t("PROJECT_FILES")}
+      subtitle={(insideRepo && activeRepo ? activeRepo.name : project?.name) ?? null}
+    >
       {#snippet navigationIcon()}
-        {#if committing}
-          {@render selectAllAction()}
-        {:else}
-          <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
+        <div class="flex shrink-0 items-center">
+          <TooltipIconButton label={t("BACK")} onclick={() => stepUp() || navigation.back()}>
             <ArrowLeft size={20} />
           </TooltipIconButton>
-        {/if}
+          {#if committing}
+            {@render selectAllAction()}
+          {/if}
+        </div>
       {/snippet}
       {#snippet actions()}
         {@render headerActions()}
@@ -672,9 +893,16 @@
     </AppTopBar>
   {/if}
 
-  {#if projects.length > 1}
+  {#if projects.length}
     <div class="px-2 pt-2">
-      <ProjectSelector {projects} selected={projectKey} allowAll={false} onSelect={(key) => (opened.project = key)} />
+      <ProjectSelector
+        {projects}
+        selected={pinned || null}
+        shown={project ? projectLabel(project) : (projectKey ?? t("ALL_PROJECTS"))}
+        following={pinned === null}
+        onFollow={() => tabs.setPanelProject(null)}
+        onSelect={(key) => tabs.setPanelProject(key ?? "")}
+      />
     </div>
   {/if}
 
@@ -694,11 +922,37 @@
     </div>
   {/if}
 
-  <div class="min-h-0 flex-1 overflow-y-auto pb-2">
+  <div class="min-h-0 flex-1 overflow-y-auto pb-2" onscroll={onListScroll}>
     {#if loading}
       <CenteredProgress class="h-full" />
     {:else if !projectKey}
-      <EmptyState text={serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("NO_PROJECTS")} class="h-full" />
+      {#if serverStatus.unavailable}
+        <EmptyState text={t("SERVER_UNAVAILABLE")} class="h-full" />
+      {:else}
+        {#each projects as item (item.projectKey)}
+          {@render projectRow(item)}
+        {:else}
+          <EmptyState text={t("NO_PROJECTS")} class="h-full" />
+        {/each}
+      {/if}
+    {:else if showChanged && repos === null}
+      <CenteredProgress class="h-full" />
+    {:else if showChanged && !activeRepo}
+      {#each repoRows as item (item.path)}
+        {@render repoRow(item)}
+      {:else}
+        <EmptyState text={t("NOT_A_REPOSITORY")} class="h-full" />
+      {/each}
+    {:else if showLog}
+      {#if commits === null}
+        <CenteredProgress class="h-full" />
+      {:else}
+        {#each commits as commit, index (commit.hash)}
+          {@render commitRow(commit, index, index === commits.length - 1)}
+        {:else}
+          <EmptyState text={t("GIT_NO_COMMITS")} class="h-full" />
+        {/each}
+      {/if}
     {:else if showChanged && changed === null}
       <CenteredProgress class="h-full" />
     {:else if showChanged}
@@ -707,7 +961,7 @@
           row.entry.isDir ? fold(row.entry.path) : open(row.entry),
         )}
       {:else}
-        <EmptyState text={outsideGit ? t("NOT_A_REPOSITORY") : t("NO_CHANGES")} class="h-full" />
+        <EmptyState text={t("NO_CHANGES")} class="h-full" />
       {/each}
     {:else if results !== null}
       {#each results as entry (entry.path)}
@@ -726,12 +980,13 @@
     {/if}
   </div>
 
-  {#if showChanged && commitRepo && projectKey}
+  {#if showChanged && activeRepo && projectKey}
     <CommitBar
       {projectKey}
-      repo={commitRepo}
+      repo={activeRepo}
       paths={commitPaths}
       {locked}
+      {instant}
       onDone={() => {
         gitTick++;
         watch.refresh();

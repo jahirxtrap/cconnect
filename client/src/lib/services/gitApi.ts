@@ -24,6 +24,13 @@ export interface GitIdentities {
   options: GitIdentity[];
 }
 
+export interface GitCommit {
+  hash: string;
+  author: string;
+  date: number;
+  subject: string;
+}
+
 export interface GitResult {
   ok: boolean;
   output: string;
@@ -54,6 +61,13 @@ const parseRepo = (raw: Wire): GitRepo => ({
 
 const parseIdentity = (raw: Wire): GitIdentity => ({ name: raw.name ?? "", email: raw.email ?? "" });
 
+const parseCommit = (raw: Wire): GitCommit => ({
+  hash: raw.hash ?? "",
+  author: raw.author ?? "",
+  date: raw.date ?? 0,
+  subject: raw.subject ?? "",
+});
+
 const parseResult = (raw: Wire | null): GitResult => ({
   ok: raw?.ok === true,
   output: raw?.output ?? "",
@@ -77,6 +91,11 @@ export const createGitApi = (client: HttpClient) => ({
     };
   },
 
+  async log(projectKey: string, repo: string, before = ""): Promise<GitCommit[] | null> {
+    const data = await client.get<Wire[]>(`${gitBase(projectKey)}/log`, { repo, before });
+    return Array.isArray(data) ? data.map(parseCommit) : null;
+  },
+
   async lastMessage(projectKey: string, repo: string): Promise<string> {
     const data = await client.get<Wire>(`${gitBase(projectKey)}/last-message`, { repo });
     return data?.message ?? "";
@@ -87,8 +106,14 @@ export const createGitApi = (client: HttpClient) => ({
     repo: string,
     paths: string[],
     note = "",
+    amend = false,
   ): Promise<string> {
-    const data = await client.post<Wire>(`${gitBase(projectKey)}/message`, { repo, paths, note });
+    const data = await client.post<Wire>(`${gitBase(projectKey)}/message`, {
+      repo,
+      paths,
+      note,
+      amend,
+    });
     return data?.message ?? "";
   },
 
