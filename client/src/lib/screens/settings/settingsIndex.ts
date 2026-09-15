@@ -47,6 +47,7 @@ export type SettingsDialog =
   | "environments"
   | "local_server"
   | "user_prompt"
+  | "commit_prompt"
   | "project_prompt"
   | "export"
   | "import"
@@ -141,6 +142,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "sdk", label: "SDK", value: sdkValue, section: "claude", group: "CLI" },
   { id: "sdk_auto_update", label: "SDK_AUTO_UPDATE", summary: "SDK_AUTO_UPDATE_SUMMARY", section: "claude", group: "CLI" },
   { id: "user_prompt", label: "USER_PROMPT", summary: "USER_PROMPT_SUMMARY", value: userPromptValue, section: "claude", group: "CLI", dialog: "user_prompt" },
+  { id: "commit_prompt", label: "COMMIT_PROMPT", summary: "COMMIT_PROMPT_SUMMARY", section: "claude", group: "CLI", dialog: "commit_prompt" },
   { id: "project_prompt", label: "PROJECT_PROMPT", summary: "PROJECT_PROMPT_SUMMARY", available: hasProjects, section: "claude", group: "CLI", dialog: "project_prompt" },
 
   { id: "plugins", label: "PLUGINS", value: pluginsValue, section: "claude", group: "EXTENSIONS" },

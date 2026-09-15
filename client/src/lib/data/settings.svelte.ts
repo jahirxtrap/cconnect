@@ -122,6 +122,20 @@ class Settings {
     this.#write("project_changed_only", value);
   }
 
+  get projectCommitOpen() {
+    return this.#read<boolean>("project_commit_open");
+  }
+  set projectCommitOpen(value: boolean) {
+    this.#write("project_commit_open", value);
+  }
+
+  get projectCommitHeight() {
+    return this.#read<number>("project_commit_height");
+  }
+  set projectCommitHeight(value: number) {
+    this.#write("project_commit_height", value);
+  }
+
   get showTimestamps() {
     return this.#read<boolean>("show_timestamps");
   }

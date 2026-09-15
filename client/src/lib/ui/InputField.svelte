@@ -113,7 +113,7 @@
           bind:this={field}
           {value}
           {onkeydown}
-          rows={minLines}
+          rows={Math.max(1, Math.round(minLines))}
           oninput={handle}
           style="min-height: {minLines * LINE_HEIGHT}px{maxLines
             ? `; max-height: ${maxLines * LINE_HEIGHT}px`

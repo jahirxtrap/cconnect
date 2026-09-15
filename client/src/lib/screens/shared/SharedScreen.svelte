@@ -759,7 +759,7 @@
       shortcut="shared.selectAll"
       onclick={selectAll}
     >
-      <SelectionDot selected={allSelected} />
+      <SelectionDot selected={allSelected} size={compact ? 18 : 24} />
     </TooltipIconButton>
   {/snippet}
 

@@ -25,6 +25,22 @@ def set_user_prompt(text: str) -> None:
     paths.USER_PROMPT_FILE.write_text(text, encoding="utf-8")
 
 
+def get_commit_prompt() -> str:
+    """The user's commit instructions, falling back to the ones shipped with the app."""
+    for source in (paths.COMMIT_PROMPT_FILE, paths.PROMPTS_DIR / "COMMIT.md"):
+        try:
+            text = source.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if text:
+            return text
+    return ""
+
+
+def set_commit_prompt(text: str) -> None:
+    paths.COMMIT_PROMPT_FILE.write_text(text, encoding="utf-8")
+
+
 def get_project_prompt(project_key: str) -> str:
     if not _PROJECT_KEY_RE.match(project_key or ""):
         return ""

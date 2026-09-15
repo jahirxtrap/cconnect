@@ -17,7 +17,11 @@
   import Lock from "@lucide/svelte/icons/lock";
   import Search from "@lucide/svelte/icons/search";
   import { untrack } from "svelte";
+  import { activeScope } from "$lib/app/activeScope.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
+  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { projectFilePath } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
@@ -32,6 +36,7 @@
     type ProjectDiff,
     type ProjectEntry,
   } from "$lib/services/projectFilesApi";
+  import { gitApi, type GitRepo } from "$lib/services/gitApi";
   import { ProjectWatch } from "$lib/services/projectWatch.svelte";
   import { recallProject, rememberProject } from "./projectMemory";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
@@ -42,8 +47,10 @@
   import Pressable from "$lib/ui/Pressable.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
+  import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import FilePreview, { type ToolbarButton } from "$lib/screens/shared/FilePreview.svelte";
+  import CommitBar from "./CommitBar.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import ProjectSelector from "$lib/screens/chat/ProjectSelector.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
@@ -70,6 +77,65 @@
   let fileDiff = $state<ProjectDiff | null>(null);
   let showChanged = $state(settings.projectChangedOnly);
   let changed = $state<ProjectEntry[] | null>(null);
+  let repos = $state<GitRepo[] | null>(null);
+  let picked = $state<Record<string, boolean>>({});
+
+  const files = $derived((changed ?? []).filter((entry) => !entry.isDir && entry.repoPath));
+  const chosen = $derived(files.filter((entry) => picked[entry.path] === true));
+  const committing = $derived(showChanged && settings.projectCommitOpen);
+
+  const commitRepo = $derived.by(() => {
+    const listed = repos ?? [];
+    const wanted = chosen[0]?.repoRoot ?? files[0]?.repoRoot ?? "";
+    return listed.find((item) => item.path === wanted) ?? listed[0] ?? null;
+  });
+
+  const commitPaths = $derived(
+    commitRepo ? chosen.filter((entry) => entry.repoRoot === commitRepo.path).map((entry) => entry.repoPath) : [],
+  );
+
+  const selectAll = () => {
+    const turningOn = chosen.length < files.length;
+    for (const entry of files) picked[entry.path] = turningOn;
+  };
+
+  useShortcut("project.selectAll", () => {
+    if (activeScope() !== "project" || isEditing() || !committing || !files.length) return false;
+    selectAll();
+  });
+
+  const showChanges = (value: boolean) => {
+    showChanged = value;
+    settings.projectChangedOnly = value;
+  };
+
+  useShortcut("project.changes", () => {
+    if (activeScope() !== "project" || !projectKey) return false;
+    showChanges(!showChanged);
+  });
+
+  useShortcut("project.commit", () => {
+    if (activeScope() !== "project" || !projectKey) return false;
+    if (!showChanged) {
+      showChanges(true);
+      settings.projectCommitOpen = true;
+      return;
+    }
+    settings.projectCommitOpen = !settings.projectCommitOpen;
+  });
+
+  const togglePick = (entry: ProjectEntry) => {
+    const targets = entry.isDir
+      ? files.filter((item) => item.path.startsWith(`${entry.path}/`))
+      : files.filter((item) => item.path === entry.path);
+    const turningOn = targets.some((item) => picked[item.path] !== true);
+    for (const item of targets) picked[item.path] = turningOn;
+  };
+
+  const marked = (entry: ProjectEntry) =>
+    entry.isDir
+      ? files.some((item) => item.path.startsWith(`${entry.path}/`) && picked[item.path] === true)
+      : picked[entry.path] === true;
   let anchorAt = $state<number | null>(null);
   let unlocking = $state(false);
   let rejected = $state(false);
@@ -173,7 +239,9 @@
     items: 0,
     status: "",
     ignored: false,
-    repo: false,
+    repo: (repos ?? []).some((item) => item.relative === path),
+    repoRoot: "",
+    repoPath: "",
   });
 
   interface Branch {
@@ -349,7 +417,20 @@
       return;
     }
     void projectFilesApi.changes(key).then((found) => {
-      if (projectKey === key && showChanged) changed = found;
+      if (projectKey !== key || !showChanged) return;
+      changed = found;
+    });
+  });
+
+  $effect(() => {
+    const key = projectKey;
+    void watch.revision;
+    if (!key || !showChanged) {
+      repos = null;
+      return;
+    }
+    void gitApi.repos(key).then((found) => {
+      if (projectKey === key && showChanged) repos = found;
     });
   });
 
@@ -397,11 +478,9 @@
   {#if projectKey}
     <TooltipIconButton
       label={t("CHANGED_FILES")}
-      class={compact ? "size-8" : ""}
-      onclick={() => {
-        showChanged = !showChanged;
-        settings.projectChangedOnly = showChanged;
-      }}
+      class={paneActionClass(compact)}
+      shortcut="project.changes"
+      onclick={() => showChanges(!showChanged)}
     >
       <GitCompare class={showChanged ? "text-accent" : ""} />
     </TooltipIconButton>
@@ -458,10 +537,53 @@
   </Pressable>
 {/snippet}
 
-{#snippet fileRow(entry: ProjectEntry, depth: number, open: boolean, action: () => void)}
+{#snippet selectAllAction()}
+  <TooltipIconButton
+    label={t("SELECT_ALL")}
+    class={paneActionClass(compact)}
+    shortcut="project.selectAll"
+    onclick={selectAll}
+  >
+    <SelectionDot selected={files.length > 0 && chosen.length === files.length} size={compact ? 18 : 24} />
+  </TooltipIconButton>
+{/snippet}
+
+{#snippet changedRow(entry: ProjectEntry, depth: number, open: boolean, action: () => void)}
+  <div
+    class="flex w-full items-center transition-colors hover:bg-on-surface/8"
+    oncontextmenu={(event) => {
+      event.preventDefault();
+      togglePick(entry);
+    }}
+    role="presentation"
+  >
+    {#if committing}
+      <button
+        type="button"
+        onclick={() => togglePick(entry)}
+        aria-label={entry.name}
+        class="flex shrink-0 cursor-pointer items-center py-1.5 pl-4"
+      >
+        <SelectionDot selected={marked(entry)} size={16} />
+      </button>
+    {/if}
+    <div class="min-w-0 flex-1">
+      {@render fileRow(entry, depth, open, action, false, committing ? 4 : BASE_INDENT)}
+    </div>
+  </div>
+{/snippet}
+
+{#snippet fileRow(
+  entry: ProjectEntry,
+  depth: number,
+  open: boolean,
+  action: () => void,
+  hover = true,
+  base = BASE_INDENT,
+)}
   {@const Icon = projectIcon(entry.path, entry.isDir, entry.repo)}
-  <Pressable onclick={action} class="flex w-full items-center gap-1.5 py-1.5 pr-3 text-left">
-    <span style="width: {BASE_INDENT + depth * INDENT}px" class="shrink-0"></span>
+  <Pressable onclick={action} {hover} class="flex w-full items-center gap-1.5 py-1.5 pr-4 text-left">
+    <span style="width: {base + depth * INDENT}px" class="shrink-0"></span>
     <span class="flex size-4 shrink-0 items-center justify-center">
       {#if entry.isDir}
         <ChevronRight size={14} class="text-on-surface-variant {open ? 'rotate-90' : ''}" />
@@ -472,15 +594,26 @@
   </Pressable>
 {/snippet}
 
-<div class="relative flex h-full min-h-0 flex-col">
+<div
+  class="relative flex h-full min-h-0 flex-col"
+  onpointerdowncapture={() => paneFocus.set("project")}
+>
   {#if compact}
-    <PaneHeader title={t("PROJECT_FILES")} actions={headerActions} />
+    <PaneHeader
+      title={t("PROJECT_FILES")}
+      leading={committing ? selectAllAction : undefined}
+      actions={headerActions}
+    />
   {:else}
     <AppTopBar title={t("PROJECT_FILES")} subtitle={project?.name ?? null}>
       {#snippet navigationIcon()}
-        <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
-          <ArrowLeft size={20} />
-        </TooltipIconButton>
+        {#if committing}
+          {@render selectAllAction()}
+        {:else}
+          <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
+            <ArrowLeft size={20} />
+          </TooltipIconButton>
+        {/if}
       {/snippet}
       {#snippet actions()}
         {@render headerActions()}
@@ -519,7 +652,7 @@
       <CenteredProgress class="h-full" />
     {:else if showChanged}
       {#each changedRows as row (row.entry.path)}
-        {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
+        {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
           row.entry.isDir ? fold(row.entry.path) : open(row.entry),
         )}
       {:else}
@@ -541,6 +674,15 @@
       {/each}
     {/if}
   </div>
+
+  {#if showChanged && commitRepo && projectKey}
+    <CommitBar
+      {projectKey}
+      repo={commitRepo}
+      paths={commitPaths}
+      onDone={() => watch.refresh()}
+    />
+  {/if}
 
   {#if opened.path !== null && projectKey}
     <div class={opened.full ? "" : "absolute inset-0 z-10"}>

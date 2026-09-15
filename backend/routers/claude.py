@@ -58,6 +58,17 @@ def set_user_prompt(body: PromptBody):
     return api_response()
 
 
+@router.get("/claude/commit-prompt")
+def get_commit_prompt():
+    return api_response(data={"text": claude_assets.get_commit_prompt()})
+
+
+@router.put("/claude/commit-prompt")
+def set_commit_prompt(body: PromptBody):
+    claude_assets.set_commit_prompt(body.text)
+    return api_response()
+
+
 class ProjectPromptBody(BaseModel):
     project: str
     text: str

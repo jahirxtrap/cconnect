@@ -2,6 +2,7 @@
   import FilePen from "@lucide/svelte/icons/file-pen";
   import FileText from "@lucide/svelte/icons/file-text";
   import FolderPen from "@lucide/svelte/icons/folder-pen";
+  import FolderGit from "@lucide/svelte/icons/folder-git";
   import Package from "@lucide/svelte/icons/package";
   import { t } from "$lib/i18n/index.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -37,10 +38,20 @@
   let sdkUpdating = $state(false);
   let promptOpen = $state(false);
   let projectPromptOpen = $state(false);
+  let commitPromptOpen = $state(false);
+  let commitPrompt = $state("");
+
+  $effect(() => {
+    if (!commitPromptOpen || commitPrompt) return;
+    void claudeApi.commitPrompt().then((text) => {
+      if (text !== null) commitPrompt = text;
+    });
+  });
 
   useSettingsDialog("claude", (target) => {
     if (target === "user_prompt") promptOpen = true;
     if (target === "project_prompt") projectPromptOpen = true;
+    if (target === "commit_prompt") commitPromptOpen = true;
   });
   let changelog = $state<{ sdk: boolean; version: string | null } | null>(null);
 
@@ -124,6 +135,13 @@
     {enabled}
     onclick={() => (promptOpen = true)}
   />
+  <PreferenceRow
+    icon={FolderGit}
+    title={t("COMMIT_PROMPT")}
+    summary={t("COMMIT_PROMPT_SUMMARY")}
+    {enabled}
+    onclick={() => (commitPromptOpen = true)}
+  />
   {#if projects.length}
     <PreferenceRow
       icon={FolderPen}
@@ -147,6 +165,21 @@
       });
     }}
     onDismiss={() => (promptOpen = false)}
+  />
+{/if}
+
+{#if commitPromptOpen}
+  <PromptDialog
+    initial={commitPrompt}
+    title={t("COMMIT_PROMPT")}
+    summary={t("COMMIT_PROMPT_SUMMARY")}
+    onConfirm={(text) => {
+      commitPromptOpen = false;
+      void claudeApi.setCommitPrompt(text).then((ok) => {
+        if (ok) commitPrompt = text;
+      });
+    }}
+    onDismiss={() => (commitPromptOpen = false)}
   />
 {/if}
 

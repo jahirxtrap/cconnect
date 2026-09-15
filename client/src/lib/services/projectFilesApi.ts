@@ -12,6 +12,8 @@ export interface ProjectEntry {
   status: string;
   ignored: boolean;
   repo: boolean;
+  repoRoot: string;
+  repoPath: string;
 }
 
 export interface ProjectDiff {
@@ -38,6 +40,8 @@ const parseEntry = (raw: Wire): ProjectEntry => ({
   status: raw.status ?? "",
   ignored: raw.ignored === true,
   repo: raw.repo === true,
+  repoRoot: raw.repo_root ?? "",
+  repoPath: raw.repo_path ?? "",
 });
 
 const projectBase = (projectKey: string) => `/projects/${encodeURIComponent(projectKey)}`;

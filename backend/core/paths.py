@@ -21,6 +21,7 @@ DB_FILE = CONFIG_DIR / "cconnect.db"
 ACCOUNTS_DIR = CONFIG_DIR / "accounts"
 MCP_DISABLED_FILE = CONFIG_DIR / "mcp_disabled.json"
 USER_PROMPT_FILE = CONFIG_DIR / "prompts" / "USER.md"
+COMMIT_PROMPT_FILE = CONFIG_DIR / "prompts" / "COMMIT.md"
 PROJECT_PROMPTS_DIR = CONFIG_DIR / "prompts" / "projects"
 
 RUNTIME_FILE = STATE_DIR / ".runtime"

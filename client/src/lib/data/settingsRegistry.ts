@@ -13,6 +13,8 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "markdown_preview_formatted", kind: "boolean", fallback: true, backup: true },
   { key: "project_diff", kind: "boolean", fallback: false, backup: true },
   { key: "project_changed_only", kind: "boolean", fallback: false, backup: true },
+  { key: "project_commit_open", kind: "boolean", fallback: false, backup: true },
+  { key: "project_commit_height", kind: "number", fallback: 40, backup: true },
   { key: "show_timestamps", kind: "boolean", fallback: false, backup: true },
   { key: "minimize_to_tray", kind: "boolean", fallback: false, backup: true },
   { key: "discord_presence", kind: "boolean", fallback: false, backup: true },

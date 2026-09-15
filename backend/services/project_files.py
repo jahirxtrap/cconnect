@@ -247,7 +247,13 @@ def changes(root: Path) -> list[dict]:
                 relative = absolute.relative_to(root).as_posix()
             except ValueError:
                 continue
-            listed.append({"name": absolute.name, "path": relative, "status": status})
+            listed.append({
+                "name": absolute.name,
+                "path": relative,
+                "status": status,
+                "repo_root": str(repo),
+                "repo_path": path,
+            })
     listed.sort(key=lambda item: item["path"].lower())
     return listed
 

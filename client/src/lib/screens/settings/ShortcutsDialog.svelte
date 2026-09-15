@@ -29,10 +29,11 @@
     terminal: "SCOPE_TERMINAL",
     shared: "SCOPE_SHARED",
     browser: "BROWSER",
+    project: "PROJECT_FILES",
     global: "SCOPE_GENERAL",
   };
 
-  const ORDER: ShortcutScope[] = ["chat", "terminal", "shared", "browser", "global"];
+  const ORDER: ShortcutScope[] = ["chat", "terminal", "shared", "browser", "project", "global"];
 
   const MODIFIER_CODES = [
     "ControlLeft",

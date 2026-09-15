@@ -152,6 +152,15 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return (await client.put("/claude/prompt", { text })) !== null;
   },
 
+  async commitPrompt(): Promise<string | null> {
+    const data = await client.get<Wire>("/claude/commit-prompt");
+    return data?.text ?? null;
+  },
+
+  async setCommitPrompt(text: string): Promise<boolean> {
+    return (await client.put("/claude/commit-prompt", { text })) !== null;
+  },
+
   async projectPrompt(project: string): Promise<string | null> {
     const data = await client.get<Wire>("/claude/project-prompt", { project });
     return data?.text ?? null;

@@ -6,6 +6,7 @@ export const activeScope = (): ShortcutScope => {
   if (navigation.route === "/shared") return "shared";
   if (navigation.route === "/terminal") return "terminal";
   if (navigation.route === "/browser") return "browser";
+  if (navigation.route === "/project") return "project";
   if (navigation.route === "/") return paneFocus.active;
   return "global";
 };

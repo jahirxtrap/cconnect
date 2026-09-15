@@ -1064,6 +1064,36 @@ async def generate_title(transcript: str, account: Optional[str] = None) -> str:
     return "".join(parts).strip()
 
 
+async def generate_commit_message(context: str, account: Optional[str] = None) -> str:
+    """Ask a fast model for a commit subject and return ONLY the text — the caller commits.
+    Runs in the isolated AI workspace, like generate_title."""
+    from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage
+
+    from services import accounts, claude_assets
+
+    target = accounts.resolve(account)
+    options = ClaudeAgentOptions(
+        cwd=str(paths.AI_WORKDIR),
+        permission_mode="default",
+        model=accounts.model_for(target, "haiku"),
+        system_prompt=claude_assets.get_commit_prompt(),
+        setting_sources=[],
+        cli_path=cli_manager.resolve_cli_path(),
+        env=accounts.env_for(target),
+    )
+
+    parts: list[str] = []
+    try:
+        async for message in query(prompt=context, options=options):
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if type(block).__name__ == "TextBlock":
+                        parts.append(getattr(block, "text", ""))
+    except Exception as exc:
+        logger.error(f"generate_commit_message failed: {type(exc).__name__}: {exc}")
+    return "".join(parts).strip().splitlines()[0] if parts else ""
+
+
 async def ask_side_question(
     question: str,
     context: str,

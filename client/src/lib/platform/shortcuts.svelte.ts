@@ -1,7 +1,7 @@
 import { isTauri, isTouch, platformName } from "./index";
 import { store } from "./storage";
 
-export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser";
+export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project";
 
 export interface ShortcutDef {
   id: string;
@@ -59,6 +59,9 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "browser.copy", label: "SHORTCUT_BROWSER_COPY", scope: "browser", keys: "Mod+KeyC" },
   { id: "browser.cut", label: "SHORTCUT_BROWSER_CUT", scope: "browser", keys: "Mod+KeyX" },
   { id: "browser.paste", label: "SHORTCUT_BROWSER_PASTE", scope: "browser", keys: "Mod+KeyV" },
+  { id: "project.changes", label: "SHORTCUT_PROJECT_CHANGES", scope: "project", keys: "Mod+KeyG" },
+  { id: "project.commit", label: "SHORTCUT_PROJECT_COMMIT", scope: "project", keys: "Mod+KeyJ" },
+  { id: "project.selectAll", label: "SHORTCUT_PROJECT_SELECT_ALL", scope: "project", keys: "Mod+KeyA" },
   { id: "shared.selectAll", label: "SHORTCUT_SHARED_SELECT_ALL", scope: "shared", keys: "Mod+KeyA" },
   { id: "shared.copy", label: "SHORTCUT_SHARED_COPY", scope: "shared", keys: "Mod+KeyC" },
   { id: "shared.cut", label: "SHORTCUT_SHARED_CUT", scope: "shared", keys: "Mod+KeyX" },
