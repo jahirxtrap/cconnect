@@ -270,13 +270,27 @@ def resolve_file(root: Path, relpath: str, unlocked: bool = False) -> Optional[P
     return path
 
 
+def _line_count(path: Path) -> int:
+    try:
+        return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+    except OSError:
+        return 0
+
+
 def diff(root: Path, relpath: str) -> dict:
     """Which lines of the file on disk are new, and what was removed just before each one."""
     path = files.resolve(root, relpath)
     repo = repo_of(path.parent)
-    if repo is None or not path.is_file():
+    if repo is None:
         return {"added": [], "removed": {}}
-    reported = _git(repo, "diff", "--unified=0", "HEAD", "--", _relative(repo, path))
+    inside = _relative(repo, path)
+    if not path.is_file():
+        gone = _git(repo, "show", f"HEAD:{inside}")
+        lines = (gone or "").splitlines()
+        return {"added": [], "removed": {"1": lines} if lines else {}}
+    if inside in (_git(repo, "ls-files", "--others", "--exclude-standard", "--", inside) or "").splitlines():
+        return {"added": list(range(1, _line_count(path) + 1)), "removed": {}}
+    reported = _git(repo, "diff", "--unified=0", "HEAD", "--", inside)
     added: list[int] = []
     removed: dict[int, list[str]] = {}
     at = 0
@@ -296,6 +310,14 @@ def diff(root: Path, relpath: str) -> dict:
         elif line.startswith(" "):
             at += 1
     return {"added": added, "removed": {str(key): value for key, value in removed.items()}}
+
+
+def deleted_at_head(root: Path, relpath: str) -> bool:
+    path = files.resolve(root, relpath)
+    repo = repo_of(path.parent)
+    if repo is None or path.is_file():
+        return False
+    return statuses(repo).get(_relative(repo, path), "").strip().startswith("D")
 
 
 def invalidate() -> None:

@@ -314,8 +314,9 @@
   };
 
   const focusField = (event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest("button, a, input, textarea")) return;
-    field?.focus();
+    if (!field || (event.target as HTMLElement).closest("button, a, input, textarea")) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
   };
 
   const ondragenter = (event: DragEvent) => {

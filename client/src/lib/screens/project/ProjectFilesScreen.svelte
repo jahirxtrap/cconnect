@@ -78,11 +78,12 @@
   let showChanged = $state(settings.projectChangedOnly);
   let changed = $state<ProjectEntry[] | null>(null);
   let repos = $state<GitRepo[] | null>(null);
+  let gitTick = $state(0);
   let picked = $state<Record<string, boolean>>({});
 
   const files = $derived((changed ?? []).filter((entry) => !entry.isDir && entry.repoPath));
   const chosen = $derived(files.filter((entry) => picked[entry.path] === true));
-  const committing = $derived(showChanged && settings.projectCommitOpen);
+  const committing = $derived(showChanged && settings.projectCommitOpen && !locked);
 
   const commitRepo = $derived.by(() => {
     const listed = repos ?? [];
@@ -115,7 +116,7 @@
   });
 
   useShortcut("project.commit", () => {
-    if (activeScope() !== "project" || !projectKey) return false;
+    if (activeScope() !== "project" || !projectKey || locked) return false;
     if (!showChanged) {
       showChanges(true);
       settings.projectCommitOpen = true;
@@ -156,10 +157,13 @@
         ) ?? null),
   );
 
-  const modified = $derived(!!openEntry?.status && !openEntry.status.startsWith("?"));
+  const modified = $derived(!!openEntry?.status);
+  const wholeFile = $derived(
+    !!openEntry?.status && (openEntry.status.startsWith("?") || openEntry.status.includes("D")),
+  );
 
   const anchors = $derived.by(() => {
-    if (!showDiff || !fileDiff) return [];
+    if (!showDiff || !fileDiff || wholeFile) return [];
     const starts = new Set(Object.keys(fileDiff.removed).map(Number));
     let previous = -1;
     for (const line of [...fileDiff.added].sort((first, second) => first - second)) {
@@ -424,7 +428,7 @@
 
   $effect(() => {
     const key = projectKey;
-    void watch.revision;
+    void gitTick;
     if (!key || !showChanged) {
       repos = null;
       return;
@@ -680,7 +684,11 @@
       {projectKey}
       repo={commitRepo}
       paths={commitPaths}
-      onDone={() => watch.refresh()}
+      {locked}
+      onDone={() => {
+        gitTick++;
+        watch.refresh();
+      }}
     />
   {/if}
 

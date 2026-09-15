@@ -2,7 +2,7 @@
 
 import asyncio
 
-from fastapi import APIRouter, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from loguru import logger
 
@@ -84,6 +84,8 @@ def project_file(project_key: str, path: str, x_security_key: str = Header("")):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
+        if project_files.deleted_at_head(_root(project_key), path):
+            return Response(content=b"", media_type="text/plain")
         raise HTTPException(status_code=404, detail="file not found")
     return FileResponse(
         resolved,

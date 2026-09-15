@@ -37,6 +37,12 @@
     (highlighted === null ? text.split("\n") : highlighted.split(LINE_BREAK)).map(filled),
   );
 
+  const trailing = $derived(
+    Object.entries(removed)
+      .filter(([number]) => Number(number) > lines.length)
+      .flatMap(([, gone]) => gone),
+  );
+
   $effect(() => {
     const body = text;
     const target = language;
@@ -85,5 +91,10 @@
         ? 'border-accent'
         : 'border-transparent'} {marked.has(number) ? 'bg-green-bg' : ''}"
     >{#if highlighted === null}{line}{:else}{@html line}{/if}</div>
+  {/each}
+  {#each trailing as gone, at (at)}
+    <div
+      class="border-l-2 border-transparent bg-red-bg px-2.5 py-px break-all whitespace-pre-wrap text-red"
+    >{filled(gone)}</div>
   {/each}
 </div>

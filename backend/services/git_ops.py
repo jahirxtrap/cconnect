@@ -38,34 +38,46 @@ def _write(repo: Path, *args: str, timeout: int = _TIMEOUT) -> dict:
     }
 
 
-def _counts(repo: Path) -> tuple[int, int]:
-    reported = _read(repo, "rev-list", "--left-right", "--count", "@{upstream}...HEAD")
-    if not reported:
-        return 0, 0
-    parts = reported.split()
-    if len(parts) != 2 or not all(part.isdigit() for part in parts):
-        return 0, 0
-    return int(parts[0]), int(parts[1])
+def _branch_state(repo: Path) -> dict:
+    """Branch, upstream and ahead/behind from a single status call."""
+    state = {"branch": "", "detached": False, "upstream": "", "ahead": 0, "behind": 0}
+    reported = _read(repo, "status", "--porcelain=v2", "--branch")
+    for line in (reported or "").splitlines():
+        if not line.startswith("# branch."):
+            continue
+        field, _, value = line[len("# branch."):].partition(" ")
+        if field == "head":
+            state["detached"] = value == "(detached)"
+            state["branch"] = "" if state["detached"] else value
+        elif field == "upstream":
+            state["upstream"] = value
+        elif field == "ab":
+            for part in value.split():
+                if part.startswith("+"):
+                    state["ahead"] = int(part[1:] or 0)
+                elif part.startswith("-"):
+                    state["behind"] = int(part[1:] or 0)
+    return state
 
 
 def repos(root: Path) -> list[dict]:
     """Every repository under a project root, with the state its header shows."""
     listed = []
     for repo in project_files._repos_under(root):
-        branch = _read(repo, "rev-parse", "--abbrev-ref", "HEAD") or ""
-        behind, ahead = _counts(repo)
+        state = _branch_state(repo)
         listed.append({
             "path": str(repo),
             "name": repo.name,
             "relative": _relative_root(root, repo),
-            "branch": "" if branch == "HEAD" else branch,
-            "detached": branch == "HEAD",
-            "upstream": _read(repo, "rev-parse", "--abbrev-ref", "@{upstream}") or "",
-            "ahead": ahead,
-            "behind": behind,
-            "remote": _read(repo, "remote") or "",
+            **state,
+            "remote": "" if state["upstream"] else _first_remote(repo),
         })
     return listed
+
+
+def _first_remote(repo: Path) -> str:
+    listed = (_read(repo, "remote") or "").splitlines()
+    return listed[0] if listed else ""
 
 
 def _relative_root(root: Path, repo: Path) -> str:
@@ -91,17 +103,20 @@ def _untracked(repo: Path, paths: list[str]) -> list[str]:
 
 def identities(repo: Path) -> dict:
     """Who this repository commits as, and the alternatives worth offering."""
-    effective = {
-        "name": _read(repo, "config", "user.name") or "",
-        "email": _read(repo, "config", "user.email") or "",
-    }
+    scoped: dict[str, dict[str, str]] = {}
+    for line in (_read(repo, "config", "--list", "--show-scope") or "").splitlines():
+        scope, _, setting = line.partition("\t")
+        key, _, value = setting.partition("=")
+        if key in ("user.name", "user.email"):
+            scoped.setdefault(scope, {})[key.split(".")[1]] = value
+    merged: dict[str, str] = {}
+    for scope in ("system", "global", "local", "worktree", "command"):
+        merged.update(scoped.get(scope, {}))
+    effective = {"name": merged.get("name", ""), "email": merged.get("email", "")}
     options = [effective] if effective["email"] else []
-    globals_ = {
-        "name": _read(repo, "config", "--global", "user.name") or "",
-        "email": _read(repo, "config", "--global", "user.email") or "",
-    }
-    if globals_["email"]:
-        options.append(globals_)
+    globals_ = scoped.get("global", {})
+    if globals_.get("email"):
+        options.append({"name": globals_.get("name", ""), "email": globals_["email"]})
     reported = _read(repo, "log", f"-n{_LOG_IDENTITIES}", f"--format=%an{_FIELD_FORMAT}%ae")
     for line in (reported or "").splitlines():
         name, _, email = line.partition(_FIELD)

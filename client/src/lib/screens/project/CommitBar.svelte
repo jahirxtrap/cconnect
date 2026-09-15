@@ -24,10 +24,11 @@
     repo: GitRepo;
     paths: string[];
     note?: string;
+    locked?: boolean;
     onDone: () => void;
   }
 
-  const { projectKey, repo, paths, note = "", onDone }: Props = $props();
+  const { projectKey, repo, paths, note = "", locked = false, onDone }: Props = $props();
 
   const ACTION_CLASS = "size-8";
   const PANEL_MS = 350;
@@ -52,7 +53,11 @@
   const idle = $derived(running === "");
   const ready = $derived(paths.length > 0 && message.trim() !== "" && idle);
   const shown = $derived(author || (effective ? label(effective) : t("GIT_AUTHOR_DEFAULT")));
-  const open = $derived(settings.projectCommitOpen);
+  const commitLabel = $derived(
+    running === "commit" ? t("GIT_COMMITTING") : amend ? t("GIT_AMEND") : t("GIT_COMMIT"),
+  );
+  const pushLabel = $derived(amend ? t("GIT_AMEND_PUSH") : t("GIT_COMMIT_PUSH"));
+  const open = $derived(settings.projectCommitOpen && !locked);
   const height = $derived(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, settings.projectCommitHeight)));
 
   $effect(() => {
@@ -114,12 +119,9 @@
       await guard("revert", () => gitApi.revert(projectKey, repo.path, paths));
       return;
     }
-    if (choice === "push") {
-      await publish();
-      force = false;
-      return;
-    }
-    if (await commit()) await publish();
+    if (choice === "commit" && !(await commit())) return;
+    await publish();
+    force = false;
   };
 </script>
 
@@ -152,34 +154,36 @@
     {#if repo.ahead}
       <span class="flex items-center px-1 text-label-md text-accent"><ArrowUp size={13} />{repo.ahead}</span>
     {/if}
-    <TooltipIconButton
-      label={t("GIT_PULL")}
-      class={ACTION_CLASS}
-      enabled={idle}
-      onclick={() => void guard("pull", () => gitApi.pull(projectKey, repo.path))}
-    >
-      <ArrowDown />
-    </TooltipIconButton>
-    <TooltipIconButton
-      label={t("GIT_PUSH")}
-      class={ACTION_CLASS}
-      enabled={idle}
-      onclick={() => (asking = "push")}
-    >
-      {#if running === "push"}
-        <LoadingIndicator size={16} />
-      {:else}
-        <ArrowUp />
-      {/if}
-    </TooltipIconButton>
-    <TooltipIconButton
-      label={open ? t("COLLAPSE") : t("EXPAND")}
-      class={ACTION_CLASS}
-      shortcut="project.commit"
-      onclick={() => (settings.projectCommitOpen = !open)}
-    >
-      <ChevronDown class={open ? "" : "rotate-180"} />
-    </TooltipIconButton>
+    {#if !locked}
+      <TooltipIconButton
+        label={t("GIT_PULL")}
+        class={ACTION_CLASS}
+        enabled={idle}
+        onclick={() => void guard("pull", () => gitApi.pull(projectKey, repo.path))}
+      >
+        <ArrowDown />
+      </TooltipIconButton>
+      <TooltipIconButton
+        label={t("GIT_PUSH")}
+        class={ACTION_CLASS}
+        enabled={idle}
+        onclick={() => (asking = "push")}
+      >
+        {#if running === "push"}
+          <LoadingIndicator size={16} />
+        {:else}
+          <ArrowUp />
+        {/if}
+      </TooltipIconButton>
+      <TooltipIconButton
+        label={open ? t("COLLAPSE") : t("EXPAND")}
+        class={ACTION_CLASS}
+        shortcut="project.commit"
+        onclick={() => (settings.projectCommitOpen = !open)}
+      >
+        <ChevronDown class={open ? "" : "rotate-180"} />
+      </TooltipIconButton>
+    {/if}
   </div>
 
   {#if open}
@@ -204,7 +208,7 @@
 
       <div class="flex items-center">
         <CompactSwitch checked={amend} onCheckedChange={(next) => (amend = next)} enabled={running === ""} />
-        <span class="flex-1 pl-2 text-body-sm text-on-surface-variant">{t("GIT_AMEND")}</span>
+        <span class="flex-1 pl-2 text-body-sm text-on-surface-variant">{t("GIT_AMEND_LAST")}</span>
         <TooltipIconButton
           label={t("GIT_SUGGEST")}
           class={ACTION_CLASS}
@@ -233,10 +237,10 @@
 
       <div class="flex gap-2">
         <Button class="flex-1" enabled={ready} onclick={() => void commit()}>
-          {running === "commit" ? t("GIT_COMMITTING") : t("GIT_COMMIT")}
+          {commitLabel}
         </Button>
         <Button variant="outlined" class="flex-1" enabled={ready} onclick={() => (asking = "commit")}>
-          {t("GIT_COMMIT_PUSH")}
+          {pushLabel}
         </Button>
       </div>
     </div>
@@ -253,22 +257,13 @@
   />
 {/if}
 
-{#if asking === "commit"}
+{#if asking === "commit" || asking === "push"}
+  {@const choice = asking}
   <ConfirmDialog
-    title={t("GIT_COMMIT_PUSH")}
+    title={choice === "commit" ? pushLabel : t("GIT_PUSH")}
     text={t("GIT_PUSH_CONFIRM", repo.branch, repo.upstream || repo.remote)}
     confirmLabel={t("CONFIRM")}
-    onConfirm={() => void resolve("commit")}
-    onDismiss={() => (asking = null)}
-  />
-{/if}
-
-{#if asking === "push"}
-  <ConfirmDialog
-    title={t("GIT_PUSH")}
-    text={t("GIT_PUSH_CONFIRM", repo.branch, repo.upstream || repo.remote)}
-    confirmLabel={t("CONFIRM")}
-    onConfirm={() => void resolve("push")}
+    onConfirm={() => void resolve(choice)}
     onDismiss={() => {
       asking = null;
       force = false;

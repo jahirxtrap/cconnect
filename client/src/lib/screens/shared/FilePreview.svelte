@@ -122,10 +122,15 @@
     return encoded ? decodeURIComponent(encoded) : null;
   });
 
+  let shownFile = "";
+
   $effect(() => {
     const target = source;
     if (!readsAsText(kind)) return;
-    text = null;
+    if (base !== shownFile) {
+      shownFile = base;
+      text = null;
+    }
     failed = false;
     void fetch(target, {
       headers: { ...authHeadersOf(backend.active), ...securityKeys.headersFor(backend.active) },
