@@ -399,25 +399,28 @@ class LiveSession:
         worker = self._worker
         if worker is None or worker.done():
             return
-        announced = False
-        if self._queued or self._inflight:
-            announced = await self._stop_and_continue()
-            if announced and (self._drained.is_set() or worker.done()):
-                return
-        if not announced:
-            self._stopping = True
-            if await self._ask_cli_to_stop():
-                return
-        worker.cancel()
         try:
-            await worker
-        except asyncio.CancelledError:
-            pass
-        if worker.cancelled():
-            self._requeue_inflight()
-            self._publish_queue()
+            announced = False
+            if self._queued or self._inflight:
+                announced = await self._stop_and_continue()
+                if announced and (self._drained.is_set() or worker.done()):
+                    return
             if not announced:
-                await self._emit({"type": "interrupted"})
+                self._stopping = True
+                if await self._ask_cli_to_stop():
+                    return
+            worker.cancel()
+            try:
+                await worker
+            except asyncio.CancelledError:
+                pass
+            if worker.cancelled():
+                self._requeue_inflight()
+                self._publish_queue()
+                if not announced:
+                    await self._emit({"type": "interrupted"})
+        finally:
+            self._publish_activity(self.activity)
 
     async def _stop_and_continue(self):
         """Stop the running answer and wait for the queue to take over. False when the CLI

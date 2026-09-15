@@ -1,8 +1,8 @@
 """Live updates for the project explorer over WebSocket.
 
 One recursive watcher per project a client is looking at, started on the first subscriber
-and stopped with the last, so nothing runs while the explorer is closed. Every change
-drops the git caches and tells the subscribers of that project to re-read the tree.
+and stopped with the last, so nothing runs while the explorer is closed. A burst drops the
+git caches and carries the paths it touched, truncated past `_MAX_PATHS`.
 """
 
 import asyncio
@@ -16,7 +16,15 @@ from core import paths
 from services import project_files
 
 _DEBOUNCE_SECONDS = 0.4
+_MAX_PATHS = 200
 _GIT_INTERNALS = {"index", "HEAD"}
+
+
+def _inside(root: Path, path: str) -> str:
+    try:
+        return Path(path).relative_to(root).as_posix()
+    except ValueError:
+        return ""
 
 
 def _relevant(path: str) -> bool:
@@ -45,7 +53,8 @@ class ProjectWatchHub:
         self._observers: dict[str, object] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
-        self._pending: set[str] = set()
+        self._pending: dict[str, set[str]] = {}
+        self._overflowed: set[str] = set()
         self._timer: Optional[threading.Timer] = None
 
     async def start(self):
@@ -100,8 +109,9 @@ class ProjectWatchHub:
 
             class _Handler(FileSystemEventHandler):
                 def on_any_event(self, event):
-                    if _relevant(str(event.src_path)):
-                        hub._touch(project_key)
+                    for raw in (event.src_path, getattr(event, "dest_path", "")):
+                        if raw and _relevant(str(raw)):
+                            hub._touch(project_key, _inside(root, str(raw)))
 
             observer = Observer()
             observer.schedule(_Handler(), str(root), recursive=True)
@@ -123,9 +133,13 @@ class ProjectWatchHub:
         except Exception:
             pass
 
-    def _touch(self, project_key: str):
+    def _touch(self, project_key: str, path: str):
         with self._lock:
-            self._pending.add(project_key)
+            touched = self._pending.setdefault(project_key, set())
+            if not path or len(touched) >= _MAX_PATHS:
+                self._overflowed.add(project_key)
+            else:
+                touched.add(path)
             if self._timer is not None:
                 return
             self._timer = threading.Timer(_DEBOUNCE_SECONDS, self._flush)
@@ -136,7 +150,9 @@ class ProjectWatchHub:
         loop = self._loop
         with self._lock:
             changed = self._pending
-            self._pending = set()
+            overflowed = self._overflowed
+            self._pending = {}
+            self._overflowed = set()
             self._timer = None
             targets = [(q, key) for q, key in self._subscribers.items() if key in changed]
         if not changed:
@@ -145,7 +161,12 @@ class ProjectWatchHub:
         if loop is None:
             return
         for queue, key in targets:
-            loop.call_soon_threadsafe(queue.put_nowait, {"type": "changed", "project_key": key})
+            loop.call_soon_threadsafe(queue.put_nowait, {
+                "type": "changed",
+                "project_key": key,
+                "paths": sorted(changed[key]),
+                "truncated": key in overflowed,
+            })
 
 
 hub = ProjectWatchHub()

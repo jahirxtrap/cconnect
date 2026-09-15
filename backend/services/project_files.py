@@ -76,7 +76,7 @@ def index_of(repo: Path) -> Optional[set[str]]:
 
 
 def _build_status(repo: Path) -> dict[str, str]:
-    reported = _git(repo, "status", "--porcelain", "-z")
+    reported = _git(repo, "status", "--porcelain", "-z", "--untracked-files=all")
     if not reported:
         return {}
     status: dict[str, str] = {}
@@ -272,7 +272,7 @@ def resolve_file(root: Path, relpath: str, unlocked: bool = False) -> Optional[P
 
 def _line_count(path: Path) -> int:
     try:
-        return len(path.read_text(encoding="utf-8", errors="replace").splitlines())
+        return len(path.read_text(encoding="utf-8", errors="replace").split("\n"))
     except OSError:
         return 0
 
