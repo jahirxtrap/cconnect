@@ -2137,7 +2137,7 @@ export class ChatState {
           (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
         );
         this.#append(newMessage(this.#nextId++, "interrupted"));
-        this.streaming = this.queue.length > 0;
+        this.streaming = false;
         this.compacting = false;
         this.pendingToolIds = [];
         this.streamStatus = this.streamStatus === "failed" ? "failed" : null;

@@ -137,7 +137,7 @@
   });
 
   $effect(() => {
-    layout.rightInset = !layout.mobile && panes.open ? rightWidth : 0;
+    layout.rightInset = navigation.chatActive && !layout.mobile && panes.open ? rightWidth : 0;
     layout.rightInsetAnimated = !rightDragging;
     return () => (layout.rightInset = 0);
   });

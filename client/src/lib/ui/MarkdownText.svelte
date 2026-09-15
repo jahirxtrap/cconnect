@@ -107,6 +107,7 @@
       for (const anchor of node.querySelectorAll("a")) {
         if (anchor.dataset.decorated) continue;
         anchor.dataset.decorated = "true";
+        anchor.dataset.press = "off";
         const url = anchor.getAttribute("href") ?? "";
         const own = shared(url);
         const icon = (own ? (isArchive(filenameOf(url)) ? archive : file) : external).cloneNode(

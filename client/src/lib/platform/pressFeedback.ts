@@ -3,7 +3,8 @@ import { scrollableAbove } from "$lib/ui/scrollbar";
 import { isTouch } from "./index";
 
 const DISABLED = ":disabled, [data-disabled], [aria-disabled='true']";
-const SURFACE = "[data-press]";
+const SURFACE = "[data-press]:not([data-press='off'])";
+const MUTED = "[data-press='off']";
 
 export const trackPressFeedback = () => {
   if (!isTouch) return;
@@ -90,7 +91,7 @@ export const trackPressFeedback = () => {
       drop();
       const from = event.target instanceof Element ? event.target : null;
       const pressable = from?.closest<HTMLElement>(PRESSABLE) ?? null;
-      if (!from || !pressable || pressable.matches(DISABLED)) return;
+      if (!from || !pressable || pressable.matches(DISABLED) || pressable.closest(MUTED)) return;
       const target = shapeOf(from, pressable);
       aim(target, event.clientX, event.clientY);
       candidate = target;

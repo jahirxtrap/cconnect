@@ -84,6 +84,7 @@
   const files = $derived((changed ?? []).filter((entry) => !entry.isDir && entry.repoPath));
   const chosen = $derived(files.filter((entry) => picked[entry.path] === true));
   const committing = $derived(showChanged && settings.projectCommitOpen && !locked);
+  const outsideGit = $derived(!tracked && repos !== null && repos.length === 0);
 
   const commitRepo = $derived.by(() => {
     const listed = repos ?? [];
@@ -103,6 +104,31 @@
   useShortcut("project.selectAll", () => {
     if (activeScope() !== "project" || isEditing() || !committing || !files.length) return false;
     selectAll();
+  });
+
+  const clearMode = () => {
+    if (chosen.length) {
+      picked = {};
+      return true;
+    }
+    if (searching) {
+      searching = false;
+      query = "";
+      return true;
+    }
+    return false;
+  };
+
+  const onKeydown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || activeScope() !== "project" || isEditing()) return;
+    if (!clearMode()) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  };
+
+  $effect(() => {
+    window.addEventListener("keydown", onKeydown, true);
+    return () => window.removeEventListener("keydown", onKeydown, true);
   });
 
   const showChanges = (value: boolean) => {
@@ -344,17 +370,25 @@
   const slot = $derived(`${backend.activeId ?? ""}|${projectKey ?? ""}`);
 
   let placed = "";
+  let diffed = "";
+
+  const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
 
   $effect(() => {
     const target = slot;
     if (target === placed) return;
     untrack(() => {
-      if (compact && placed) rememberProject(placed, { children, expanded, path: opened.path });
+      if (compact && placed) {
+        rememberProject(placed, { children, expanded, path: opened.path, changed, repos });
+      }
       placed = target;
       results = null;
+      picked = {};
       const saved = compact ? recallProject(target) : undefined;
       children = saved?.children ?? {};
       expanded = saved?.expanded ?? {};
+      changed = saved?.changed ?? null;
+      repos = saved?.repos ?? null;
       if (saved?.path) opened.path = saved.path;
       else closeFile();
     });
@@ -362,13 +396,18 @@
 
   $effect(() => {
     const key = projectKey;
-    void watch.revision;
+    const burst = watch.burst;
     const known = untrack(() => Object.keys(children));
     if (!key) {
       loading = false;
       return;
     }
-    const targets = known.length ? known : [""];
+    const listed = known.length ? known : [""];
+    const targets =
+      burst.truncated || !known.length
+        ? listed
+        : listed.filter((path) => burst.paths.some((changed) => folderOf(changed) === path));
+    if (!targets.length) return;
     loading = !known.length;
     void Promise.all(
       targets.map((path) => projectFilesApi.tree(key, path).then((listing) => [path, listing] as const)),
@@ -376,9 +415,12 @@
       if (projectKey !== key) return;
       loading = false;
       const root = loaded.find(([path]) => path === "")?.[1];
-      children = Object.fromEntries(
-        loaded.filter(([, listing]) => listing).map(([path, listing]) => [path, listing!.entries]),
-      );
+      children = {
+        ...children,
+        ...Object.fromEntries(
+          loaded.filter(([, listing]) => listing).map(([path, listing]) => [path, listing!.entries]),
+        ),
+      };
       if (!root) return;
       tracked = root.tracked;
       locked = !root.unlocked;
@@ -403,11 +445,14 @@
   $effect(() => {
     const key = projectKey;
     const target = opened.path;
-    void watch.revision;
+    const burst = watch.burst;
     if (!key || target === null || !showDiff) {
+      diffed = "";
       fileDiff = null;
       return;
     }
+    if (diffed === `${key}|${target}` && !burst.truncated && !burst.paths.includes(target)) return;
+    diffed = `${key}|${target}`;
     void projectFilesApi.diff(key, target).then((found) => {
       if (projectKey === key && opened.path === target) fileDiff = found;
     });
@@ -415,11 +460,12 @@
 
   $effect(() => {
     const key = projectKey;
-    void watch.revision;
+    const burst = watch.burst;
     if (!key || !showChanged) {
       changed = null;
       return;
     }
+    if (!burst.truncated && !burst.paths.length && untrack(() => changed) !== null) return;
     void projectFilesApi.changes(key).then((found) => {
       if (projectKey !== key || !showChanged) return;
       changed = found;
@@ -533,7 +579,7 @@
 {#snippet pathRow(entry: ProjectEntry)}
   <Pressable
     onclick={() => !entry.status.includes("D") && open(entry)}
-    class="flex w-full items-center gap-2 px-3 py-1.5 text-left"
+    class="flex w-full items-center gap-2 px-4 py-1.5 text-left"
   >
     {@const Icon = fileIcon(entry.path)}
     <Icon size={16} class="shrink-0 text-on-surface-variant" />
@@ -557,6 +603,7 @@
     class="flex w-full items-center transition-colors hover:bg-on-surface/8"
     oncontextmenu={(event) => {
       event.preventDefault();
+      if (!locked) settings.projectCommitOpen = true;
       togglePick(entry);
     }}
     role="presentation"
@@ -660,7 +707,7 @@
           row.entry.isDir ? fold(row.entry.path) : open(row.entry),
         )}
       {:else}
-        <EmptyState text={t("NO_CHANGES")} class="h-full" />
+        <EmptyState text={outsideGit ? t("NOT_A_REPOSITORY") : t("NO_CHANGES")} class="h-full" />
       {/each}
     {:else if results !== null}
       {#each results as entry (entry.path)}

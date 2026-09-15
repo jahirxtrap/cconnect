@@ -1,8 +1,14 @@
 import { backend, type Profile } from "./backend.svelte";
 import { ReconnectingSocket } from "./socket";
 
+export interface ProjectBurst {
+  tick: number;
+  paths: string[];
+  truncated: boolean;
+}
+
 export class ProjectWatch {
-  revision = $state(0);
+  burst = $state<ProjectBurst>({ tick: 0, paths: [], truncated: true });
 
   #socket: ReconnectingSocket;
   #projectKey = "";
@@ -32,7 +38,7 @@ export class ProjectWatch {
   }
 
   refresh() {
-    this.revision++;
+    this.#publish([], true);
   }
 
   #sendWatch() {
@@ -42,6 +48,12 @@ export class ProjectWatch {
   #apply(message: Record<string, unknown>) {
     if (message.type !== "changed") return;
     if ((message.project_key ?? "") !== this.#projectKey) return;
-    this.revision++;
+    const paths = message.paths;
+    if (!Array.isArray(paths) || message.truncated === true) this.#publish([], true);
+    else this.#publish(paths.map(String), false);
+  }
+
+  #publish(paths: string[], truncated: boolean) {
+    this.burst = { tick: this.burst.tick + 1, paths, truncated };
   }
 }

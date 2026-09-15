@@ -133,9 +133,9 @@
                 terminalDrag.draggingId
                   ? 1
                   : 0}; transition: {terminalDrag.transitionOf(tab.id)}"
-                class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
+                class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border-2 pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
                 terminalTabs.activeId
-                  ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
+                  ? 'border-accent bg-surface-variant text-on-surface'
                   : 'border-outline-variant text-on-surface-variant'}"
               >
                 <SquareTerminal size={16} class="shrink-0" />
@@ -154,7 +154,7 @@
             <button
               type="button"
               onclick={() => void newTerminal()}
-              class="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-item border border-outline-variant pr-1 pl-2.5 text-on-surface-variant"
+              class="flex min-h-10 cursor-pointer items-center gap-1.5 rounded-item border-2 border-outline-variant pr-1 pl-2.5 text-on-surface-variant"
             >
               <Plus size={16} class="shrink-0" />
               <span class="min-w-0 flex-1 truncate text-left text-label-lg">{t("NEW_TERMINAL")}</span>
@@ -181,9 +181,9 @@
     style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id === drag.draggingId
       ? 1
       : 0}; transition: {drag.transitionOf(tab.id)}"
-    class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
+    class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border-2 pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
     panes.focusedTab?.id
-      ? 'border-[1.5px] border-accent bg-surface-variant text-on-surface'
+      ? 'border-accent bg-surface-variant text-on-surface'
       : 'border-outline-variant text-on-surface-variant'}"
   >
     <span

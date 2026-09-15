@@ -7,7 +7,7 @@ export const PRESS_HOLD_MS = 225;
 
 export const PRESS_FADE_MS = 150;
 
-export const LONG_PRESS_MS = 500;
+export const LONG_PRESS_MS = 400;
 
 export const DRAG_PRESS_MS = 400;
 

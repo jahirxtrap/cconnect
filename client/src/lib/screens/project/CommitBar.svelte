@@ -53,9 +53,7 @@
   const idle = $derived(running === "");
   const ready = $derived(paths.length > 0 && message.trim() !== "" && idle);
   const shown = $derived(author || (effective ? label(effective) : t("GIT_AUTHOR_DEFAULT")));
-  const commitLabel = $derived(
-    running === "commit" ? t("GIT_COMMITTING") : amend ? t("GIT_AMEND") : t("GIT_COMMIT"),
-  );
+  const commitLabel = $derived(amend ? t("GIT_AMEND") : t("GIT_COMMIT"));
   const pushLabel = $derived(amend ? t("GIT_AMEND_PUSH") : t("GIT_COMMIT_PUSH"));
   const open = $derived(settings.projectCommitOpen && !locked);
   const height = $derived(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, settings.projectCommitHeight)));
@@ -141,7 +139,7 @@
       }}
     ></div>
   {/if}
-  <div class="flex items-center py-1 pr-1 pl-3">
+  <div class="flex min-h-10 items-center py-1 pr-1 pl-3">
     <GitBranch size={14} class="mr-1.5 shrink-0 text-on-surface-variant" />
     <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
       {repo.branch || t("GIT_DETACHED")}{repo.relative && repo.relative !== "." ? ` • ${repo.relative}` : ""}
