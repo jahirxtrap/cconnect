@@ -11,6 +11,7 @@ export interface Transfer {
   name: string;
   dir: string;
   url: string;
+  saved: string;
   progress: number;
   status: TransferStatus;
 }
@@ -54,14 +55,22 @@ class TransferManager {
   async task(
     kind: TransferKind,
     name: string,
-    run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>,
+    run: (
+      onProgress: (value: number) => void,
+      signal: AbortSignal,
+      keep: (saved: string) => void,
+    ) => Promise<boolean>,
     url = "",
   ) {
     const id = this.#start(kind, name, "", url);
     const abort = new AbortController();
     this.#aborts.set(id, abort);
     try {
-      const done = await run((progress) => this.#patch(id, { progress }), abort.signal);
+      const done = await run(
+        (progress) => this.#patch(id, { progress }),
+        abort.signal,
+        (saved) => this.#patch(id, { saved }),
+      );
       this.#settle(id, done);
       return done;
     } catch {
@@ -72,7 +81,11 @@ class TransferManager {
 
   download(
     name: string,
-    run: (onProgress: (value: number) => void, signal: AbortSignal) => Promise<boolean>,
+    run: (
+      onProgress: (value: number) => void,
+      signal: AbortSignal,
+      keep: (saved: string) => void,
+    ) => Promise<boolean>,
     url = "",
   ) {
     return this.task("download", name, run, url);
@@ -97,7 +110,7 @@ class TransferManager {
 
   #start(kind: TransferKind, name: string, dir: string, url = "") {
     const id = ++this.#nextId;
-    this.items = [...this.items, { id, kind, name, dir, url, progress: 0, status: "active" }];
+    this.items = [...this.items, { id, kind, name, dir, url, saved: "", progress: 0, status: "active" }];
     this.collapsed = false;
     return id;
   }

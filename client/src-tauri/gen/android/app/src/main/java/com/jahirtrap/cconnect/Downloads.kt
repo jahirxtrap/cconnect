@@ -29,9 +29,12 @@ private class Progress {
     @Volatile var cancelled = false
 }
 
+private const val SAVED_LIMIT = 50
+
 class Downloads(private val activity: Activity, private val onSaveAs: (String, String, String) -> Unit) {
     private val workers = Executors.newCachedThreadPool()
     private val transfers = ConcurrentHashMap<String, Progress>()
+    private val saved = ConcurrentHashMap<String, String>()
     private val counter = AtomicInteger()
 
     @JavascriptInterface
@@ -40,10 +43,17 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
         val progress = Progress()
         transfers[id] = progress
         workers.execute {
-            val saved = runCatching { copyToDownloads(url, filename, headersJson, progress) }.getOrDefault(false)
-            progress.status = if (saved) "done" else "failed"
+            val target = runCatching { copyToDownloads(url, filename, headersJson, progress) }.getOrNull()
+            if (target != null) remember(id, target)
+            progress.status = if (target != null) "done" else "failed"
         }
         return id
+    }
+
+    @JavascriptInterface
+    fun openSaved(id: String): Boolean {
+        val target = saved[id] ?: return false
+        return viewSaved(target)
     }
 
     @JavascriptInterface
@@ -81,7 +91,7 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
 
     @JavascriptInterface
     fun saveText(filename: String, text: String): Boolean =
-        writeToDownloads(filename) { out -> out.write(text.toByteArray()) }
+        writeToDownloads(filename) { out -> out.write(text.toByteArray()) } != null
 
     @JavascriptInterface
     fun shareText(filename: String, text: String) {
@@ -102,13 +112,28 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
         }
     }
 
-    private fun copyToDownloads(url: String, filename: String, headersJson: String, progress: Progress): Boolean {
+    private fun copyToDownloads(url: String, filename: String, headersJson: String, progress: Progress): String? {
         val connection = connect(url, headersJson)
         progress.total = connection.contentLengthLong
         return connection.inputStream.use { stream ->
             writeToDownloads(filename) { out -> pump(stream, out, progress) }
         }
     }
+
+    private fun remember(id: String, target: String) {
+        if (saved.size >= SAVED_LIMIT) saved.keys.take(saved.size - SAVED_LIMIT + 1).forEach(saved::remove)
+        saved[id] = target
+    }
+
+    private fun viewSaved(target: String): Boolean = runCatching {
+        val uri = if (target.startsWith("content://")) Uri.parse(target) else sharedUri(File(target))
+        val view = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, activity.contentResolver.getType(uri) ?: mimeOf(target))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        activity.startActivity(view)
+        true
+    }.getOrDefault(false)
 
     private fun pump(stream: InputStream, out: OutputStream, progress: Progress) {
         val buffer = ByteArray(BUFFER_SIZE)
@@ -159,7 +184,7 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
 
     private fun open(url: String, headersJson: String): InputStream = connect(url, headersJson).inputStream
 
-    private fun writeToDownloads(filename: String, copy: (OutputStream) -> Unit): Boolean = runCatching {
+    private fun writeToDownloads(filename: String, copy: (OutputStream) -> Unit): String? = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
                 put(MediaStore.Downloads.DISPLAY_NAME, filename)
@@ -167,9 +192,9 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
                 put(MediaStore.Downloads.IS_PENDING, 1)
             }
             val resolver = activity.contentResolver
-            val target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return false
+            val target = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
             try {
-                resolver.openOutputStream(target)?.use(copy) ?: return false
+                resolver.openOutputStream(target)?.use(copy) ?: return null
             } catch (error: Throwable) {
                 resolver.delete(target, null, null)
                 throw error
@@ -177,12 +202,13 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
             values.clear()
             values.put(MediaStore.Downloads.IS_PENDING, 0)
             resolver.update(target, values, null, null)
-            return true
+            return target.toString()
         }
         val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS).apply { mkdirs() }
-        dedup(dir, filename).outputStream().use(copy)
-        true
-    }.getOrDefault(false)
+        val file = dedup(dir, filename)
+        file.outputStream().use(copy)
+        file.absolutePath
+    }.getOrNull()
 
     private fun state(status: String, bytes: Long, total: Long) =
         JSONObject().put("status", status).put("bytes", bytes).put("total", total).toString()

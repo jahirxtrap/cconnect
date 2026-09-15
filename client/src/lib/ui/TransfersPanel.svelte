@@ -8,7 +8,7 @@
   import { transfers } from "$lib/data/transfers.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
-  import { openSharedExternally } from "$lib/services/sharedFiles";
+  import { openTransfer } from "$lib/services/sharedFiles";
   import { snapToDevicePixel } from "./gridHeight";
   import ProgressRing from "./ProgressRing.svelte";
   import { borderWidth, scrollableUnder, scrollbarWidth } from "./scrollbar";
@@ -83,10 +83,15 @@
       </div>
 
       {#if !transfers.collapsed}
-        <div class="scrollbar-thin max-h-64 overflow-y-auto border-t border-outline-variant py-1">
+        <div class="scrollbar-thin max-h-64 overflow-y-auto border-t border-outline-variant p-1">
           {#each items as item (item.id)}
             {@const openable = item.status === "done" && item.url.length > 0}
-            <div class="flex items-center gap-2.5 px-3.5 py-1.5">
+            <div
+              data-press={openable ? "" : "off"}
+              class="flex items-center gap-2.5 rounded-item px-2.5 py-1.5 transition-colors {openable
+                ? 'hover:bg-on-surface/8'
+                : ''}"
+            >
               {#if item.kind === "upload"}
                 <ArrowUp size={16} class="shrink-0 text-on-surface-variant" />
               {:else}
@@ -95,10 +100,10 @@
               <button
                 type="button"
                 disabled={!openable}
-                onclick={() => void openSharedExternally(item.url, item.name)}
+                onclick={() => void openTransfer(item.saved, item.url, item.name)}
                 class="block min-w-0 flex-1 truncate text-left text-body-md {item.status === 'done'
                   ? 'text-on-surface-variant'
-                  : ''} {openable ? 'cursor-pointer hover:text-accent' : 'cursor-default'}"
+                  : ''} {openable ? 'cursor-pointer' : 'cursor-default'}"
               >
                 {item.name}
               </button>
@@ -106,6 +111,7 @@
                 <ProgressRing value={item.progress} size={20} stroke={2.5} />
                 <button
                   type="button"
+                  data-press="off"
                   onclick={() => transfers.cancel(item.id)}
                   aria-label={t("CANCEL")}
                   class="cursor-pointer text-on-surface-variant transition-colors hover:text-on-surface"

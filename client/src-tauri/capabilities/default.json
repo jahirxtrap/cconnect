@@ -20,7 +20,7 @@
     "opener:default",
     {
       "identifier": "opener:allow-open-path",
-      "allow": [{ "path": "$TEMP/cconnect/**" }]
+      "allow": [{ "path": "$TEMP/cconnect/**" }, { "path": "$DOWNLOAD/**" }]
     },
     {
       "identifier": "http:default",

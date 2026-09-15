@@ -40,7 +40,7 @@ const TEXT_TYPE = "text/markdown";
 
 const headersJson = (profile: Profile = backend.active) => JSON.stringify(authHeadersOf(profile));
 
-const saveBlob = async (blob: Blob, filename: string): Promise<boolean> => {
+const saveBlob = async (blob: Blob, filename: string): Promise<string | null> => {
   if (!isTauri) {
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -48,12 +48,23 @@ const saveBlob = async (blob: Blob, filename: string): Promise<boolean> => {
     anchor.download = filename;
     anchor.click();
     URL.revokeObjectURL(objectUrl);
-    return true;
+    return "";
   }
   const bytes = new Uint8Array(await blob.arrayBuffer());
   try {
     const { writeFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
     await writeFile(filename, bytes, { baseDir: BaseDirectory.Download });
+    const { downloadDir, join } = await import("@tauri-apps/api/path");
+    return await join(await downloadDir(), filename);
+  } catch {
+    return null;
+  }
+};
+
+const openSaved = async (path: string): Promise<boolean> => {
+  try {
+    const { openPath } = await import("@tauri-apps/plugin-opener");
+    await openPath(path);
     return true;
   } catch {
     return false;
@@ -65,9 +76,10 @@ export const downloadShared = (url: string, filename: string) => {
   if (bridge) {
     return transfers.download(
       filename,
-      (onProgress, signal) => {
+      (onProgress, signal, keep) => {
         const id = bridge.enqueue(url, filename, headersJson());
         if (!id) return Promise.resolve(false);
+        keep(id);
         return trackAndroidDownload(bridge, id, onProgress, signal);
       },
       url,
@@ -75,9 +87,12 @@ export const downloadShared = (url: string, filename: string) => {
   }
   return transfers.download(
     filename,
-    async (onProgress, signal) => {
+    async (onProgress, signal, keep) => {
       const blob = await fetchTracked(url, onProgress, signal);
-      return blob !== null && (await saveBlob(blob, filename));
+      if (!blob) return false;
+      const saved = await saveBlob(blob, filename);
+      if (saved) keep(saved);
+      return saved !== null;
     },
     url,
   );
@@ -86,7 +101,11 @@ export const downloadShared = (url: string, filename: string) => {
 export const saveTextToDownloads = async (filename: string, text: string) => {
   const bridge = androidDownloads();
   if (bridge) return bridge.saveText(filename, text);
-  return transfers.download(filename, () => saveBlob(new Blob([text], { type: TEXT_TYPE }), filename));
+  return transfers.download(filename, async (_progress, _signal, keep) => {
+    const saved = await saveBlob(new Blob([text], { type: TEXT_TYPE }), filename);
+    if (saved) keep(saved);
+    return saved !== null;
+  });
 };
 
 export const saveTextAs = async (filename: string, text: string) => {
@@ -165,10 +184,11 @@ export const saveSharedAs = async (url: string, filename: string) => {
   const target = await save({ defaultPath: filename });
   if (typeof target !== "string") return;
   const { writeFile } = await import("@tauri-apps/plugin-fs");
-  await transfers.download(filename, async (onProgress, signal) => {
+  await transfers.download(filename, async (onProgress, signal, keep) => {
     const blob = await fetchTracked(url, onProgress, signal);
     if (!blob) return false;
     await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
+    keep(target);
     return true;
   });
 };
@@ -183,10 +203,12 @@ export const saveAllShared = async (items: SharedItem[]) => {
   if (typeof directory !== "string") return;
   const { writeFile } = await import("@tauri-apps/plugin-fs");
   for (const item of items) {
-    await transfers.download(item.name, async (onProgress, signal) => {
+    await transfers.download(item.name, async (onProgress, signal, keep) => {
       const blob = await fetchTracked(item.url, onProgress, signal);
       if (!blob) return false;
-      await writeFile(`${directory}/${item.name}`, new Uint8Array(await blob.arrayBuffer()));
+      const target = `${directory}/${item.name}`;
+      await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
+      keep(target);
       return true;
     });
   }
@@ -210,6 +232,15 @@ export const shareShared = async (url: string, filename: string) => {
   const found = blob as Blob | null;
   if (found && (await shareFile(new File([found], filename, { type: found.type })))) return;
   openExternal(url);
+};
+
+export const openTransfer = async (saved: string, url: string, filename: string) => {
+  const bridge = androidDownloads();
+  if (saved) {
+    if (bridge && bridge.openSaved(saved)) return;
+    if (!bridge && isTauri && (await openSaved(saved))) return;
+  }
+  await openSharedExternally(url, filename);
 };
 
 export const openSharedExternally = async (url: string, filename: string) => {
