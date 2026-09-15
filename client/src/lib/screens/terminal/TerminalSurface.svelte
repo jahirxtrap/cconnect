@@ -27,6 +27,11 @@
 
   const SCROLLBACK = 5000;
   const FIT_SETTLE_MS = 250;
+  const GLIDE_DECAY_MS = 325;
+  const GLIDE_GRACE_MS = 80;
+  const GLIDE_FLOOR = 0.04;
+  const FRAME_CAP_MS = 32;
+  const SPEED_WEIGHT = 0.6;
 
   let host = $state<HTMLDivElement | null>(null);
   let terminal: Terminal | null = null;
@@ -130,32 +135,78 @@
     const screen = container.querySelector<HTMLElement>(".xterm-screen");
     let pointer: number | null = null;
     let lastY = 0;
+    let lastAt = 0;
     let carry = 0;
+    let speed = 0;
+    let gliding = 0;
 
-    const onTouchStart = (event: TouchEvent) => {
-      if (event.touches.length !== 1) {
-        pointer = null;
-        return;
-      }
-      pointer = event.touches[0].identifier;
-      lastY = event.touches[0].clientY;
+    const cellHeight = () => (screen && term.rows ? screen.clientHeight / term.rows : 0);
+
+    const stop = () => {
+      if (gliding) cancelAnimationFrame(gliding);
+      gliding = 0;
+      speed = 0;
       carry = 0;
     };
 
-    const onTouchMove = (event: TouchEvent) => {
-      const touch = Array.from(event.touches).find((item) => item.identifier === pointer);
-      const cell = screen && term.rows ? screen.clientHeight / term.rows : 0;
-      if (!touch || cell <= 0) return;
-      carry += lastY - touch.clientY;
-      lastY = touch.clientY;
+    const shift = (pixels: number, cell: number) => {
+      carry += pixels;
       const lines = Math.trunc(carry / cell);
       if (!lines) return;
       carry -= lines * cell;
       term.scrollLines(lines);
     };
 
-    const onTouchEnd = () => {
+    const blocked = () => {
+      const buffer = term.buffer.active;
+      return speed < 0 ? buffer.viewportY <= 0 : buffer.viewportY >= buffer.baseY;
+    };
+
+    const glide = (previous: number) => {
+      gliding = requestAnimationFrame((now) => {
+        const cell = cellHeight();
+        const elapsed = Math.min(FRAME_CAP_MS, now - previous);
+        if (cell <= 0 || Math.abs(speed) < GLIDE_FLOOR || blocked()) {
+          stop();
+          return;
+        }
+        shift(speed * elapsed, cell);
+        speed *= Math.exp(-elapsed / GLIDE_DECAY_MS);
+        glide(now);
+      });
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      stop();
+      if (event.touches.length !== 1) {
+        pointer = null;
+        return;
+      }
+      pointer = event.touches[0].identifier;
+      lastY = event.touches[0].clientY;
+      lastAt = event.timeStamp;
+    };
+
+    const onTouchMove = (event: TouchEvent) => {
+      const touch = Array.from(event.touches).find((item) => item.identifier === pointer);
+      const cell = cellHeight();
+      if (!touch || cell <= 0) return;
+      const travelled = lastY - touch.clientY;
+      const elapsed = event.timeStamp - lastAt;
+      lastY = touch.clientY;
+      lastAt = event.timeStamp;
+      shift(travelled, cell);
+      if (elapsed > 0) speed = speed * (1 - SPEED_WEIGHT) + (travelled / elapsed) * SPEED_WEIGHT;
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      const released = pointer !== null;
       pointer = null;
+      if (!released || Math.abs(speed) < GLIDE_FLOOR || event.timeStamp - lastAt > GLIDE_GRACE_MS) {
+        stop();
+        return;
+      }
+      glide(performance.now());
     };
 
     container.addEventListener("touchstart", onTouchStart, { passive: true });
@@ -180,6 +231,7 @@
 
     return () => {
       if (settle !== null) clearTimeout(settle);
+      stop();
       container.removeEventListener("touchstart", onTouchStart);
       container.removeEventListener("touchmove", onTouchMove);
       container.removeEventListener("touchend", onTouchEnd);
@@ -197,6 +249,6 @@
   });
 </script>
 
-<div class="h-full w-full p-2" style="background: {TERMINAL_BACKGROUND}">
-  <div bind:this={host} class="h-full w-full touch-none"></div>
+<div class="h-full w-full overflow-hidden p-2" style="background: {TERMINAL_BACKGROUND}">
+  <div bind:this={host} class="h-full w-full overflow-hidden touch-none"></div>
 </div>
