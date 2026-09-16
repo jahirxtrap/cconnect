@@ -105,7 +105,7 @@
   $effect(() => {
     void backend.activeId;
     monitor.setActive(
-      navigation.route === "/monitor" || (panes.open && panes.kind === "monitor" && !layout.mobile),
+      navigation.route === "/monitor" || (panes.open && panes.kind === "monitor"),
     );
   });
 

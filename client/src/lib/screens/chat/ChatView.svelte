@@ -157,6 +157,7 @@
   const busy = $derived(
     chat.streaming || ["waiting", "working", "slow", "compacting"].includes(activity ?? ""),
   );
+  const idle = $derived(chat.link === "connected" && !chat.transcriptLoading && !busy);
 
   const availableCommands = $derived.by(() => {
     const all = chat.capabilities?.commands ?? [];
@@ -227,7 +228,7 @@
         <Trash size={20} />
       </TooltipIconButton>
     {:else}
-      {#if chat.sessionId !== null && !busy}
+      {#if chat.sessionId !== null && idle}
         <TooltipIconButton
           label={t("REWIND")}
           onclick={() => {

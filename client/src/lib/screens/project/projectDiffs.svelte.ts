@@ -8,14 +8,16 @@ const keyOf = (projectKey: string, path: string) => `${projectKey}|${path}`;
 class ProjectDiffs {
   #entries = $state<Record<string, ProjectDiff>>({});
   #revisions = $state<Record<string, number>>({});
-  #loading = new Map<string, Promise<void>>();
+  #loaded = $state<Record<string, number>>({});
+  #loading = new Map<string, { at: number; request: Promise<void> }>();
 
   get(projectKey: string, path: string): ProjectDiff | null {
     return this.#entries[keyOf(projectKey, path)] ?? null;
   }
 
   has(projectKey: string, path: string): boolean {
-    return keyOf(projectKey, path) in this.#entries;
+    const key = keyOf(projectKey, path);
+    return key in this.#entries && this.#loaded[key] === this.revision(projectKey, path);
   }
 
   revision(projectKey: string, path: string): number {
@@ -24,37 +26,38 @@ class ProjectDiffs {
 
   load(projectKey: string, path: string): Promise<void> {
     const key = keyOf(projectKey, path);
-    if (untrack(() => key in this.#entries)) return Promise.resolve();
+    const at = untrack(() => this.revision(projectKey, path));
+    if (untrack(() => this.#loaded[key]) === at) return Promise.resolve();
     const running = this.#loading.get(key);
-    if (running) return running;
+    if (running?.at === at) return running.request;
     const request = projectFilesApi
       .diff(projectKey, path)
       .then((found) => {
+        if (untrack(() => this.revision(projectKey, path)) !== at) return;
         this.#entries = { ...this.#entries, [key]: found ?? { added: [], removed: {} } };
+        this.#loaded = { ...this.#loaded, [key]: at };
       })
-      .finally(() => this.#loading.delete(key));
-    this.#loading.set(key, request);
+      .finally(() => {
+        if (this.#loading.get(key)?.at === at) this.#loading.delete(key);
+      });
+    this.#loading.set(key, { at, request });
     return request;
   }
 
   async prefetch(projectKey: string, paths: string[]) {
-    const pending = untrack(() => paths.filter((path) => !(keyOf(projectKey, path) in this.#entries)));
+    const pending = untrack(() =>
+      paths.filter((path) => this.#loaded[keyOf(projectKey, path)] !== this.revision(projectKey, path)),
+    );
     for (let at = 0; at < pending.length; at += PREFETCH_BATCH) {
       await Promise.all(pending.slice(at, at + PREFETCH_BATCH).map((path) => this.load(projectKey, path)));
     }
   }
 
   invalidate(paths: string[] | null) {
-    const stale = paths === null ? Object.keys(untrack(() => this.#entries)) : null;
-    const entries = { ...untrack(() => this.#entries) };
     const revisions = { ...untrack(() => this.#revisions) };
-    const drop = (key: string) => {
-      delete entries[key];
-      revisions[key] = (revisions[key] ?? 0) + 1;
-    };
-    if (stale) stale.forEach(drop);
-    else for (const key of Object.keys(entries)) if (paths!.some((path) => key.endsWith(`|${path}`))) drop(key);
-    this.#entries = entries;
+    const keys = untrack(() => Object.keys(this.#entries));
+    const stale = paths === null ? keys : keys.filter((key) => paths.some((path) => key.endsWith(`|${path}`)));
+    for (const key of stale) revisions[key] = (revisions[key] ?? 0) + 1;
     this.#revisions = revisions;
   }
 }

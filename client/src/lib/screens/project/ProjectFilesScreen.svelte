@@ -717,6 +717,7 @@
 
 {#snippet changedRow(entry: ProjectEntry, depth: number, open: boolean, action: () => void)}
   <div
+    data-press
     class="flex w-full items-center transition-colors hover:bg-on-surface/8"
     oncontextmenu={(event) => {
       event.preventDefault();
