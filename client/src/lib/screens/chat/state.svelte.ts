@@ -252,6 +252,15 @@ export class ChatState {
   rewindBusy = $state(false);
   pendingInput = $state<string | null>(null);
 
+  readonly untouched = $derived(
+    this.sessionId === null &&
+      this.viewOnly === null &&
+      this.messages.length === 0 &&
+      this.queue.length === 0 &&
+      this.attachments.length === 0 &&
+      this.draft.trim() === "",
+  );
+
   readonly environment = $derived(backend.find(this.environmentId));
   readonly list = $derived(chatListFor(this.environment));
   readonly historyUnavailable = $derived(this.list === null || serverStatus.unavailable);

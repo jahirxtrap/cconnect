@@ -1,6 +1,7 @@
 import type { SessionInfo } from "$lib/data/models";
 import { paneFocus, type Pane } from "$lib/data/paneFocus.svelte";
 import { settings } from "$lib/data/settings.svelte";
+import { layout } from "$lib/platform/layout.svelte";
 import { closeProjectFile, opened } from "$lib/screens/project/openFile.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
@@ -52,6 +53,14 @@ class Panes {
   previewing = $state(false);
   centerView = $state(settings.viewInCenter);
 
+  #wideOpen = false;
+  #mobile = layout.mobile;
+  #tool = $state<RightKind>("terminal");
+
+  readonly tool = $derived(this.kind === "chat" ? this.#tool : this.kind);
+
+  readonly showingTool = $derived(this.open && this.kind !== "chat");
+
   readonly rightTab = $derived(
     this.kind === "chat"
       ? (tabs.right.find((tab) => tab.id === this.rightTabId) ?? tabs.right[0] ?? null)
@@ -66,6 +75,8 @@ class Panes {
     this.open && this.focused === "right" && this.kind === "chat" ? "right" : "center",
   );
 
+  readonly onSecondary = $derived(this.target === "right");
+
   readonly focusedTab = $derived(
     this.target === "right" && this.rightTab ? this.rightTab : tabs.active,
   );
@@ -74,7 +85,9 @@ class Panes {
     try {
       const stored = JSON.parse(settings.rightPane || "{}") as StoredRight;
       this.kind = stored.kind && KINDS.includes(stored.kind) ? stored.kind : "terminal";
-      this.open = stored.open === true;
+      if (this.kind !== "chat") this.#tool = this.kind;
+      this.#wideOpen = stored.open === true;
+      this.open = this.#wideOpen && !layout.mobile;
       this.rightTabId = tabs.right[stored.tab ?? 0]?.id ?? tabs.right[0]?.id ?? null;
     } catch {
       this.rightTabId = tabs.right[0]?.id ?? null;
@@ -107,13 +120,30 @@ class Panes {
     this.focus(this.focused === "right" ? "center" : "right");
   }
 
+  adoptLayout(mobile: boolean) {
+    if (mobile === this.#mobile) return;
+    this.#mobile = mobile;
+    this.setOpen(mobile ? false : this.#wideOpen);
+  }
+
   setOpen(open: boolean) {
     this.open = open;
     if (open && this.kind === "chat" && !this.rightTab) {
       this.rightTabId = tabs.newTab(null, "right").id;
     }
+    if (!open) this.#dropBlankChats();
     this.focus(open ? "right" : "center");
     this.commit();
+  }
+
+  #dropBlankChats() {
+    for (const tab of tabs.right) {
+      if (tab.sessionId !== null) continue;
+      const state = tabs.liveState(tab.id);
+      if (state && !state.untouched) continue;
+      if (tab.id === this.rightTabId) this.rightTabId = null;
+      tabs.close(tab.id);
+    }
   }
 
   showCenterView(value: boolean) {
@@ -129,7 +159,13 @@ class Panes {
     this.previewing = false;
     if (kind !== "project") closeProjectFile();
     this.kind = kind;
-    if (kind === "chat" && !this.rightTab) this.rightTabId = tabs.newTab(null, "right").id;
+    this.open = true;
+    if (kind === "chat") {
+      if (!this.rightTab) this.rightTabId = tabs.newTab(null, "right").id;
+    } else {
+      this.#tool = kind;
+      this.#dropBlankChats();
+    }
     this.focus("right");
     this.commit();
   }
@@ -253,8 +289,9 @@ class Panes {
   commit() {
     tabs.rightActiveId = this.rightTab?.id ?? null;
     tabs.commit();
+    if (!layout.mobile) this.#wideOpen = this.open;
     settings.rightPane = JSON.stringify({
-      open: this.open,
+      open: this.#wideOpen,
       kind: this.kind,
       tab: Math.max(
         tabs.right.findIndex((tab) => tab.id === this.rightTabId),

@@ -55,3 +55,6 @@ export const SCREENS: ScreenEntry[] = [
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),
 );
+
+export const screenFor = (kind: RightKind) =>
+  SCREENS.find((screen) => screen.kind === kind) ?? SCREENS[0];

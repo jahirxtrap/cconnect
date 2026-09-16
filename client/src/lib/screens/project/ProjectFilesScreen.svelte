@@ -22,6 +22,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
+  import { layout } from "$lib/platform/layout.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { projectFilesApi, type ProjectEntry } from "$lib/services/projectFilesApi";
   import { gitApi, type GitCommit, type GitRepo } from "$lib/services/gitApi";
@@ -65,6 +66,9 @@
 
   const compact = inPane();
   const watch = new ProjectWatch();
+
+  const expandable = $derived(compact && !layout.mobile);
+  const fullFile = $derived(opened.full && expandable);
 
   const chat = $derived(tabs.state);
   const projects = $derived(chatListFor(backend.active)?.projects ?? []);
@@ -892,14 +896,14 @@
   {/if}
 
   {#if opened.path !== null && projectKey && !elsewhere}
-    <div class={opened.full ? "" : "absolute inset-0 z-10"}>
+    <div class={fullFile ? "" : "absolute inset-0 z-10"}>
       <ProjectDiffView
         {projectKey}
         path={opened.path}
         status={opened.status}
         root={project?.path ?? null}
-        embedded={compact && !opened.full}
-        onExpand={compact && !opened.full ? () => (opened.full = true) : null}
+        embedded={compact && !fullFile}
+        onExpand={expandable && !fullFile ? () => (opened.full = true) : null}
         onClose={closeFile}
       />
     </div>

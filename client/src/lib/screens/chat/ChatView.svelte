@@ -39,6 +39,7 @@
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
   import RewindDialog from "./RewindDialog.svelte";
+  import PaneActions from "./PaneActions.svelte";
   import SidePanel from "./SidePanel.svelte";
   import TabSwitcher from "./TabSwitcher.svelte";
   import TaskIndicator from "./TaskIndicator.svelte";
@@ -50,7 +51,6 @@
     tab: Tab;
     primary?: boolean;
     focused?: boolean;
-    switcherCwd?: string[];
     transfersLift?: number;
     instant?: boolean;
     navigationIcon?: Snippet;
@@ -62,7 +62,6 @@
     tab,
     primary = false,
     focused = true,
-    switcherCwd = [],
     transfersLift = 0,
     instant = false,
     navigationIcon,
@@ -242,7 +241,8 @@
       <TaskIndicator todos={chat.todos} />
     {/if}
     {#if layout.mobile && primary}
-      <TabSwitcher cwd={switcherCwd} />
+      <TabSwitcher />
+      <PaneActions role="center" />
     {/if}
     <TooltipIconButton
       label={t("NEW_SESSION")}

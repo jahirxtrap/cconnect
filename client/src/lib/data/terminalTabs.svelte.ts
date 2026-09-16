@@ -24,8 +24,6 @@ const NEW_ROWS = 24;
 const connectors = new Map<string, TerminalConnector>();
 
 class TerminalTabs {
-  overlayOpen = $state(false);
-
   #items = $state<TerminalTab[]>([]);
   #activeId = $state<string | null>(null);
 

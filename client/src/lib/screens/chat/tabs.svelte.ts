@@ -201,6 +201,10 @@ class Tabs {
     return created;
   }
 
+  liveState(id: string): ChatState | null {
+    return this.#states.get(id)?.chat ?? null;
+  }
+
   #syncContext(id: string, state: ChatState) {
     const current = this.list.find((tab) => tab.id === id);
     if (!current || (current.environmentId === state.environmentId && current.cwd === state.cwd)) return;

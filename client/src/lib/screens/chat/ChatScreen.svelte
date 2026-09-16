@@ -4,14 +4,12 @@
   import { closeFilePreview, expandFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { claudeRefresh } from "$lib/data/claudeRefresh.svelte";
   import { accentAt } from "$lib/design/accents";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { accentVars, theme } from "$lib/design/theme.svelte";
   import type { SessionInfo } from "$lib/data/models";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
-  import { terminalTabs } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
@@ -21,30 +19,18 @@
   import Drawer from "$lib/ui/Drawer.svelte";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
-  import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
-  import ClaudeDetail, { type ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
-  import ClaudeActions from "$lib/screens/claude/ClaudeActions.svelte";
-  import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
-  import ProjectFilesScreen from "$lib/screens/project/ProjectFilesScreen.svelte";
   import ProjectDiffView from "$lib/screens/project/ProjectDiffView.svelte";
   import { closeProjectFile, opened } from "$lib/screens/project/openFile.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
-  import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
-  import NotesActions from "$lib/screens/notes/NotesActions.svelte";
-  import NotesEditor from "$lib/screens/notes/NotesEditor.svelte";
-  import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
-  import BrowserView from "$lib/screens/browser/BrowserView.svelte";
-  import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneActions from "./PaneActions.svelte";
-  import PaneHeader from "./PaneHeader.svelte";
+  import PaneContent from "./PaneContent.svelte";
   import PaneSurface from "./PaneSurface.svelte";
   import ChatList from "./ChatList.svelte";
   import { panes } from "./panes.svelte";
   import LeftPane from "./LeftPane.svelte";
-  import TerminalView from "./TerminalView.svelte";
   import MoveSessionDialog from "./MoveSessionDialog.svelte";
   import OrganizeDialog from "./OrganizeDialog.svelte";
   import TabStrip from "./TabStrip.svelte";
@@ -52,7 +38,8 @@
   import { drawer } from "./drawer.svelte";
 
   const chat = $derived(panes.focusedTab ? tabs.stateFor(panes.focusedTab) : tabs.state);
-  const shownTab = $derived(layout.mobile ? panes.focusedTab : tabs.active);
+  const paneLayer = $derived(layout.mobile && panes.showingTool);
+  const shownTab = $derived(layout.mobile && !paneLayer ? panes.focusedTab : tabs.active);
 
   const accentOf = (environmentId: string | null | undefined) => {
     const index = backend.environments.find((item) => item.id === environmentId)?.accentIndex ?? null;
@@ -79,12 +66,11 @@
   let leftWidth = $state(settings.leftWidth);
   let rightWidth = $state(settings.rightWidth);
   let rightDragging = $state(false);
-  let claudeDetail = $state<ClaudeKind | null>(null);
 
   const centerView = $derived(panes.centerView && !layout.mobile);
   const centerPreview = $derived(centerView && panes.previewing);
   const centerDiff = $derived(centerView && !panes.previewing);
-  const centerFocused = $derived(layout.mobile || panes.focused === "center");
+  const centerFocused = $derived(layout.mobile ? !paneLayer : panes.focused === "center");
   const chatFocused = $derived(centerFocused && !panes.centerBusy);
 
   const terminalCwd = $derived.by(() => {
@@ -107,8 +93,8 @@
 
   $effect(() =>
     navigation.intercept(() => {
-      if (!navigation.chatActive || !terminalTabs.overlayOpen) return false;
-      terminalTabs.overlayOpen = false;
+      if (!navigation.chatActive || !paneLayer) return false;
+      panes.setOpen(false);
       return true;
     }),
   );
@@ -116,11 +102,6 @@
   $effect(() => {
     navigation.routeLocked =
       navigation.chatActive && !layout.mobile && panes.open && panes.focused === "right";
-  });
-
-  $effect(() => {
-    if (layout.mobile || !terminalTabs.overlayOpen) return;
-    terminalTabs.overlayOpen = false;
   });
 
   const notices = $derived(serverStatus.notices.filter((notice) => !dismissed.includes(notice)));
@@ -153,18 +134,6 @@
   };
 
   const swappable = $derived(panes.open && panes.kind === "chat");
-
-  $effect(() => {
-    if (panes.kind !== "claude") claudeDetail = null;
-  });
-
-  $effect(() =>
-    navigation.intercept(() => {
-      if (!navigation.chatActive || claudeDetail === null) return false;
-      claudeDetail = null;
-      return true;
-    }),
-  );
 
   $effect(() =>
     navigation.intercept(() => {
@@ -221,10 +190,7 @@
     else setExpanded(!expanded);
   });
 
-  useShortcut("panel.right", () => {
-    if (layout.mobile) terminalTabs.overlayOpen = !terminalTabs.overlayOpen;
-    else panes.setOpen(!panes.open);
-  });
+  useShortcut("panel.right", () => panes.setOpen(!panes.open));
 
   useShortcut("panel.view", () => {
     if (layout.mobile) return false;
@@ -235,6 +201,8 @@
     if (!layout.mobile) drawer.open = false;
   });
 
+  $effect(() => panes.adoptLayout(layout.mobile));
+
   $effect(() =>
     navigation.intercept(() => {
       if (!drawer.showing) return false;
@@ -244,12 +212,12 @@
   );
 </script>
 
-{#if layout.mobile && terminalTabs.overlayOpen}
+{#if paneLayer}
   <div
     class="safe-area fixed inset-x-0 top-0 z-40 bg-surface"
-    style="height: calc(100% - var(--keyboard, 0px))"
+    style="height: calc(100% - var(--keyboard, 0px)); {rightAccent}"
   >
-    <TerminalView cwd={terminalCwd} onClose={() => (terminalTabs.overlayOpen = false)} />
+    <PaneContent instant={instantLayout} centerView={false} {terminalCwd} />
   </div>
 {/if}
 
@@ -333,7 +301,6 @@
         tab={shownTab}
         primary
         focused={chatFocused}
-        switcherCwd={terminalCwd}
         {transfersLift}
         instant={instantLayout}
         navigationIcon={layout.mobile ? menuButton : undefined}
@@ -374,87 +341,13 @@
             },
           }}
         ></div>
-        {#if panes.kind === "chat" && panes.rightTab}
-          <PaneSurface>
-            <TabStrip
-              items={tabs.right}
-              activeId={panes.rightTab?.id ?? null}
-              onSelect={(id) => panes.showTab(id)}
-              onNew={() => panes.newTab()}
-              newShortcut="tab.new"
-              onClose={(id) => panes.close(id)}
-              onMove={(id, index) => tabs.move(id, index)}
-              onDrop={() => tabs.commit()}
-              onPaneDrag={(dx, done) => dragPanes(dx, done, "right")}
-              onTabDrag={dragTab}
-              group="chat"
-              focused={panes.focused === "right"}
-              trailing={sideActions}
-            />
-            <ChatView tab={panes.rightTab} focused={panes.focused === "right"} />
-          </PaneSurface>
-        {:else if panes.kind === "notes"}
-          <PaneSurface>
-            <PaneHeader title={t("NOTES")} actions={notesActions} />
-            <NotesEditor />
-          </PaneSurface>
-        {:else if panes.kind === "shared"}
-          <PaneSurface>
-            <SharedScreen />
-          </PaneSurface>
-        {:else if panes.kind === "project"}
-          <PaneSurface>
-            <ProjectFilesScreen instant={instantLayout} elsewhere={centerView} />
-          </PaneSurface>
-        {:else if panes.kind === "monitor"}
-          <PaneSurface>
-            <PaneHeader title={t("MONITOR")} actions={monitorActions} />
-            <MonitorContent />
-          </PaneSurface>
-        {:else if panes.kind === "browser"}
-          <PaneSurface>
-            <BrowserView trailing={sideActions} focused={panes.focused === "right"} />
-          </PaneSurface>
-        {:else if panes.kind === "claude"}
-          <PaneSurface>
-            {#if claudeDetail}
-              <ClaudeDetail kind={claudeDetail} onClose={() => (claudeDetail = null)} />
-            {:else}
-              <PaneHeader title={t("CLAUDE")} actions={claudeActions} />
-              <PullToRefresh
-                refreshing={claudeRefresh.refreshing}
-                onRefresh={() => void claudeRefresh.run()}
-              >
-                <div class="px-4 pb-4">
-                  <ClaudeSections
-                    tick={claudeRefresh.tick}
-                    onOpen={(kind) => (claudeDetail = kind)}
-                    onAccountsChanged={() => void claudeRefresh.run()}
-                  />
-                </div>
-              </PullToRefresh>
-            {/if}
-          </PaneSurface>
-        {:else}
-          <PaneSurface>
-            <TerminalView cwd={terminalCwd} />
-          </PaneSurface>
-        {/if}
-        {#if panes.previewing && navigation.previewPane && navigation.preview && !centerView}
-          {@const request = navigation.preview}
-          <div class="absolute inset-0 z-20">
-            <PaneSurface>
-              <FilePreview
-                embedded
-                url={request.url}
-                filename={request.name}
-                onDelete={request.onDelete}
-                onClose={closeFilePreview}
-                onExpand={expandFilePreview}
-              />
-            </PaneSurface>
-          </div>
-        {/if}
+        <PaneContent
+          instant={instantLayout}
+          {centerView}
+          {terminalCwd}
+          onPaneDrag={(dx, done) => dragPanes(dx, done, "right")}
+          onTabDrag={dragTab}
+        />
         {#if panes.dropTarget === "right"}
           {@render dropHint()}
         {/if}
@@ -489,22 +382,6 @@
   <div class="drop-overlay pointer-events-none absolute inset-0 z-40 border-2 border-accent"></div>
 {/snippet}
 
-{#snippet notesActions()}
-  <NotesActions />
-{/snippet}
-
-{#snippet monitorActions()}
-  <MonitorActions />
-{/snippet}
-
-{#snippet claudeActions()}
-  <ClaudeActions />
-{/snippet}
-
-{#snippet sideActions()}
-  <PaneActions />
-{/snippet}
-
 {#snippet centerActions()}
   <PaneActions role="center" />
 {/snippet}
@@ -516,7 +393,11 @@
 {/snippet}
 
 {#if layout.mobile}
-  <Drawer open={drawer.showing} onDismiss={() => (drawer.open = false)} onOpen={() => (drawer.open = true)}>
+  <Drawer
+    open={drawer.showing}
+    onDismiss={() => (drawer.open = false)}
+    onOpen={paneLayer ? null : () => (drawer.open = true)}
+  >
     <ChatList
       {chat}
       onOpenRight={(session) => panes.openInRight(session)}

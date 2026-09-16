@@ -3,7 +3,6 @@
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Network from "@lucide/svelte/icons/network";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
-  import X from "@lucide/svelte/icons/x";
   import { tick } from "svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
@@ -32,17 +31,13 @@
   import SshHostsList from "$lib/screens/terminal/SshHostsList.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import PaneActions from "./PaneActions.svelte";
-  import { inPane } from "./paneSurface";
   import TabStrip from "./TabStrip.svelte";
 
   interface Props {
     cwd: string[];
-    onClose?: () => void;
   }
 
-  const { cwd, onClose }: Props = $props();
-
-  const pane = inPane();
+  const { cwd }: Props = $props();
 
   let sessions = $state<TerminalInfo[]>([]);
   let menuOpen = $state(false);
@@ -156,14 +151,7 @@
 </script>
 
 {#snippet headerActions()}
-  {#if pane}
-    <PaneActions actions={terminalActions} />
-  {:else}
-    {@render terminalActions()}
-    <TooltipIconButton label={t("CLOSE")} onclick={onClose} class="size-8">
-      <X />
-    </TooltipIconButton>
-  {/if}
+  <PaneActions actions={terminalActions} />
 {/snippet}
 
 {#snippet terminalActions()}
