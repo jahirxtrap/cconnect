@@ -1030,6 +1030,32 @@ def _parse_ts(value) -> Optional[int]:
         return None
 
 
+def _tool_durations(entries: list[dict]) -> dict[str, int]:
+    """How long each tool call took, from the transcript's own entry timestamps."""
+    started: dict[str, int] = {}
+    elapsed: dict[str, int] = {}
+    for entry in entries:
+        content = (entry.get("message") or {}).get("content")
+        if not isinstance(content, list):
+            continue
+        stamp = _parse_ts(entry.get("timestamp"))
+        if stamp is None:
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "tool_use":
+                bid = block.get("id")
+                if isinstance(bid, str):
+                    started[bid] = stamp
+            elif block.get("type") == "tool_result":
+                tuid = block.get("tool_use_id")
+                began = started.pop(tuid, None) if isinstance(tuid, str) else None
+                if began is not None and stamp >= began:
+                    elapsed[tuid] = stamp - began
+    return elapsed
+
+
 class _StampedList(list):
     cur_ts: Optional[int] = None
     cur_parent: Optional[str] = None
@@ -1074,6 +1100,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
         _display_tool_name, _flatten_result_content,
     )
     entries = list(_iter_lines(sub_file))
+    sub_ms = _tool_durations(entries)
     sub_results: dict[str, object] = {}
     for entry in entries:
         content = (entry.get("message") or {}).get("content")
@@ -1114,6 +1141,9 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
                 _working(out, vis)
                 continue
             ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id}
+            took = sub_ms.get(bid or "") if vis.get("timings") else None
+            if took is not None:
+                ev["ms"] = took
             if vis["tool_use"] == "full":
                 result = _flatten_result_content(sub_results.get(bid or "")).strip()
                 if result:
@@ -1238,6 +1268,7 @@ def get_session_messages(
                     _register_user_text(b.get("text") or "", real=True)
     # AskUserQuestion answers live in the tool_result, not in the tool_use input.
     tool_result_by_id: dict[str, object] = {}
+    tool_ms = _tool_durations(entries)
     agent_files: dict[str, str] = {}
     agent_results: dict[str, dict] = {}
     for entry in entries:
@@ -1516,6 +1547,9 @@ def get_session_messages(
                     _working(messages, vis)
                     continue
                 ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid}
+                took = tool_ms.get(bid or "") if vis.get("timings") else None
+                if took is not None:
+                    ev["ms"] = took
                 if vis["tool_use"] == "full":
                     from services.claude_runtime import _flatten_result_content
                     result = _flatten_result_content(tool_result_by_id.get(bid or "")).strip()

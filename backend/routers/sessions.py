@@ -319,6 +319,8 @@ def get_session_messages(
     file_change: str | None = None,
     compact: str | None = None,
     working: str | None = None,
+    tokens: bool | None = None,
+    timings: bool | None = None,
     trashed: bool = False,
 ):
     if limit < 1 or limit > 500:
@@ -331,6 +333,8 @@ def get_session_messages(
             "file_change": file_change,
             "compact": compact,
             "working": working,
+            "tokens": tokens,
+            "timings": timings,
         }, trashed)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

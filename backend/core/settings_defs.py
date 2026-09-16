@@ -37,6 +37,7 @@ SETTINGS: dict[str, SettingDef] = {
     "show_compact": SettingDef("full", str, "How to show compaction blocks: full summary or just a label", allowed=("full", "label")),
     "show_working": SettingDef("label", str, "How to show the quick-chat working indicator: label or off", allowed=("label", "off")),
     "show_tokens": SettingDef(False, bool, "Report how many tokens each thinking block and subagent spent"),
+    "show_tool_time": SettingDef(False, bool, "Report how long each tool call took, from the call to its result"),
     "simple_mode": SettingDef(False, bool, "Collapse thinking, tools and edits into a single working block, like the quick chat"),
     "chat_order": SettingDef("auto", str, "How chats sort inside their category: by last activity, or as arranged by hand", allowed=("auto", "manual")),
     "trash_enabled": SettingDef(False, bool, "Deleting a chat moves it to a trash it can be restored from, instead of removing it"),

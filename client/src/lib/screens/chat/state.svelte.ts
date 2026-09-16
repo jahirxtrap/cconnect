@@ -40,6 +40,7 @@ const componentDefaults = (blocks: ComponentElement[]): Record<string, string> =
 interface Effective {
   simple: boolean;
   tokens: boolean;
+  timings: boolean;
   thinking: string;
   tool_use: string;
   file_change: string;
@@ -161,6 +162,7 @@ export class ChatState {
   serverVisibility = $state<Effective>({
     simple: false,
     tokens: false,
+    timings: false,
     thinking: "full",
     tool_use: "label",
     file_change: "full",
@@ -175,6 +177,7 @@ export class ChatState {
     const merged = {
       simple,
       tokens: local.tokens ?? server.tokens,
+      timings: local.timings ?? server.timings,
       thinking: local.thinking ?? server.thinking,
       tool_use: local.tool_use ?? server.tool_use,
       file_change: local.file_change ?? server.file_change,
@@ -1400,6 +1403,7 @@ export class ChatState {
       this.serverVisibility = {
         simple: snapshot.simpleMode,
         tokens: snapshot.showTokens,
+        timings: snapshot.showToolTime,
         thinking: snapshot.showThinking,
         tool_use: snapshot.showToolUse,
         file_change: snapshot.showFileChange,
@@ -1578,6 +1582,7 @@ export class ChatState {
         compact: item.compact,
         agentResult: item.agentResult,
         thinkingTokens: item.thinkingTokens,
+        toolMs: item.toolMs,
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
         result: item.result,
@@ -2012,6 +2017,7 @@ export class ChatState {
             toolName: event.name,
             toolUseId: event.id,
             result: event.result,
+            toolMs: event.ms,
           }),
         );
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];
@@ -2020,9 +2026,15 @@ export class ChatState {
         if (event.toolUseId) {
           const toolUseId = event.toolUseId;
           this.pendingToolIds = this.pendingToolIds.filter((id) => id !== toolUseId);
-          if (event.content !== null) {
+          if (event.content !== null || event.ms !== null) {
             this.messages = this.messages.map((item) =>
-              item.toolUseId === toolUseId ? { ...item, result: event.content } : item,
+              item.toolUseId === toolUseId
+                ? {
+                    ...item,
+                    result: event.content ?? item.result,
+                    toolMs: event.ms ?? item.toolMs,
+                  }
+                : item,
             );
           }
         }

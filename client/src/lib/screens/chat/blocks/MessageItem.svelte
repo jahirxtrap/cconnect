@@ -133,6 +133,7 @@
       name={message.toolName}
       input={message.text}
       result={message.result}
+      took={message.toolMs}
       {running}
       {expanded}
       {onToggle}

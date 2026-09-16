@@ -48,6 +48,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "right_pane", kind: "string", fallback: "", backup: false },
   { key: "visibility_simple", kind: "string", fallback: "", backup: false },
   { key: "visibility_tokens", kind: "string", fallback: "", backup: false },
+  { key: "visibility_timings", kind: "string", fallback: "", backup: false },
   { key: "visibility_thinking", kind: "string", fallback: "", backup: false },
   { key: "visibility_tool_use", kind: "string", fallback: "", backup: false },
   { key: "visibility_file_change", kind: "string", fallback: "", backup: false },

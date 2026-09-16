@@ -161,6 +161,7 @@ export interface ChatMessage {
   compact: CompactData | null;
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
+  toolMs: number | null;
   sourceIndex: number;
   labelOnly: boolean;
   result: string | null;
@@ -315,6 +316,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   compact: null,
   agentResult: null,
   thinkingTokens: null,
+  toolMs: null,
   sourceIndex: -1,
   labelOnly: false,
   result: null,

@@ -119,6 +119,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "visibility", label: "VISIBILITY", summary: "VISIBILITY_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "simple_mode", label: "SIMPLE_MODE", summary: "SIMPLE_MODE_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_tokens", label: "SHOW_TOKENS", summary: "SHOW_TOKENS_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
+  { id: "show_tool_time", label: "SHOW_TOOL_TIME", summary: "SHOW_TOOL_TIME_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_thinking", label: "THINKING", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_tool_use", label: "TOOLS", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_file_change", label: "FILE_CHANGES", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },

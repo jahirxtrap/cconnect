@@ -438,6 +438,7 @@
       compact: remote.compact,
       working: remote.working,
       tokens: remote.tokens ? "on" : "off",
+      timings: remote.timings ? "on" : "off",
     }}
     simple={local.simple === null ? "" : local.simple ? "on" : "off"}
     thinking={local.thinking ?? ""}
@@ -446,6 +447,7 @@
     compact={local.compact ?? ""}
     working={local.working ?? ""}
     tokens={local.tokens === null ? "" : local.tokens ? "on" : "off"}
+    timings={local.timings === null ? "" : local.timings ? "on" : "off"}
     onConfirm={(values) => {
       tabs.applyVisibility({
         simple: values.simple === "" ? null : values.simple === "on",
@@ -455,6 +457,7 @@
         compact: values.compact || null,
         working: values.working || null,
         tokens: values.tokens === "" ? null : values.tokens === "on",
+        timings: values.timings === "" ? null : values.timings === "on",
       });
       visibilityOpen = false;
     }}

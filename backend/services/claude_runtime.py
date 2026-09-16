@@ -845,6 +845,7 @@ async def run_prompt(
     prompt_arg = _prompt_stream() if (ask_user is not None or images or drain is not None) else prompt
 
     hidden_tool_ids: set[str] = set()
+    tool_started: dict[str, float] = {}
     awaiting_cycle = True  # the next answer that starts belongs to the next message we handed over
     context_tokens: Optional[int] = None
     first_chunk_pending: set[int] = set()
@@ -937,11 +938,12 @@ async def run_prompt(
                     ).strip() or f"API Error: {_err}"
                     yield {"type": "api_error", "text": _text}
                 else:
-                    if emit is not None:
-                        for _b in message.content or []:
-                            if type(_b).__name__ == "ToolUseBlock":
-                                _bid = getattr(_b, "id", None)
-                                if _bid:
+                    for _b in message.content or []:
+                        if type(_b).__name__ == "ToolUseBlock":
+                            _bid = getattr(_b, "id", None)
+                            if _bid:
+                                tool_started[_bid] = loop.time()
+                                if emit is not None:
                                     status_state["pending"].add(_bid)
                     for event in _blocks_to_events(message.content, vis(), skip_streamed=partial, hidden_tool_ids=hidden_tool_ids):
                         if parent:
@@ -966,6 +968,9 @@ async def run_prompt(
                         if tuid and tuid in hidden_tool_ids:
                             continue
                         ev = {"type": "tool_result", "tool_use_id": tuid}
+                        began = tool_started.pop(tuid, None)
+                        if began is not None and vis().get("timings"):
+                            ev["ms"] = int((loop.time() - began) * 1000)
                         if tu_mode == "full":
                             ev["content"] = _flatten_result_content(getattr(block, "content", None))
                         if parent:

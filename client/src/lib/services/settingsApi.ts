@@ -19,6 +19,7 @@ export interface SettingsSnapshot {
   showCompact: string;
   showWorking: string;
   showTokens: boolean;
+  showToolTime: boolean;
   simpleMode: boolean;
   chatOrder: string;
   trashEnabled: boolean;
@@ -52,6 +53,7 @@ export interface SettingsPatch {
   show_compact?: string;
   show_working?: string;
   show_tokens?: boolean;
+  show_tool_time?: boolean;
   simple_mode?: boolean;
   chat_order?: string;
   trash_enabled?: boolean;
@@ -111,6 +113,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   showCompact: effectiveStr(wire, "show_compact", "full"),
   showWorking: effectiveStr(wire, "show_working", "label"),
   showTokens: effectiveBool(wire, "show_tokens", false),
+  showToolTime: effectiveBool(wire, "show_tool_time", false),
   simpleMode: effectiveBool(wire, "simple_mode", false),
   chatOrder: effectiveStr(wire, "chat_order", "auto"),
   trashEnabled: effectiveBool(wire, "trash_enabled", false),

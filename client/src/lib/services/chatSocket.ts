@@ -37,8 +37,15 @@ export type ServerEvent =
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
   | { type: "working" }
-  | { type: "tool_use"; id: string | null; name: string | null; input: string | null; result: string | null }
-  | { type: "tool_result"; toolUseId: string | null; content: string | null }
+  | {
+      type: "tool_use";
+      id: string | null;
+      name: string | null;
+      input: string | null;
+      result: string | null;
+      ms: number | null;
+    }
+  | { type: "tool_result"; toolUseId: string | null; content: string | null; ms: number | null }
   | { type: "file_change"; id: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
   | { type: "compacting"; trigger: string | null }
   | { type: "status"; kind: string }
@@ -595,9 +602,15 @@ export class ChatSocket {
           name: text(wire, "name"),
           input: text(wire, "input"),
           result: text(wire, "result"),
+          ms: int(wire, "ms"),
         };
       case "tool_result":
-        return { type: "tool_result", toolUseId: text(wire, "tool_use_id"), content: text(wire, "content") };
+        return {
+          type: "tool_result",
+          toolUseId: text(wire, "tool_use_id"),
+          content: text(wire, "content"),
+          ms: int(wire, "ms"),
+        };
       case "file_change":
         return {
           type: "file_change",

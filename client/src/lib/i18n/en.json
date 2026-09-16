@@ -492,6 +492,8 @@
   "SIMPLE_MODE_SUMMARY": "Show one working block instead of thinking and tool detail",
   "SHOW_TOKENS": "Token usage",
   "SHOW_TOKENS_SUMMARY": "Show how many tokens each thinking block and subagent spent",
+  "SHOW_TOOL_TIME": "Tool time",
+  "SHOW_TOOL_TIME_SUMMARY": "Show how long each tool took, from the call to its result",
   "QUICK_CHAT_WORKING": "Working (quick chat)",
   "VISIBILITY_SUMMARY": "What appears in the chat",
   "SHOW_FULL": "Full",

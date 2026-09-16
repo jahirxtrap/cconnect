@@ -81,6 +81,8 @@ export const createSessionsApi = (http: HttpClient) => ({
       ...(prefs?.file_change ? { file_change: prefs.file_change } : {}),
       ...(prefs?.compact ? { compact: prefs.compact } : {}),
       ...(prefs?.working ? { working: prefs.working } : {}),
+      ...(prefs?.tokens === null || prefs === null ? {} : { tokens: prefs.tokens }),
+      ...(prefs?.timings === null || prefs === null ? {} : { timings: prefs.timings }),
       ...(trashed ? { trashed: true } : {}),
     });
     if (!data) return null;

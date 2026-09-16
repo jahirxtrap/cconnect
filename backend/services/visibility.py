@@ -28,9 +28,10 @@ def resolve(prefs: dict | None) -> dict:
     out = {name: settings_store.visibility_mode(name) for name in TYPES}
     out["simple"] = bool(settings_store.get("simple_mode"))
     out["tokens"] = bool(settings_store.get("show_tokens"))
+    out["timings"] = bool(settings_store.get("show_tool_time"))
     out["working"] = settings_store.get("show_working")
     for key, value in (prefs or {}).items():
-        if key in ("simple", "tokens"):
+        if key in ("simple", "tokens", "timings"):
             if value is not None:
                 out[key] = bool(value)
         elif key == "working":
@@ -58,6 +59,7 @@ def ceiling(everyone: Iterable[dict]) -> dict:
                 out[name] = prefs[name]
     out["simple"] = all(p.get("simple") for p in listed)
     out["tokens"] = any(p.get("tokens") for p in listed)
+    out["timings"] = any(p.get("timings") for p in listed)
     return out
 
 

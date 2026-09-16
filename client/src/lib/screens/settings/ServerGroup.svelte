@@ -270,6 +270,7 @@
     compact={snapshot.showCompact}
     working={snapshot.showWorking}
     tokens={snapshot.showTokens ? "on" : "off"}
+    timings={snapshot.showToolTime ? "on" : "off"}
     onConfirm={(values) =>
       void apply({
         simple_mode: values.simple === "on",
@@ -279,6 +280,7 @@
         show_compact: values.compact,
         show_working: values.working,
         show_tokens: values.tokens === "on",
+        show_tool_time: values.timings === "on",
       })}
     onDismiss={() => (dialog = null)}
   />

@@ -21,6 +21,7 @@ export interface SessionMessage {
   compact: CompactData | null;
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
+  toolMs: number | null;
   index: number;
   labelOnly: boolean;
   result: string | null;
@@ -135,6 +136,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
           }
         : null,
     thinkingTokens: type === "thinking" ? int(raw, "tokens") : null,
+    toolMs: int(raw, "ms"),
     agentResult: (() => {
       const done = raw.agent_result;
       if (type !== "agent" || typeof done !== "object" || done === null) return null;

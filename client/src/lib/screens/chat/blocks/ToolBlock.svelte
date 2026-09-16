@@ -1,5 +1,6 @@
 <script lang="ts">
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
+  import { formatDuration } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import Collapsible from "./Collapsible.svelte";
@@ -9,19 +10,32 @@
     input: string;
     result: string | null;
     running: boolean;
+    took?: number | null;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
   }
 
-  const { name, input, result, running, expanded = null, onToggle = null }: Props = $props();
+  const {
+    name,
+    input,
+    result,
+    running,
+    took = null,
+    expanded = null,
+    onToggle = null,
+  }: Props = $props();
+
+  const SLOW_MS = 1000;
 
   const empty = $derived(!input.trim() && !result?.trim());
+  const elapsed = $derived(took !== null && took >= SLOW_MS ? formatDuration(took) : null);
 </script>
 
 <Collapsible
   label={name ?? t("TOOLS")}
   icon={SquareTerminal}
   preview={input}
+  stat={running ? null : elapsed}
   labelOnly={empty}
   {running}
   {expanded}

@@ -4,6 +4,7 @@ import { CLIENT_DEFAULTS, CLIENT_SETTINGS } from "./settingsRegistry";
 export interface VisibilityPrefs {
   simple: boolean | null;
   tokens: boolean | null;
+  timings: boolean | null;
   thinking: string | null;
   tool_use: string | null;
   file_change: string | null;
@@ -66,9 +67,11 @@ class Settings {
   get visibility(): VisibilityPrefs {
     const simple = this.#read<string>("visibility_simple");
     const tokens = this.#read<string>("visibility_tokens");
+    const timings = this.#read<string>("visibility_timings");
     return {
       simple: simple === "" ? null : simple === "on",
       tokens: tokens === "" ? null : tokens === "on",
+      timings: timings === "" ? null : timings === "on",
       thinking: this.#read<string>("visibility_thinking") || null,
       tool_use: this.#read<string>("visibility_tool_use") || null,
       file_change: this.#read<string>("visibility_file_change") || null,
@@ -80,6 +83,7 @@ class Settings {
   set visibility(value: VisibilityPrefs) {
     this.#write("visibility_simple", value.simple === null ? "" : value.simple ? "on" : "off");
     this.#write("visibility_tokens", value.tokens === null ? "" : value.tokens ? "on" : "off");
+    this.#write("visibility_timings", value.timings === null ? "" : value.timings ? "on" : "off");
     this.#write("visibility_thinking", value.thinking ?? "");
     this.#write("visibility_tool_use", value.tool_use ?? "");
     this.#write("visibility_file_change", value.file_change ?? "");
