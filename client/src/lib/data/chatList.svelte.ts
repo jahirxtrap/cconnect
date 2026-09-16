@@ -8,6 +8,7 @@ import {
   type ProjectInfo,
   type SessionInfo,
 } from "./models";
+import { settings } from "./settings.svelte";
 import { isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
@@ -18,6 +19,11 @@ const byLastActive = <T extends { lastActive: number | null }>(items: T[]) =>
 
 export class ChatListStore {
   projects = $state<ProjectInfo[]>([]);
+
+  readonly visibleProjects = $derived(
+    this.projects.filter((item) => !settings.hiddenProjects.includes(item.projectKey)),
+  );
+
   sessions = $state<SessionInfo[]>([]);
   categories = $state<ChatCategory[]>([]);
   placement = $state<Record<string, ChatPlacement>>({});
@@ -64,8 +70,10 @@ export class ChatListStore {
   }
 
   sessionsOf(projectKey: string | null): SessionInfo[] {
-    if (!projectKey) return this.sessions;
-    return this.sessions.filter((session) => session.projectKey === projectKey);
+    if (projectKey) return this.sessions.filter((session) => session.projectKey === projectKey);
+    const hidden = settings.hiddenProjects;
+    if (!hidden.length) return this.sessions;
+    return this.sessions.filter((session) => !hidden.includes(session.projectKey ?? ""));
   }
 
   upsertSession(session: SessionInfo) {

@@ -100,7 +100,7 @@
   };
 
   const sortedProjects = $derived(
-    [...chat.historyProjects].sort((a, b) => projectLabel(a).localeCompare(projectLabel(b))),
+    [...chat.allProjects].sort((a, b) => projectLabel(a).localeCompare(projectLabel(b))),
   );
 
   const commitProject = (project: ProjectInfo) => {

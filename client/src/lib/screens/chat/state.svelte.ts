@@ -272,7 +272,17 @@ export class ChatState {
   readonly trashEnabled = $derived(this.list?.trashEnabled ?? false);
   readonly historyProject = $derived(settings.lockedProject || this.historyProjectKey);
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProject) ?? []);
-  readonly historyProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
+  readonly historyProjects = $derived.by(() => {
+    const visible = this.list?.visibleProjects ?? [];
+    const opened = this.historyProject;
+    const kept =
+      opened && !visible.some((item) => item.projectKey === opened)
+        ? (this.list?.projects ?? []).filter((item) => item.projectKey === opened)
+        : [];
+    return this.withDefaultProject([...visible, ...kept]);
+  });
+
+  readonly allProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly link = $derived<ConnectionState>(
     serverStatus.unavailable ? "disconnected" : this.connection,
   );

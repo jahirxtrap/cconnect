@@ -202,6 +202,13 @@
 
   const projects = $derived(chatListFor(backend.active)?.projects ?? []);
   const projectKeys = $derived(new Set(projects.map((item) => item.projectKey)));
+  const hiddenKeys = $derived(
+    new Set(
+      (chatListFor(backend.active)?.projects ?? [])
+        .filter((item) => settings.hiddenProjects.includes(item.projectKey))
+        .map((item) => item.projectKey),
+    ),
+  );
   const ceiling = $derived(settings.lockedProject);
 
   const entryLabel = (path: string, name: string) =>
@@ -257,7 +264,8 @@
   };
 
   const ordered = $derived.by(() => {
-    const source = searchResults ?? entries;
+    const all = searchResults ?? entries;
+    const source = path || !hiddenKeys.size ? all : all.filter((entry) => !hiddenKeys.has(entry.name));
     const list = hiddenKinds.size
       ? source.filter((entry) => entry.isDir || !hiddenKinds.has(fileKindOf(entry.name)))
       : [...source];

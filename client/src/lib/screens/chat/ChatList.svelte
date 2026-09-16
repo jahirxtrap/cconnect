@@ -82,11 +82,7 @@
   });
 
 
-  const visibleProjects = $derived(
-    chat.historyProjects.filter(
-      (item) => !chat.isProjectHidden(item.projectKey) || item.projectKey === chat.historyProject,
-    ),
-  );
+  const visibleProjects = $derived(chat.historyProjects);
 
   let list = $state<HTMLDivElement | null>(null);
   const drag = new ChatDrag();

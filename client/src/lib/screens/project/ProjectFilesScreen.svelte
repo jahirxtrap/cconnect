@@ -71,7 +71,7 @@
   const fullFile = $derived(opened.full && expandable);
 
   const chat = $derived(tabs.state);
-  const projects = $derived(chatListFor(backend.active)?.projects ?? []);
+  const projects = $derived(chatListFor(backend.active)?.visibleProjects ?? []);
 
   let children = $state<Record<string, ProjectEntry[]>>({});
   let expanded = $state<Record<string, boolean>>({});
