@@ -85,6 +85,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
+  { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
 
   { id: "notifications", label: "NOTIFICATIONS", value: notificationsValue, section: "background", group: "BACKGROUND_GROUP", dialog: "notifications" },

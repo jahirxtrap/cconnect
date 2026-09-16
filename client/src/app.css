@@ -374,11 +374,6 @@ textarea,
   -webkit-touch-callout: default;
 }
 
-[data-unfocused] .selectable {
-  user-select: none;
-  -webkit-user-select: none;
-}
-
 @layer base {
   input,
   textarea,
@@ -611,4 +606,14 @@ a > .md-link-icon:last-child {
 
 .markdown th {
   font-weight: 700;
+}
+
+.code-gutter {
+  --gutter: var(--gutter-raw);
+}
+
+@supports (width: round(1px, 1px)) {
+  .code-gutter {
+    --gutter: round(var(--gutter-raw), var(--px-grid, 1px));
+  }
 }

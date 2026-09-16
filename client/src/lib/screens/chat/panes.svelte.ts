@@ -1,6 +1,7 @@
 import type { SessionInfo } from "$lib/data/models";
 import { paneFocus, type Pane } from "$lib/data/paneFocus.svelte";
 import { settings } from "$lib/data/settings.svelte";
+import { closeProjectFile, opened } from "$lib/screens/project/openFile.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
@@ -49,12 +50,17 @@ class Panes {
   focused = $state<PaneRole>("center");
   dropTarget = $state<PaneRole | null>(null);
   previewing = $state(false);
+  centerView = $state(settings.viewInCenter);
 
   readonly rightTab = $derived(
     this.kind === "chat"
       ? (tabs.right.find((tab) => tab.id === this.rightTabId) ?? tabs.right[0] ?? null)
       : null,
   );
+
+  readonly viewing = $derived(this.previewing || opened.path !== null);
+
+  readonly centerBusy = $derived(this.centerView && this.viewing);
 
   readonly target = $derived<PaneRole>(
     this.open && this.focused === "right" && this.kind === "chat" ? "right" : "center",
@@ -110,8 +116,18 @@ class Panes {
     this.commit();
   }
 
+  showCenterView(value: boolean) {
+    this.centerView = value;
+    settings.viewInCenter = value;
+    if (!this.viewing) return;
+    if (!value) this.open = true;
+    this.focus(value ? "center" : "right");
+    this.commit();
+  }
+
   setKind(kind: RightKind) {
     this.previewing = false;
+    if (kind !== "project") closeProjectFile();
     this.kind = kind;
     if (kind === "chat" && !this.rightTab) this.rightTabId = tabs.newTab(null, "right").id;
     this.focus("right");
@@ -226,7 +242,7 @@ class Panes {
 
   focus(role: PaneRole) {
     this.focused = role;
-    paneFocus.set(role === "right" ? SCOPE[this.kind] : "chat");
+    paneFocus.set(role === "right" || this.centerBusy ? SCOPE[this.kind] : "chat");
     const environmentId = this.focusedTab?.environmentId;
     if (environmentId && backend.activeId !== environmentId) backend.select(environmentId);
     tabs.rightFocused = this.target === "right";

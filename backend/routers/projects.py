@@ -91,5 +91,5 @@ def project_file(project_key: str, path: str, x_security_key: str = Header("")):
         resolved,
         filename=resolved.name,
         content_disposition_type="inline",
-        headers={"Content-Encoding": "identity"},
+        headers={"Content-Encoding": "identity", "Cache-Control": "no-cache"},
     )

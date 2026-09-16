@@ -1,16 +1,8 @@
-<script module lang="ts">
-  const opened = $state<{ path: string | null; full: boolean }>({ path: null, full: false });
-</script>
-
 <script lang="ts">
   import ArrowDown from "@lucide/svelte/icons/arrow-down";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
-  import AtSign from "@lucide/svelte/icons/at-sign";
-  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
-  import ChevronUp from "@lucide/svelte/icons/chevron-up";
-  import FileDiff from "@lucide/svelte/icons/file-diff";
   import FolderClosed from "@lucide/svelte/icons/folder-closed";
   import GitCompare from "@lucide/svelte/icons/git-compare";
   import History from "@lucide/svelte/icons/history";
@@ -23,21 +15,15 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { projectFilePath, projectLabel, type ProjectInfo } from "$lib/data/models";
+  import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { formatDateShort } from "$lib/data/time";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
-  import { copyText } from "$lib/platform/clipboard";
   import { backend } from "$lib/services/backend.svelte";
-  import {
-    projectFileUrl,
-    projectFilesApi,
-    type ProjectDiff,
-    type ProjectEntry,
-  } from "$lib/services/projectFilesApi";
+  import { projectFilesApi, type ProjectEntry } from "$lib/services/projectFilesApi";
   import { gitApi, type GitCommit, type GitRepo } from "$lib/services/gitApi";
   import { ProjectWatch } from "$lib/services/projectWatch.svelte";
   import { recallProject, rememberProject } from "./projectMemory";
@@ -45,15 +31,16 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
-  import MenuItem from "$lib/ui/MenuItem.svelte";
   import { nearEdge } from "$lib/ui/paging";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import FilePreview, { type ToolbarButton } from "$lib/screens/shared/FilePreview.svelte";
   import CommitBar from "./CommitBar.svelte";
+  import ProjectDiffView from "./ProjectDiffView.svelte";
+  import { closeProjectFile, opened, openProjectFile } from "./openFile.svelte";
+  import { projectDiffs } from "./projectDiffs.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import ProjectSelector from "$lib/screens/chat/ProjectSelector.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
@@ -61,9 +48,10 @@
 
   interface Props {
     instant?: boolean;
+    elsewhere?: boolean;
   }
 
-  const { instant = false }: Props = $props();
+  const { instant = false, elsewhere = false }: Props = $props();
 
   const INDENT = 14;
   const BASE_INDENT = 8;
@@ -88,8 +76,6 @@
   let results = $state<ProjectEntry[] | null>(null);
   let tracked = $state(false);
   let locked = $state(false);
-  let showDiff = $state(settings.projectDiff);
-  let fileDiff = $state<ProjectDiff | null>(null);
   let showChanged = $state(settings.projectChangedOnly);
   let changed = $state<ProjectEntry[] | null>(null);
   let showLog = $state(false);
@@ -118,6 +104,7 @@
   const committing = $derived(
     showChanged && !showLog && activeRepo !== null && settings.projectCommitOpen && !locked,
   );
+  const selectable = $derived(committing && files.length > 0);
 
   const repoCounts = $derived.by(() => {
     const counted: Record<string, number> = {};
@@ -181,15 +168,21 @@
     for (const entry of files) picked[entry.path] = turningOn;
   };
 
+  const viewing = $derived(opened.path !== null);
+
   useShortcut("project.selectAll", () => {
-    if (activeScope() !== "project" || isEditing() || !committing || !files.length) return false;
+    if (activeScope() !== "project" || isEditing() || viewing || !committing || !files.length) {
+      return false;
+    }
     selectAll();
   });
 
   const engaged = $derived(activeScope() === "project");
 
+  const showingFile = $derived(opened.path !== null && !elsewhere);
+
   const cancelMode = () => {
-    if (opened.path !== null) return false;
+    if (showingFile) return false;
     if (chosen.length) {
       picked = {};
       return true;
@@ -213,7 +206,7 @@
   };
 
   const stepUp = () => {
-    if (opened.path !== null) {
+    if (showingFile) {
       closeFile();
       return true;
     }
@@ -246,12 +239,12 @@
   };
 
   useShortcut("project.changes", () => {
-    if (activeScope() !== "project" || !projectKey) return false;
+    if (activeScope() !== "project" || viewing || !projectKey) return false;
     toggleChanges();
   });
 
   useShortcut("project.commit", () => {
-    if (activeScope() !== "project" || !projectKey || locked) return false;
+    if (activeScope() !== "project" || viewing || !projectKey || locked) return false;
     if (!showChanged) {
       showChanges(true);
       settings.projectCommitOpen = true;
@@ -275,7 +268,6 @@
     entry.isDir
       ? files.some((item) => inFolder(entry, item) && picked[item.path] === true)
       : picked[entry.path] === true;
-  let anchorAt = $state<number | null>(null);
   let unlocking = $state(false);
   let rejected = $state(false);
   let loading = $state(false);
@@ -286,54 +278,7 @@
 
   const project = $derived(projects.find((item) => item.projectKey === projectKey) ?? null);
 
-  const openEntry = $derived(
-    opened.path === null
-      ? null
-      : ([...(changed ?? []), ...(results ?? []), ...Object.values(children).flat()].find(
-          (item) => item.path === opened.path,
-        ) ?? null),
-  );
-
-  const modified = $derived(!!openEntry?.status);
-  const wholeFile = $derived(
-    !!openEntry?.status && (openEntry.status.startsWith("?") || openEntry.status.includes("D")),
-  );
-
-  const anchors = $derived.by(() => {
-    if (!showDiff || !fileDiff || wholeFile) return [];
-    const starts = new Set(Object.keys(fileDiff.removed).map(Number));
-    let previous = -1;
-    for (const line of [...fileDiff.added].sort((first, second) => first - second)) {
-      if (line !== previous + 1) starts.add(line);
-      previous = line;
-    }
-    return [...starts].sort((first, second) => first - second);
-  });
-
-  const anchor = $derived(anchorAt === null ? null : (anchors[anchorAt] ?? null));
-
-  const current = $derived.by(() => {
-    if (anchor === null || !fileDiff) return [];
-    const lines = new Set(fileDiff.added);
-    if (!lines.has(anchor)) return [];
-    const block = [anchor];
-    let line = anchor;
-    while (lines.has(line + 1)) {
-      line += 1;
-      block.push(line);
-    }
-    return block;
-  });
-
-  const step = (delta: number) => {
-    const at = anchorAt === null ? 0 : anchorAt + delta;
-    anchorAt = Math.min(Math.max(at, 0), anchors.length - 1);
-  };
-
-  const closeFile = () => {
-    opened.path = null;
-    opened.full = false;
-  };
+  const closeFile = closeProjectFile;
 
   $effect(() => (engaged ? navigation.intercept(stepBack) : undefined));
 
@@ -445,16 +390,8 @@
     if (listing && projectKey === key) children = { ...children, [entry.path]: listing.entries };
   };
 
-  const absolute = $derived(opened.path === null ? "" : projectFilePath(project?.path ?? null, opened.path));
-
-  const mention = () => {
-    const chat = tabs.state;
-    chat.draft = chat.draft ? `${chat.draft} @${absolute}` : `@${absolute}`;
-  };
-
   const open = (entry: ProjectEntry) => {
-    anchorAt = null;
-    opened.path = entry.path;
+    if (projectKey) openProjectFile(projectKey, entry.path, entry.status);
   };
 
   const fold = (path: string) => {
@@ -469,7 +406,6 @@
   const slot = $derived(`${backend.activeId ?? ""}|${projectKey ?? ""}`);
 
   let placed = "";
-  let diffed = "";
   let logged = "";
   let synced = "";
 
@@ -557,19 +493,9 @@
   });
 
   $effect(() => {
-    const key = projectKey;
-    const target = opened.path;
     const burst = watch.burst;
-    if (!key || target === null || !showDiff) {
-      diffed = "";
-      fileDiff = null;
-      return;
-    }
-    if (diffed === `${key}|${target}` && !burst.truncated && !burst.paths.includes(target)) return;
-    diffed = `${key}|${target}`;
-    void projectFilesApi.diff(key, target).then((found) => {
-      if (projectKey === key && opened.path === target) fileDiff = found;
-    });
+    if (burst.truncated) projectDiffs.invalidate(null);
+    else if (burst.paths.length) projectDiffs.invalidate(burst.paths);
   });
 
   $effect(() => {
@@ -585,6 +511,16 @@
       if (projectKey !== key || !showChanged) return;
       changed = found;
     });
+  });
+
+  $effect(() => {
+    const key = projectKey;
+    const listed = files;
+    if (!key || !settings.projectDiff || !listed.length) return;
+    void projectDiffs.prefetch(
+      key,
+      listed.filter((entry) => !entry.isDir).map((entry) => entry.path),
+    );
   });
 
   $effect(() => {
@@ -686,45 +622,6 @@
       <GitCompare class={showChanged && !showLog ? "text-accent" : ""} />
     </TooltipIconButton>
   {/if}
-{/snippet}
-
-{#snippet diffToggle(button: ToolbarButton)}
-  {#if anchors.length}
-    <TooltipIconButton
-      label={t("PREVIOUS_CHANGE")}
-      class={button.class}
-      enabled={anchorAt !== null && anchorAt > 0}
-      onclick={() => step(-1)}
-    >
-      <ChevronUp size={button.size} />
-    </TooltipIconButton>
-    <TooltipIconButton
-      label={t("NEXT_CHANGE")}
-      class={button.class}
-      enabled={anchorAt === null || anchorAt < anchors.length - 1}
-      onclick={() => step(1)}
-    >
-      <ChevronDown size={button.size} />
-    </TooltipIconButton>
-  {/if}
-  <TooltipIconButton
-    label={t("DIFF")}
-    class={button.class}
-    onclick={() => {
-      showDiff = !showDiff;
-      settings.projectDiff = showDiff;
-    }}
-  >
-    <FileDiff size={button.size} class={showDiff ? "text-accent" : ""} />
-  </TooltipIconButton>
-{/snippet}
-
-{#snippet fileMenu()}
-  <MenuItem text={t("MENTION_IN_CHAT")} onclick={mention}>
-    {#snippet leading()}
-      <AtSign size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
 {/snippet}
 
 {#snippet commitRow(commit: GitCommit, index: number, last: boolean)}
@@ -868,7 +765,7 @@
   {#if compact}
     <PaneHeader
       title={insideRepo && activeRepo ? activeRepo.name : t("PROJECT_FILES")}
-      leading={committing ? selectAllAction : undefined}
+      leading={selectable ? selectAllAction : undefined}
       onBack={insideRepo || pinned ? stepUp : undefined}
       actions={headerActions}
     />
@@ -882,7 +779,7 @@
           <TooltipIconButton label={t("BACK")} onclick={() => stepUp() || navigation.back()}>
             <ArrowLeft size={20} />
           </TooltipIconButton>
-          {#if committing}
+          {#if selectable}
             {@render selectAllAction()}
           {/if}
         </div>
@@ -994,19 +891,14 @@
     />
   {/if}
 
-  {#if opened.path !== null && projectKey}
+  {#if opened.path !== null && projectKey && !elsewhere}
     <div class={opened.full ? "" : "absolute inset-0 z-10"}>
-      <FilePreview
-        url={projectFileUrl(projectKey, opened.path)}
-        filename={opened.path.split("/").at(-1) ?? opened.path}
+      <ProjectDiffView
+        {projectKey}
+        path={opened.path}
+        status={opened.status}
+        root={project?.path ?? null}
         embedded={compact && !opened.full}
-        menuItems={fileMenu}
-        onCopyPath={() => void copyText(absolute)}
-        actions={modified ? diffToggle : undefined}
-        added={showDiff ? (fileDiff?.added ?? []) : []}
-        removed={showDiff ? (fileDiff?.removed ?? {}) : {}}
-        {current}
-        {anchor}
         onExpand={compact && !opened.full ? () => (opened.full = true) : null}
         onClose={closeFile}
       />

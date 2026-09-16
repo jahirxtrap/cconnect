@@ -1,7 +1,11 @@
 import { getContext, setContext } from "svelte";
 
+import type { PaneRole } from "./tabs.svelte";
+
 const PANE_SURFACE = Symbol("pane-surface");
 
-export const providePaneSurface = () => setContext(PANE_SURFACE, true);
+export const providePaneSurface = (role: PaneRole = "right") => setContext(PANE_SURFACE, role);
 
-export const inPane = (): boolean => getContext(PANE_SURFACE) === true;
+export const paneRole = (): PaneRole | null => (getContext(PANE_SURFACE) as PaneRole) ?? null;
+
+export const inPane = (): boolean => paneRole() !== null;

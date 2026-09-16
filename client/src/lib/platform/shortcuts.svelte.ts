@@ -36,6 +36,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "tab.movePrevious", label: "SHORTCUT_TAB_MOVE_PREVIOUS", scope: "chat", keys: "Alt+ArrowLeft" },
   { id: "panel.left", label: "PANEL_LEFT", scope: "chat", keys: "Mod+KeyB" },
   { id: "panel.right", label: "PANEL_RIGHT", scope: "chat", keys: "" },
+  { id: "panel.view", label: "VIEW_IN_CENTER", scope: "global", keys: "" },
   { id: "terminal.tab.new", label: "SHORTCUT_TERMINAL_TAB_NEW", scope: "terminal", keys: "Mod+KeyT" },
   { id: "terminal.tab.close", label: "SHORTCUT_TERMINAL_TAB_CLOSE", scope: "terminal", keys: "Mod+KeyW" },
   { id: "terminal.tab.next", label: "SHORTCUT_TERMINAL_TAB_NEXT", scope: "terminal", keys: "Ctrl+Tab" },

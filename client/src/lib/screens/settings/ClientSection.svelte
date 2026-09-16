@@ -2,6 +2,7 @@
   import Clock from "@lucide/svelte/icons/clock";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Languages from "@lucide/svelte/icons/languages";
+  import ListOrdered from "@lucide/svelte/icons/list-ordered";
   import Moon from "@lucide/svelte/icons/moon";
   import Palette from "@lucide/svelte/icons/palette";
   import Sun from "@lucide/svelte/icons/sun";
@@ -89,6 +90,19 @@
       <CompactSwitch
         checked={settings.showTimestamps}
         onCheckedChange={(value) => (settings.showTimestamps = value)}
+      />
+    {/snippet}
+  </PreferenceRow>
+  <PreferenceRow
+    icon={ListOrdered}
+    title={t("LINE_NUMBERS")}
+    summary={rowSummary("line_numbers")}
+    onclick={() => (settings.codeLineNumbers = !settings.codeLineNumbers)}
+  >
+    {#snippet trailing()}
+      <CompactSwitch
+        checked={settings.codeLineNumbers}
+        onCheckedChange={(value) => (settings.codeLineNumbers = value)}
       />
     {/snippet}
   </PreferenceRow>

@@ -108,6 +108,13 @@ class Settings {
     this.#write("markdown_preview_formatted", value);
   }
 
+  get codeLineNumbers() {
+    return this.#read<boolean>("code_line_numbers");
+  }
+  set codeLineNumbers(value: boolean) {
+    this.#write("code_line_numbers", value);
+  }
+
   get projectDiff() {
     return this.#read<boolean>("project_diff");
   }
@@ -120,6 +127,13 @@ class Settings {
   }
   set projectChangedOnly(value: boolean) {
     this.#write("project_changed_only", value);
+  }
+
+  get viewInCenter() {
+    return this.#read<boolean>("view_in_center");
+  }
+  set viewInCenter(value: boolean) {
+    this.#write("view_in_center", value);
   }
 
   get projectCommitOpen() {

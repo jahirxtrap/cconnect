@@ -569,7 +569,8 @@
       !confirmingDelete &&
       extractRequest === null &&
       compressing === null &&
-      !navigation.previewOverlay,
+      !navigation.previewOverlay &&
+      !panes.previewing,
   );
 
   const cancelMode = () => {
@@ -620,7 +621,7 @@
   };
 
   useShortcut("shared.selectAll", () => {
-    if (!engaged || isEditing() || archive !== null || !entries.length) return false;
+    if (!shortcutsEnabled || isEditing() || archive !== null || !entries.length) return false;
     selectAll();
   });
   useShortcut("shared.copy", () => startIfAllowed("copy"));

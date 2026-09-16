@@ -6,6 +6,7 @@
   import { panes } from "./panes.svelte";
   import PaneActions from "./PaneActions.svelte";
   import { PANE_HEADER_CLASS, paneFocusBorder } from "./paneChrome";
+  import { paneRole } from "./paneSurface";
 
   interface Props {
     title: string;
@@ -16,7 +17,8 @@
 
   const { title, actions, leading, onBack }: Props = $props();
 
-  const focused = $derived(panes.focused === "right");
+  const role = paneRole() ?? "right";
+  const focused = $derived(panes.focused === role);
 </script>
 
 <div
@@ -33,5 +35,5 @@
     </div>
   {/if}
   <p class="min-w-0 flex-1 truncate text-label-lg">{title}</p>
-  <PaneActions {actions} />
+  <PaneActions {actions} {role} />
 </div>

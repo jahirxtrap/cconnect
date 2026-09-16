@@ -1,8 +1,6 @@
 <script lang="ts">
   import { flushSync } from "svelte";
   import Menu from "@lucide/svelte/icons/menu";
-  import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
-  import PanelRightOpen from "@lucide/svelte/icons/panel-right-open";
   import { closeFilePreview, expandFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
@@ -30,6 +28,8 @@
   import ClaudeActions from "$lib/screens/claude/ClaudeActions.svelte";
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import ProjectFilesScreen from "$lib/screens/project/ProjectFilesScreen.svelte";
+  import ProjectDiffView from "$lib/screens/project/ProjectDiffView.svelte";
+  import { closeProjectFile, opened } from "$lib/screens/project/openFile.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
   import NotesActions from "$lib/screens/notes/NotesActions.svelte";
@@ -81,7 +81,11 @@
   let rightDragging = $state(false);
   let claudeDetail = $state<ClaudeKind | null>(null);
 
-  const chatFocused = $derived(layout.mobile || panes.focused === "center");
+  const centerView = $derived(panes.centerView && !layout.mobile);
+  const centerPreview = $derived(centerView && panes.previewing);
+  const centerDiff = $derived(centerView && !panes.previewing);
+  const centerFocused = $derived(layout.mobile || panes.focused === "center");
+  const chatFocused = $derived(centerFocused && !panes.centerBusy);
 
   const terminalCwd = $derived.by(() => {
     const selected = chat.historyProject;
@@ -132,7 +136,7 @@
 
 
   $effect(() => {
-    layout.bottomInset = composerHeight;
+    layout.bottomInset = panes.centerBusy ? 0 : composerHeight;
     return () => (layout.bottomInset = 0);
   });
 
@@ -222,6 +226,11 @@
     else panes.setOpen(!panes.open);
   });
 
+  useShortcut("panel.view", () => {
+    if (layout.mobile) return false;
+    panes.showCenterView(!panes.centerView);
+  });
+
   $effect(() => {
     if (!layout.mobile) drawer.open = false;
   });
@@ -272,10 +281,10 @@
   <div
     class="relative flex min-w-0 flex-1 flex-col"
     style={centerAccent}
-    data-unfocused={chatFocused ? undefined : true}
+    data-unfocused={centerFocused ? undefined : true}
     onpointerdowncapture={(event) => focusFrom(event, "center")}
   >
-    {#if !layout.mobile}
+    {#if !layout.mobile && !panes.centerBusy}
       <TabStrip
         items={tabs.center}
         activeId={tabs.activeId}
@@ -289,10 +298,37 @@
         onTabDrag={swappable ? dragTab : undefined}
         group="chat"
         focused={chatFocused}
-        trailing={sideToggle}
+        trailing={centerActions}
       />
     {/if}
-    {#if shownTab}
+    {#if centerPreview && navigation.preview}
+      {@const request = navigation.preview}
+      <PaneSurface role="center">
+        <FilePreview
+          embedded
+          url={request.url}
+          filename={request.name}
+          onDelete={request.onDelete}
+          onClose={closeFilePreview}
+          onExpand={expandFilePreview}
+        />
+      </PaneSurface>
+    {:else if centerDiff && opened.project && opened.path}
+      {@const project = chatListFor(backend.active)?.projects.find(
+        (item) => item.projectKey === opened.project,
+      )}
+      <PaneSurface role="center">
+        <ProjectDiffView
+          projectKey={opened.project}
+          path={opened.path}
+          status={opened.status}
+          root={project?.path ?? null}
+          embedded={!opened.full}
+          onExpand={opened.full ? null : () => (opened.full = true)}
+          onClose={closeProjectFile}
+        />
+      </PaneSurface>
+    {:else if shownTab}
       <ChatView
         tab={shownTab}
         primary
@@ -368,7 +404,7 @@
           </PaneSurface>
         {:else if panes.kind === "project"}
           <PaneSurface>
-            <ProjectFilesScreen instant={instantLayout} />
+            <ProjectFilesScreen instant={instantLayout} elsewhere={centerView} />
           </PaneSurface>
         {:else if panes.kind === "monitor"}
           <PaneSurface>
@@ -404,7 +440,7 @@
             <TerminalView cwd={terminalCwd} />
           </PaneSurface>
         {/if}
-        {#if panes.previewing && navigation.previewPane && navigation.preview}
+        {#if panes.previewing && navigation.previewPane && navigation.preview && !centerView}
           {@const request = navigation.preview}
           <div class="absolute inset-0 z-20">
             <PaneSurface>
@@ -469,19 +505,8 @@
   <PaneActions />
 {/snippet}
 
-{#snippet sideToggle()}
-  <TooltipIconButton
-    label={t("PANEL_RIGHT")}
-    shortcut="panel.right"
-    class="size-8"
-    onclick={() => panes.setOpen(!panes.open)}
-  >
-    {#if panes.open}
-      <PanelRightClose />
-    {:else}
-      <PanelRightOpen />
-    {/if}
-  </TooltipIconButton>
+{#snippet centerActions()}
+  <PaneActions role="center" />
 {/snippet}
 
 {#snippet menuButton()}

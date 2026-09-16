@@ -9,6 +9,7 @@
     removed?: Record<number, string[]>;
     current?: number[];
     anchor?: number | null;
+    numbers?: boolean;
     class?: string;
   }
 
@@ -19,12 +20,21 @@
     removed = {},
     current = [],
     anchor = null,
+    numbers = true,
     class: className = "",
   }: Props = $props();
 
   const LINE_BREAK = /<br\s*\/?>/;
 
-  const filled = (line: string) => line || " ";
+  const NUMBERED =
+    "pl-[calc(var(--gutter)+0.625rem)] before:absolute before:left-0 before:w-[var(--gutter)] " +
+    "before:pr-2 before:text-right before:text-on-surface-variant before:content-[attr(data-line)]";
+
+  const LINE_CLASS = $derived(
+    `relative border-l-2 py-px pr-2.5 break-all whitespace-pre-wrap ${numbers ? NUMBERED : "pl-2.5"}`,
+  );
+
+  const filled = (line: string) => line.replace(/\r$/, "") || " ";
 
   const language = $derived(resolveLang(lang));
   const marked = $derived(new Set(added));
@@ -33,8 +43,10 @@
   let scroller = $state<HTMLDivElement | null>(null);
   let highlighted = $state<string | null>(null);
 
+  const source = $derived(text.replace(/\r\n?/g, "\n"));
+
   const lines = $derived(
-    (highlighted === null ? text.split("\n") : highlighted.split(LINE_BREAK)).map(filled),
+    (highlighted === null ? source.split("\n") : highlighted.split(LINE_BREAK)).map(filled),
   );
 
   const trailing = $derived(
@@ -43,8 +55,10 @@
       .flatMap(([, gone]) => gone),
   );
 
+  const gutter = $derived(`calc(${String(lines.length).length}ch + 1rem)`);
+
   $effect(() => {
-    const body = text;
+    const body = source;
     const target = language;
     const dark = theme.dark;
     if (!target) {
@@ -72,29 +86,33 @@
 
 <div
   bind:this={scroller}
-  class="overflow-y-auto py-3 font-mono text-body-sm leading-[18px] {className}"
+  style="--gutter-raw: {gutter}"
+  class="code-gutter overflow-y-auto font-mono text-body-sm leading-[18px] {className}"
 >
-  {#each lines as line, index (index)}
-    {@const number = index + 1}
-    {@const here = marking.has(number)}
-    {#each removed[number] ?? [] as gone, at (at)}
+  <div
+    class="relative min-h-full py-3 {numbers
+      ? 'after:absolute after:inset-y-0 after:left-[var(--gutter)] after:w-px after:bg-outline-variant'
+      : ''}"
+  >
+    {#each lines as line, index (index)}
+      {@const number = index + 1}
+      {@const here = marking.has(number)}
+      {#each removed[number] ?? [] as gone, at (at)}
+        <div
+          class="{LINE_CLASS} bg-red-bg text-red {number === anchor
+            ? 'border-accent'
+            : 'border-transparent'}"
+        >{filled(gone)}</div>
+      {/each}
       <div
-        class="border-l-2 bg-red-bg px-2.5 py-px break-all whitespace-pre-wrap text-red {number ===
-        anchor
-          ? 'border-accent'
-          : 'border-transparent'}"
-      >{filled(gone)}</div>
+        data-line={number}
+        class="{LINE_CLASS} {here ? 'border-accent' : 'border-transparent'} {marked.has(number)
+          ? 'bg-green-bg'
+          : ''}"
+      >{#if highlighted === null}{line}{:else}{@html line}{/if}</div>
     {/each}
-    <div
-      data-line={number}
-      class="border-l-2 px-2.5 py-px break-all whitespace-pre-wrap {here
-        ? 'border-accent'
-        : 'border-transparent'} {marked.has(number) ? 'bg-green-bg' : ''}"
-    >{#if highlighted === null}{line}{:else}{@html line}{/if}</div>
-  {/each}
-  {#each trailing as gone, at (at)}
-    <div
-      class="border-l-2 border-transparent bg-red-bg px-2.5 py-px break-all whitespace-pre-wrap text-red"
-    >{filled(gone)}</div>
-  {/each}
+    {#each trailing as gone, at (at)}
+      <div class="{LINE_CLASS} border-transparent bg-red-bg text-red">{filled(gone)}</div>
+    {/each}
+  </div>
 </div>

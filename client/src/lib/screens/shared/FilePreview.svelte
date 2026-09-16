@@ -55,12 +55,24 @@
     embedded?: boolean;
     onExpand?: (() => void) | null;
     menuItems?: Snippet;
-    actions?: Snippet<[ToolbarButton]>;
+    actions?: Snippet<[ToolbarButton, boolean]>;
     onCopyPath?: (() => void) | null;
     added?: number[];
     removed?: Record<number, string[]>;
     current?: number[];
     anchor?: number | null;
+    ready?: boolean;
+    revision?: number;
+  }
+
+  interface Shown {
+    base: string;
+    name: string;
+    body: string;
+    added: number[];
+    removed: Record<number, string[]>;
+    current: number[];
+    anchor: number | null;
   }
 
   const {
@@ -77,13 +89,16 @@
     removed = {},
     current = [],
     anchor = null,
+    ready = true,
+    revision = 0,
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
 
   const button = $derived<ToolbarButton>({ class: embedded ? "size-8" : "", size: embedded ? 18 : 20 });
 
-  let text = $state<string | null>(null);
+  let arrived = $state<{ base: string; name: string; body: string } | null>(null);
+  let shown = $state<Shown | null>(null);
   let failed = $state(false);
   let loaded = $state(false);
   let version = $state(0);
@@ -97,7 +112,9 @@
   const pdfStep = $derived(Math.round(pdfWidth / PDF_RESIZE_STEP));
 
   const kind = $derived(previewKindOf(filename));
-  const binary = $derived(text !== null && text.includes(NUL));
+  const binary = $derived(shown !== null && shown.body.includes(NUL));
+  const prose = $derived(shown !== null && previewKindOf(shown.name) === "markdown" && formatted);
+  const lined = $derived(readsAsText(kind) && !failed && shown !== null && !binary && !prose);
   const relative = $derived(relativeFromUrl(url));
 
   const attach = $derived.by(() => {
@@ -116,20 +133,21 @@
         : () => void sharedApi.absolutePaths([relative]).then((paths) => paths && copyText(paths[0]))),
   );
   const base = $derived(url.split("?fb=")[0]);
-  const source = $derived(version > 0 ? `${base}${base.includes("?") ? "&" : "?"}cb=${version}` : base);
+  const stamp = $derived(version + revision);
+  const source = $derived(stamp > 0 ? `${base}${base.includes("?") ? "&" : "?"}cb=${stamp}` : base);
   const fallback = $derived.by(() => {
     const encoded = url.split("?fb=")[1];
     return encoded ? decodeURIComponent(encoded) : null;
   });
 
-  let shownFile = "";
-
   $effect(() => {
     const target = source;
-    if (!readsAsText(kind)) return;
-    if (base !== shownFile) {
-      shownFile = base;
-      text = null;
+    const requested = base;
+    const name = filename;
+    if (!readsAsText(kind)) {
+      arrived = null;
+      shown = null;
+      return;
     }
     failed = false;
     void fetch(target, {
@@ -137,9 +155,14 @@
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
-        text = await response.text();
+        arrived = { base: requested, name, body: await response.text() };
       })
       .catch(() => (failed = true));
+  });
+
+  $effect(() => {
+    if (arrived === null || arrived.base !== base || !ready) return;
+    shown = { ...arrived, added, removed, current, anchor };
   });
 
 
@@ -173,7 +196,7 @@
 </script>
 
 {#snippet toolbar()}
-  {@render actions?.(button)}
+  {@render actions?.(button, lined)}
   {#if onExpand}
     <TooltipIconButton label={t("EXPAND")} class={button.class} onclick={onExpand}>
       <Maximize2 size={button.size} />
@@ -324,24 +347,29 @@
     ></iframe>
   {:else if failed}
     <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
-  {:else if text === null}
+  {:else if shown === null}
     <CenteredProgress class="flex-1" />
   {:else if binary}
     <EmptyState text={t("FILE_BINARY")} class="flex-1" />
-  {:else if kind === "markdown" && formatted}
-    <div class="selectable min-h-0 flex-1 overflow-y-auto p-4">
-      <MarkdownText {text} />
-    </div>
+  {:else if prose}
+    {#key shown.base}
+      <div class="selectable min-h-0 flex-1 overflow-y-auto p-4">
+        <MarkdownText text={shown.body} />
+      </div>
+    {/key}
   {:else}
-    <CodeView
-      {text}
-      lang={extensionOf(filename)}
-      {added}
-      {removed}
-      {current}
-      {anchor}
-      class="selectable min-h-0 flex-1"
-    />
+    {#key shown.base}
+      <CodeView
+        text={shown.body}
+        lang={extensionOf(shown.name)}
+        added={shown.added}
+        removed={shown.removed}
+        current={shown.current}
+        anchor={shown.anchor}
+        numbers={settings.codeLineNumbers}
+        class="selectable min-h-0 flex-1"
+      />
+    {/key}
   {/if}
 </div>
 
