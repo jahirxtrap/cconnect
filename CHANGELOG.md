@@ -1,14 +1,11 @@
-- The project panel commits what you are looking at: tick the files that go in, write the message, pick the author, amend the last commit, and pull or push without leaving the chat
-- Claude writes the commit message for you from the changes you marked, following a prompt of your own kept beside the others in the Claude screen
-- Every repository under the project is listed, not only the one at its root, and each file is committed to the one it belongs to
-- Throwing away the changes of the files you marked, pushing a branch that has no remote yet, and forcing a push are each one confirmation away
-- The changes view shows new and deleted files whole instead of leaving them out, and folders there carry the same icons as the tree
-- Without the security key the panel shows the branch you are on and nothing else — no commits, nothing to open
-- The chat list was rebuilt underneath: opening or closing a block no longer cuts the text, shifts the page or flickers on the way, in the chat and in the quick chat alike
-- A chat reaches the list the moment you send the first message, instead of when the turn ends
-- Holding an attachment chip opens its menu, and the account code is filled from the clipboard with a paste button
-- Switching between two of your accounts no longer parks the toolbar on loading
-- The duplicate Compacted block is gone, a message queued while a tool is running survives the interruption, the drawer no longer throws away the chat you just started, a finished transfer opens from its panel, clicking beside the composer toolbar clears the selection, and holding a link or a row on Android stops painting a box over it
+- The project panel opens any project you have, not only the one the chat is on, and steps into the repository you want when a project holds more than one
+- The branch's history is in the panel too: the commits behind it, newest first, loading more as you reach the end, with the ones already pushed told apart from the ones still waiting to go
+- A file you open can take over the centre pane instead of sitting beside the chat — the eye in its header moves it there and back, and from either side it expands to the whole window
+- Files show the number of every line, with a switch in the Client settings to turn them off
+- Claude writes the message of an amend from the whole commit it is rewriting, not only from the changes you marked last
+- Moving from one file to the next no longer blinks: their diffs are loaded ahead of time and what you were reading stays on screen until the new file is complete
+- Blank lines no longer collapse in files written on Windows, a file you open starts at the top, and selecting everything lands on what you are looking at instead of the chat behind it
+- A finished transfer opens the copy it saved, the terminal scroll glides and stays inside its box, and a chat interrupted while a tool was running settles where it should
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/

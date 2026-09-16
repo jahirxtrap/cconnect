@@ -237,8 +237,10 @@ chat, served over the same authenticated connection.
 The side panel also browses the project you are working on. Search the tree by
 typing a few letters of any path, and open a file read-only while Claude edits
 it. Git colours the tree — added, modified, untracked — and inside a file the
-change is painted on the lines themselves, with buttons to walk from one to the
-next. A toggle folds the tree down to only what changed. From a file you can
+change is painted on the numbered lines themselves, with buttons to walk from
+one to the next. An eye in the file's header moves it to the centre pane, where
+it takes the place of the chat, and from either side it expands to the whole
+window. A toggle folds the tree down to only what changed. From a file you can
 mention its full path in the chat or copy it. What git ignores stays hidden
 until you unlock it with the security key.
 
@@ -246,9 +248,11 @@ With that changed view open, a bar at the bottom carries the branch, how far
 ahead or behind it is, and everything a commit takes: tick the files that go in,
 write the message — or have Claude write it from what you marked, following a
 prompt of your own kept in the Claude screen — choose the author among the
-identities the repository knows, amend the last commit, and pull or push. Every
-repository under the project is listed, not only the one at its root, so each
-file is committed to the one it belongs to.
+identities the repository knows, amend the last commit, and pull or push. The
+same bar opens the branch's history: the commits behind it, newest first,
+loading more as you reach the end. Every repository under the project is listed,
+not only the one at its root, so each file is committed to the one it belongs
+to.
 
 Throwing away the changes of what you ticked, pushing a branch that has no
 remote yet, and forcing a push are each one confirmation away. The security key
