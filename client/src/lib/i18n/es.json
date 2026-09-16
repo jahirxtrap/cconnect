@@ -73,7 +73,7 @@
   "GIT_FAILED": "Git rechazó la operación",
   "GIT_GENERATE_FAILED": "No llegó ningún mensaje",
   "COMMIT_PROMPT": "Prompt de commits",
-  "COMMIT_PROMPT_SUMMARY": "Instrucciones con las que se escriben los mensajes",
+  "COMMIT_PROMPT_SUMMARY": "Instrucciones con las que se escriben los mensajes de commit",
   "SSH_HOSTS": "Hosts SSH",
   "SSH_HOSTS_SUMMARY": "Conexiones SSH guardadas a otras máquinas",
   "MANAGE_SSH_HOSTS": "Administrar hosts",

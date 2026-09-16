@@ -129,6 +129,8 @@
 
   const sheetWidth = $derived(Math.min(width, layout.width));
 
+  const onScreen = $derived(open || dragging);
+
   const shade = $derived(dragging ? offset / sheetWidth : open ? 1 : 0);
 
   $effect(() => {
@@ -142,7 +144,7 @@
   });
 </script>
 
-{#if open || dragging}
+{#if onScreen}
   <div
     class="fixed inset-0 z-40 bg-black/32 {dragging ? '' : 'transition-opacity duration-200'}"
     style="opacity: {shade}"
@@ -152,9 +154,9 @@
   ></div>
 {/if}
 <aside
-  class="fixed inset-y-0 left-0 z-40 border-r border-outline-variant bg-surface {dragging
+  class="fixed inset-y-0 left-0 z-40 border-r border-outline-variant bg-surface {onScreen
     ? ''
-    : 'transition-transform duration-200'}"
+    : 'invisible'} {dragging ? '' : 'transition-[transform,visibility] duration-200'}"
   style="width: {sheetWidth}px; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); transform: translateX({dragging
     ? offset - sheetWidth
     : open

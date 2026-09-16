@@ -135,7 +135,7 @@
 </script>
 
 <div class="flex h-full min-w-0 flex-1 items-stretch">
-<TooltipWrap label={t("QUICK_CHAT")} class="relative {SLOT} pl-0.5">
+<TooltipWrap label={t("QUICK_CHAT")} class="relative {SLOT} pr-1.5 pl-0.5">
   <button type="button" use:keepFocus onclick={onQuickChat} aria-label={t("QUICK_CHAT")} class={TOGGLE_CLASS}>
     <MessagesSquare size={16} class="text-accent" />
   </button>
@@ -146,7 +146,7 @@
 
 <div
   use:hscrollbar={{ wheel: true }}
-  class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pr-0.5 pl-1.5"
+  class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto"
 >
   {#if disconnected}
     <span class={STATE_CLASS}>

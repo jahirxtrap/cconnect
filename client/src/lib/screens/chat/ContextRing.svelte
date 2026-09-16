@@ -90,7 +90,7 @@
     use:keepFocus
     onclick={toggle}
     aria-label={t("CONTEXT_USAGE")}
-    class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full"
+    class="ripple mr-0.5 ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full"
   >
     {@render ring()}
   </button>
@@ -100,7 +100,7 @@
 {:else}
   <Tooltip.Provider>
     <Tooltip.Root delayDuration={0}>
-      <Tooltip.Trigger onmousedown={holdFocus} class="ripple ml-1 mr-0.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full">
+      <Tooltip.Trigger onmousedown={holdFocus} class="ripple mr-0.5 ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full">
         {@render ring()}
       </Tooltip.Trigger>
       <Tooltip.Portal>

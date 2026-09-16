@@ -57,9 +57,16 @@ export const trackPressFeedback = () => {
 
   const radiusOf = (node: Element) => parseFloat(getComputedStyle(node).borderTopLeftRadius) || 0;
 
+  const onlyChild = (node: Element) =>
+    node.children.length === 1 ? (node.firstElementChild as HTMLElement) : null;
+
   const soleShape = (pressable: HTMLElement) => {
-    const child = pressable.children.length === 1 ? (pressable.firstElementChild as HTMLElement) : null;
-    return child && radiusOf(child) > 0 ? child : null;
+    let node = onlyChild(pressable);
+    while (node) {
+      if (radiusOf(node) > 0) return node;
+      node = onlyChild(node);
+    }
+    return null;
   };
 
   const shapeOf = (from: Element, pressable: HTMLElement) => {

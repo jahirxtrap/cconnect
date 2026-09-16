@@ -12,13 +12,15 @@ export class ProjectWatch {
 
   #socket: ReconnectingSocket;
   #projectKey = "";
+  #dropped = false;
 
   constructor(profile: () => Profile = () => backend.active) {
     this.#socket = new ReconnectingSocket(
       "/projects/ws",
       {
-        onOpen: () => this.#sendWatch(),
+        onOpen: () => this.#resume(),
         onMessage: (message) => this.#apply(message),
+        onDrop: () => (this.#dropped = true),
       },
       profile,
     );
@@ -39,6 +41,12 @@ export class ProjectWatch {
 
   refresh() {
     this.#publish([], true);
+  }
+
+  #resume() {
+    this.#sendWatch();
+    if (this.#dropped) this.refresh();
+    this.#dropped = false;
   }
 
   #sendWatch() {
