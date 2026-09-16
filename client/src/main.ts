@@ -15,10 +15,18 @@ const selectableRoot = (node: Node | null) => {
   return host?.closest(SELECTABLE) ?? null;
 };
 
-const focusedRegion = () =>
-  selectableRoot(document.activeElement) ??
-  [...document.querySelectorAll(".selectable")].find((node) => !node.closest("[data-unfocused]")) ??
-  null;
+const inFront = (node: Element) => {
+  const { x, y, width, height } = node.getBoundingClientRect();
+  if (width === 0 || height === 0) return false;
+  return node.contains(document.elementFromPoint(x + width / 2, y + height / 2));
+};
+
+const focusedRegion = () => {
+  const active = selectableRoot(document.activeElement);
+  if (active && inFront(active)) return active;
+  const shown = [...document.querySelectorAll(".selectable")].filter(inFront);
+  return shown.find((node) => !node.closest("[data-unfocused]")) ?? shown[0] ?? null;
+};
 
 document.addEventListener("contextmenu", (event) => {
   if (!matches(event.target, NATIVE_MENU)) event.preventDefault();
