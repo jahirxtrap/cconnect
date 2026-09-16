@@ -42,6 +42,7 @@
 
   let scroller = $state<HTMLDivElement | null>(null);
   let highlighted = $state<string | null>(null);
+  let sought: number | null = null;
 
   const source = $derived(text.replace(/\r\n?/g, "\n"));
 
@@ -77,10 +78,15 @@
   $effect(() => {
     const line = anchor;
     void lines.length;
-    if (line === null || !scroller) return;
-    scroller
-      .querySelector(`[data-line="${line}"]`)
-      ?.scrollIntoView({ block: "center", behavior: "instant" });
+    if (line === null) {
+      sought = null;
+      return;
+    }
+    if (line === sought || !scroller) return;
+    const target = scroller.querySelector(`[data-line="${line}"]`);
+    if (!target) return;
+    sought = line;
+    target.scrollIntoView({ block: "center", behavior: "instant" });
   });
 </script>
 
