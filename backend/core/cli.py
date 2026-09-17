@@ -319,7 +319,7 @@ def _invocation() -> str:
 
 
 def _flag_parser() -> argparse.ArgumentParser:
-    """The launcher's original flags, still accepted so documented commands keep working."""
+    """The launcher's original flags, accepted alongside the subcommands."""
     parser = argparse.ArgumentParser(description="CConnect backend launcher.")
     parser.add_argument("--production", action="store_true",
                         help="No reload, multi-worker (Linux/macOS only).")
@@ -375,7 +375,7 @@ def _command_parser() -> argparse.ArgumentParser:
     migrate.add_argument("source", nargs="?", default="",
                          help="The old data folder. Found on its own from inside a checkout.")
     migrate.add_argument("--force", action="store_true",
-                         help="Merge into a data folder that already holds a database.")
+                         help="Overwrite what this data folder already holds.")
 
     key = commands.add_parser("key", help="Print the key that unlocks the terminal and ignored files.")
     key.add_argument("--rotate", action="store_true",
@@ -464,8 +464,8 @@ def _migrate(source: str, force: bool) -> None:
     if _running_pid() is not None or _runtime():
         _abort("stop the backend before copying its data.")
     if paths.DB_FILE.exists() and not force:
-        _abort(f"{paths.DATA_DIR} already holds a database. Pass --force to merge into it.")
-    taken = data_migration.adopt(origin)
+        _abort(f"{paths.DATA_DIR} already holds a database. Pass --force to replace what is there.")
+    taken = data_migration.adopt(origin, force)
     _print_rows([
         ("From", str(origin)),
         ("Into", str(paths.DATA_DIR)),

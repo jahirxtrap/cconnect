@@ -26,7 +26,7 @@ scratchpad.
                                     └──> the data folder      (settings, accounts, shared, trash)
 ```
 
-The data folder is `backend/data` in a checkout and `~/.cconnect` once the package is
+The data folder is `backend/data` in a checkout and `~/.cconnect/data` once the package is
 installed, with `CCONNECT_DATA_DIR` above both (`core/paths.INSTALLED` picks).
 
 Two transport modes: **local** (both devices on the tailnet, plain HTTP, no auth) and

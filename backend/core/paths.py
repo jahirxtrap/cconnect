@@ -7,9 +7,9 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = PACKAGE_DIR.parent
 
 INSTALLED = not (BACKEND_DIR / "pyproject.toml").exists()
-"""True when imported from a wheel: there is no source tree around us to keep data in."""
+"""True when imported from a wheel rather than from a source tree."""
 
-HOME_DATA_DIR = Path.home() / ".cconnect"
+HOME_DATA_DIR = Path.home() / ".cconnect" / "data"
 
 DATA_DIR = Path(
     os.environ.get("CCONNECT_DATA_DIR") or (HOME_DATA_DIR if INSTALLED else BACKEND_DIR / "data")
@@ -17,10 +17,11 @@ DATA_DIR = Path(
 
 CONFIG_DIR = DATA_DIR / "config"
 STATE_DIR = DATA_DIR / "state"
-CACHE_DIR = DATA_DIR / "cache"
 LOGS_DIR = DATA_DIR / "logs"
 SHARED_DIR = DATA_DIR / "shared"
 TRASH_DIR = DATA_DIR / "trash"
+
+CACHE_DIR = Path(os.environ.get("CCONNECT_CACHE_DIR") or DATA_DIR.parent / "cache")
 
 PROMPTS_DIR = PACKAGE_DIR / "prompts"
 ENV_FILE = (CONFIG_DIR if INSTALLED else BACKEND_DIR) / ".env"

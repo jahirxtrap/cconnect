@@ -36,7 +36,7 @@ def upgrade_command() -> list[str]:
 
 
 def _on_disk() -> str:
-    """The version sitting in the environment, which an upgrade changes under the running one."""
+    """The version installed in the environment right now."""
     try:
         return installed_version(DISTRIBUTION)
     except PackageNotFoundError:
@@ -44,7 +44,7 @@ def _on_disk() -> str:
 
 
 def upgrade() -> dict:
-    """Replaces the installed package. The process keeps running the version it imported."""
+    """Replaces the installed package with the newest release."""
     before = _on_disk()
     try:
         result = packages.run(upgrade_command(), _TIMEOUT)

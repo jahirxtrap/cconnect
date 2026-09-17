@@ -1,4 +1,4 @@
-"""The pieces of text the server hands the apps ready to show, so both sides read the same."""
+"""The pieces of text the server hands the apps ready to show."""
 
 SEPARATOR = " • "
 

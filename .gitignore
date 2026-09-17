@@ -24,8 +24,9 @@ desktop.ini
 dist/
 build/
 
-# Everything the backend owns at runtime (config, state, cache, logs, shared, trash)
+# Everything the backend owns at runtime (config, state, logs, shared, trash, caches)
 backend/data/
+backend/cache/
 
 # Session output a Playwright MCP attached to that browser leaves behind
 backend/.playwright-mcp/

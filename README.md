@@ -33,7 +33,7 @@ irm https://cconnect.dev/install.ps1 | iex          # Windows PowerShell
 
 It installs [uv](https://docs.astral.sh/uv/) if it is missing and leaves the
 `cconnect` command on your PATH, in an environment of its own. Its data —
-settings, accounts, the shared folder and the trash — lives in `~/.cconnect`;
+settings, accounts, the shared folder and the trash — lives in `~/.cconnect/data`;
 the conversations stay with the Claude CLI, in `~/.claude`.
 
 From a git checkout instead, the same code with the same commands:
@@ -452,7 +452,8 @@ required for a plain local run.
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `8723` | Port the backend binds to |
-| `CCONNECT_DATA_DIR` | `backend/data` | Everything the backend owns on disk — settings, accounts, your prompts, caches, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
+| `CCONNECT_DATA_DIR` | `backend/data` | Everything the backend owns on disk and would carry to another machine — settings, accounts, your prompts, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
+| `CCONNECT_CACHE_DIR` | `backend/cache` | What it can rebuild on its own, beside the data folder rather than inside it, so a migration never drags it along |
 | `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Where Claude Code keeps its sessions |
 | `DEFAULT_CWD` | parent of `backend/` | Directory a chat starts in when neither the app nor the connection picks one |
 | `AI_WORKDIR` | `backend/data/state/internal_task` | Throwaway cwd for the internal helper actions (titles, quick questions), kept out of your history |
@@ -468,7 +469,7 @@ required for a plain local run.
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
 | `BROWSER_HEADLESS` | `1` | Runs it without a window; set `0` to watch the real browser on the server |
 | `BROWSER_QUALITY` | `70` | JPEG quality of the streamed frames. Lower it on a slow link — the pane stays sharp because the resolution does not change |
-| `BROWSER_PROFILE_DIR` | `backend/data/cache/browser` | Its own profile, so it never touches the one you browse with |
+| `BROWSER_PROFILE_DIR` | `backend/cache/browser` | Its own profile, so it never touches the one you browse with |
 
 ## Settings
 

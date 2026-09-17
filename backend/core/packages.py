@@ -1,4 +1,4 @@
-"""How this environment installs into itself: uv builds its tool venvs without pip."""
+"""The commands that install into this environment."""
 
 import shutil
 import subprocess

@@ -86,11 +86,21 @@ def _move(source: Path, target: Path) -> bool:
     return _move_dir(source, target) if source.is_dir() else _move_file(source, target)
 
 
-def adopt(source: Path) -> list[str]:
-    """Copy another data folder into this one, file by file, keeping both sides intact."""
+def _drop_stale_journals(source: Path) -> None:
+    """Removes the destination journals the source has no copy of."""
+    for suffix in ("-wal", "-shm"):
+        journal = paths.DB_FILE.with_name(f"{paths.DB_FILE.name}{suffix}")
+        if journal.exists() and not (source / journal.relative_to(paths.DATA_DIR)).exists():
+            journal.unlink()
+
+
+def adopt(source: Path, replace: bool = False) -> list[str]:
+    """Copy another data folder into this one, leaving the source untouched. `replace` overwrites."""
+    if replace:
+        _drop_stale_journals(source)
     taken: list[str] = []
     settings_file = source.parent / paths.ENV_FILE.name
-    if settings_file.is_file() and not paths.ENV_FILE.exists():
+    if settings_file.is_file() and (replace or not paths.ENV_FILE.exists()):
         paths.ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(settings_file, paths.ENV_FILE)
         taken.append(settings_file.name)
@@ -98,8 +108,12 @@ def adopt(source: Path) -> list[str]:
         if item.is_dir() or item.name in _PER_RUN:
             continue
         relative = item.relative_to(source)
+        if relative.parts[0] == paths.CACHE_DIR.name:
+            continue
+        if any(part.startswith(".") for part in relative.parts[:-1]):
+            continue
         destination = paths.DATA_DIR / relative
-        if destination.exists():
+        if destination.exists() and not replace:
             continue
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(item, destination)
