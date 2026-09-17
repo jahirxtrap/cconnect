@@ -54,13 +54,21 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           body_path: CHANGELOG.md
-          files: |
-            client/src-tauri/target/release/bundle/nsis/*.exe
-            client/src-tauri/target/release/bundle/msi/*.msi
-            client/src-tauri/target/release/bundle/deb/*.deb
-            client/src-tauri/target/release/bundle/rpm/*.rpm
-            client/src-tauri/target/release/bundle/appimage/*.AppImage
-            client/src-tauri/target/release/bundle/dmg/*.dmg
+
+      - name: Upload the installers
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          bundle=src-tauri/target/release/bundle
+          for file in $bundle/{nsis/*.exe,msi/*.msi,deb/*.deb,rpm/*.rpm,appimage/*.AppImage,dmg/*.dmg}; do
+            for attempt in 1 2 3; do
+              gh release upload "$GITHUB_REF_NAME" "$file" --clobber && break
+              [ "$attempt" = 3 ] && exit 1
+              sleep 20
+            done
+          done
 
   android:
     runs-on: ubuntu-latest
@@ -117,7 +125,17 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         with:
           body_path: CHANGELOG.md
-          files: client/cconnect-tauri-*.apk
+
+      - name: Upload the APK
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in 1 2 3; do
+            gh release upload "$GITHUB_REF_NAME" "cconnect-tauri-${GITHUB_REF_NAME}.apk" --clobber && break
+            [ "$attempt" = 3 ] && exit 1
+            sleep 20
+          done
 
   pypi:
     runs-on: ubuntu-latest
@@ -127,7 +145,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.1.0
 
       - name: Build the backend
         working-directory: backend
