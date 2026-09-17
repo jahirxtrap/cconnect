@@ -29,8 +29,10 @@ scratchpad.
 The data folder is `backend/data` in a checkout and `~/.cconnect/data` once the package is
 installed, with `CCONNECT_DATA_DIR` above both (`core/paths.INSTALLED` picks).
 
-Two transport modes: **local** (both devices on the tailnet, plain HTTP, no auth) and
-**public** (`cconnect expose tailscale|caddy`, HTTPS + `Authorization: Bearer`).
+Three transport modes: **local** (both devices on the tailnet, plain HTTP, no auth),
+**tailnet** (`cconnect expose tailnet`, HTTPS through `tailscale serve`, still no token
+because it never leaves the tailnet) and **public** (`cconnect expose tailscale|caddy`,
+HTTPS + `Authorization: Bearer`).
 Claude auth is the CLI's own OAuth subscription, never an API key.
 
 The backend ships two ways from one codebase: the `cconnect` command on PyPI, which the

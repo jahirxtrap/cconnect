@@ -609,6 +609,7 @@
   "PYTHON_PATH": "Ruta de Python",
   "RUN_MODE": "Modo",
   "MODE_LOCAL": "Local",
+  "MODE_TAILNET": "Solo tailnet",
   "MODE_TAILSCALE": "Tailscale",
   "MODE_CADDY": "Proxy inverso (Caddy)",
   "PUBLIC_HOST": "Nombre de host público (vacío: derivado de la IP pública)",

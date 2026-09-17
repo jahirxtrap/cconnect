@@ -28,7 +28,8 @@ _ENV_PATH = paths.ENV_FILE
 _TOKEN_VAR = "PUBLIC_ACCESS_TOKEN"
 _SECURITY_KEY_VAR = "SECURITY_KEY"
 _HOSTNAME_VAR = "PUBLIC_HOSTNAME"
-_PROVIDERS = ("tailscale", "caddy")
+_PROVIDERS = ("tailscale", "tailnet", "caddy")
+_PRIVATE_PROVIDERS = ("tailnet",)
 _STOP_TIMEOUT = 10
 _POLL_SECONDS = 0.5
 _MODULE = "core.cli"
@@ -160,6 +161,33 @@ def _start_tailscale_funnel(port: int) -> str:
     _abort(f"could not work out the public URL from tailscale:\n{output}")
 
 
+def _start_tailscale_serve(port: int) -> str:
+    status = _require_tailscale()
+    host = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
+    if not host:
+        _abort("tailscale did not report a name for this machine.")
+    try:
+        subprocess.run(["tailscale", "serve", "reset"], capture_output=True, timeout=10)
+        result = subprocess.run(
+            ["tailscale", "serve", "--bg", str(port)],
+            capture_output=True, text=True, check=True, timeout=20, encoding="utf-8", errors="replace",
+        )
+    except subprocess.CalledProcessError as exc:
+        _abort(f"tailscale serve failed:\n{(exc.stderr or '') + (exc.stdout or '')}")
+    except subprocess.SubprocessError as exc:
+        _abort(f"tailscale serve did not answer: {exc}")
+    output = (result.stdout or "") + (result.stderr or "")
+    match = re.search(r"https://[^\s]+\.ts\.net/?", output)
+    return match.group(0).rstrip("/") if match else f"https://{host}"
+
+
+def _stop_tailscale_serve() -> None:
+    try:
+        subprocess.run(["tailscale", "serve", "reset"], capture_output=True, timeout=10)
+    except Exception:
+        pass
+
+
 def _stop_tailscale_funnel() -> None:
     """Best-effort shutdown of the background funnel on exit."""
     try:
@@ -248,28 +276,34 @@ def _expose(
     keep_running: bool = False,
     key_generated: bool = False,
 ) -> None:
-    generated = _ensure_public_token()
+    private = provider in _PRIVATE_PROVIDERS
+    generated = False if private else _ensure_public_token()
     if provider == "tailscale":
         public_url = _start_tailscale_funnel(port)
         if not keep_running:
             atexit.register(_stop_tailscale_funnel)
+    elif provider == "tailnet":
+        public_url = _start_tailscale_serve(port)
+        if not keep_running:
+            atexit.register(_stop_tailscale_serve)
     elif provider == "caddy":
         public_url = _caddy_url(public_host, port)
     else:
         _abort(f"unknown --expose provider: {provider}")
-        return  # unreachable, satisfies static checkers
+        return
     os.environ["PUBLIC_URL"] = public_url
-    token = os.environ[_TOKEN_VAR]
+    token = "" if private else os.environ[_TOKEN_VAR]
     parsed = urlparse(public_url)
     pub_port = parsed.port or (443 if parsed.scheme == "https" else 80)
     _print_rows([
-        ("Public URL", public_url),
+        ("URL" if private else "Public URL", public_url),
         ("Provider", provider),
         ("Port", str(pub_port)),
-        ("Token", f"{token}{' [Auto]' if generated else ''}"),
+        *([] if private else [("Token", f"{token}{' [Auto]' if generated else ''}")]),
         _security_key_row(key_generated),
     ])
-    _print_qr(json.dumps({"url": public_url, "token": token}, separators=(",", ":")))
+    payload = {"url": public_url} if private else {"url": public_url, "token": token}
+    _print_qr(json.dumps(payload, separators=(",", ":")))
 
 
 def _running_pid() -> int | None:
@@ -349,8 +383,11 @@ def _stop_detached() -> None:
             _abort(f"could not stop pid {pid}.")
         print(f"Stopped detached backend (pid {pid}).")
     paths.DETACHED_PID_FILE.unlink(missing_ok=True)
-    if _detached_provider() == "tailscale":
+    detached = _detached_provider()
+    if detached == "tailscale":
         _stop_tailscale_funnel()
+    elif detached == "tailnet":
+        _stop_tailscale_serve()
     paths.DETACHED_PROVIDER_FILE.unlink(missing_ok=True)
 
 
@@ -364,7 +401,8 @@ def _flag_parser() -> argparse.ArgumentParser:
     parser.add_argument("--production", action="store_true",
                         help="No reload, multi-worker (Linux/macOS only).")
     parser.add_argument("--expose", choices=list(_PROVIDERS), default="",
-                        help="Expose the backend to the public internet via the given provider.")
+                        help="Serve the backend through the given provider: tailnet keeps it "
+                             "inside your tailnet, tailscale and caddy publish it.")
     parser.add_argument("--public-host", default="",
                         help="Hostname the reverse proxy serves (--expose caddy). Falls back to "
                              f"{_HOSTNAME_VAR}, then to <user>-<ip>.sslip.io.")

@@ -191,7 +191,7 @@ fn access_token(config: &LocalServerConfig) -> Option<String> {
 }
 
 fn expects_gate(config: &LocalServerConfig) -> bool {
-    config.mode != "local"
+    config.mode != "local" && config.mode != "tailnet"
 }
 
 fn matching_exposure(config: &LocalServerConfig, port: u16) -> Option<(bool, Option<String>)> {

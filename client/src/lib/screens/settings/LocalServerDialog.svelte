@@ -41,6 +41,7 @@
 
   const MODE_OPTIONS = [
     { value: "local", label: t("MODE_LOCAL") },
+    { value: "tailnet", label: t("MODE_TAILNET") },
     { value: "tailscale", label: t("MODE_TAILSCALE") },
     { value: "caddy", label: t("MODE_CADDY") },
   ];

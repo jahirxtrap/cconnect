@@ -53,6 +53,7 @@ it into an installed one without touching the original.
 | Command | What it does |
 |---|---|
 | `cconnect` | Serve on this machine and its network |
+| `cconnect expose tailnet` | Serve over HTTPS to your tailnet only, no token |
 | `cconnect expose tailscale` | Publish over the internet through a Tailscale Funnel |
 | `cconnect expose caddy --public-host cc.example.com` | Publish behind a proxy you already run |
 | `cconnect run --detach`, `cconnect stop` | Leave it serving after the terminal closes |
@@ -82,6 +83,22 @@ python run.py
   same account: connect to the PC's tailnet IP (`100.x.x.x`) shown in the
   Tailscale app, e.g. `http://100.x.x.x:8723`. No funnel needed. Tailscale is how
   your phone reaches the PC here, not something the backend itself requires.
+
+### Tailnet HTTPS (no token, never leaves your tailnet)
+
+```bash
+python run.py --expose tailnet
+```
+
+Runs `tailscale serve --bg 8723`, so the machine answers at
+`https://<machine>.<tailnet>.ts.net` with a real certificate — reachable only from
+devices signed into your tailnet, never from the internet. No token: the tailnet is
+the gate, the same as the local mode. It is what you want when the browser refuses a
+plain `http://100.x.x.x` because the page itself came over HTTPS. `Ctrl+C` (or
+`cconnect stop`) runs `tailscale serve reset` and the address stops answering.
+
+**Requirement:** Tailscale installed and signed in. HTTPS certificates must be on for
+the tailnet, which is the same switch Funnel needs.
 
 ### Public HTTPS (token-gated, exposes the PC over the internet)
 
@@ -153,7 +170,7 @@ both down. It survives the terminal, not a reboot.
 The desktop app can start the backend for you instead of running `python run.py`
 yourself. In Settings → Local server, point it at the backend folder, choose how
 to run Python (auto-detect a virtualenv there, the system Python, or a path you
-pick) and the mode — Local or a Tailscale Funnel — and it launches the server on
+pick) and the mode — local, tailnet only, a Tailscale Funnel or Caddy — and it launches the server on
 startup, showing its status and, in public mode, the URL and token to connect
 with. It only manages a server it started; if one is already running, it steps
 aside.

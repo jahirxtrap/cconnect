@@ -56,9 +56,12 @@ Bearer gate is on (`gated()`), so a plain local run is open. Each route checks i
 itself; there is no middleware for it, and a read that the panel needs before it can ask
 for anything (`repos`) is deliberately outside it.
 
+`--expose tailnet` is the one exposure that skips both the token and `CCONNECT_AUTH_ACTIVE`:
+`tailscale serve` answers only inside the tailnet, so it is the local mode with HTTPS on top.
 `--expose caddy` only advertises an exposure someone else terminates, so `--stop` must not
-close a Funnel it never opened (`.detached.provider`). Its default hostname aborts when no
-globally routable IPv4 exists, or the QR would point nowhere.
+close a Funnel it never opened (`.detached.provider`, which also tells a `serve` apart from a
+`funnel` when shutting down). Its default hostname aborts when no globally routable IPv4
+exists, or the QR would point nowhere.
 
 ## HTTP API
 
