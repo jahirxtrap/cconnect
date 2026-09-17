@@ -1,14 +1,12 @@
 """How this backend updates itself: from the git checkout it runs from, or from PyPI."""
 
-import shutil
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version as installed_version
-from pathlib import Path
 
 import httpx
 
-from core import paths, release
+from core import packages, paths, release
 from services import git
 
 _TIMEOUT = 120
@@ -34,11 +32,7 @@ def _released() -> str:
 
 
 def upgrade_command() -> list[str]:
-    """uv installs its tools without pip, so only its own upgrade path works there."""
-    parts = Path(sys.prefix).parts
-    if "uv" in parts and "tools" in parts and shutil.which("uv"):
-        return ["uv", "tool", "upgrade", DISTRIBUTION]
-    return [sys.executable, "-m", "pip", "install", "--upgrade", DISTRIBUTION]
+    return packages.upgrade_command(DISTRIBUTION)
 
 
 def _on_disk() -> str:
@@ -52,12 +46,8 @@ def _on_disk() -> str:
 def upgrade() -> dict:
     """Replaces the installed package. The process keeps running the version it imported."""
     before = _on_disk()
-    command = upgrade_command()
     try:
-        result = subprocess.run(
-            command, capture_output=True, text=True, timeout=_TIMEOUT,
-            encoding="utf-8", errors="replace",
-        )
+        result = packages.run(upgrade_command(), _TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:
         return {**_package_status(), "ok": False, "message": str(exc), "changed": False}
     return {

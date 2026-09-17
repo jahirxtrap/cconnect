@@ -8,6 +8,8 @@ import sys
 
 from loguru import logger
 
+from core import packages
+
 SDK_PACKAGE = "claude-agent-sdk"
 SDK_MODULE = "claude_agent_sdk"
 SETTING = "sdk_auto_update"
@@ -33,7 +35,7 @@ async def update_sdk() -> dict:
     logger.info(f"Updating {SDK_PACKAGE}...")
     result = await asyncio.to_thread(
         subprocess.run,
-        [sys.executable, "-m", "pip", "install", "-U", SDK_PACKAGE],
+        packages.install_command(SDK_PACKAGE),
         capture_output=True,
         text=True,
     )
@@ -54,7 +56,7 @@ async def ensure_sdk_installed():
     if version is None:
         raise RuntimeError(
             f"{SDK_PACKAGE} is not installed and could not be installed automatically. "
-            f"Run: {sys.executable} -m pip install {SDK_PACKAGE}"
+            f"Run: {' '.join(packages.install_command(SDK_PACKAGE))}"
         )
     logger.info(f"{SDK_PACKAGE} ready (v{version}).")
 
