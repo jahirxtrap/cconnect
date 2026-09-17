@@ -90,6 +90,11 @@ class Backend {
     return (profile && this.schemes[profile.id]) || "";
   }
 
+  resolveShared(text: string): string {
+    const scheme = this.schemeOf(this.active);
+    return scheme ? text.split(scheme).join(sharedRootOf(this.active)) : text;
+  }
+
   readonly active = $derived(
     this.environments.find((profile) => profile.id === this.activeId) ?? this.environments[0] ?? null,
   );

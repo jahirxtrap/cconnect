@@ -1,5 +1,6 @@
 import {
   diffKindOf,
+  sharedFilesFrom,
   VALUE_SEPARATOR,
   type ComponentCondition,
   type ComponentConfirm,
@@ -9,6 +10,7 @@ import {
   type DiffLine,
   type InteractionOption,
   type QueuedMessage,
+  type SharedFile,
   type TodoItem,
 } from "$lib/data/chatModels";
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
@@ -47,6 +49,7 @@ export type ServerEvent =
     }
   | { type: "tool_result"; toolUseId: string | null; content: string | null; ms: number | null }
   | { type: "file_change"; id: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
+  | { type: "shared"; id: string | null; files: SharedFile[] }
   | { type: "compacting"; trigger: string | null }
   | { type: "status"; kind: string }
   | { type: "compact"; trigger: string | null; preTokens: number | null; postTokens: number | null; summary: string }
@@ -621,6 +624,12 @@ export class ChatSocket {
             text: text(line, "text") ?? "",
           })),
           labelOnly: flag(wire, "label"),
+        };
+      case "shared":
+        return {
+          type: "shared",
+          id: text(wire, "id"),
+          files: sharedFilesFrom(wire.files),
         };
       case "compacting":
         return { type: "compacting", trigger: text(wire, "trigger") };

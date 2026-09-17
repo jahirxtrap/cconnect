@@ -1579,6 +1579,7 @@ export class ChatState {
         path: item.path,
         interaction: item.interaction,
         diffLines: item.diffLines,
+        files: item.files,
         compact: item.compact,
         agentResult: item.agentResult,
         thinkingTokens: item.thinkingTokens,
@@ -2050,6 +2051,11 @@ export class ChatState {
             labelOnly: event.labelOnly,
           }),
         );
+        break;
+      case "shared":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(newMessage(this.#nextId++, "shared", { toolUseId: event.id, files: event.files }));
         break;
       case "compacting":
         this.compacting = true;

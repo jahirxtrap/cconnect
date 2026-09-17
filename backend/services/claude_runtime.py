@@ -15,10 +15,12 @@ from core import cli_manager, paths
 from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server
 from mcps.media import block_types
+from mcps.shared_files import TOOL as SHARE_TOOL
 from services import claude_assets, cli_info, diffs, providers, settings_store, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
+_SHARE_RULE = f"mcp__cconnect__{SHARE_TOOL}"
 
 _TRANSIENT_API_STATUS = frozenset({500, 502, 503, 504, 529})
 _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
@@ -416,6 +418,10 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                     if mode == "label":
                         event = {"type": "file_change", "id": event.get("id"), "path": event.get("path"), "label": True}
                     events.append(event)
+            elif name == _SHARE_RULE:
+                bid = getattr(block, "id", None)
+                if bid:
+                    hidden.add(bid)
             elif not name.startswith("Task"):
                 if vis["tool_use"] == "off":
                     _mark_working(events, vis)
@@ -531,6 +537,11 @@ _NO_SECRETS = (
     "the value you need, or read the documented variable names in README.md instead."
 )
 
+_OTHER_SHARED = (
+    "{stale} is the shared folder of another CConnect install, and this server neither serves "
+    "nor downloads from it. The one to use is {shared}."
+)
+
 _ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 _ENV_KEY = os.path.normcase(str(_ENV_FILE))
 _ENV_RULE = f"Read({str(_ENV_FILE).replace(os.sep, '/')})"
@@ -552,6 +563,51 @@ def _mentions_env_file(value: Any, cwd: str) -> bool:
     if isinstance(value, (list, tuple)):
         return any(_mentions_env_file(item, cwd) for item in value)
     return False
+
+
+_DATA_MARKS = ("config", "state")
+_PATH_TOKEN = re.compile(r"(?<![\w.-])([^\s\"';|&<>]*[/\\]shared[/\\][^\s\"';|&<>]*)")
+
+
+def _foreign_shared(candidate: str, cwd: str) -> Optional[Path]:
+    """The shared folder a path falls into when it belongs to another CConnect install."""
+    try:
+        path = Path(cwd, candidate).resolve()
+    except (OSError, ValueError):
+        return None
+    for parent in path.parents:
+        if parent.name != paths.SHARED_DIR.name:
+            continue
+        if parent == paths.SHARED_DIR:
+            return None
+        return parent if all((parent.parent / mark).is_dir() for mark in _DATA_MARKS) else None
+    return None
+
+
+def _stale_shared(value: Any, cwd: str) -> Optional[Path]:
+    if isinstance(value, str):
+        found = (_foreign_shared(match.group(1), cwd) for match in _PATH_TOKEN.finditer(value))
+        return next((folder for folder in found if folder), None)
+    if isinstance(value, dict):
+        value = list(value.values())
+    if isinstance(value, (list, tuple)):
+        found = (_stale_shared(item, cwd) for item in value)
+        return next((folder for folder in found if folder), None)
+    return None
+
+
+async def _block_stale_shared(input_data, tool_use_id, context):
+    data = input_data or {}
+    folder = _stale_shared(data.get("tool_input"), data.get("cwd") or os.getcwd())
+    if folder is not None:
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": _OTHER_SHARED.format(stale=folder, shared=paths.SHARED_DIR),
+            }
+        }
+    return {}
 
 
 async def _block_secrets(input_data, tool_use_id, context):
@@ -641,18 +697,22 @@ async def run_prompt(
         enable_file_checkpointing=True,
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )
-    if scope["cconnect"]:
-        options_kwargs["mcp_servers"] = {"cconnect": build_cconnect_server({
-            "request_compact": request_compact,
-            "ask_user": ask_user,
-            "emit": emit,
-            "account": account,
-            "session_info": session_info,
-            "capabilities": list(capabilities or ()),
-        })}
+    if scope["cconnect"] or scope["guides"]:
+        options_kwargs["mcp_servers"] = {"cconnect": build_cconnect_server(
+            {
+                "request_compact": request_compact,
+                "ask_user": ask_user,
+                "emit": emit,
+                "account": account,
+                "session_info": session_info,
+                "capabilities": list(capabilities or ()),
+            },
+            only=None if scope["cconnect"] else [SHARE_TOOL],
+        )}
     tools = scope["tools"]
     if tools is not True:
-        options_kwargs["tools"] = tools if isinstance(tools, list) else []
+        allowed = tools if isinstance(tools, list) else []
+        options_kwargs["tools"] = [*allowed, _SHARE_RULE] if scope["guides"] else allowed
     session_env = dict(accounts.env_for(account))
     if scope["search"]:
         session_env["ENABLE_TOOL_SEARCH"] = "true"
@@ -679,7 +739,7 @@ async def run_prompt(
     options_kwargs["settings"] = json.dumps(overrides)
     status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}
     hooks_map: dict[str, Any] = {
-        "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets])]
+        "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
     }
     loop = asyncio.get_running_loop() if emit is not None else None
     if ask_user is not None:
@@ -1153,7 +1213,7 @@ async def ask_side_question(
     tools = scope["tools"]
     if tools is not True:
         options_kwargs["tools"] = tools if isinstance(tools, list) else []
-    hooks = [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets])]
+    hooks = [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
         hooks.append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))

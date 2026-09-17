@@ -214,6 +214,15 @@ export const saveAllShared = async (items: SharedItem[]) => {
   }
 };
 
+export const downloadAllShared = async (items: SharedItem[]) => {
+  for (const item of items) await downloadShared(item.url, item.name);
+};
+
+export const saveSharedItemsAs = async (items: SharedItem[]) => {
+  if (items.length === 1) await saveSharedAs(items[0].url, items[0].name);
+  else if (items.length) await saveAllShared(items);
+};
+
 export const shareAllShared = async (items: SharedItem[]) => {
   await copyText(items.map((item) => item.url).join("\n"));
 };

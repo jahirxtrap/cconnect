@@ -65,7 +65,7 @@ def _move_file(source: Path, target: Path) -> bool:
 
 
 def _move_dir(source: Path, target: Path) -> bool:
-    """Moves the entries rather than the folder, which a watcher or a running CLI can hold open."""
+    """Moves the entries one by one instead of the folder itself."""
     target.mkdir(parents=True, exist_ok=True)
     moved = False
     for child in sorted(source.iterdir()):

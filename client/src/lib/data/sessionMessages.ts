@@ -2,12 +2,14 @@ import { toDismiss, toElement } from "$lib/services/chatSocket";
 import {
   diffKindOf,
   emptyInteraction,
+  sharedFilesFrom,
   VALUE_SEPARATOR,
   type AgentResult,
   type CompactData,
   type DiffLine,
   type InteractionData,
   type Role,
+  type SharedFile,
 } from "./chatModels";
 
 export interface SessionMessage {
@@ -18,6 +20,7 @@ export interface SessionMessage {
   path: string | null;
   interaction: InteractionData | null;
   diffLines: DiffLine[] | null;
+  files: SharedFile[] | null;
   compact: CompactData | null;
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
@@ -45,6 +48,7 @@ const ROLES: Record<string, Role> = {
   tool_use: "tool",
   tool_result: "tool_result",
   file_change: "file_change",
+  shared: "shared",
   interaction: "interaction",
   compact: "compact",
   summary: "summary",
@@ -96,7 +100,7 @@ const parseInteraction = (raw: Wire): InteractionData => {
 export const parseSessionMessage = (raw: Wire): SessionMessage => {
   const type = text(raw, "type");
   const body =
-    type === "file_change" || type === "compact"
+    type === "file_change" || type === "compact" || type === "shared"
       ? ""
       : type === "interaction"
         ? (text(raw, "input") ?? "")
@@ -126,6 +130,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
             text: text(line, "text") ?? "",
           }))
         : null,
+    files: type === "shared" ? sharedFilesFrom(raw.files) : null,
     compact:
       type === "compact"
         ? {
@@ -164,6 +169,7 @@ export const isVisible = (item: SessionMessage): boolean =>
   !!item.text.trim() ||
   item.interaction !== null ||
   !!item.diffLines?.length ||
+  !!item.files?.length ||
   item.compact !== null ||
   item.labelOnly ||
   !!item.images?.length ||

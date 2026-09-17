@@ -143,7 +143,7 @@ def _local_ipv4() -> list[str]:
 
 
 def _public_ipv4() -> str | None:
-    """First globally routable IPv4, read from the interfaces so it works offline."""
+    """The first globally routable IPv4 among this machine's interfaces."""
     return next((ip for ip in _local_ipv4() if ipaddress.ip_address(ip).is_global), None)
 
 
@@ -152,7 +152,7 @@ def _dns_label(value: str) -> str:
 
 
 def _default_public_host() -> str:
-    """Zero-setup hostname: sslip.io decodes the address out of the name itself."""
+    """The sslip.io hostname built from the user name and the public address."""
     address = _public_ipv4()
     if not address:
         _abort(
@@ -167,7 +167,7 @@ def _default_public_host() -> str:
 
 
 def _warn_if_unserved(host: str, port: int) -> None:
-    """The proxy is configured outside this repo, so a bad hostname fails only once scanned."""
+    """Warns when the hostname points elsewhere or nothing answers on 443."""
     try:
         resolved = {info[4][0] for info in socket.getaddrinfo(host, None, socket.AF_INET)}
     except OSError:
@@ -249,7 +249,7 @@ def _running_pid() -> int | None:
 
 
 def _detached_provider() -> str:
-    """Which provider the detached run exposed with, so --stop only tears down what it started."""
+    """The provider the detached run exposed with."""
     with suppress(OSError):
         return paths.DETACHED_PROVIDER_FILE.read_text(encoding="utf-8").strip()
     return ""

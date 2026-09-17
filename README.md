@@ -454,6 +454,7 @@ required for a plain local run.
 | `PORT` | `8723` | Port the backend binds to |
 | `CCONNECT_DATA_DIR` | `backend/data` | Everything the backend owns on disk and would carry to another machine — settings, accounts, your prompts, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
 | `CCONNECT_CACHE_DIR` | `backend/cache` | What it can rebuild on its own, beside the data folder rather than inside it, so a migration never drags it along |
+| `CCONNECT_SHARED_DIR` | `<data>/shared` | The drop folder on its own. Point two backends at the same one and both serve the same files |
 | `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Where Claude Code keeps its sessions |
 | `DEFAULT_CWD` | parent of `backend/` | Directory a chat starts in when neither the app nor the connection picks one |
 | `AI_WORKDIR` | `backend/data/state/internal_task` | Throwaway cwd for the internal helper actions (titles, quick questions), kept out of your history |

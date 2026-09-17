@@ -42,10 +42,7 @@
 
   const segments = createSegmenter();
   const sharedRoot = $derived(sharedRootOf(backend.active));
-  const resolved = $derived.by(() => {
-    const scheme = backend.schemeOf(backend.active);
-    return scheme ? text.split(scheme).join(sharedRoot) : text;
-  });
+  const resolved = $derived(backend.resolveShared(text));
   const parts = $derived(segments(resolved));
   const shared = (url: string) => url.startsWith(sharedRoot);
 

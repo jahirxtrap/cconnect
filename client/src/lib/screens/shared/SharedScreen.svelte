@@ -51,8 +51,7 @@
   import {
     downloadShared,
     openSharedExternally,
-    saveAllShared,
-    saveSharedAs,
+    saveSharedItemsAs,
     shareAllShared,
     shareShared,
   } from "$lib/services/sharedFiles";
@@ -1133,12 +1132,9 @@
               <MenuItem
                 text={t("SAVE_AS")}
                 onclick={() => {
-                  const files = selectedEntries.map((entry) => ({
-                    url: downloadUrl(child(entry.name)),
-                    name: entry.name,
-                  }));
-                  if (files.length === 1) void saveSharedAs(files[0].url, files[0].name);
-                  else void saveAllShared(files);
+                  void saveSharedItemsAs(
+                    selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.name)), name: entry.name })),
+                  );
                   exitSelection();
                 }}
               >

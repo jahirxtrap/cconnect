@@ -2,10 +2,11 @@
   import Archive from "@lucide/svelte/icons/archive";
   import Bot from "@lucide/svelte/icons/bot";
   import FilePen from "@lucide/svelte/icons/file-pen";
+  import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import type { ChatMessage } from "$lib/data/chatModels";
-  import { t } from "$lib/i18n/index.svelte";
+  import { plural, t } from "$lib/i18n/index.svelte";
   import type { IconSource } from "$lib/ui/icons";
   import CollapsibleHead from "./CollapsibleHead.svelte";
 
@@ -34,6 +35,8 @@
         return { icon: null, label: t("SUMMARY"), accent: false };
       case "file_change":
         return { icon: FilePen, label: message.path ?? "", accent: true };
+      case "shared":
+        return { icon: FolderSymlink, label: plural("SHARED_COUNT", message.files?.length ?? 0), accent: false };
       case "compact":
         return { icon: Archive, label: t("COMPACTED"), accent: true };
       case "agent":

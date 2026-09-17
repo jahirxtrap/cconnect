@@ -8,6 +8,7 @@ export type Role =
   | "summary"
   | "interaction"
   | "file_change"
+  | "shared"
   | "compact"
   | "system"
   | "api_error"
@@ -26,6 +27,11 @@ export type DiffKind = "header" | "hunk" | "add" | "del" | "ctx";
 export interface DiffLine {
   kind: DiffKind;
   text: string;
+}
+
+export interface SharedFile {
+  name: string;
+  url: string;
 }
 
 export interface CompactData {
@@ -158,6 +164,7 @@ export interface ChatMessage {
   interaction: InteractionData | null;
   path: string | null;
   diffLines: DiffLine[] | null;
+  files: SharedFile[] | null;
   compact: CompactData | null;
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
@@ -186,6 +193,12 @@ export interface QueuedMessage {
   attachments: string[];
   uploading: boolean;
 }
+
+export const sharedFilesFrom = (value: unknown): SharedFile[] =>
+  (Array.isArray(value) ? value : [])
+    .map((item) => (item && typeof item === "object" ? (item as Record<string, unknown>) : {}))
+    .map((item) => ({ name: String(item.name ?? ""), url: String(item.url ?? "") }))
+    .filter((file) => file.name !== "" && file.url !== "");
 
 export const diffKindOf = (value: string | null | undefined): DiffKind =>
   value === "header" || value === "hunk" || value === "add" || value === "del" ? value : "ctx";
@@ -313,6 +326,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   interaction: null,
   path: null,
   diffLines: null,
+  files: null,
   compact: null,
   agentResult: null,
   thinkingTokens: null,

@@ -1,11 +1,9 @@
 # File sharing
 
-The folder `{{SHARED_DIR}}` is served by this backend and is downloadable from the user's
-device in the CConnect app. When the user asks you to share, export or send them a file,
-write it into that folder; anything placed there becomes available to download.
-
-Give them the ready-to-open link `{{SHARED_URL}}/<filename>` (URL-encode the filename
-if it has spaces), as a plain markdown link and never inside a code block.
+When the user asks you to share, export or send them a file, write it wherever you are
+working and hand it over with the `share_files` tool. It copies the file into the folder
+this backend serves and answers with the link, already shown in the chat: quote that link
+as a plain markdown link, never inside a code block, and never write the folder yourself.
 
 `@`-mentioned paths under `{{SHARED_DIR}}/uploads` are files the user uploaded from their
 device. Use them directly and don't repeat the paths back.

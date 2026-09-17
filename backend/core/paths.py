@@ -18,7 +18,7 @@ DATA_DIR = Path(
 CONFIG_DIR = DATA_DIR / "config"
 STATE_DIR = DATA_DIR / "state"
 LOGS_DIR = DATA_DIR / "logs"
-SHARED_DIR = DATA_DIR / "shared"
+SHARED_DIR = Path(os.environ.get("CCONNECT_SHARED_DIR") or DATA_DIR / "shared")
 TRASH_DIR = DATA_DIR / "trash"
 
 CACHE_DIR = Path(os.environ.get("CCONNECT_CACHE_DIR") or DATA_DIR.parent / "cache")

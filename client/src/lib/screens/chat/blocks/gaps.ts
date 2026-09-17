@@ -17,6 +17,7 @@ const GROUPED: Role[] = [
   "tool_result",
   "interaction",
   "file_change",
+  "shared",
   "compact",
   "plan",
   "agent",

@@ -71,9 +71,18 @@ def tool_specs(capabilities: Iterable[str] = ()) -> list[dict]:
     return [specs[name] for name in sorted(specs)]
 
 
-def build_cconnect_server(context: Optional[dict] = None, exclude: Iterable[str] = ()) -> Any:
+def build_cconnect_server(
+    context: Optional[dict] = None,
+    exclude: Iterable[str] = (),
+    only: Optional[Iterable[str]] = None,
+) -> Any:
     from claude_agent_sdk import create_sdk_mcp_server
 
     hidden = disabled_tools() | set(exclude)
-    collected = [tool for _module, tool in _discover(context or {}) if _tool_name(tool) not in hidden]
+    wanted = None if only is None else set(only)
+    collected = [
+        tool
+        for _module, tool in _discover(context or {})
+        if _tool_name(tool) not in hidden and (wanted is None or _tool_name(tool) in wanted)
+    ]
     return create_sdk_mcp_server(name="cconnect", version="1.0.0", tools=collected)

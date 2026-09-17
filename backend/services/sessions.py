@@ -1413,7 +1413,8 @@ def get_session_messages(
                         item["tokens"] = thinking_tokens
                     messages.append(item)
             elif btype == "tool_use":
-                from services.claude_runtime import _FILE_EDIT_TOOLS, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
+                from mcps import shared_files
+                from services.claude_runtime import _FILE_EDIT_TOOLS, _SHARE_RULE, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
@@ -1524,6 +1525,13 @@ def get_session_messages(
                 if name == "TodoWrite" or name.startswith("Task"):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
+                    continue
+                if name == _SHARE_RULE and isinstance(inp, dict):
+                    if isinstance(bid, str):
+                        hidden_ids.add(bid)
+                    handed = shared_files.listing(inp, project_key)
+                    if handed:
+                        messages.append({"type": "shared", "files": handed, "id": bid})
                     continue
                 if name in _FILE_EDIT_TOOLS and isinstance(inp, dict):
                     path = inp.get("file_path") or inp.get("notebook_path")

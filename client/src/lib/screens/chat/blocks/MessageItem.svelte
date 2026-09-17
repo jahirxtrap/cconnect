@@ -19,6 +19,7 @@
   import AgentBlock from "./AgentBlock.svelte";
   import Collapsible from "./Collapsible.svelte";
   import CompactBlock from "./CompactBlock.svelte";
+  import SharedBlock from "./SharedBlock.svelte";
   import FileChangeBlock from "./FileChangeBlock.svelte";
   import InteractionBlock from "./InteractionBlock.svelte";
   import PlanBlock from "./PlanBlock.svelte";
@@ -171,6 +172,8 @@
       {expanded}
       {onToggle}
     />
+  {:else if message.role === "shared"}
+    <SharedBlock files={message.files ?? []} {onSharedLink} {onSharedMenu} {expanded} {onToggle} />
   {:else if message.role === "compact"}
     {#if message.compact}
       <CompactBlock compact={message.compact} {expanded} {onToggle} />
