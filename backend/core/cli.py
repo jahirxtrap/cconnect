@@ -9,6 +9,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import socket
 import subprocess
 import sys
@@ -61,7 +62,6 @@ def _persist_in_env(var: str, value: str) -> None:
 
 def _ensure_public_token() -> bool:
     """Make sure a Bearer token exists for public exposure. Returns True if just generated."""
-    # Env var (not module mutation) so uvicorn's reload subprocess inherits the state.
     os.environ["CCONNECT_AUTH_ACTIVE"] = "1"
     if os.environ.get(_TOKEN_VAR):
         return False
@@ -97,27 +97,67 @@ def _print_security_key(generated: bool, qr: bool = False) -> None:
         _print_qr(json.dumps({"security_key": os.environ[_SECURITY_KEY_VAR]}, separators=(",", ":")))
 
 
+def _tailscale_status() -> dict:
+    """What `tailscale status` reports, or {} when the CLI is missing or the daemon is down."""
+    try:
+        result = subprocess.run(
+            ["tailscale", "status", "--json"],
+            capture_output=True, text=True, timeout=20, encoding="utf-8", errors="replace",
+        )
+    except (OSError, subprocess.SubprocessError):
+        return {}
+    if result.returncode != 0:
+        return {}
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return {}
+
+
+def _require_tailscale() -> dict:
+    if shutil.which("tailscale") is None:
+        _abort("Tailscale is not installed. Get it from https://tailscale.com/download and try again.")
+    status = _tailscale_status()
+    state = status.get("BackendState") or ""
+    if not state:
+        _abort("Tailscale is installed but not running. Start the Tailscale app or service and try again.")
+    if state in ("NeedsLogin", "NoState"):
+        _abort("Tailscale is not signed in. Run 'tailscale up', then try again.")
+    if state == "Stopped":
+        subprocess.run(["tailscale", "up"], capture_output=True, text=True, timeout=60)
+        status = _tailscale_status()
+    return status
+
+
+def _funnel_hint(output: str) -> str:
+    if "funnel" in output.lower() and "https://login.tailscale.com/f/funnel" in output:
+        return "Funnel is not enabled for this tailnet. Enable it from the link below and try again.\n"
+    return ""
+
+
 def _start_tailscale_funnel(port: int) -> str:
     """Start Tailscale Funnel in the background and return the public URL."""
+    status = _require_tailscale()
     try:
-        subprocess.run(["tailscale", "up"], capture_output=True, text=True, timeout=60)
-        # Clear serve/funnel state left by a previous run: a stale config silently
-        # downgrades the funnel to tailnet-only (tailscale/tailscale#19803).
         subprocess.run(["tailscale", "funnel", "reset"], capture_output=True, timeout=10)
         result = subprocess.run(
             ["tailscale", "funnel", "--bg", str(port)],
-            capture_output=True, text=True, check=True, timeout=20,
+            capture_output=True, text=True, check=True, timeout=20, encoding="utf-8", errors="replace",
         )
-    except FileNotFoundError:
-        _abort("tailscale CLI not found in PATH. Install Tailscale and try again.")
     except subprocess.CalledProcessError as exc:
-        _abort(f"tailscale funnel failed:\n{exc.stderr or exc.stdout}")
+        output = (exc.stderr or "") + (exc.stdout or "")
+        _abort(f"{_funnel_hint(output)}tailscale funnel failed:\n{output}")
+    except subprocess.SubprocessError as exc:
+        _abort(f"tailscale funnel did not answer: {exc}")
 
     output = (result.stdout or "") + (result.stderr or "")
     match = re.search(r"https://[^\s]+\.ts\.net/?", output)
-    if not match:
-        _abort(f"could not parse public URL from tailscale output:\n{output}")
-    return match.group(0).rstrip("/")
+    if match:
+        return match.group(0).rstrip("/")
+    host = ((status.get("Self") or {}).get("DNSName") or "").rstrip(".")
+    if host:
+        return f"https://{host}"
+    _abort(f"could not work out the public URL from tailscale:\n{output}")
 
 
 def _stop_tailscale_funnel() -> None:
@@ -534,7 +574,6 @@ def main():
     else:
         _print_security_key(key_generated)
 
-    # Disabled on Windows: uvicorn's reload worker breaks the Claude CLI's asyncio subprocess.
     reload = not args.production and not is_windows
     workers = int(os.environ.get("WEB_CONCURRENCY", "2")) if (args.production and not is_windows) else 1
 
