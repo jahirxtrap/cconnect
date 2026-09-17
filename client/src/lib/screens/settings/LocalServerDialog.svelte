@@ -29,8 +29,8 @@
   type Target = "dir" | "python" | "command";
 
   const SOURCE_OPTIONS = [
-    { value: "native", label: t("SOURCE_NATIVE") },
-    { value: "python", label: t("SOURCE_PYTHON") },
+    { value: "native", label: t("LOCAL_SERVER_NATIVE") },
+    { value: "python", label: t("LOCAL_SERVER_REPOSITORY") },
   ];
 
   const PYTHON_OPTIONS = [
