@@ -304,10 +304,15 @@
     return list.sort(compare);
   });
 
+  const shownCount = $derived.by(() => {
+    const total = (searchResults ?? entries).length;
+    return ordered.length === total ? "" : `${ordered.length}/${total}`;
+  });
+
   const selectedEntries = $derived(entries.filter((entry) => selected.includes(entry.file)));
   const single = $derived(selected.length === 1 ? (selectedEntries[0] ?? null) : null);
   const canShare = $derived(selectedEntries.length > 0 && selectedEntries.every((entry) => !entry.isDir));
-  const allSelected = $derived(entries.length > 0 && selected.length === entries.length);
+  const allSelected = $derived(ordered.length > 0 && ordered.every((entry) => selected.includes(entry.file)));
   const transferAllowed = $derived(
     transfer !== null &&
       archive === null &&
@@ -317,7 +322,7 @@
 
   const selectAll = () => {
     selecting = true;
-    selected = allSelected ? [] : entries.map((entry) => entry.file);
+    selected = allSelected ? [] : ordered.map((entry) => entry.file);
   };
 
   const exitSelection = () => {
@@ -935,6 +940,7 @@
     nameOf={entryLabel}
     {searching}
     {narrow}
+    count={shownCount}
     query={searchQuery}
     searchable={archive === null}
     onQueryChange={(value) => (searchQuery = value)}
@@ -975,7 +981,7 @@
           {@const isSelected = selected.includes(entry.file)}
           <div data-row={index} data-name={entry.file}>
             <ListRow
-              icon={entryIcon(child(entry.file), entry.isDir, projectKeys, UPLOAD_DIR)}
+              icon={entryIcon(child(entry.name), entry.isDir, projectKeys, UPLOAD_DIR)}
               iconBadge={entry.link ? (entry.missing ? CircleX : Link2) : null}
               badgeClass={entry.missing ? "text-red" : "text-on-surface-variant"}
               title={entryLabel(child(entry.file), entry.name)}

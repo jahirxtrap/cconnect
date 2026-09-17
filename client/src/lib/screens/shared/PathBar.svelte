@@ -15,6 +15,7 @@
     query: string;
     searchable: boolean;
     narrow?: boolean;
+    count?: string;
     onQueryChange: (value: string) => void;
     onToggleSearch: () => void;
     onNavigate: (target: string) => void;
@@ -29,6 +30,7 @@
     query,
     searchable,
     narrow = false,
+    count = "",
     onQueryChange,
     onToggleSearch,
     onNavigate,
@@ -99,6 +101,9 @@
           </button>
         {/each}
       </div>
+      {#if count}
+        <span class="shrink-0 px-2 text-label-md text-on-surface-variant">{count}</span>
+      {/if}
       {#if searchable}
         <button
           type="button"

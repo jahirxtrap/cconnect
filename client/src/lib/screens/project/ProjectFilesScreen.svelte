@@ -62,7 +62,9 @@
   const RAIL_X = 20;
   const RAIL_GAP = 12;
   const HEAD_SIZE = 16;
-  const DOT_SIZE = 9;
+  const DOT_SIZE = 8;
+  const DOT_BOX = 20;
+  const RING_STROKE = 2;
   const HALF = 2;
 
   const compact = inPane();
@@ -632,27 +634,42 @@
 {#snippet commitRow(commit: GitCommit, index: number, last: boolean)}
   {@const local = index < unpushed}
   {@const head = index === 0}
-  {@const dot = local ? "bg-green" : "bg-accent"}
-  {@const ring = local ? "border-green" : "border-accent"}
+  {@const rail = local ? "bg-green" : "bg-accent"}
+  {@const dot = local ? "fill-green" : "fill-accent"}
+  {@const ring = local ? "stroke-green" : "stroke-accent"}
   <div class="relative py-1.5 pr-4" style="padding-left: {RAIL_X + RAIL_GAP}px">
     <span
       style="left: {RAIL_X}px; top: {head ? `calc(50% + ${HEAD_SIZE / HALF}px)` : '0px'}; bottom: {last
         ? '50%'
         : '0px'}"
-      class="absolute w-0.5 -translate-x-1/2 {dot}"
+      class="absolute w-0.5 -translate-x-1/2 {rail}"
     ></span>
     {#if head}
-      <span
+      <svg
         style="left: {RAIL_X}px; width: {HEAD_SIZE}px; height: {HEAD_SIZE}px"
-        class="absolute top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 {ring}"
+        viewBox="0 0 {DOT_BOX} {DOT_BOX}"
+        class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+        aria-hidden="true"
       >
-        <span style="width: {DOT_SIZE}px; height: {DOT_SIZE}px" class="rounded-full {dot}"></span>
-      </span>
+        <circle
+          cx={DOT_BOX / HALF}
+          cy={DOT_BOX / HALF}
+          r={(DOT_BOX - RING_STROKE * 1.5) / HALF}
+          fill="none"
+          stroke-width={RING_STROKE}
+          class={ring}
+        />
+        <circle cx={DOT_BOX / HALF} cy={DOT_BOX / HALF} r={DOT_BOX / 4} class={dot} />
+      </svg>
     {:else}
-      <span
+      <svg
         style="left: {RAIL_X}px; width: {DOT_SIZE}px; height: {DOT_SIZE}px"
-        class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full {dot}"
-      ></span>
+        viewBox="0 0 {DOT_BOX} {DOT_BOX}"
+        class="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+        aria-hidden="true"
+      >
+        <circle cx={DOT_BOX / HALF} cy={DOT_BOX / HALF} r={DOT_BOX / HALF} class={dot} />
+      </svg>
     {/if}
     <span class="block truncate text-body-md">{commit.subject}</span>
     <span class="block truncate text-body-sm text-on-surface-variant">
