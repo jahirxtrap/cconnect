@@ -12,6 +12,7 @@ export interface ChatCategory {
   name: string;
   position: number;
   color: string | null;
+  projectKey: string | null;
 }
 
 export interface ChatPlacement {
@@ -71,6 +72,7 @@ export const parseCategory = (raw: Wire): ChatCategory => ({
   name: text(raw.name) ?? "",
   position: number(raw.position) ?? 0,
   color: text(raw.color),
+  projectKey: text(raw.project_key),
 });
 
 const PROJECT_KEY_SEPARATOR = /[^A-Za-z0-9]/g;

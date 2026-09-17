@@ -43,6 +43,7 @@ class CategoryBody(BaseModel):
     name: Optional[str] = None
     color: Optional[str] = None
     index: Optional[int] = None
+    project_key: Optional[str] = None
 
 
 class PlacementBody(BaseModel):
@@ -70,7 +71,7 @@ async def create_category(body: CategoryBody):
     if body.color and body.color not in COLORS:
         raise HTTPException(status_code=400, detail="invalid color")
     try:
-        created = categories_service.create_category(body.name or "", body.color)
+        created = categories_service.create_category(body.name or "", body.color, body.project_key)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     chat_list.hub.publish([{"type": "category_changed", "category": created}])
@@ -82,7 +83,9 @@ async def update_category(category_id: str, body: CategoryBody):
     if body.color and body.color not in COLORS:
         raise HTTPException(status_code=400, detail="invalid color")
     try:
-        updated = categories_service.update_category(category_id, body.name, body.color, body.index)
+        updated = categories_service.update_category(
+            category_id, body.name, body.color, body.index, body.project_key
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if updated is None:

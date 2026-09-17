@@ -1,6 +1,7 @@
 <script lang="ts">
   import Eye from "@lucide/svelte/icons/eye";
   import EyeOff from "@lucide/svelte/icons/eye-off";
+  import Folder from "@lucide/svelte/icons/folder";
   import GripHorizontal from "@lucide/svelte/icons/grip-horizontal";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Trash from "@lucide/svelte/icons/trash";
@@ -11,6 +12,8 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EditableText from "$lib/ui/EditableText.svelte";
+  import MenuItem from "$lib/ui/MenuItem.svelte";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ProjectPathDialog from "./ProjectPathDialog.svelte";
@@ -29,6 +32,7 @@
   const SPACING = 4;
 
   let editing = $state<string | null>(null);
+  let ownerMenu = $state<string | null>(null);
   let draft = $state("");
   let deletingCategory = $state<ChatCategory | null>(null);
   let deletingProject = $state<ProjectInfo | null>(null);
@@ -106,6 +110,11 @@
   const commitProject = (project: ProjectInfo) => {
     if (draft.trim()) void chat.renameProject(project, draft);
     editing = null;
+  };
+
+  const ownerLabel = (category: ChatCategory) => {
+    const owner = sortedProjects.find((item) => item.projectKey === category.projectKey);
+    return owner ? projectLabel(owner) : t("ALL_PROJECTS");
   };
 
 
@@ -223,6 +232,32 @@
             onCancel={() => (editing = null)}
           />
         </div>
+        <PopupMenu
+          open={ownerMenu === category.id}
+          label={t("PROJECT")}
+          onOpenChange={(value) => (ownerMenu = value ? category.id : null)}
+        >
+          {#snippet trigger()}
+            <span
+              class="inline-flex max-w-32 cursor-pointer items-center gap-1 truncate rounded-full px-2 py-1 text-label-sm text-on-surface-variant transition-colors hover:bg-on-surface/10"
+            >
+              <Folder size={14} class="shrink-0" />
+              <span class="truncate">{ownerLabel(category)}</span>
+            </span>
+          {/snippet}
+          <MenuItem
+            text={t("ALL_PROJECTS")}
+            selected={!category.projectKey}
+            onclick={() => void chat.setCategoryProject(category, "")}
+          />
+          {#each sortedProjects as project (project.projectKey)}
+            <MenuItem
+              text={projectLabel(project)}
+              selected={category.projectKey === project.projectKey}
+              onclick={() => void chat.setCategoryProject(category, project.projectKey)}
+            />
+          {/each}
+        </PopupMenu>
         <TooltipIconButton
           label={hidden ? t("SHOW") : t("HIDE")}
           class="size-8 [&_svg]:size-4"

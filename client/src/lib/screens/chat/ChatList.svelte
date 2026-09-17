@@ -62,7 +62,7 @@
 
   const groups = $derived.by((): SessionGroup[] => {
     const sessions = chat.historySessions;
-    if (!chat.categories.length) return [{ category: null, sessions }];
+    if (!chat.historyCategories.length) return [{ category: null, sessions }];
     const manual = chat.chatOrder === "manual";
     const ordered = (list: SessionInfo[]) =>
       manual
@@ -72,9 +72,13 @@
               (chat.placement[b.sessionId]?.position ?? Number.MAX_VALUE),
           )
         : [...list].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
-    const inCategory = (id: string | null) =>
-      ordered(sessions.filter((item) => (chat.placement[item.sessionId]?.categoryId ?? null) === id));
-    const result: SessionGroup[] = chat.categories
+    const shown = new Set(chat.historyCategories.map((category) => category.id));
+    const groupOf = (session: SessionInfo) => {
+      const placed = chat.placement[session.sessionId]?.categoryId ?? null;
+      return placed !== null && shown.has(placed) ? placed : null;
+    };
+    const inCategory = (id: string | null) => ordered(sessions.filter((item) => groupOf(item) === id));
+    const result: SessionGroup[] = chat.historyCategories
       .filter((category) => !chat.isCategoryHidden(category.id))
       .map((category) => ({ category, sessions: inCategory(category.id) }));
     const loose = inCategory(null);
@@ -309,7 +313,7 @@
                 : null}
               onDelete={() => onDelete(session)}
               onMove={(preset) => onMove(session, preset)}
-              categories={chat.categories}
+              categories={chat.categoriesFor(session.projectKey)}
               currentCategoryId={chat.placement[session.sessionId]?.categoryId ?? null}
               onPlace={(categoryId) => void chat.placeSession(session.sessionId, categoryId)}
               onNewCategory={() => onNewCategory(session)}

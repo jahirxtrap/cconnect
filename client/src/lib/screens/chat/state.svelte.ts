@@ -660,7 +660,8 @@ export class ChatState {
     const wanted = this.pendingCategoryId || this.defaultCategory;
     this.pendingCategoryId = null;
     if (!sessionId) return;
-    const categoryId = this.categories.some((item) => item.id === wanted) ? wanted : null;
+    const owner = this.categoriesFor(projectKeyOf(this.cwd));
+    const categoryId = owner.some((item) => item.id === wanted) ? wanted : null;
     void this.placeSession(sessionId, categoryId, 0);
   }
 
@@ -1147,6 +1148,17 @@ export class ChatState {
   readonly categories = $derived(this.list?.categories ?? []);
   readonly placement = $derived(this.list?.placement ?? {});
 
+  readonly historyCategories = $derived.by(() => {
+    const project = this.historyProject;
+    if (!project) return this.categories;
+    const used = new Set(this.historySessions.map((item) => this.placement[item.sessionId]?.categoryId));
+    return this.categories.filter((item) => item.projectKey === project || (!item.projectKey && used.has(item.id)));
+  });
+
+  categoriesFor(projectKey: string | null): ChatCategory[] {
+    return this.categories.filter((item) => !item.projectKey || item.projectKey === projectKey);
+  }
+
   async setChatOrder(order: string) {
     if (order === this.chatOrder) return;
     if (order === "manual") await this.#seedManualOrder();
@@ -1169,14 +1181,15 @@ export class ChatState {
   async createCategory(name: string, color: string | null = null) {
     const clean = name.trim();
     if (!clean) return;
-    const created = await this.#sessions.createCategory(clean, color);
+    const created = await this.#sessions.createCategory(clean, color, this.historyProject);
     if (created) this.list?.upsertCategory(created);
   }
 
   async createCategoryWith(name: string, sessionId: string) {
     const clean = name.trim();
     if (!clean) return;
-    const created = await this.#sessions.createCategory(clean, null);
+    const owner = this.list?.sessions.find((item) => item.sessionId === sessionId)?.projectKey ?? null;
+    const created = await this.#sessions.createCategory(clean, null, owner);
     if (!created) return;
     this.list?.upsertCategory(created);
     await this.#sessions.placeSession(sessionId, created.id, 0);
@@ -1186,6 +1199,11 @@ export class ChatState {
     const clean = name.trim();
     if (!clean) return;
     const updated = await this.#sessions.updateCategory(category.id, { name: clean });
+    if (updated) this.list?.upsertCategory(updated);
+  }
+
+  async setCategoryProject(category: ChatCategory, projectKey: string) {
+    const updated = await this.#sessions.updateCategory(category.id, { project_key: projectKey });
     if (updated) this.list?.upsertCategory(updated);
   }
 

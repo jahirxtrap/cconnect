@@ -16,6 +16,7 @@ def _category_dict(row: SessionCategory) -> dict:
         "name": row.name,
         "position": row.position,
         "color": row.color,
+        "project_key": row.project_key,
     }
 
 
@@ -66,13 +67,19 @@ def snapshot() -> dict:
         }
 
 
-def create_category(name: str, color: Optional[str] = None) -> dict:
+def create_category(name: str, color: Optional[str] = None, project_key: Optional[str] = None) -> dict:
     clean = (name or "").strip()
     if not clean:
         raise ValueError("name is required")
     with Session() as s:
         last = max((row.position for row in s.query(SessionCategory).all()), default=-_STEP)
-        row = SessionCategory(id=uuid.uuid4().hex, name=clean, position=last + _STEP, color=color or None)
+        row = SessionCategory(
+            id=uuid.uuid4().hex,
+            name=clean,
+            position=last + _STEP,
+            color=color or None,
+            project_key=project_key or None,
+        )
         s.add(row)
         s.commit()
         return _category_dict(row)
@@ -83,6 +90,7 @@ def update_category(
     name: Optional[str] = None,
     color: Optional[str] = None,
     index: Optional[int] = None,
+    project_key: Optional[str] = None,
 ) -> Optional[dict]:
     with Session() as s:
         row = s.get(SessionCategory, category_id)
@@ -95,6 +103,8 @@ def update_category(
             row.name = clean
         if color is not None:
             row.color = color or None
+        if project_key is not None:
+            row.project_key = project_key or None
         if index is not None:
             others = sorted(
                 (item for item in s.query(SessionCategory).all() if item.id != category_id),

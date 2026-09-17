@@ -28,6 +28,10 @@ class SessionCategory(Base):
         nullable=True,
         comment="Accent name from the shared palette; NULL uses the default one",
     )
+    project_key: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Project the category belongs to; NULL shows it under every project",
+    )
 
 
 class SessionPlacement(Base):

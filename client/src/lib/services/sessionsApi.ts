@@ -1,4 +1,4 @@
-import type { ChatCategory } from "$lib/data/models";
+import { parseCategory, type ChatCategory } from "$lib/data/models";
 import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { http, type HttpClient } from "./http";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
@@ -148,15 +148,17 @@ export const createSessionsApi = (http: HttpClient) => ({
     return (await http.post(`/sessions/${sessionId}/color`, { project, color })) !== null;
   },
 
-  async createCategory(name: string, color: string | null): Promise<ChatCategory | null> {
-    return await http.post<ChatCategory>("/sessions/categories", { name, color });
+  async createCategory(name: string, color: string | null, projectKey: string | null): Promise<ChatCategory | null> {
+    const created = await http.post<Wire>("/sessions/categories", { name, color, project_key: projectKey });
+    return created ? parseCategory(created) : null;
   },
 
   async updateCategory(
     id: string,
-    patch: { name?: string; color?: string; index?: number },
+    patch: { name?: string; color?: string; index?: number; project_key?: string },
   ): Promise<ChatCategory | null> {
-    return await http.patch<ChatCategory>(`/sessions/categories/${id}`, patch);
+    const updated = await http.patch<Wire>(`/sessions/categories/${id}`, patch);
+    return updated ? parseCategory(updated) : null;
   },
 
   async deleteCategory(id: string): Promise<boolean> {
