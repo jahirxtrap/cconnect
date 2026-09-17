@@ -50,11 +50,12 @@ def upgrade() -> dict:
         result = packages.run(upgrade_command(), _TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:
         return {**_package_status(), "ok": False, "message": str(exc), "changed": False}
+    changed = _on_disk() != before
     return {
         **_package_status(),
-        "ok": result.returncode == 0,
+        "ok": result.returncode == 0 or changed,
         "message": (result.stdout + result.stderr).strip(),
-        "changed": _on_disk() != before,
+        "changed": changed,
     }
 
 
