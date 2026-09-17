@@ -23,22 +23,30 @@ scratchpad.
                                     │
                                     ├──> ~/.claude/projects   (sessions on disk)
                                     ├──> ~/.claude            (plugins, MCP, skills, memories)
-                                    └──> backend/data/        (settings, accounts, shared, trash)
+                                    └──> the data folder      (settings, accounts, shared, trash)
 ```
 
+The data folder is `backend/data` in a checkout and `~/.cconnect` once the package is
+installed, with `CCONNECT_DATA_DIR` above both (`core/paths.INSTALLED` picks).
+
 Two transport modes: **local** (both devices on the tailnet, plain HTTP, no auth) and
-**public** (`python run.py --expose tailscale|caddy`, HTTPS + `Authorization: Bearer`).
+**public** (`cconnect expose tailscale|caddy`, HTTPS + `Authorization: Bearer`).
 Claude auth is the CLI's own OAuth subscription, never an API key.
+
+The backend ships two ways from one codebase: the `cconnect` command on PyPI, which the
+release workflow publishes on every tag, and a git checkout, where `python run.py` is the
+same entry point. Both take the same commands; see the README.
 
 ## Version contract
 
-`backend/pyproject.toml` declares `version`, `supported-app` and `supported-cli`; the
-app carries `SUPPORTED_SERVER`. `/api/health` and `/api/capabilities` expose all of them
-and the app renders AppOutdated / ServerOutdated / CliOutdated notices.
+`backend/core/release.py` declares `VERSION`, `SUPPORTED_APP` and `SUPPORTED_CLI` — the
+wheel reads its version from there too; the app carries `SUPPORTED_SERVER`. `/api/health`
+and `/api/capabilities` expose all of them and the app renders AppOutdated /
+ServerOutdated / CliOutdated notices.
 
 A release is one commit named `v<x.y.z>` that replaces `CHANGELOG.md` and bumps five
-files: `backend/pyproject.toml` (`version`, `supported-app`, and `supported-cli` when the
-CLI floor moves), `client/package.json`, `client/src-tauri/Cargo.toml` and its
+files: `backend/core/release.py` (`VERSION`, and the two floors when they move),
+`client/package.json`, `client/src-tauri/Cargo.toml` and its
 `Cargo.lock` entry, `client/src-tauri/tauri.conf.json` (`version` **and**
 `bundle.android.versionCode`) and `client/vite.config.ts` (`SUPPORTED_SERVER`). Tags are
 lightweight and unprefixed (`1.6.1`). An Android build rewrites the Cargo files

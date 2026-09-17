@@ -15,12 +15,17 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 
 ## Layout
 
-- `main.py` — app, router auto-discovery, gzip, catch-all 404.
-- `run.py` — supervisor: launches uvicorn as a child and relaunches it on a restart
-  request. `--expose {tailscale,caddy}` turns on the Bearer gate and prints URL + token + QR.
-- `core/` — `paths` (**the** path table: every file the backend owns, under `data/`),
-  `config` (env + version contract), `settings_defs` + `db` + `settings_store`
-  (SQLite KV), `cli_manager`, `sdk`, `responses` (**the** envelope: `{success, status, message, data}`).
+- `core/app.py` — the FastAPI app: router auto-discovery, gzip, catch-all 404. Served as
+  `core.app:app`; it lives inside the package so an installed wheel carries it.
+- `core/cli.py` — the `cconnect` command and the supervisor: launches uvicorn as a child
+  and relaunches it on a restart request. Subcommands `run / expose / stop / status /
+  update / migrate / key`, with the launcher's original flags still accepted. `run.py` at
+  the backend root is the three-line entry a checkout (and the desktop app) calls.
+- `core/` — `paths` (**the** path table: every file the backend owns, plus `INSTALLED`,
+  which decides where the data folder is), `release` (the version contract), `config`
+  (env), `display` (separator and joining, shared with the app), `settings_defs` + `db` +
+  `settings_store` (SQLite KV), `cli_manager`, `sdk`, `responses` (**the** envelope:
+  `{success, status, message, data}`).
 - `middleware/` — `public_auth` (Bearer, no-op without a token), `security`, `error_handler`.
 - `routers/` — thin: validate, call a service, return `api_response()`.
 - `services/` — all the logic. `live_sessions` (turn decoupled from the socket), `claude_runtime`
@@ -29,7 +34,7 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `system_monitor`, `network`, `usage`, `accounts`, `shared`, `git_ops` (the commit panel,
   on top of the single runner in `services/git`, one lock per repository).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
-- `prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
+- `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
   substituted per request), `BLOCKS.md`, `BROWSER.md` and `SUGGESTIONS.md`. Versioned, so
   the user-owned `USER.md` and the per-project prompts live in `data/config/prompts/`
   instead (never deleted — emptied). `{{SHARED_URL}}` resolves to `config.SHARED_SCHEME`

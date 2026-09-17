@@ -3,11 +3,11 @@
 import os
 from pathlib import Path
 
-from core import paths
+from core import paths, release
 
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(paths.ENV_FILE)
 except ImportError:
     pass
 
@@ -16,19 +16,9 @@ PUBLIC_URL = os.environ.get("PUBLIC_URL", "").strip().rstrip("/")
 
 SHARED_SCHEME = "cconnect://shared"
 
-def _pyproject() -> dict:
-    import tomllib
-    try:
-        with paths.PYPROJECT_FILE.open("rb") as fh:
-            return tomllib.load(fh)
-    except (OSError, ValueError):
-        return {}
-
-
-_PYPROJECT = _pyproject()
-SERVER_VERSION = _PYPROJECT.get("project", {}).get("version", "1.0.0")
-SUPPORTED_APP = _PYPROJECT.get("tool", {}).get("cconnect", {}).get("supported-app", ">=1.0.0")
-SUPPORTED_CLI = _PYPROJECT.get("tool", {}).get("cconnect", {}).get("supported-cli", ">=0.0.0")
+SERVER_VERSION = release.VERSION
+SUPPORTED_APP = release.SUPPORTED_APP
+SUPPORTED_CLI = release.SUPPORTED_CLI
 
 CLAUDE_PROJECTS_DIR = os.environ.get(
     "CLAUDE_PROJECTS_DIR",
@@ -39,8 +29,10 @@ CLAUDE_PROJECTS_DIR = os.environ.get(
 RESTART_EXIT_CODE = 42
 
 # Fallback cwd when the mobile starts a chat without picking a directory and the
-# active connection has none. Defaults to the parent of the backend folder.
-DEFAULT_CWD = os.environ.get("DEFAULT_CWD", str(paths.BACKEND_DIR.parent))
+# active connection has none. The parent of a checkout, home when installed.
+DEFAULT_CWD = os.environ.get(
+    "DEFAULT_CWD", str(Path.home() if paths.INSTALLED else paths.BACKEND_DIR.parent)
+)
 
 # Fallback used only if the SDK can't be introspected yet.
 _FALLBACK_PERMISSION_MODES = ("default", "acceptEdits", "plan", "dontAsk", "bypassPermissions", "auto")

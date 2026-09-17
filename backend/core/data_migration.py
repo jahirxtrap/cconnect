@@ -10,6 +10,7 @@ from loguru import logger
 from core import paths
 
 LEGACY_AI_WORKDIR = paths.BACKEND_DIR / "internal_task"
+LEGACY_PROMPTS_DIR = paths.BACKEND_DIR / "prompts"
 
 _KEPT = (
     (paths.BACKEND_DIR / "cconnect.db", paths.DB_FILE),
@@ -17,8 +18,8 @@ _KEPT = (
     (paths.BACKEND_DIR / "cconnect.db-shm", paths.DB_FILE.with_name("cconnect.db-shm")),
     (paths.BACKEND_DIR / "mcp_disabled.json", paths.MCP_DISABLED_FILE),
     (paths.BACKEND_DIR / "accounts", paths.ACCOUNTS_DIR),
-    (paths.PROMPTS_DIR / "USER.md", paths.USER_PROMPT_FILE),
-    (paths.PROMPTS_DIR / "projects", paths.PROJECT_PROMPTS_DIR),
+    (LEGACY_PROMPTS_DIR / "USER.md", paths.USER_PROMPT_FILE),
+    (LEGACY_PROMPTS_DIR / "projects", paths.PROJECT_PROMPTS_DIR),
     (paths.BACKEND_DIR / "rewind_pending.json", paths.REWIND_FILE),
     (paths.BACKEND_DIR / "session_todos.json", paths.TODOS_FILE),
     (paths.BACKEND_DIR / ".detached.pid", paths.DETACHED_PID_FILE),
@@ -39,6 +40,8 @@ _SPENT = (
     paths.BACKEND_DIR / ".restart",
     paths.BACKEND_DIR / ".browser",
 )
+
+_PER_RUN = {".runtime", ".restart", ".stop", ".detached.pid", ".detached.provider"}
 
 
 def _discard(path: Path) -> None:
@@ -81,6 +84,27 @@ def _move(source: Path, target: Path) -> bool:
     if not source.exists():
         return False
     return _move_dir(source, target) if source.is_dir() else _move_file(source, target)
+
+
+def adopt(source: Path) -> list[str]:
+    """Copy another data folder into this one, file by file, keeping both sides intact."""
+    taken: list[str] = []
+    settings_file = source.parent / paths.ENV_FILE.name
+    if settings_file.is_file() and not paths.ENV_FILE.exists():
+        paths.ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(settings_file, paths.ENV_FILE)
+        taken.append(settings_file.name)
+    for item in sorted(source.rglob("*")):
+        if item.is_dir() or item.name in _PER_RUN:
+            continue
+        relative = item.relative_to(source)
+        destination = paths.DATA_DIR / relative
+        if destination.exists():
+            continue
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(item, destination)
+        taken.append(relative.as_posix())
+    return taken
 
 
 def migrate() -> list[str]:

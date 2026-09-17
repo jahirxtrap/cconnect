@@ -119,6 +119,24 @@ jobs:
           body_path: CHANGELOG.md
           files: client/cconnect-tauri-*.apk
 
+  pypi:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v10
+
+      - name: Build the backend
+        working-directory: backend
+        run: uv build
+
+      - name: Publish to PyPI
+        working-directory: backend
+        run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/cconnect/
+
   web:
     runs-on: ubuntu-latest
     steps:

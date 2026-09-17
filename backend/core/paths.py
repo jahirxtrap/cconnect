@@ -3,9 +3,17 @@
 import os
 from pathlib import Path
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
+PACKAGE_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = PACKAGE_DIR.parent
 
-DATA_DIR = Path(os.environ.get("CCONNECT_DATA_DIR") or BACKEND_DIR / "data")
+INSTALLED = not (BACKEND_DIR / "pyproject.toml").exists()
+"""True when imported from a wheel: there is no source tree around us to keep data in."""
+
+HOME_DATA_DIR = Path.home() / ".cconnect"
+
+DATA_DIR = Path(
+    os.environ.get("CCONNECT_DATA_DIR") or (HOME_DATA_DIR if INSTALLED else BACKEND_DIR / "data")
+)
 
 CONFIG_DIR = DATA_DIR / "config"
 STATE_DIR = DATA_DIR / "state"
@@ -14,8 +22,8 @@ LOGS_DIR = DATA_DIR / "logs"
 SHARED_DIR = DATA_DIR / "shared"
 TRASH_DIR = DATA_DIR / "trash"
 
-PYPROJECT_FILE = BACKEND_DIR / "pyproject.toml"
-PROMPTS_DIR = BACKEND_DIR / "prompts"
+PROMPTS_DIR = PACKAGE_DIR / "prompts"
+ENV_FILE = (CONFIG_DIR if INSTALLED else BACKEND_DIR) / ".env"
 
 DB_FILE = CONFIG_DIR / "cconnect.db"
 ACCOUNTS_DIR = CONFIG_DIR / "accounts"

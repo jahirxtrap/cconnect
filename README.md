@@ -21,17 +21,57 @@ The desktop, web and Android apps are one Svelte + Tauri codebase: the desktop
 build is a native installer per OS, and the web build is the same UI hosted as a
 static site (see [Web app](#web-app)). The assets are named `cconnect-tauri`.
 
-## Run modes
+## Install
 
-The backend runs local or public, and public has two providers. All of them use
-the same `python run.py` entry.
+```bash
+curl -fsSL https://cconnect.dev/install.sh | sh     # macOS, Linux, WSL
+```
 
-### Local HTTP (no auth)
+```powershell
+irm https://cconnect.dev/install.ps1 | iex          # Windows PowerShell
+```
+
+It installs [uv](https://docs.astral.sh/uv/) if it is missing and leaves the
+`cconnect` command on your PATH, in an environment of its own. Its data —
+settings, accounts, the shared folder and the trash — lives in `~/.cconnect`;
+the conversations stay with the Claude CLI, in `~/.claude`.
+
+From a git checkout instead, the same code with the same commands:
 
 ```bash
 cd backend
 python -m venv .venv && source .venv/Scripts/activate
 pip install -e .
+python run.py
+```
+
+A checkout keeps its data in `backend/data`; `cconnect migrate <that folder>` copies
+it into an installed one without touching the original.
+
+### Commands
+
+| Command | What it does |
+|---|---|
+| `cconnect` | Serve on this machine and its network |
+| `cconnect expose tailscale` | Publish over the internet through a Tailscale Funnel |
+| `cconnect expose caddy --public-host cc.example.com` | Publish behind a proxy you already run |
+| `cconnect run --detach`, `cconnect stop` | Leave it serving after the terminal closes |
+| `cconnect status` | Version, where the data lives, what is running |
+| `cconnect update` | Upgrade to the latest release |
+| `cconnect migrate <folder>` | Copy a previous data folder into this one |
+| `cconnect key` | Print the security key, `--rotate` to replace it |
+
+The launcher's original flags still work — `python run.py --expose tailscale`,
+`--detach`, `--stop`, `--security-key` — so scripts written against them keep running.
+
+## Run modes
+
+The backend runs local or public, and public has two providers. Every example
+below is written as `python run.py`; `cconnect` takes the same commands.
+
+### Local HTTP (no auth)
+
+```bash
 python run.py
 ```
 
@@ -381,14 +421,15 @@ is off.
 
 ## Optional tools
 
-`pip install -e .` covers everything the backend imports; the Claude Code CLI is
-the only hard requirement on top. A handful of features reach for a program that
-isn't a Python package, so they're worth installing if you want the full set —
-none of them is needed to start the server, and each one degrades on its own.
+Installing the command, or `pip install -e .` in a checkout, covers everything the
+backend imports; the Claude Code CLI is the only hard requirement on top. A handful
+of features reach for a program that isn't a Python package, so they're worth
+installing if you want the full set — none of them is needed to start the server,
+and each one degrades on its own.
 
-- **Tailscale** — the `--expose tailscale` mode and its QR pairing. Without it
+- **Tailscale** — the `expose tailscale` mode and its QR pairing. Without it
   you're limited to local access, unless you front the backend yourself.
-- **Caddy** (or nginx, or any reverse proxy) — the `--expose caddy` mode. Unlike
+- **Caddy** (or nginx, or any reverse proxy) — the `expose caddy` mode. Unlike
   the rest of this list it isn't a binary you install and forget: it's a service
   you configure and leave running, and CConnect never starts or stops it.
 - **git** — the Claude screen clones plugin marketplaces with it. The backend
