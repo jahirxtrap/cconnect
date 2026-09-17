@@ -15,6 +15,7 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { chatListFor } from "$lib/data/chatList.svelte";
+  import { joined } from "$lib/data/format";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { formatDateShort } from "$lib/data/time";
@@ -655,7 +656,7 @@
     {/if}
     <span class="block truncate text-body-md">{commit.subject}</span>
     <span class="block truncate text-body-sm text-on-surface-variant">
-      {commit.hash} • {commit.author} • {formatDateShort(commit.date * MILLIS_PER_SECOND)}
+      {joined(commit.hash, commit.author, formatDateShort(commit.date * MILLIS_PER_SECOND))}
     </span>
   </div>
 {/snippet}

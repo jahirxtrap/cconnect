@@ -1,7 +1,7 @@
 <script lang="ts">
   import Archive from "@lucide/svelte/icons/archive";
   import type { CompactData } from "$lib/data/chatModels";
-  import { formatTokens } from "$lib/data/format";
+  import { formatTokens, joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import Collapsible from "./Collapsible.svelte";
@@ -23,7 +23,7 @@
     if (compact.preTokens !== null && compact.postTokens !== null) {
       parts.push(`${formatTokens(compact.preTokens)} → ${formatTokens(compact.postTokens)}`);
     }
-    return parts.join(" • ");
+    return joined(...parts);
   });
 </script>
 

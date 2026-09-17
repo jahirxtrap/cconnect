@@ -4,7 +4,7 @@ import { claudeStatus } from "$lib/data/claudeStatus.svelte";
 import { projectNameOf } from "$lib/data/models";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { settings } from "$lib/data/settings.svelte";
-import { formatDays } from "$lib/data/format";
+import { formatDays, joined } from "$lib/data/format";
 import { ACCENTS } from "$lib/design/accents";
 import { theme, type FontStyle } from "$lib/design/theme.svelte";
 import { i18n, t } from "$lib/i18n/index.svelte";
@@ -62,7 +62,7 @@ export const discordValue = (): string =>
   settings.discord.enabled ? t("OPTION_ON") : t("OPTION_OFF");
 
 export const environmentValue = (): string =>
-  backend.active ? `${backend.active.name} • ${address(backend.active)}` : t("NO_ENVIRONMENTS");
+  backend.active ? joined(backend.active.name, address(backend.active)) : t("NO_ENVIRONMENTS");
 
 export const fastModeAvailable = (): boolean =>
   serverSettings.capabilities?.models.some((model) => model.fastMode) === true;
@@ -82,8 +82,7 @@ export const trimmedScope = (scope: string): string => {
 
 export const accountSummary = (account: Account): string => {
   if (account.provider) {
-    const trimmed = trimmedScope(account.provider.contextScope);
-    return trimmed ? `${account.provider.baseUrl} • ${trimmed}` : account.provider.baseUrl;
+    return joined(account.provider.baseUrl, trimmedScope(account.provider.contextScope));
   }
   if (!account.loggedIn) return t("ACCOUNT_PENDING");
   return account.id === accountsStore.defaultId ? t("ACCOUNT_IS_DEFAULT") : t("ACCOUNT_CONNECTED");
@@ -104,7 +103,7 @@ export const effortValue = (): string => serverSettings.snapshot?.effort ?? "";
 
 export const generationValue = (): string => {
   const model = modelValue();
-  return model ? `${model} • ${effortValue()}` : "";
+  return model ? joined(model, effortValue()) : "";
 };
 
 export const outputStyleValue = (): string => serverSettings.snapshot?.outputStyle ?? "";
@@ -218,10 +217,10 @@ export const localServerValue = (): string => {
 export const chatsValue = (): string => {
   const snapshot = serverSettings.snapshot;
   if (!snapshot) return "";
-  return [
+  return joined(
     t(snapshot.trashEnabled ? "TRASH_ON" : "TRASH_OFF"),
     snapshot.retentionDays >= RETENTION_FOREVER_DAYS
       ? t("RETENTION_NEVER")
       : formatDays(snapshot.retentionDays),
-  ].join(" • ");
+  );
 };

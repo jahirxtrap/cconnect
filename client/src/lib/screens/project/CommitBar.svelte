@@ -6,6 +6,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Undo2 from "@lucide/svelte/icons/undo-2";
   import { slide } from "svelte/transition";
+  import { joined } from "$lib/data/format";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { gitApi, type GitIdentity, type GitRepo } from "$lib/services/gitApi";
@@ -158,7 +159,7 @@
   <div class="flex min-h-10 items-center py-1 pr-1 pl-3">
     <GitBranch size={14} class="mr-1.5 shrink-0 text-on-surface-variant" />
     <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
-      {repo.branch || t("GIT_DETACHED")}{repo.relative && repo.relative !== "." ? ` • ${repo.relative}` : ""}
+      {joined(repo.branch || t("GIT_DETACHED"), repo.relative !== "." && repo.relative)}
     </span>
     {#if repo.behind}
       <span class="flex items-center px-1 text-label-md text-on-surface-variant">

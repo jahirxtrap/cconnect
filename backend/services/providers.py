@@ -7,6 +7,8 @@ from typing import Optional
 import httpx
 from loguru import logger
 
+from core import display
+
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
 ANTHROPIC_BASE_URL = "https://api.anthropic.com"
 
@@ -110,7 +112,7 @@ def _tagged(raw: dict) -> dict | None:
     parts = (details.get("parameter_size") or "", details.get("quantization_level") or "")
     return _model(
         name,
-        " · ".join(p for p in parts if p),
+        display.joined(*parts),
         _window(details.get("context_length")),
         _THINKING in capabilities,
     )

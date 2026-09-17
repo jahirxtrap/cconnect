@@ -1,5 +1,6 @@
 <script lang="ts">
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
+  import { joined } from "$lib/data/format";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
@@ -44,7 +45,7 @@
       (accounts?.accounts.length ?? 0) > 1
         ? (accounts?.accounts.find((item) => item.id === accounts?.default)?.label ?? null)
         : null;
-    return [accountLabel, usage?.plan].filter(Boolean).join(" • ");
+    return joined(accountLabel, usage?.plan);
   });
 
   let asked: number | null = null;

@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { joined } from "$lib/data/format";
 import { settings } from "$lib/data/settings.svelte";
 import { plural, t } from "$lib/i18n/index.svelte";
 import { isDesktop } from "$lib/platform";
@@ -7,7 +8,6 @@ import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { backend } from "$lib/services/backend.svelte";
 
 const MIN_INTERVAL_MS = 15_000;
-const SEPARATOR = " · ";
 
 interface Lines {
   details: string | null;
@@ -54,7 +54,7 @@ export function presenceLines(): Lines | null {
 
   return {
     details,
-    state: pieces.length ? pieces.join(SEPARATOR) : null,
+    state: joined(...pieces) || null,
     started_at: prefs.time && stage === "working" ? startedAt : null,
     small_image: prefs.status ? stage : null,
     small_text: prefs.status ? t(STAGE_LABEL[stage]) : null,

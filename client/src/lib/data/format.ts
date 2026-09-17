@@ -15,6 +15,11 @@ const ARCHIVE_SUFFIXES = [
   ".txz",
 ];
 
+export const SEPARATOR = " • ";
+
+export const joined = (...parts: (string | number | false | null | undefined)[]): string =>
+  parts.filter(Boolean).join(SEPARATOR);
+
 const THOUSAND = 1000;
 const MILLION = 1_000_000;
 const DAYS_IN_YEAR = 365;
@@ -62,7 +67,7 @@ export const usageRatio = (used: number, limit: number): number =>
   limit > 0 ? Math.min(1, Math.max(0, used / limit)) : 0;
 
 export const formatUsage = (used: number, limit: number, unit: (value: number) => string): string =>
-  `${unit(used)} / ${unit(limit)} • ${Math.round(usageRatio(used, limit) * PERCENT)}%`;
+  joined(`${unit(used)} / ${unit(limit)}`, `${Math.round(usageRatio(used, limit) * PERCENT)}%`);
 
 export const isArchive = (name: string): boolean => {
   const lower = name.toLowerCase();

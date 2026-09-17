@@ -4,7 +4,7 @@
   import Gauge from "@lucide/svelte/icons/gauge";
   import Globe from "@lucide/svelte/icons/globe";
   import Wifi from "@lucide/svelte/icons/wifi";
-  import { formatDecimal } from "$lib/data/format";
+  import { formatDecimal, joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import {
     networkApi,
@@ -188,7 +188,7 @@
       <PreferenceRow
         icon={item.kind === "wifi" ? Wifi : Cable}
         title={item.name}
-        summary={[item.network, item.linkSpeed].filter(Boolean).join(" • ") || null}
+        summary={joined(item.network, item.linkSpeed) || null}
         onclick={controllable && !busy
           ? () => void run(item.name, () => networkApi.setInterface(item.name, !item.up))
           : undefined}
@@ -245,9 +245,10 @@
         <PreferenceRow
           icon={Wifi}
           title={network.ssid}
-          summary={[network.signal === null ? null : t("NETWORK_SIGNAL", `${network.signal}%`), network.security]
-            .filter(Boolean)
-            .join(" • ") || null}
+          summary={joined(
+            network.signal === null ? null : t("NETWORK_SIGNAL", `${network.signal}%`),
+            network.security,
+          ) || null}
           onclick={network.active
             ? undefined
             : () =>
@@ -288,7 +289,7 @@
         <PreferenceRow
           icon={Gauge}
           title={t("NETWORK_PING")}
-          summary="{formatMillis(result.ping)} • {t('NETWORK_JITTER')} {formatMillis(result.jitter)}"
+          summary={joined(formatMillis(result.ping), `${t("NETWORK_JITTER")} ${formatMillis(result.jitter)}`)}
         />
         {#if result.server}
           <PreferenceRow icon={Globe} title={result.server} summary={result.isp} />

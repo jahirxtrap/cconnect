@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { formatSize } from "$lib/data/format";
+  import { formatSize, joined } from "$lib/data/format";
   import { formatLogTime } from "$lib/data/time";
   import { osIcon } from "$lib/design/osIcons";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -102,9 +102,7 @@
           {#if gpu}
             {@render graph(
               "GPU",
-              [gpu.name.replace("NVIDIA GeForce ", ""), gpu.temp === null ? null : `${gpu.temp}°C`]
-                .filter(Boolean)
-                .join(" • "),
+              joined(gpu.name.replace("NVIDIA GeForce ", ""), gpu.temp === null ? null : `${gpu.temp}°C`),
               gpu.percent,
               monitor.gpuHistory,
             )}
@@ -171,7 +169,7 @@
                 <div class="min-w-0">
                   <p class="truncate text-body-lg">{current.os}</p>
                   <p class="truncate text-body-sm text-on-surface-variant">
-                    {current.hostname} • {formatUptime(current.uptime)}
+                    {joined(current.hostname, formatUptime(current.uptime))}
                   </p>
                 </div>
               </div>

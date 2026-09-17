@@ -1,7 +1,7 @@
 <script lang="ts">
   import Bot from "@lucide/svelte/icons/bot";
   import type { ChatMessage } from "$lib/data/chatModels";
-  import { formatDuration, formatTokens } from "$lib/data/format";
+  import { formatDuration, formatTokens, joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import Collapsible from "./Collapsible.svelte";
   import MessageItem from "./MessageItem.svelte";
@@ -31,7 +31,7 @@
     if (done.status && done.status !== "completed") parts.push(t(`AGENT_${done.status.toUpperCase()}`));
     if (done.durationMs !== null) parts.push(formatDuration(done.durationMs));
     if (done.tokens !== null) parts.push(formatTokens(done.tokens));
-    return parts.join(" • ") || null;
+    return joined(...parts) || null;
   });
 </script>
 

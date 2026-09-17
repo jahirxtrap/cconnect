@@ -22,6 +22,7 @@
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
+  import { joined, SEPARATOR } from "$lib/data/format";
   import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
@@ -350,7 +351,7 @@
           <ListRow
             padding={ROW_PADDING}
             title={plugin.name}
-            subtitle={[plugin.marketplace, plugin.version, plugin.scope].filter(Boolean).join(" • ")}
+            subtitle={joined(plugin.marketplace, plugin.version, plugin.scope)}
             onclick={() => (pluginMenu = plugin)}
           >
             {#snippet trailing()}
@@ -376,7 +377,7 @@
           <ListRow
             padding={ROW_PADDING}
             title={server.name}
-            subtitle={[server.type, server.detail].filter(Boolean).join(" • ")}
+            subtitle={joined(server.type, server.detail)}
             onclick={() => (mcpMenu = server)}
           >
             {#snippet trailing()}
@@ -448,7 +449,7 @@
                     <span class="font-bold {indicatorTone(incident.impact).replace('bg-', 'text-')}">
                       {incidentLabel(incident.status)}
                     </span>
-                    •
+                    {SEPARATOR}
                   {/if}
                   {incident.latest}
                 </p>

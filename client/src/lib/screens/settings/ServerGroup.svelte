@@ -7,6 +7,7 @@
   import Unplug from "@lucide/svelte/icons/unplug";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Server from "@lucide/svelte/icons/server";
+  import { joined } from "$lib/data/format";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
@@ -50,7 +51,7 @@
   const version = $derived(serverStatus.version?.serverVersion ?? null);
 
   const versionSummary = $derived(
-    [version ? t("VERSION_LABEL", version) : null, repo?.revision || null].filter(Boolean).join(" • "),
+    joined(version ? t("VERSION_LABEL", version) : null, repo?.revision),
   );
 
   const packaged = $derived(repo?.source === "package");
