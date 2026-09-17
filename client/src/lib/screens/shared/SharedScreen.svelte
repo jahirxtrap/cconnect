@@ -1,6 +1,7 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ArrowDownUp from "@lucide/svelte/icons/arrow-down-up";
+  import CircleX from "@lucide/svelte/icons/circle-x";
   import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
   import { copyText } from "$lib/platform/clipboard";
   import Copy from "@lucide/svelte/icons/copy";
@@ -9,6 +10,8 @@
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import Eye from "@lucide/svelte/icons/eye";
   import Filter from "@lucide/svelte/icons/filter";
+  import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
+  import Link2 from "@lucide/svelte/icons/link-2";
   import Folder from "@lucide/svelte/icons/folder";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import FolderInput from "@lucide/svelte/icons/folder-input";
@@ -27,7 +30,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { projectNameOf } from "$lib/data/models";
-  import { formatSize, isArchive } from "$lib/data/format";
+  import { formatSize, isArchive, visibleName } from "$lib/data/format";
   import {
     FILE_KINDS,
     fileKindOf,
@@ -245,7 +248,7 @@
     navigation.sharedTarget = null;
     untrack(() => {
       const name = target.split("/").pop() ?? "";
-      const opening = isArchive(name);
+      const opening = isArchive(visibleName(name));
       path = target.split("/").slice(0, -1).join("/");
       archive = opening ? target : null;
       archiveDir = "";
@@ -275,7 +278,7 @@
   };
 
   const archiveNameOf = (entry: SharedEntry) => {
-    const label = pathLabel(child(entry.name));
+    const label = pathLabel(child(entry.file));
     return entry.isDir ? label : splitName(archiveStem(label), false).base;
   };
 
@@ -301,7 +304,7 @@
     return list.sort(compare);
   });
 
-  const selectedEntries = $derived(entries.filter((entry) => selected.includes(entry.name)));
+  const selectedEntries = $derived(entries.filter((entry) => selected.includes(entry.file)));
   const single = $derived(selected.length === 1 ? (selectedEntries[0] ?? null) : null);
   const canShare = $derived(selectedEntries.length > 0 && selectedEntries.every((entry) => !entry.isDir));
   const allSelected = $derived(entries.length > 0 && selected.length === entries.length);
@@ -314,7 +317,7 @@
 
   const selectAll = () => {
     selecting = true;
-    selected = allSelected ? [] : entries.map((entry) => entry.name);
+    selected = allSelected ? [] : entries.map((entry) => entry.file);
   };
 
   const exitSelection = () => {
@@ -347,13 +350,13 @@
 
   const openEntry = (entry: SharedEntry) => {
     if (selecting) {
-      toggle(entry.name);
+      toggle(entry.file);
       return;
     }
     if (entry.isDir) {
-      if (archive !== null) archiveDir = innerChild(entry.name);
+      if (archive !== null) archiveDir = innerChild(entry.file);
       else {
-        path = child(entry.name);
+        path = child(entry.file);
         searching = false;
         searchQuery = "";
       }
@@ -362,25 +365,35 @@
     if (archive !== null) {
       if (isPreviewable(entry.name)) {
         openFilePreview({
-          url: archiveFileUrl(archive, innerChild(entry.name)),
+          url: archiveFileUrl(archive, innerChild(entry.file)),
           name: entry.name,
           onDelete: null,
         });
       } else if (!transfer) {
         selecting = true;
-        selected = [entry.name];
+        selected = [entry.file];
       }
       return;
     }
+    if (entry.missing) {
+      const relative = child(entry.file);
+      openFilePreview({
+        url: downloadUrl(relative),
+        name: entry.name,
+        kind: "text",
+        onDelete: () => void sharedApi.remove(relative).then(reload),
+      });
+      return;
+    }
     if (isArchive(entry.name)) {
-      archive = child(entry.name);
+      archive = child(entry.file);
       archiveDir = "";
       searching = false;
       searchQuery = "";
       return;
     }
     if (isPreviewable(entry.name)) {
-      const relative = child(entry.name);
+      const relative = child(entry.file);
       openFilePreview({
         url: downloadUrl(relative),
         name: entry.name,
@@ -390,16 +403,16 @@
     }
     if (!transfer) {
       selecting = true;
-      selected = [entry.name];
+      selected = [entry.file];
     }
   };
 
   const startTransfer = (kind: TransferKind) => {
     transfer = {
       kind,
-      paths: selectedEntries.map((entry) => child(entry.name)),
+      paths: selectedEntries.map((entry) => child(entry.file)),
       sourceDir: path,
-      folders: selectedEntries.filter((entry) => entry.isDir).map((entry) => child(entry.name)),
+      folders: selectedEntries.filter((entry) => entry.isDir).map((entry) => child(entry.file)),
     };
     exitSelection();
   };
@@ -449,7 +462,10 @@
   };
 
   const detailOf = (entry: SharedEntry) =>
-    entry.isDir ? plural("ITEM_COUNT", entry.items) : formatSize(entry.size);
+    entry.isDir ? plural("ITEM_COUNT", entry.items) : entry.missing ? "" : formatSize(entry.size);
+
+  const subtitleOf = (entry: SharedEntry) =>
+    entry.missing ? t("LINK_MISSING") : entry.link || formatDateShort(entry.modified * MILLIS_PER_SECOND);
 
   const rowAt = (x: number, y: number) => {
     const element = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-row]");
@@ -467,7 +483,7 @@
   const filesOf = (items: SharedEntry[]): SharedFile[] =>
     items
       .filter((entry) => !entry.isDir)
-      .map((entry) => ({ path: child(entry.name), name: entry.name, size: entry.size }));
+      .map((entry) => ({ path: child(entry.file), name: entry.name, size: entry.size }));
 
   const sharedSelection = (): SharedFile[] => filesOf(selectedEntries);
 
@@ -506,7 +522,7 @@
     if (selected.includes(row.name)) {
       if (archive !== null) return;
       if (event.pointerType !== "touch") {
-        pendingDrag = selectedEntries.map((entry) => child(entry.name));
+        pendingDrag = selectedEntries.map((entry) => child(entry.file));
         pendingFiles = sharedSelection();
         return;
       }
@@ -514,15 +530,15 @@
       pressTimer = setTimeout(() => {
         pressTimer = null;
         heldDrag = true;
-        pendingDrag = selectedEntries.map((entry) => child(entry.name));
+        pendingDrag = selectedEntries.map((entry) => child(entry.file));
         pendingFiles = sharedSelection();
         capture(held);
       }, LONG_PRESS_MS);
       return;
     }
-    const entry = ordered.find((item) => item.name === row.name);
+    const entry = ordered.find((item) => item.file === row.name);
     if (archive === null && event.pointerType !== "touch" && entry) {
-      pendingDrag = [child(entry.name)];
+      pendingDrag = [child(entry.file)];
       pendingFiles = filesOf([entry]);
     }
     const pointerId = event.pointerId;
@@ -553,8 +569,8 @@
     if (dragging) {
       dragTransfer.track(event.clientX, event.clientY);
       const row = dragTransfer.over ? null : rowAt(event.clientX, event.clientY);
-      const entry = row ? ordered.find((item) => item.name === row.name) : null;
-      dropTarget = entry?.isDir && !dragging.includes(child(entry.name)) ? entry.name : null;
+      const entry = row ? ordered.find((item) => item.file === row.name) : null;
+      dropTarget = entry?.isDir && !dragging.includes(child(entry.file)) ? entry.file : null;
       dragPoint = { x: event.clientX, y: event.clientY };
       scrollEdge(event.clientY);
       return;
@@ -563,7 +579,7 @@
     const row = rowAt(event.clientX, event.clientY);
     if (row) {
       const [from, to] = row.index >= anchor ? [anchor, row.index] : [row.index, anchor];
-      selected = [...new Set([...markBase, ...ordered.slice(from, to + 1).map((entry) => entry.name)])];
+      selected = [...new Set([...markBase, ...ordered.slice(from, to + 1).map((entry) => entry.file)])];
     }
     scrollEdge(event.clientY);
   };
@@ -955,19 +971,21 @@
         }}
         class="h-full overflow-y-auto {marking || dragging ? 'touch-none select-none' : ''}"
       >
-        {#each ordered as entry, index (entry.name)}
-          {@const isSelected = selected.includes(entry.name)}
-          <div data-row={index} data-name={entry.name}>
+        {#each ordered as entry, index (entry.file)}
+          {@const isSelected = selected.includes(entry.file)}
+          <div data-row={index} data-name={entry.file}>
             <ListRow
-              icon={entryIcon(child(entry.name), entry.isDir, projectKeys, UPLOAD_DIR)}
-              title={entryLabel(child(entry.name), entry.name)}
-              subtitle={formatDateShort(entry.modified * MILLIS_PER_SECOND)}
-              class={dropTarget === entry.name ? "bg-accent/15" : ""}
+              icon={entryIcon(child(entry.file), entry.isDir, projectKeys, UPLOAD_DIR)}
+              iconBadge={entry.link ? (entry.missing ? CircleX : Link2) : null}
+              badgeClass={entry.missing ? "text-red" : "text-on-surface-variant"}
+              title={entryLabel(child(entry.file), entry.name)}
+              subtitle={subtitleOf(entry)}
+              class={dropTarget === entry.file ? "bg-accent/15" : ""}
               onclick={() => openEntry(entry)}
               oncontextmenu={() => {
                 if (touchGesture || transfer) return;
                 selecting = true;
-                toggle(entry.name);
+                toggle(entry.file);
               }}
             >
               {#snippet leading()}
@@ -1021,7 +1039,7 @@
             archive: current,
             members: selectedEntries.map((entry) => innerChild(entry.name)),
             base: archiveDir,
-            stem: archiveStem(current.split("/").pop() ?? current),
+            stem: archiveStem(visibleName(current.split("/").pop() ?? current)),
           })}
       />
       <ToolbarAction
@@ -1078,7 +1096,7 @@
         label={t("SHARE")}
         enabled={canShare}
         onclick={() => {
-          const files = selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.name)), name: entry.name }));
+          const files = selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name }));
           if (files.length === 1) void shareShared(files[0].url, files[0].name);
           else void shareAllShared(files);
           exitSelection();
@@ -1107,11 +1125,25 @@
             <span class="truncate">{t("MORE")}</span>
           {/if}
         {/snippet}
+            {#if single && single.link && !single.missing}
+              <MenuItem
+                text={t("BRING_HERE")}
+                onclick={() => {
+                  const relative = child(single.file);
+                  void sharedApi.materialize(relative).then(reload);
+                  exitSelection();
+                }}
+              >
+                {#snippet leading()}
+                  <HardDriveDownload size={20} class="shrink-0 text-on-surface-variant" />
+                {/snippet}
+              </MenuItem>
+            {/if}
             {#if single && !single.isDir && isPreviewable(single.name)}
               <MenuItem
                 text={t("VIEW")}
                 onclick={() => {
-                  const relative = child(single.name);
+                  const relative = child(single.file);
                   openFilePreview({
                     url: downloadUrl(relative),
                     name: single.name,
@@ -1137,7 +1169,7 @@
                 text={t("SAVE")}
                 onclick={() => {
                   selectedEntries.forEach((entry) =>
-                    void downloadShared(downloadUrl(child(entry.name)), entry.name),
+                    void downloadShared(downloadUrl(child(entry.file)), entry.name),
                   );
                   exitSelection();
                 }}
@@ -1150,7 +1182,7 @@
                 text={t("SAVE_AS")}
                 onclick={() => {
                   void saveSharedItemsAs(
-                    selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.name)), name: entry.name })),
+                    selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name })),
                   );
                   exitSelection();
                 }}
@@ -1164,8 +1196,7 @@
               <MenuItem
                 text={t("OPEN_EXTERNALLY")}
                 onclick={() => {
-                  const name = single.name;
-                  void openSharedExternally(downloadUrl(child(name)), name);
+                  void openSharedExternally(downloadUrl(child(single.file)), single.name);
                   exitSelection();
                 }}
               >
@@ -1192,7 +1223,7 @@
               text={t("COPY_PATH")}
               onclick={() => {
                 void sharedApi
-                  .absolutePaths(selectedEntries.map((entry) => child(entry.name)))
+                  .absolutePaths(selectedEntries.map((entry) => child(entry.file)))
                   .then((paths) => paths && copyText(paths.join("\n")));
                 exitSelection();
               }}
@@ -1203,7 +1234,7 @@
             </MenuItem>
             <MenuItem
               text={t("COMPRESS")}
-              onclick={() => (compressing = selectedEntries.map((entry) => child(entry.name)))}
+              onclick={() => (compressing = selectedEntries.map((entry) => child(entry.file)))}
             >
               {#snippet leading()}
                 <FolderArchive size={20} class="shrink-0 text-on-surface-variant" />
@@ -1214,7 +1245,7 @@
                 text={t("EXTRACT")}
                 onclick={() =>
                   (extractRequest = {
-                    archive: child(single.name),
+                    archive: child(single.file),
                     members: null,
                     base: "",
                     stem: archiveStem(single.name),
@@ -1297,11 +1328,11 @@
   <ConfirmDialog
     title={t("DELETE")}
     text={selectedEntries.length === 1
-      ? t("DELETE_FILE_CONFIRM", selectedEntries[0].name)
+      ? t(selectedEntries[0].link ? "DELETE_LINK_CONFIRM" : "DELETE_FILE_CONFIRM", selectedEntries[0].name)
       : t("DELETE_ITEMS_CONFIRM", selectedEntries.length)}
     confirmLabel={t("DELETE")}
     onConfirm={() => {
-      const targets = selectedEntries.map((entry) => child(entry.name));
+      const targets = selectedEntries.map((entry) => child(entry.file));
       confirmingDelete = false;
       exitSelection();
       void Promise.all(targets.map((target) => sharedApi.remove(target))).then(reload);
@@ -1327,7 +1358,7 @@
       const full = extension ? `${input.trim()}.${extension}` : input.trim();
       renaming = null;
       exitSelection();
-      void sharedApi.rename(child(target.name), full).then(reload);
+      void sharedApi.rename(child(target.file), full).then(reload);
     }}
     onDismiss={() => (renaming = null)}
   />

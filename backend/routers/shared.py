@@ -4,12 +4,13 @@ import asyncio
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, StreamingResponse
 from starlette.requests import ClientDisconnect
 from loguru import logger
 from pydantic import BaseModel
 
+from core.access import key_matches
 from core.responses import api_response
 from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
@@ -65,6 +66,11 @@ class PathsBody(BaseModel):
     paths: list[str]
 
 
+class LinkBody(BaseModel):
+    source: str
+    dest: str = ""
+
+
 @router.post("/shared/folder")
 def create_shared_folder(body: FolderBody):
     try:
@@ -83,6 +89,30 @@ def rename_shared(body: RenameEntryBody):
     if not renamed:
         raise HTTPException(status_code=404, detail="not found")
     return api_response()
+
+
+@router.post("/shared/link")
+def link_shared(body: LinkBody, x_security_key: str = Header("")):
+    if not key_matches(x_security_key):
+        return api_response(status=403)
+    try:
+        created = shared_service.create_link(body.source, body.dest)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return api_response(data={"path": created})
+
+
+@router.post("/shared/materialize")
+def materialize_shared(body: FolderBody, x_security_key: str = Header("")):
+    if not key_matches(x_security_key):
+        return api_response(status=403)
+    try:
+        created = shared_service.materialize(body.path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if created is None:
+        raise HTTPException(status_code=404, detail="not a reference")
+    return api_response(data={"path": created})
 
 
 @router.post("/shared/paths")
@@ -203,16 +233,18 @@ async def upload_shared(path: str, request: Request, policy: Literal["keep", "re
 
 
 @router.get("/shared/{path:path}")
-def download_shared(path: str):
+def download_shared(path: str, x_security_key: str = Header("")):
     try:
         resolved = shared_service.resolve_file(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
+    if shared_service.outside(resolved) and not key_matches(x_security_key):
+        raise HTTPException(status_code=403, detail="the security key unlocks referenced files")
     return FileResponse(
         resolved,
-        filename=resolved.name,
+        filename=shared_service.visible_of(path),
         content_disposition_type="inline",
         headers={"Content-Encoding": "identity"},
     )

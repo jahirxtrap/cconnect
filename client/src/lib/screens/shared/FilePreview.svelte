@@ -11,7 +11,7 @@
   import Trash from "@lucide/svelte/icons/trash";
   import Type from "@lucide/svelte/icons/type";
   import type { Snippet } from "svelte";
-  import { extensionOf, previewKindOf, readsAsText } from "$lib/data/previewKind";
+  import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -63,6 +63,7 @@
     anchor?: number | null;
     ready?: boolean;
     revision?: number;
+    forcedKind?: PreviewKind | null;
   }
 
   interface Shown {
@@ -91,6 +92,7 @@
     anchor = null,
     ready = true,
     revision = 0,
+    forcedKind = null,
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
@@ -111,7 +113,7 @@
 
   const pdfStep = $derived(Math.round(pdfWidth / PDF_RESIZE_STEP));
 
-  const kind = $derived(previewKindOf(filename));
+  const kind = $derived(forcedKind ?? previewKindOf(filename));
   const binary = $derived(shown !== null && shown.body.includes(NUL));
   const prose = $derived(shown !== null && previewKindOf(shown.name) === "markdown" && formatted);
   const lined = $derived(readsAsText(kind) && !failed && shown !== null && !binary && !prose);

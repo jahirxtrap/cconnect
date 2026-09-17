@@ -69,6 +69,11 @@ export const usageRatio = (used: number, limit: number): number =>
 export const formatUsage = (used: number, limit: number, unit: (value: number) => string): string =>
   joined(`${unit(used)} / ${unit(limit)}`, `${Math.round(usageRatio(used, limit) * PERCENT)}%`);
 
+const REFERENCE_SUFFIX = ".ccref";
+
+export const visibleName = (name: string): string =>
+  name.endsWith(REFERENCE_SUFFIX) ? name.slice(0, -REFERENCE_SUFFIX.length) : name;
+
 export const isArchive = (name: string): boolean => {
   const lower = name.toLowerCase();
   return ARCHIVE_SUFFIXES.some((suffix) => lower.endsWith(suffix));

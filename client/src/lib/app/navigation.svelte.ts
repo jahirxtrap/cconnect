@@ -1,5 +1,6 @@
 import { backend } from "$lib/services/backend.svelte";
 import { consumingDismiss, dismissTop } from "$lib/app/dismissStack";
+import type { PreviewKind } from "$lib/data/previewKind";
 import { isTauri } from "$lib/platform";
 
 export const ROUTES = [
@@ -28,6 +29,7 @@ const subOf = (path: string): string | null => {
 export interface PreviewRequest {
   url: string;
   name: string;
+  kind?: PreviewKind | null;
   onDelete: (() => void) | null;
 }
 

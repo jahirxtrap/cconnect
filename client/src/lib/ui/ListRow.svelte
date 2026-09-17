@@ -6,6 +6,8 @@
   interface Props {
     title: string;
     icon?: IconSource;
+    iconBadge?: IconSource | null;
+    badgeClass?: string;
     subtitle?: string | null;
     iconClass?: string;
     dim?: boolean;
@@ -22,6 +24,8 @@
 
   const {
     icon: IconComponent,
+    iconBadge: BadgeComponent = null,
+    badgeClass = "text-on-surface-variant",
     title,
     subtitle,
     iconClass = "text-accent",
@@ -46,7 +50,14 @@
 >
   {@render leading?.()}
   {#if IconComponent}
-    <IconComponent size={24} class="shrink-0 {iconClass}" />
+    <span class="relative shrink-0">
+      <IconComponent size={24} class={iconClass} />
+      {#if BadgeComponent}
+        <span class="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full bg-background {badgeClass}">
+          <BadgeComponent size={12} />
+        </span>
+      {/if}
+    </span>
   {/if}
   <div class="min-w-0 flex-1 {IconComponent || leading ? 'ml-3.5' : ''}">
     <p class="truncate text-body-lg">{title}</p>

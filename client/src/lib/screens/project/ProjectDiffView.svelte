@@ -3,6 +3,7 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import FileDiff from "@lucide/svelte/icons/file-diff";
+  import Link2 from "@lucide/svelte/icons/link-2";
   import { projectFilePath } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -10,6 +11,7 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import FilePreview, { type ToolbarButton } from "$lib/screens/shared/FilePreview.svelte";
   import { projectFileUrl } from "$lib/services/projectFilesApi";
+  import { sharedApi } from "$lib/services/sharedApi";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { projectDiffs } from "./projectDiffs.svelte";
@@ -128,6 +130,11 @@
   <MenuItem text={t("MENTION_IN_CHAT")} onclick={mention}>
     {#snippet leading()}
       <AtSign size={20} class="shrink-0 text-on-surface-variant" />
+    {/snippet}
+  </MenuItem>
+  <MenuItem text={t("LINK_TO_SHARED")} onclick={() => void sharedApi.link(absolute, projectKey)}>
+    {#snippet leading()}
+      <Link2 size={20} class="shrink-0 text-on-surface-variant" />
     {/snippet}
   </MenuItem>
 {/snippet}

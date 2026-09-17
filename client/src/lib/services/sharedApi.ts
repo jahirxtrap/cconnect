@@ -1,12 +1,16 @@
+import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { backend, baseUrlOf, type Profile } from "./backend.svelte";
-import { http, type HttpClient } from "./http";
+import { createHttp, http, type HttpClient } from "./http";
 
 export interface SharedEntry {
   name: string;
+  file: string;
   isDir: boolean;
   size: number;
   modified: number;
   items: number;
+  link: string;
+  missing: boolean;
 }
 
 export type ClashPolicy = "keep" | "replace" | "skip";
@@ -30,10 +34,13 @@ const decodeSegment = (segment: string) => {
 
 export const parseEntry = (raw: Wire): SharedEntry => ({
   name: raw.name ?? "",
+  file: raw.file ?? raw.name ?? "",
   isDir: raw.is_dir === true,
   size: raw.size ?? 0,
   modified: raw.modified ?? 0,
   items: raw.items ?? 0,
+  link: raw.link ?? "",
+  missing: raw.missing === true,
 });
 
 export const sharedPrefix = (profile: Profile = backend.active) => `${baseUrlOf(profile)}/shared/`;
@@ -49,6 +56,11 @@ export const relativeFromUrl = (url: string, profile: Profile = backend.active):
 
 export const archiveFileUrl = (path: string, inner: string, profile: Profile = backend.active) =>
   `${baseUrlOf(profile)}/shared-archive-file?path=${encodeURIComponent(path)}&inner=${encodeURIComponent(inner)}`;
+
+const machine = createHttp(
+  () => backend.active,
+  () => securityKeys.headersFor(backend.active),
+);
 
 export const createSharedApi = (client: HttpClient) => ({
   async remove(path: string): Promise<boolean> {
@@ -67,6 +79,16 @@ export const createSharedApi = (client: HttpClient) => ({
 
   async mkdir(path: string): Promise<boolean> {
     return (await client.post("/shared/folder", { path })) !== null;
+  },
+
+  async link(source: string, dest = ""): Promise<string | null> {
+    const data = await machine.post<{ path?: string }>("/shared/link", { source, dest });
+    return data?.path ?? null;
+  },
+
+  async materialize(path: string): Promise<string | null> {
+    const data = await machine.post<{ path?: string }>("/shared/materialize", { path });
+    return data?.path ?? null;
   },
 
   async rename(path: string, name: string): Promise<boolean> {

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional
 
 from core import paths
-from services import files
+from services import files, shared_links
 
 try:
     import py7zr
@@ -50,27 +50,92 @@ def _resolve(relpath: str) -> Path:
     return files.resolve(_base(), relpath)
 
 
+def _entry_for(path: Path) -> dict:
+    if not shared_links.is_link(path.name):
+        return {**files.entry(path, path.stat(), path.is_dir()), "file": path.name}
+    target = shared_links.target_of(path)
+    name = shared_links.visible_name(path.name)
+    reachable = target.is_file() if target else False
+    stat = target.stat() if reachable else path.stat()
+    return {
+        **files.entry(path, stat, False, name),
+        "size": stat.st_size if reachable else 0,
+        "file": path.name,
+        "link": str(target) if target else "",
+        "missing": not reachable,
+    }
+
+
+def outside(path: Path) -> bool:
+    root = _base().resolve()
+    return path.resolve() != root and root not in path.resolve().parents
+
+
+def content_path(path: Path) -> Path:
+    """What a path holds: the file a reference points at, or the reference itself when it is broken."""
+    if not shared_links.is_link(path.name):
+        return path
+    target = shared_links.target_of(path)
+    return target if target and target.is_file() else path
+
+
 def list_entries(relpath: str = "") -> list[dict]:
     target = _resolve(relpath)
     if not target.is_dir():
         raise ValueError("not a directory")
-    entries = [
-        files.entry(e, stat, e.is_dir())
-        for e in target.iterdir()
-        if not e.name.startswith(".")
-        for stat in (e.stat(),)
-    ]
+    entries = [_entry_for(e) for e in target.iterdir() if not e.name.startswith(".")]
     entries.sort(key=lambda f: (not f["is_dir"], -f["modified"]))
     return entries
 
 
 def resolve_file(relpath: str) -> Optional[Path]:
     path = _resolve(relpath)
-    return path if path.is_file() else None
+    if not path.is_file():
+        return None
+    return content_path(path)
+
+
+def visible_of(relpath: str) -> str:
+    return shared_links.visible_name(_resolve(relpath).name)
 
 
 def absolute_paths(relpaths: list[str]) -> list[str]:
-    return [str(_resolve(rel)) for rel in relpaths]
+    return [str(content_path(_resolve(rel))) for rel in relpaths]
+
+
+def create_link(source: str, dest: str = "", name: str = "", replace: bool = False) -> str:
+    """Point at a file from the shared folder instead of copying it in."""
+    origin = Path(source).expanduser()
+    if not origin.is_file():
+        raise ValueError("no such file")
+    dest_dir = _resolve(dest)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    if not dest_dir.is_dir():
+        raise ValueError("destination is not a folder")
+    shown = shared_links.visible_name(name.strip() or origin.name)
+    if not replace:
+        target = _dedup_target(dest_dir, shared_links.link_name(shown))
+    else:
+        taken = _occupied(dest_dir, shown)
+        if taken is not None and not taken.is_dir():
+            taken.unlink()
+        target = dest_dir / shared_links.link_name(shown)
+    shared_links.write(target, origin.resolve())
+    return target.relative_to(_base().resolve()).as_posix()
+
+
+def materialize(relpath: str) -> Optional[str]:
+    """Turn a reference into a real copy, under the name it was showing."""
+    path = _resolve(relpath)
+    if not path.is_file() or not shared_links.is_link(path.name):
+        return None
+    origin = shared_links.target_of(path)
+    if origin is None or not origin.is_file():
+        raise ValueError("the file it points at is gone")
+    target = _dedup_target(path.parent, shared_links.visible_name(path.name))
+    shutil.copy2(origin, target)
+    path.unlink(missing_ok=True)
+    return target.relative_to(_base().resolve()).as_posix()
 
 
 async def save_upload(relpath: str, chunks, policy: str = "keep") -> str:
@@ -78,10 +143,11 @@ async def save_upload(relpath: str, chunks, policy: str = "keep") -> str:
     if path == _base().resolve() or path.is_dir():
         raise ValueError("invalid destination")
     path.parent.mkdir(parents=True, exist_ok=True)
-    if policy == "replace":
-        path.unlink(missing_ok=True)
-    elif policy == "skip" and path.exists():
-        return path.relative_to(_base().resolve()).as_posix()
+    taken = _occupied(path.parent, path.name)
+    if policy == "replace" and taken is not None:
+        taken.unlink()
+    elif policy == "skip" and taken is not None:
+        return taken.relative_to(_base().resolve()).as_posix()
     path = _reserve_target(path.parent, path.name)
     tmp = path.parent / f".{path.name}.part"
     try:
@@ -101,23 +167,24 @@ def create_folder(relpath: str) -> None:
     path = _resolve(relpath)
     if path == _base().resolve():
         raise ValueError("invalid folder name")
-    if path.exists():
+    if _occupied(path.parent, path.name) is not None:
         raise ValueError("already exists")
     path.mkdir(parents=True)
 
 
 def rename_entry(relpath: str, new_name: str) -> bool:
-    if not new_name or "/" in new_name or "\\" in new_name or new_name.startswith("."):
+    shown = shared_links.visible_name(new_name)
+    if not shown or "/" in shown or "\\" in shown or shown.startswith("."):
         raise ValueError("invalid name")
     path = _resolve(relpath)
     if path == _base().resolve():
         raise ValueError("cannot rename the shared root")
     if not path.exists():
         return False
-    target = path.with_name(new_name)
-    if target.exists():
+    taken = _occupied(path.parent, shown)
+    if taken is not None and taken != path:
         raise ValueError("already exists")
-    path.rename(target)
+    path.rename(path.with_name(shared_links.link_name(shown) if shared_links.is_link(path.name) else shown))
     return True
 
 
@@ -131,12 +198,24 @@ def _candidates(dest_dir: Path, name: str):
         index += 1
 
 
+def _occupied(dest_dir: Path, name: str) -> Optional[Path]:
+    """Whatever already answers to a name, in whichever of its two forms is on disk."""
+    shown = shared_links.visible_name(name)
+    for candidate in (dest_dir / shown, dest_dir / shared_links.link_name(shown)):
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _dedup_target(dest_dir: Path, name: str) -> Path:
-    return next(target for target in _candidates(dest_dir, name) if not target.exists())
+    free = next(c for c in _candidates(dest_dir, shared_links.visible_name(name)) if _occupied(dest_dir, c.name) is None)
+    return free.with_name(shared_links.link_name(free.name)) if shared_links.is_link(name) else free
 
 
 def _reserve_target(dest_dir: Path, name: str) -> Path:
     for target in _candidates(dest_dir, name):
+        if _occupied(dest_dir, target.name) is not None:
+            continue
         try:
             target.touch(exist_ok=False)
             return target
@@ -164,15 +243,13 @@ def _resolve_transfer(relpaths: list[str], dest: str) -> tuple[list[Path], Path]
 
 def _clashes(src: Path, dest_dir: Path, prefix: str = "") -> list[str]:
     """Files that already exist at the destination; folders merge instead of clashing."""
-    target = dest_dir / src.name
-    label = f"{prefix}{src.name}"
-    if not src.is_dir():
-        return [label] if target.exists() else []
-    if not target.is_dir():
-        return [label] if target.exists() else []
+    label = f"{prefix}{shared_links.visible_name(src.name)}"
+    taken = _occupied(dest_dir, src.name)
+    if not src.is_dir() or taken is None or not taken.is_dir():
+        return [label] if taken is not None else []
     found: list[str] = []
     for child in src.iterdir():
-        found.extend(_clashes(child, target, f"{label}/"))
+        found.extend(_clashes(child, taken, f"{label}/"))
     return found
 
 
@@ -197,14 +274,15 @@ def _place(src: Path, dest_dir: Path, policy: str, move: bool) -> bool:
                 src.rmdir()
         return True
 
-    if target.exists():
+    taken = _occupied(dest_dir, src.name)
+    if taken is not None:
         if policy == "skip":
             return False
         if policy == "replace":
-            if target.is_dir():
-                shutil.rmtree(target)
+            if taken.is_dir():
+                shutil.rmtree(taken)
             else:
-                target.unlink()
+                taken.unlink()
         else:
             target = _dedup_target(dest_dir, src.name)
 
@@ -289,6 +367,15 @@ def capabilities() -> dict:
     return {"compress_formats": formats}
 
 
+def _staged(src: Path, dest: Path) -> Path:
+    """A file under the name the archive has to store it with, without copying when the volume allows it."""
+    try:
+        dest.hardlink_to(src)
+    except OSError:
+        shutil.copy2(src, dest)
+    return dest
+
+
 def compress_entries(relpaths: list[str], fmt: str = "zip", name: Optional[str] = None) -> Optional[str]:
     if fmt not in COMPRESS_FORMATS:
         raise ValueError("unsupported format")
@@ -303,37 +390,43 @@ def compress_entries(relpaths: list[str], fmt: str = "zip", name: Optional[str] 
     if "/" in base_name or "\\" in base_name or base_name.startswith("."):
         raise ValueError("invalid name")
     parent = sources[0].parent
+    packed = [(content_path(src), shared_links.visible_name(src.name)) for src in sources]
     if not base_name:
-        base_name = sources[0].stem if len(sources) == 1 else parent.name or "shared"
+        base_name = Path(packed[0][1]).stem if len(sources) == 1 else parent.name or "shared"
     target = _dedup_target(parent, base_name + COMPRESS_FORMATS[fmt])
     if fmt == "zip":
         with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
-            for src in sources:
+            for src, arcname in packed:
                 if src.is_dir():
                     for child in sorted(src.rglob("*")):
                         if child.is_file():
-                            archive.write(child, child.relative_to(src.parent))
+                            archive.write(child, Path(arcname) / child.relative_to(src))
                 else:
-                    archive.write(src, src.name)
+                    archive.write(src, arcname)
     elif fmt == "7z":
         with py7zr.SevenZipFile(target, "w") as archive:
-            for src in sources:
+            for src, arcname in packed:
                 if src.is_dir():
-                    archive.writeall(src, src.name)
+                    archive.writeall(src, arcname)
                 else:
-                    archive.write(src, src.name)
+                    archive.write(src, arcname)
     elif fmt == "rar":
-        result = subprocess.run(
-            [_rar_tool(), "a", "-ep1", "-idq", str(target), *[s.name for s in sources]],
-            cwd=str(parent), capture_output=True, text=True,
-        )
+        with tempfile.TemporaryDirectory(dir=str(parent), prefix=".rar-", ignore_cleanup_errors=True) as staging:
+            listed = [
+                _staged(src, Path(staging) / arcname) if src.name != arcname else src
+                for src, arcname in packed
+            ]
+            result = subprocess.run(
+                [_rar_tool(), "a", "-ep1", "-idq", str(target), *[str(item) for item in listed]],
+                cwd=str(parent), capture_output=True, text=True,
+            )
         if result.returncode != 0:
             target.unlink(missing_ok=True)
             raise ValueError(f"rar failed: {result.stderr.strip() or result.returncode}")
     else:
         with tarfile.open(target, "w:gz" if fmt == "tar.gz" else "w:xz") as archive:
-            for src in sources:
-                archive.add(src, arcname=src.name)
+            for src, arcname in packed:
+                archive.add(src, arcname=arcname)
     return str(target.relative_to(_base().resolve())).replace("\\", "/")
 
 
@@ -363,7 +456,7 @@ def _archive_members(src: Path, kind: str) -> list[tuple[str, bool, int, float]]
 
 
 def archive_entries(relpath: str, inner: str = "") -> list[dict]:
-    src = _resolve(relpath)
+    src = content_path(_resolve(relpath))
     kind = archive_kind(src.name) if src.is_file() else None
     if kind is None:
         raise ValueError("not a supported archive")
@@ -391,7 +484,7 @@ def archive_entries(relpath: str, inner: str = "") -> list[dict]:
 
 
 def archive_member_stream(relpath: str, inner: str):
-    src = _resolve(relpath)
+    src = content_path(_resolve(relpath))
     kind = archive_kind(src.name) if src.is_file() else None
     if kind is None:
         return None
@@ -431,16 +524,17 @@ def extract_entry(
     members: Optional[list[str]] = None,
     base: str = "",
 ) -> Optional[str]:
-    src = _resolve(relpath)
+    entry = _resolve(relpath)
+    src = content_path(entry)
     kind = archive_kind(src.name) if src.is_file() else None
     if kind is None:
         return None
-    dest_dir = _resolve(dest) if dest else src.parent
+    dest_dir = _resolve(dest) if dest else entry.parent
     if not dest_dir.is_dir():
         raise ValueError("destination is not a folder")
     out = dest_dir
     if into_folder:
-        out = _dedup_target(dest_dir, _archive_stem(src.name) or "extracted")
+        out = _dedup_target(dest_dir, _archive_stem(shared_links.visible_name(entry.name)) or "extracted")
         out.mkdir(parents=True)
     out_res = out.resolve()
     base_prefix = base.strip("/")
@@ -516,10 +610,10 @@ def search_entries(relpath: str, query: str, limit: int = 200) -> list[dict]:
         return []
     results = []
     for child in sorted(base.rglob("*")):
-        if needle not in child.name.lower():
+        if needle not in shared_links.visible_name(child.name).lower():
             continue
-        name = str(child.relative_to(base)).replace("\\", "/")
-        results.append(files.entry(child, child.stat(), child.is_dir(), name))
+        relative = str(child.relative_to(base)).replace("\\", "/")
+        results.append({**_entry_for(child), "name": shared_links.visible_name(relative), "file": relative})
         if len(results) >= limit:
             break
     return results

@@ -1,5 +1,6 @@
 <script lang="ts">
   import ImageOff from "@lucide/svelte/icons/image-off";
+  import { visibleName } from "$lib/data/format";
   import { isVideo } from "$lib/data/previewKind";
   import { mediaSrc } from "$lib/services/mediaSource";
   import CenteredProgress from "./CenteredProgress.svelte";
@@ -17,16 +18,16 @@
 
   const resolved = $derived(url);
 
-  const video = $derived(isVideo(resolved));
-
   const filename = $derived.by(() => {
     const raw = resolved.split(/[?#]/)[0].split("/").pop() ?? "";
     try {
-      return decodeURIComponent(raw) || "image";
+      return visibleName(decodeURIComponent(raw) || "image");
     } catch {
-      return raw || "image";
+      return visibleName(raw) || "image";
     }
   });
+
+  const video = $derived(isVideo(filename));
 </script>
 
 <div

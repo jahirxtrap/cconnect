@@ -276,6 +276,7 @@
           embedded
           url={request.url}
           filename={request.name}
+          forcedKind={request.kind}
           onDelete={request.onDelete}
           onClose={closeFilePreview}
           onExpand={expandFilePreview}

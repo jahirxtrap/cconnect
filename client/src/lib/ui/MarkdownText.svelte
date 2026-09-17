@@ -8,7 +8,7 @@
   import MessageSquareWarning from "@lucide/svelte/icons/message-square-warning";
   import OctagonAlert from "@lucide/svelte/icons/octagon-alert";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
-  import { isArchive } from "$lib/data/format";
+  import { isArchive, visibleName } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
@@ -52,9 +52,9 @@
   const filenameOf = (url: string) => {
     const raw = url.split(/[?#]/)[0].split("/").pop() ?? "";
     try {
-      return decodeURIComponent(raw) || raw;
+      return visibleName(decodeURIComponent(raw) || raw);
     } catch {
-      return raw;
+      return visibleName(raw);
     }
   };
 
