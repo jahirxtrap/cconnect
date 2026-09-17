@@ -65,16 +65,21 @@
   );
 
   const startUpdate = async (target: Release) => {
-    const version = target.tag.replace(/^v/, "");
     if (!isTauri) {
       await updater.reload();
       return;
     }
-    if (!target.installerUrl) {
-      open(target.url);
+    let ready = target;
+    if (!ready.installerUrl) {
+      await check();
+      ready = serverStatus.release ?? ready;
+    }
+    if (!ready.installerUrl) {
+      open(ready.url);
       return;
     }
-    if (!(await updater.download(target.installerUrl, version)) && !updater.cancelled) open(target.url);
+    const version = ready.tag.replace(/^v/, "");
+    if (!(await updater.download(ready.installerUrl, version)) && !updater.cancelled) open(ready.url);
   };
 
   $effect(() => {
