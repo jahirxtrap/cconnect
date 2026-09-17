@@ -180,6 +180,18 @@
     {/if}
   {:else if message.role === "agent"}
     <AgentBlock {message} {running} {labelMode} {expanded} {onToggle} {onSharedLink} />
+  {:else if message.role === "agent_report"}
+    <Collapsible
+      label={message.toolName || t("AGENT_REPORT")}
+      icon={Bot}
+      preview={message.text}
+      labelOnly={labelMode || !message.text.trim()}
+      {expanded}
+      {onToggle}
+      labelClass="text-accent"
+    >
+      <MarkdownText text={message.text} dense {onSharedLink} {onSharedMenu} />
+    </Collapsible>
   {:else if message.role === "session_message"}
     <Collapsible
       label={message.toolName || t("SESSION_MESSAGE")}

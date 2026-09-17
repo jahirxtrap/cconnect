@@ -6,6 +6,7 @@ import re
 import shutil
 import time
 from pathlib import Path
+from textwrap import dedent
 from typing import Any, Optional
 
 from core import data_migration, paths
@@ -18,11 +19,9 @@ _SESSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 
 _ASK_ANSWERS_RE = re.compile(r'"([^"]+)"="([^"]*)"')
 
-# Slash-command invocations and their output are stored as user messages.
 _COMMAND_META_RE = re.compile(r"<command-(name|message|args)>|<local-command-stdout>")
 _COMMAND_NAME_RE = re.compile(r"<command-name>\s*([^<]+?)\s*</command-name>")
 _COMPACT_MARK = b'"compact_boundary"'
-# The CLI writes interruption notices as plain user text.
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
 
 _SDK_ENTRYPOINT_RE = re.compile(r'"entrypoint":"sdk-[A-Za-z]+"')
@@ -57,7 +56,6 @@ def project_key_for(cwd: str) -> str:
     return project_key_for_directory(cwd) if cwd else ""
 
 
-# Project key for the internal AI workspace, hidden from history listings.
 _AI_PROJECT_KEYS = {
     project_key_for(str(path))
     for path in (paths.AI_WORKDIR, data_migration.LEGACY_AI_WORKDIR)
@@ -842,7 +840,6 @@ def session_tasks(session_id: str, project_key: str = "") -> list[dict]:
                 "content": data.get("subject", ""),
                 "status": data.get("status", "pending"),
             })
-    # All completed means nothing pending to resume.
     if tasks and all(t["status"] == "completed" for t in tasks):
         return []
     return tasks
@@ -1076,12 +1073,12 @@ def _thinking_tokens(message: dict) -> Optional[int]:
     return tokens if isinstance(tokens, int) and tokens > 0 else None
 
 
-def _agent_result(tur: dict, tokens: bool) -> dict:
+def _agent_result(tur: dict, vis: dict) -> dict:
     """The live `agent_result` shape, rebuilt from the transcript's own field names."""
     return {
         "status": tur.get("status"),
-        "duration_ms": tur.get("totalDurationMs"),
-        "tokens": tur.get("totalTokens") if tokens else None,
+        "duration_ms": tur.get("totalDurationMs") if vis.get("timings") else None,
+        "tokens": tur.get("totalTokens") if vis.get("tokens") else None,
         "tool_uses": tur.get("totalToolUseCount"),
     }
 
@@ -1154,6 +1151,9 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
 
 _NOTIFICATION_BLOCK_RE = re.compile(r"<task-notification>(.*?)</task-notification>", re.DOTALL)
 _SESSION_MESSAGE_RE = re.compile(r"<cross-session-message\b([^>]*)>(.*?)</cross-session-message>", re.DOTALL)
+_AGENT_MESSAGE_RE = re.compile(r"<agent-message\b([^>]*)>(.*?)</agent-message>", re.DOTALL)
+_INCOMING_LEAD = "Another Claude session sent a message:"
+_REPORT_LEAD_RE = re.compile(r"^.*?The report follows:[ \t]*\n", re.DOTALL)
 _ATTRIBUTE_RE = re.compile(r'([\w-]+)="([^"]*)"')
 
 
@@ -1171,34 +1171,78 @@ def _session_message_item(text: str) -> dict | None:
     return _session_message(match) if match else None
 
 
+def _agent_report(match: re.Match) -> dict:
+    """The final report a subagent hands back, without the harness frame around it."""
+    attributes = dict(_ATTRIBUTE_RE.findall(match.group(1)))
+    body = _REPORT_LEAD_RE.sub("", match.group(2).strip("\n"), count=1)
+    return {
+        "type": "agent_report",
+        "name": attributes.get("from-name") or "",
+        "text": dedent(body).strip(),
+    }
+
+
+def _agent_reports(text: str) -> list[dict]:
+    return [_agent_report(match) for match in _AGENT_MESSAGE_RE.finditer(text or "")]
+
+
+def _without_reports(text: str) -> str:
+    return _AGENT_MESSAGE_RE.sub("", text or "").replace(_INCOMING_LEAD, "").strip()
+
+
+def _agent_report_item(text: str) -> dict | None:
+    reports = _agent_reports(text)
+    return reports[0] if reports and not _without_reports(text) else None
+
+
+def _tag(text: str, name: str) -> str | None:
+    found = re.search(rf"<{name}>(.*?)</{name}>", text, re.DOTALL)
+    return found.group(1).strip() if found else None
+
+
+def _as_int(value: str | None) -> Optional[int]:
+    return int(value) if value and value.isdigit() else None
+
+
+def _notified_results(text: str) -> dict[str, dict]:
+    """What a finished agent reports about itself, keyed by the call that launched it."""
+    results = {}
+    for match in _NOTIFICATION_BLOCK_RE.finditer(text or ""):
+        body = match.group(1)
+        tool_use_id = _tag(body, "tool-use-id")
+        if not tool_use_id:
+            continue
+        usage = _tag(body, "usage") or ""
+        results[tool_use_id] = {
+            "status": _tag(body, "status"),
+            "totalDurationMs": _as_int(_tag(usage, "duration_ms")),
+            "totalTokens": _as_int(_tag(usage, "subagent_tokens")),
+            "totalToolUseCount": _as_int(_tag(usage, "tool_uses")),
+        }
+    return results
+
+
 def _split_notifications(text: str) -> tuple[str, list[dict]]:
     """Notifications and cross-session messages the CLI carries inside user text."""
     items = []
     for match in _NOTIFICATION_BLOCK_RE.finditer(text):
         body = match.group(1)
-
-        def _tag(name: str) -> str | None:
-            found = re.search(rf"<{name}>(.*?)</{name}>", body, re.DOTALL)
-            return found.group(1).strip() if found else None
-
-        items.append({"type": "notification", "text": _tag("summary") or "", "result": _tag("status")})
+        items.append({"type": "notification", "text": _tag(body, "summary") or "", "result": _tag(body, "status")})
     if items:
         text = _NOTIFICATION_BLOCK_RE.sub("", text).strip()
     session_items = [_session_message(match) for match in _SESSION_MESSAGE_RE.finditer(text)]
     if session_items:
         text = _SESSION_MESSAGE_RE.sub("", text).strip()
-    return text, items + session_items
+    reports = _agent_reports(text)
+    if reports:
+        text = _without_reports(text)
+    return text, items + session_items + reports
 
 
 def _notification_item(text: str) -> dict | None:
     if not text.startswith("<task-notification>"):
         return None
-
-    def _tag(name: str) -> str | None:
-        m = re.search(rf"<{name}>(.*?)</{name}>", text, re.DOTALL)
-        return m.group(1).strip() if m else None
-
-    return {"type": "notification", "text": _tag("summary") or "", "result": _tag("status")}
+    return {"type": "notification", "text": _tag(text, "summary") or "", "result": _tag(text, "status")}
 
 
 def _working(messages, vis) -> None:
@@ -1266,14 +1310,18 @@ def get_session_messages(
             for b in c:
                 if isinstance(b, dict) and b.get("type") == "text":
                     _register_user_text(b.get("text") or "", real=True)
-    # AskUserQuestion answers live in the tool_result, not in the tool_use input.
     tool_result_by_id: dict[str, object] = {}
     tool_ms = _tool_durations(entries)
     agent_files: dict[str, str] = {}
     agent_results: dict[str, dict] = {}
+    notified: dict[str, dict] = {}
     for entry in entries:
         msg = entry.get("message", {})
         content = msg.get("content")
+        queued = entry.get("content")
+        notified.update(_notified_results(_text_from_content(content)))
+        if isinstance(queued, str):
+            notified.update(_notified_results(queued))
         tur = entry.get("toolUseResult")
         aid = tur.get("agentId") if isinstance(tur, dict) else None
         if not isinstance(content, list):
@@ -1286,7 +1334,6 @@ def get_session_messages(
                     if isinstance(aid, str) and aid:
                         agent_files[tuid] = aid
                         agent_results[tuid] = tur
-    # Everything before the last compaction boundary is replaced by its summary.
     last_boundary = max(
         (i for i, e in enumerate(entries)
          if e.get("type") == "system" and e.get("subtype") == "compact_boundary"),
@@ -1294,6 +1341,19 @@ def get_session_messages(
     )
     vis = visibility.resolve(prefs)
     messages = _StampedList()
+    reported: set[str] = set()
+
+    def _once(items: list[dict]) -> list[dict]:
+        """A hand-back is written twice, once queued and once delivered."""
+        kept = []
+        for item in items:
+            if item.get("type") == "agent_report":
+                if item["text"] in reported:
+                    continue
+                reported.add(item["text"])
+            kept.append(item)
+        return kept
+
     hidden_ids: set[str] = set()
     compact_block: dict | None = None
     for i, entry in enumerate(entries):
@@ -1323,6 +1383,8 @@ def get_session_messages(
                 messages.append({"type": "summary", "text": text})
             continue
         if entry.get("isMeta"):
+            if i >= last_boundary:
+                messages.extend(_once(_agent_reports(_text_from_content(entry.get("message", {}).get("content")))))
             continue
         if i < last_boundary:
             continue
@@ -1335,7 +1397,7 @@ def get_session_messages(
                 qtext, notifs = _split_notifications(qtext)
                 if qtext and not consumed and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
                     messages.append({"type": "text", "role": "user", "text": qtext})
-                messages.extend(notifs)
+                messages.extend(_once(notifs))
             continue
         if etype == "queue-operation":
             if entry.get("operation") == "enqueue":
@@ -1345,7 +1407,7 @@ def get_session_messages(
                 if qtext and not seen and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
                     messages.append({"type": "text", "role": "user", "text": qtext})
                 if not seen:
-                    messages.extend(notifs)
+                    messages.extend(_once(notifs))
             continue
         message = entry.get("message", {})
         if entry.get("isSidechain"):
@@ -1369,7 +1431,7 @@ def get_session_messages(
             text, notifs = _split_notifications(text)
             if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
                 messages.append({"type": "text", "role": role, "text": text})
-            messages.extend(notifs)
+            messages.extend(_once(notifs))
             continue
         if not isinstance(content, list):
             continue
@@ -1394,7 +1456,7 @@ def get_session_messages(
                         item["images"] = user_images
                         user_images = None
                     messages.append(item)
-                messages.extend(notifs)
+                messages.extend(_once(notifs))
             elif btype == "thinking":
                 if vis["thinking"] == "off":
                     _working(messages, vis)
@@ -1512,9 +1574,9 @@ def get_session_messages(
                             "description": inp.get("description"),
                             "label": vis["tool_use"] == "label",
                         }
-                        done = agent_results.get(bid or "")
+                        done = notified.get(bid or "") or agent_results.get(bid or "")
                         if done is not None:
-                            block_event["agent_result"] = _agent_result(done, vis.get("tokens"))
+                            block_event["agent_result"] = _agent_result(done, vis)
                         messages.append(block_event)
                         aid = agent_files.get(bid or "")
                         sub_file = _subagent_file(file.parent / session_id, aid) if aid else None

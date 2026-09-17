@@ -238,7 +238,7 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
             "type": "agent_result",
             "id": data.get("tool_use_id"),
             "status": data.get("status"),
-            "duration_ms": usage.get("duration_ms"),
+            "duration_ms": usage.get("duration_ms") if vis.get("timings") else None,
             "tokens": usage.get("total_tokens") if vis.get("tokens") else None,
             "tool_uses": usage.get("tool_uses"),
         }]
@@ -846,6 +846,11 @@ async def run_prompt(
             if incoming is not None:
                 seen_users.add(uid)
                 events.append(incoming)
+                continue
+            report = _q._agent_report_item(text)
+            if report is not None:
+                seen_users.add(uid)
+                events.append(report)
                 continue
             if not chips:
                 continue

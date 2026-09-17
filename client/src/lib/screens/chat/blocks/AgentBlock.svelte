@@ -24,11 +24,17 @@
     onSharedLink,
   }: Props = $props();
 
+  const statusLabel = (status: string) => {
+    const key = `AGENT_${status.toUpperCase()}`;
+    const label = t(key);
+    return label === key ? status.replace(/_/g, " ") : label;
+  };
+
   const stat = $derived.by(() => {
     const done = message.agentResult;
     if (!done) return null;
     const parts: string[] = [];
-    if (done.status && done.status !== "completed") parts.push(t(`AGENT_${done.status.toUpperCase()}`));
+    if (done.status && done.status !== "completed") parts.push(statusLabel(done.status));
     if (done.durationMs !== null) parts.push(formatDuration(done.durationMs));
     if (done.tokens !== null) parts.push(formatTokens(done.tokens));
     return joined(...parts) || null;

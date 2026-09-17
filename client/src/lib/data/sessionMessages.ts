@@ -45,6 +45,7 @@ const ROLES: Record<string, Role> = {
   working: "working",
   notification: "notification",
   session_message: "session_message",
+  agent_report: "agent_report",
   tool_use: "tool",
   tool_result: "tool_result",
   file_change: "file_change",

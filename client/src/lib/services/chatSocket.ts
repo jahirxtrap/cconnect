@@ -86,6 +86,7 @@ export type ServerEvent =
   | { type: "hook_failed"; name: string | null; text: string }
   | { type: "notification"; summary: string; status: string | null }
   | { type: "session_message"; name: string | null; text: string }
+  | { type: "agent_report"; name: string | null; text: string }
   | { type: "todos"; items: TodoItem[] }
   | { type: "task"; id: string; content: string | null; status: string | null }
   | { type: "session_started"; sessionId: string | null }
@@ -674,6 +675,8 @@ export class ChatSocket {
         return { type: "notification", summary: text(wire, "text") ?? "", status: text(wire, "result") };
       case "session_message":
         return { type: "session_message", name: text(wire, "name"), text: text(wire, "text") ?? "" };
+      case "agent_report":
+        return { type: "agent_report", name: text(wire, "name"), text: text(wire, "text") ?? "" };
       case "queued":
         return { type: "queued", id: text(wire, "id"), text: text(wire, "text") ?? "" };
       case "queue":

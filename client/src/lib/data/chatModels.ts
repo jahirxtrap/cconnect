@@ -16,7 +16,8 @@ export type Role =
   | "plan"
   | "agent"
   | "notification"
-  | "session_message";
+  | "session_message"
+  | "agent_report";
 
 export type SendStatus = "sent" | "error";
 

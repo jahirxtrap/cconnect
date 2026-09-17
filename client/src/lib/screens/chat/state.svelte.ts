@@ -1976,6 +1976,11 @@ export class ChatState {
         this.#thinkingId = null;
         this.#append(newMessage(this.#nextId++, "session_message", { text: event.text, toolName: event.name }));
         break;
+      case "agent_report":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(newMessage(this.#nextId++, "agent_report", { text: event.text, toolName: event.name }));
+        break;
       case "agent":
         this.#assistantId = null;
         this.#thinkingId = null;
