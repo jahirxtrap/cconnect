@@ -44,7 +44,7 @@ class Navigation {
   route = $state<Route>(currentRoute());
   sub = $state<string | null>(subOf(window.location.pathname));
   settingsHighlight = $state<string | null>(null);
-  sharedArchive = $state<string | null>(null);
+  sharedTarget = $state<string | null>(null);
   preview = $state<PreviewRequest | null>(null);
   previewPane = $state(false);
 
@@ -68,7 +68,7 @@ class Navigation {
       if (this.close()) return true;
       if (this.route === "/") return false;
       this.settingsHighlight = null;
-      this.sharedArchive = null;
+      this.sharedTarget = null;
       window.history.back();
       return true;
     };
@@ -131,8 +131,8 @@ class Navigation {
     this.openSub(sub);
   }
 
-  openShared(archive: string | null = null) {
-    this.sharedArchive = archive;
+  openShared(target: string | null = null) {
+    this.sharedTarget = target;
     this.navigate("/shared");
   }
 
@@ -175,7 +175,7 @@ class Navigation {
     if (this.close()) return;
     if (this.routeLocked) return;
     this.settingsHighlight = null;
-    this.sharedArchive = null;
+    this.sharedTarget = null;
     window.history.back();
   }
 

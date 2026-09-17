@@ -239,6 +239,23 @@
       exitSelection();
     });
   });
+  $effect(() => {
+    const target = navigation.sharedTarget;
+    if (!target || compact) return;
+    navigation.sharedTarget = null;
+    untrack(() => {
+      const name = target.split("/").pop() ?? "";
+      const opening = isArchive(name);
+      path = target.split("/").slice(0, -1).join("/");
+      archive = opening ? target : null;
+      archiveDir = "";
+      searching = false;
+      searchQuery = "";
+      selecting = !opening;
+      selected = opening ? [] : [name];
+    });
+  });
+
   const innerChild = (name: string) => (archiveDir ? `${archiveDir}/${name}` : name);
 
   const archiveStem = (name: string) => {

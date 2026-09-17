@@ -478,7 +478,7 @@
         name: target.filename,
         onDelete: relative ? () => void sharedApi.remove(relative) : null,
       })}
-    onOpenInShared={relative && isArchive(target.filename) ? () => navigation.openShared(relative) : null}
+    onOpenInShared={relative ? () => navigation.openShared(relative) : null}
     onDismiss={() => (sharedLink = null)}
   />
 {/if}
