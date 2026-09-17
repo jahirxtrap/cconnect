@@ -28,8 +28,6 @@ interface ReleaseWire {
   assets?: Array<{ name?: string; browser_download_url?: string }>;
 }
 
-export const ALT_MARK = "-tauri";
-
 const installerExtensions = (): string[] => {
   const name = platformName();
   if (name === "windows") return [".msi", ".exe"];
@@ -83,9 +81,7 @@ const fetchJson = async <T>(url: string): Promise<T | null> => {
 const installerFor = (assets: ReleaseWire["assets"]): string | null => {
   const listed = (assets ?? []).filter((asset) => !!asset.browser_download_url);
   for (const extension of installerExtensions()) {
-    const match = listed.find(
-      (asset) => asset.browser_download_url!.endsWith(extension) && (asset.name ?? "").includes(ALT_MARK),
-    );
+    const match = listed.find((asset) => asset.browser_download_url!.endsWith(extension));
     if (match) return match.browser_download_url!;
   }
   return null;
