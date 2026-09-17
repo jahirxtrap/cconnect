@@ -276,6 +276,20 @@ class Settings {
     this.#write("local_server_dir", value);
   }
 
+  get localServerSource() {
+    return this.#read<string>("local_server_source") || (this.localServerDir ? "python" : "native");
+  }
+  set localServerSource(value: string) {
+    this.#write("local_server_source", value);
+  }
+
+  get localServerCommandPath() {
+    return this.#read<string>("local_server_command_path");
+  }
+  set localServerCommandPath(value: string) {
+    this.#write("local_server_command_path", value);
+  }
+
   get localServerPython() {
     return this.#read<string>("local_server_python");
   }

@@ -37,6 +37,8 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "shared_hidden_kinds", kind: "strings", fallback: "", backup: true },
   { key: "local_server_enabled", kind: "boolean", fallback: false, backup: true },
   { key: "local_server_dir", kind: "string", fallback: "", backup: true },
+  { key: "local_server_source", kind: "string", fallback: "", backup: true },
+  { key: "local_server_command_path", kind: "string", fallback: "", backup: true },
   { key: "local_server_python", kind: "string", fallback: "auto", backup: true },
   { key: "local_server_python_path", kind: "string", fallback: "", backup: true },
   { key: "local_server_mode", kind: "string", fallback: "local", backup: true },

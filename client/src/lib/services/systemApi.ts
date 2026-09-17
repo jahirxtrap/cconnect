@@ -65,6 +65,8 @@ export interface LogEntry {
 export interface ServerUpdate {
   ok: boolean;
   message: string;
+  source: "package" | "checkout";
+  latest: string;
   tracked: boolean;
   changed: boolean;
   revision: string;
@@ -127,6 +129,8 @@ const parseInfo = (raw: Wire): SystemInfo => ({
 const parseUpdate = (raw: Wire): ServerUpdate => ({
   ok: raw.ok !== false,
   message: raw.message ?? "",
+  source: raw.source === "package" ? "package" : "checkout",
+  latest: raw.latest ?? "",
   tracked: raw.tracked === true,
   changed: raw.changed === true,
   revision: raw.revision ?? "",

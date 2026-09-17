@@ -11,6 +11,7 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { localServer } from "$lib/services/localServer.svelte";
   import { type SettingsPatch } from "$lib/services/settingsApi";
   import { systemApi, type ServerUpdate } from "$lib/services/systemApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -42,6 +43,9 @@
   let checkingUpdate = $state(false);
   let updating = $state(false);
   let pulled = $state(false);
+  let failure = $state<string | null>(null);
+
+  const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
 
   const version = $derived(serverStatus.version?.serverVersion ?? null);
 
@@ -49,8 +53,17 @@
     [version ? t("VERSION_LABEL", version) : null, repo?.revision || null].filter(Boolean).join(" • "),
   );
 
-  const updateAvailable = $derived((repo?.behind ?? 0) > 0);
+  const packaged = $derived(repo?.source === "package");
+  const updateAvailable = $derived(packaged ? !!repo?.latest : (repo?.behind ?? 0) > 0);
   const serverModified = $derived((repo?.ahead ?? 0) > 0 || repo?.dirty === true);
+
+  const localInfo = $derived(localServer.info);
+  const managedHere = $derived(
+    localServer.native &&
+      localInfo.managed &&
+      LOCAL_HOSTS.includes((backend.active?.host ?? "").toLowerCase()) &&
+      (backend.active?.port ?? 0) === localInfo.port,
+  );
 
   const updateLabel = $derived(
     updating
@@ -65,6 +78,7 @@
   const checkUpdate = async () => {
     checkingUpdate = true;
     pulled = false;
+    failure = null;
     const result = await systemApi.checkUpdate();
     checkingUpdate = false;
     if (result) repo = result;
@@ -72,6 +86,14 @@
 
   const runUpdate = async () => {
     updating = true;
+    if (packaged && managedHere) {
+      const output = await localServer.update();
+      updating = false;
+      pulled = true;
+      repo = await systemApi.checkUpdate();
+      failure = output === null ? t("SERVER_UPDATE_FAILED") : null;
+      return;
+    }
     const result = await systemApi.update();
     updating = false;
     pulled = true;
@@ -193,10 +215,12 @@
         <p class="text-body-sm text-red">{t("COMPAT_SERVER_OUTDATED")}</p>
       {/if}
       {#if updateAvailable}
-        <p class="text-body-sm text-accent">{plural("SERVER_BEHIND", repo?.behind ?? 0)}</p>
+        <p class="text-body-sm text-accent">
+          {packaged ? t("SERVER_NEW_VERSION", repo?.latest ?? "") : plural("SERVER_BEHIND", repo?.behind ?? 0)}
+        </p>
       {:else if pulled && repo?.changed && !repo.reloads}
         <p class="text-body-sm text-accent">{t("SERVER_UPDATE_RESTART")}</p>
-      {:else if repo?.tracked && repo.ok}
+      {:else if (repo?.tracked || packaged) && repo?.ok}
         <p class="text-body-sm text-on-surface-variant">
           {serverModified ? t("SERVER_MODIFIED") : t("UP_TO_DATE")}
         </p>
@@ -204,7 +228,7 @@
     </div>
   </div>
 
-  {#if !repo || repo.tracked}
+  {#if !repo || repo.tracked || packaged}
     <div class="px-4 py-3">
       <ActionButton
         class="w-full"
@@ -212,7 +236,9 @@
         enabled={ready && !checkingUpdate && !updating}
         onclick={() => void (updateAvailable ? runUpdate() : checkUpdate())}
       />
-      {#if repo?.message && !repo.ok}
+      {#if failure}
+        <OutputPanel text={failure} failure class="mt-2.5" />
+      {:else if repo?.message && !repo.ok}
         <OutputPanel text={repo.message} failure class="mt-2.5" />
       {/if}
     </div>

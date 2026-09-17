@@ -137,6 +137,7 @@ pub fn run() {
             local_server::local_server_start,
             local_server::local_server_stop,
             local_server::local_server_restart,
+            local_server::local_server_update,
             system::system_accent,
             system::install_update,
             secret::secret_protect,

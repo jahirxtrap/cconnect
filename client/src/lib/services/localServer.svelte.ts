@@ -4,6 +4,7 @@ import { isTauri } from "$lib/platform";
 export type LocalServerError =
   | "bad_dir"
   | "no_python"
+  | "no_command"
   | "launch_failed"
   | "crashed"
   | "port_busy"
@@ -44,6 +45,8 @@ const empty: LocalServerInfo = {
 
 const config = () => ({
   dir: settings.localServerDir,
+  source: settings.localServerSource,
+  commandPath: settings.localServerCommandPath,
   python: settings.localServerPython,
   pythonPath: settings.localServerPythonPath,
   mode: settings.localServerMode,
@@ -52,6 +55,12 @@ const config = () => ({
 
 class LocalServer {
   info = $state<LocalServerInfo>(empty);
+
+  readonly native = $derived(settings.localServerSource === "native");
+
+  update(): Promise<string | null> {
+    return this.#call<string>("local_server_update", { config: config() });
+  }
 
   start() {
     void this.#call("local_server_start", { config: config() });

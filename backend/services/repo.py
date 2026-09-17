@@ -1,14 +1,84 @@
-"""Updates the backend in place from the git checkout it runs from."""
+"""How this backend updates itself: from the git checkout it runs from, or from PyPI."""
 
+import shutil
 import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError, version as installed_version
+from pathlib import Path
 
-from core import paths
+import httpx
+
+from core import paths, release
 from services import git
 
 _TIMEOUT = 120
+_RELEASE_TIMEOUT = 10
+_RELEASE_URL = "https://pypi.org/pypi/cconnect/json"
 
+DISTRIBUTION = "cconnect"
 RELOADS = sys.platform != "win32"
+
+
+def _parts(version: str) -> tuple[int, ...]:
+    return tuple(int(piece) for piece in version.split(".") if piece.isdigit())
+
+
+def _released() -> str:
+    """The version on PyPI, empty unless it is newer than the one running."""
+    try:
+        answer = httpx.get(_RELEASE_URL, timeout=_RELEASE_TIMEOUT)
+        latest = str(answer.json()["info"]["version"]) if answer.status_code == 200 else ""
+    except (httpx.HTTPError, ValueError, KeyError):
+        return ""
+    return latest if _parts(latest) > _parts(release.VERSION) else ""
+
+
+def upgrade_command() -> list[str]:
+    """uv installs its tools without pip, so only its own upgrade path works there."""
+    parts = Path(sys.prefix).parts
+    if "uv" in parts and "tools" in parts and shutil.which("uv"):
+        return ["uv", "tool", "upgrade", DISTRIBUTION]
+    return [sys.executable, "-m", "pip", "install", "--upgrade", DISTRIBUTION]
+
+
+def _on_disk() -> str:
+    """The version sitting in the environment, which an upgrade changes under the running one."""
+    try:
+        return installed_version(DISTRIBUTION)
+    except PackageNotFoundError:
+        return release.VERSION
+
+
+def upgrade() -> dict:
+    """Replaces the installed package. The process keeps running the version it imported."""
+    before = _on_disk()
+    command = upgrade_command()
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=_TIMEOUT,
+            encoding="utf-8", errors="replace",
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {**_package_status(), "ok": False, "message": str(exc), "changed": False}
+    return {
+        **_package_status(),
+        "ok": result.returncode == 0,
+        "message": (result.stdout + result.stderr).strip(),
+        "changed": _on_disk() != before,
+    }
+
+
+def _package_status() -> dict:
+    return {
+        "source": "package",
+        "tracked": False,
+        "revision": "",
+        "behind": 0,
+        "ahead": 0,
+        "dirty": False,
+        "latest": "",
+        "reloads": RELOADS,
+    }
 
 
 def _git(*args: str, writes: bool = False) -> subprocess.CompletedProcess:
@@ -41,18 +111,24 @@ def dirty() -> bool:
 
 
 def status() -> dict:
+    if paths.INSTALLED:
+        return _package_status()
     current = revision()
     return {
+        "source": "checkout",
         "tracked": bool(current),
         "revision": current,
         "behind": _count("HEAD..@{u}") if current else 0,
         "ahead": _count("@{u}..HEAD") if current else 0,
         "dirty": dirty() if current else False,
+        "latest": "",
         "reloads": RELOADS,
     }
 
 
 def check() -> dict:
+    if paths.INSTALLED:
+        return {**_package_status(), "latest": _released(), "ok": True, "message": ""}
     if not revision():
         return status()
     try:
@@ -67,6 +143,8 @@ def check() -> dict:
 
 
 def pull() -> dict:
+    if paths.INSTALLED:
+        return upgrade()
     before = revision()
     if not before:
         return {**status(), "ok": False, "message": "", "changed": False}

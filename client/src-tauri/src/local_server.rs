@@ -5,7 +5,7 @@ use std::os::windows::process::CommandExt;
 use std::net::{SocketAddr, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -23,6 +23,9 @@ const TAIL_REPORTED: usize = 12;
 const STATUS_EVENT: &str = "local-server://status";
 const DEFAULT_PORT: u16 = 8723;
 const RUNTIME_FILE: &str = "data/state/.runtime";
+const STATE_RUNTIME: &str = "state/.runtime";
+const NATIVE_SOURCE: &str = "native";
+const COMMAND_NAME: &str = if cfg!(windows) { "cconnect.exe" } else { "cconnect" };
 const ENV_FILE: &str = ".env";
 const PORT_KEY: &str = "PORT";
 const PID_KEY: &str = "PID";
@@ -36,11 +39,21 @@ const RESTART_PATH: &str = "/api/system/restart";
 #[serde(rename_all = "camelCase")]
 pub struct LocalServerConfig {
     pub dir: String,
+    pub source: String,
+    pub command_path: String,
     pub python: String,
     pub python_path: String,
     pub mode: String,
     pub public_host: String,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+struct NativeStatus {
+    data: String,
+    env: String,
+}
+
+static NATIVE_STATUS: OnceLock<Mutex<HashMap<PathBuf, NativeStatus>>> = OnceLock::new();
 
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -104,24 +117,77 @@ fn read_pairs(path: &Path) -> HashMap<String, String> {
     pairs
 }
 
-fn resolve_port(dir: &Path) -> u16 {
-    let port_in = |name: &str| {
-        read_pairs(&dir.join(name))
+fn native(config: &LocalServerConfig) -> bool {
+    config.source == NATIVE_SOURCE
+}
+
+fn home_dir() -> Option<PathBuf> {
+    std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(PathBuf::from)
+}
+
+fn installed_command() -> Option<PathBuf> {
+    let path = home_dir()?.join(".local").join("bin").join(COMMAND_NAME);
+    path.is_file().then_some(path)
+}
+
+fn resolve_command(config: &LocalServerConfig) -> Option<PathBuf> {
+    let chosen = config.command_path.trim();
+    if !chosen.is_empty() {
+        let path = PathBuf::from(chosen);
+        return path.is_file().then_some(path);
+    }
+    Some(installed_command().unwrap_or_else(|| PathBuf::from(COMMAND_NAME)))
+}
+
+fn native_status(command: &Path) -> Option<NativeStatus> {
+    let cache = NATIVE_STATUS.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Some(known) = cache.lock().unwrap().get(command) {
+        return Some(known.clone());
+    }
+    let mut probe = Command::new(command);
+    probe.arg("status").arg("--json").stdin(Stdio::null());
+    #[cfg(windows)]
+    probe.creation_flags(CREATE_NO_WINDOW);
+    let output = probe.output().ok()?;
+    let printed = String::from_utf8_lossy(&output.stdout);
+    let line = printed.lines().rev().find(|line| line.trim_start().starts_with('{'))?;
+    let status: NativeStatus = serde_json::from_str(line).ok()?;
+    cache.lock().unwrap().insert(command.to_path_buf(), status.clone());
+    Some(status)
+}
+
+fn data_paths(config: &LocalServerConfig) -> Option<(PathBuf, PathBuf)> {
+    if native(config) {
+        let status = native_status(&resolve_command(config)?)?;
+        let data = PathBuf::from(status.data);
+        return Some((data.join(STATE_RUNTIME), PathBuf::from(status.env)));
+    }
+    let dir = PathBuf::from(&config.dir);
+    Some((dir.join(RUNTIME_FILE), dir.join(ENV_FILE)))
+}
+
+fn resolve_port(config: &LocalServerConfig) -> u16 {
+    let Some((runtime, environment)) = data_paths(config) else {
+        return DEFAULT_PORT;
+    };
+    let port_in = |path: &Path| {
+        read_pairs(path)
             .get(PORT_KEY)
             .and_then(|value| value.parse().ok())
     };
-    port_in(RUNTIME_FILE).or_else(|| port_in(ENV_FILE)).unwrap_or(DEFAULT_PORT)
+    port_in(&runtime).or_else(|| port_in(&environment)).unwrap_or(DEFAULT_PORT)
 }
 
-fn env_secret(dir: &Path, key: &str) -> Option<String> {
-    read_pairs(&dir.join(ENV_FILE))
+fn env_secret(config: &LocalServerConfig, key: &str) -> Option<String> {
+    let (_, environment) = data_paths(config)?;
+    read_pairs(&environment)
         .get(key)
         .map(|value| value.to_string())
         .filter(|value| !value.is_empty())
 }
 
-fn access_token(dir: &Path) -> Option<String> {
-    env_secret(dir, TOKEN_KEY)
+fn access_token(config: &LocalServerConfig) -> Option<String> {
+    env_secret(config, TOKEN_KEY)
 }
 
 fn expects_gate(config: &LocalServerConfig) -> bool {
@@ -159,12 +225,11 @@ fn sync_credentials(
         info.security_key = None;
         return;
     }
-    let dir = PathBuf::from(&config.dir);
     if info.token.is_none() {
-        info.token = env_secret(&dir, TOKEN_KEY);
+        info.token = env_secret(config, TOKEN_KEY);
     }
     if info.security_key.is_none() {
-        info.security_key = env_secret(&dir, SECURITY_KEY_KEY);
+        info.security_key = env_secret(config, SECURITY_KEY_KEY);
     }
 }
 
@@ -199,8 +264,9 @@ fn get(port: u16, path: &str) -> Option<String> {
     head.lines().next()?.contains(" 200").then(|| body.to_string())
 }
 
-fn recorded_pid(dir: &Path) -> Option<u32> {
-    read_pairs(&dir.join(RUNTIME_FILE))
+fn recorded_pid(config: &LocalServerConfig) -> Option<u32> {
+    let (runtime, _) = data_paths(config)?;
+    read_pairs(&runtime)
         .get(PID_KEY)
         .and_then(|value| value.parse().ok())
 }
@@ -301,8 +367,7 @@ pub fn local_server_status(
         }
         inner.child.is_some()
     };
-    let dir = PathBuf::from(&config.dir);
-    let port = resolve_port(&dir);
+    let port = resolve_port(&config);
     let open = port_open(port);
     {
         let mut inner = state.inner.lock().unwrap();
@@ -345,12 +410,12 @@ fn start_inner(
     let _guard = StartGuard { state };
 
     let dir = PathBuf::from(&config.dir);
-    let port = resolve_port(&dir);
+    let port = resolve_port(config);
     let mut info = LocalServerInfo {
         port,
         ..LocalServerInfo::default()
     };
-    if config.dir.trim().is_empty() || !dir.is_dir() {
+    if !native(config) && (config.dir.trim().is_empty() || !dir.is_dir()) {
         info.error = Some("bad_dir".into());
         state.inner.lock().unwrap().info = info.clone();
         emit(app, &info);
@@ -371,17 +436,23 @@ fn start_inner(
         return Ok(info);
     }
 
-    let Some(python) = resolve_python(config, &dir) else {
-        info.error = Some("no_python".into());
+    let launcher = if native(config) {
+        resolve_command(config).filter(|command| native_status(command).is_some())
+    } else {
+        resolve_python(config, &dir)
+    };
+    let Some(launcher) = launcher else {
+        info.error = Some(if native(config) { "no_command" } else { "no_python" }.into());
         state.inner.lock().unwrap().info = info.clone();
         emit(app, &info);
         return Ok(info);
     };
 
-    let mut command = Command::new(python);
+    let mut command = Command::new(launcher);
+    if !native(config) {
+        command.arg("run.py").current_dir(&dir);
+    }
     command
-        .arg("run.py")
-        .current_dir(&dir)
         .env("PYTHONUNBUFFERED", "1")
         .env("PYTHONIOENCODING", "utf-8")
         .stdout(Stdio::piped())
@@ -557,14 +628,13 @@ pub fn shutdown(state: &LocalServerState) {
 }
 
 fn stop_inner(app: &AppHandle, state: &LocalServerState, config: &LocalServerConfig) -> LocalServerInfo {
-    let dir = PathBuf::from(&config.dir);
-    let port = resolve_port(&dir);
+    let port = resolve_port(config);
     let child = state.inner.lock().unwrap().child.take();
     match child {
         Some(mut child) => kill_tree(&mut child),
         None => {
-            if !post(port, STOP_PATH, access_token(&dir).as_deref()) {
-                if let Some(pid) = recorded_pid(&dir) {
+            if !post(port, STOP_PATH, access_token(config).as_deref()) {
+                if let Some(pid) = recorded_pid(config) {
                     kill_pid(pid);
                 }
             }
@@ -601,6 +671,38 @@ pub fn local_server_stop(
 }
 
 #[tauri::command(async)]
+pub fn local_server_update(
+    app: AppHandle,
+    state: State<'_, LocalServerState>,
+    config: LocalServerConfig,
+) -> Result<String, String> {
+    if !native(&config) {
+        return Err("not_native".into());
+    }
+    let command = resolve_command(&config).ok_or("no_command")?;
+    let managed = state.inner.lock().unwrap().child.is_some();
+    if managed {
+        stop_inner(&app, &state, &config);
+    }
+    let mut upgrade = Command::new(&command);
+    upgrade.arg("update").stdin(Stdio::null());
+    #[cfg(windows)]
+    upgrade.creation_flags(CREATE_NO_WINDOW);
+    let output = upgrade.output().map_err(|_| "launch_failed".to_string())?;
+    NATIVE_STATUS.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap().remove(&command);
+    let printed = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let failed = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if managed {
+        start_inner(&app, &state, &config)?;
+    }
+    if output.status.success() {
+        Ok(printed)
+    } else {
+        Err(if failed.is_empty() { printed } else { failed })
+    }
+}
+
+#[tauri::command(async)]
 pub fn local_server_restart(
     app: AppHandle,
     state: State<'_, LocalServerState>,
@@ -610,9 +712,8 @@ pub fn local_server_restart(
         stop_inner(&app, &state, &config);
         return start_inner(&app, &state, &config);
     }
-    let dir = PathBuf::from(&config.dir);
-    let port = resolve_port(&dir);
-    if !post(port, RESTART_PATH, access_token(&dir).as_deref()) {
+    let port = resolve_port(&config);
+    if !post(port, RESTART_PATH, access_token(&config).as_deref()) {
         return Ok(state.inner.lock().unwrap().info.clone());
     }
     wait_port(port, false, STOP_ATTEMPTS);

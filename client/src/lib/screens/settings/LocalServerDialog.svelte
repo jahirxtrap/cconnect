@@ -18,11 +18,20 @@
 
   const { onDismiss }: Props = $props();
 
+  let source = $state(settings.localServerSource);
+  let commandPath = $state(settings.localServerCommandPath);
   let dir = $state(settings.localServerDir);
   let python = $state(settings.localServerPython);
   let pythonPath = $state(settings.localServerPythonPath);
   let mode = $state(settings.localServerMode);
   let publicHost = $state(settings.localServerPublicHost);
+
+  type Target = "dir" | "python" | "command";
+
+  const SOURCE_OPTIONS = [
+    { value: "native", label: t("SOURCE_NATIVE") },
+    { value: "python", label: t("SOURCE_PYTHON") },
+  ];
 
   const PYTHON_OPTIONS = [
     { value: "auto", label: t("PYTHON_AUTO") },
@@ -36,16 +45,18 @@
     { value: "caddy", label: t("MODE_CADDY") },
   ];
 
-  let browsing = $state<"dir" | "file" | null>(null);
+  let browsing = $state<Target | null>(null);
 
-  const pick = async (directory: boolean) => {
-    const mode = directory ? "dir" : "file";
-    const selected = await pickPath(mode);
-    if (selected === "fallback") browsing = mode;
-    else if (selected) {
-      if (directory) dir = selected;
-      else pythonPath = selected;
-    }
+  const apply = (target: Target, chosen: string) => {
+    if (target === "dir") dir = chosen;
+    else if (target === "python") pythonPath = chosen;
+    else commandPath = chosen;
+  };
+
+  const pick = async (target: Target) => {
+    const selected = await pickPath(target === "dir" ? "dir" : "file");
+    if (selected === "fallback") browsing = target;
+    else if (selected) apply(target, selected);
   };
 
   const info = $derived(localServer.info);
@@ -53,6 +64,7 @@
   const failure = $derived.by(() => {
     if (info.error === "bad_dir") return t("LOCAL_SERVER_BAD_DIR");
     if (info.error === "no_python") return t("LOCAL_SERVER_NO_PYTHON");
+    if (info.error === "no_command") return t("LOCAL_SERVER_NO_COMMAND");
     if (info.error === "launch_failed") return t("LOCAL_SERVER_LAUNCH_FAILED");
     if (info.error === "port_busy") return t("LOCAL_SERVER_PORT_BUSY", info.port);
     if (info.error === "mode_mismatch") return t("LOCAL_SERVER_MODE_MISMATCH");
@@ -70,6 +82,8 @@
   });
 
   const save = () => {
+    settings.localServerSource = source;
+    settings.localServerCommandPath = commandPath.trim();
     settings.localServerDir = dir.trim();
     settings.localServerPython = python;
     settings.localServerPythonPath = pythonPath.trim();
@@ -85,34 +99,57 @@
     <Button onclick={save}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-2">
-    <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine>
-      {#snippet trailing()}
-        <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(true)} class="size-6 [&_svg]:size-[18px]">
-          <Folder />
-        </TooltipIconButton>
-      {/snippet}
-    </InputField>
-
     <SelectField
-      label={t("PYTHON")}
-      selected={python}
-      options={PYTHON_OPTIONS}
-      onSelect={(value) => (python = value)}
+      label={t("LOCAL_SERVER_SOURCE")}
+      selected={source}
+      options={SOURCE_OPTIONS}
+      onSelect={(value) => (source = value)}
     />
 
-    {#if python === "custom"}
+    {#if source === "native"}
       <InputField
-        value={pythonPath}
-        oninput={(value) => (pythonPath = value)}
-        label={t("PYTHON_PATH")}
+        value={commandPath}
+        oninput={(value) => (commandPath = value)}
+        label={t("COMMAND_PATH")}
+        placeholder={t("COMMAND_PATH_AUTO")}
         singleLine
       >
         {#snippet trailing()}
-          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick(false)} class="size-6 [&_svg]:size-[18px]">
+          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("command")} class="size-6 [&_svg]:size-[18px]">
             <Folder />
           </TooltipIconButton>
         {/snippet}
       </InputField>
+    {:else}
+      <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine>
+        {#snippet trailing()}
+          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("dir")} class="size-6 [&_svg]:size-[18px]">
+            <Folder />
+          </TooltipIconButton>
+        {/snippet}
+      </InputField>
+
+      <SelectField
+        label={t("PYTHON")}
+        selected={python}
+        options={PYTHON_OPTIONS}
+        onSelect={(value) => (python = value)}
+      />
+
+      {#if python === "custom"}
+        <InputField
+          value={pythonPath}
+          oninput={(value) => (pythonPath = value)}
+          label={t("PYTHON_PATH")}
+          singleLine
+        >
+          {#snippet trailing()}
+            <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("python")} class="size-6 [&_svg]:size-[18px]">
+              <Folder />
+            </TooltipIconButton>
+          {/snippet}
+        </InputField>
+      {/if}
     {/if}
 
     <SelectField label={t("RUN_MODE")} selected={mode} options={MODE_OPTIONS} onSelect={(value) => (mode = value)} />
@@ -133,13 +170,12 @@
 </CompactDialog>
 
 {#if browsing}
-  {@const mode = browsing}
+  {@const target = browsing}
   <PathPickerDialog
-    {mode}
-    start={mode === "dir" ? dir : pythonPath}
+    mode={target === "dir" ? "dir" : "file"}
+    start={target === "dir" ? dir : target === "python" ? pythonPath : commandPath}
     onConfirm={(chosen) => {
-      if (mode === "dir") dir = chosen;
-      else pythonPath = chosen;
+      apply(target, chosen);
       browsing = null;
     }}
     onDismiss={() => (browsing = null)}
