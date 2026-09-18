@@ -1,5 +1,5 @@
 import { transfers } from "$lib/data/transfers.svelte";
-import { isTauri, openExternal } from "$lib/platform";
+import { isDesktop, isTauri, openExternal } from "$lib/platform";
 import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDownloads";
 import { copyText } from "$lib/platform/clipboard";
 import { authHeadersOf, backend, type Profile } from "./backend.svelte";
@@ -58,6 +58,33 @@ const saveBlob = async (blob: Blob, filename: string): Promise<string | null> =>
     return await join(await downloadDir(), filename);
   } catch {
     return null;
+  }
+};
+
+const DRAG_ICON = 64;
+
+let dragIcon: string | null = null;
+
+const dragIconData = async (): Promise<string> => {
+  if (dragIcon) return dragIcon;
+  const source = new Image();
+  source.src = "/favicon.png";
+  await source.decode();
+  const canvas = document.createElement("canvas");
+  canvas.width = DRAG_ICON;
+  canvas.height = DRAG_ICON;
+  canvas.getContext("2d")?.drawImage(source, 0, 0, DRAG_ICON, DRAG_ICON);
+  dragIcon = canvas.toDataURL("image/png");
+  return dragIcon;
+};
+
+export const dragSaved = async (path: string) => {
+  if (!isDesktop || !path) return;
+  try {
+    const { startDrag } = await import("@crabnebula/tauri-plugin-drag");
+    await startDrag({ item: [path], icon: await dragIconData() });
+  } catch {
+    return;
   }
 };
 

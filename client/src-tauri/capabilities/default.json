@@ -46,6 +46,7 @@
     "fs:allow-temp-write-recursive",
     "notification:default",
     "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-read-text",
+    "drag:default"
   ]
 }

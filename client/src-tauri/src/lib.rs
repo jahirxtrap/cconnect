@@ -104,6 +104,7 @@ pub fn run() {
                 .with_state_flags(state_flags())
                 .build(),
         );
+        builder = builder.plugin(tauri_plugin_drag::init());
     }
 
     #[cfg(mobile)]

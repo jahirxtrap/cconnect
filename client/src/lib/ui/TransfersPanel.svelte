@@ -7,8 +7,9 @@
   import X from "@lucide/svelte/icons/x";
   import { transfers } from "$lib/data/transfers.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
-  import { openTransfer } from "$lib/services/sharedFiles";
+  import { dragSaved, openTransfer } from "$lib/services/sharedFiles";
   import { snapToDevicePixel } from "./gridHeight";
   import ProgressRing from "./ProgressRing.svelte";
   import { borderWidth, scrollableUnder, scrollbarWidth } from "./scrollbar";
@@ -83,11 +84,19 @@
       </div>
 
       {#if !transfers.collapsed}
-        <div class="scrollbar-thin max-h-64 overflow-y-auto border-t border-outline-variant p-1">
+        <div role="list" class="scrollbar-thin max-h-64 overflow-y-auto border-t border-outline-variant p-1">
           {#each items as item (item.id)}
             {@const openable = item.status === "done" && item.url.length > 0}
+            {@const dragging = isDesktop && item.status === "done" && item.saved.length > 0}
             <div
+              role="listitem"
               data-press={openable ? "" : "off"}
+              draggable={dragging}
+              ondragstart={(event) => {
+                if (!dragging) return;
+                event.preventDefault();
+                void dragSaved(item.saved);
+              }}
               class="flex items-center gap-2.5 rounded-item px-2.5 py-1.5 transition-colors {openable
                 ? 'hover:bg-on-surface/8'
                 : ''}"
