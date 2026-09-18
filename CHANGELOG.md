@@ -1,7 +1,8 @@
-- Categories now belong to a project: the ones you create with a project open live there, the ones you create from all the chats show up everywhere, and a project no longer greets you with a row of empty headers that belong to another one
-- Organize tells you which project each category belongs to, and that same label moves it to another project or makes it shared by all of them
-- Opening a shared file from the chat lands on the file itself — inside it when it is an archive, picked out in its folder when it is not — and the action is there for every file instead of only for archives
-- `cconnect expose tailscale` says what is wrong in one line — not installed, not running, not signed in, or a tailnet without Funnel — instead of printing whatever Tailscale answered
+- Claude can hand you a file without copying it into the shared folder: it leaves a reference to where the file already lives, marked with a link badge, and opening, downloading, renaming, moving, compressing or extracting it works on the real file behind it — the project explorer sends any file of the repository the same way, and a reference becomes a real copy from its menu
+- `cconnect expose tailnet` serves the backend over HTTPS to your tailnet alone and asks for no token — the local mode with a certificate on top — while `cconnect expose tailscale` stays for the public Funnel
+- Background agents list their subtasks again, hand their report back as a message from the agent instead of one of yours, and show the same summary when you reopen the chat
+- Updating the server no longer reports a failure on Windows when it actually went through, and the update button opens the installer instead of sending you to the web page
+- The shared list counts what the filter is showing against the whole folder, select all takes only the rows you can see, and the selection and commit circles are drawn to scale
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
