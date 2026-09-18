@@ -74,7 +74,10 @@
   const fullFile = $derived(opened.full && expandable);
 
   const chat = $derived(tabs.state);
-  const projects = $derived(chatListFor(backend.active)?.visibleProjects ?? []);
+  const list = $derived(chatListFor(backend.active));
+  const projects = $derived(list?.visibleProjects ?? []);
+  const known = (key: string | null) =>
+    key !== null && (list?.projects ?? []).some((item) => item.projectKey === key);
 
   let children = $state<Record<string, ProjectEntry[]>>({});
   let expanded = $state<Record<string, boolean>>({});
@@ -281,7 +284,13 @@
 
   const followed = $derived(chat.historyProject);
   const pinned = $derived(tabs.active?.panelProject ?? null);
-  const projectKey = $derived(settings.lockedProject || (pinned === null ? followed : pinned || null));
+  const wanted = $derived(settings.lockedProject || (pinned === null ? followed : pinned || null));
+  const settled = $derived(list !== null && !list.loading);
+  const projectKey = $derived(!settled || known(wanted) ? wanted : known(followed) ? followed : null);
+
+  $effect(() => {
+    if (settled && pinned && !known(pinned)) tabs.setPanelProject(null);
+  });
 
   const project = $derived(projects.find((item) => item.projectKey === projectKey) ?? null);
 
@@ -516,7 +525,7 @@
     if (!burst.truncated && !burst.paths.length && untrack(() => changed) !== null) return;
     void projectFilesApi.changes(key).then((found) => {
       if (projectKey !== key || !showChanged) return;
-      changed = found;
+      changed = found ?? [];
     });
   });
 
@@ -546,8 +555,8 @@
     logDone = false;
     void gitApi.log(key, target).then((found) => {
       if (projectKey !== key || activeRepo?.path !== target || !showLog) return;
-      commits = found;
-      logDone = found !== null && found.length === 0;
+      commits = found ?? [];
+      logDone = found === null || found.length === 0;
     });
   });
 
@@ -565,7 +574,7 @@
     if (synced === stamp && !moved) return;
     synced = stamp;
     void gitApi.repos(key).then((found) => {
-      if (projectKey === key && showChanged) repos = found;
+      if (projectKey === key && showChanged) repos = found ?? [];
     });
   });
 

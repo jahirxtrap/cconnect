@@ -24,7 +24,7 @@
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { joined, SEPARATOR } from "$lib/data/format";
   import { projectLabel, projectNameOf } from "$lib/data/models";
-  import { formatDayTime, parseIsoMillis } from "$lib/data/time";
+  import { formatDateShort, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, openExternal } from "$lib/platform";
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
@@ -455,7 +455,7 @@
                 </p>
               {/if}
               {#if millis !== null}
-                <p class="mt-0.5 text-label-md text-on-surface-variant">{formatDayTime(millis)}</p>
+                <p class="mt-0.5 text-label-md text-on-surface-variant">{formatDateShort(millis)}</p>
               {/if}
             </button>
           {/each}

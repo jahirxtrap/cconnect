@@ -1,6 +1,6 @@
 <script lang="ts">
   import StickyNote from "@lucide/svelte/icons/sticky-note";
-  import { formatDayTime } from "$lib/data/time";
+  import { formatDateShort } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
@@ -51,7 +51,7 @@
             <p class="line-clamp-4 min-h-0 flex-1 text-body-sm text-on-surface-variant">
               {notePreview(note.body)}
             </p>
-            <p class="truncate text-body-sm text-on-surface-variant">{formatDayTime(note.updatedAt)}</p>
+            <p class="truncate text-body-sm text-on-surface-variant">{formatDateShort(note.updatedAt)}</p>
           </OutlinedPanel>
           <div class="absolute top-1.5 right-1.5">
             <NoteMenu
@@ -71,7 +71,7 @@
     {#each listed as note (note.id)}
       <ListRow
         title={titleOf(note)}
-        subtitle={formatDayTime(note.updatedAt)}
+        subtitle={formatDateShort(note.updatedAt)}
         icon={StickyNote}
         onclick={() => onOpen(note.id)}
         onlongclick={() => (menuId = note.id)}
