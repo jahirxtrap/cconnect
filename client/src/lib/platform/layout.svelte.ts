@@ -72,7 +72,10 @@ class Layout {
 
       const viewport = window.visualViewport;
       if (!viewport) return;
-      const track = () => apply(Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop));
+      const track = () => {
+        if (window.scrollY !== 0) window.scrollTo(0, 0);
+        apply(Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop));
+      };
       track();
       viewport.addEventListener("resize", track);
       viewport.addEventListener("scroll", track);

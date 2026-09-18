@@ -3,6 +3,7 @@
   import { WebglAddon } from "@xterm/addon-webgl";
   import { Terminal } from "@xterm/xterm";
   import type { TerminalConnector, TerminalLink, TerminalStatus } from "$lib/data/terminalLink";
+  import { isDesktop } from "$lib/platform";
   import { copyText, pasteText } from "$lib/platform/clipboard";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
   import type { PtyInfo } from "$lib/services/terminalApi";
@@ -51,7 +52,8 @@
   const clipboardHandled = (term: Terminal, event: KeyboardEvent) => {
     const action = shortcuts.idFor(signature(event), ["terminal"]);
     if (action === "terminal.copy") return copySelection(term);
-    if (action !== "terminal.paste") return false;
+    if (action !== "terminal.paste" || !isDesktop) return false;
+    event.preventDefault();
     void pasteText().then((text) => text && term.paste(text));
     return true;
   };
