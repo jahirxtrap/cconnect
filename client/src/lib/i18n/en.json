@@ -181,6 +181,8 @@
   "UP_TO_DATE": "You have the latest version",
   "UPDATE_ACTION": "Update",
   "CHECK_UPDATES": "Check for updates",
+  "ATTACH_CAMERA": "Camera",
+  "ATTACH_PHOTOS": "Photos",
   "INSTALL_APP": "Install app",
   "INSTALL_APP_SUMMARY": "Open it in its own window, without the browser bar",
   "ADD_TO_HOME": "Add to Home Screen",

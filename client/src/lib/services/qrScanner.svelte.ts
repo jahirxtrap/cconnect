@@ -1,9 +1,14 @@
-import { isTauri } from "$lib/platform";
+import { isTauri, systemName } from "$lib/platform";
 import { androidQrScan } from "$lib/platform/androidQrScan";
 
 const isMobile = () => isTauri && /android|iphone|ipad/i.test(navigator.userAgent);
 
-export const qrScanAvailable = () => isMobile();
+const handheld = () => systemName() === "android" || systemName() === "ios";
+
+const browserScanAvailable = () =>
+  !isTauri && handheld() && window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
+
+export const qrScanAvailable = () => isMobile() || browserScanAvailable();
 
 const codeScannerAvailable = () => {
   try {
@@ -13,7 +18,24 @@ const codeScannerAvailable = () => {
   }
 };
 
-export const cameraScan = $state({ active: false });
+export const cameraScan = $state({ active: false, browser: false });
+
+let settle: ((raw: string | null) => void) | null = null;
+
+const scanWithBrowser = () =>
+  new Promise<string | null>((resolve) => {
+    settle = resolve;
+    cameraScan.browser = true;
+    cameraScan.active = true;
+  });
+
+export const finishBrowserScan = (raw: string | null) => {
+  const resolve = settle;
+  settle = null;
+  cameraScan.active = false;
+  cameraScan.browser = false;
+  resolve?.(raw);
+};
 
 const scanWithCodeScanner = () =>
   new Promise<string | null>((resolve) => {
@@ -43,12 +65,17 @@ const scanWithCamera = async (): Promise<string | null> => {
 };
 
 export const cancelCameraScan = async () => {
+  if (cameraScan.browser) {
+    finishBrowserScan(null);
+    return;
+  }
   const { cancel } = await import("@tauri-apps/plugin-barcode-scanner");
   await cancel().catch(() => undefined);
 };
 
 export const scanQr = async (): Promise<string | null> => {
   try {
+    if (browserScanAvailable()) return await scanWithBrowser();
     return codeScannerAvailable() ? await scanWithCodeScanner() : await scanWithCamera();
   } catch {
     return null;

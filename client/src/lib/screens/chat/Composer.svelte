@@ -1,6 +1,8 @@
 <script lang="ts">
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
+  import Camera from "@lucide/svelte/icons/camera";
   import Hourglass from "@lucide/svelte/icons/hourglass";
+  import ImageIcon from "@lucide/svelte/icons/image";
   import Mic from "@lucide/svelte/icons/mic";
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import Plus from "@lucide/svelte/icons/plus";
@@ -12,7 +14,7 @@
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
-  import { isTouch } from "$lib/platform";
+  import { isTouch, systemName } from "$lib/platform";
   import { startDictation, voiceAvailable } from "$lib/platform/voice";
   import { commandToken, type CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
@@ -89,6 +91,16 @@
     if (field && document.activeElement === field) field.blur();
   });
   let picker = $state<HTMLInputElement | null>(null);
+
+  const phone = systemName() === "android" || systemName() === "ios";
+
+  const pickFrom = (accept = "", capture = "") => {
+    if (!picker) return;
+    picker.accept = accept;
+    if (capture) picker.setAttribute("capture", capture);
+    else picker.removeAttribute("capture");
+    picker.click();
+  };
 
   const canSubmit = $derived(!blocked && (!!draft.trim() || attachments.length > 0));
   const busy = $derived(streaming || uploading);
@@ -447,7 +459,19 @@
               <Plus size={18} />
             </span>
           {/snippet}
-          <MenuItem text={t("ATTACH_FILES")} enabled={!uploading} onclick={() => picker?.click()}>
+          {#if phone}
+            <MenuItem text={t("ATTACH_CAMERA")} enabled={!uploading} onclick={() => pickFrom("image/*", "environment")}>
+              {#snippet leading()}
+                <Camera size={16} class="shrink-0 text-on-surface-variant" />
+              {/snippet}
+            </MenuItem>
+            <MenuItem text={t("ATTACH_PHOTOS")} enabled={!uploading} onclick={() => pickFrom("image/*")}>
+              {#snippet leading()}
+                <ImageIcon size={16} class="shrink-0 text-on-surface-variant" />
+              {/snippet}
+            </MenuItem>
+          {/if}
+          <MenuItem text={t("ATTACH_FILES")} enabled={!uploading} onclick={() => pickFrom()}>
             {#snippet leading()}
               <Paperclip size={16} class="shrink-0 text-on-surface-variant" />
             {/snippet}

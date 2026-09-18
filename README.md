@@ -21,6 +21,11 @@ The desktop, web and Android apps are one Svelte + Tauri codebase: the desktop
 build is a native installer per OS, and the web build is the same UI hosted as a
 static site (see [Web app](#web-app)). The assets are named `cconnect-tauri`.
 
+None of the installers is signed, so the first launch needs one extra step:
+macOS says the developer is unidentified and lets you through from **System
+Settings → Privacy & Security → Open anyway**, and Windows hides the button
+behind **More info** in the SmartScreen notice. Only the first time.
+
 ## Install
 
 ```bash

@@ -27,6 +27,7 @@
     "bits-ui": "^2.18.1",
     "markdown-it": "^15.0.0",
     "pdfjs-dist": "^6.2.108",
+    "qr-scanner": "^1.4.2",
     "shiki": "^4.4.1"
   },
   "devDependencies": {
