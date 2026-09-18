@@ -1,8 +1,7 @@
-- Claude can hand you a file without copying it into the shared folder: it leaves a reference to where the file already lives, marked with a link badge, and opening, downloading, renaming, moving, compressing or extracting it works on the real file behind it — the project explorer sends any file of the repository the same way, and a reference becomes a real copy from its menu
-- `cconnect expose tailnet` serves the backend over HTTPS to your tailnet alone and asks for no token — the local mode with a certificate on top — while `cconnect expose tailscale` stays for the public Funnel
-- Background agents list their subtasks again, hand their report back as a message from the agent instead of one of yours, and show the same summary when you reopen the chat
-- Updating the server no longer reports a failure on Windows when it actually went through, and the update button opens the installer instead of sending you to the web page
-- The shared list counts what the filter is showing against the whole folder, select all takes only the rows you can see, and the selection and commit circles are drawn to scale
+- The web version installs like an app: from Information, Chrome and Edge open their own install dialog, and Safari on the iPhone opens the share menu with the two steps to add it to the Home Screen
+- Once installed it opens in its own window, with a real icon at every size instead of one blown up inside a white frame
+- The macOS installer is universal: it runs on Intel Macs as well as on Apple Silicon
+- Keyboard shortcuts in a browser on a Mac use ⌘ like the rest of the system, and the ones the browser keeps for itself move to Alt so they work at all
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
