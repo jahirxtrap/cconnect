@@ -2,7 +2,6 @@
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import X from "@lucide/svelte/icons/x";
   import { Dialog } from "bits-ui";
-  import { pushDismiss } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -68,7 +67,6 @@
     void serverStatus.refresh();
   });
 
-  $effect(() => pushDismiss(() => onDismiss()));
 
   const select = (id: SettingsSection) => {
     section = id;

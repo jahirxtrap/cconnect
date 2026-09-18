@@ -1,6 +1,6 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import CirclePlus from "@lucide/svelte/icons/circle-plus";
+  import Plus from "@lucide/svelte/icons/plus";
   import Pencil from "@lucide/svelte/icons/pencil";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import Trash from "@lucide/svelte/icons/trash";
@@ -37,7 +37,7 @@
     class={paneActionClass(compact)}
     onclick={() => (adding = true)}
   >
-    <CirclePlus />
+    <Plus />
   </TooltipIconButton>
 {/snippet}
 

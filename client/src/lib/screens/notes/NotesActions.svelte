@@ -1,55 +1,60 @@
 <script lang="ts">
-  import Download from "@lucide/svelte/icons/download";
-  import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import Save from "@lucide/svelte/icons/save";
-  import Share2 from "@lucide/svelte/icons/share-2";
+  import LayoutGrid from "@lucide/svelte/icons/layout-grid";
+  import Plus from "@lucide/svelte/icons/plus";
+  import Rows3 from "@lucide/svelte/icons/rows-3";
+  import Search from "@lucide/svelte/icons/search";
   import Type from "@lucide/svelte/icons/type";
   import { t } from "$lib/i18n/index.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
-  import { saveTextAs, saveTextToDownloads, shareText } from "$lib/services/sharedFiles";
-  import MenuItem from "$lib/ui/MenuItem.svelte";
-  import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { scratch } from "./scratch.svelte";
+  import NoteMenu from "./NoteMenu.svelte";
+  import { notes, type Note } from "./notes.svelte";
+
+  interface Props {
+    note: Note | null;
+    onNew: () => void;
+    onClosed: () => void;
+  }
+
+  const { note, onNew, onClosed }: Props = $props();
 
   let menu = $state(false);
 
-  const filename = $derived(t("NOTES_FILENAME"));
   const actionClass = paneActionClass(inPane());
 </script>
 
-<TooltipIconButton
-  label={t("FORMATTED_VIEW")}
-  class={actionClass}
-  onclick={() => (scratch.formatted = !scratch.formatted)}
->
-  <Type class={scratch.formatted ? "text-accent" : ""} />
-</TooltipIconButton>
-<PopupMenu
-  open={menu}
-  onOpenChange={(open) => (menu = open)}
-  label={t("MORE_OPTIONS")}
-  align="center"
->
-  {#snippet triggerChild(props)}
-    <TooltipIconButton label={t("MORE_OPTIONS")} class={actionClass} {...props}>
-      <EllipsisVertical />
-    </TooltipIconButton>
-  {/snippet}
-  <MenuItem text={t("SAVE")} onclick={() => saveTextToDownloads(filename, scratch.text)}>
-    {#snippet leading()}
-      <Download size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-  <MenuItem text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, scratch.text)}>
-    {#snippet leading()}
-      <Save size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-  <MenuItem text={t("SHARE")} onclick={() => void shareText(filename, scratch.text)}>
-    {#snippet leading()}
-      <Share2 size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-</PopupMenu>
+{#if note}
+  <TooltipIconButton
+    label={t("FORMATTED_VIEW")}
+    class={actionClass}
+    onclick={() => (notes.formatted = !notes.formatted)}
+  >
+    <Type class={notes.formatted ? "text-accent" : ""} />
+  </TooltipIconButton>
+  <NoteMenu
+    {note}
+    open={menu}
+    onOpenChange={(open) => (menu = open)}
+    onDeleted={onClosed}
+    class={actionClass}
+  />
+{:else}
+  <TooltipIconButton label={t("SEARCH")} class={actionClass} onclick={() => notes.search(!notes.searching)}>
+    <Search class={notes.searching ? "text-accent" : ""} />
+  </TooltipIconButton>
+  <TooltipIconButton
+    label={t(notes.view === "cards" ? "VIEW_AS_LIST" : "VIEW_AS_CARDS")}
+    class={actionClass}
+    onclick={() => notes.show(notes.view === "cards" ? "list" : "cards")}
+  >
+    {#if notes.view === "cards"}
+      <Rows3 />
+    {:else}
+      <LayoutGrid />
+    {/if}
+  </TooltipIconButton>
+  <TooltipIconButton label={t("NEW_NOTE")} class={actionClass} onclick={onNew}>
+    <Plus />
+  </TooltipIconButton>
+{/if}

@@ -477,6 +477,10 @@ textarea::selection {
   font-variant-numeric: tabular-nums;
 }
 
+.tasks-live .markdown li.task > .li-marker {
+  cursor: pointer;
+}
+
 .markdown a {
   color: var(--c-accent);
   text-decoration: underline;

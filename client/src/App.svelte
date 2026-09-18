@@ -160,7 +160,7 @@
 {/if}
 
 {#if navigation.route === "/settings" && settingsAsDialog}
-  <SettingsDialog onDismiss={() => navigation.navigate("/")} />
+  <SettingsDialog onDismiss={() => navigation.closeSettings()} />
 {/if}
 
 <TransfersPanel />

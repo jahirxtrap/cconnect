@@ -89,6 +89,7 @@ class Navigation {
         }
         this.route = currentRoute();
         this.sub = subOf(window.location.pathname);
+        this.#closingSettings = false;
       };
       window.addEventListener("popstate", onPopState);
       return () => window.removeEventListener("popstate", onPopState);
@@ -121,6 +122,12 @@ class Navigation {
   openSettings(highlight: string | null = null) {
     this.settingsHighlight = highlight;
     this.navigate("/settings");
+  }
+
+  closeSettings() {
+    if (this.route !== "/settings" || this.#closingSettings) return;
+    this.#closingSettings = true;
+    this.back();
   }
 
   openClaude(highlight: string | null = null) {
@@ -192,6 +199,8 @@ class Navigation {
     }
     return false;
   }
+
+  #closingSettings = false;
 
   #interceptors: (() => boolean)[] = [];
 }

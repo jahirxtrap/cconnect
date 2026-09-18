@@ -12,6 +12,8 @@
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import NotesActions from "$lib/screens/notes/NotesActions.svelte";
   import NotesEditor from "$lib/screens/notes/NotesEditor.svelte";
+  import NotesList from "$lib/screens/notes/NotesList.svelte";
+  import { notes, noteTitle } from "$lib/screens/notes/notes.svelte";
   import ProjectFilesScreen from "$lib/screens/project/ProjectFilesScreen.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
@@ -35,6 +37,14 @@
   const { instant, centerView, terminalCwd, onPaneDrag, onTabDrag }: Props = $props();
 
   let claudeDetail = $state<ClaudeKind | null>(null);
+  let noteId = $state<string | null>(null);
+
+  const openNote = $derived(noteId === null ? null : notes.find(noteId));
+
+  const closeNote = () => {
+    if (noteId) notes.discardEmpty(noteId);
+    noteId = null;
+  };
 
   const focused = $derived(panes.focused === "right");
 
@@ -46,6 +56,14 @@
     navigation.intercept(() => {
       if (!navigation.chatActive || claudeDetail === null) return false;
       claudeDetail = null;
+      return true;
+    }),
+  );
+
+  $effect(() =>
+    navigation.intercept(() => {
+      if (!navigation.chatActive || noteId === null) return false;
+      closeNote();
       return true;
     }),
   );
@@ -72,8 +90,16 @@
   </PaneSurface>
 {:else if panes.kind === "notes"}
   <PaneSurface>
-    <PaneHeader title={t("NOTES")} actions={notesActions} />
-    <NotesEditor />
+    <PaneHeader
+      title={openNote ? noteTitle(openNote) || t("NOTE_UNTITLED") : t("NOTES")}
+      actions={notesActions}
+      onBack={openNote ? closeNote : undefined}
+    />
+    {#if openNote}
+      <NotesEditor note={openNote} />
+    {:else}
+      <NotesList onOpen={(id) => (noteId = id)} />
+    {/if}
   </PaneSurface>
 {:else if panes.kind === "shared"}
   <PaneSurface>
@@ -137,7 +163,7 @@
 {/snippet}
 
 {#snippet notesActions()}
-  <NotesActions />
+  <NotesActions note={openNote} onNew={() => (noteId = notes.create())} onClosed={() => (noteId = null)} />
 {/snippet}
 
 {#snippet monitorActions()}

@@ -1011,7 +1011,9 @@
     {:else}
       <EmptyState
         loading={!loaded && !serverStatus.unavailable}
-        text={compact && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("NO_FILES")}
+        text={compact && serverStatus.unavailable
+          ? t("SERVER_UNAVAILABLE")
+          : t(searching && searchQuery.trim() ? "NO_RESULTS" : "NO_FILES")}
         class="h-full"
       />
     {/if}

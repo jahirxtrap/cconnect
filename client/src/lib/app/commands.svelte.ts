@@ -79,7 +79,10 @@ export const collectCommands = (): Command[] => {
     detail: session.projectKey
       ? projectNameOf(projects, session.projectKey, session.path)
       : null,
-    run: () => panes.openSession(session),
+    run: () => {
+      panes.openSession(session);
+      navigation.navigate("/");
+    },
   }));
 
   const projectCommands: Command[] = projects.map((project) => ({

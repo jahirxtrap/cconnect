@@ -13,7 +13,7 @@
 
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import CirclePlus from "@lucide/svelte/icons/circle-plus";
+  import Plus from "@lucide/svelte/icons/plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Store from "@lucide/svelte/icons/store";
@@ -277,11 +277,11 @@
           if (market) void openCatalog(market.name);
         }}
       >
-        <CirclePlus />
+        <Plus />
       </TooltipIconButton>
     {:else if kind === "marketplaces"}
       <TooltipIconButton label={t("ADD")} class={actionClass} onclick={() => (addingMarket = true)}>
-        <CirclePlus />
+        <Plus />
       </TooltipIconButton>
     {:else if kind === "mcp"}
       <TooltipIconButton
@@ -294,7 +294,7 @@
           addingMcp = true;
         }}
       >
-        <CirclePlus />
+        <Plus />
       </TooltipIconButton>
     {:else if kind === "status"}
       <TooltipIconButton

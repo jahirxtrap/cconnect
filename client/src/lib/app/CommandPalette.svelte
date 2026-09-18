@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Dialog } from "bits-ui";
-  import { tick } from "svelte";
   import { collectCommands, filterCommands, type CommandGroup } from "$lib/app/commands.svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
   import { t } from "$lib/i18n/index.svelte";
@@ -37,12 +36,11 @@
     })),
   );
 
-  const launch = async (index: number) => {
+  const launch = (index: number) => {
     const command = matches[index];
     if (!command) return;
-    onDismiss();
-    await tick();
     command.run();
+    onDismiss();
   };
 
   const move = (delta: number) => {
