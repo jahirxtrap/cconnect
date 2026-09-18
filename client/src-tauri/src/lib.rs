@@ -1,4 +1,5 @@
 mod local_server;
+mod oauth;
 mod presence;
 mod secret;
 mod ssh;
@@ -128,6 +129,7 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .manage(ssh::SshState::default())
         .manage(local_server::LocalServerState::default())
+        .manage(oauth::OauthState::default())
         .manage(presence::Presence::default())
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_connect,
@@ -144,6 +146,9 @@ pub fn run() {
             secret::secret_protect,
             secret::secret_unprotect,
             secret::secret_available,
+            oauth::oauth_start,
+            oauth::oauth_wait,
+            oauth::oauth_cancel,
             presence::presence_set,
             presence::presence_clear
         ])

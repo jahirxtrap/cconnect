@@ -24,7 +24,12 @@
     },
     {
       "identifier": "http:default",
-      "allow": [{ "url": "https://github.com/*" }, { "url": "https://*.githubusercontent.com/*" }]
+      "allow": [
+        { "url": "https://github.com/*" },
+        { "url": "https://*.githubusercontent.com/*" },
+        { "url": "https://oauth2.googleapis.com/*" },
+        { "url": "https://www.googleapis.com/*" }
+      ]
     },
     "dialog:default",
     "fs:default",

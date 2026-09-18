@@ -7,6 +7,7 @@ import { androidBackground } from "$lib/platform/androidBackground";
 import { webApp } from "$lib/platform/pwa.svelte";
 import { describe, shortcuts, SHORTCUTS } from "$lib/platform/shortcuts.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
+import { driveAvailable } from "$lib/services/drive/config";
 import { SETTINGS_SECTIONS, type SettingsSection } from "./sections";
 import {
   accountSummary,
@@ -52,6 +53,7 @@ export type SettingsDialog =
   | "project_prompt"
   | "export"
   | "import"
+  | "drive"
   | "reset"
   | "theme"
   | "language"
@@ -160,12 +162,15 @@ const SETTINGS_ROWS: SettingsEntry[] = [
 
   { id: "export", label: "EXPORT_SETTINGS", summary: "EXPORT_SETTINGS_SUMMARY", section: "recovery", group: "SETTINGS_RECOVERY", dialog: "export" },
   { id: "import", label: "IMPORT_SETTINGS", summary: "IMPORT_SETTINGS_SUMMARY", section: "recovery", group: "SETTINGS_RECOVERY", dialog: "import" },
+  { id: "drive", label: "DRIVE_BACKUP", summary: "DRIVE_BACKUP_SUMMARY", available: driveAvailable, section: "recovery", group: "SETTINGS_RECOVERY", dialog: "drive" },
   { id: "reset", label: "RESET_SETTINGS", summary: "RESET_SETTINGS_SUMMARY", section: "recovery", group: "SETTINGS_RECOVERY", dialog: "reset" },
 
   { id: "about", label: "APP_NAME", section: "about", group: "ABOUT" },
   { id: "install", label: "INSTALL_APP", summary: "INSTALL_APP_SUMMARY", available: () => webApp.offered, section: "about", group: "ABOUT" },
   { id: "support", label: "SUPPORT_CREATOR", section: "about", group: "ABOUT" },
   { id: "repository", label: "REPOSITORY", section: "about", group: "ABOUT" },
+  { id: "privacy_policy", label: "PRIVACY_POLICY", section: "about", group: "ABOUT" },
+  { id: "terms", label: "TERMS_OF_SERVICE", section: "about", group: "ABOUT" },
 ];
 
 const SHORTCUT_ENTRIES: SettingsEntry[] = SHORTCUTS.map((shortcut) => ({

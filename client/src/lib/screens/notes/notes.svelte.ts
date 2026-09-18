@@ -166,6 +166,12 @@ class Notes {
     this.#save();
   }
 
+  replaceAll(items: Note[]) {
+    this.items = items;
+    this.history = {};
+    this.#save();
+  }
+
   show(view: NotesView) {
     this.view = view;
     store.set(VIEW_KEY, view);

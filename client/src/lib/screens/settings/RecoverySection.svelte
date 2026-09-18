@@ -2,15 +2,18 @@
   import Download from "@lucide/svelte/icons/download";
   import History from "@lucide/svelte/icons/history";
   import Upload from "@lucide/svelte/icons/upload";
-  import { exportSettings, importSettings } from "$lib/data/backup";
+  import { importSettings } from "$lib/data/backup";
   import { DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
   import { theme } from "$lib/design/theme.svelte";
   import { i18n, t } from "$lib/i18n/index.svelte";
+  import { driveAvailable } from "$lib/services/drive/config";
   import { settingsApi } from "$lib/services/settingsApi";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import GoogleDriveIcon from "$lib/ui/GoogleDriveIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import BackupDialog from "./BackupDialog.svelte";
+  import DriveDialog from "./DriveDialog.svelte";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
 
   interface Props {
@@ -19,15 +22,11 @@
 
   const { onChanged }: Props = $props();
 
-  type Dialog = "export" | "import" | "reset";
+  type Dialog = "export" | "import" | "reset" | "drive";
 
   let dialog = $state<Dialog | null>(null);
-  let backup = $state("");
 
-  useSettingsDialog("recovery", (target) => {
-    if (target === "export") backup = exportSettings();
-    dialog = target as Dialog;
-  });
+  useSettingsDialog("recovery", (target) => (dialog = target as Dialog));
 
   const reset = () => {
     theme.setMode("system");
@@ -46,10 +45,7 @@
     icon={Upload}
     title={t("EXPORT_SETTINGS")}
     summary={t("EXPORT_SETTINGS_SUMMARY")}
-    onclick={() => {
-      backup = exportSettings();
-      dialog = "export";
-    }}
+    onclick={() => (dialog = "export")}
   />
   <PreferenceRow
     icon={Download}
@@ -57,6 +53,14 @@
     summary={t("IMPORT_SETTINGS_SUMMARY")}
     onclick={() => (dialog = "import")}
   />
+  {#if driveAvailable()}
+    <PreferenceRow
+      icon={GoogleDriveIcon}
+      title={t("DRIVE_BACKUP")}
+      summary={t("DRIVE_BACKUP_SUMMARY")}
+      onclick={() => (dialog = "drive")}
+    />
+  {/if}
   <PreferenceRow
     icon={History}
     title={t("RESET_SETTINGS")}
@@ -74,7 +78,9 @@
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "export"}
-  <BackupDialog mode="export" payload={backup} onDismiss={() => (dialog = null)} />
+  <BackupDialog mode="export" onDismiss={() => (dialog = null)} />
+{:else if dialog === "drive"}
+  <DriveDialog {onChanged} onDismiss={() => (dialog = null)} />
 {:else if dialog === "import"}
   <BackupDialog
     mode="import"

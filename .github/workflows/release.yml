@@ -37,6 +37,9 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       - name: Build installers
+        env:
+          GOOGLE_CLIENT_ID_DESKTOP: ${{ secrets.GOOGLE_CLIENT_ID_DESKTOP }}
+          GOOGLE_CLIENT_SECRET_DESKTOP: ${{ secrets.GOOGLE_CLIENT_SECRET_DESKTOP }}
         run: |
           npm ci
           if [ "$RUNNER_OS" = macOS ]; then
@@ -110,6 +113,7 @@ jobs:
       - name: Build APK
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          GOOGLE_CLIENT_ID_ANDROID: ${{ secrets.GOOGLE_CLIENT_ID_ANDROID }}
         run: |
           npm ci
           npm run tauri android build -- --apk --target aarch64
@@ -187,6 +191,8 @@ jobs:
 
       - name: Build web bundle
         working-directory: client
+        env:
+          GOOGLE_CLIENT_ID_WEB: ${{ secrets.GOOGLE_CLIENT_ID_WEB }}
         run: |
           npm ci
           npm run build

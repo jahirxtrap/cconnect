@@ -63,4 +63,4 @@ class SecureStore {
 
 export const secureStore = new SecureStore();
 
-export const SECURE_KEYS = ["environments", "ssh.profiles", "security.keys"];
+export const SECURE_KEYS = ["environments", "ssh.profiles", "security.keys", "drive.session"];

@@ -1,5 +1,6 @@
 import { i18n, type Locale } from "$lib/i18n/index.svelte";
 import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
+import { notes, type Note } from "$lib/screens/notes/notes.svelte";
 import { backend, type AuthKind, type EnvironmentProfile } from "$lib/services/backend.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { settings, type VisibilityPrefs } from "./settings.svelte";
@@ -23,7 +24,16 @@ const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw
 const texts = (raw: Wire, key: string): string[] | null =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : null;
 
-export const exportSettings = (): string =>
+export interface BackupOptions {
+  notes?: boolean;
+}
+
+export interface BackupCounts {
+  environments: number;
+  notes: number;
+}
+
+export const exportSettings = (options: BackupOptions = {}): string =>
   JSON.stringify(
     {
       app: APP,
@@ -70,6 +80,18 @@ export const exportSettings = (): string =>
         password: profile.password,
         ...(profile.os === null ? {} : { os: profile.os }),
       })),
+      ...(options.notes
+        ? {
+            notes: notes.items
+              .filter((note) => !note.deletedAt)
+              .map((note) => ({
+                id: note.id,
+                ...(note.title ? { title: note.title } : {}),
+                body: note.body,
+                updated_at: note.updatedAt,
+              })),
+          }
+        : {}),
     },
     null,
     2,
@@ -139,43 +161,80 @@ const toSshProfile = (raw: Wire): SshProfile | null => {
   };
 };
 
-export const importSettings = (raw: string): boolean => {
-  let root: Wire | null;
+const toNote = (raw: Wire): Note | null => {
+  const id = text(raw, "id");
+  if (!id) return null;
+  return {
+    id,
+    title: text(raw, "title") ?? undefined,
+    body: text(raw, "body") ?? "",
+    updatedAt: number(raw, "updated_at") ?? Date.now(),
+  };
+};
+
+interface Backup {
+  values: Wire | null;
+  environments: EnvironmentProfile[];
+  keys: Array<[EnvironmentProfile, string]>;
+  bindings: Array<[string, string]>;
+  active: string;
+  ssh: SshProfile[];
+  notes: Note[] | null;
+}
+
+const parsed = (raw: string): Wire | null => {
   try {
-    root = JSON.parse(raw) as Wire | null;
+    const root = JSON.parse(raw) as Wire | null;
+    return root && typeof root === "object" && text(root, "app") === APP ? root : null;
   } catch {
-    return false;
+    return null;
   }
-  if (!root || typeof root !== "object" || text(root, "app") !== APP) return false;
+};
 
-  const values = root.settings;
-  if (values && typeof values === "object") applySettings(values as Wire);
+const readBackup = (raw: string): Backup | null => {
+  const root = parsed(raw);
+  if (!root) return null;
 
-  const environments = list(root, "environments")
-    .map(toEnvironment)
-    .filter((profile): profile is EnvironmentProfile => profile !== null);
-  if (environments.length) backend.save(environments);
-
-  for (const raw of list(root, "environments")) {
-    const profile = toEnvironment(raw);
-    const key = text(raw, "security_key");
-    if (profile && key) securityKeys.setFor(profile, key);
-  }
-
+  const environments = list(root, "environments");
   const bindings = root.shortcuts;
-  if (bindings && typeof bindings === "object") {
-    for (const [id, keys] of Object.entries(bindings as Wire)) {
-      if (typeof keys === "string") shortcuts.set(id, keys);
-    }
-  }
+  return {
+    values: root.settings && typeof root.settings === "object" ? (root.settings as Wire) : null,
+    environments: environments.map(toEnvironment).filter((profile): profile is EnvironmentProfile => profile !== null),
+    keys: environments.flatMap((entry) => {
+      const profile = toEnvironment(entry);
+      const key = text(entry, "security_key");
+      return profile && key ? [[profile, key] as [EnvironmentProfile, string]] : [];
+    }),
+    bindings:
+      bindings && typeof bindings === "object"
+        ? Object.entries(bindings as Wire).flatMap(([id, keys]) =>
+            typeof keys === "string" ? [[id, keys] as [string, string]] : [],
+          )
+        : [],
+    active: text(root, "active_environment") ?? "",
+    ssh: list(root, "ssh")
+      .map(toSshProfile)
+      .filter((profile): profile is SshProfile => profile !== null),
+    notes: "notes" in root ? list(root, "notes").map(toNote).filter((note): note is Note => note !== null) : null,
+  };
+};
 
-  const active = text(root, "active_environment");
-  if (active) backend.select(active);
+export const backupCounts = (raw: string): BackupCounts => {
+  const backup = readBackup(raw);
+  return { environments: backup?.environments.length ?? 0, notes: backup?.notes?.length ?? 0 };
+};
 
-  const profiles = list(root, "ssh")
-    .map(toSshProfile)
-    .filter((profile): profile is SshProfile => profile !== null);
-  if (profiles.length) sshStore.replaceAll(profiles);
+export const importSettings = (raw: string): boolean => {
+  const backup = readBackup(raw);
+  if (!backup) return false;
+
+  if (backup.values) applySettings(backup.values);
+  if (backup.environments.length) backend.save(backup.environments);
+  for (const [profile, key] of backup.keys) securityKeys.setFor(profile, key);
+  for (const [id, keys] of backup.bindings) shortcuts.set(id, keys);
+  if (backup.active) backend.select(backup.active);
+  if (backup.ssh.length) sshStore.replaceAll(backup.ssh);
+  if (backup.notes) notes.replaceAll(backup.notes);
 
   return true;
 };

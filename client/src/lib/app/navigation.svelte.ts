@@ -109,6 +109,12 @@ class Navigation {
     window.history.pushState(null, "", `${this.route}/${encodeURIComponent(value)}`);
   }
 
+  showSub(value: string) {
+    if (this.sub === value) return;
+    this.sub = value;
+    window.history.replaceState(null, "", `${this.route}/${encodeURIComponent(value)}`);
+  }
+
   closeSub() {
     if (this.sub !== null) window.history.back();
   }
@@ -121,6 +127,11 @@ class Navigation {
 
   openSettings(highlight: string | null = null) {
     this.settingsHighlight = highlight;
+    this.#closingSettings = false;
+    if (this.route === "/settings") {
+      this.clearSub();
+      return;
+    }
     this.navigate("/settings");
   }
 

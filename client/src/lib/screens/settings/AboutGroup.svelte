@@ -3,7 +3,9 @@
 
   import FileText from "@lucide/svelte/icons/file-text";
   import MonitorDown from "@lucide/svelte/icons/monitor-down";
+  import ScrollText from "@lucide/svelte/icons/scroll-text";
   import Share from "@lucide/svelte/icons/share";
+  import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import SquarePlus from "@lucide/svelte/icons/square-plus";
   import { APP_VERSION } from "$lib/data/build";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -39,6 +41,9 @@
   }
 
   const { flash = false }: Props = $props();
+
+  const PRIVACY_URL = "https://cconnect.dev/privacy";
+  const TERMS_URL = "https://cconnect.dev/terms";
 
   let changelogOpen = $state(false);
   let homeScreenOpen = $state(false);
@@ -187,6 +192,28 @@
     title={t("REPOSITORY")}
     summary={REPO_URL.replace("https://", "")}
     onclick={() => open(REPO_URL)}
+  >
+    {#snippet trailing()}
+      <ExternalIndicator />
+    {/snippet}
+  </PreferenceRow>
+
+  <PreferenceRow
+    icon={ShieldCheck}
+    title={t("PRIVACY_POLICY")}
+    summary={PRIVACY_URL.replace("https://", "")}
+    onclick={() => open(PRIVACY_URL)}
+  >
+    {#snippet trailing()}
+      <ExternalIndicator />
+    {/snippet}
+  </PreferenceRow>
+
+  <PreferenceRow
+    icon={ScrollText}
+    title={t("TERMS_OF_SERVICE")}
+    summary={TERMS_URL.replace("https://", "")}
+    onclick={() => open(TERMS_URL)}
   >
     {#snippet trailing()}
       <ExternalIndicator />

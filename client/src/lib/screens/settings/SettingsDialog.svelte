@@ -71,7 +71,7 @@
   const select = (id: SettingsSection) => {
     section = id;
     if (id === "general") navigation.clearSub();
-    else navigation.openSub(id);
+    else navigation.showSub(id);
   };
 
   $effect(() => {
