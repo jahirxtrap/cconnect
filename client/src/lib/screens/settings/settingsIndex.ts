@@ -4,6 +4,7 @@ import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { t } from "$lib/i18n/index.svelte";
 import { isDesktop, isTauri } from "$lib/platform";
 import { androidBackground } from "$lib/platform/androidBackground";
+import { webApp } from "$lib/platform/pwa.svelte";
 import { describe, shortcuts, SHORTCUTS } from "$lib/platform/shortcuts.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
 import { SETTINGS_SECTIONS, type SettingsSection } from "./sections";
@@ -162,6 +163,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "reset", label: "RESET_SETTINGS", summary: "RESET_SETTINGS_SUMMARY", section: "recovery", group: "SETTINGS_RECOVERY", dialog: "reset" },
 
   { id: "about", label: "APP_NAME", section: "about", group: "ABOUT" },
+  { id: "install", label: "INSTALL_APP", summary: "INSTALL_APP_SUMMARY", available: () => webApp.offered, section: "about", group: "ABOUT" },
   { id: "support", label: "SUPPORT_CREATOR", section: "about", group: "ABOUT" },
   { id: "repository", label: "REPOSITORY", section: "about", group: "ABOUT" },
 ];

@@ -1,4 +1,4 @@
-import { isTauri, isTouch, platformName } from "./index";
+import { isTauri, isTouch, systemName } from "./index";
 import { store } from "./storage";
 
 export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project";
@@ -14,7 +14,7 @@ export interface ShortcutDef {
 
 const CUSTOM_KEY = "shortcuts";
 
-const MAC = platformName() === "macos";
+const APPLE = systemName() === "macos" || systemName() === "ios";
 
 const NAMED_KEYS: Record<string, string> = {
   ArrowUp: "↑",
@@ -23,13 +23,13 @@ const NAMED_KEYS: Record<string, string> = {
   ArrowRight: "→",
   Escape: "Esc",
   Delete: "Del",
-  Backspace: MAC ? "⌫" : "Backspace",
+  Backspace: APPLE ? "⌫" : "Backspace",
   Space: "Space",
 };
 
 export const SHORTCUTS: ShortcutDef[] = [
-  { id: "tab.new", label: "SHORTCUT_TAB_NEW", scope: "chat", keys: "Mod+KeyT" },
-  { id: "tab.close", label: "SHORTCUT_TAB_CLOSE", scope: "chat", keys: "Mod+KeyW" },
+  { id: "tab.new", label: "SHORTCUT_TAB_NEW", scope: "chat", keys: "Mod+KeyT", web: "Alt+KeyT" },
+  { id: "tab.close", label: "SHORTCUT_TAB_CLOSE", scope: "chat", keys: "Mod+KeyW", web: "Alt+KeyW" },
   { id: "tab.next", label: "SHORTCUT_TAB_NEXT", scope: "chat", keys: "Ctrl+Tab" },
   { id: "tab.previous", label: "SHORTCUT_TAB_PREVIOUS", scope: "chat", keys: "Ctrl+Shift+Tab" },
   { id: "tab.moveNext", label: "SHORTCUT_TAB_MOVE_NEXT", scope: "chat", keys: "Alt+ArrowRight" },
@@ -37,14 +37,38 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "panel.left", label: "PANEL_LEFT", scope: "chat", keys: "Mod+KeyB" },
   { id: "panel.right", label: "PANEL_RIGHT", scope: "chat", keys: "" },
   { id: "panel.view", label: "VIEW_IN_CENTER", scope: "global", keys: "" },
-  { id: "terminal.tab.new", label: "SHORTCUT_TERMINAL_TAB_NEW", scope: "terminal", keys: "Mod+KeyT" },
-  { id: "terminal.tab.close", label: "SHORTCUT_TERMINAL_TAB_CLOSE", scope: "terminal", keys: "Mod+KeyW" },
+  {
+    id: "terminal.tab.new",
+    label: "SHORTCUT_TERMINAL_TAB_NEW",
+    scope: "terminal",
+    keys: "Mod+KeyT",
+    web: "Alt+KeyT",
+  },
+  {
+    id: "terminal.tab.close",
+    label: "SHORTCUT_TERMINAL_TAB_CLOSE",
+    scope: "terminal",
+    keys: "Mod+KeyW",
+    web: "Alt+KeyW",
+  },
   { id: "terminal.tab.next", label: "SHORTCUT_TERMINAL_TAB_NEXT", scope: "terminal", keys: "Ctrl+Tab" },
   { id: "terminal.tab.previous", label: "SHORTCUT_TERMINAL_TAB_PREVIOUS", scope: "terminal", keys: "Ctrl+Shift+Tab" },
   { id: "terminal.copy", label: "SHORTCUT_TERMINAL_COPY", scope: "terminal", keys: "Mod+KeyC" },
   { id: "terminal.paste", label: "SHORTCUT_TERMINAL_PASTE", scope: "terminal", keys: "Mod+KeyV" },
-  { id: "browser.tab.new", label: "SHORTCUT_BROWSER_TAB_NEW", scope: "browser", keys: "Mod+KeyT" },
-  { id: "browser.tab.close", label: "SHORTCUT_BROWSER_TAB_CLOSE", scope: "browser", keys: "Mod+KeyW" },
+  {
+    id: "browser.tab.new",
+    label: "SHORTCUT_BROWSER_TAB_NEW",
+    scope: "browser",
+    keys: "Mod+KeyT",
+    web: "Alt+KeyT",
+  },
+  {
+    id: "browser.tab.close",
+    label: "SHORTCUT_BROWSER_TAB_CLOSE",
+    scope: "browser",
+    keys: "Mod+KeyW",
+    web: "Alt+KeyW",
+  },
   { id: "browser.tab.next", label: "SHORTCUT_BROWSER_TAB_NEXT", scope: "browser", keys: "Ctrl+Tab" },
   {
     id: "browser.tab.previous",
@@ -55,7 +79,13 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "browser.reload", label: "SHORTCUT_BROWSER_RELOAD", scope: "browser", keys: "Mod+KeyR", web: "" },
   { id: "browser.back", label: "SHORTCUT_BROWSER_BACK", scope: "browser", keys: "Alt+ArrowLeft" },
   { id: "browser.forward", label: "SHORTCUT_BROWSER_FORWARD", scope: "browser", keys: "Alt+ArrowRight" },
-  { id: "browser.address", label: "SHORTCUT_BROWSER_ADDRESS", scope: "browser", keys: "Mod+KeyL" },
+  {
+    id: "browser.address",
+    label: "SHORTCUT_BROWSER_ADDRESS",
+    scope: "browser",
+    keys: "Mod+KeyL",
+    web: "Alt+KeyL",
+  },
   { id: "browser.pick", label: "SHORTCUT_BROWSER_PICK", scope: "browser", keys: "Mod+Shift+KeyE" },
   { id: "browser.copy", label: "SHORTCUT_BROWSER_COPY", scope: "browser", keys: "Mod+KeyC" },
   { id: "browser.cut", label: "SHORTCUT_BROWSER_CUT", scope: "browser", keys: "Mod+KeyX" },
@@ -84,7 +114,7 @@ const BY_ID = new Map(SHORTCUTS.map((shortcut) => [shortcut.id, shortcut]));
 
 export type ShortcutKeys = Record<string, string>;
 
-const MOD = MAC ? "Meta" : "Ctrl";
+const MOD = APPLE ? "Meta" : "Ctrl";
 const MODIFIER_ORDER = ["Ctrl", "Alt", "Shift", "Meta"];
 
 const normalize = (keys: string): string => {
@@ -99,7 +129,7 @@ export const defaultKeys = (id: string): string => {
   const shortcut = BY_ID.get(id);
   if (!shortcut) return "";
   if (!isTauri && shortcut.web !== undefined) return normalize(shortcut.web);
-  if (MAC && shortcut.mac !== undefined) return normalize(shortcut.mac);
+  if (APPLE && shortcut.mac !== undefined) return normalize(shortcut.mac);
   return normalize(shortcut.keys);
 };
 
@@ -125,9 +155,9 @@ const keyLabel = (code: string): string => {
 
 const THIN_SPACE = " ";
 
-const META_LABEL = platformName() === "linux" ? "Super" : "Win";
+const META_LABEL = systemName() === "linux" ? "Super" : "Win";
 
-const MODIFIER_LABELS: Record<string, string> = MAC
+const MODIFIER_LABELS: Record<string, string> = APPLE
   ? { Ctrl: "⌃", Alt: "⌥", Shift: "⇧", Meta: "⌘" }
   : { Ctrl: "Ctrl", Alt: "Alt", Shift: "⇧", Meta: META_LABEL };
 

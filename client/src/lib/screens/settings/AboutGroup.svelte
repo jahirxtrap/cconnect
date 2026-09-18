@@ -2,6 +2,9 @@
   import Coffee from "@lucide/svelte/icons/coffee";
 
   import FileText from "@lucide/svelte/icons/file-text";
+  import MonitorDown from "@lucide/svelte/icons/monitor-down";
+  import Share from "@lucide/svelte/icons/share";
+  import SquarePlus from "@lucide/svelte/icons/square-plus";
   import { APP_VERSION } from "$lib/data/build";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -16,10 +19,13 @@
     type Release,
   } from "$lib/services/githubApi";
   import { isTauri, openExternal } from "$lib/platform";
+  import { webApp } from "$lib/platform/pwa.svelte";
   import { updater } from "$lib/services/updater.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppLogo from "$lib/ui/AppLogo.svelte";
+  import Button from "$lib/ui/Button.svelte";
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
+  import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ExternalIndicator from "$lib/ui/ExternalIndicator.svelte";
   import GithubIcon from "$lib/ui/GithubIcon.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
@@ -35,6 +41,7 @@
   const { flash = false }: Props = $props();
 
   let changelogOpen = $state(false);
+  let homeScreenOpen = $state(false);
   let owner = $state<Profile | null>(null);
   let contributor = $state<Profile | null>(null);
   let checking = $state(false);
@@ -149,6 +156,18 @@
     />
   </div>
 
+  {#if webApp.offered}
+    <PreferenceRow
+      icon={MonitorDown}
+      title={t("INSTALL_APP")}
+      summary={t("INSTALL_APP_SUMMARY")}
+      onclick={() => {
+        if (webApp.prompt) void webApp.install();
+        else homeScreenOpen = true;
+      }}
+    />
+  {/if}
+
   {@render profileRow(owner, t("CREATOR"))}
   {@render profileRow(contributor, t("CONTRIBUTOR"))}
 
@@ -174,6 +193,24 @@
     {/snippet}
   </PreferenceRow>
 </SettingsGroup>
+
+{#if homeScreenOpen}
+  <CompactDialog title={t("ADD_TO_HOME")} onDismiss={() => (homeScreenOpen = false)}>
+    {#snippet buttons()}
+      <Button onclick={() => (homeScreenOpen = false)} variant="outlined">{t("CLOSE")}</Button>
+    {/snippet}
+    <div class="flex flex-col gap-3">
+      <div class="flex items-center gap-3">
+        <Share size={20} class="shrink-0 text-on-surface-variant" />
+        <p class="min-w-0 flex-1 text-body-md">{t("ADD_TO_HOME_SHARE")}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <SquarePlus size={20} class="shrink-0 text-on-surface-variant" />
+        <p class="min-w-0 flex-1 text-body-md">{t("ADD_TO_HOME_ADD")}</p>
+      </div>
+    </div>
+  </CompactDialog>
+{/if}
 
 {#if changelogOpen}
   <ChangelogDialog load={() => releaseNotes(APP_VERSION)} onDismiss={() => (changelogOpen = false)} />

@@ -200,12 +200,18 @@ It's a plain static site, so it can be hosted anywhere and opened from any
 browser.
 
 Because the page is served over HTTPS, the browser only lets it reach a backend
-over **HTTPS/WSS** — so the web app pairs with the public mode: run
-`python run.py --expose tailscale` and add the server with its
-`https://<hostname>.<tailnet>.ts.net` URL and token. (For that reason the
-environment form on web offers only HTTPS; the native apps keep plain HTTP for
-local backends.) Updating is just a reload. It is hosted at
-https://app.cconnect.dev/.
+over **HTTPS/WSS**, so it pairs with either mode that terminates TLS:
+`cconnect expose tailnet` for a backend only your tailnet can reach, with no
+token to paste, or `cconnect expose tailscale` for the public Funnel, with its
+token. (For that reason the environment form on web offers only HTTPS; the
+native apps keep plain HTTP for local backends.) Updating is just a reload. It
+is hosted at https://app.cconnect.dev/.
+
+It can also be installed, and then it opens in its own window without the
+browser bar. **Install app** in Settings → Information opens the browser's own
+install dialog on Chrome and Edge; on the iPhone there is no such dialog, and no
+way to open one, so it shows the two steps instead: the share button in Safari's
+own bar, then *Add to Home Screen*. The entry disappears once it is installed.
 
 ## In the chat
 

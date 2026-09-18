@@ -54,6 +54,13 @@ files: `backend/core/release.py` (`VERSION`, and the two floors when they move),
 lightweight and unprefixed (`1.6.1`). An Android build rewrites the Cargo files
 from `tauri.conf.json` on its own.
 
+A release that only touches the client leaves `backend/core/release.py` where it is, so
+the server keeps the version it shipped with while the app moves on. The `pypi` job asks
+PyPI for that version before doing anything and skips building and publishing when it is
+already there — otherwise `uv publish` rebuilds the same wheel, finds the filename taken
+with a different hash and fails the release. `SUPPORTED_SERVER` only moves when the app
+genuinely needs a newer backend.
+
 `CHANGELOG.md` is replaced whole: no headers, versions or dates, one bullet per
 user-visible change written as what the user sees, minor work collapsed into the closing
 bullets, and the `> [!NOTE]` block with the web link at the end.

@@ -37,6 +37,10 @@ src/
   (`align="start"`), collision padding comes from `layout.menuPadding`, and the exit
   animation is `.menu-surface[data-state="closed"]` in `app.css`.
 - Every string goes through `t()` and lives in `lib/i18n/en.json` + `es.json`.
+- **`platformName()` answers `"web"` for anything outside Tauri**, so it says which build
+  is running, not which system. Anything that depends on the OS — ⌘ versus Ctrl, the
+  iPhone's install path — asks `systemName()`, which reads the agent either way. Mixing
+  them is what left the browser on a Mac showing Ctrl shortcuts.
 
 ## The pixel grid (`lib/ui/gridHeight.ts` + `design/tokens.css`)
 
@@ -92,6 +96,20 @@ overlay and the `preventDefault` swallows the drop that the textarea would have 
 `platform/fieldSizing.ts` for engines that lack it, plus `keepCaretInView`. Chromium has
 open caret bugs around that property, so do not "clean up" the polyfill without testing the
 composer: growth, caret while typing, and the caret shown when dragging text over it.
+
+## Installable web app
+
+`public/manifest.json` and `public/sw.js`, registered from `platform/pwa.svelte.ts` only
+outside Tauri and only over HTTPS. The worker **caches nothing**: it forwards same-origin
+GETs and lets everything else through. It exists because Chrome only promotes the install
+when there is a fetch handler, and caching the shell here would mean a stale app arguing
+with the server's `SUPPORTED_SERVER` floor — there is no offline mode to win, since the app
+does nothing without its backend.
+
+`beforeinstallprompt` is captured with `preventDefault()`, which silences Chrome's own
+banner and hands the promotion to **Install app** in Settings → Information. iOS fires no
+such event and exposes no install API, so there the same entry only spells out the two
+steps.
 
 ## Android
 

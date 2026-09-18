@@ -39,12 +39,19 @@ jobs:
       - name: Build installers
         run: |
           npm ci
-          npm run tauri build
+          if [ "$RUNNER_OS" = macOS ]; then
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+            npm run tauri build -- --target universal-apple-darwin
+            echo "BUNDLE_DIR=src-tauri/target/universal-apple-darwin/release/bundle" >> "$GITHUB_ENV"
+          else
+            npm run tauri build
+            echo "BUNDLE_DIR=src-tauri/target/release/bundle" >> "$GITHUB_ENV"
+          fi
 
       - name: Normalize asset names
         run: |
           version="${GITHUB_REF_NAME}"
-          cd src-tauri/target/release/bundle
+          cd "$BUNDLE_DIR"
           for file in nsis/*.exe msi/*.msi deb/*.deb rpm/*.rpm appimage/*.AppImage dmg/*.dmg; do
             [ -e "$file" ] || continue
             mv "$file" "$(dirname "$file")/cconnect-tauri-$version.${file##*.}"
@@ -61,8 +68,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          bundle=src-tauri/target/release/bundle
-          for file in $bundle/{nsis/*.exe,msi/*.msi,deb/*.deb,rpm/*.rpm,appimage/*.AppImage,dmg/*.dmg}; do
+          for file in $BUNDLE_DIR/{nsis/*.exe,msi/*.msi,deb/*.deb,rpm/*.rpm,appimage/*.AppImage,dmg/*.dmg}; do
             for attempt in 1 2 3; do
               gh release upload "$GITHUB_REF_NAME" "$file" --clobber && break
               [ "$attempt" = 3 ] && exit 1
@@ -147,11 +153,24 @@ jobs:
 
       - uses: astral-sh/setup-uv@v10.1.0
 
+      - name: Look up the published version
+        id: backend
+        run: |
+          version=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' backend/core/release.py)
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/cconnect/$version/json")
+          if [ "$code" = 200 ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build the backend
+        if: steps.backend.outputs.published == 'false'
         working-directory: backend
         run: uv build
 
       - name: Publish to PyPI
+        if: steps.backend.outputs.published == 'false'
         working-directory: backend
         run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/cconnect/
 
