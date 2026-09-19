@@ -528,6 +528,16 @@ _NO_BACKGROUND = (
 )
 
 
+_NO_BACKGROUND_ENV = {
+    "CLAUDE_CODE_DISABLE_BACKGROUND_TASKS": "1",
+    "CLAUDE_CODE_DISABLE_MCP_TASK_BACKGROUND": "1",
+}
+
+
+def _cli_env(account_id: Optional[str]) -> dict[str, str]:
+    return {**accounts.env_for(account_id), **_NO_BACKGROUND_ENV}
+
+
 async def _block_background(input_data, tool_use_id, context):
     if ((input_data or {}).get("tool_input") or {}).get("run_in_background"):
         return {
@@ -1138,7 +1148,7 @@ async def generate_title(transcript: str, account: Optional[str] = None) -> str:
         system_prompt="You write conversation titles. Reply with ONLY the title: 3-6 words, in the conversation's language, capitalised like a sentence, no quotes, no trailing punctuation.",
         setting_sources=[],
         cli_path=cli_manager.resolve_cli_path(),
-        env=accounts.env_for(target),
+        env=_cli_env(target),
     )
 
     parts: list[str] = []
@@ -1168,7 +1178,7 @@ async def generate_commit_message(context: str, account: Optional[str] = None) -
         system_prompt=claude_assets.commit_instructions(),
         setting_sources=[],
         cli_path=cli_manager.resolve_cli_path(),
-        env=accounts.env_for(target),
+        env=_cli_env(target),
     )
 
     parts: list[str] = []
@@ -1222,7 +1232,7 @@ async def ask_side_question(
         include_partial_messages=partial,
         cli_path=cli_manager.resolve_cli_path(),
         resume=resume_id,
-        env=accounts.env_for(accounts.resolve(account)),
+        env=_cli_env(accounts.resolve(account)),
         settings=json.dumps(_cli_settings(scope)),
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )
