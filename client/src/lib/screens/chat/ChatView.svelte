@@ -295,7 +295,7 @@
           bind:follow={chat.followBottom}
           onSharedLink={openShared}
           onSharedMenu={(url, filename) => (sharedLink = { url, filename })}
-          onSuggest={chat.viewOnly
+          onSuggest={chat.viewOnly || chat.streaming
             ? null
             : (item) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text))}
           sessionId={chat.sessionId}
