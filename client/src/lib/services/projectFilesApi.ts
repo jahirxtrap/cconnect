@@ -52,6 +52,14 @@ export const projectFileUrl = (
   profile: Profile = backend.active,
 ) => `${baseUrlOf(profile)}${projectBase(projectKey)}/file?path=${encodeURIComponent(path)}`;
 
+export const projectArchiveFileUrl = (
+  projectKey: string,
+  path: string,
+  inner: string,
+  profile: Profile = backend.active,
+) =>
+  `${baseUrlOf(profile)}${projectBase(projectKey)}/archive-file?path=${encodeURIComponent(path)}&inner=${encodeURIComponent(inner)}`;
+
 export const createProjectFilesApi = (client: HttpClient) => ({
   async tree(projectKey: string, path = ""): Promise<ProjectListing | null> {
     const data = await client.get<Wire>(`${projectBase(projectKey)}/tree`, { path });
@@ -62,6 +70,11 @@ export const createProjectFilesApi = (client: HttpClient) => ({
       tracked: data.tracked === true,
       unlocked: data.unlocked === true,
     };
+  },
+
+  async archive(projectKey: string, path: string, inner = ""): Promise<ProjectEntry[] | null> {
+    const data = await client.get<Wire[]>(`${projectBase(projectKey)}/archive`, { path, inner });
+    return Array.isArray(data) ? data.map(parseEntry) : null;
   },
 
   async search(projectKey: string, query: string): Promise<ProjectEntry[] | null> {

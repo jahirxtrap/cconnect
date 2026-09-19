@@ -666,7 +666,7 @@
   };
 
   useShortcut("shared.selectAll", () => {
-    if (!shortcutsEnabled || isEditing() || archive !== null || !entries.length) return false;
+    if (!shortcutsEnabled || isEditing() || !entries.length) return false;
     selectAll();
   });
   useShortcut("shared.copy", () => startIfAllowed("copy"));

@@ -15,7 +15,8 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { joined } from "$lib/data/format";
+  import { isArchive, joined } from "$lib/data/format";
+  import { openFilePreview } from "$lib/app/filePreview";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { formatDateShort } from "$lib/data/time";
@@ -25,7 +26,7 @@
   import { isTouch } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { projectFilesApi, type ProjectEntry } from "$lib/services/projectFilesApi";
+  import { projectArchiveFileUrl, projectFilesApi, type ProjectEntry } from "$lib/services/projectFilesApi";
   import { gitApi, type GitCommit, type GitRepo } from "$lib/services/gitApi";
   import { ProjectWatch } from "$lib/services/projectWatch.svelte";
   import { recallProject, rememberProject } from "./projectMemory";
@@ -55,6 +56,7 @@
 
   const { instant = false, elsewhere = false }: Props = $props();
 
+  const ARCHIVE_MARK = "!";
   const INDENT = 14;
   const BASE_INDENT = 8;
   const SEARCH_DELAY_MS = 200;
@@ -396,18 +398,43 @@
             ? "text-red"
             : "text-blue";
 
+  const archiveOf = (path: string) => path.split(ARCHIVE_MARK)[0];
+  const innerOf = (path: string) => path.split(ARCHIVE_MARK).slice(1).join(ARCHIVE_MARK);
+  const insideArchive = (path: string) => path.includes(ARCHIVE_MARK);
+  const opensArchive = (entry: ProjectEntry) => !entry.isDir && isArchive(entry.name);
+
+  const archiveChildren = async (key: string, path: string): Promise<ProjectEntry[] | null> => {
+    const inner = innerOf(path);
+    const found = await projectFilesApi.archive(key, archiveOf(path), inner);
+    if (!found) return null;
+    const base = inner ? `${path}/` : `${path}${ARCHIVE_MARK}`;
+    return found.map((entry) => ({ ...entry, path: `${base}${entry.name}` }));
+  };
+
   const toggle = async (entry: ProjectEntry) => {
     const key = projectKey;
     if (!key) return;
     const opening = !expanded[entry.path];
     expanded = { ...expanded, [entry.path]: opening };
     if (!opening || children[entry.path]) return;
-    const listing = await projectFilesApi.tree(key, entry.path);
-    if (listing && projectKey === key) children = { ...children, [entry.path]: listing.entries };
+    const archived = insideArchive(entry.path) || opensArchive(entry);
+    const entries = archived
+      ? await archiveChildren(key, entry.path)
+      : (await projectFilesApi.tree(key, entry.path))?.entries ?? null;
+    if (entries && projectKey === key) children = { ...children, [entry.path]: entries };
   };
 
   const open = (entry: ProjectEntry) => {
-    if (projectKey) openProjectFile(projectKey, entry.path, entry.status);
+    if (!projectKey) return;
+    if (insideArchive(entry.path)) {
+      openFilePreview({
+        url: projectArchiveFileUrl(projectKey, archiveOf(entry.path), innerOf(entry.path)),
+        name: entry.name,
+        onDelete: null,
+      });
+      return;
+    }
+    openProjectFile(projectKey, entry.path, entry.status);
   };
 
   const fold = (path: string) => {
@@ -415,7 +442,7 @@
   };
 
   const activate = (entry: ProjectEntry) => {
-    if (entry.isDir) void toggle(entry);
+    if (entry.isDir || opensArchive(entry)) void toggle(entry);
     else open(entry);
   };
 
@@ -781,7 +808,7 @@
   <Pressable onclick={action} {hover} class="flex w-full items-center gap-1.5 py-1.5 pr-4 text-left">
     <span style="width: {base + depth * INDENT}px" class="shrink-0"></span>
     <span class="flex size-4 shrink-0 items-center justify-center">
-      {#if entry.isDir}
+      {#if entry.isDir || opensArchive(entry)}
         <ChevronRight size={14} class="text-on-surface-variant {open ? 'rotate-90' : ''}" />
       {/if}
     </span>

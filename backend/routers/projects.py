@@ -2,8 +2,10 @@
 
 import asyncio
 
+from urllib.parse import quote
+
 from fastapi import APIRouter, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 
 from core.access import key_matches
@@ -75,6 +77,31 @@ async def projects_ws(ws: WebSocket):
     finally:
         pump_task.cancel()
         project_watch.hub.unsubscribe(queue)
+
+
+@router.get("/projects/{project_key}/archive")
+def project_archive(project_key: str, path: str, inner: str = Query(""), x_security_key: str = Header("")):
+    try:
+        return api_response(
+            data=project_files.archive_listing(_root(project_key), path, inner, key_matches(x_security_key))
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.get("/projects/{project_key}/archive-file")
+def project_archive_file(project_key: str, path: str, inner: str, x_security_key: str = Header("")):
+    try:
+        result = project_files.archive_member(_root(project_key), path, inner, key_matches(x_security_key))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if result is None:
+        raise HTTPException(status_code=404, detail="member not found")
+    chunks, filename, size = result
+    headers = {"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}"}
+    if size:
+        headers["Content-Length"] = str(size)
+    return StreamingResponse(chunks, headers=headers, media_type="application/octet-stream")
 
 
 @router.get("/projects/{project_key}/file")

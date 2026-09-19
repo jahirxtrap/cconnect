@@ -7,7 +7,7 @@ from typing import Optional
 
 from loguru import logger
 
-from services import chat_list, files, git
+from services import chat_list, files, git, shared
 
 _GIT_TIMEOUT = 30
 _SEARCH_LIMIT = 200
@@ -268,6 +268,20 @@ def resolve_file(root: Path, relpath: str, unlocked: bool = False) -> Optional[P
     if not _visible(index, inside, path.name, False, unlocked):
         return None
     return path
+
+
+def archive_listing(root: Path, relpath: str, inner: str = "", unlocked: bool = False) -> list[dict]:
+    path = resolve_file(root, relpath, unlocked)
+    if path is None:
+        raise ValueError("file not found")
+    return shared.archive_entries_at(path, inner)
+
+
+def archive_member(root: Path, relpath: str, inner: str, unlocked: bool = False):
+    path = resolve_file(root, relpath, unlocked)
+    if path is None:
+        return None
+    return shared.archive_member_stream_at(path, inner)
 
 
 def _line_count(path: Path) -> int:

@@ -456,7 +456,10 @@ def _archive_members(src: Path, kind: str) -> list[tuple[str, bool, int, float]]
 
 
 def archive_entries(relpath: str, inner: str = "") -> list[dict]:
-    src = content_path(_resolve(relpath))
+    return archive_entries_at(content_path(_resolve(relpath)), inner)
+
+
+def archive_entries_at(src: Path, inner: str = "") -> list[dict]:
     kind = archive_kind(src.name) if src.is_file() else None
     if kind is None:
         raise ValueError("not a supported archive")
@@ -484,7 +487,10 @@ def archive_entries(relpath: str, inner: str = "") -> list[dict]:
 
 
 def archive_member_stream(relpath: str, inner: str):
-    src = content_path(_resolve(relpath))
+    return archive_member_stream_at(content_path(_resolve(relpath)), inner)
+
+
+def archive_member_stream_at(src: Path, inner: str):
     kind = archive_kind(src.name) if src.is_file() else None
     if kind is None:
         return None
