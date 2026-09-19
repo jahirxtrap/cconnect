@@ -18,6 +18,8 @@ DESCRIPTION = (
     "copies them into the folder this backend serves, then answers with a ready link for "
     "each one. Use it whenever the user asks you to share, send, export or pass them "
     "something, and quote the links it returns instead of writing any path yourself. "
+    "One call takes every file you are handing over, however many there are: splitting "
+    "them across calls only litters the chat with repeated blocks. "
     "Set link for a big file or one that lives in the project: it is referenced where it "
     "is instead of copied, and the user sees it marked as a reference."
 )
