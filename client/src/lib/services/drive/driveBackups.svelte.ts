@@ -41,19 +41,26 @@ class DriveBackups {
   busy = $state(false);
   failed = $state(false);
 
+  #listing: Promise<void> | null = null;
+
   clear() {
     this.copies = [];
     this.failed = false;
   }
 
   async refresh() {
-    if (this.loading) return;
+    this.#listing ??= this.#list();
+    await this.#listing;
+  }
+
+  async #list() {
     this.loading = true;
     const token = await activeToken(false);
     const copies = token ? await listCopies(token) : null;
     if (copies) this.copies = copies;
     this.failed = copies === null;
     this.loading = false;
+    this.#listing = null;
   }
 
   async upload(options: UploadOptions): Promise<boolean> {

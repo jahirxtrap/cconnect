@@ -11,6 +11,8 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import android.view.View
 import androidx.core.content.IntentCompat
@@ -22,7 +24,6 @@ import org.json.JSONObject
 
 private const val SHARE_ATTEMPTS = 20
 private const val SHARE_RETRY_MS = 400L
-private const val OAUTH_SCHEME = "com.jahirtrap.cconnect"
 
 class MainActivity : TauriActivity() {
   override val handleBackNavigation = false
@@ -34,8 +35,6 @@ class MainActivity : TauriActivity() {
   private var content: WebView? = null
   private var pendingShare: String? = null
   private var shareAttempts = 0
-  private var pendingRedirect: String? = null
-  private var redirectAttempts = 0
   @Volatile private var safeArea: Insets = Insets.NONE
   @Volatile private var keyboard = 0
 
@@ -51,6 +50,13 @@ class MainActivity : TauriActivity() {
       }
     }
   }
+
+  private val googleConsent: ActivityResultLauncher<IntentSenderRequest> =
+    registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+      googleAuth.onConsent(result.data)
+    }
+
+  private val googleAuth by lazy { GoogleAuth(this, { content }, { googleConsent }) }
 
   private val createDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri: Uri? ->
     val pending = pendingSave ?: return@registerForActivityResult
@@ -69,7 +75,6 @@ class MainActivity : TauriActivity() {
     onBackPressedDispatcher.addCallback(this, backCallback)
     trackWindowInsets()
     takeShare(intent)
-    takeRedirect(intent)
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -77,28 +82,6 @@ class MainActivity : TauriActivity() {
     setIntent(intent)
     takeShare(intent)
     deliverShare()
-    takeRedirect(intent)
-    deliverRedirect()
-  }
-
-  private fun takeRedirect(intent: Intent?) {
-    val data = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.data ?: return
-    if (data.scheme != OAUTH_SCHEME) return
-    pendingRedirect = data.toString()
-    redirectAttempts = 0
-  }
-
-  private fun deliverRedirect() {
-    val url = pendingRedirect ?: return
-    val view = content ?: return
-    if (redirectAttempts++ > SHARE_ATTEMPTS) return
-    view.postDelayed({
-      view.evaluateJavascript(
-        "window.__cconnectOauth ? (window.__cconnectOauth(${JSONObject.quote(url)}), true) : false",
-      ) { accepted ->
-        if (accepted == "true") pendingRedirect = null else deliverRedirect()
-      }
-    }, SHARE_RETRY_MS)
   }
 
   private fun takeShare(intent: Intent?) {
@@ -180,9 +163,9 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(CodeScanner(), "AndroidQrScan")
     webView.addJavascriptInterface(installer, "AndroidInstaller")
     webView.addJavascriptInterface(Voice(), "AndroidVoice")
+    webView.addJavascriptInterface(googleAuth, "AndroidGoogleAuth")
     PastedContent(webView).install()
     deliverShare()
-    deliverRedirect()
   }
 
   inner class CodeScanner {

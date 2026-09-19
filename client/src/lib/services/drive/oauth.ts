@@ -1,14 +1,14 @@
 import { t } from "$lib/i18n/index.svelte";
-import { isDesktop, isTauri, openExternal } from "$lib/platform";
+import { isTauri, openExternal } from "$lib/platform";
+import { androidGoogleAuth, androidGoogleToken } from "$lib/platform/androidGoogleAuth";
 import { DRIVE_SCOPE, GOOGLE_OAUTH, googleClientId, request } from "./config";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const IDENTITY_URL = "https://accounts.google.com/gsi/client";
-const ANDROID_REDIRECT = "com.jahirtrap.cconnect:/oauth2redirect";
 const FORM_TYPE = "application/x-www-form-urlencoded";
-const WAIT_LIMIT_MS = 300_000;
+const NATIVE_TOKEN_MS = 3_300_000;
 const VERIFIER_BYTES = 32;
 const STATE_BYTES = 16;
 
@@ -45,7 +45,6 @@ interface Identity {
 
 declare global {
   interface Window {
-    __cconnectOauth?: (url: string) => void;
     google?: { accounts: { oauth2: Identity } };
   }
 }
@@ -76,7 +75,7 @@ const authUrl = (redirect: string, challenge: string, state: string): string =>
 
 const exchange = async (params: Record<string, string>): Promise<Tokens | null> => {
   const body = new URLSearchParams({ client_id: googleClientId(), ...params });
-  if (isDesktop && GOOGLE_OAUTH.desktopSecret) body.set("client_secret", GOOGLE_OAUTH.desktopSecret);
+  if (isTauri && GOOGLE_OAUTH.desktopSecret) body.set("client_secret", GOOGLE_OAUTH.desktopSecret);
   const response = await request(TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": FORM_TYPE },
@@ -92,7 +91,7 @@ const exchange = async (params: Record<string, string>): Promise<Tokens | null> 
   };
 };
 
-const desktopTokens = async (): Promise<Tokens | null> => {
+const loopbackTokens = async (): Promise<Tokens | null> => {
   const { invoke } = await import("@tauri-apps/api/core");
   const port = await invoke<number>("oauth_start").catch(() => 0);
   if (!port) return null;
@@ -106,35 +105,6 @@ const desktopTokens = async (): Promise<Tokens | null> => {
     code: answer.code,
     code_verifier: verifier,
     redirect_uri: redirect,
-    grant_type: "authorization_code",
-  });
-};
-
-const awaitRedirect = (): Promise<string> =>
-  new Promise((resolve) => {
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const finish = (url: string) => {
-      clearTimeout(timer);
-      delete window.__cconnectOauth;
-      resolve(url);
-    };
-    timer = setTimeout(() => finish(""), WAIT_LIMIT_MS);
-    window.__cconnectOauth = finish;
-  });
-
-const androidTokens = async (): Promise<Tokens | null> => {
-  const verifier = randomText(VERIFIER_BYTES);
-  const state = randomText(STATE_BYTES);
-  const redirected = awaitRedirect();
-  openExternal(authUrl(ANDROID_REDIRECT, await challengeOf(verifier), state));
-  const url = await redirected;
-  if (!url) return null;
-  const answer = new URLSearchParams(url.split("?")[1] ?? "");
-  if (!answer.get("code") || answer.get("state") !== state) return null;
-  return exchange({
-    code: answer.get("code") ?? "",
-    code_verifier: verifier,
-    redirect_uri: ANDROID_REDIRECT,
     grant_type: "authorization_code",
   });
 };
@@ -176,20 +146,26 @@ const webTokens = async (prompt: string): Promise<Tokens | null> => {
   });
 };
 
-export const connectTokens = (): Promise<Tokens | null> => {
-  if (isDesktop) return desktopTokens();
-  if (isTauri) return androidTokens();
-  return webTokens("consent");
+const nativeTokens = async (interactive: boolean): Promise<Tokens | null> => {
+  const token = await androidGoogleToken(interactive);
+  return token ? { accessToken: token, refreshToken: "", expiresAt: Date.now() + NATIVE_TOKEN_MS } : null;
 };
 
-export const silentTokens = (): Promise<Tokens | null> => (isTauri ? Promise.resolve(null) : webTokens(""));
+export const connectTokens = (): Promise<Tokens | null> => {
+  if (androidGoogleAuth()) return nativeTokens(true);
+  return isTauri ? loopbackTokens() : webTokens("consent");
+};
+
+export const silentTokens = (): Promise<Tokens | null> => {
+  if (androidGoogleAuth()) return nativeTokens(false);
+  return isTauri ? Promise.resolve(null) : webTokens("");
+};
 
 export const refreshTokens = (refreshToken: string): Promise<Tokens | null> =>
   exchange({ refresh_token: refreshToken, grant_type: "refresh_token" });
 
 export const cancelConnect = async () => {
-  window.__cconnectOauth?.("");
-  if (!isDesktop) return;
+  if (!isTauri) return;
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("oauth_cancel").catch(() => undefined);
 };

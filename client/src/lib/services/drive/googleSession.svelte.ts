@@ -1,4 +1,3 @@
-import { isTauri } from "$lib/platform";
 import { secureStore } from "$lib/platform/secureStorage";
 import { fetchUser, type DriveUser } from "./driveApi";
 import { cancelConnect, connectTokens, refreshTokens, revokeTokens, silentTokens, type Tokens } from "./oauth";
@@ -37,7 +36,7 @@ class GoogleSession {
 
   async token(): Promise<string> {
     if (this.#access && Date.now() < this.#expiresAt - EXPIRY_MARGIN_MS) return this.#access;
-    const tokens = this.#refresh ? await refreshTokens(this.#refresh) : isTauri ? null : await silentTokens();
+    const tokens = this.#refresh ? await refreshTokens(this.#refresh) : await silentTokens();
     if (!tokens) return "";
     this.#access = tokens.accessToken;
     this.#expiresAt = tokens.expiresAt;

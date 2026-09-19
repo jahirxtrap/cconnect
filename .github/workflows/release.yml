@@ -113,7 +113,8 @@ jobs:
       - name: Build APK
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
-          GOOGLE_CLIENT_ID_ANDROID: ${{ secrets.GOOGLE_CLIENT_ID_ANDROID }}
+          GOOGLE_CLIENT_ID_DESKTOP: ${{ secrets.GOOGLE_CLIENT_ID_DESKTOP }}
+          GOOGLE_CLIENT_SECRET_DESKTOP: ${{ secrets.GOOGLE_CLIENT_SECRET_DESKTOP }}
         run: |
           npm ci
           npm run tauri android build -- --apk --target aarch64

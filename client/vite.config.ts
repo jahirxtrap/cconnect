@@ -22,7 +22,6 @@ export default defineConfig(({ mode }) => {
       __GOOGLE_OAUTH__: JSON.stringify({
         desktopId: env.GOOGLE_CLIENT_ID_DESKTOP ?? "",
         desktopSecret: env.GOOGLE_CLIENT_SECRET_DESKTOP ?? "",
-        androidId: env.GOOGLE_CLIENT_ID_ANDROID ?? "",
         webId: env.GOOGLE_CLIENT_ID_WEB ?? "",
       }),
     },
