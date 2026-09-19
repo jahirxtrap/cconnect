@@ -1,7 +1,7 @@
 import { backupCounts, exportSettings, importSettings } from "$lib/data/backup";
 import { decryptBackup, encryptBackup } from "$lib/data/backupCrypto";
 import { platformName } from "$lib/platform";
-import { deleteCopy, downloadCopy, listCopies, uploadCopy, type DriveCopy } from "./driveApi";
+import { deleteCopy, downloadCopy, listCopies, uploadCopy, type DriveAuth, type DriveCopy } from "./driveApi";
 import { googleSession } from "./googleSession.svelte";
 
 const KEEP = 10;
@@ -24,11 +24,10 @@ export interface UploadOptions {
   password: string;
 }
 
-const activeToken = async (interactive: boolean): Promise<string> => {
-  const token = await googleSession.token();
-  if (token || !interactive) return token;
-  return (await googleSession.connect()) ? googleSession.token() : "";
-};
+const auth = (interactive: boolean): DriveAuth => ({
+  token: () => googleSession.access(interactive),
+  renew: () => googleSession.renew(interactive),
+});
 
 const fileName = (): string => {
   const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
@@ -55,10 +54,9 @@ class DriveBackups {
 
   async #list() {
     this.loading = true;
-    const token = await activeToken(false);
-    const copies = token ? await listCopies(token) : null;
+    const copies = await listCopies(auth(false));
     if (copies) this.copies = copies;
-    this.failed = copies === null;
+    this.failed = copies === null && googleSession.ready;
     this.loading = false;
     this.#listing = null;
   }
@@ -68,18 +66,15 @@ class DriveBackups {
     const payload = exportSettings({ notes: options.notes });
     const counts = backupCounts(payload);
     const content = options.password ? await encryptBackup(payload, options.password) : payload;
-    const token = await activeToken(true);
-    const copy = token
-      ? await uploadCopy(token, fileName(), content, {
-          device: DEVICE,
-          encrypted: options.password !== "",
-          environments: counts.environments,
-          notes: counts.notes,
-        })
-      : null;
+    const copy = await uploadCopy(auth(true), fileName(), content, {
+      device: DEVICE,
+      encrypted: options.password !== "",
+      environments: counts.environments,
+      notes: counts.notes,
+    });
     if (copy) {
       this.copies = [copy, ...this.copies];
-      await this.#prune(token);
+      await this.#prune();
     }
     this.failed = copy === null;
     this.busy = false;
@@ -88,8 +83,7 @@ class DriveBackups {
 
   async restore(copy: DriveCopy, password: string): Promise<RestoreResult> {
     this.busy = true;
-    const token = await activeToken(true);
-    const raw = token ? await downloadCopy(token, copy.id) : null;
+    const raw = await downloadCopy(auth(true), copy.id);
     const plain = raw === null ? null : copy.encrypted ? await decryptBackup(raw, password) : raw;
     const result: RestoreResult =
       raw === null ? "failed" : plain === null ? "password" : importSettings(plain) ? "ok" : "failed";
@@ -100,16 +94,15 @@ class DriveBackups {
 
   async remove(copy: DriveCopy): Promise<boolean> {
     this.busy = true;
-    const token = await activeToken(true);
-    const removed = token ? await deleteCopy(token, copy.id) : false;
+    const removed = await deleteCopy(auth(true), copy.id);
     if (removed) this.copies = this.copies.filter((item) => item.id !== copy.id);
     this.failed = !removed;
     this.busy = false;
     return removed;
   }
 
-  async #prune(token: string) {
-    for (const old of this.copies.slice(KEEP)) await deleteCopy(token, old.id);
+  async #prune() {
+    for (const old of this.copies.slice(KEEP)) await deleteCopy(auth(false), old.id);
     this.copies = this.copies.slice(0, KEEP);
   }
 }

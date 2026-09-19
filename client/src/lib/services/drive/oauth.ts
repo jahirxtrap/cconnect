@@ -8,7 +8,6 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const REVOKE_URL = "https://oauth2.googleapis.com/revoke";
 const IDENTITY_URL = "https://accounts.google.com/gsi/client";
 const FORM_TYPE = "application/x-www-form-urlencoded";
-const NATIVE_TOKEN_MS = 3_300_000;
 const VERIFIER_BYTES = 32;
 const STATE_BYTES = 16;
 
@@ -48,6 +47,8 @@ declare global {
     google?: { accounts: { oauth2: Identity } };
   }
 }
+
+let cancelWeb: (() => void) | null = null;
 
 const base64Url = (bytes: Uint8Array): string =>
   btoa(String.fromCharCode(...bytes))
@@ -123,15 +124,23 @@ const loadIdentity = (): Promise<Identity | null> =>
     document.head.append(script);
   });
 
-const webTokens = async (prompt: string): Promise<Tokens | null> => {
+const webTokens = async (): Promise<Tokens | null> => {
   const identity = await loadIdentity();
   if (!identity) return null;
   return new Promise((resolve) => {
+    let settled = false;
+    const settle = (tokens: Tokens | null) => {
+      if (settled) return;
+      settled = true;
+      cancelWeb = null;
+      resolve(tokens);
+    };
+    cancelWeb = () => settle(null);
     const client = identity.initTokenClient({
       client_id: googleClientId(),
       scope: DRIVE_SCOPE,
       callback: (response) =>
-        resolve(
+        settle(
           response.access_token
             ? {
                 accessToken: response.access_token,
@@ -140,31 +149,32 @@ const webTokens = async (prompt: string): Promise<Tokens | null> => {
               }
             : null,
         ),
-      error_callback: () => resolve(null),
+      error_callback: () => settle(null),
     });
-    client.requestAccessToken({ prompt });
+    client.requestAccessToken({ prompt: "consent" });
   });
 };
 
 const nativeTokens = async (interactive: boolean): Promise<Tokens | null> => {
   const token = await androidGoogleToken(interactive);
-  return token ? { accessToken: token, refreshToken: "", expiresAt: Date.now() + NATIVE_TOKEN_MS } : null;
+  return token ? { accessToken: token, refreshToken: "", expiresAt: 0 } : null;
 };
 
 export const connectTokens = (): Promise<Tokens | null> => {
   if (androidGoogleAuth()) return nativeTokens(true);
-  return isTauri ? loopbackTokens() : webTokens("consent");
+  return isTauri ? loopbackTokens() : webTokens();
 };
 
-export const silentTokens = (): Promise<Tokens | null> => {
-  if (androidGoogleAuth()) return nativeTokens(false);
-  return isTauri ? Promise.resolve(null) : webTokens("");
-};
+export const canRenewSilently = (): boolean => androidGoogleAuth() !== undefined;
+
+export const silentTokens = (): Promise<Tokens | null> =>
+  androidGoogleAuth() ? nativeTokens(false) : Promise.resolve(null);
 
 export const refreshTokens = (refreshToken: string): Promise<Tokens | null> =>
   exchange({ refresh_token: refreshToken, grant_type: "refresh_token" });
 
 export const cancelConnect = async () => {
+  cancelWeb?.();
   if (!isTauri) return;
   const { invoke } = await import("@tauri-apps/api/core");
   await invoke("oauth_cancel").catch(() => undefined);

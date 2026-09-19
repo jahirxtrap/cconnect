@@ -34,8 +34,10 @@
   let deleting = $state<DriveCopy | null>(null);
   let disconnecting = $state(false);
 
+  const linked = $derived(googleSession.connected && googleSession.ready);
+
   $effect(() => {
-    if (googleSession.connected) void driveBackups.refresh();
+    if (linked) void driveBackups.refresh();
   });
 
   const summary = (copy: DriveCopy) =>
@@ -113,7 +115,7 @@
     <Button onclick={dismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
 
-  {#if !googleSession.connected}
+  {#if !linked}
     <p class="text-body-md">{t("DRIVE_CONNECT_HINT")}</p>
     <div class="mt-3">
       <ActionButton
