@@ -214,7 +214,7 @@
 
 {#if paneLayer}
   <div
-    class="safe-area fixed inset-x-0 top-0 z-40 bg-surface"
+    class="safe-area fixed inset-x-0 top-0 z-40 bg-background"
     style="height: calc(100% - var(--keyboard, 0px)); {rightAccent}"
   >
     <PaneContent instant={instantLayout} centerView={false} {terminalCwd} />
