@@ -1,5 +1,6 @@
 """CConnect — FastAPI application entry point."""
 
+import asyncio
 import importlib
 import os
 import pkgutil
@@ -29,6 +30,8 @@ async def lifespan(app: FastAPI):
     data_migration.migrate()
     init_db()
     settings_store.load()
+    from services import accounts
+    await asyncio.to_thread(accounts.link_all_shared_dirs)
     paths.RUNTIME_FILE.write_text(f"PORT={PORT}\nPID={os.getpid()}\n", encoding="utf-8")
     system_monitor.setup_log_capture()
     ensure_subscription_auth()

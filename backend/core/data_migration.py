@@ -94,6 +94,16 @@ def _drop_stale_journals(source: Path) -> None:
             journal.unlink()
 
 
+def _files_under(root: Path):
+    for child in sorted(root.iterdir()):
+        if paths.is_link(child):
+            continue
+        if child.is_dir():
+            yield from _files_under(child)
+        else:
+            yield child
+
+
 def adopt(source: Path, replace: bool = False) -> list[str]:
     """Copy another data folder into this one, leaving the source untouched. `replace` overwrites."""
     if replace:
@@ -104,8 +114,8 @@ def adopt(source: Path, replace: bool = False) -> list[str]:
         paths.ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(settings_file, paths.ENV_FILE)
         taken.append(settings_file.name)
-    for item in sorted(source.rglob("*")):
-        if item.is_dir() or item.name in _PER_RUN:
+    for item in _files_under(source):
+        if item.name in _PER_RUN:
             continue
         relative = item.relative_to(source)
         if relative.parts[0] == paths.CACHE_DIR.name:

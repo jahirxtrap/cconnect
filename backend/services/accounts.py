@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -21,7 +22,7 @@ from typing import Optional
 
 from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import cli_settings, providers, settings_store
+from services import cli_settings, providers, sessions, settings_store
 
 _WINDOWS = sys.platform == "win32"
 
@@ -121,6 +122,7 @@ def env_for(account_id: Optional[str]) -> dict[str, str]:
     """Environment overrides to run the CLI as this account, with its shared config brought up to date."""
     path = config_dir(account_id)
     if path is not None:
+        link_shared_dirs(account_id)
         sync_shared_config(account_id)
     env = {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
     provider = provider_for(account_id)
@@ -204,9 +206,46 @@ def resolve(account_id: Optional[str], known: Optional[set[str]] = None) -> str:
     return account_id if account_id in ids else default_account(ids)
 
 
+def _adopt(item: Path, destination: Path) -> bool:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.replace(item, destination)
+    except OSError:
+        try:
+            shutil.copy2(item, destination)
+        except OSError:
+            return False
+    return True
+
+
+def _merge_dir(source: Path, target: Path) -> tuple[list[Path], bool]:
+    adopted: list[Path] = []
+    merged = True
+    for item in source.rglob("*"):
+        if item.is_dir():
+            continue
+        destination = target / item.relative_to(source)
+        if destination.exists():
+            continue
+        if _adopt(item, destination):
+            adopted.append(destination)
+        else:
+            merged = False
+    return adopted, merged
+
+
 def _link_dir(source: Path, target: Path) -> None:
-    if target.exists() or target.is_symlink():
-        return
+    if paths.is_link(target):
+        if target.resolve() == source.resolve():
+            return
+        _unlink_dir(target)
+    elif target.is_dir():
+        adopted, merged = _merge_dir(target, source)
+        if not merged:
+            return
+        shutil.rmtree(target, ignore_errors=True)
+        for path in adopted:
+            sessions.normalize_entrypoint(path)
     source.mkdir(parents=True, exist_ok=True)
     if _WINDOWS:
         subprocess.run(
@@ -232,6 +271,21 @@ def _unlink_dir(target: Path) -> None:
         target.unlink()
 
 
+def link_shared_dirs(account_id: str) -> None:
+    path = config_dir(account_id)
+    if path is None:
+        return
+    primary = primary_dir()
+    for name in _SHARED_DIRS:
+        _link_dir(primary / name, path / name)
+
+
+def link_all_shared_dirs() -> None:
+    for account in list_accounts():
+        if not account["primary"]:
+            link_shared_dirs(account["id"])
+
+
 def _slug(label: str, taken: set[str]) -> str:
     base = _ID_RE.sub("-", label.strip().lower()).strip("-") or "account"
     if base == PRIMARY_ID:
@@ -249,9 +303,8 @@ def create(label: str) -> dict:
     path = paths.ACCOUNTS_DIR / account_id
     path.mkdir(parents=True, exist_ok=True)
     (path / _META_FILE).write_text(json.dumps({"label": label.strip() or account_id}), encoding="utf-8")
+    link_shared_dirs(account_id)
     primary = primary_dir()
-    for name in _SHARED_DIRS:
-        _link_dir(primary / name, path / name)
     for name in _COPIED_FILES:
         source = primary / name
         if source.is_file():

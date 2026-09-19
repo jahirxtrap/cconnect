@@ -68,17 +68,19 @@ def _open_transcript(path: Path, mode: str):
 
 
 def normalize_session_entrypoint(cwd: str, session_id: str):
-    """Rewrite the SDK's "sdk-*" entrypoint to "cli"; `claude --resume` hides sdk sessions."""
     if not _SESSION_RE.match(session_id or ""):
         return
-    encoded = project_key_for(cwd)
-    path = _base() / encoded / f"{session_id}.jsonl"
+    normalize_entrypoint(_base() / project_key_for(cwd) / f"{session_id}.jsonl")
+
+
+def normalize_entrypoint(path: Path):
+    """Rewrite the SDK's "sdk-*" entrypoint to "cli"; `claude --resume` hides sdk sessions."""
     if not path.is_file():
         return
     with _open_transcript(path, "r") as src:
         if not any(_SDK_ENTRYPOINT_RE.search(line) for line in src):
             return
-    staged = path.with_name(f".{session_id}.jsonl.entrypoint")
+    staged = path.with_name(f".{path.name}.entrypoint")
     try:
         with _open_transcript(path, "r") as src, _open_transcript(staged, "w") as dst:
             for line in src:

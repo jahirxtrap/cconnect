@@ -1,6 +1,7 @@
 """Every path the backend owns, grouped by what the data is."""
 
 import os
+import stat
 from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -48,6 +49,16 @@ BROWSER_PROFILE_DIR = Path(os.environ.get("BROWSER_PROFILE_DIR") or CACHE_DIR / 
 
 SERVER_LOG_FILE = LOGS_DIR / "server.jsonl"
 DETACHED_LOG_FILE = LOGS_DIR / "detached.log"
+
+
+def is_link(path: Path) -> bool:
+    if path.is_symlink():
+        return True
+    try:
+        return bool(os.stat(path, follow_symlinks=False).st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+    except (OSError, AttributeError):
+        return False
+
 
 OWNED_DIRS = (
     CONFIG_DIR,
