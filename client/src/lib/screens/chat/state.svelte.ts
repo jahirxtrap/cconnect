@@ -634,22 +634,32 @@ export class ChatState {
     this.#sides = { ...rest, [sessionId]: pending };
   }
 
+  #dropUnborn() {
+    const sessionId = this.sessionId;
+    if (!sessionId || !this.list?.isLocal(sessionId)) return;
+    if (this.messages.some((item) => item.role === "assistant" && item.text.trim())) return;
+    this.list.removeSession(sessionId);
+  }
+
   #bindSession(sessionId: string | null) {
     if (!sessionId) return;
     const born = this.sessionId === null;
     const list = this.list;
     if (list && !list.sessions.some((item) => item.sessionId === sessionId)) {
-      list.upsertSession({
-        sessionId,
-        projectKey: this.projectKey,
-        path: this.cwd,
-        lastActive: Date.now() / MILLIS_PER_SECOND,
-        size: 0,
-        preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
-        title: null,
-        color: this.sessionColor,
-        activity: null,
-      });
+      list.upsertSession(
+        {
+          sessionId,
+          projectKey: this.projectKey,
+          path: this.cwd,
+          lastActive: Date.now() / MILLIS_PER_SECOND,
+          size: 0,
+          preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
+          title: null,
+          color: this.sessionColor,
+          activity: null,
+        },
+        true,
+      );
     }
     this.sessionId = sessionId;
     if (born) this.#claimPendingCategory(sessionId);
@@ -2179,6 +2189,7 @@ export class ChatState {
         }
         this.#resetStreaming();
         this.#interrupting = false;
+        this.#dropUnborn();
         this.#pumpQueue();
         if (this.#reloadOnDone && !this.streaming) {
           this.#reloadOnDone = false;

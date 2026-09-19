@@ -35,6 +35,8 @@ export class ChatListStore {
   trashEnabled = $state(false);
   settingsReady = $state(false);
 
+  #local = new Set<string>();
+
   #socket: ReconnectingSocket;
   #settings: ReturnType<typeof createSettingsApi>;
 
@@ -76,15 +78,22 @@ export class ChatListStore {
     return this.sessions.filter((session) => !hidden.includes(session.projectKey ?? ""));
   }
 
-  upsertSession(session: SessionInfo) {
+  upsertSession(session: SessionInfo, local = false) {
     if (!session.sessionId) return;
+    if (local) this.#local.add(session.sessionId);
+    else this.#local.delete(session.sessionId);
     this.sessions = byLastActive([
       ...this.sessions.filter((item) => item.sessionId !== session.sessionId),
       session,
     ]);
   }
 
+  isLocal(sessionId: string): boolean {
+    return this.#local.has(sessionId);
+  }
+
   removeSession(sessionId: string) {
+    this.#local.delete(sessionId);
     this.sessions = this.sessions.filter((item) => item.sessionId !== sessionId);
     this.removePlacement(sessionId);
   }
