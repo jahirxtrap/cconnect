@@ -198,7 +198,6 @@
   "SERVER_BEHIND_ONE": "{1} cambio por aplicar",
   "SERVER_BEHIND_OTHER": "{1} cambios por aplicar",
   "SERVER_MODIFIED": "Tienes una versión modificada",
-  "SERVER_UPDATE_RESTART": "Reinicia el servidor para aplicarlo",
   "SERVER_NEW_VERSION": "Ya salió la versión {1}",
   "SERVER_UPDATE_FAILED": "La actualización no se completó",
   "COMPAT_CLI_OUTDATED": "Actualiza Claude Code en el servidor para evitar fallos",

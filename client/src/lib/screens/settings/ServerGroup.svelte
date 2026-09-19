@@ -43,7 +43,6 @@
   let repo = $state<ServerUpdate | null>(null);
   let checkingUpdate = $state(false);
   let updating = $state(false);
-  let pulled = $state(false);
   let failure = $state<string | null>(null);
 
   const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
@@ -66,6 +65,12 @@
       (backend.active?.port ?? 0) === localInfo.port,
   );
 
+  const applyUpdate = async () => {
+    if (!repo?.changed || repo.reloads) return;
+    if (packaged && managedHere) localServer.restart();
+    else await systemApi.restart();
+  };
+
   const updateLabel = $derived(
     updating
       ? t("SERVER_UPDATING")
@@ -78,7 +83,6 @@
 
   const checkUpdate = async () => {
     checkingUpdate = true;
-    pulled = false;
     failure = null;
     const result = await systemApi.checkUpdate();
     checkingUpdate = false;
@@ -90,15 +94,15 @@
     if (packaged && managedHere) {
       const output = await localServer.update();
       updating = false;
-      pulled = true;
       repo = await systemApi.checkUpdate();
       failure = output === null ? t("SERVER_UPDATE_FAILED") : null;
+      if (!failure) await applyUpdate();
       return;
     }
     const result = await systemApi.update();
     updating = false;
-    pulled = true;
     if (result) repo = result;
+    await applyUpdate();
   };
 
   const snapshot = $derived(serverSettings.snapshot);
@@ -219,8 +223,6 @@
         <p class="text-body-sm text-accent">
           {packaged ? t("SERVER_NEW_VERSION", repo?.latest ?? "") : plural("SERVER_BEHIND", repo?.behind ?? 0)}
         </p>
-      {:else if pulled && repo?.changed && !repo.reloads}
-        <p class="text-body-sm text-accent">{t("SERVER_UPDATE_RESTART")}</p>
       {:else if (repo?.tracked || packaged) && repo?.ok}
         <p class="text-body-sm text-on-surface-variant">
           {serverModified ? t("SERVER_MODIFIED") : t("UP_TO_DATE")}
