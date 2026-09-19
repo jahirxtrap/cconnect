@@ -35,6 +35,14 @@ _TRANSIENT_PATTERNS = (
 _USAGE_PATTERNS = ("rate limit", "rate_limit", "usage limit", "quota", "too many requests")
 _CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
 _SLOW_SECONDS = 15
+_BACKGROUND_RESULT = re.compile(r"moved to the background", re.IGNORECASE)
+
+
+def _result_text(block: Any) -> str:
+    raw = getattr(block, "content", None)
+    if isinstance(raw, str):
+        return raw
+    return " ".join(str(part.get("text", "")) for part in raw or [] if isinstance(part, dict))
 _MODEL_VARIANT = re.compile(r"\[[^\]]*\]$")
 
 
@@ -737,7 +745,14 @@ async def run_prompt(
     if style:
         overrides["outputStyle"] = style
     options_kwargs["settings"] = json.dumps(overrides)
-    status_state = {"slow": False, "last": 0.0, "compacting": False, "awaiting_user": False, "pending": set()}
+    status_state = {
+        "slow": False,
+        "last": 0.0,
+        "compacting": False,
+        "awaiting_user": False,
+        "background": False,
+        "pending": set(),
+    }
     hooks_map: dict[str, Any] = {
         "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
     }
@@ -782,6 +797,7 @@ async def run_prompt(
                     not status_state["slow"]
                     and not status_state["compacting"]
                     and not status_state["awaiting_user"]
+                    and not status_state["background"]
                     and not status_state["pending"]
                     and loop.time() - status_state["last"] > _SLOW_SECONDS
                 ):
@@ -1010,6 +1026,7 @@ async def run_prompt(
                                 tool_started[_bid] = loop.time()
                                 if emit is not None:
                                     status_state["pending"].add(_bid)
+                                    status_state["background"] = False
                     for event in _blocks_to_events(message.content, vis(), skip_streamed=partial, hidden_tool_ids=hidden_tool_ids):
                         if parent:
                             event["parent"] = parent
@@ -1024,6 +1041,8 @@ async def run_prompt(
                     for _b in getattr(message, "content", None) or []:
                         if type(_b).__name__ == "ToolResultBlock":
                             status_state["pending"].discard(getattr(_b, "tool_use_id", None))
+                            if _BACKGROUND_RESULT.search(_result_text(_b)):
+                                status_state["background"] = True
                 tu_mode = vis()["tool_use"]
                 if tu_mode != "off":
                     for block in getattr(message, "content", None) or []:
