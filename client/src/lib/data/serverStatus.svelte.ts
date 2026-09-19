@@ -1,6 +1,7 @@
 import { APP_VERSION, SUPPORTED_SERVER } from "./build";
 import { chatListFor } from "./chatList.svelte";
 import { compareVersions, satisfies } from "./compat";
+import { onWake } from "$lib/platform/wake";
 import { backend } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
 import { latestRelease, type Release } from "$lib/services/githubApi";
@@ -18,6 +19,7 @@ class ServerStatus {
   releaseChecked = $state(false);
 
   #releaseRequested = false;
+  #request = 0;
 
   readonly unauthorized = $derived(this.reachable && this.version?.gated === true && !this.version.authorized);
 
@@ -48,7 +50,11 @@ class ServerStatus {
       this.checking = true;
       void this.refresh();
       const timer = setInterval(() => void this.refresh(), POLL_MS);
-      return () => clearInterval(timer);
+      const stopWake = onWake(() => void this.refresh());
+      return () => {
+        clearInterval(timer);
+        stopWake();
+      };
     });
 
     $effect(() => {
@@ -76,7 +82,9 @@ class ServerStatus {
   }
 
   async refresh() {
+    const request = ++this.#request;
     const version = await capabilitiesApi.versionInfo();
+    if (request !== this.#request) return;
     this.version = version;
     this.reachable = version !== null;
     this.checking = false;

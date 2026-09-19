@@ -15,8 +15,10 @@ import {
 } from "$lib/data/chatModels";
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
+import { onWake } from "$lib/platform/wake";
 import type { TerminalInfo } from "./terminalApi";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
+import { backoffFor, CONNECT_TIMEOUT_MS } from "./socket";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
 export type ServerEvent =
@@ -155,9 +157,6 @@ export interface GenerationPatch {
 
 type Wire = Record<string, unknown>;
 
-const MAX_BACKOFF_MS = 15_000;
-const BASE_BACKOFF_MS = 1000;
-const MAX_BACKOFF_SHIFT = 4;
 const PING_MS = 20_000;
 const STALE_MS = 45_000;
 
@@ -317,6 +316,8 @@ export class ChatSocket {
   #closed = true;
   #attempts = 0;
   #timer: ReturnType<typeof setTimeout> | null = null;
+  #handshake: ReturnType<typeof setTimeout> | null = null;
+  #stopWake: (() => void) | null = null;
 
   #heartbeat: ReturnType<typeof setInterval> | null = null;
   #lastSeen = 0;
@@ -335,18 +336,20 @@ export class ChatSocket {
     this.#closed = false;
     this.#attempts = 0;
     this.#clearTimer();
+    this.#stopWake ??= onWake((stale) => this.#onWake(stale));
     this.#open();
-    document.addEventListener("visibilitychange", this.#onVisible);
   }
 
-  #onVisible = () => {
-    if (this.#closed || document.visibilityState !== "visible") return;
-    this.#lastSeen = Date.now();
-    if (this.#socket?.readyState === WebSocket.OPEN) return;
+  #onWake(stale: boolean) {
+    if (this.#closed) return;
+    if (!stale && this.#socket?.readyState === WebSocket.OPEN) {
+      this.#lastSeen = Date.now();
+      return;
+    }
     this.#attempts = 0;
     this.#clearTimer();
     this.#open();
-  };
+  }
 
   #startHeartbeat() {
     this.#stopHeartbeat();
@@ -371,8 +374,10 @@ export class ChatSocket {
   close() {
     this.#closed = true;
     this.#stopHeartbeat();
-    document.removeEventListener("visibilitychange", this.#onVisible);
+    this.#stopWake?.();
+    this.#stopWake = null;
     this.#clearTimer();
+    this.#clearHandshake();
     this.#generation++;
     this.#socket?.close(1000);
     this.#socket = null;
@@ -497,18 +502,32 @@ export class ChatSocket {
     this.#timer = null;
   }
 
+  #clearHandshake() {
+    if (this.#handshake !== null) clearTimeout(this.#handshake);
+    this.#handshake = null;
+  }
+
   #open() {
     const url = socketUrlOf(this.profile(), "/chat/ws");
     if (!url) return;
     const generation = ++this.#generation;
+    this.#clearHandshake();
     this.#socket?.close();
     this.onEvent(false, null, { type: "connecting" });
     const socket = new WebSocket(url);
     this.#socket = socket;
 
+    this.#handshake = setTimeout(() => {
+      this.#handshake = null;
+      if (generation !== this.#generation || socket.readyState === WebSocket.OPEN) return;
+      socket.close();
+      this.#drop("failed");
+    }, CONNECT_TIMEOUT_MS);
+
     socket.onopen = () => {
       if (generation !== this.#generation) return;
       this.#attempts = 0;
+      this.#clearHandshake();
       this.#startHeartbeat();
       this.onEvent(false, null, { type: "open" });
     };
@@ -527,9 +546,10 @@ export class ChatSocket {
 
   #drop(reason: string) {
     this.#stopHeartbeat();
+    this.#clearHandshake();
     this.onEvent(false, null, { type: "closed", reason });
     if (this.#closed || this.#timer !== null) return;
-    const backoff = Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS << Math.min(this.#attempts, MAX_BACKOFF_SHIFT));
+    const backoff = backoffFor(this.#attempts);
     this.#attempts++;
     this.#timer = setTimeout(() => {
       this.#timer = null;

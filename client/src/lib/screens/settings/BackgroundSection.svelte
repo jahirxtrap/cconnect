@@ -6,6 +6,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { androidBackground } from "$lib/platform/androidBackground";
+  import { onWake } from "$lib/platform/wake";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -27,16 +28,7 @@
   $effect(() => {
     const bridge = androidBackground();
     if (!bridge) return;
-    const refresh = () => (batteryIgnored = bridge.batteryOptimizationIgnored());
-    const target = window as unknown as { __cconnectResume?: () => void };
-    target.__cconnectResume = refresh;
-    document.addEventListener("visibilitychange", refresh);
-    window.addEventListener("focus", refresh);
-    return () => {
-      delete target.__cconnectResume;
-      document.removeEventListener("visibilitychange", refresh);
-      window.removeEventListener("focus", refresh);
-    };
+    return onWake(() => (batteryIgnored = bridge.batteryOptimizationIgnored()));
   });
 </script>
 
