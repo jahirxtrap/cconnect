@@ -1,5 +1,6 @@
 <script lang="ts">
   import Clock from "@lucide/svelte/icons/clock";
+  import Expand from "@lucide/svelte/icons/expand";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Languages from "@lucide/svelte/icons/languages";
   import ListOrdered from "@lucide/svelte/icons/list-ordered";
@@ -13,6 +14,7 @@
   import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
+  import { layout } from "$lib/platform/layout.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -106,6 +108,21 @@
       />
     {/snippet}
   </PreferenceRow>
+  {#if !layout.mobile}
+    <PreferenceRow
+      icon={Expand}
+      title={t("CHAT_FILES")}
+      summary={rowSummary("chat_files")}
+      onclick={() => (settings.chatViewFull = !settings.chatViewFull)}
+    >
+      {#snippet trailing()}
+        <CompactSwitch
+          checked={settings.chatViewFull}
+          onCheckedChange={(value) => (settings.chatViewFull = value)}
+        />
+      {/snippet}
+    </PreferenceRow>
+  {/if}
   {#if isDesktop}
     <PreferenceRow
       icon={DiscordIcon}

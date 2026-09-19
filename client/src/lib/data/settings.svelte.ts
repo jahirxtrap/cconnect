@@ -140,6 +140,13 @@ class Settings {
     this.#write("view_in_center", value);
   }
 
+  get chatViewFull() {
+    return this.#read<boolean>("chat_view_full");
+  }
+  set chatViewFull(value: boolean) {
+    this.#write("chat_view_full", value);
+  }
+
   get projectCommitOpen() {
     return this.#read<boolean>("project_commit_open");
   }

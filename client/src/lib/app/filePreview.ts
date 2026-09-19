@@ -1,9 +1,10 @@
+import { settings } from "$lib/data/settings.svelte";
 import { layout } from "$lib/platform/layout.svelte";
 import { panes } from "$lib/screens/chat/panes.svelte";
 import { navigation, type PreviewRequest } from "./navigation.svelte";
 
 export const openFilePreview = (request: PreviewRequest) => {
-  if (layout.mobile || !panes.open || navigation.route !== "/") {
+  if (layout.mobile || settings.chatViewFull || !panes.open || navigation.route !== "/") {
     panes.closePreview();
     navigation.openPreview(request);
     return;

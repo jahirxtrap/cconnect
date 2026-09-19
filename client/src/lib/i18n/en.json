@@ -45,6 +45,8 @@
   "FILES_LOCKED": "Files locked",
   "DIFF": "Changes",
   "VIEW_IN_CENTER": "View in the centre",
+  "CHAT_FILES": "Full view",
+  "CHAT_FILES_SUMMARY": "Open chat files outside the panel",
   "CHANGED_FILES": "Changed files",
   "NEXT_CHANGE": "Next change",
   "PREVIOUS_CHANGE": "Previous change",

@@ -4,6 +4,7 @@ import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { t } from "$lib/i18n/index.svelte";
 import { isDesktop, isTauri } from "$lib/platform";
 import { androidBackground } from "$lib/platform/androidBackground";
+import { layout } from "$lib/platform/layout.svelte";
 import { webApp } from "$lib/platform/pwa.svelte";
 import { describe, shortcuts, SHORTCUTS } from "$lib/platform/shortcuts.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
@@ -89,6 +90,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
+  { id: "chat_files", label: "CHAT_FILES", summary: "CHAT_FILES_SUMMARY", available: () => !layout.mobile, section: "client", group: "SETTINGS_CLIENT" },
   { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
 
   { id: "notifications", label: "NOTIFICATIONS", value: notificationsValue, section: "background", group: "BACKGROUND_GROUP", dialog: "notifications" },
