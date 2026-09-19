@@ -1,7 +1,9 @@
 package com.jahirtrap.cconnect
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -58,6 +60,10 @@ class MainActivity : TauriActivity() {
 
   private val googleAuth by lazy { GoogleAuth(this, { content }, { googleConsent }) }
 
+  private val link by lazy { BackgroundLink(this) }
+
+  private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
   private val createDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri: Uri? ->
     val pending = pendingSave ?: return@registerForActivityResult
     pendingSave = null
@@ -73,6 +79,7 @@ class MainActivity : TauriActivity() {
     }
     super.onCreate(savedInstanceState)
     onBackPressedDispatcher.addCallback(this, backCallback)
+    askNotifications()
     trackWindowInsets()
     takeShare(intent)
   }
@@ -82,6 +89,12 @@ class MainActivity : TauriActivity() {
     setIntent(intent)
     takeShare(intent)
     deliverShare()
+  }
+
+  private fun askNotifications() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) return
+    notifications.launch(Manifest.permission.POST_NOTIFICATIONS)
   }
 
   private fun takeShare(intent: Intent?) {
@@ -145,7 +158,20 @@ class MainActivity : TauriActivity() {
 
   override fun onResume() {
     super.onResume()
+    link.close()
     content?.evaluateJavascript("window.__cconnectResume && window.__cconnectResume()", null)
+  }
+
+  override fun onPause() {
+    super.onPause()
+    content?.evaluateJavascript("window.__cconnectBackground ? window.__cconnectBackground() : null") { payload ->
+      link.open(JSONObject("{\"value\":$payload}").optString("value"))
+    }
+  }
+
+  override fun onDestroy() {
+    link.close()
+    super.onDestroy()
   }
 
   private fun leave() {
@@ -185,7 +211,7 @@ class MainActivity : TauriActivity() {
   ) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
     if (requestCode != Dictation.PERMISSION_REQUEST) return
-    dictation.onPermissionResult(grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED)
+    dictation.onPermissionResult(grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED)
   }
 
   inner class Voice {

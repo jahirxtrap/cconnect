@@ -354,11 +354,15 @@ export class ChatSocket {
   #startHeartbeat() {
     this.#stopHeartbeat();
     this.#lastSeen = Date.now();
+    let beat = Date.now();
     this.#heartbeat = setInterval(() => {
+      const now = Date.now();
+      const throttled = now - beat > PING_MS * 2;
+      beat = now;
       const socket = this.#socket;
       if (socket?.readyState !== WebSocket.OPEN) return;
-      const idle = Date.now() - this.#lastSeen;
-      if (idle > STALE_MS) {
+      const idle = now - this.#lastSeen;
+      if (idle > STALE_MS && !throttled) {
         socket.close();
         return;
       }
