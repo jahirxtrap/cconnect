@@ -55,6 +55,8 @@ export class ChatListStore {
         },
       },
       () => profile,
+      0,
+      true,
     );
     this.#socket.connect();
   }

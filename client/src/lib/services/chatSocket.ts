@@ -15,6 +15,7 @@ import {
 } from "$lib/data/chatModels";
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
+import { nativeSockets, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
 import type { TerminalInfo } from "./terminalApi";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
@@ -22,7 +23,7 @@ import { backoffFor, CONNECT_TIMEOUT_MS } from "./socket";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
 export type ServerEvent =
-  | { type: "connecting" }
+  | { type: "connecting"; resumed?: boolean }
   | { type: "open" }
   | {
       type: "ready";
@@ -342,13 +343,13 @@ export class ChatSocket {
 
   #onWake(stale: boolean) {
     if (this.#closed) return;
-    if (!stale && this.#socket?.readyState === WebSocket.OPEN) {
+    if ((nativeSockets() || !stale) && this.#socket?.readyState === WebSocket.OPEN) {
       this.#lastSeen = Date.now();
       return;
     }
     this.#attempts = 0;
     this.#clearTimer();
-    this.#open();
+    this.#open(true);
   }
 
   #startHeartbeat() {
@@ -511,14 +512,14 @@ export class ChatSocket {
     this.#handshake = null;
   }
 
-  #open() {
+  #open(resumed = false) {
     const url = socketUrlOf(this.profile(), "/chat/ws");
     if (!url) return;
     const generation = ++this.#generation;
     this.#clearHandshake();
     this.#socket?.close();
-    this.onEvent(false, null, { type: "connecting" });
-    const socket = new WebSocket(url);
+    this.onEvent(false, null, { type: "connecting", resumed });
+    const socket = openSocket(url, true);
     this.#socket = socket;
 
     this.#handshake = setTimeout(() => {

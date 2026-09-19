@@ -50,7 +50,10 @@ class ServerStatus {
       this.checking = true;
       void this.refresh();
       const timer = setInterval(() => void this.refresh(), POLL_MS);
-      const stopWake = onWake(() => void this.refresh());
+      const stopWake = onWake(() => {
+        this.checking = true;
+        void this.refresh();
+      });
       return () => {
         clearInterval(timer);
         stopWake();

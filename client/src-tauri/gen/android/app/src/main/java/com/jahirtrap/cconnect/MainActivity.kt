@@ -60,7 +60,7 @@ class MainActivity : TauriActivity() {
 
   private val googleAuth by lazy { GoogleAuth(this, { content }, { googleConsent }) }
 
-  private val link by lazy { BackgroundLink(this) }
+  private val link by lazy { BackgroundLink(this) { content } }
 
   private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
@@ -158,19 +158,17 @@ class MainActivity : TauriActivity() {
 
   override fun onResume() {
     super.onResume()
-    link.close()
+    link.onForeground()
     content?.evaluateJavascript("window.__cconnectResume && window.__cconnectResume()", null)
   }
 
   override fun onPause() {
     super.onPause()
-    content?.evaluateJavascript("window.__cconnectBackground ? window.__cconnectBackground() : null") { payload ->
-      link.open(JSONObject("{\"value\":$payload}").optString("value"))
-    }
+    link.onBackground()
   }
 
   override fun onDestroy() {
-    link.close()
+    link.closeAll()
     super.onDestroy()
   }
 
@@ -190,6 +188,7 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(installer, "AndroidInstaller")
     webView.addJavascriptInterface(Voice(), "AndroidVoice")
     webView.addJavascriptInterface(googleAuth, "AndroidGoogleAuth")
+    webView.addJavascriptInterface(link, "AndroidLink")
     PastedContent(webView).install()
     deliverShare()
   }

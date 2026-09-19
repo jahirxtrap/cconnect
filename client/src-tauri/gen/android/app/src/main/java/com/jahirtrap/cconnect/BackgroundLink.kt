@@ -7,6 +7,9 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -17,46 +20,82 @@ import org.json.JSONObject
 
 private const val CHANNEL_ID = "cconnect.chat"
 private const val PING_SECONDS = 20L
+private const val QUEUE_LIMIT = 2000
 private val BUSY = setOf("working", "slow", "compacting")
 
-class BackgroundLink(private val context: Context) {
+class BackgroundLink(private val context: Context, private val view: () -> WebView?) {
   private val client = OkHttpClient.Builder()
     .pingInterval(PING_SECONDS, TimeUnit.SECONDS)
     .readTimeout(0, TimeUnit.MILLISECONDS)
     .build()
 
-  private var socket: WebSocket? = null
-  private var doneTitle = ""
-  private var waitingTitle = ""
-  private val activity = mutableMapOf<String, String>()
-  private val titles = mutableMapOf<String, String>()
+  private val sockets = ConcurrentHashMap<String, WebSocket>()
+  private val queued = ConcurrentHashMap<String, MutableList<String>>()
+  private val activity = ConcurrentHashMap<String, String>()
+  private val titles = ConcurrentHashMap<String, String>()
 
-  fun open(payload: String) {
-    close()
-    val config = runCatching { JSONObject(payload) }.getOrNull() ?: return
-    val url = config.optString("url")
-    if (url.isEmpty()) return
-    doneTitle = config.optString("done")
-    waitingTitle = config.optString("waiting")
-    activity.clear()
-    titles.clear()
-    socket = client.newWebSocket(
+  @Volatile private var awake = true
+  @Volatile private var doneTitle = ""
+  @Volatile private var waitingTitle = ""
+
+  fun onForeground() {
+    awake = true
+    for (id in queued.keys.toList()) {
+      val pending = queued.remove(id) ?: continue
+      for (frame in pending) deliver(frame)
+    }
+  }
+
+  fun onBackground() {
+    awake = false
+  }
+
+  fun closeAll() {
+    for (socket in sockets.values) socket.cancel()
+    sockets.clear()
+    queued.clear()
+  }
+
+  @JavascriptInterface
+  fun reset() = closeAll()
+
+  @JavascriptInterface
+  fun notifications(done: String, waiting: String) {
+    doneTitle = done
+    waitingTitle = waiting
+  }
+
+  @JavascriptInterface
+  fun open(id: String, url: String) {
+    sockets.remove(id)?.cancel()
+    queued.remove(id)
+    sockets[id] = client.newWebSocket(
       Request.Builder().url(url.replaceFirst("ws", "http")).build(),
       object : WebSocketListener() {
-        override fun onMessage(webSocket: WebSocket, text: String) = onEvent(text)
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-          socket = null
+        override fun onOpen(webSocket: WebSocket, response: Response) = emit(id, "open", "")
+        override fun onMessage(webSocket: WebSocket, text: String) {
+          if (!awake) watch(text)
+          emit(id, "message", text)
         }
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = emit(id, "close", reason)
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) =
+          emit(id, "close", t.message ?: "failed")
       },
     )
   }
 
-  fun close() {
-    socket?.cancel()
-    socket = null
+  @JavascriptInterface
+  fun send(id: String, text: String) {
+    sockets[id]?.send(text)
   }
 
-  private fun onEvent(text: String) {
+  @JavascriptInterface
+  fun close(id: String) {
+    sockets.remove(id)?.cancel()
+    queued.remove(id)
+  }
+
+  private fun watch(text: String) {
     val event = runCatching { JSONObject(text) }.getOrNull() ?: return
     when (event.optString("type")) {
       "snapshot" -> {
@@ -109,5 +148,25 @@ class BackgroundLink(private val context: Context) {
         .setAutoCancel(true)
         .build(),
     )
+  }
+
+  private fun emit(id: String, kind: String, payload: String) {
+    val frame = JSONObject().put("id", id).put("kind", kind).put("payload", payload).toString()
+    if (awake) {
+      deliver(frame)
+      return
+    }
+    val pending = queued.getOrPut(id) { mutableListOf() }
+    synchronized(pending) {
+      if (pending.size >= QUEUE_LIMIT) pending.removeAt(0)
+      pending.add(frame)
+    }
+  }
+
+  private fun deliver(frame: String) {
+    val target = view() ?: return
+    target.post {
+      target.evaluateJavascript("window.__cconnectLink && window.__cconnectLink($frame)", null)
+    }
   }
 }

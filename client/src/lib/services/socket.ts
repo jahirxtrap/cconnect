@@ -1,3 +1,4 @@
+import { nativeSockets, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
 
@@ -34,6 +35,7 @@ export class ReconnectingSocket {
     private readonly handlers: SocketHandlers,
     private readonly profile: () => Profile = () => backend.active,
     private readonly pingSeconds = 0,
+    private readonly native = false,
   ) {}
 
   connect() {
@@ -62,7 +64,8 @@ export class ReconnectingSocket {
 
   #onWake(stale: boolean) {
     if (this.#closed) return;
-    if (!stale && this.#socket?.readyState === WebSocket.OPEN) return;
+    const trusted = this.native && nativeSockets();
+    if ((trusted || !stale) && this.#socket?.readyState === WebSocket.OPEN) return;
     this.#attempts = 0;
     this.#clearTimer();
     this.#open();
@@ -89,7 +92,7 @@ export class ReconnectingSocket {
     const generation = ++this.#generation;
     this.#clearHandshake();
     this.#socket?.close();
-    const socket = new WebSocket(url);
+    const socket = openSocket(url, this.native);
     socket.binaryType = "arraybuffer";
     this.#socket = socket;
 

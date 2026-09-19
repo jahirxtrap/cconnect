@@ -8,7 +8,7 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
-  import { handOverInBackground } from "$lib/platform/androidBackgroundLink";
+  import { publishNotificationTitles } from "$lib/platform/androidNotify";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { watchPresence } from "$lib/platform/discordPresence.svelte";
   import { mirrorNativeCopy } from "$lib/platform/clipboard";
@@ -44,7 +44,7 @@
   notifier.start((tabId) => {
     if (tabId) panes.reveal(tabId);
   });
-  handOverInBackground();
+  $effect(() => publishNotificationTitles());
   void desktop.start();
 
   useShortcut("tab.new", () => void panes.newTab());

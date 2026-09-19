@@ -1883,7 +1883,9 @@ export class ChatState {
     }
     switch (event.type) {
       case "connecting":
-        if (this.connection !== "connected" && this.connection !== "disconnected") this.connection = "connecting";
+        if (event.resumed || (this.connection !== "connected" && this.connection !== "disconnected")) {
+          this.connection = "connecting";
+        }
         break;
       case "open":
         this.#startSession(this.sessionId);
