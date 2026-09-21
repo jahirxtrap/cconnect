@@ -111,6 +111,7 @@ export type ServerEvent =
       items: Record<string, unknown>[];
       hasMore: boolean;
     }
+  | { type: "tail"; items: Record<string, unknown>[] }
   | {
       type: "interaction_request";
       replay: boolean;
@@ -437,6 +438,10 @@ export class ChatSocket {
 
   sendSetPermissionMode(mode: string) {
     this.#send({ type: "set_permission_mode", mode });
+  }
+
+  sendCloseResident() {
+    this.#send({ type: "close_resident" });
   }
 
   sendSetGeneration(patch: GenerationPatch) {
@@ -769,6 +774,8 @@ export class ChatSocket {
         return { type: "error", message: text(wire, "message") ?? "error" };
       case "api_error":
         return { type: "api_error", message: text(wire, "text") ?? "" };
+      case "tail":
+        return { type: "tail", items: list(wire, "items") };
       case "history_chunk":
         return {
           type: "history_chunk",

@@ -94,8 +94,10 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                 prompt_text, prompt_images = attachments_service.compose_prompt(text, attachments)
             resumed_sid = state.session_id
             resume_at = rewind_service.get_pending(resumed_sid)
+            resident = await session.resident()
             try:
                 async for event in run_prompt(
+                    resident=resident,
                     prompt=prompt_text,
                     images=prompt_images,
                     cwd=state.cwd,
@@ -425,6 +427,10 @@ async def chat_ws(ws: WebSocket):
                     session.state.permission_mode = msg.mode
                     await session.set_permission_mode(msg.mode)
                 await send({"type": "permission_mode", "mode": msg.mode})
+
+            elif mtype == "close_resident":
+                if session is not None:
+                    await session.release_resident()
 
             elif mtype == "set_visibility":
                 try:

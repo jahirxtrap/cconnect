@@ -16,6 +16,7 @@ import {
   accentValue,
   chatLanguageValue,
   chatsValue,
+  persistentValue,
   cliSourceValue,
   discordValue,
   cliValue,
@@ -64,6 +65,7 @@ export type SettingsDialog =
   | "discord"
   | "generation"
   | "permissions"
+  | "persistent"
   | "visibility"
   | "account"
   | "account_actions"
@@ -135,6 +137,10 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "trash", label: "TRASH", summary: "TRASH_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "chats" },
   { id: "retention", label: "RETENTION_DAYS", summary: "RETENTION_DAYS_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "chats" },
   { id: "retention_never", label: "RETENTION_NEVER", summary: "RETENTION_NEVER_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "chats" },
+
+  { id: "persistent_sessions", label: "PERSISTENT_SESSIONS", value: persistentValue, summary: "PERSISTENT_SESSIONS_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
+  { id: "persistent_grace", label: "PERSISTENT_GRACE", summary: "PERSISTENT_GRACE_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
+  { id: "persistent_limit", label: "PERSISTENT_LIMIT", summary: "PERSISTENT_LIMIT_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
 
   { id: "account", label: "ACCOUNT", value: accountValue, available: multipleAccounts, section: "server", group: "SETTINGS_SERVER", dialog: "account" },
   { id: "server", label: "SERVER_VERSION", section: "server", group: "SETTINGS_SERVER" },

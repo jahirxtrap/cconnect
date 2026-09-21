@@ -3,6 +3,7 @@
   import Eye from "@lucide/svelte/icons/eye";
   import Lock from "@lucide/svelte/icons/lock";
   import Shield from "@lucide/svelte/icons/shield";
+  import Flame from "@lucide/svelte/icons/flame";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Unplug from "@lucide/svelte/icons/unplug";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
@@ -24,6 +25,7 @@
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import ChatsDialog from "./ChatsDialog.svelte";
+  import PersistentDialog from "./PersistentDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
   import PrivacyDialog from "./PrivacyDialog.svelte";
   import { entryFor, entryHint, type SettingsDialog } from "./settingsIndex";
@@ -195,6 +197,14 @@
     onclick={() => (dialog = "chats")}
   />
 
+  <PreferenceRow
+    icon={Flame}
+    title={t("PERSISTENT_SESSIONS")}
+    summary={rowSummary("persistent_sessions")}
+    enabled={ready}
+    onclick={() => (dialog = "persistent")}
+  />
+
   {#if (capabilities?.accounts.length ?? 0) > 1}
     <PreferenceRow
       icon={CircleUser}
@@ -320,6 +330,15 @@
     retentionMin={snapshot.retentionMin}
     retentionMax={snapshot.retentionMax}
     onConfirm={(trash_enabled, retention_days) => void apply({ trash_enabled, retention_days })}
+    onDismiss={() => (dialog = null)}
+  />
+{:else if dialog === "persistent" && snapshot}
+  <PersistentDialog
+    sessions={snapshot.persistentSessions}
+    grace={snapshot.persistentGrace}
+    limit={snapshot.persistentLimit}
+    onConfirm={(persistent_sessions, persistent_grace, persistent_limit) =>
+      void apply({ persistent_sessions, persistent_grace, persistent_limit })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "privacy" && snapshot}

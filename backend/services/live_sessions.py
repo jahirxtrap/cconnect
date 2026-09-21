@@ -13,7 +13,7 @@ import uuid
 
 from loguru import logger
 
-from services import todos as todos_store
+from services import persistent_sessions, todos as todos_store
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -21,6 +21,8 @@ from services import todos as todos_store
 OUTBOX_MAX = 5000
 
 STOP_GRACE = 15.0
+
+TAIL_POLL = 1.0
 
 _CLOSE = object()
 
@@ -51,11 +53,17 @@ class LiveSession:
         self._transport = None
         self._stopping = False
         self._drained = asyncio.Event()
+        self._resident = None
+        self._cooldown = None
+        self._ending = False
+        self._tail = None
+        self._tail_count = None
+        self._tail_stamp = None
         self.turn_start_index = 0
 
     @property
     def running(self):
-        return self._worker is not None and not self._worker.done()
+        return self._worker is not None and not self._worker.done() and not self._ending
 
     @property
     def attached(self):
@@ -73,7 +81,9 @@ class LiveSession:
             if self._compacting:
                 return "compacting"
             return "slow" if self._health == "slow" else "working"
-        return "failed" if self._health == "failed" else None
+        if self._health == "failed":
+            return "failed"
+        return "persistent" if self._resident is not None and self._resident.connected else None
 
     def wanted(self):
         """What the attached sockets asked to see, so a turn never produces detail
@@ -95,6 +105,7 @@ class LiveSession:
                 event = entry.get("event")
                 if event is not None and event["seq"] <= last_seq:
                     await self._send_one(sink, {**event, "replay": True})
+        self._watch_transcript()
 
     async def detach(self, sink):
         """Drop one socket. The worker keeps running — it is not cancelled,
@@ -102,6 +113,85 @@ class LiveSession:
         receiving."""
         async with self._lock:
             self._sinks.pop(sink, None)
+        if not self._sinks:
+            self._schedule_cooldown()
+
+    def _watch_transcript(self):
+        if self._tail is None or self._tail.done():
+            self._tail = asyncio.create_task(self._tail_loop())
+
+    async def _tail_loop(self):
+        from services import sessions as sessions_service
+
+        try:
+            while self._sinks:
+                await asyncio.sleep(TAIL_POLL)
+                if self.running or not self._sinks:
+                    continue
+                sid, cwd = self.state.session_id, self.state.cwd
+                if not sid or not cwd:
+                    continue
+                project_key = sessions_service.project_key_for(cwd)
+                stamp = sessions_service.transcript_stamp(project_key, sid)
+                if stamp is None or stamp == self._tail_stamp:
+                    continue
+                self._tail_stamp = stamp
+                items = sessions_service.get_session_messages(
+                    project_key, sid, next(iter(self.wanted()), None)
+                )
+                known, self._tail_count = self._tail_count, len(items)
+                if known is None or len(items) <= known:
+                    continue
+                await self._emit({"type": "tail", "items": items[known:]})
+        except asyncio.CancelledError:
+            return
+
+    async def resident(self):
+        """The standing client this chat writes to, created on demand while the mode is on."""
+        if not persistent_sessions.enabled():
+            if self._resident is not None:
+                await self.release_resident()
+            return None
+        self._cancel_cooldown()
+        shape = persistent_sessions.shape_of(self.state.cwd, self.state.account, self.channel)
+        self._resident = await persistent_sessions.pool.take(self.channel, shape)
+        await persistent_sessions.pool.trim(persistent_sessions.limit(), registry.busy_channels() | {self.channel})
+        return self._resident
+
+    @property
+    def resident_alive(self):
+        return self._resident is not None and self._resident.connected
+
+    async def release_resident(self):
+        self._cancel_cooldown()
+        self._resident = None
+        dropped = await persistent_sessions.pool.drop(self.channel)
+        self._publish_activity(self.activity)
+        return dropped
+
+    def _cancel_cooldown(self):
+        if self._cooldown is not None:
+            self._cooldown.cancel()
+            self._cooldown = None
+
+    def _schedule_cooldown(self):
+        if self._resident is None:
+            return
+        self._cancel_cooldown()
+        self._cooldown = asyncio.create_task(self._cooldown_loop())
+
+    async def _cooldown_loop(self):
+        try:
+            while True:
+                await asyncio.sleep(persistent_sessions.grace())
+                if self._sinks:
+                    return
+                if self.running:
+                    continue
+                await self.release_resident()
+                return
+        except asyncio.CancelledError:
+            return
 
     async def _emit(self, event):
         async with self._lock:
@@ -197,7 +287,7 @@ class LiveSession:
         from services import sessions as sessions_service
 
         self._compacting = False
-        self._publish_activity("failed" if self._health == "failed" else None)
+        self._publish_activity(self.activity)
         if self.state.session_id and self.state.cwd:
             sessions_service.reassert_meta(
                 sessions_service.project_key_for(self.state.cwd), self.state.session_id
@@ -338,6 +428,7 @@ class LiveSession:
         self._cancelled.clear()
         self._result_seen = False
         self._compacting = compacting
+        self._ending = False
         self._health = None
         self._transport = None
         self._stopping = False
@@ -496,6 +587,13 @@ class LiveSession:
             await self._flush_inflight()
             await self._emit({"type": "interrupted" if self._stopping else "done"})
             self._settle()
+        finally:
+            self._ending = True
+            self._tail_count = None
+            self._tail_stamp = None
+            self._publish_activity(self.activity)
+            if self._resident is not None and not self._sinks:
+                self._schedule_cooldown()
 
 
 class SessionRegistry:
@@ -553,8 +651,25 @@ class SessionRegistry:
                 from services import sessions as sessions_service
 
                 sessions_service.forget_pinned(session.state.session_id)
+                asyncio.create_task(session.release_resident())
                 del self._sessions[channel]
                 self._idle_since.pop(channel, None)
+
+    def resident_channels(self):
+        return {channel for channel, session in self._sessions.items() if session.resident_alive}
+
+    def busy_channels(self):
+        return {
+            channel for channel, session in self._sessions.items()
+            if session.running or session.attached
+        }
+
+    async def cool_down(self, channel):
+        session = self._sessions.get(channel)
+        if session is None:
+            return False
+        await session.release_resident()
+        return True
 
 
 registry = SessionRegistry()

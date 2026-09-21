@@ -11,6 +11,9 @@ export interface SettingsSnapshot {
   browserView: boolean;
   suggestions: boolean;
   sdkAutoUpdate: boolean;
+  persistentSessions: boolean;
+  persistentGrace: number;
+  persistentLimit: number;
   outputStyle: string;
   mcpDisabled: string;
   showThinking: string;
@@ -45,6 +48,9 @@ export interface SettingsPatch {
   browser_view?: boolean;
   suggestions?: boolean;
   sdk_auto_update?: boolean;
+  persistent_sessions?: boolean;
+  persistent_grace?: number;
+  persistent_limit?: number;
   output_style?: string;
   mcp_disabled?: string;
   show_thinking?: string;
@@ -105,6 +111,9 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   browserView: effectiveBool(wire, "browser_view", false),
   suggestions: effectiveBool(wire, "suggestions", true),
   sdkAutoUpdate: effectiveBool(wire, "sdk_auto_update", true),
+  persistentSessions: effectiveBool(wire, "persistent_sessions", false),
+  persistentGrace: effectiveNum(wire, "persistent_grace", 120),
+  persistentLimit: effectiveNum(wire, "persistent_limit", 10),
   outputStyle: effectiveStr(wire, "output_style", "default"),
   mcpDisabled: effectiveStr(wire, "mcp_disabled", ""),
   showThinking: effectiveStr(wire, "show_thinking", "full"),

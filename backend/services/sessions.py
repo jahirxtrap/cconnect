@@ -157,6 +157,14 @@ def _last_compact_offset(path: Path, block: int = 1 << 20) -> int:
     return 0
 
 
+def transcript_stamp(project_key: str, session_id: str) -> Optional[tuple[int, int]]:
+    try:
+        stat = _session_file(project_key, session_id).stat()
+    except (ValueError, OSError):
+        return None
+    return (stat.st_mtime_ns, stat.st_size)
+
+
 def last_context_tokens(project_key: str, session_id: str, trashed: bool = False) -> Optional[int]:
     try:
         file = _session_file(project_key, session_id, trashed)

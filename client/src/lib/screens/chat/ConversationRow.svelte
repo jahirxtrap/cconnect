@@ -1,5 +1,6 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+  import Flame from "@lucide/svelte/icons/flame";
   import Plus from "@lucide/svelte/icons/plus";
   import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
@@ -98,6 +99,10 @@
   {:else if activity === "working"}
     <span class="inline-flex size-4 shrink-0 items-center justify-center">
       <LoadingIndicator size={9} fill />
+    </span>
+  {:else if activity === "persistent"}
+    <span class="inline-flex size-4 shrink-0 items-center justify-center" title={t("PERSISTENT_ALIVE")}>
+      <Flame size={12} class="text-accent" />
     </span>
   {/if}
   <div>

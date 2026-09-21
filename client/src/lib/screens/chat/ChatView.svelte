@@ -1,6 +1,7 @@
 <script lang="ts">
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
+  import Flame from "@lucide/svelte/icons/flame";
   import History from "@lucide/svelte/icons/history";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import SquarePen from "@lucide/svelte/icons/square-pen";
@@ -193,6 +194,7 @@
         spinner: false,
         text: chat.sessionId?.slice(0, SESSION_ID_PREVIEW) ?? t("NEW_CHAT"),
       };
+    if (activity === "persistent") return { dot: "bg-accent", spinner: false, text: t("PERSISTENT_ALIVE") };
     return {
       dot: "bg-green",
       spinner: false,
@@ -237,6 +239,11 @@
           }}
         >
           <History size={20} />
+        </TooltipIconButton>
+      {/if}
+      {#if activity === "persistent"}
+        <TooltipIconButton label={t("PERSISTENT_CLOSE")} onclick={() => chat.closeResident()}>
+          <Flame size={20} class="text-accent" />
         </TooltipIconButton>
       {/if}
       <TaskIndicator todos={chat.todos} />

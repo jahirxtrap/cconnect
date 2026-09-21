@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 from urllib.parse import quote
@@ -16,7 +17,7 @@ from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server
 from mcps.media import block_types
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, diffs, providers, settings_store, visibility
+from services import claude_assets, cli_info, diffs, persistent_sessions, providers, settings_store, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
@@ -535,10 +536,17 @@ _NO_BACKGROUND_ENV = {
 
 
 def _cli_env(account_id: Optional[str]) -> dict[str, str]:
-    return {**accounts.env_for(account_id), **_NO_BACKGROUND_ENV}
+    from services import accounts
+
+    env = dict(accounts.env_for(account_id))
+    if not persistent_sessions.enabled():
+        env.update(_NO_BACKGROUND_ENV)
+    return env
 
 
 async def _block_background(input_data, tool_use_id, context):
+    if persistent_sessions.enabled():
+        return {}
     if ((input_data or {}).get("tool_input") or {}).get("run_in_background"):
         return {
             "hookSpecificOutput": {
@@ -641,6 +649,43 @@ async def _block_secrets(input_data, tool_use_id, context):
     return {}
 
 
+async def _resident_stream(resident, options, prompt_arg, on_transport) -> AsyncIterator[Any]:
+    """Write the turn to the standing client and read until the session closes the input."""
+    if not resident.connected:
+        await resident.connect(options)
+    from claude_agent_sdk import ResultMessage
+
+    client = resident.client
+    if on_transport is not None:
+        on_transport(getattr(client, "_transport", None))
+    inbox = resident.listen()
+    writer = asyncio.create_task(client.query(prompt_arg))
+    reader = asyncio.ensure_future(inbox.get())
+    answered = False
+    try:
+        while True:
+            waiters = {reader} if writer.done() else {reader, writer}
+            await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+            if not reader.done():
+                if answered:
+                    break
+                continue
+            message = reader.result()
+            reader = asyncio.ensure_future(inbox.get())
+            if message is None:
+                break
+            yield message
+            answered = isinstance(message, ResultMessage)
+            if answered and writer.done():
+                break
+    finally:
+        reader.cancel()
+        if not writer.done():
+            writer.cancel()
+        with suppress(asyncio.CancelledError, Exception):
+            await writer
+
+
 async def run_prompt(
     prompt: str,
     cwd: str,
@@ -663,6 +708,7 @@ async def run_prompt(
     capabilities: Optional[list[str]] = None,
     session_info: Optional[Callable[[], dict]] = None,
     on_transport: Optional[Callable[[Any], None]] = None,
+    resident: Optional[Any] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
@@ -715,14 +761,18 @@ async def run_prompt(
         enable_file_checkpointing=True,
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )
+    turn_emit = resident.emit if resident is not None else emit
+    turn_ask = resident.ask_user if resident is not None else ask_user
+    turn_compact = resident.request_compact if resident is not None else request_compact
+    turn_info = resident.session_info if resident is not None else session_info
     if scope["cconnect"] or scope["guides"]:
         options_kwargs["mcp_servers"] = {"cconnect": build_cconnect_server(
             {
-                "request_compact": request_compact,
-                "ask_user": ask_user,
-                "emit": emit,
+                "request_compact": turn_compact,
+                "ask_user": turn_ask,
+                "emit": turn_emit,
                 "account": account,
-                "session_info": session_info,
+                "session_info": turn_info,
                 "capabilities": list(capabilities or ()),
             },
             only=None if scope["cconnect"] else [SHARE_TOOL],
@@ -731,7 +781,7 @@ async def run_prompt(
     if tools is not True:
         allowed = tools if isinstance(tools, list) else []
         options_kwargs["tools"] = [*allowed, _SHARE_RULE] if scope["guides"] else allowed
-    session_env = dict(accounts.env_for(account))
+    session_env = _cli_env(account)
     if scope["search"]:
         session_env["ENABLE_TOOL_SEARCH"] = "true"
     window = cli_info.provider_window(model, account)
@@ -767,36 +817,39 @@ async def run_prompt(
         "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
     }
     loop = asyncio.get_running_loop() if emit is not None else None
-    if ask_user is not None:
-        base_can_use_tool = _build_can_use_tool(ask_user)
-        if emit is not None:
+    turn_status = resident.status if resident is not None else (lambda: status_state)
+
+    async def _clear_slow(state):
+        if not state.get("slow"):
+            return
+        state["slow"] = False
+        try:
+            await turn_emit({"type": "status", "kind": "ok"})
+        except Exception:
+            pass
+
+    if turn_ask is not None:
+        base_can_use_tool = _build_can_use_tool(turn_ask)
+        if turn_emit is not None:
             async def _can_use_tool_status(tool_name, tool_input, ctx):
-                status_state["awaiting_user"] = True
-                if status_state["slow"]:
-                    status_state["slow"] = False
-                    try:
-                        await emit({"type": "status", "kind": "ok"})
-                    except Exception:
-                        pass
+                state = turn_status()
+                state["awaiting_user"] = True
+                await _clear_slow(state)
                 try:
                     return await base_can_use_tool(tool_name, tool_input, ctx)
                 finally:
-                    status_state["awaiting_user"] = False
-                    status_state["last"] = loop.time()
+                    state["awaiting_user"] = False
+                    state["last"] = asyncio.get_running_loop().time()
             options_kwargs["can_use_tool"] = _can_use_tool_status
         else:
             options_kwargs["can_use_tool"] = base_can_use_tool
         hooks_map["PreToolUse"].append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))
-    if emit is not None:
+    if turn_emit is not None:
         async def _pre_compact(input_data, tool_use_id, context):
-            status_state["compacting"] = True
-            if status_state["slow"]:
-                status_state["slow"] = False
-                try:
-                    await emit({"type": "status", "kind": "ok"})
-                except Exception:
-                    pass
-            await emit({"type": "compacting", "trigger": (input_data or {}).get("trigger")})
+            state = turn_status()
+            state["compacting"] = True
+            await _clear_slow(state)
+            await turn_emit({"type": "compacting", "trigger": (input_data or {}).get("trigger")})
             return {}
         hooks_map["PreCompact"] = [HookMatcher(matcher=None, hooks=[_pre_compact])]
 
@@ -819,6 +872,19 @@ async def run_prompt(
     if hooks_map:
         options_kwargs["hooks"] = hooks_map
     options = ClaudeAgentOptions(**options_kwargs)
+
+    if resident is not None:
+        mark = {
+            "model": model,
+            "effort": effort_level,
+            "permission_mode": permission_mode,
+            "partial": partial,
+            "scope": scope["id"],
+            "style": overrides.get("outputStyle"),
+        }
+        if resident.connected and (resident.mark != mark or resume_at or fork):
+            await resident.close()
+        resident.mark = mark
 
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 
@@ -949,15 +1015,22 @@ async def run_prompt(
         if emit is not None:
             status_state["last"] = loop.time()
             watchdog_task = asyncio.create_task(_idle_watchdog())
-        transport = None
-        if on_transport is not None:
-            try:
-                transport = SubprocessCLITransport(prompt=prompt_arg, options=options)
-                on_transport(transport)
-            except Exception as exc:
-                logger.warning(f"no interruptible transport: {type(exc).__name__}: {exc}")
-                transport = None
-        async for message in query(prompt=prompt_arg, options=options, transport=transport):
+        if resident is not None:
+            resident.bind(
+                persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, session_info, status_state)
+            )
+            source = _resident_stream(resident, options, prompt_arg, on_transport)
+        else:
+            transport = None
+            if on_transport is not None:
+                try:
+                    transport = SubprocessCLITransport(prompt=prompt_arg, options=options)
+                    on_transport(transport)
+                except Exception as exc:
+                    logger.warning(f"no interruptible transport: {type(exc).__name__}: {exc}")
+                    transport = None
+            source = query(prompt=prompt_arg, options=options, transport=transport)
+        async for message in source:
             if emit is not None:
                 status_state["last"] = loop.time()
                 status_state["compacting"] = False
@@ -1129,6 +1202,8 @@ async def run_prompt(
     finally:
         if watchdog_task is not None:
             watchdog_task.cancel()
+        if resident is not None:
+            resident.unbind()
 
 
 async def generate_title(transcript: str, account: Optional[str] = None) -> str:

@@ -1072,6 +1072,10 @@ export class ChatState {
     if (this.connected) this.#socket.sendSetPermissionMode(mode || this.permissionMode);
   }
 
+  closeResident() {
+    if (this.connected) this.#socket.sendCloseResident();
+  }
+
   setModel(model: string) {
     this.onOverrides?.({ model });
     this.modelOverride = model;
@@ -1787,6 +1791,19 @@ export class ChatState {
     this.transcriptExhausted = !hasMore;
   }
 
+  #onTail(items: SessionMessage[]) {
+    const sessionId = this.sessionId;
+    const visible = sessionId ? items.filter(isVisible) : [];
+    if (!visible.length) return;
+    const appended = this.#nest(
+      visible.map((item, index) =>
+        this.#fromSession(item, this.#nextId + index, sessionId as string, this.projectKey),
+      ),
+    );
+    this.#nextId += visible.length;
+    this.messages = [...this.messages, ...appended];
+  }
+
   #upsertTodo(id: string, content: string | null, status: string | null) {
     if (!id) return;
     if (status === "deleted") {
@@ -2154,6 +2171,9 @@ export class ChatState {
         break;
       case "dequeued":
         this.#onDequeued(event.ids, event.text, event.ts);
+        break;
+      case "tail":
+        this.#onTail(event.items.map(parseSessionMessage));
         break;
       case "history_chunk":
         this.#onHistoryChunk(

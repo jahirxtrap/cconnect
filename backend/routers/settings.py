@@ -7,7 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 
 from core.responses import api_response
-from services import cli_settings, settings_store
+from services import cli_settings, persistent_sessions, settings_store
 
 router = APIRouter(tags=["Settings"])
 
@@ -22,18 +22,22 @@ def get_settings():
 
 
 @router.post("/settings")
-def update_settings(body: dict[str, Any]):
+async def update_settings(body: dict[str, Any]):
     try:
         for key, value in body.items():
             owner = cli_settings if key in cli_settings.SETTINGS else settings_store
             owner.set(key, value)
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    if not persistent_sessions.enabled():
+        await persistent_sessions.pool.close_all()
     return api_response(data=_all())
 
 
 @router.post("/settings/reset")
-def reset_settings():
+async def reset_settings():
     settings_store.reset()
     cli_settings.reset()
+    if not persistent_sessions.enabled():
+        await persistent_sessions.pool.close_all()
     return api_response(data=_all())
