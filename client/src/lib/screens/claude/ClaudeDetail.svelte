@@ -206,8 +206,7 @@
 
   const memoryList = $derived([...(memories?.global ?? []), ...(memories?.project ?? [])]);
 
-  const scopeLabel = (scope: string) =>
-    scope === "global" ? t("MEMORY_GLOBAL") : scope === "repo" ? "CLAUDE.md" : t("MEMORIES");
+  const scopeLabel = (scope: string) => (scope === "global" ? t("MEMORY_GLOBAL") : t("MEMORIES"));
 
   const openMemory = (scope: string, name: string) => {
     const project = scope === "global" ? null : memoriesProject;

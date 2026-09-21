@@ -261,6 +261,12 @@ def _project_path(project_key: str) -> Path | None:
 _MEMORY_NAME_RE = re.compile(r"^[\w.\- ]+\.md$")
 
 
+def _repo_memory(root: Path) -> Path:
+    claude = root / "CLAUDE.md"
+    agents = root / "AGENTS.md"
+    return agents if not claude.is_file() and agents.is_file() else claude
+
+
 def _memory_file(scope: str, project_key: str, name: str) -> Path:
     if scope == "global":
         return _CLAUDE_DIR / "CLAUDE.md"
@@ -268,7 +274,7 @@ def _memory_file(scope: str, project_key: str, name: str) -> Path:
         root = _project_path(project_key)
         if root is None:
             raise ValueError("unknown project")
-        return root / "CLAUDE.md"
+        return _repo_memory(root)
     if scope == "memory":
         if not re.match(r"^[A-Za-z0-9._-]+$", project_key or "") or set(project_key) == {"."}:
             raise ValueError("invalid project key")
@@ -284,8 +290,9 @@ def list_memories(project_key: str | None) -> dict:
         out["global"].append({"scope": "global", "name": "CLAUDE.md", "description": None})
     if project_key:
         root = _project_path(project_key)
-        if root is not None and (root / "CLAUDE.md").is_file():
-            out["project"].append({"scope": "repo", "name": "CLAUDE.md", "description": str(root / "CLAUDE.md")})
+        repo_memory = _repo_memory(root) if root is not None else None
+        if repo_memory is not None and repo_memory.is_file():
+            out["project"].append({"scope": "repo", "name": repo_memory.name, "description": str(repo_memory)})
         memory_dir = _CLAUDE_DIR / "projects" / project_key / "memory"
         if memory_dir.is_dir():
             for file in sorted(memory_dir.glob("*.md")):
