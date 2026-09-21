@@ -131,7 +131,7 @@
 @supports (width: round(1px, 1px)) {
   :root {
     --chat-gap-lg: round(16px, var(--px-grid, 1px));
-    --chat-gap-sm: round(6px, var(--px-grid, 1px));
+    --chat-gap-sm: round(up, 6px, var(--px-grid, 1px));
     --chat-line-dense: round(19px, var(--px-grid, 1px));
     --chat-line-code: round(16.5px, var(--px-grid, 1px));
     --chat-pad-xs: round(2px, var(--px-grid, 1px));

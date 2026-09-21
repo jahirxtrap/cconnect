@@ -24,7 +24,7 @@
   import InteractionBlock from "./InteractionBlock.svelte";
   import PlanBlock from "./PlanBlock.svelte";
   import ToolBlock from "./ToolBlock.svelte";
-  import { gapAbove, gapBelow } from "./gaps";
+  import { gapAbove, gapBelow, NO_GAP } from "./gaps";
 
   interface Props {
     message: ChatMessage;
@@ -60,11 +60,11 @@
     component,
   }: Props = $props();
 
-  const top = $derived(gluedTop ? 0 : gapAbove(prevRole, message.role));
+  const top = $derived(gluedTop ? NO_GAP : gapAbove(prevRole, message.role));
   const bottom = $derived(gapBelow(message.role, nextRole));
 </script>
 
-<div class="w-full" style="padding-top: {top}px; padding-bottom: {bottom}px">
+<div class="w-full" style="padding-top: {top}; padding-bottom: {bottom}">
   {#if message.role === "user"}
     {@const content = userContent(message)}
     {@const showTime = message.timestamp !== null && settings.showTimestamps}

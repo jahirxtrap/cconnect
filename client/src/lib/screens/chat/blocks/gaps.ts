@@ -1,12 +1,8 @@
 import type { Role } from "$lib/data/chatModels";
 
-const token = (name: string, fallback: number) => {
-  const raw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name));
-  return Number.isFinite(raw) ? raw : fallback;
-};
-
-const BIG = () => token("--chat-gap-lg", 16);
-const SMALL = () => token("--chat-gap-sm", 6);
+const BIG = "var(--chat-gap-lg)";
+const SMALL = "var(--chat-gap-sm)";
+const NONE = "0px";
 
 const NOTICE: Role[] = ["api_error", "interrupted"];
 
@@ -34,25 +30,27 @@ const group = (role: Role | null): number => {
   return 3;
 };
 
-export const gapAbove = (prev: Role | null, current: Role): number => {
-  if (prev === null) return BIG();
-  if (prev === "interaction" && current === "interaction") return SMALL();
-  if (prev === current) return 0;
+export const gapAbove = (prev: Role | null, current: Role): string => {
+  if (prev === null) return BIG;
+  if (prev === "interaction" && current === "interaction") return SMALL;
+  if (prev === current) return NONE;
   if (isNotice(current) || isNotice(prev)) {
     const other = isNotice(current) ? prev : current;
-    if (other === "assistant") return BIG();
-    if (other === "user") return 0;
-    return SMALL();
+    if (other === "assistant") return BIG;
+    if (other === "user") return NONE;
+    return SMALL;
   }
   const a = group(prev);
   const b = group(current);
-  if (a !== 0 && b !== 0) return BIG();
-  if (current === "interaction") return SMALL();
-  return a === 1 || b === 1 ? 0 : SMALL();
+  if (a !== 0 && b !== 0) return BIG;
+  if (current === "interaction") return SMALL;
+  return a === 1 || b === 1 ? NONE : SMALL;
 };
 
-export const gapBelow = (current: Role, next: Role | null): number => {
-  if (next !== null) return 0;
-  if (isNotice(current) || current === "user") return 0;
-  return BIG();
+export const gapBelow = (current: Role, next: Role | null): string => {
+  if (next !== null) return NONE;
+  if (isNotice(current) || current === "user") return NONE;
+  return BIG;
 };
+
+export const NO_GAP = NONE;
