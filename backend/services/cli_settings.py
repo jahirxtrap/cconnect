@@ -111,6 +111,11 @@ def _stored(key: str) -> Any:
     return value if _valid(value, defn.type) else None
 
 
+def bypass_disabled() -> bool:
+    permissions = _read().get("permissions")
+    return isinstance(permissions, dict) and permissions.get("disableBypassPermissionsMode") == "disable"
+
+
 def get(key: str) -> Any:
     if key not in SETTINGS:
         raise KeyError(key)

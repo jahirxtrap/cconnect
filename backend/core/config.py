@@ -76,6 +76,14 @@ COMMANDS = [
 ]
 
 
+def _bypass_refused() -> bool:
+    if _RUNNING_AS_ROOT or os.environ.get("CLAUDE_CODE_RESTRICTED") == "1":
+        return True
+    from services import cli_settings
+
+    return cli_settings.bypass_disabled()
+
+
 def permission_modes() -> tuple[str, ...]:
     """Permission modes from the installed SDK, minus the ones this process cannot use."""
     try:
@@ -84,7 +92,7 @@ def permission_modes() -> tuple[str, ...]:
         modes = tuple(get_args(PermissionMode)) or _FALLBACK_PERMISSION_MODES
     except Exception:
         modes = _FALLBACK_PERMISSION_MODES
-    if _RUNNING_AS_ROOT:
+    if _bypass_refused():
         return tuple(mode for mode in modes if mode != "bypassPermissions")
     return modes
 
