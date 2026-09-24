@@ -39,6 +39,8 @@
 
   const chat = $derived(panes.focusedTab ? tabs.stateFor(panes.focusedTab) : tabs.state);
   const paneLayer = $derived(layout.mobile && panes.showingTool);
+  let paneOpened = $state(false);
+  const paneKept = $derived(paneOpened && layout.mobile && panes.kind !== "chat");
   const shownTab = $derived(layout.mobile && !paneLayer ? panes.focusedTab : tabs.active);
 
   const accentOf = (environmentId: string | null | undefined) => {
@@ -90,6 +92,10 @@
   let organizeOpen = $state(false);
   let dismissed = $state<CompatNotice[]>([]);
   let composerHeight = $state(0);
+
+  $effect(() => {
+    if (paneLayer) paneOpened = true;
+  });
 
   $effect(() =>
     navigation.intercept(() => {
@@ -212,10 +218,11 @@
   );
 </script>
 
-{#if paneLayer}
+{#if paneKept}
   <div
-    class="safe-area fixed inset-x-0 top-0 z-40 bg-background"
+    class="safe-area fixed inset-x-0 top-0 z-40 bg-background {paneLayer ? '' : 'invisible'}"
     style="height: calc(100% - var(--keyboard, 0px)); {rightAccent}"
+    inert={!paneLayer}
   >
     <PaneContent instant={instantLayout} centerView={false} {terminalCwd} />
   </div>

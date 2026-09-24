@@ -54,7 +54,7 @@
 
   $effect(() =>
     navigation.intercept(() => {
-      if (!navigation.chatActive || claudeDetail === null) return false;
+      if (!navigation.chatActive || !panes.open || claudeDetail === null) return false;
       claudeDetail = null;
       return true;
     }),
@@ -62,7 +62,7 @@
 
   $effect(() =>
     navigation.intercept(() => {
-      if (!navigation.chatActive || noteId === null) return false;
+      if (!navigation.chatActive || !panes.open || noteId === null) return false;
       closeNote();
       return true;
     }),

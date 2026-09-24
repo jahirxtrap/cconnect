@@ -217,15 +217,15 @@
     return true;
   };
 
-  const stepUp = () => {
-    if (showingFile) {
-      closeFile();
-      return true;
-    }
-    return leaveRepo() || leaveProject();
+  const leaveView = () => {
+    if (!showingFile) return leaveRepo();
+    closeFile();
+    return true;
   };
 
-  const stepBack = () => (isTouch ? cancelMode() || stepUp() : stepUp() || cancelMode());
+  const stepUp = () => leaveView() || leaveProject();
+
+  const stepBack = () => (isTouch ? cancelMode() || leaveView() : leaveView() || cancelMode());
 
   const onKeydown = (event: KeyboardEvent) => {
     if (event.key !== "Escape" || !engaged || isEditing()) return;

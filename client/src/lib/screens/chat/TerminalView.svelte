@@ -139,7 +139,7 @@
 
   $effect(() =>
     navigation.intercept(() => {
-      if (!navigation.chatActive || !managing) return false;
+      if (!navigation.chatActive || !focused || !managing) return false;
       managing = false;
       return true;
     }),
