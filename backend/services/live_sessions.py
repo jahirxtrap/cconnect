@@ -117,14 +117,20 @@ class LiveSession:
             self._schedule_cooldown()
 
     def _watch_transcript(self):
-        if self._tail is None or self._tail.done():
-            self._tail = asyncio.create_task(self._tail_loop())
+        if not self.resident_alive or (self._tail is not None and not self._tail.done()):
+            return
+        self._rebase_tail()
+        self._tail = asyncio.create_task(self._tail_loop())
+
+    def _rebase_tail(self):
+        self._tail_count = None
+        self._tail_stamp = None
 
     async def _tail_loop(self):
         from services import sessions as sessions_service
 
         try:
-            while self._sinks:
+            while self._sinks and self.resident_alive:
                 await asyncio.sleep(TAIL_POLL)
                 if self.running or not self._sinks:
                     continue
@@ -136,21 +142,22 @@ class LiveSession:
                 if stamp is None or stamp == self._tail_stamp:
                     continue
                 self._tail_stamp = stamp
-                items = sessions_service.get_session_messages(
-                    project_key, sid, next(iter(self.wanted()), None)
+                items = await asyncio.to_thread(
+                    sessions_service.get_session_messages, project_key, sid, next(iter(self.wanted()), None)
                 )
+                if self.running:
+                    continue
                 known, self._tail_count = self._tail_count, len(items)
                 if known is None or len(items) <= known:
                     continue
-                await self._emit({"type": "tail", "items": items[known:]})
+                await self._send({"type": "tail", "items": items[known:], "channel": self.channel})
         except asyncio.CancelledError:
             return
 
     async def resident(self):
         """The standing client this chat writes to, created on demand while the mode is on."""
         if not persistent_sessions.enabled():
-            if self._resident is not None:
-                await self.release_resident()
+            await self.release_resident()
             return None
         self._cancel_cooldown()
         shape = persistent_sessions.shape_of(self.state.cwd, self.state.account, self.channel)
@@ -164,10 +171,11 @@ class LiveSession:
 
     async def release_resident(self):
         self._cancel_cooldown()
+        if self._resident is None:
+            return
         self._resident = None
-        dropped = await persistent_sessions.pool.drop(self.channel)
+        await persistent_sessions.pool.drop(self.channel)
         self._publish_activity(self.activity)
-        return dropped
 
     def _cancel_cooldown(self):
         if self._cooldown is not None:
@@ -287,7 +295,6 @@ class LiveSession:
         from services import sessions as sessions_service
 
         self._compacting = False
-        self._publish_activity(self.activity)
         if self.state.session_id and self.state.cwd:
             sessions_service.reassert_meta(
                 sessions_service.project_key_for(self.state.cwd), self.state.session_id
@@ -589,10 +596,11 @@ class LiveSession:
             self._settle()
         finally:
             self._ending = True
-            self._tail_count = None
-            self._tail_stamp = None
+            self._rebase_tail()
             self._publish_activity(self.activity)
-            if self._resident is not None and not self._sinks:
+            if self._sinks:
+                self._watch_transcript()
+            else:
                 self._schedule_cooldown()
 
 
@@ -655,21 +663,11 @@ class SessionRegistry:
                 del self._sessions[channel]
                 self._idle_since.pop(channel, None)
 
-    def resident_channels(self):
-        return {channel for channel, session in self._sessions.items() if session.resident_alive}
-
     def busy_channels(self):
         return {
             channel for channel, session in self._sessions.items()
             if session.running or session.attached
         }
-
-    async def cool_down(self, channel):
-        session = self._sessions.get(channel)
-        if session is None:
-            return False
-        await session.release_resident()
-        return True
 
 
 registry = SessionRegistry()

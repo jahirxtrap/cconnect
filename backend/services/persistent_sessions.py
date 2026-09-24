@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, Optional
 
 from loguru import logger
 
-from services import settings_store
+from services import settings_store, visibility
 
 CLOSE_TIMEOUT = 20.0
 
@@ -57,8 +57,6 @@ class PersistentSession:
     def wanted(self) -> dict:
         turn = self.turn
         if turn is None or turn.wanted is None:
-            from services import visibility
-
             return visibility.defaults()
         return turn.wanted()
 
