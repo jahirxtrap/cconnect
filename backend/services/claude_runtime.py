@@ -224,6 +224,10 @@ def _settled_len(text: str) -> int:
     return max(cut, 0)
 
 
+def _flat(text: str) -> str:
+    return " ".join((text or "").split())
+
+
 def _stream_event_to_events(event: Any) -> list[dict]:
     """Map a raw Anthropic streaming event into incremental delta events."""
     if not isinstance(event, dict) or event.get("type") != "content_block_delta":
@@ -947,21 +951,23 @@ async def run_prompt(
             if not chips:
                 continue
             seen_users.add(uid)
+            wanted = _flat(text)
             begin = end = None
             for start in range(len(chips)):
                 acc = ""
                 for i in range(start, len(chips)):
                     acc = chips[i]["sent"] if i == start else acc + "\n" + chips[i]["sent"]
-                    if acc == text:
+                    flat = _flat(acc)
+                    if flat == wanted:
                         begin, end = start, i + 1
                         break
-                    if len(acc) >= len(text):
+                    if len(flat) >= len(wanted):
                         break
                 if begin is not None:
                     break
             if begin is None:
-                head = chips[0]["sent"] or ""
-                if not head or head not in text:
+                head = _flat(chips[0]["sent"])
+                if not head or head not in wanted:
                     continue
                 begin, end = 0, 1
             skipped, taken = chips[:begin], chips[begin:end]
