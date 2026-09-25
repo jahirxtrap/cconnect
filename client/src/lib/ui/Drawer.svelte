@@ -140,7 +140,7 @@
   $effect(() => {
     if (!open) return;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-    return pushDismiss(onDismiss);
+    return pushDismiss(onDismiss, { modal: false });
   });
 </script>
 
