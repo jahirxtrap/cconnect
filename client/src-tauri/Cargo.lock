@@ -574,7 +574,7 @@ dependencies = [
 
 [[package]]
 name = "cconnect"
-version = "1.9.5"
+version = "1.9.6"
 dependencies = [
  "base64 0.23.1",
  "discord-rich-presence",
