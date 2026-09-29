@@ -2112,6 +2112,9 @@ export class ChatState {
       case "compacting":
         this.compacting = true;
         break;
+      case "compacting_ended":
+        this.compacting = false;
+        break;
       case "status":
         if (!(this.#interrupting && event.kind === "slow")) {
           this.streamStatus = event.kind === "ok" ? null : event.kind;

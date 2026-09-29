@@ -229,6 +229,8 @@ class LiveSession:
             return
         if kind == "compacting":
             self._compacting = True
+        elif kind == "compacting_ended":
+            self._compacting = False
         elif kind == "compact":
             self._compacting = False
             self.turn_start_index = 0

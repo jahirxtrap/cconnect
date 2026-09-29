@@ -53,7 +53,8 @@ export type ServerEvent =
   | { type: "tool_result"; toolUseId: string | null; content: string | null; ms: number | null }
   | { type: "file_change"; id: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
   | { type: "shared"; id: string | null; files: SharedFile[] }
-  | { type: "compacting"; trigger: string | null }
+  | { type: "compacting" }
+  | { type: "compacting_ended" }
   | { type: "status"; kind: string }
   | { type: "compact"; trigger: string | null; preTokens: number | null; postTokens: number | null; summary: string }
   | {
@@ -663,7 +664,9 @@ export class ChatSocket {
           files: sharedFilesFrom(wire.files),
         };
       case "compacting":
-        return { type: "compacting", trigger: text(wire, "trigger") };
+        return { type: "compacting" };
+      case "compacting_ended":
+        return { type: "compacting_ended" };
       case "status":
         return { type: "status", kind: text(wire, "kind") ?? "" };
       case "terminal_opened":

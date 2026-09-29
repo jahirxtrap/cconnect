@@ -849,14 +849,6 @@ async def run_prompt(
             options_kwargs["can_use_tool"] = base_can_use_tool
         hooks_map["PreToolUse"].append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))
     if turn_emit is not None:
-        async def _pre_compact(input_data, tool_use_id, context):
-            state = turn_status()
-            state["compacting"] = True
-            await _clear_slow(state)
-            await turn_emit({"type": "compacting", "trigger": (input_data or {}).get("trigger")})
-            return {}
-        hooks_map["PreCompact"] = [HookMatcher(matcher=None, hooks=[_pre_compact])]
-
         async def _idle_watchdog():
             while True:
                 await asyncio.sleep(4)
@@ -1014,6 +1006,7 @@ async def run_prompt(
     first_chunk_pending: set[int] = set()
     streamed_text: dict[int, str] = {}
     streamed_sent: dict[int, int] = {}
+    compacting_shown = False
 
     watchdog_task = None
     try:
@@ -1156,7 +1149,20 @@ async def run_prompt(
             elif isinstance(message, SystemMessage):
                 subtype = getattr(message, "subtype", None)
                 data = getattr(message, "data", None)
-                if subtype == "compact_boundary":
+                if subtype == "status":
+                    busy = isinstance(data, dict) and data.get("status") == "compacting"
+                    if emit is not None:
+                        status_state["compacting"] = busy
+                    if busy and not compacting_shown:
+                        compacting_shown = True
+                        if emit is not None:
+                            await _clear_slow(status_state)
+                        yield {"type": "compacting"}
+                    elif not busy and compacting_shown:
+                        compacting_shown = False
+                        yield {"type": "compacting_ended"}
+                elif subtype == "compact_boundary":
+                    compacting_shown = False
                     meta = (data or {}).get("compactMetadata", {}) if isinstance(data, dict) else {}
                     yield {
                         "type": "compact",
