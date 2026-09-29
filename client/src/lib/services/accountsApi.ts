@@ -1,36 +1,8 @@
+import { authWire, emptyAuth, type AuthInput } from "$lib/data/auth";
 import { serverDefaults } from "$lib/data/serverDefaults.svelte";
 import { transfers } from "$lib/data/transfers.svelte";
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
-
-export type ProviderAuthKind = "none" | "bearer" | "api_key" | "basic" | "header";
-
-export interface ProviderAuth {
-  kind: ProviderAuthKind;
-  token: string;
-  user: string;
-  password: string;
-  headerName: string;
-  headerValue: string;
-}
-
-export const emptyAuth = (): ProviderAuth => ({
-  kind: "none",
-  token: "",
-  user: "",
-  password: "",
-  headerName: "",
-  headerValue: "",
-});
-
-const authWire = (auth: ProviderAuth): Wire => ({
-  kind: auth.kind,
-  token: auth.token.trim(),
-  user: auth.user.trim(),
-  password: auth.password,
-  header_name: auth.headerName.trim(),
-  header_value: auth.headerValue.trim(),
-});
 
 export interface AccountProvider {
   baseUrl: string;
@@ -39,7 +11,7 @@ export interface AccountProvider {
 }
 
 export interface ProviderSettings extends AccountProvider {
-  auth: ProviderAuth;
+  auth: AuthInput;
 }
 
 export interface Account {
@@ -150,7 +122,7 @@ export const createAccountsApi = (client: HttpClient) => ({
   async updateProvider(
     id: string,
     baseUrl: string,
-    auth: ProviderAuth,
+    auth: AuthInput,
     contextScope: string,
   ): Promise<boolean> {
     const body = { base_url: baseUrl, auth: authWire(auth), context_scope: contextScope };
@@ -162,7 +134,7 @@ export const createAccountsApi = (client: HttpClient) => ({
   async createProvider(
     label: string,
     baseUrl: string,
-    auth: ProviderAuth,
+    auth: AuthInput,
     contextScope: string,
   ): Promise<Account | null> {
     const data = await client.post<Wire>("/accounts/provider", {

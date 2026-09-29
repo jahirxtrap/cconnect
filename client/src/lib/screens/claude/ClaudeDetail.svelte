@@ -22,6 +22,7 @@
   import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
+  import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
   import { joined, SEPARATOR } from "$lib/data/format";
   import { projectLabel, projectNameOf } from "$lib/data/models";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
@@ -42,6 +43,7 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
+  import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
@@ -111,6 +113,8 @@
   let mcpName = $state("");
   let mcpTarget = $state("");
   let mcpTransport = $state(TRANSPORTS[0]);
+  let mcpAuth = $state<AuthInput>(emptyAuth());
+  let mcpEnv = $state("");
 
   const title = $derived(
     kind === "plugins"
@@ -290,6 +294,8 @@
           mcpName = "";
           mcpTarget = "";
           mcpTransport = TRANSPORTS[0];
+          mcpAuth = emptyAuth();
+          mcpEnv = "";
           addingMcp = true;
         }}
       >
@@ -781,9 +787,10 @@
       <Button
         onclick={() => {
           addingMcp = false;
-          void runAction(() => claudeApi.mcpAdd(mcpName.trim(), mcpTarget.trim(), mcpTransport));
+          void runAction(() =>
+            claudeApi.mcpAdd(mcpName.trim(), mcpTarget.trim(), mcpTransport, mcpAuth, mcpEnv.split("\n")),
+          );
         }}
-       
         enabled={!!mcpName.trim() && !!mcpTarget.trim()}
       >
         {t("ADD")}
@@ -798,6 +805,17 @@
         onSelect={(value) => (mcpTransport = value)}
       />
       <InputField value={mcpTarget} oninput={(value) => (mcpTarget = value)} label={t("COMMAND_OR_URL")} singleLine />
+      {#if mcpTransport === "stdio"}
+        <InputField
+          value={mcpEnv}
+          oninput={(value) => (mcpEnv = value)}
+          label={t("MCP_ENV")}
+          placeholder={t("MCP_ENV_PLACEHOLDER")}
+          minLines={2}
+        />
+      {:else}
+        <AuthFields value={mcpAuth} kinds={AUTH_KINDS} onChange={(next) => (mcpAuth = next)} />
+      {/if}
     </div>
   </CompactDialog>
 {/if}

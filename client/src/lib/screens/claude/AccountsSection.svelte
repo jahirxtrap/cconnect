@@ -7,19 +7,14 @@
   import { openExternal } from "$lib/platform";
   import { downloadShared } from "$lib/services/sharedFiles";
   import { accountsStore } from "$lib/data/accountsStore.svelte";
+  import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
   import { accountIdOf } from "$lib/screens/settings/settingsIndex";
   import { useSettingsDialog } from "$lib/screens/settings/useSettingsDialog.svelte";
   import { accountSummary, scopeLabel } from "$lib/screens/settings/settingsValues";
-  import {
-    accountsApi,
-    emptyAuth,
-    type Account,
-    type ProviderAuth,
-    type ProviderAuthKind,
-    type ProviderProbe,
-  } from "$lib/services/accountsApi";
+  import { accountsApi, type Account, type ProviderProbe } from "$lib/services/accountsApi";
   import { settingsApi } from "$lib/services/settingsApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
+  import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
@@ -43,14 +38,6 @@
 
   const PROBE_PREVIEW = 8;
 
-  const AUTH_OPTIONS = [
-    { value: "none", label: t("AUTH_NONE") },
-    { value: "bearer", label: t("AUTH_BEARER") },
-    { value: "api_key", label: t("AUTH_API_KEY") },
-    { value: "basic", label: t("AUTH_BASIC") },
-    { value: "header", label: t("AUTH_HEADER") },
-  ];
-
   let adding = $state(false);
   let actions = $state<Account | null>(null);
   let renaming = $state<Account | null>(null);
@@ -65,7 +52,7 @@
   let providerAdding = $state(false);
   let editing = $state<Account | null>(null);
   let providerUrl = $state("");
-  let auth = $state<ProviderAuth>(emptyAuth());
+  let auth = $state<AuthInput>(emptyAuth());
 
   const pasteCode = async () => {
     const text = (await pasteText()).trim();
@@ -402,61 +389,9 @@
         singleLine
       />
     </div>
-    <div class="mt-3">
-      <SelectField
-        label={t("ENVIRONMENT_AUTH")}
-        selected={auth.kind}
-        options={AUTH_OPTIONS}
-        onSelect={(value) => (auth.kind = value as ProviderAuthKind)}
-      />
+    <div class="mt-3 flex flex-col gap-3">
+      <AuthFields value={auth} kinds={AUTH_KINDS} onChange={(next) => (auth = next)} />
     </div>
-    {#if auth.kind === "bearer" || auth.kind === "api_key"}
-      <div class="mt-3">
-        <InputField
-          value={auth.token}
-          oninput={(value) => (auth.token = value)}
-          label={auth.kind === "api_key" ? t("AUTH_API_KEY") : t("ENVIRONMENT_TOKEN")}
-          secret
-          singleLine
-        />
-      </div>
-    {:else if auth.kind === "basic"}
-      <div class="mt-3">
-        <InputField
-          value={auth.user}
-          oninput={(value) => (auth.user = value)}
-          label={t("AUTH_USER")}
-          singleLine
-        />
-      </div>
-      <div class="mt-3">
-        <InputField
-          value={auth.password}
-          oninput={(value) => (auth.password = value)}
-          label={t("AUTH_PASSWORD")}
-          secret
-          singleLine
-        />
-      </div>
-    {:else if auth.kind === "header"}
-      <div class="mt-3">
-        <InputField
-          value={auth.headerName}
-          oninput={(value) => (auth.headerName = value)}
-          label={t("AUTH_HEADER_NAME")}
-          singleLine
-        />
-      </div>
-      <div class="mt-3">
-        <InputField
-          value={auth.headerValue}
-          oninput={(value) => (auth.headerValue = value)}
-          label={t("AUTH_HEADER_VALUE")}
-          secret
-          singleLine
-        />
-      </div>
-    {/if}
     {#if scopeOptions.length > 1}
       <div class="mt-3">
         <SelectField

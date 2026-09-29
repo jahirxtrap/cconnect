@@ -251,6 +251,8 @@
   "ADD": "Add",
   "TRANSPORT": "Transport",
   "COMMAND_OR_URL": "Command or URL",
+  "MCP_ENV": "Environment variables",
+  "MCP_ENV_PLACEHOLDER": "KEY=value, one per line",
   "ENABLED_COUNT": "{1}/{2} enabled",
   "MONITOR": "Monitor",
   "RESOURCES": "Resources",

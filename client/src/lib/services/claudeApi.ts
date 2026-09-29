@@ -1,3 +1,4 @@
+import { authWire, type AuthInput } from "$lib/data/auth";
 import { backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 
@@ -236,8 +237,8 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return toAction(await client.post<Wire>("/claude/mcp/toggle", { name, enabled }));
   },
 
-  async mcpAdd(name: string, target: string, transport: string): Promise<ActionResult> {
-    return toAction(await client.post<Wire>("/claude/mcp", { name, target, transport }));
+  async mcpAdd(name: string, target: string, transport: string, auth: AuthInput, env: string[]): Promise<ActionResult> {
+    return toAction(await client.post<Wire>("/claude/mcp", { name, target, transport, auth: authWire(auth), env }));
   },
 
   async mcpRemove(name: string): Promise<ActionResult> {

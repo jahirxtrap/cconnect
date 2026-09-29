@@ -4,14 +4,16 @@
   import LockOpen from "@lucide/svelte/icons/lock-open";
   import ScanQrCode from "@lucide/svelte/icons/scan-qr-code";
   import { untrack } from "svelte";
+  import { AUTH_KINDS, type AuthInput } from "$lib/data/auth";
   import { projectKeyOf } from "$lib/data/models";
   import { parseQrPayload } from "$lib/data/qrPayload";
   import { settings } from "$lib/data/settings.svelte";
   import { accentAt, ACCENTS } from "$lib/design/accents";
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
-  import type { AuthKind, EnvironmentProfile } from "$lib/services/backend.svelte";
+  import type { EnvironmentProfile } from "$lib/services/backend.svelte";
   import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
+  import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -42,12 +44,7 @@
       ]
     : [{ value: "https", label: "HTTPS" }];
 
-  const AUTH_OPTIONS = [
-    { value: "none", label: t("AUTH_NONE") },
-    { value: "bearer", label: t("AUTH_BEARER") },
-    { value: "basic", label: t("AUTH_BASIC") },
-    { value: "header", label: t("AUTH_HEADER") },
-  ];
+  const ENVIRONMENT_AUTH_KINDS = AUTH_KINDS.filter((kind) => kind !== "api_key");
 
   const defaultPortFor = (kind: string) => (kind === "https" ? HTTPS_PORT : HTTP_PORT);
 
@@ -78,10 +75,14 @@
   let kind = $state<EnvironmentProfile["kind"]>(initial.kind);
   let host = $state(initial.host);
   let port = $state(initial.port === null ? defaultPortFor(initial.kind) : String(initial.port));
-  let authKind = $state<AuthKind>(initial.authKind);
-  let authToken = $state(initial.authToken);
-  let authUser = $state(initial.authUser);
-  let authPassword = $state(initial.authPassword);
+  let auth = $state<AuthInput>({
+    kind: initial.authKind,
+    token: initial.authToken,
+    user: initial.authUser,
+    password: initial.authPassword,
+    headerName: initial.authHeaderName,
+    headerValue: initial.authHeaderValue,
+  });
   const qrAvailable = qrScanAvailable();
 
   const startScan = async () => {
@@ -97,11 +98,8 @@
     kind = parsed.kind;
     host = parsed.host;
     port = parsed.kind === "https" ? "" : parsed.port;
-    authKind = "bearer";
-    authToken = payload.token;
+    auth = { ...auth, kind: "bearer", token: payload.token };
   };
-  let authHeaderName = $state(initial.authHeaderName);
-  let authHeaderValue = $state(initial.authHeaderValue);
   let directory = $state(initial.directory);
   let accentIndex = $state<number | null>(initial.accentIndex);
   let picking = $state(false);
@@ -135,12 +133,12 @@
       kind: finalKind,
       host: finalHost,
       port: finalKind === "https" ? null : (Number.parseInt(finalPort, RADIX) || Number.parseInt(HTTP_PORT, RADIX)),
-      authKind,
-      authToken: authToken.trim(),
-      authUser: authUser.trim(),
-      authPassword,
-      authHeaderName: authHeaderName.trim(),
-      authHeaderValue: authHeaderValue.trim(),
+      authKind: auth.kind,
+      authToken: auth.token.trim(),
+      authUser: auth.user.trim(),
+      authPassword: auth.password,
+      authHeaderName: auth.headerName.trim(),
+      authHeaderValue: auth.headerValue.trim(),
       directory: directory.trim(),
       accentIndex,
     });
@@ -172,44 +170,7 @@
         singleLine
       />
     {/if}
-    <SelectField
-      label={t("ENVIRONMENT_AUTH")}
-      selected={authKind}
-      options={AUTH_OPTIONS}
-      onSelect={(value) => (authKind = value as AuthKind)}
-    />
-    {#if authKind === "bearer"}
-      <InputField
-        value={authToken}
-        oninput={(value) => (authToken = value)}
-        label={t("ENVIRONMENT_TOKEN")}
-        singleLine
-        secret
-      />
-    {:else if authKind === "basic"}
-      <InputField value={authUser} oninput={(value) => (authUser = value)} label={t("AUTH_USER")} singleLine />
-      <InputField
-        value={authPassword}
-        oninput={(value) => (authPassword = value)}
-        label={t("AUTH_PASSWORD")}
-        singleLine
-        secret
-      />
-    {:else if authKind === "header"}
-      <InputField
-        value={authHeaderName}
-        oninput={(value) => (authHeaderName = value)}
-        label={t("AUTH_HEADER_NAME")}
-        singleLine
-      />
-      <InputField
-        value={authHeaderValue}
-        oninput={(value) => (authHeaderValue = value)}
-        label={t("AUTH_HEADER_VALUE")}
-        singleLine
-        secret
-      />
-    {/if}
+    <AuthFields value={auth} kinds={ENVIRONMENT_AUTH_KINDS} onChange={(next) => (auth = next)} />
     <InputField
       value={directory}
       oninput={(value) => (directory = value)}

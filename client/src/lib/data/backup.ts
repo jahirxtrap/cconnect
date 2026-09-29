@@ -1,7 +1,8 @@
 import { i18n, type Locale } from "$lib/i18n/index.svelte";
+import type { AuthKind } from "./auth";
 import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
 import { notes, type Note } from "$lib/screens/notes/notes.svelte";
-import { backend, type AuthKind, type EnvironmentProfile } from "$lib/services/backend.svelte";
+import { backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { settings, type VisibilityPrefs } from "./settings.svelte";
 import { BACKED_UP } from "./settingsRegistry";

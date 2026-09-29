@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -12,6 +13,8 @@ _PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "updat
 _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
 
 OFFICIAL_MARKETPLACE = "anthropics/claude-plugins-official"
+
+_ENV_ENTRY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 
 
 def _shared(result: dict) -> dict:
@@ -79,12 +82,20 @@ async def ensure_official_marketplace() -> None:
     await asyncio.to_thread(marketplace_action, "add", OFFICIAL_MARKETPLACE)
 
 
-def mcp_add(name: str, target: str, transport: str = "stdio") -> dict:
+def mcp_add(
+    name: str, target: str, transport: str = "stdio", auth: dict | None = None, env: list[str] | None = None
+) -> dict:
     if not name or not target:
         return {"ok": False, "message": "name and command/url are required"}
     if transport in ("http", "sse"):
-        return _shared(_run(["mcp", "add", "-s", "user", "--transport", transport, name, target]))
-    return _shared(_run(["mcp", "add", "-s", "user", name, "--", *target.split()]))
+        headers = accounts.auth_headers(auth or {})
+        flags = [arg for key, value in headers.items() for arg in ("--header", f"{key}: {value}")]
+        return _shared(_run(["mcp", "add", "-s", "user", "--transport", transport, name, target, *flags]))
+    entries = [entry.strip() for entry in env or () if entry.strip()]
+    if not all(_ENV_ENTRY.match(entry) for entry in entries):
+        return {"ok": False, "message": "environment variables go one per line as KEY=value"}
+    flags = [arg for entry in entries for arg in ("-e", entry)]
+    return _shared(_run(["mcp", "add", "-s", "user", name, *flags, "--", *target.split()]))
 
 
 def mcp_remove(name: str) -> dict:

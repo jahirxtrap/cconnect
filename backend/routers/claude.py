@@ -2,9 +2,10 @@
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.responses import api_response
+from schemas.accounts import ProviderAuth
 from services import claude_assets, claude_manage
 from services import claude_status
 from services import usage as usage_service
@@ -38,8 +39,10 @@ class MarketplaceActionBody(BaseModel):
 
 class McpAddBody(BaseModel):
     name: str
-    target: str  # command line (stdio) or url (http/sse)
+    target: str
     transport: str = "stdio"
+    auth: ProviderAuth = Field(default_factory=ProviderAuth)
+    env: list[str] = Field(default_factory=list)
 
 
 class McpToggleBody(BaseModel):
@@ -144,7 +147,9 @@ def get_mcp():
 
 @router.post("/claude/mcp")
 def add_mcp(body: McpAddBody):
-    return api_response(data=claude_manage.mcp_add(body.name, body.target, body.transport))
+    return api_response(
+        data=claude_manage.mcp_add(body.name, body.target, body.transport, body.auth.model_dump(), body.env)
+    )
 
 
 @router.post("/claude/mcp/toggle")

@@ -1,7 +1,6 @@
+import type { AuthKind } from "$lib/data/auth";
 import { secureStore } from "$lib/platform/secureStorage";
 import { store } from "$lib/platform/storage";
-
-export type AuthKind = "none" | "bearer" | "basic" | "header";
 
 export interface EnvironmentProfile {
   id: string;
