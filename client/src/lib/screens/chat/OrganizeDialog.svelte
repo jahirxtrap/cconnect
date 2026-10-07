@@ -6,6 +6,7 @@
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Trash from "@lucide/svelte/icons/trash";
   import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
+  import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -281,48 +282,50 @@
       onclick={() => void chat.createCategory(`${t("CATEGORY")} ${chat.categories.length + 1}`)}
     />
 
-    <p class="mt-1 mb-1.5 text-label-lg">{t("PROJECTS")}</p>
-    {#each sortedProjects as project (project.projectKey)}
-      {@const hidden = chat.isProjectHidden(project.projectKey)}
-      <div class="flex items-center pr-1">
-        <div class="min-w-0 flex-1">
-          <EditableText
-            value={editing === project.projectKey ? draft : projectLabel(project)}
-            editing={editing === project.projectKey}
-            onEdit={() => {
-              editing = project.projectKey;
-              draft = projectLabel(project);
-            }}
-            oninput={(value) => (draft = value)}
-            onCommit={() => commitProject(project)}
-            onCancel={() => (editing = null)}
-          />
+    {#if !settings.lockedProject}
+      <p class="mt-1 mb-1.5 text-label-lg">{t("PROJECTS")}</p>
+      {#each sortedProjects as project (project.projectKey)}
+        {@const hidden = chat.isProjectHidden(project.projectKey)}
+        <div class="flex items-center pr-1">
+          <div class="min-w-0 flex-1">
+            <EditableText
+              value={editing === project.projectKey ? draft : projectLabel(project)}
+              editing={editing === project.projectKey}
+              onEdit={() => {
+                editing = project.projectKey;
+                draft = projectLabel(project);
+              }}
+              oninput={(value) => (draft = value)}
+              onCommit={() => commitProject(project)}
+              onCancel={() => (editing = null)}
+            />
+          </div>
+          <TooltipIconButton
+            label={t("RESET_NAME")}
+            enabled={project.customName}
+            class="size-8 [&_svg]:size-4"
+            onclick={() => void chat.renameProject(project, "")}
+          >
+            <RotateCcw />
+          </TooltipIconButton>
+          <TooltipIconButton
+            label={hidden ? t("SHOW") : t("HIDE")}
+            class="size-8 [&_svg]:size-4"
+            onclick={() => chat.toggleProjectHidden(project.projectKey)}
+          >
+            {#if hidden}
+              <EyeOff />
+            {:else}
+              <Eye />
+            {/if}
+          </TooltipIconButton>
+          <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingProject = project)}>
+            <Trash />
+          </TooltipIconButton>
         </div>
-        <TooltipIconButton
-          label={t("RESET_NAME")}
-          enabled={project.customName}
-          class="size-8 [&_svg]:size-4"
-          onclick={() => void chat.renameProject(project, "")}
-        >
-          <RotateCcw />
-        </TooltipIconButton>
-        <TooltipIconButton
-          label={hidden ? t("SHOW") : t("HIDE")}
-          class="size-8 [&_svg]:size-4"
-          onclick={() => chat.toggleProjectHidden(project.projectKey)}
-        >
-          {#if hidden}
-            <EyeOff />
-          {:else}
-            <Eye />
-          {/if}
-        </TooltipIconButton>
-        <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingProject = project)}>
-          <Trash />
-        </TooltipIconButton>
-      </div>
-    {/each}
-    <ActionButton class="w-full" text={t("ADD_PROJECT")} onclick={() => (addingProject = true)} />
+      {/each}
+      <ActionButton class="w-full" text={t("ADD_PROJECT")} onclick={() => (addingProject = true)} />
+    {/if}
 
     {#if chat.trashEnabled}
       <ActionButton class="mt-1 w-full" text={t("TRASH")} onclick={() => (trashOpen = true)} />
