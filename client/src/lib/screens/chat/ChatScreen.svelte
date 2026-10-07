@@ -37,7 +37,7 @@
   import { tabs, type PaneRole } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
 
-  const chat = $derived(panes.focusedTab ? tabs.stateFor(panes.focusedTab) : tabs.state);
+  const chat = $derived(panes.focusedChat);
   const paneLayer = $derived(layout.mobile && panes.showingTool);
   let paneOpened = $state(false);
   const paneKept = $derived(paneOpened && layout.mobile && panes.kind !== "chat");

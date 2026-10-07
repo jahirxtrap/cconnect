@@ -9,6 +9,7 @@
   import { isTauri } from "$lib/platform";
   import { parseQrPayload } from "$lib/data/qrPayload";
   import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
+  import { panes } from "$lib/screens/chat/panes.svelte";
   import { address, backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -75,10 +76,15 @@
     editing = null;
   };
 
+  const choose = (id: string) => panes.focusedChat.selectEnvironment(id);
+
   const remove = (profile: EnvironmentProfile) => {
     const left = backend.environments.filter((item) => item.id !== profile.id);
     backend.save(left);
-    if (backend.activeId === profile.id) backend.select(left[0]?.id ?? "");
+    if (backend.activeId === profile.id) {
+      if (left[0]) choose(left[0].id);
+      else backend.select("");
+    }
     deleting = null;
   };
 </script>
@@ -105,7 +111,7 @@
         label={profile.name}
         subtitle={address(profile)}
         selected={profile.id === backend.active?.id}
-        onclick={() => backend.select(profile.id)}
+        onclick={() => choose(profile.id)}
       >
         {#snippet trailing()}
           {#if profile.id === backend.active?.id}

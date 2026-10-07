@@ -6,7 +6,6 @@ import { projectLabel, projectNameOf, type SessionInfo } from "$lib/data/models"
 import { t } from "$lib/i18n/index.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { panes } from "$lib/screens/chat/panes.svelte";
-import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { SETTINGS_SECTIONS } from "$lib/screens/settings/sections";
 import { backend } from "$lib/services/backend.svelte";
 import type { IconSource } from "$lib/ui/icons";
@@ -37,8 +36,6 @@ const rank = (label: string, query: string): number => {
   if (haystack.includes(` ${query}`)) return 1;
   return haystack.includes(query) ? 2 : -1;
 };
-
-const focusedChat = () => (panes.focusedTab ? tabs.stateFor(panes.focusedTab) : tabs.state);
 
 const sessionLabel = (session: SessionInfo) =>
   session.title?.trim() || session.preview?.trim() || t("NEW_CHAT");
@@ -90,7 +87,7 @@ export const collectCommands = (): Command[] => {
     group: "project",
     label: projectLabel(project),
     detail: project.path,
-    run: () => focusedChat().selectHistoryProject(project.projectKey),
+    run: () => panes.focusedChat.selectHistoryProject(project.projectKey),
   }));
 
   return [...actions, ...screens, ...chats, ...projectCommands, ...settings];

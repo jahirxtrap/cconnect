@@ -81,6 +81,8 @@ class Panes {
     this.target === "right" && this.rightTab ? this.rightTab : tabs.active,
   );
 
+  readonly focusedChat = $derived(this.focusedTab ? tabs.stateFor(this.focusedTab) : tabs.state);
+
   constructor() {
     try {
       const stored = JSON.parse(settings.rightPane || "{}") as StoredRight;
