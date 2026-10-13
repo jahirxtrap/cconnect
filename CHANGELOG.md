@@ -1,7 +1,7 @@
-- Adding an MCP server takes the key it needs: one you reach by URL gets a bearer token, an API key, basic auth or a header of your own, and one started by a command gets its environment variables, one per line
-- The chat no longer sits on Compacting for hours when nothing is being compacted: the bar shows only while Claude is compacting and goes away the moment it finishes or fails
-- A message you queue during a long task no longer stays in the queue once Claude has answered it, holding the chat on working with no end
-- Ctrl+B closes the drawer on a narrow window as well as opening it
+- A file Claude hands you as a reference downloads from a server behind a token: saving it, saving it as, sharing it or opening it sends your security key the way the preview already did, on the phone as well, instead of ending in a red cross in the transfers panel
+- A referenced PDF opens in the chat and in the phone's preview instead of saying the file is unavailable
+- Choosing an environment in Settings moves the tab you are on to it and the selector follows at once, while your other tabs stay on their own
+- When an environment locks you to one project, Organize leaves out the list of projects and the button to add one, since there is nothing to choose there
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
