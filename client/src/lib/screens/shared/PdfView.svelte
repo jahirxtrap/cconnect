@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { PDFPageProxy, RenderTask } from "pdfjs-dist";
   import { tick, untrack } from "svelte";
-  import { authHeadersOf, backend } from "$lib/services/backend.svelte";
+  import { securityKeys } from "$lib/data/securityKeys.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
 
   interface Props {
@@ -107,7 +108,7 @@
     const pdfjs = await import("pdfjs-dist");
     pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href;
 
-    const response = await fetch(url, { headers: authHeadersOf(backend.active) });
+    const response = await fetch(url, { headers: securityKeys.fileHeadersFor(backend.active) });
     if (!response.ok) throw new Error(String(response.status));
     const document_ = await pdfjs.getDocument({ data: await response.arrayBuffer() }).promise;
 

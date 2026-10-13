@@ -16,7 +16,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { platformName } from "$lib/platform";
-  import { authHeadersOf, backend } from "$lib/services/backend.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import { mediaSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
@@ -152,9 +152,7 @@
       return;
     }
     failed = false;
-    void fetch(target, {
-      headers: { ...authHeadersOf(backend.active), ...securityKeys.headersFor(backend.active) },
-    })
+    void fetch(target, { headers: securityKeys.fileHeadersFor(backend.active) })
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
         arrived = { base: requested, name, body: await response.text() };

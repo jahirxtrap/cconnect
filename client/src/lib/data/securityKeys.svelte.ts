@@ -1,5 +1,5 @@
 import { secureStore } from "$lib/platform/secureStorage";
-import { backend, baseUrlOf, type Profile } from "$lib/services/backend.svelte";
+import { authHeadersOf, backend, baseUrlOf, type Profile } from "$lib/services/backend.svelte";
 
 const KEY = "security.keys";
 const HEADER = "X-Security-Key";
@@ -31,6 +31,10 @@ class SecurityKeys {
 
   headersFor(profile: Profile): Record<string, string> {
     return this.headers(this.keyFor(profile));
+  }
+
+  fileHeadersFor(profile: Profile): Record<string, string> {
+    return { ...authHeadersOf(profile), ...this.headersFor(profile) };
   }
 
   forget() {

@@ -1,8 +1,9 @@
+import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { transfers } from "$lib/data/transfers.svelte";
 import { isDesktop, isTauri, openExternal } from "$lib/platform";
 import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDownloads";
 import { copyText } from "$lib/platform/clipboard";
-import { authHeadersOf, backend, type Profile } from "./backend.svelte";
+import { backend, type Profile } from "./backend.svelte";
 
 export interface SharedItem {
   url: string;
@@ -16,7 +17,7 @@ const fetchTracked = async (
   profile: Profile = backend.active,
 ): Promise<Blob | null> => {
   try {
-    const response = await fetch(url, { headers: authHeadersOf(profile), signal });
+    const response = await fetch(url, { headers: securityKeys.fileHeadersFor(profile), signal });
     if (!response.ok) return null;
     const total = Number(response.headers.get("content-length")) || 0;
     if (!response.body || !total) return await response.blob();
@@ -38,7 +39,7 @@ const fetchTracked = async (
 
 const TEXT_TYPE = "text/markdown";
 
-const headersJson = (profile: Profile = backend.active) => JSON.stringify(authHeadersOf(profile));
+const headersJson = (profile: Profile = backend.active) => JSON.stringify(securityKeys.fileHeadersFor(profile));
 
 const saveBlob = async (blob: Blob, filename: string): Promise<string | null> => {
   if (!isTauri) {
