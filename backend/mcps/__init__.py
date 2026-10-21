@@ -85,4 +85,4 @@ def build_cconnect_server(
         for _module, tool in _discover(context or {})
         if _tool_name(tool) not in hidden and (wanted is None or _tool_name(tool) in wanted)
     ]
-    return create_sdk_mcp_server(name="cconnect", version="1.0.0", tools=collected)
+    return {**create_sdk_mcp_server(name="cconnect", version="1.0.0", tools=collected), "alwaysLoad": True}

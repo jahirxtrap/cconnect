@@ -21,6 +21,8 @@ class CliSettingDef:
     description: str
     minimum: Optional[int] = None
     maximum: Optional[int] = None
+    unset_by: Any = None
+    replaces: Optional[str] = None
 
 
 SETTINGS: dict[str, CliSettingDef] = {
@@ -57,10 +59,12 @@ SETTINGS: dict[str, CliSettingDef] = {
         description="Let a session started here be taken over from claude.ai",
     ),
     "co_authored": CliSettingDef(
-        json_key="includeCoAuthoredBy",
-        default=None,
+        json_key="attribution",
+        default=True,
         type=bool,
         description="Add the Co-Authored-By trailer to the commits and pull requests Claude writes",
+        unset_by=True,
+        replaces="includeCoAuthoredBy",
     ),
     "session_upload": CliSettingDef(
         json_key="autoUploadSessions",
@@ -72,7 +76,7 @@ SETTINGS: dict[str, CliSettingDef] = {
 
 
 def json_keys() -> tuple[str, ...]:
-    return tuple(defn.json_key for defn in SETTINGS.values())
+    return tuple(key for defn in SETTINGS.values() for key in (defn.json_key, defn.replaces) if key)
 
 
 def _path() -> Path:
@@ -143,7 +147,7 @@ def set(key: str, value: Any) -> None:
     if key not in SETTINGS:
         raise KeyError(key)
     defn = SETTINGS[key]
-    blank = value is None or (defn.type is str and value == "")
+    blank = value is None or value == defn.unset_by or (defn.type is str and value == "")
     if not blank:
         if not _valid(value, defn.type):
             raise ValueError(f"{key} expects {defn.type.__name__}")
@@ -152,10 +156,10 @@ def set(key: str, value: Any) -> None:
         if defn.maximum is not None and value > defn.maximum:
             raise ValueError(f"{key} must be at most {defn.maximum}")
     data = _read()
-    if blank:
-        data.pop(defn.json_key, None)
-    else:
+    if not blank:
         data[defn.json_key] = value
+    elif value is None or _valid(data.get(defn.json_key), defn.type):
+        data.pop(defn.json_key, None)
     _write(data)
     accounts.sync_all_shared_config()
 
@@ -163,3 +167,16 @@ def set(key: str, value: Any) -> None:
 def reset() -> None:
     for key in SETTINGS:
         set(key, None)
+
+
+def migrate() -> None:
+    """Move a setting the CLI renamed onto its current key."""
+    data = _read()
+    moved = [defn for defn in SETTINGS.values() if defn.replaces and defn.replaces in data]
+    if not moved:
+        return
+    for defn in moved:
+        value = data.pop(defn.replaces)
+        if defn.json_key not in data and _valid(value, defn.type) and value != defn.unset_by:
+            data[defn.json_key] = value
+    _write(data)

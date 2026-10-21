@@ -34,7 +34,7 @@ export interface SettingsSnapshot {
   alwaysThinking: boolean;
   autoCompact: boolean;
   remoteControl: boolean | null;
-  coAuthored: boolean | null;
+  coAuthored: boolean;
   sessionUpload: boolean | null;
 }
 
@@ -69,7 +69,7 @@ export interface SettingsPatch {
   always_thinking?: boolean;
   auto_compact?: boolean;
   remote_control?: boolean | null;
-  co_authored?: boolean | null;
+  co_authored?: boolean;
   session_upload?: boolean | null;
 }
 
@@ -134,7 +134,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   alwaysThinking: effectiveBool(wire, "always_thinking", false),
   autoCompact: effectiveBool(wire, "auto_compact", true),
   remoteControl: effectiveFlag(wire, "remote_control"),
-  coAuthored: effectiveFlag(wire, "co_authored"),
+  coAuthored: effectiveBool(wire, "co_authored", true),
   sessionUpload: effectiveFlag(wire, "session_upload"),
 });
 

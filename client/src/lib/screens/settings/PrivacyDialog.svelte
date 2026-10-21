@@ -7,7 +7,7 @@
 
   interface Values {
     remoteControl: boolean | null;
-    coAuthored: boolean | null;
+    coAuthored: boolean;
     sessionUpload: boolean | null;
   }
 
@@ -24,6 +24,8 @@
     { value: "off", label: t("OPTION_OFF") },
   ];
 
+  const SWITCH_OPTIONS = OPTIONS.slice(1);
+
   const toOption = (value: boolean | null) => (value === null ? "" : value ? "on" : "off");
   const toValue = (option: string) => (option === "" ? null : option === "on");
 
@@ -39,7 +41,7 @@
       onclick={() =>
         onConfirm({
           remoteControl: toValue(remote),
-          coAuthored: toValue(coAuthor),
+          coAuthored: coAuthor === "on",
           sessionUpload: toValue(upload),
         })}
     >
@@ -57,7 +59,7 @@
     <SelectField
       label={t("CO_AUTHORED")}
       selected={coAuthor}
-      options={OPTIONS}
+      options={SWITCH_OPTIONS}
       onSelect={(value) => (coAuthor = value)}
     />
     <p class="-mt-2.5 text-body-sm text-on-surface-variant">{t("CO_AUTHORED_DESC")}</p>

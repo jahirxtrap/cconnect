@@ -528,8 +528,8 @@ async def _keep_stream_open(input_data, tool_use_id, context):
 
 
 _NO_BACKGROUND = (
-    "Background work is not available here: the CLI process ends with the turn, so anything "
-    "left running is killed and its output is lost. Run it in the foreground and wait."
+    "Background work is not available in this chat: its Claude process only lives for the turn. "
+    "Run the command in the foreground and wait for it."
 )
 
 

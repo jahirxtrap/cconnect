@@ -18,7 +18,7 @@ from core.db import init_db
 from core.rate_limit import limiter
 from core.responses import api_response
 from core.sdk import ensure_sdk_installed, ensure_subscription_auth
-from services import settings_store, system_monitor
+from services import cli_settings, settings_store, system_monitor
 from middleware.error_handler import register_error_handlers
 from middleware.public_auth import register_public_auth_middleware
 from middleware.security import register_security_middleware
@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     data_migration.migrate()
     init_db()
     settings_store.load()
+    cli_settings.migrate()
     from services import accounts
     await asyncio.to_thread(accounts.link_all_shared_dirs)
     paths.RUNTIME_FILE.write_text(f"PORT={PORT}\nPID={os.getpid()}\n", encoding="utf-8")
