@@ -385,6 +385,7 @@
     onAccount={(value) => chat.setAccount(value)}
     streamTokens={chat.effectiveStreamTokens}
     contextTokens={chat.contextView}
+    compactWindow={chat.compactWindow}
     requestBytes={chat.requestView}
     mediaBytes={chat.mediaView}
     onModel={(value) => chat.setModel(value)}

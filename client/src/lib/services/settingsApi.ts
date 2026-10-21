@@ -33,6 +33,10 @@ export interface SettingsSnapshot {
   chatLanguage: string;
   alwaysThinking: boolean;
   autoCompact: boolean;
+  autoCompactWindow: number | null;
+  autoCompactWindowMin: number | null;
+  autoCompactWindowMax: number | null;
+  instructionFiles: string | null;
   remoteControl: boolean | null;
   coAuthored: boolean;
   sessionUpload: boolean | null;
@@ -68,6 +72,8 @@ export interface SettingsPatch {
   chat_language?: string;
   always_thinking?: boolean;
   auto_compact?: boolean;
+  auto_compact_window?: number | null;
+  instruction_files?: string | null;
   remote_control?: boolean | null;
   co_authored?: boolean;
   session_upload?: boolean | null;
@@ -78,8 +84,11 @@ export const RETENTION_FOREVER_DAYS = 36500;
 type Field = { effective?: unknown; default?: unknown; minimum?: unknown; maximum?: unknown };
 type Wire = Record<string, Field | undefined>;
 
+const boundOf = (wire: Wire, key: string, bound: "minimum" | "maximum"): number | null =>
+  typeof wire[key]?.[bound] === "number" ? (wire[key]![bound] as number) : null;
+
 const boundNum = (wire: Wire, key: string, bound: "minimum" | "maximum", fallback: number): number =>
-  typeof wire[key]?.[bound] === "number" ? (wire[key]![bound] as number) : fallback;
+  boundOf(wire, key, bound) ?? fallback;
 
 const effective = <T>(wire: Wire, key: string, kind: string, fallback: T): T => {
   const field = wire[key];
@@ -95,8 +104,10 @@ const effectiveStr = (wire: Wire, key: string, fallback: string): string =>
 const effectiveBool = (wire: Wire, key: string, fallback: boolean): boolean =>
   effective(wire, key, "boolean", fallback);
 
-const effectiveFlag = (wire: Wire, key: string): boolean | null =>
-  typeof wire[key]?.effective === "boolean" ? (wire[key]!.effective as boolean) : null;
+const configured = <T>(wire: Wire, key: string, kind: string): T | null =>
+  typeof wire[key]?.effective === kind ? (wire[key]!.effective as T) : null;
+
+const effectiveFlag = (wire: Wire, key: string): boolean | null => configured(wire, key, "boolean");
 
 const effectiveNum = (wire: Wire, key: string, fallback: number): number =>
   effective(wire, key, "number", fallback);
@@ -133,6 +144,10 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   chatLanguage: effectiveStr(wire, "chat_language", ""),
   alwaysThinking: effectiveBool(wire, "always_thinking", false),
   autoCompact: effectiveBool(wire, "auto_compact", true),
+  autoCompactWindow: configured(wire, "auto_compact_window", "number"),
+  autoCompactWindowMin: boundOf(wire, "auto_compact_window", "minimum"),
+  autoCompactWindowMax: boundOf(wire, "auto_compact_window", "maximum"),
+  instructionFiles: wire.instruction_files ? effectiveStr(wire, "instruction_files", "") : null,
   remoteControl: effectiveFlag(wire, "remote_control"),
   coAuthored: effectiveBool(wire, "co_authored", true),
   sessionUpload: effectiveFlag(wire, "session_upload"),

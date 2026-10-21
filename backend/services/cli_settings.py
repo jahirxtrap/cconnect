@@ -52,6 +52,14 @@ SETTINGS: dict[str, CliSettingDef] = {
         type=bool,
         description="Compact a conversation on its own when it fills the context window",
     ),
+    "auto_compact_window": CliSettingDef(
+        json_key="autoCompactWindow",
+        default=None,
+        type=int,
+        description="Context size, in tokens, at which a conversation compacts; unset follows the model's window",
+        minimum=100_000,
+        maximum=1_000_000,
+    ),
     "remote_control": CliSettingDef(
         json_key="remoteControlAtStartup",
         default=None,

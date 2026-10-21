@@ -19,6 +19,7 @@ class SettingDef:
 
 
 _SHOW_MODES = ("full", "label", "off")
+_INSTRUCTION_FILES = ("claude-md-or-agents-md", "claude-md-and-agents-md", "claude-md", "managed-only")
 
 SETTINGS: dict[str, SettingDef] = {
     "account": SettingDef(None, str, "Claude account used to run chats"),
@@ -28,6 +29,7 @@ SETTINGS: dict[str, SettingDef] = {
     "permission_mode": SettingDef(DEFAULT_PERMISSION_MODE, str, "Default permission mode for new chat sessions"),
     "streaming": SettingDef(True, bool, "Stream tokens (partial messages) as they are generated"),
     "todo_tools": SettingDef(False, bool, "Expose the task-tracking tools, which recent models otherwise omit to save context"),
+    "instruction_files": SettingDef(None, str, "Which project instructions Claude reads: CLAUDE.md, AGENTS.md or both; empty follows the CLI's own choice", allowed=_INSTRUCTION_FILES),
     "mcp_disabled": SettingDef("", str, "Built-in cconnect MCP tools hidden from Claude, by name and comma separated"),
     "cli_source": SettingDef("system", str, "Which Claude CLI the backend drives: system, custom, or bundled", allowed=("system", "custom", "bundled")),
     "cli_custom_path": SettingDef(None, str, "Filesystem path to the CLI when cli_source is custom"),

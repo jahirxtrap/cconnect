@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { formatTokens } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import { effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
   import Button from "$lib/ui/Button.svelte";
@@ -18,6 +19,10 @@
     chatLanguage: string;
     alwaysThinking: boolean;
     autoCompact: boolean;
+    autoCompactWindow: number | null;
+    compactMin: number | null;
+    compactMax: number | null;
+    instructionFiles: string | null;
     onConfirm: (values: {
       model: string;
       effort: string;
@@ -27,6 +32,8 @@
       chatLanguage: string;
       alwaysThinking: boolean;
       autoCompact: boolean;
+      autoCompactWindow: number | null;
+      instructionFiles: string | null;
     }) => void;
     onDismiss: () => void;
   }
@@ -41,9 +48,19 @@
     chatLanguage,
     alwaysThinking,
     autoCompact,
+    autoCompactWindow,
+    compactMin,
+    compactMax,
+    instructionFiles,
     onConfirm,
     onDismiss,
   }: Props = $props();
+
+  const INSTRUCTION_LABELS: Record<string, string> = {
+    "": t("OPTION_DEFAULT"),
+    "claude-md-and-agents-md": t("INSTRUCTION_FILES_BOTH"),
+    "claude-md": t("INSTRUCTION_FILES_CLAUDE"),
+  };
 
   let selectedModel = $state(untrack(() => model));
   let selectedEffort = $state(untrack(() => effort));
@@ -53,6 +70,25 @@
   let language = $state(untrack(() => chatLanguage));
   let thinkAlways = $state(untrack(() => alwaysThinking));
   let compactAuto = $state(untrack(() => autoCompact));
+  let compactAt = $state(untrack(() => (autoCompactWindow === null ? "" : String(autoCompactWindow))));
+  let instructions = $state(untrack(() => instructionFiles ?? ""));
+
+  const windowOptions = $derived.by(() => {
+    if (compactMin === null || compactMax === null) return [];
+    const steps = Array.from({ length: Math.floor(compactMax / compactMin) }, (_, index) => compactMin * (index + 1));
+    const listed = autoCompactWindow === null || steps.includes(autoCompactWindow) ? steps : [...steps, autoCompactWindow];
+    return [
+      { value: "", label: t("OPTION_DEFAULT") },
+      ...listed.sort((a, b) => a - b).map((value) => ({ value: String(value), label: formatTokens(value) })),
+    ];
+  });
+
+  const instructionOptions = $derived(
+    [...new Set([...Object.keys(INSTRUCTION_LABELS), instructionFiles ?? ""])].map((value) => ({
+      value,
+      label: INSTRUCTION_LABELS[value] ?? value,
+    })),
+  );
 
   const styleOptions = $derived(capabilities.outputStyles.map((value) => ({ value, label: value })));
 
@@ -79,6 +115,8 @@
           chatLanguage: language.trim(),
           alwaysThinking: thinkAlways,
           autoCompact: compactAuto,
+          autoCompactWindow: compactAt === "" ? null : Number(compactAt),
+          instructionFiles: instructions || null,
         })}
     >
       {t("SAVE")}
@@ -118,6 +156,15 @@
       oninput={(value) => (language = value)}
       onClear={() => (language = "")}
     />
+    {#if instructionFiles !== null}
+      <SelectField
+        label={t("INSTRUCTION_FILES")}
+        selected={instructions}
+        options={instructionOptions}
+        onSelect={(value) => (instructions = value)}
+      />
+      <p class="-mt-2.5 text-body-sm text-on-surface-variant">{t("INSTRUCTION_FILES_DESC")}</p>
+    {/if}
     {#if capabilities.models.some((item) => item.fastMode)}
       <SwitchRow
         class="-mt-2"
@@ -156,5 +203,14 @@
       checked={compactAuto}
       onChange={(value) => (compactAuto = value)}
     />
+    {#if compactAuto && windowOptions.length}
+      <SelectField
+        label={t("AUTO_COMPACT_WINDOW")}
+        selected={compactAt}
+        options={windowOptions}
+        onSelect={(value) => (compactAt = value)}
+      />
+      <p class="-mt-2.5 text-body-sm text-on-surface-variant">{t("AUTO_COMPACT_WINDOW_DESC")}</p>
+    {/if}
   </div>
 </CompactDialog>

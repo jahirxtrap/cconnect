@@ -25,6 +25,7 @@ _SHARE_RULE = f"mcp__cconnect__{SHARE_TOOL}"
 
 _TRANSIENT_API_STATUS = frozenset({500, 502, 503, 504, 529})
 _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
+_AGENTS_MD_PLUGIN = "cc-plugin-agents-md@builtin"
 _OUTPUT_SHARE = 4
 _MIN_OUTPUT_TOKENS = 1024
 _TRANSIENT_PATTERNS = (
@@ -158,6 +159,9 @@ def _cli_settings(scope: dict) -> dict[str, Any]:
     overrides: dict[str, Any] = {"permissions": {"deny": deny}}
     if not scope["memory"]:
         overrides["autoMemoryEnabled"] = False
+    instructions = settings_store.get("instruction_files")
+    if instructions and scope["project_files"]:
+        overrides["pluginConfigs"] = {_AGENTS_MD_PLUGIN: {"options": {"instructionFiles": instructions}}}
     return overrides
 
 
@@ -877,6 +881,7 @@ async def run_prompt(
             "partial": partial,
             "scope": scope["id"],
             "style": overrides.get("outputStyle"),
+            "instructions": overrides.get("pluginConfigs"),
         }
         if resident.connected and (resident.mark != mark or resume_at or fork):
             await resident.close()

@@ -107,11 +107,13 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "effort", label: "EFFORT", value: effortValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "output_style", label: "OUTPUT_STYLE", value: outputStyleValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "chat_language", label: "CHAT_LANGUAGE", value: chatLanguageValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
+  { id: "instruction_files", label: "INSTRUCTION_FILES", summary: "INSTRUCTION_FILES_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "fast_mode", label: "FAST_MODE", summary: "FAST_MODE_DESC", available: fastModeAvailable, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "streaming", label: "STREAMING", summary: "STREAMING_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "task_tools", label: "TASK_TOOLS", summary: "TASK_TOOLS_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "always_thinking", label: "ALWAYS_THINKING", summary: "ALWAYS_THINKING_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "auto_compact", label: "AUTO_COMPACT", summary: "AUTO_COMPACT_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
+  { id: "auto_compact_window", label: "AUTO_COMPACT_WINDOW", summary: "AUTO_COMPACT_WINDOW_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
 
   { id: "tools", label: "TOOLS", summary: "MCP_TOOLS_DESC", value: toolsValue, section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
   { id: "browser_view", label: "BROWSER_VIEW", summary: "BROWSER_VIEW_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "tools" },

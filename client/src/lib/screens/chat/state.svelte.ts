@@ -144,6 +144,7 @@ export class ChatState {
   activity = $state<string | null>(null);
   todos = $state<TodoItem[]>([]);
   contextTokens = $state<number | null>(null);
+  compactWindow = $state<number | null>(null);
   requestBytes = $state<number | null>(null);
   mediaBytes = $state<number | null>(null);
   pendingToolIds = $state<string[]>([]);
@@ -1431,6 +1432,7 @@ export class ChatState {
       this.effort = snapshot.effort;
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
+      this.compactWindow = snapshot.autoCompact ? snapshot.autoCompactWindow : null;
       this.list?.applySettings(snapshot);
       this.serverVisibility = {
         simple: snapshot.simpleMode,

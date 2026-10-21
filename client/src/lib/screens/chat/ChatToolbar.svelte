@@ -38,6 +38,7 @@
     streamingSelected: string;
     simpleMode: boolean;
     contextTokens: number | null;
+    compactWindow: number | null;
     requestBytes: number | null;
     mediaBytes: number | null;
     quickChatActive: boolean;
@@ -68,6 +69,7 @@
     streamingSelected,
     simpleMode,
     contextTokens,
+    compactWindow,
     requestBytes,
     mediaBytes,
     quickChatActive,
@@ -126,7 +128,10 @@
 
   const modelsAvailable = $derived((capabilities?.models.length ?? 0) > 0);
   const modelLabel = $derived(capabilities?.models.find((item) => item.id === model)?.label ?? model);
-  const contextWindow = $derived(contextWindowFor(capabilities, model));
+  const modelWindow = $derived(contextWindowFor(capabilities, model));
+  const contextWindow = $derived(
+    modelWindow !== null && compactWindow !== null ? Math.min(modelWindow, compactWindow) : modelWindow,
+  );
   const permissionLabel = $derived(
     capabilities?.permissionModes.find((item) => item.id === permissionMode)?.label ?? permissionMode,
   );

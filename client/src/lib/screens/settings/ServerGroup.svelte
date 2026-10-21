@@ -269,6 +269,10 @@
     chatLanguage={snapshot.chatLanguage}
     alwaysThinking={snapshot.alwaysThinking}
     autoCompact={snapshot.autoCompact}
+    autoCompactWindow={snapshot.autoCompactWindow}
+    compactMin={snapshot.autoCompactWindowMin}
+    compactMax={snapshot.autoCompactWindowMax}
+    instructionFiles={snapshot.instructionFiles}
     onConfirm={(values) =>
       void apply({
         model: values.model,
@@ -279,6 +283,8 @@
         chat_language: values.chatLanguage,
         always_thinking: values.alwaysThinking,
         auto_compact: values.autoCompact,
+        ...(snapshot.autoCompactWindowMin !== null ? { auto_compact_window: values.autoCompactWindow } : {}),
+        ...(snapshot.instructionFiles !== null ? { instruction_files: values.instructionFiles } : {}),
       })}
     onDismiss={() => (dialog = null)}
   />
