@@ -313,8 +313,11 @@ class Tabs {
   newTab(categoryId: string | null = null, pane: PaneRole = "center"): Tab {
     const source = pane === "right" ? (this.right.at(-1) ?? this.active) : this.active;
     const environmentId = source?.environmentId ?? backend.active?.id ?? null;
-    const directory = backend.environments.find((item) => item.id === environmentId)?.directory ?? "";
+    const chosen = source ? this.liveState(source.id) : null;
+    const directory =
+      chosen?.historyPath ?? backend.environments.find((item) => item.id === environmentId)?.directory ?? "";
     const tab = this.openTab(environmentId, directory, pane);
+    if (chosen?.historyProject) this.stateFor(tab).selectHistoryProject(chosen.historyProject);
     if (categoryId) this.stateFor(tab).pendingCategoryId = categoryId;
     return tab;
   }

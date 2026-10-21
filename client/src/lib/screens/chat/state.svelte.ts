@@ -289,6 +289,7 @@ export class ChatState {
         : [];
     return this.withDefaultProject([...visible, ...kept]);
   });
+  readonly historyPath = $derived(this.#projectPath(this.historyProject));
 
   readonly allProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly link = $derived<ConnectionState>(
@@ -1041,10 +1042,14 @@ export class ChatState {
     return value;
   }
 
+  #projectPath(projectKey: string | null): string | null {
+    return this.historyProjects.find((item) => item.projectKey === projectKey)?.path ?? null;
+  }
+
   selectHistoryProject(projectKey: string | null) {
     this.historyProjectKey = projectKey;
     if (!projectKey) return;
-    const path = this.historyProjects.find((item) => item.projectKey === projectKey)?.path;
+    const path = this.#projectPath(projectKey);
     if (!path || path === this.cwd) return;
     this.cwd = path;
     this.onContextChange?.();
