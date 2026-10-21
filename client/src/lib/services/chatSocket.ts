@@ -77,7 +77,15 @@ export type ServerEvent =
       blocks: ComponentElement[];
     }
   | { type: "plan"; markdown: string }
-  | { type: "agent"; id: string | null; subagentType: string | null; description: string | null; labelOnly: boolean }
+  | {
+      type: "agent";
+      id: string | null;
+      subagentType: string | null;
+      description: string | null;
+      model: string | null;
+      effort: string | null;
+      labelOnly: boolean;
+    }
   | {
       type: "agent_result";
       id: string | null;
@@ -729,6 +737,8 @@ export class ChatSocket {
           id: text(wire, "id"),
           subagentType: text(wire, "subagent_type"),
           description: text(wire, "description"),
+          model: text(wire, "model"),
+          effort: text(wire, "effort"),
           labelOnly: flag(wire, "label"),
         };
       case "agent_result":

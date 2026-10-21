@@ -49,6 +49,11 @@ export interface AgentResult {
   toolUses: number | null;
 }
 
+export interface AgentRun {
+  model: string | null;
+  effort: string | null;
+}
+
 export interface InteractionOption {
   id: string;
   label: string | null;
@@ -167,6 +172,7 @@ export interface ChatMessage {
   diffLines: DiffLine[] | null;
   files: SharedFile[] | null;
   compact: CompactData | null;
+  agentRun: AgentRun | null;
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
   toolMs: number | null;
@@ -329,6 +335,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   diffLines: null,
   files: null,
   compact: null,
+  agentRun: null,
   agentResult: null,
   thinkingTokens: null,
   toolMs: null,

@@ -540,6 +540,7 @@
   "INTERRUPTED": "Interrupted",
   "PLAN": "Plan",
   "AGENT": "Agent",
+  "AGENT_TYPE_FORK": "Chat fork",
   "AGENT_REPORT": "Agent report",
   "SESSION_MESSAGE": "Message from another session",
   "TOKENS_COUNT_ONE": "{2} token",

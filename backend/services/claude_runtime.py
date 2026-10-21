@@ -303,6 +303,18 @@ def _todo_items(todos: Any) -> list[dict]:
     ]
 
 
+def _agent_event(block_id: Any, raw_input: dict, mode: str) -> dict:
+    return {
+        "type": "agent",
+        "id": block_id,
+        "subagent_type": raw_input.get("subagent_type"),
+        "description": raw_input.get("description"),
+        "model": raw_input.get("model"),
+        "effort": raw_input.get("effort"),
+        "label": mode == "label",
+    }
+
+
 _RESULT_PAYLOAD_KEYS = {"text": "text", "tool_reference": "tool_name"}
 
 
@@ -409,13 +421,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 if mode == "off":
                     _mark_working(events, vis)
                 if mode != "off":
-                    events.append({
-                        "type": "agent",
-                        "id": getattr(block, "id", None),
-                        "subagent_type": raw_input.get("subagent_type"),
-                        "description": raw_input.get("description"),
-                        "label": mode == "label",
-                    })
+                    events.append(_agent_event(getattr(block, "id", None), raw_input, mode))
                 continue
             if name == "TodoWrite" and isinstance(raw_input, dict):
                 events.append({"type": "todos", "items": _todo_items(raw_input.get("todos"))})

@@ -1615,6 +1615,7 @@ export class ChatState {
         diffLines: item.diffLines,
         files: item.files,
         compact: item.compact,
+        agentRun: item.agentRun,
         agentResult: item.agentResult,
         thinkingTokens: item.thinkingTokens,
         toolMs: item.toolMs,
@@ -2021,6 +2022,7 @@ export class ChatState {
             toolName: event.subagentType,
             toolUseId: event.id,
             labelOnly: event.labelOnly,
+            agentRun: { model: event.model, effort: event.effort },
           }),
         );
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];

@@ -5,6 +5,7 @@ import {
   sharedFilesFrom,
   VALUE_SEPARATOR,
   type AgentResult,
+  type AgentRun,
   type CompactData,
   type DiffLine,
   type InteractionData,
@@ -22,6 +23,7 @@ export interface SessionMessage {
   diffLines: DiffLine[] | null;
   files: SharedFile[] | null;
   compact: CompactData | null;
+  agentRun: AgentRun | null;
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
   toolMs: number | null;
@@ -143,6 +145,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
         : null,
     thinkingTokens: type === "thinking" ? int(raw, "tokens") : null,
     toolMs: int(raw, "ms"),
+    agentRun: type === "agent" ? { model: text(raw, "model"), effort: text(raw, "effort") } : null,
     agentResult: (() => {
       const done = raw.agent_result;
       if (type !== "agent" || typeof done !== "object" || done === null) return null;

@@ -1498,7 +1498,7 @@ def get_session_messages(
                     messages.append(item)
             elif btype == "tool_use":
                 from mcps import shared_files
-                from services.claude_runtime import _FILE_EDIT_TOOLS, _SHARE_RULE, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
+                from services.claude_runtime import _FILE_EDIT_TOOLS, _SHARE_RULE, _agent_event, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
@@ -1589,14 +1589,8 @@ def get_session_messages(
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
                     if vis["tool_use"] != "off":
-                        block_event = {
-                            "type": "agent",
-                            "id": bid,
-                            "subagent_type": inp.get("subagent_type"),
-                            "description": inp.get("description"),
-                            "label": vis["tool_use"] == "label",
-                        }
-                        done = notified.get(bid or "") or agent_results.get(bid or "")
+                        block_event = _agent_event(bid, inp, vis["tool_use"])
+                        done =notified.get(bid or "") or agent_results.get(bid or "")
                         if done is not None:
                             block_event["agent_result"] = _agent_result(done, vis)
                         messages.append(block_event)

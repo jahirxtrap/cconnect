@@ -24,25 +24,28 @@
     onSharedLink,
   }: Props = $props();
 
-  const statusLabel = (status: string) => {
-    const key = `AGENT_${status.toUpperCase()}`;
+  const keyed = (prefix: string, value: string, fallback: string) => {
+    const key = `${prefix}${value.toUpperCase().replace(/-/g, "_")}`;
     const label = t(key);
-    return label === key ? status.replace(/_/g, " ") : label;
+    return label === key ? fallback : label;
   };
 
   const stat = $derived.by(() => {
     const done = message.agentResult;
-    if (!done) return null;
-    const parts: string[] = [];
-    if (done.status && done.status !== "completed") parts.push(statusLabel(done.status));
-    if (done.durationMs !== null) parts.push(formatDuration(done.durationMs));
-    if (done.tokens !== null) parts.push(formatTokens(done.tokens));
-    return joined(...parts) || null;
+    return (
+      joined(
+        message.agentRun?.model,
+        message.agentRun?.effort,
+        done?.status && done.status !== "completed" && keyed("AGENT_", done.status, done.status.replace(/_/g, " ")),
+        done && done.durationMs !== null && formatDuration(done.durationMs),
+        done && done.tokens !== null && formatTokens(done.tokens),
+      ) || null
+    );
   });
 </script>
 
 <Collapsible
-  label={message.toolName ?? t("AGENT")}
+  label={message.toolName ? keyed("AGENT_TYPE_", message.toolName, message.toolName) : t("AGENT")}
   icon={Bot}
   preview={message.text}
   {stat}
