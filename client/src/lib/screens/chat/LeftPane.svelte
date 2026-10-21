@@ -57,13 +57,15 @@
   const MAX_FRACTION = 0.5;
 
   let dragging = $state(false);
+
+  const shownWidth = $derived(Math.round(Math.min(Math.max(width, MIN_WIDTH), layout.width * MAX_FRACTION)));
 </script>
 
 <div
   class="relative h-full shrink-0 overflow-hidden bg-surface {dragging
     ? ''
     : 'transition-[width] duration-200'}"
-  style="width: {expanded ? width : RAIL_WIDTH}px; {accent}"
+  style="width: {expanded ? shownWidth : RAIL_WIDTH}px; {accent}"
 >
   {#if expanded}
     <ChatList
@@ -87,13 +89,13 @@
       class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize"
       use:resizeHandle={{
         axis: "x",
-        value: () => width,
+        value: () => shownWidth,
         min: MIN_WIDTH,
         max: () => layout.width * MAX_FRACTION,
         onResize: (value) => onWidth(value, false),
         onDragging: (active) => {
           dragging = active;
-          if (!active) onWidth(width, true);
+          if (!active) onWidth(shownWidth, true);
         },
       }}
     ></div>

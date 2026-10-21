@@ -69,6 +69,9 @@
   let rightWidth = $state(settings.rightWidth);
   let rightDragging = $state(false);
 
+  const sideMax = $derived(layout.width * MAX_PANEL_FRACTION);
+  const panelWidth = $derived(Math.round(Math.min(Math.max(rightWidth, MIN_SIDE_WIDTH), sideMax)));
+
   const centerView = $derived(panes.centerView && !layout.mobile);
   const centerPreview = $derived(centerView && panes.previewing);
   const centerDiff = $derived(centerView && !panes.previewing);
@@ -128,7 +131,7 @@
   });
 
   $effect(() => {
-    layout.rightInset = navigation.chatActive && !layout.mobile && panes.open ? rightWidth : 0;
+    layout.rightInset = navigation.chatActive && !layout.mobile && panes.open ? panelWidth : 0;
     layout.rightInsetAnimated = !rightDragging;
     return () => (layout.rightInset = 0);
   });
@@ -150,7 +153,7 @@
   );
 
   const paneAt = (pointerX: number): PaneRole =>
-    pointerX >= layout.width - rightWidth ? "right" : "center";
+    pointerX >= layout.width - panelWidth ? "right" : "center";
 
   const dragPanes = (pointerX: number, done: boolean, origin: PaneRole) => {
     const target = paneAt(pointerX);
@@ -331,11 +334,11 @@
       class="relative h-full shrink-0 overflow-hidden {rightDragging
         ? ''
         : 'transition-[width] duration-200'}"
-      style="width: {panes.open ? rightWidth : 0}px; {rightAccent}"
+      style="width: {panes.open ? panelWidth : 0}px; {rightAccent}"
       data-unfocused={panes.focused === "right" ? undefined : true}
       onpointerdowncapture={(event) => focusFrom(event, "right")}
     >
-      <div class="relative flex h-full flex-col" style="width: {rightWidth}px">
+      <div class="relative flex h-full flex-col" style="width: {panelWidth}px">
         <div
           role="separator"
           aria-orientation="vertical"
@@ -343,11 +346,12 @@
           use:resizeHandle={{
             axis: "x",
             invert: true,
-            value: () => rightWidth,
+            value: () => panelWidth,
             min: MIN_SIDE_WIDTH,
-            max: () => layout.width * MAX_PANEL_FRACTION,
+            max: () => sideMax,
             onResize: (value) => (rightWidth = value),
             onDragging: (active) => {
+              if (active) rightWidth = panelWidth;
               rightDragging = active;
               if (!active) settings.rightWidth = rightWidth;
             },
