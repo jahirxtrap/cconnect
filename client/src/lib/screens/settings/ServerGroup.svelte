@@ -7,6 +7,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Unplug from "@lucide/svelte/icons/unplug";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
+  import Puzzle from "@lucide/svelte/icons/puzzle";
   import Server from "@lucide/svelte/icons/server";
   import { joined } from "$lib/data/format";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
@@ -18,6 +19,7 @@
   import { systemApi, type ServerUpdate } from "$lib/services/systemApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
+  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import OutputPanel from "$lib/ui/OutputPanel.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -205,6 +207,21 @@
     onclick={() => (dialog = "persistent")}
   />
 
+  {#if snapshot && snapshot.modSurfaces !== null}
+    {@const modsOn = snapshot.modSurfaces}
+    <PreferenceRow
+      icon={Puzzle}
+      title={t("MODS")}
+      summary={rowSummary("mod_surfaces")}
+      enabled={ready}
+      onclick={() => void apply({ mod_surfaces: !modsOn })}
+    >
+      {#snippet trailing()}
+        <CompactSwitch checked={modsOn} onCheckedChange={(value) => void apply({ mod_surfaces: value })} />
+      {/snippet}
+    </PreferenceRow>
+  {/if}
+
   {#if (capabilities?.accounts.length ?? 0) > 1}
     <PreferenceRow
       icon={CircleUser}
@@ -343,14 +360,8 @@
     sessions={snapshot.persistentSessions}
     grace={snapshot.persistentGrace}
     limit={snapshot.persistentLimit}
-    modSurfaces={snapshot.modSurfaces}
-    onConfirm={(persistent_sessions, persistent_grace, persistent_limit, mod_surfaces) =>
-      void apply({
-        persistent_sessions,
-        persistent_grace,
-        persistent_limit,
-        ...(mod_surfaces === null ? {} : { mod_surfaces }),
-      })}
+    onConfirm={(persistent_sessions, persistent_grace, persistent_limit) =>
+      void apply({ persistent_sessions, persistent_grace, persistent_limit })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "privacy" && snapshot}

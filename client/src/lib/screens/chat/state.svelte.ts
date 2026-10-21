@@ -16,6 +16,7 @@ import {
   type Role,
   type TodoItem,
 } from "$lib/data/chatModels";
+import { emptyModState } from "$lib/data/modModels";
 import { projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings } from "$lib/data/settings.svelte";
@@ -1446,6 +1447,7 @@ export class ChatState {
       this.streamTokens = snapshot.streaming;
       this.compactWindow = snapshot.autoCompact ? snapshot.autoCompactWindow : null;
       this.modsAvailable = snapshot.persistentSessions && snapshot.modSurfaces === true;
+      if (snapshot.modSurfaces === false) this.mods.applyState(emptyModState());
       this.list?.applySettings(snapshot);
       this.serverVisibility = {
         simple: snapshot.simpleMode,

@@ -143,7 +143,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "persistent_sessions", label: "PERSISTENT_SESSIONS", value: persistentValue, summary: "PERSISTENT_SESSIONS_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
   { id: "persistent_grace", label: "PERSISTENT_GRACE", summary: "PERSISTENT_GRACE_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
   { id: "persistent_limit", label: "PERSISTENT_LIMIT", summary: "PERSISTENT_LIMIT_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
-  { id: "mod_surfaces", label: "MOD_SURFACES", summary: "MOD_SURFACES_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "persistent" },
+  { id: "mod_surfaces", label: "MODS", summary: "MOD_SURFACES_DESC", section: "server", group: "SETTINGS_SERVER" },
 
   { id: "account", label: "ACCOUNT", value: accountValue, available: multipleAccounts, section: "server", group: "SETTINGS_SERVER", dialog: "account" },
   { id: "server", label: "SERVER_VERSION", section: "server", group: "SETTINGS_SERVER" },

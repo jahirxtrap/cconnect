@@ -142,14 +142,17 @@ def commands(listed: Any) -> dict:
 
 
 def events(subtype: Optional[str], data: Any) -> list[dict]:
+    """What a CLI system message shows; with mods off, only the lines the transcript keeps."""
     if not isinstance(data, dict):
+        return []
+    if subtype == "informational":
+        return [kept_notice(data.get("content"), data.get("level"), data.get("uuid"))]
+    if not enabled():
         return []
     if subtype == "commands_changed":
         return [commands(data.get("commands"))]
     if subtype == "ui_log":
         return [notice(data.get("text"), data.get("plugin"))]
-    if subtype == "informational":
-        return [kept_notice(data.get("content"), data.get("level"), data.get("uuid"))]
     if subtype == "ui_status":
         return [{"type": "mod_status", "plugin": data.get("plugin"), "text": data.get("text")}]
     if subtype == "ui_toast":
@@ -211,15 +214,16 @@ class Surface:
                 self.status.pop(plugin, None)
 
     def snapshot(self) -> dict:
+        shown = self if enabled() else Surface()
         return {
             "type": "mods",
-            "surface": self.attached,
-            "panes": self.panes,
-            "shown_id": self.shown_id,
-            "focused_id": self.focused_id,
-            "focus_requested_id": self.focus_requested_id,
-            "status": [{"plugin": plugin, "text": text} for plugin, text in self.status.items()],
-            "commands": self.commands,
+            "surface": shown.attached,
+            "panes": shown.panes,
+            "shown_id": shown.shown_id,
+            "focused_id": shown.focused_id,
+            "focus_requested_id": shown.focus_requested_id,
+            "status": [{"plugin": plugin, "text": text} for plugin, text in shown.status.items()],
+            "commands": shown.commands,
         }
 
 

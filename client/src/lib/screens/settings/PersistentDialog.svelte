@@ -10,12 +10,11 @@
     sessions: boolean;
     grace: number;
     limit: number;
-    modSurfaces: boolean | null;
-    onConfirm: (sessions: boolean, grace: number, limit: number, modSurfaces: boolean | null) => void;
+    onConfirm: (sessions: boolean, grace: number, limit: number) => void;
     onDismiss: () => void;
   }
 
-  const { sessions, grace, limit, modSurfaces, onConfirm, onDismiss }: Props = $props();
+  const { sessions, grace, limit, onConfirm, onDismiss }: Props = $props();
 
   const GRACE_MAX = 3600;
   const LIMIT_MAX = 20;
@@ -23,7 +22,6 @@
   let live = $state(untrack(() => sessions));
   let seconds = $state(untrack(() => String(grace)));
   let count = $state(untrack(() => String(limit)));
-  let surfaces = $state(untrack(() => modSurfaces));
 
   const parsedGrace = $derived(Number(seconds));
   const parsedLimit = $derived(Number(count));
@@ -35,7 +33,7 @@
 <CompactDialog title={t("PERSISTENT_SESSIONS")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button enabled={valid} onclick={() => onConfirm(live, parsedGrace, parsedLimit, surfaces)}>{t("SAVE")}</Button>
+    <Button enabled={valid} onclick={() => onConfirm(live, parsedGrace, parsedLimit)}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-3.5">
     <SwitchRow
@@ -67,14 +65,6 @@
         />
         <p class="text-body-sm text-on-surface-variant">{t("PERSISTENT_LIMIT_HINT")}</p>
       </div>
-      {#if surfaces !== null}
-        <SwitchRow
-          title={t("MOD_SURFACES")}
-          summary={t("MOD_SURFACES_DESC")}
-          checked={surfaces}
-          onChange={(checked) => (surfaces = checked)}
-        />
-      {/if}
     {/if}
   </div>
 </CompactDialog>
