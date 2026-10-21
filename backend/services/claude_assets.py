@@ -9,6 +9,11 @@ from core import paths
 from services import claude_manage
 
 _CLAUDE_DIR = Path.home() / ".claude"
+SKILLS_DIR = _CLAUDE_DIR / "skills"
+LOCAL_MARKETPLACE = "skills-dir"
+_CHAT_MODS_DIR = _CLAUDE_DIR / "dev-mods"
+_MANIFEST = Path(".claude-plugin") / "plugin.json"
+_HOOKS_FILE = "hooks/hooks.json"
 _PROJECT_KEY_RE = re.compile(r"^[A-Za-z0-9-]+$")
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
@@ -104,6 +109,51 @@ def _catalog_descriptions(marketplace: str) -> dict[str, str]:
     }
 
 
+def read_manifest(root: Path) -> dict:
+    return _read_json(root / _MANIFEST)
+
+
+def _is_mod(root: Path, manifest: dict) -> bool:
+    declared = manifest.get("hooks") or _HOOKS_FILE
+    for source in declared if isinstance(declared, list) else [declared]:
+        config = source if isinstance(source, dict) else _read_json(root / source) if isinstance(source, str) else {}
+        if config.get("modules"):
+            return True
+    return False
+
+
+def _plugin_item(name: str, marketplace: str, root: Path | None, manifest: dict | None = None, **fields) -> dict:
+    if manifest is None:
+        manifest = read_manifest(root) if root else {}
+    return {
+        "name": name,
+        "marketplace": marketplace,
+        **fields,
+        "install_path": str(root) if root else None,
+        "mod": root is not None and _is_mod(root, manifest),
+        "options": bool(manifest.get("userConfig")),
+        "local": marketplace == LOCAL_MARKETPLACE,
+    }
+
+
+def _local_plugins(taken: set[str], enabled: dict) -> list[dict]:
+    items = []
+    for manifest_file in sorted(SKILLS_DIR.glob(f"*/{_MANIFEST.as_posix()}")):
+        root = manifest_file.parent.parent
+        manifest = _read_json(manifest_file)
+        name = manifest.get("name") or root.name
+        if name in taken:
+            continue
+        items.append(_plugin_item(
+            name, LOCAL_MARKETPLACE, root, manifest,
+            version=manifest.get("version"),
+            scope="user",
+            enabled=bool(enabled.get(f"{name}@{LOCAL_MARKETPLACE}", True)),
+            description=manifest.get("description"),
+        ))
+    return items
+
+
 def list_plugins() -> list[dict]:
     installed = _read_json(_CLAUDE_DIR / "plugins" / "installed_plugins.json").get("plugins", {})
     enabled = _enabled_plugins()
@@ -116,16 +166,44 @@ def list_plugins() -> list[dict]:
         info = installs[0]
         if marketplace not in descriptions:
             descriptions[marketplace] = _catalog_descriptions(marketplace)
+        path = info.get("installPath")
+        items.append(_plugin_item(
+            name, marketplace, Path(path) if path else None,
+            version=(info.get("version") or "").replace("unknown", "") or None,
+            scope=info.get("scope"),
+            enabled=bool(enabled.get(key, True)),
+            description=descriptions[marketplace].get(name),
+        ))
+    items += _local_plugins({item["name"] for item in items}, enabled)
+    items.sort(key=lambda p: (not p["enabled"], p["name"]))
+    return items
+
+
+def plugin_root(plugin: str) -> Path | None:
+    name, _, marketplace = plugin.partition("@")
+    if marketplace == LOCAL_MARKETPLACE:
+        return next((Path(item["install_path"]) for item in _local_plugins(set(), {}) if item["name"] == name), None)
+    installs = _read_json(_CLAUDE_DIR / "plugins" / "installed_plugins.json").get("plugins", {}).get(plugin)
+    path = installs[0].get("installPath") if isinstance(installs, list) and installs else None
+    return Path(path) if path else None
+
+
+def list_chat_mods(installed: set[str]) -> list[dict]:
+    items = []
+    for manifest_file in _CHAT_MODS_DIR.glob(f"*/*/{_MANIFEST.as_posix()}"):
+        root = manifest_file.parent.parent
+        manifest = _read_json(manifest_file)
+        name = manifest.get("name") or root.name
         items.append({
             "name": name,
-            "marketplace": marketplace,
-            "version": (info.get("version") or "").replace("unknown", "") or None,
-            "scope": info.get("scope"),
-            "enabled": bool(enabled.get(key, True)),
-            "install_path": info.get("installPath"),
-            "description": descriptions[marketplace].get(name),
+            "description": manifest.get("description"),
+            "version": manifest.get("version"),
+            "path": str(root),
+            "session_id": root.parent.name,
+            "installed": name in installed,
+            "modified": int(manifest_file.stat().st_mtime * 1000),
         })
-    items.sort(key=lambda p: (not p["enabled"], p["name"]))
+    items.sort(key=lambda m: m["modified"], reverse=True)
     return items
 
 
@@ -169,9 +247,8 @@ def list_skills() -> list[dict]:
                 "plugin_name": plugin["name"],
                 "enabled": plugin["enabled"],
             })
-    personal = _CLAUDE_DIR / "skills"
-    if personal.is_dir():
-        for skill_file in sorted(personal.glob("*/SKILL.md")):
+    if SKILLS_DIR.is_dir():
+        for skill_file in sorted(SKILLS_DIR.glob("*/SKILL.md")):
             meta = _skill_meta(skill_file) or {}
             items.append({
                 "name": meta.get("name") or skill_file.parent.name,
@@ -191,13 +268,12 @@ _SKILL_ID_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 def _skill_dir(plugin: str | None, skill_id: str) -> Path:
     if not _SKILL_ID_RE.match(skill_id or ""):
         raise ValueError("invalid skill id")
-    if plugin:
-        installed = _read_json(_CLAUDE_DIR / "plugins" / "installed_plugins.json").get("plugins", {})
-        installs = installed.get(plugin)
-        if not isinstance(installs, list) or not installs:
-            raise ValueError("unknown plugin")
-        return Path(installs[0].get("installPath") or "") / "skills" / skill_id
-    return _CLAUDE_DIR / "skills" / skill_id
+    if not plugin:
+        return SKILLS_DIR / skill_id
+    root = plugin_root(plugin)
+    if root is None:
+        raise ValueError("unknown plugin")
+    return root / "skills" / skill_id
 
 
 def list_skill_files(plugin: str | None, skill_id: str) -> list[str]:

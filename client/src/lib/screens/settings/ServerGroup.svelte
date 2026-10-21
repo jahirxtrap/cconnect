@@ -343,8 +343,14 @@
     sessions={snapshot.persistentSessions}
     grace={snapshot.persistentGrace}
     limit={snapshot.persistentLimit}
-    onConfirm={(persistent_sessions, persistent_grace, persistent_limit) =>
-      void apply({ persistent_sessions, persistent_grace, persistent_limit })}
+    modSurfaces={snapshot.modSurfaces}
+    onConfirm={(persistent_sessions, persistent_grace, persistent_limit, mod_surfaces) =>
+      void apply({
+        persistent_sessions,
+        persistent_grace,
+        persistent_limit,
+        ...(mod_surfaces === null ? {} : { mod_surfaces }),
+      })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "privacy" && snapshot}

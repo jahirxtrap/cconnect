@@ -8,12 +8,26 @@ import {
   type ComponentOption,
   type ComponentType,
   type DiffLine,
+  type InteractionMod,
   type InteractionOption,
   type QueuedMessage,
   type SharedFile,
   type TodoItem,
 } from "$lib/data/chatModels";
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
+import {
+  toModComponent,
+  toModDrawn,
+  toModRequest,
+  toModState,
+  type ModAction,
+  type ModActionFields,
+  type ModComponent,
+  type ModDrawn,
+  type ModRenderSite,
+  type ModRequest,
+  type ModState,
+} from "$lib/data/modModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { nativeSockets, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
@@ -97,7 +111,17 @@ export type ServerEvent =
   | { type: "thinking_tokens"; tokens: number }
   | { type: "hook_failed"; name: string | null; text: string }
   | { type: "notification"; summary: string; status: string | null }
+  | { type: "notice"; name: string | null; text: string; level: string | null }
+  | { type: "mods"; state: ModState }
+  | { type: "mod_toast"; plugin: string | null; text: string; timeoutMs: number | null }
+  | { type: "mod_invalidate" }
+  | { type: "mod_tree"; rid: number; component: ModComponent; instanceId: string; drawn: ModDrawn }
+  | { type: "mod_reply"; rid: number; answer: unknown }
+  | { type: "mod_request"; request: ModRequest }
+  | { type: "mod_focus"; component: ModComponent; instanceId: string; plugin: string; key: string }
+  | { type: "mod_scroll"; component: ModComponent; instanceId: string; offset: number; followEnd: boolean }
   | { type: "session_message"; name: string | null; text: string }
+  | { type: "plugin_message"; name: string | null; text: string }
   | { type: "agent_report"; name: string | null; text: string }
   | { type: "todos"; items: TodoItem[] }
   | { type: "task"; id: string; content: string | null; status: string | null }
@@ -138,6 +162,8 @@ export type ServerEvent =
       submitKey: string | null;
       dismiss: ComponentOption | null;
       present: string | null;
+      variant: string | null;
+      mod: InteractionMod | null;
     }
   | {
       type: "interaction_resolved";
@@ -196,6 +222,16 @@ const toOption = (raw: Wire): InteractionOption => ({
   description: text(raw, "description"),
   preview: text(raw, "preview"),
 });
+
+const toInteractionMod = (raw: unknown): InteractionMod | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const wire = raw as Wire;
+  const instanceId = text(wire, "instance_id");
+  const drawn = toModDrawn({ ...wire, hooked: true });
+  if (!instanceId || !drawn.tree) return null;
+  const props = wire.props && typeof wire.props === "object" ? (wire.props as Record<string, unknown>) : {};
+  return { instanceId, props, drawn: { ...drawn, props: null } };
+};
 
 const toValues = (raw: unknown): Record<string, string> | null => {
   if (!raw || typeof raw !== "object") return null;
@@ -451,6 +487,31 @@ export class ChatSocket {
 
   sendCloseResident() {
     this.#send({ type: "close_resident" });
+  }
+
+  sendModRender(site: ModRenderSite, rid: number) {
+    this.#send({
+      type: "mod_render",
+      component: site.component,
+      instance_id: site.instanceId,
+      props: site.props,
+      columns: site.columns,
+      rows: site.rows,
+      offset: site.offset,
+      rid,
+    });
+  }
+
+  sendModAction(action: ModAction, fields: ModActionFields, rid?: number) {
+    this.#send({ type: "mod_act", action, ...fields, ...(rid === undefined ? {} : { rid }) });
+  }
+
+  sendModClientModule(plugin: string, rid: number) {
+    this.#send({ type: "mod_client_module", plugin, rid });
+  }
+
+  sendModAnswer(id: string, answer: Record<string, unknown>) {
+    this.#send({ type: "mod_answer", id, answer });
   }
 
   sendSetGeneration(patch: GenerationPatch) {
@@ -714,8 +775,52 @@ export class ChatSocket {
         return { type: "plan", markdown: text(wire, "markdown") ?? "" };
       case "notification":
         return { type: "notification", summary: text(wire, "text") ?? "", status: text(wire, "result") };
+      case "notice":
+        return { type: "notice", name: text(wire, "name"), text: text(wire, "text") ?? "", level: text(wire, "level") };
+      case "mods":
+        return { type: "mods", state: toModState(wire) };
+      case "mod_toast":
+        return {
+          type: "mod_toast",
+          plugin: text(wire, "plugin"),
+          text: text(wire, "text") ?? "",
+          timeoutMs: int(wire, "timeout_ms"),
+        };
+      case "mod_invalidate":
+        return { type: "mod_invalidate" };
+      case "mod_tree":
+        return {
+          type: "mod_tree",
+          rid: int(wire, "rid") ?? 0,
+          component: toModComponent(wire.component),
+          instanceId: text(wire, "instance_id") ?? "",
+          drawn: toModDrawn(wire),
+        };
+      case "mod_reply":
+        return { type: "mod_reply", rid: int(wire, "rid") ?? 0, answer: wire.answer ?? null };
+      case "mod_request": {
+        const request = toModRequest(wire);
+        return request ? { type: "mod_request", request } : null;
+      }
+      case "mod_focus":
+        return {
+          type: "mod_focus",
+          component: toModComponent(wire.component),
+          instanceId: text(wire, "instance_id") ?? "",
+          plugin: text(wire, "plugin") ?? "",
+          key: text(wire, "key") ?? "",
+        };
+      case "mod_scroll":
+        return {
+          type: "mod_scroll",
+          component: toModComponent(wire.component),
+          instanceId: text(wire, "instance_id") ?? "",
+          offset: int(wire, "offset") ?? 0,
+          followEnd: flag(wire, "follow_end"),
+        };
       case "session_message":
-        return { type: "session_message", name: text(wire, "name"), text: text(wire, "text") ?? "" };
+      case "plugin_message":
+        return { type: kind, name: text(wire, "name"), text: text(wire, "text") ?? "" };
       case "agent_report":
         return { type: "agent_report", name: text(wire, "name"), text: text(wire, "text") ?? "" };
       case "queued":
@@ -815,6 +920,8 @@ export class ChatSocket {
           submitKey: text(wire, "submit_key"),
           dismiss: toDismiss(wire.dismiss),
           present: text(wire, "present"),
+          variant: text(wire, "variant"),
+          mod: toInteractionMod(wire.mod),
         };
       case "interaction_resolved":
         return {

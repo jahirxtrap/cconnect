@@ -4,6 +4,7 @@
   import { tick } from "svelte";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
+  import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
@@ -173,7 +174,7 @@
     class="shrink-0 cursor-ns-resize touch-none"
   >
     <div class="flex justify-center pt-2.5 pb-0.5">
-      <span class="h-1 w-8 rounded-[2px] bg-on-surface-variant/40"></span>
+      <PanelHandle />
     </div>
     <div class="flex items-center px-4 pt-0.5 pb-1.5">
       <MessagesSquare size={18} class="mr-2 shrink-0 text-accent" />

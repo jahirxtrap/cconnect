@@ -1,7 +1,7 @@
 import { isTauri, isTouch, systemName } from "./index";
 import { store } from "./storage";
 
-export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project";
+export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project" | "mods";
 
 export interface ShortcutDef {
   id: string;
@@ -41,6 +41,11 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "terminal.tab.close", label: "SHORTCUT_TERMINAL_TAB_CLOSE", scope: "terminal", keys: "Mod+KeyW" },
   { id: "terminal.tab.next", label: "SHORTCUT_TERMINAL_TAB_NEXT", scope: "terminal", keys: "Ctrl+Tab" },
   { id: "terminal.tab.previous", label: "SHORTCUT_TERMINAL_TAB_PREVIOUS", scope: "terminal", keys: "Ctrl+Shift+Tab" },
+  { id: "mods.tab.close", label: "SHORTCUT_MODS_TAB_CLOSE", scope: "mods", keys: "Mod+KeyW" },
+  { id: "mods.tab.next", label: "SHORTCUT_MODS_TAB_NEXT", scope: "mods", keys: "Ctrl+Tab" },
+  { id: "mods.tab.previous", label: "SHORTCUT_MODS_TAB_PREVIOUS", scope: "mods", keys: "Ctrl+Shift+Tab" },
+  { id: "mods.band.focus", label: "SHORTCUT_MODS_BAND_FOCUS", scope: "chat", keys: "Alt+ArrowUp" },
+  { id: "mods.band.toggle", label: "SHORTCUT_MODS_BAND_TOGGLE", scope: "chat", keys: "" },
   { id: "terminal.copy", label: "SHORTCUT_TERMINAL_COPY", scope: "terminal", keys: "Mod+KeyC" },
   { id: "terminal.paste", label: "SHORTCUT_TERMINAL_PASTE", scope: "terminal", keys: "Mod+KeyV" },
   { id: "browser.tab.new", label: "SHORTCUT_BROWSER_TAB_NEW", scope: "browser", keys: "Mod+KeyT" },

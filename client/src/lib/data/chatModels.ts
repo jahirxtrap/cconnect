@@ -1,3 +1,5 @@
+import type { ModDrawn } from "./modModels";
+
 export type Role =
   | "user"
   | "assistant"
@@ -16,7 +18,9 @@ export type Role =
   | "plan"
   | "agent"
   | "notification"
+  | "notice"
   | "session_message"
+  | "plugin_message"
   | "agent_report";
 
 export type SendStatus = "sent" | "error";
@@ -157,8 +161,16 @@ export interface InteractionData {
   submitKey: string | null;
   dismiss: ComponentOption | null;
   present: string | null;
+  variant: string | null;
+  mod: InteractionMod | null;
   dismissedBy: string | null;
   values: Record<string, string>;
+}
+
+export interface InteractionMod {
+  instanceId: string;
+  props: Record<string, unknown>;
+  drawn: ModDrawn;
 }
 
 export interface ChatMessage {
@@ -320,6 +332,8 @@ export const emptyInteraction = (requestId: string, kind: string): InteractionDa
   submitKey: null,
   dismiss: null,
   present: null,
+  variant: null,
+  mod: null,
   dismissedBy: null,
   values: {},
 });

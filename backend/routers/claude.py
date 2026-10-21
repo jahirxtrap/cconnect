@@ -32,6 +32,15 @@ class PluginActionBody(BaseModel):
     plugin: str  # name@marketplace
 
 
+class PluginOptionsBody(BaseModel):
+    plugin: str
+    values: dict[str, str]
+
+
+class LocalPluginBody(BaseModel):
+    path: str
+
+
 class MarketplaceActionBody(BaseModel):
     action: str  # add | remove | update
     target: str  # source for add, name otherwise
@@ -91,15 +100,43 @@ def set_project_prompt(body: ProjectPromptBody):
 @router.get("/claude/plugins")
 async def get_plugins():
     await claude_manage.ensure_official_marketplace()
+    plugins = claude_assets.list_plugins()
     return api_response(data={
-        "plugins": claude_assets.list_plugins(),
+        "plugins": plugins,
         "marketplaces": claude_assets.list_marketplaces(),
+        "chat_mods": claude_assets.list_chat_mods({plugin["name"] for plugin in plugins}),
     })
 
 
 @router.post("/claude/plugins/action")
 def plugin_action(body: PluginActionBody):
     return api_response(data=claude_manage.plugin_action(body.action, body.plugin))
+
+
+@router.get("/claude/plugins/review")
+def plugin_review(plugin: str):
+    review = claude_manage.plugin_review(plugin)
+    if review is None:
+        raise HTTPException(status_code=404, detail="plugin not found")
+    return api_response(data=review)
+
+
+@router.get("/claude/plugins/options")
+def plugin_options(plugin: str):
+    options = claude_manage.plugin_options(plugin)
+    if options is None:
+        raise HTTPException(status_code=404, detail="plugin has no options")
+    return api_response(data=options)
+
+
+@router.put("/claude/plugins/options")
+def set_plugin_options(body: PluginOptionsBody):
+    return api_response(data=claude_manage.set_plugin_options(body.plugin, body.values))
+
+
+@router.post("/claude/plugins/local")
+def add_local_plugin(body: LocalPluginBody):
+    return api_response(data=claude_manage.add_local_plugin(body.path))
 
 
 @router.post("/claude/marketplaces/action")

@@ -4,6 +4,7 @@
   import FilePen from "@lucide/svelte/icons/file-pen";
   import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
   import Inbox from "@lucide/svelte/icons/inbox";
+  import Puzzle from "@lucide/svelte/icons/puzzle";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import type { ChatMessage } from "$lib/data/chatModels";
@@ -55,6 +56,8 @@
         return { icon: Bot, label: message.toolName || t("AGENT_REPORT"), iconClass: ACCENT, labelClass: ACCENT };
       case "session_message":
         return { icon: Inbox, label: message.toolName || t("SESSION_MESSAGE"), iconClass: ACCENT, labelClass: ACCENT };
+      case "plugin_message":
+        return { icon: Puzzle, label: message.toolName || t("PLUGIN_MESSAGE"), iconClass: ACCENT, labelClass: ACCENT };
       case "plan":
       case "interaction":
         return { icon: Lightbulb, label: t("PLAN"), iconClass: ACCENT, labelClass: ACCENT };

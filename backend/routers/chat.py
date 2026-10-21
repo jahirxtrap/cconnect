@@ -20,7 +20,17 @@ from core.responses import api_response
 from core.ws import send_event
 from mcps import terminal as terminal_mcp
 from middleware.public_auth import ws_bearer_ok
-from schemas.chat import PromptMessage, SetGenerationMessage, SetPermissionMessage, SetVisibilityMessage, StartMessage
+from schemas.chat import (
+    ModActionMessage,
+    ModAnswerMessage,
+    ModClientModuleMessage,
+    ModRenderMessage,
+    PromptMessage,
+    SetGenerationMessage,
+    SetPermissionMessage,
+    SetVisibilityMessage,
+    StartMessage,
+)
 from services import accounts
 from services import blocks
 from services import cli_info
@@ -67,7 +77,7 @@ class _Session:
         self.partial: bool = False
 
 
-def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None):
+def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
@@ -75,7 +85,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
     drain = session.drain
 
     def factory(ask_user, emit):
-        async def one(text, attachments, seed_id, drain, request_compact):
+        async def one(text, attachments, seed_id, drain, request_compact, adopted=False):
             name = text.strip()[:80] if state.session_id is None else None
             compacted = False
             is_compact_cmd = text.strip() == "/compact" or text.strip().startswith("/compact ")
@@ -118,6 +128,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     request_compact=request_compact,
                     capabilities=capabilities,
                     on_transport=on_transport,
+                    adopt=adopted,
                     session_info=lambda: {
                         "session_id": state.session_id,
                         "cwd": state.cwd,
@@ -137,7 +148,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                         state.fork = False
                         if resume_at and not event.get("is_error"):
                             rewind_service.clear_pending(resumed_sid)
-                        if state.cwd:
+                        if state.cwd and not adopted:
                             sessions_service.record_prompt_history(state.cwd, state.session_id, prompt_text)
                     yield event
             finally:
@@ -179,7 +190,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                 pending["compact"] = True
                 pending["instructions"] = instructions
 
-            async for event in one(text, attachments, seed_id, drain, request_compact):
+            async for event in one(text, attachments, seed_id, drain, request_compact, adopt):
                 yield sized(event)
             if pending["compact"]:
                 async for event in one(f"/compact {pending['instructions']}".strip(), None, None, None, None):
@@ -194,14 +205,18 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
     return factory
 
 
+def _turn_start(session, prefs=None) -> int:
+    if not (session.state.session_id and session.state.cwd):
+        return 0
+    try:
+        return len(sessions_service.get_session_messages(
+            sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs))
+    except Exception:
+        return 0
+
+
 async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=None):
-    turn_start = 0
-    if session.state.session_id and session.state.cwd:
-        try:
-            turn_start = len(sessions_service.get_session_messages(
-                sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs))
-        except Exception:
-            turn_start = 0
+    turn_start = _turn_start(session, prefs)
     if not session.start(
         _build_turn_runner(session, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport),
         seed_id=mid,
@@ -209,9 +224,19 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
     ):
         return False
     session.turn_start_index = turn_start
+    session.adopter = lambda: _adopt_turn(session, prefs, capabilities)
     if mid:
         await session.commit_user(mid, text)
     return True
+
+
+async def _adopt_turn(session, prefs=None, capabilities=None):
+    """Show a turn the CLI started on its own, such as a prompt a mod submitted, as it runs."""
+    turn_start = _turn_start(session, prefs)
+    if session.start(
+        _build_turn_runner(session, "", wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport, adopt=True),
+    ):
+        session.turn_start_index = turn_start
 
 
 def _effort_sent(state: _Session) -> str:
@@ -271,6 +296,32 @@ async def _run_usage(send, account: str | None = None, capabilities=None):
             await send({"type": "command", "markdown": await usage_markdown(account)})
     except Exception as exc:
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
+
+
+async def _send_mod_tree(send, session, msg: ModRenderMessage):
+    """Draw one mod component for the socket that asked."""
+    try:
+        drawn = await session.mod_render(msg.component, msg.instance_id, msg.props, msg.columns, msg.rows, msg.offset)
+        await send({
+            "type": "mod_tree",
+            "rid": msg.rid,
+            "component": msg.component,
+            "instance_id": msg.instance_id,
+            **(drawn or {"tree": None, "props": None, "hooked": False, "client_modules": {}}),
+            "channel": session.channel,
+        })
+    except Exception as exc:
+        logger.debug(f"mod render ended: {type(exc).__name__}: {exc}")
+
+
+async def _send_mod_reply(send, session, rid: int, work):
+    """Run a mod request whose answer the asking socket waits on, and hand the answer back."""
+    try:
+        answer = await work
+    except Exception as exc:
+        logger.debug(f"mod request ended: {type(exc).__name__}: {exc}")
+        answer = None
+    await send({"type": "mod_reply", "rid": rid, "answer": answer, "channel": session.channel})
 
 
 @router.websocket("/chat/ws")
@@ -431,6 +482,43 @@ async def chat_ws(ws: WebSocket):
             elif mtype == "close_resident":
                 if session is not None:
                     await session.release_resident()
+
+            elif mtype == "mod_render":
+                try:
+                    msg = ModRenderMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None:
+                    spawn(_send_mod_tree(send, session, msg))
+
+            elif mtype == "mod_act":
+                try:
+                    msg = ModActionMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None:
+                    work = session.mod_act(msg.action, msg.model_dump(exclude={"type", "action", "rid"}, exclude_unset=True))
+                    spawn(work if msg.rid is None else _send_mod_reply(send, session, msg.rid, work))
+
+            elif mtype == "mod_client_module":
+                try:
+                    msg = ModClientModuleMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None:
+                    spawn(_send_mod_reply(send, session, msg.rid, session.mod_client_module(msg.plugin)))
+
+            elif mtype == "mod_answer":
+                try:
+                    msg = ModAnswerMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None:
+                    session.answer_mod(msg.id, msg.answer)
 
             elif mtype == "set_visibility":
                 try:

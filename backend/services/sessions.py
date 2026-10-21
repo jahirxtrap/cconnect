@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 from core import data_migration, paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import settings_store, visibility
+from services import mods, settings_store, visibility
 from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -1178,6 +1178,11 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
 _NOTIFICATION_BLOCK_RE = re.compile(r"<task-notification>(.*?)</task-notification>", re.DOTALL)
 _SESSION_MESSAGE_RE = re.compile(r"<cross-session-message\b([^>]*)>(.*?)</cross-session-message>", re.DOTALL)
 _AGENT_MESSAGE_RE = re.compile(r"<agent-message\b([^>]*)>(.*?)</agent-message>", re.DOTALL)
+_PLUGIN_MESSAGE_RE = re.compile(
+    r"The (.+?) plugin sent a message(?: while you were working)?:\n(.*?)\n\nThis is how Claude Code surfaces "
+    r"(?:a prompt a plugin submits|prompts a plugin submits) .*\Z",
+    re.DOTALL,
+)
 _INCOMING_LEAD = "Another Claude session sent a message:"
 _REPORT_LEAD_RE = re.compile(r"^.*?The report follows:[ \t]*\n", re.DOTALL)
 _ATTRIBUTE_RE = re.compile(r'([\w-]+)="([^"]*)"')
@@ -1195,6 +1200,14 @@ def _session_message(match: re.Match) -> dict:
 def _session_message_item(text: str) -> dict | None:
     match = _SESSION_MESSAGE_RE.match(text.strip())
     return _session_message(match) if match else None
+
+
+def _plugin_message_item(text: str) -> dict | None:
+    """A prompt a plugin submitted, without the frame the CLI puts around it for the model."""
+    match = _PLUGIN_MESSAGE_RE.match(text.strip())
+    if not match:
+        return None
+    return {"type": "plugin_message", "name": match.group(1), "text": match.group(2).strip()}
 
 
 def _agent_report(match: re.Match) -> dict:
@@ -1249,7 +1262,10 @@ def _notified_results(text: str) -> dict[str, dict]:
 
 
 def _split_notifications(text: str) -> tuple[str, list[dict]]:
-    """Notifications and cross-session messages the CLI carries inside user text."""
+    """Notifications, plugin prompts and cross-session messages the CLI carries inside user text."""
+    plugin = _plugin_message_item(text)
+    if plugin is not None:
+        return "", [plugin]
     items = []
     for match in _NOTIFICATION_BLOCK_RE.finditer(text):
         body = match.group(1)
@@ -1414,6 +1430,9 @@ def get_session_messages(
                 messages.extend(_once(_agent_reports(_text_from_content(entry.get("message", {}).get("content")))))
             continue
         if i < last_boundary:
+            continue
+        if etype == "system" and entry.get("subtype") == "informational":
+            messages.append(mods.kept_notice(entry.get("content"), entry.get("level"), entry.get("uuid")))
             continue
         if etype == "attachment":
             att = entry.get("attachment") or {}

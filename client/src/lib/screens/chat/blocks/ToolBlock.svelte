@@ -1,5 +1,6 @@
 <script lang="ts">
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
+  import type { Snippet } from "svelte";
   import { formatDuration } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
@@ -13,6 +14,7 @@
     took?: number | null;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
+    resultView?: Snippet<[string]>;
   }
 
   const {
@@ -23,6 +25,7 @@
     took = null,
     expanded = null,
     onToggle = null,
+    resultView,
   }: Props = $props();
 
   const SLOW_MS = 1000;
@@ -47,7 +50,11 @@
   {/if}
   {#if result?.trim()}
     <div class="mt-1.5">
-      <CodeBlock code={result} lang={t("RESULT")} />
+      {#if resultView}
+        {@render resultView(result)}
+      {:else}
+        <CodeBlock code={result} lang={t("RESULT")} />
+      {/if}
     </div>
   {/if}
 </Collapsible>

@@ -4,9 +4,10 @@ import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
 import FolderTree from "@lucide/svelte/icons/folder-tree";
 import Network from "@lucide/svelte/icons/network";
 import NotepadText from "@lucide/svelte/icons/notepad-text";
+import Puzzle from "@lucide/svelte/icons/puzzle";
 import SquareTerminal from "@lucide/svelte/icons/square-terminal";
 import { isTauri } from "$lib/platform";
-import type { RightKind } from "$lib/screens/chat/panes.svelte";
+import { panes, type RightKind } from "$lib/screens/chat/panes.svelte";
 import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
 import type { IconSource } from "$lib/ui/icons";
 import { navigation } from "./navigation.svelte";
@@ -20,6 +21,7 @@ export interface ScreenEntry {
   screenIcon?: IconSource;
   nativeScreen?: boolean;
   paneOnly?: boolean;
+  available?: () => boolean;
 }
 
 export const SCREENS: ScreenEntry[] = [
@@ -50,7 +52,17 @@ export const SCREENS: ScreenEntry[] = [
     open: () => navigation.navigate("/browser"),
     paneOnly: true,
   },
+  {
+    kind: "mods",
+    label: "MODS",
+    icon: Puzzle,
+    open: () => panes.setKind("mods"),
+    paneOnly: true,
+    available: () => panes.focusedChat.modsAvailable === true,
+  },
 ];
+
+export const shownScreen = (screen: ScreenEntry) => screen.available?.() ?? true;
 
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),

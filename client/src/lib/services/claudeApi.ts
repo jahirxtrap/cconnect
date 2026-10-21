@@ -9,6 +9,9 @@ export interface Plugin {
   scope: string | null;
   enabled: boolean;
   description: string | null;
+  mod: boolean;
+  options: boolean;
+  local: boolean;
 }
 
 export interface Marketplace {
@@ -16,9 +19,42 @@ export interface Marketplace {
   repo: string | null;
 }
 
+export interface ChatMod {
+  name: string;
+  description: string | null;
+  version: string | null;
+  path: string;
+  sessionId: string;
+  installed: boolean;
+}
+
 export interface Extensions {
   plugins: Plugin[];
   marketplaces: Marketplace[];
+  chatMods: ChatMod[];
+}
+
+export interface PluginReview {
+  hooks: string[];
+  calls: string[];
+  commands: string[];
+  errors: string[];
+}
+
+export interface PluginOption {
+  key: string;
+  type: string | null;
+  title: string;
+  description: string | null;
+  required: boolean;
+  secret: boolean;
+  multiple: boolean;
+  min: number | null;
+  max: number | null;
+  value: string;
+  default: string | null;
+  choices: string[];
+  configured: boolean;
 }
 
 export interface Skill {
@@ -184,11 +220,61 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
           scope: item.scope ?? null,
           enabled: item.enabled !== false,
           description: item.description ?? null,
+          mod: item.mod === true,
+          options: item.options === true,
+          local: item.local === true,
         })),
       marketplaces: (data.marketplaces ?? [])
         .filter((item: Wire) => item.name)
         .map((item: Wire) => ({ name: item.name, repo: item.repo ?? null })),
+      chatMods: (data.chat_mods ?? [])
+        .filter((item: Wire) => item.name && item.path)
+        .map((item: Wire) => ({
+          name: item.name,
+          description: item.description ?? null,
+          version: item.version ?? null,
+          path: item.path,
+          sessionId: item.session_id ?? "",
+          installed: item.installed === true,
+        })),
     };
+  },
+
+  async pluginReview(plugin: string): Promise<PluginReview | null> {
+    const data = await client.get<Wire>("/claude/plugins/review", { plugin });
+    if (!data) return null;
+    const strings = (key: string): string[] => (Array.isArray(data[key]) ? data[key].map(String) : []);
+    return { hooks: strings("hooks"), calls: strings("calls"), commands: strings("commands"), errors: strings("errors") };
+  },
+
+  async pluginOptions(plugin: string): Promise<PluginOption[] | null> {
+    const data = await client.get<Wire>("/claude/plugins/options", { plugin });
+    if (!data) return null;
+    return (data.fields ?? [])
+      .filter((item: Wire) => item.key)
+      .map((item: Wire) => ({
+        key: item.key,
+        type: item.type ?? null,
+        title: item.title ?? item.key,
+        description: item.description ?? null,
+        required: item.required === true,
+        secret: item.secret === true,
+        multiple: item.multiple === true,
+        min: typeof item.min === "number" ? item.min : null,
+        max: typeof item.max === "number" ? item.max : null,
+        value: item.value ?? "",
+        default: item.default ?? null,
+        choices: Array.isArray(item.choices) ? item.choices.map(String) : [],
+        configured: item.configured === true,
+      }));
+  },
+
+  async setPluginOptions(plugin: string, values: Record<string, string>): Promise<ActionResult> {
+    return toAction(await client.put<Wire>("/claude/plugins/options", { plugin, values }));
+  },
+
+  async addLocalPlugin(path: string): Promise<ActionResult> {
+    return toAction(await client.post<Wire>("/claude/plugins/local", { path }));
   },
 
   async skills(): Promise<Skill[] | null> {

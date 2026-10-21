@@ -10,13 +10,21 @@
   import X from "@lucide/svelte/icons/x";
   import type { Snippet } from "svelte";
   import type { QueuedMessage } from "$lib/data/chatModels";
+  import {
+    strokeOf,
+    type ModCompletionRow,
+    type ModCompletions,
+    type ModDecoration,
+    type ModFillMode,
+    type ModStroke,
+  } from "$lib/data/modModels";
   import { fileIcon } from "$lib/ui/fileIcons";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, systemName } from "$lib/platform";
   import { startDictation, voiceAvailable } from "$lib/platform/voice";
-  import { commandToken, type CommandOption } from "$lib/services/capabilitiesApi";
+  import { commandText, commandToken, takesArguments, type CommandOption } from "$lib/services/capabilitiesApi";
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -24,6 +32,7 @@
   import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import StopIcon from "$lib/ui/StopIcon.svelte";
+  import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
   import type { Attachment } from "./state.svelte";
   import { pastedName } from "$lib/data/pastedFile";
   import { keepFocus } from "$lib/ui/keepFocus";
@@ -49,6 +58,11 @@
     onCloseSide?: (() => void) | null;
     sessionColor?: string | null;
     blocked?: boolean;
+    ghost?: string | null;
+    onKey?: (event: KeyboardEvent, empty: boolean) => boolean;
+    onEdit?: (text: string, cursor: number, stroke: ModStroke | null) => void;
+    completions?: ModCompletions | null;
+    decorations?: ModDecoration[];
     controls?: Snippet;
   }
 
@@ -73,8 +87,15 @@
     onCloseSide = null,
     sessionColor = null,
     blocked = false,
+    ghost = null,
+    onKey,
+    onEdit,
+    completions = null,
+    decorations = [],
     controls,
   }: Props = $props();
+
+  let fieldScroll = $state(0);
 
   const ROUND_CLASS =
     "ripple inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full";
@@ -171,11 +192,47 @@
     if (field) field.value = value;
   };
 
-  const openCommands = () => {
-    if (!draft.trimStart().startsWith("/")) write("/");
+  const reopen = () => {
     dismissed = false;
     highlighted = 0;
     previewed = false;
+  };
+
+  const offer = (value: string) => {
+    write(value);
+    reopen();
+  };
+
+  export const caret = (): number => field?.selectionStart ?? draft.length;
+
+  export const holdsKeys = (): boolean => !!field && document.activeElement === field;
+
+  export const adopt = (text: string, cursor: number) => {
+    offer(text);
+    field?.setSelectionRange(cursor, cursor);
+  };
+
+  export const place = (text: string, mode: ModFillMode) => {
+    const [start, end] =
+      mode === "replace"
+        ? [0, draft.length]
+        : mode === "append"
+          ? [draft.length, draft.length]
+          : [field?.selectionStart ?? draft.length, field?.selectionEnd ?? draft.length];
+    offer(`${draft.slice(0, start)}${text}${draft.slice(end)}`);
+    field?.focus();
+    field?.setSelectionRange(start + text.length, start + text.length);
+  };
+
+  const acceptGhost = () => {
+    if (!ghost) return;
+    offer(ghost);
+    field?.focus();
+  };
+
+  const openCommands = () => {
+    if (!draft.trimStart().startsWith("/")) write("/");
+    reopen();
     field?.focus();
   };
 
@@ -240,28 +297,61 @@
     return commands.filter((command) => matches(command, typed.toLowerCase()));
   });
 
-  const active = $derived(suggestions.length ? highlighted % suggestions.length : 0);
+  type Entry = { command: CommandOption; row: null } | { command: null; row: ModCompletionRow };
+
+  const modEntries = $derived<Entry[]>(
+    dismissed || !completions ? [] : completions.rows.map((row) => ({ command: null, row })),
+  );
+  const entries = $derived<Entry[]>([...suggestions.map((command) => ({ command, row: null })), ...modEntries]);
+  const pickable = $derived(argumentFor ? modEntries : entries);
+  const active = $derived(pickable.length ? highlighted % pickable.length : 0);
+  const current = $derived(pickable[active] ?? null);
+
+  const taken = (row: ModCompletionRow): string =>
+    completions ? `${draft.slice(0, completions.start)}${row.text}${draft.slice(completions.end)}` : draft;
+
+  const take = (row: ModCompletionRow) => {
+    const start = completions?.start ?? draft.length;
+    write(taken(row));
+    field?.focus();
+    field?.setSelectionRange(start + row.text.length, start + row.text.length);
+  };
+
+  let stroke: ModStroke | null = null;
+
+  const typedStroke = (event: InputEvent): ModStroke | null =>
+    event.inputType === "insertText" && event.data?.length === 1
+      ? { key: event.data === " " ? "space" : event.data }
+      : null;
 
   const oninput = (event: Event) => {
-    onDraft((event.currentTarget as HTMLTextAreaElement).value);
-    dismissed = false;
-    highlighted = 0;
-    previewed = false;
+    const target = event.currentTarget as HTMLTextAreaElement;
+    const input = event as InputEvent;
+    onDraft(target.value);
+    onEdit?.(
+      target.value,
+      target.selectionStart,
+      input.inputType?.startsWith("insertFrom") ? null : (stroke ?? typedStroke(input)),
+    );
+    stroke = null;
+    reopen();
   };
 
   const cycle = (step: number, keepFirst = false) => {
-    if (!suggestions.length) return;
-    highlighted = !keepFirst || previewed ? (active + step + suggestions.length) % suggestions.length : active;
+    if (!pickable.length) return;
+    highlighted = !keepFirst || previewed ? (active + step + pickable.length) % pickable.length : active;
     previewed = true;
-    const command = suggestions[highlighted];
-    write(command.argumentHint ? `/${command.name} ` : `/${command.name}`);
+    const entry = pickable[highlighted];
+    if (entry.command) write(commandText(entry.command));
   };
 
   const complete = (command: CommandOption) => {
-    write(command.argumentHint ? `/${command.name} ` : "");
+    write(takesArguments(command) ? commandText(command) : "");
     field?.focus();
-    if (!command.argumentHint) onCommand(command);
+    if (!takesArguments(command)) onCommand(command);
   };
+
+  const choose = (entry: Entry) => (entry.command ? complete(entry.command) : take(entry.row));
 
   const pick = (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
@@ -273,7 +363,7 @@
     if (pendingInput === null) return;
     const restored = onConsumePending();
     if (restored === null) return;
-    onDraft(restored);
+    offer(restored);
     field?.focus();
   });
 
@@ -289,7 +379,17 @@
 
   const onkeydown = (event: KeyboardEvent) => {
     if (event.isComposing) return;
-    if (suggestions.length && !argumentFor) {
+    stroke = strokeOf(event);
+    if (onKey?.(event, !draft)) {
+      event.preventDefault();
+      return;
+    }
+    if (event.key === "Tab" && !draft && ghost) {
+      event.preventDefault();
+      acceptGhost();
+      return;
+    }
+    if (current) {
       if (event.key === "Tab") {
         event.preventDefault();
         cycle(event.shiftKey ? -1 : 1, true);
@@ -302,7 +402,7 @@
       }
       if (event.key === "Enter" && !isTouch && !event.shiftKey) {
         event.preventDefault();
-        complete(suggestions[active]);
+        choose(current);
         return;
       }
       if (event.key === "Escape") {
@@ -311,6 +411,7 @@
         return;
       }
     }
+    if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) return;
     if (event.key === "ArrowUp" && caretLine(true) && recallOlder()) {
       event.preventDefault();
       return;
@@ -343,29 +444,39 @@
   };
 </script>
 
-<div class="relative shrink-0 p-3">
-  {#if suggestions.length}
+<div class="relative shrink-0 px-3 pb-3">
+  {#if entries.length}
     <div
-      class="scrollbar-thin absolute inset-x-3 bottom-[calc(100%-0.75rem)] z-40 mb-1.5 max-h-64 overflow-y-auto rounded-lg border-2 border-outline-variant bg-surface py-1 shadow-lg"
+      class="scrollbar-thin absolute inset-x-3 bottom-full z-40 mb-1.5 max-h-64 overflow-y-auto rounded-lg border-2 border-outline-variant bg-surface py-1 shadow-lg"
     >
-      {#each suggestions as command, index (command.name)}
+      {#each entries as entry (entry.command ? `/${entry.command.name}` : `+${entry.row.text}`)}
         <button
           type="button"
           use:keepFocus
-          onclick={() => complete(command)}
-          onmouseenter={() => (highlighted = index)}
-          class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start px-3.5 py-2 text-left {index ===
-          active
+          onclick={() => choose(entry)}
+          onmouseenter={() => {
+            const at = pickable.indexOf(entry);
+            if (at >= 0) highlighted = at;
+          }}
+          class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start px-3.5 py-2 text-left {entry === current
             ? 'bg-on-surface/8'
             : ''}"
         >
-          <span class="w-full truncate text-body-md {command.argumentHint ? 'text-on-surface-variant' : ''}">
-            <span class={command.argumentHint ? "text-on-surface" : ""}
-              >/{command.name}</span
-            >{#if command.argumentHint}&nbsp;{command.argumentHint}{/if}
-          </span>
-          {#if command.description}
-            <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>
+          {#if entry.command}
+            {@const command = entry.command}
+            <span class="w-full truncate text-body-md {command.argumentHint ? 'text-on-surface-variant' : ''}">
+              <span class={command.argumentHint ? "text-on-surface" : ""}
+                >/{command.name}</span
+              >{#if command.argumentHint}&nbsp;{command.argumentHint}{/if}
+            </span>
+            {#if command.description}
+              <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>
+            {/if}
+          {:else}
+            <span class="w-full truncate text-body-md">{entry.row.label}</span>
+            {#if entry.row.description}
+              <span class="w-full truncate text-body-sm text-on-surface-variant">{entry.row.description}</span>
+            {/if}
           {/if}
         </button>
       {/each}
@@ -375,7 +486,7 @@
   <div
     onclick={focusField}
     style={accent ? `border-color: ${accent}` : undefined}
-    class="cursor-text rounded-lg border-2 bg-surface {accent ? '' : 'border-outline-variant'}"
+    class="relative cursor-text rounded-lg border-2 bg-surface {accent ? '' : 'border-outline-variant'}"
   >
     {#if queue.length}
       <div
@@ -414,18 +525,38 @@
       </div>
     {/if}
 
-    <div class="px-3.5 {queue.length || attachments.length ? 'pt-1.5' : 'pt-3.5'}">
-      <textarea
-        bind:this={field}
-        value={draft}
-      {oninput}
-        {onkeydown}
-        {onpaste}
-        {ondragenter}
-        rows="1"
-        placeholder={t(listening ? "VOICE_LISTENING" : "TYPE_MESSAGE")}
-        class="field-auto no-scrollbar block max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant"
-      ></textarea>
+    <div class="relative px-3.5 {queue.length || attachments.length ? 'pt-1.5' : 'pt-3.5'}">
+      {#if ghost && !draft && !listening}
+        <button
+          type="button"
+          use:keepFocus
+          onclick={acceptGhost}
+          class="absolute right-3.5 bottom-0 z-10 cursor-pointer rounded-md border border-outline-variant px-1.5 text-label-sm text-on-surface-variant transition-colors hover:bg-on-surface/8"
+        >
+          {isTouch ? t("ACCEPT") : "Tab"}
+        </button>
+      {/if}
+      <div class="relative">
+        {#if decorations.length}
+          <ModDecorations text={draft} {decorations} scrollTop={fieldScroll} class="text-body-lg" />
+        {/if}
+        <textarea
+          bind:this={field}
+          value={draft}
+          {oninput}
+          {onkeydown}
+          {onpaste}
+          {ondragenter}
+          onscroll={(event) => (fieldScroll = event.currentTarget.scrollTop)}
+          rows="1"
+          placeholder={listening ? t("VOICE_LISTENING") : (ghost ?? t("TYPE_MESSAGE"))}
+          class="field-auto no-scrollbar relative block max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant {ghost &&
+          !draft &&
+          !listening
+            ? 'pr-16'
+            : ''} {decorations.length ? 'text-transparent' : ''}"
+        ></textarea>
+      </div>
       {#if heard}
         <p class="pt-1 text-body-md wrap-anywhere text-on-surface-variant">{heard}</p>
       {/if}

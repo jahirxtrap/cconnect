@@ -3,6 +3,7 @@
 import asyncio
 import json
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -15,6 +16,12 @@ _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
 OFFICIAL_MARKETPLACE = "anthropics/claude-plugins-official"
 
 _ENV_ENTRY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+_PLUGIN_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_NOTE = re.compile(r"^\S+ (hooks|calls): (.+)$")
+_NOTE_ITEMS = re.compile(r",\s*(?![^{]*\})")
+_VIA = re.compile(r"\s*\(via [^)]*\)$")
+_COMMAND_HOOK = re.compile(r"^command\.run\{command=([^}]+)\}$")
+_COPY_SKIPS = (".git", "node_modules")
 
 
 def _shared(result: dict) -> dict:
@@ -28,20 +35,33 @@ def _cli() -> str | None:
     return cli_manager.resolve_cli_path() or cli_manager.system_cli()
 
 
-def _run(args: list[str], timeout: int = 300, cwd: str | None = None) -> dict:
+def _exec(args: list[str], timeout: int, cwd: str | None, stdin: str | None) -> subprocess.CompletedProcess:
     cli = _cli()
     if not cli:
-        return {"ok": False, "message": "No CLI available"}
+        raise OSError("No CLI available")
+    return subprocess.run(
+        [cli, *args],
+        input=stdin, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        timeout=timeout, cwd=cwd,
+    )
+
+
+def _run(args: list[str], timeout: int = 300, cwd: str | None = None, stdin: str | None = None) -> dict:
     try:
-        result = subprocess.run(
-            [cli, *args],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=timeout, cwd=cwd,
-        )
+        result = _exec(args, timeout, cwd, stdin)
     except (OSError, subprocess.SubprocessError) as exc:
         return {"ok": False, "message": str(exc)}
     output = (result.stdout + result.stderr).strip()
     return {"ok": result.returncode == 0, "message": output}
+
+
+def _report(args: list[str], cwd: str | None = None) -> dict | None:
+    """The CLI's JSON report, read whatever its exit code says."""
+    try:
+        data = json.loads(_exec([*args, "--json"], 60, cwd, None).stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
 
 
 def _plugin_install_info(plugin: str) -> tuple[str | None, str | None]:
@@ -56,18 +76,111 @@ def _plugin_install_info(plugin: str) -> tuple[str | None, str | None]:
     return info.get("scope"), info.get("projectPath")
 
 
+def _plugin_place(plugin: str) -> tuple[list[str], str | None]:
+    scope, project_path = _plugin_install_info(plugin)
+    return (["-s", scope] if scope else []), (project_path if project_path and Path(project_path).is_dir() else None)
+
+
 def plugin_action(action: str, plugin: str) -> dict:
     if action not in _PLUGIN_ACTIONS:
         return {"ok": False, "message": f"invalid action: {action}"}
-    args = ["plugin", action, plugin]
-    cwd = None
-    if action != "install":
-        scope, project_path = _plugin_install_info(plugin)
-        if scope:
-            args += ["-s", scope]
-        if project_path and Path(project_path).is_dir():
-            cwd = project_path
-    return _shared(_run(args, cwd=cwd))
+    if action == "uninstall" and plugin.partition("@")[2] == claude_assets.LOCAL_MARKETPLACE:
+        return _shared(_remove_local(plugin))
+    if action == "install":
+        return _shared(_run(["plugin", action, plugin]))
+    flags, cwd = _plugin_place(plugin)
+    return _shared(_run(["plugin", action, plugin, *flags], cwd=cwd))
+
+
+def _review(folder: Path) -> dict | None:
+    report = _report(["plugin", "validate", str(folder)])
+    if report is None:
+        return None
+    found: dict[str, dict[str, None]] = {"hooks": {}, "calls": {}}
+    errors = []
+    for part in [report.get("manifest") or {}, *(report.get("contents") or [])]:
+        errors += [item.get("message") if isinstance(item, dict) else str(item) for item in part.get("errors") or []]
+        for note in part.get("notes") or []:
+            match = _NOTE.match(note) if isinstance(note, str) else None
+            if match:
+                found[match.group(1)].update(dict.fromkeys(_VIA.sub("", item).strip() for item in _NOTE_ITEMS.split(match.group(2))))
+    hooks = [item for item in found["hooks"] if item]
+    return {
+        "hooks": hooks,
+        "calls": [item for item in found["calls"] if item],
+        "commands": [match.group(1) for match in map(_COMMAND_HOOK.match, hooks) if match],
+        "errors": [error for error in errors if error],
+    }
+
+
+def plugin_review(plugin: str) -> dict | None:
+    root = claude_assets.plugin_root(plugin)
+    return _review(root) if root is not None and root.is_dir() else None
+
+
+def plugin_options(plugin: str) -> dict | None:
+    report = _report(["plugin", "configure", plugin], _plugin_place(plugin)[1])
+    schema = (report or {}).get("schema")
+    if not isinstance(schema, dict):
+        return None
+    inputs = report.get("inputs") or {}
+    choices = report.get("choices") or {}
+    configured = set(report.get("configured") or [])
+    return {"fields": [
+        {
+            "key": key,
+            "type": spec.get("type"),
+            "title": spec.get("title") or key,
+            "description": spec.get("description"),
+            "required": bool(spec.get("required")),
+            "secret": bool(spec.get("sensitive")),
+            "multiple": bool(spec.get("multiple")),
+            "min": spec.get("min"),
+            "max": spec.get("max"),
+            "value": str(inputs.get(key) or ""),
+            "default": None if spec.get("default") is None else str(spec["default"]),
+            "choices": [str(choice) for choice in choices.get(key) or []],
+            "configured": key in configured,
+        }
+        for key, spec in schema.items()
+        if isinstance(spec, dict)
+    ]}
+
+
+def set_plugin_options(plugin: str, values: dict[str, str]) -> dict:
+    cwd = _plugin_place(plugin)[1]
+    return _shared(_run(["plugin", "configure", "--values-stdin", plugin], cwd=cwd, stdin=json.dumps(values)))
+
+
+def add_local_plugin(source: str) -> dict:
+    folder = Path(source).expanduser()
+    name = claude_assets.read_manifest(folder).get("name")
+    if not isinstance(name, str) or not _PLUGIN_NAME.match(name):
+        return {"ok": False, "message": "the folder holds no plugin manifest with a valid name"}
+    target = claude_assets.SKILLS_DIR / name
+    if target.exists():
+        return {"ok": False, "message": f"{name} is already installed"}
+    review = _review(folder)
+    if review is None:
+        return {"ok": False, "message": "the plugin could not be validated"}
+    if review["errors"]:
+        return {"ok": False, "message": "\n".join(review["errors"])}
+    try:
+        shutil.copytree(folder, target, ignore=shutil.ignore_patterns(*_COPY_SKIPS))
+    except OSError as exc:
+        return {"ok": False, "message": str(exc)}
+    return _shared({"ok": True, "message": ""})
+
+
+def _remove_local(plugin: str) -> dict:
+    root = claude_assets.plugin_root(plugin)
+    if root is None or root.parent != claude_assets.SKILLS_DIR:
+        return {"ok": False, "message": "plugin not found"}
+    try:
+        shutil.rmtree(root)
+    except OSError as exc:
+        return {"ok": False, "message": str(exc)}
+    return {"ok": True, "message": ""}
 
 
 def marketplace_action(action: str, target: str) -> dict:

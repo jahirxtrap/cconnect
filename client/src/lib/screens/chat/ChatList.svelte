@@ -10,7 +10,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { NAV_SCREENS } from "$lib/app/screens";
   import { sessionColorOf } from "$lib/design/sessionColors";
-  import type { ChatCategory, SessionInfo } from "$lib/data/models";
+  import { sessionLabel, type ChatCategory, type SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -292,7 +292,7 @@
                 : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
             >
             <ConversationRow
-              title={session.title ?? session.preview ?? session.sessionId.slice(0, 8)}
+              title={sessionLabel(session)}
               selected={session.sessionId === chat.sessionId}
               onOpen={() => {
                 chat.openSession(session);

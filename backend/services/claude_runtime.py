@@ -5,6 +5,7 @@ import json
 import os
 import re
 import time
+import uuid
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
@@ -17,7 +18,7 @@ from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server
 from mcps.media import block_types
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, diffs, persistent_sessions, providers, settings_store, visibility
+from services import claude_assets, cli_info, diffs, mods, persistent_sessions, providers, settings_store, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
@@ -270,7 +271,7 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
             "event": data.get("hook_event"),
             "text": (data.get("stderr") or data.get("output") or "").strip()[:400],
         }]
-    return []
+    return mods.events(subtype, data)
 
 
 def _task_events_from_result(result: Any) -> list[dict]:
@@ -471,7 +472,10 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
     return events
 
 
-def _build_can_use_tool(ask_user: Callable[[dict], Awaitable[dict]]):
+def _build_can_use_tool(
+    ask_user: Callable[[dict], Awaitable[dict]],
+    render_site: Optional[Callable[[str, str, dict], Awaitable[Optional[dict]]]] = None,
+):
     """can_use_tool callback routing AskUserQuestion + permission prompts through ``ask_user``.
     Shared by the main chat and the quick chat, so every interaction type works in both."""
     from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
@@ -479,17 +483,33 @@ def _build_can_use_tool(ask_user: Callable[[dict], Awaitable[dict]]):
     async def _can_use_tool(tool_name: str, tool_input: dict, ctx) -> Any:
         if tool_name == "AskUserQuestion" and isinstance(tool_input, dict):
             qs = [q for q in (tool_input.get("questions") or []) if isinstance(q, dict)]
-            response = await ask_user({
+            if mods.hot_reload(tool_input):
+                response = await ask_user(mods.hot_reload_ask(qs[0] if qs else {}))
+                return PermissionResultAllow(updated_input=mods.hot_reload_answer(tool_input, qs, response.get("option_id")))
+            source = (tool_input.get("metadata") or {}).get("source") if isinstance(tool_input.get("metadata"), dict) else None
+            site_props = {"tool": tool_name, "questions": qs, **({"metadataSource": source} if source else {})}
+            instance_id = getattr(ctx, "tool_use_id", None) or uuid.uuid4().hex
+            drawn = await render_site("AskUserQuestion", instance_id, site_props) if render_site else None
+            qs = mods.drawn_questions(drawn, qs)
+            dialog: dict[str, Any] = {
                 "kind": "component",
                 "title_key": "questions",
                 "submit_key": SUBMIT_KEY,
                 "dismiss": DISMISS,
                 "blocks": questions_to_blocks(qs),
-            })
+            }
+            if drawn and drawn.get("tree"):
+                dialog["mod"] = {
+                    "instance_id": instance_id,
+                    "props": site_props,
+                    "tree": drawn["tree"],
+                    "client_modules": drawn.get("client_modules") or {},
+                }
+            response = await ask_user(dialog)
             if response.get("chat"):
                 return PermissionResultDeny(message=DECLINE_MESSAGE)
             answers, annotations = answers_from_values(qs, response.get("values") or {})
-            updated: dict[str, Any] = {"questions": qs, "answers": answers}
+            updated: dict[str, Any] = {**tool_input, "questions": qs, "answers": answers}
             if annotations:
                 updated["annotations"] = annotations
             return PermissionResultAllow(updated_input=updated)
@@ -554,6 +574,8 @@ def _cli_env(account_id: Optional[str]) -> dict[str, str]:
     from services import accounts
 
     env = dict(accounts.env_for(account_id))
+    if not os.environ.get("HOME") and not env.get("HOME"):
+        env["HOME"] = str(Path.home())
     if not persistent_sessions.enabled():
         env.update(_NO_BACKGROUND_ENV)
     return env
@@ -664,9 +686,10 @@ async def _block_secrets(input_data, tool_use_id, context):
     return {}
 
 
-async def _resident_stream(resident, options, prompt_arg, on_transport) -> AsyncIterator[Any]:
-    """Write the turn to the standing client and read until the session closes the input."""
-    if not resident.connected:
+async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=False) -> AsyncIterator[Any]:
+    """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
+    fresh = not resident.connected
+    if fresh:
         await resident.connect(options)
     from claude_agent_sdk import ResultMessage
 
@@ -674,6 +697,10 @@ async def _resident_stream(resident, options, prompt_arg, on_transport) -> Async
     if on_transport is not None:
         on_transport(getattr(client, "_transport", None))
     inbox = resident.listen()
+    if fresh:
+        await resident.attach_surface()
+    if not adopt:
+        await resident.settle()
     writer = asyncio.create_task(client.query(prompt_arg))
     reader = asyncio.ensure_future(inbox.get())
     answered = False
@@ -724,6 +751,7 @@ async def run_prompt(
     session_info: Optional[Callable[[], dict]] = None,
     on_transport: Optional[Callable[[Any], None]] = None,
     resident: Optional[Any] = None,
+    adopt: bool = False,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
@@ -843,8 +871,13 @@ async def run_prompt(
         except Exception:
             pass
 
+    async def _render_site(component: str, instance_id: str, props: dict) -> Optional[dict]:
+        if resident is None or not resident.connected or not mods.enabled():
+            return None
+        return await mods.render_in_chat(resident.client, component, instance_id, props)
+
     if turn_ask is not None:
-        base_can_use_tool = _build_can_use_tool(turn_ask)
+        base_can_use_tool = _build_can_use_tool(turn_ask, _render_site)
         if turn_emit is not None:
             async def _can_use_tool_status(tool_name, tool_input, ctx):
                 state = turn_status()
@@ -880,7 +913,7 @@ async def run_prompt(
         options_kwargs["hooks"] = hooks_map
     options = ClaudeAgentOptions(**options_kwargs)
 
-    if resident is not None:
+    if resident is not None and not adopt:
         mark = {
             "model": model,
             "effort": effort_level,
@@ -889,6 +922,7 @@ async def run_prompt(
             "scope": scope["id"],
             "style": overrides.get("outputStyle"),
             "instructions": overrides.get("pluginConfigs"),
+            "mods": mods.enabled(),
         }
         if resident.connected and (resident.mark != mark or resume_at or fork):
             await resident.close()
@@ -896,20 +930,24 @@ async def run_prompt(
 
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 
-    chips: list[dict] = [{"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000)}]
+    chips: list[dict] = [] if adopt else [{"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000)}]
     pending_announce: list[dict] = list(chips)
     seen_users: set[str] = set()
+    carried_seen: set[str] = set()
     read_offsets: dict[str, int] = {}
     turn_started_ms = int(time.time() * 1000)
-    if drain is not None and resume and cwd:
+    if drain is not None and resume and cwd and not adopt:
         from services import sessions as _seed
         read_offsets[resume] = _seed.session_size(_seed.project_key_for(cwd), resume)
+
+    def _withdrawn(chip: dict) -> bool:
+        return bool((chip.get("item") or {}).get("withdrawn"))
 
     def _announce_next() -> list[dict]:
         """The answer to the next message just started, so that message is on screen now."""
         while pending_announce:
             chip = pending_announce.pop(0)
-            if chip.get("announced"):
+            if chip.get("announced") or _withdrawn(chip):
                 continue
             chip["announced"] = True
             return [{
@@ -930,27 +968,29 @@ async def run_prompt(
         except Exception:
             return []
         events: list[dict] = []
+        chips[:] = [chip for chip in chips if not _withdrawn(chip)]
         for u in users:
             uid = u["uuid"]
             if uid in seen_users or (u.get("ts") or turn_started_ms) < turn_started_ms - _TURN_CLOCK_SKEW_MS:
                 continue
             text = u["text"]
-            notif = _q._notification_item(text)
-            if notif is not None:
+            carried = (
+                _q._notification_item(text)
+                or _q._plugin_message_item(text)
+                or _q._session_message_item(text)
+                or _q._agent_report_item(text)
+            )
+            if carried is not None:
                 seen_users.add(uid)
-                events.append(notif)
-                continue
-            incoming = _q._session_message_item(text)
-            if incoming is not None:
-                seen_users.add(uid)
-                events.append(incoming)
-                continue
-            report = _q._agent_report_item(text)
-            if report is not None:
-                seen_users.add(uid)
-                events.append(report)
+                key = json.dumps(carried, sort_keys=True)
+                if key not in carried_seen:
+                    carried_seen.add(key)
+                    events.append(carried)
                 continue
             if not chips:
+                if adopt:
+                    seen_users.add(uid)
+                    events.append({"type": "dequeued", "ids": [], "text": text, "consumed": 0, "ts": u.get("ts")})
                 continue
             seen_users.add(uid)
             wanted = _flat(text)
@@ -991,7 +1031,8 @@ async def run_prompt(
         return events
 
     async def _prompt_stream():
-        yield {"type": "user", "message": {"role": "user", "content": content}}
+        if not adopt:
+            yield {"type": "user", "message": {"role": "user", "content": content}}
         if drain is not None:
             from services import attachments as attachments_service
             async for item in drain:
@@ -1003,11 +1044,12 @@ async def run_prompt(
                 else:
                     icontent = item["text"]
                     sent = item["text"]
-                chip = {"id": item.get("id"), "sent": sent, "drained": True, "ts": item.get("ts")}
+                item["cli_uuid"] = str(uuid.uuid4())
+                chip = {"id": item.get("id"), "sent": sent, "drained": True, "ts": item.get("ts"), "item": item}
                 chips.append(chip)
                 pending_announce.append(chip)
-                yield {"type": "user", "message": {"role": "user", "content": icontent}}
-    prompt_arg = _prompt_stream() if (ask_user is not None or images or drain is not None) else prompt
+                yield {"type": "user", "message": {"role": "user", "content": icontent}, "uuid": item["cli_uuid"]}
+    prompt_arg = _prompt_stream() if (adopt or ask_user is not None or images or drain is not None) else prompt
 
     hidden_tool_ids: set[str] = set()
     tool_started: dict[str, float] = {}
@@ -1028,7 +1070,7 @@ async def run_prompt(
             resident.bind(
                 persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, session_info, status_state)
             )
-            source = _resident_stream(resident, options, prompt_arg, on_transport)
+            source = _resident_stream(resident, options, prompt_arg, on_transport, adopt)
         else:
             transport = None
             if on_transport is not None:

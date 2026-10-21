@@ -1,6 +1,6 @@
 import { ROUTES } from "$lib/app/navigation.svelte";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
-import type { SessionInfo } from "$lib/data/models";
+import { sessionLabel, type SessionInfo } from "$lib/data/models";
 import { backend } from "$lib/services/backend.svelte";
 import { ChatState } from "./state.svelte";
 
@@ -40,8 +40,6 @@ interface StoredTab {
   over?: Partial<TabOverrides>;
   pproj?: string;
 }
-
-const SESSION_ID_PREVIEW = 8;
 
 const onChatRoute = () => {
   const path = window.location.pathname;
@@ -329,7 +327,7 @@ class Tabs {
       cwd: session.path ?? "",
       sessionId: session.sessionId,
       projectKey: session.projectKey,
-      title: session.title ?? session.preview ?? session.sessionId.slice(0, SESSION_ID_PREVIEW),
+      title: sessionLabel(session),
       color: session.color,
       running: false,
       overrides: { ...(this.active?.overrides ?? this.#environmentOverrides(environmentId)) },
@@ -370,7 +368,7 @@ class Tabs {
     const next = this.list.map((tab) => {
       const session = tab.sessionId ? byId.get(tab.sessionId) : undefined;
       if (!session) return tab;
-      const title = session.title ?? session.preview ?? session.sessionId.slice(0, SESSION_ID_PREVIEW);
+      const title = sessionLabel(session);
       if (tab.title === title && tab.color === session.color) return tab;
       changed = true;
       return { ...tab, title, color: session.color };

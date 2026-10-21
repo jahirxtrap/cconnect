@@ -18,8 +18,12 @@ const GROUPED: Role[] = [
   "plan",
   "agent",
   "notification",
+  "notice",
   "session_message",
+  "plugin_message",
 ];
+
+const ROW_ALIKE: Partial<Record<Role, Role>> = { notice: "tool" };
 
 const isNotice = (role: Role | null): boolean => role !== null && NOTICE.includes(role);
 
@@ -30,7 +34,9 @@ const group = (role: Role | null): number => {
   return 3;
 };
 
-export const gapAbove = (prev: Role | null, current: Role): string => {
+export const gapAbove = (before: Role | null, role: Role): string => {
+  const prev = before === null ? null : (ROW_ALIKE[before] ?? before);
+  const current = ROW_ALIKE[role] ?? role;
   if (prev === null) return BIG;
   if (prev === "interaction" && current === "interaction") return SMALL;
   if (prev === current) return NONE;

@@ -4,6 +4,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
@@ -36,6 +37,7 @@
     onScrollTop: (top: number) => void;
     component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     bottomInset?: number;
+    mods?: ModSurface | null;
   }
 
   let {
@@ -57,6 +59,7 @@
     onScrollTop,
     component,
     bottomInset = 0,
+    mods = null,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -206,6 +209,7 @@
           {onSharedMenu}
           onSuggest={index > lastUserAt ? onSuggest : null}
           {component}
+          {mods}
         />
       </div>
     {/each}

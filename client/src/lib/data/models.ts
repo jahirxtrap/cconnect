@@ -82,6 +82,13 @@ export const projectKeyOf = (path: string): string => path.replace(PROJECT_KEY_S
 export const projectLabel = (project: ProjectInfo): string =>
   project.name ?? project.path ?? project.projectKey;
 
+const SESSION_ID_PREVIEW = 8;
+
+export const sessionIdPreview = (sessionId: string): string => sessionId.slice(0, SESSION_ID_PREVIEW);
+
+export const sessionLabel = (session: Pick<SessionInfo, "sessionId" | "title" | "preview">): string =>
+  session.title ?? session.preview ?? sessionIdPreview(session.sessionId);
+
 export const projectFilePath = (base: string | null, relative: string): string => {
   if (!base) return relative;
   const separator = base.includes("\\") ? "\\" : "/";

@@ -7,21 +7,35 @@ interface Layer {
 
 const stack: Layer[] = [];
 
-let consuming = false;
+const rewinding: number[] = [];
+let settling = false;
 
 const depth = () => (window.history.state as { dismiss?: number } | null)?.dismiss ?? 0;
 
+const surplus = () => depth() - rewinding.reduce((sum, steps) => sum + steps, 0) - stack.length;
+
+const settle = () => {
+  settling = false;
+  const extra = surplus();
+  if (extra <= 0) return;
+  rewinding.push(extra);
+  window.history.go(-extra);
+};
+
 export const pushDismiss = (handler: Handler, { modal = true }: { modal?: boolean } = {}) => {
   const layer = { handler, modal };
+  const reuse = surplus() > 0;
   stack.push(layer);
-  window.history.pushState({ dismiss: stack.length }, "", window.location.href);
+  const entry = { dismiss: stack.length };
+  if (reuse) window.history.replaceState(entry, "", window.location.href);
+  else window.history.pushState(entry, "", window.location.href);
   return () => {
     const index = stack.lastIndexOf(layer);
     if (index < 0) return;
     stack.splice(index, 1);
-    if (depth() <= stack.length) return;
-    consuming = true;
-    window.history.back();
+    if (settling) return;
+    settling = true;
+    queueMicrotask(settle);
   };
 };
 
@@ -32,10 +46,6 @@ export const dismissTop = () => {
   return true;
 };
 
-export const consumingDismiss = () => {
-  if (!consuming) return false;
-  consuming = false;
-  return true;
-};
+export const consumingDismiss = () => rewinding.shift() !== undefined;
 
 export const dismissOpen = () => stack.some((layer) => layer.modal);

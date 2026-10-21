@@ -50,5 +50,6 @@ SETTINGS: dict[str, SettingDef] = {
     "persistent_sessions": SettingDef(False, bool, "Keep a chat's Claude process alive while it stays open: instant answers and commands that keep running in the background, at about 400 MB of memory per open chat"),
     "persistent_grace": SettingDef(120, int, "Seconds a persistent chat stays alive after the last device closes it, so a reconnection does not restart it"),
     "persistent_limit": SettingDef(10, int, "How many chats may hold a live process at once; the oldest idle one is closed past that"),
+    "mod_surfaces": SettingDef(False, bool, "Draw the panes and the band that mods open in a persistent chat, through the CLI's internal UI protocol, which can change between versions"),
     "default_category": SettingDef("", str, "Category a new chat is filed into; empty leaves it out of every category"),
 }

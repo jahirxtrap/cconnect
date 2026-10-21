@@ -13,7 +13,7 @@ import uuid
 
 from loguru import logger
 
-from services import persistent_sessions, todos as todos_store
+from services import mods, persistent_sessions, todos as todos_store
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -54,11 +54,16 @@ class LiveSession:
         self._stopping = False
         self._drained = asyncio.Event()
         self._resident = None
+        self.adopter = None
         self._cooldown = None
         self._ending = False
         self._tail = None
         self._tail_count = None
         self._tail_stamp = None
+        self._mods = mods.Surface()
+        self._mod_asks = {}
+        self._mod_lock = asyncio.Lock()
+        self._turn_open = False
         self.turn_start_index = 0
 
     @property
@@ -105,6 +110,7 @@ class LiveSession:
                 event = entry.get("event")
                 if event is not None and event["seq"] <= last_seq:
                     await self._send_one(sink, {**event, "replay": True})
+            await self._send_one(sink, self._mods_snapshot())
         self._watch_transcript()
 
     async def detach(self, sink):
@@ -162,6 +168,8 @@ class LiveSession:
         self._cancel_cooldown()
         shape = persistent_sessions.shape_of(self.state.cwd, self.state.account, self.channel)
         self._resident = await persistent_sessions.pool.take(self.channel, shape)
+        self._resident.listener = self._emit
+        self._resident.answerer = self._mod_answer
         await persistent_sessions.pool.trim(persistent_sessions.limit(), registry.busy_channels() | {self.channel})
         return self._resident
 
@@ -202,18 +210,115 @@ class LiveSession:
             return
 
     async def _emit(self, event):
+        kind = event.get("type")
+        if kind == "own_turn":
+            if self.adopter is not None and not self.running:
+                asyncio.create_task(self.adopter())
+            return None
+        if kind in mods.STATE_EVENTS:
+            self._mods.apply(event)
+            await self._send(self._mods_snapshot())
+            return None
+        if kind in mods.LIVE_EVENTS:
+            await self._send({**event, "channel": self.channel})
+            return None
         async with self._lock:
+            if kind == "notice" and not self._turn_open:
+                await self._send(self._loose_notice(event))
+                return None
             self._seq += 1
             stamped = {**event, "seq": self._seq, "channel": self.channel}
-            if event.get("type") == "todos":
+            if kind == "todos":
                 todos_store.remember(self.state.session_id, event.get("items") or [])
-            if event.get("type") != "command":
+            if kind != "command":
                 self._outbox.append(stamped)
-            if event.get("type") in ("done", "interrupted"):
+            if kind in ("done", "interrupted"):
                 self._committed_seq = self._seq
+                self._turn_open = False
             await self._send(stamped)
         self._track(event)
         return stamped
+
+    def _mods_snapshot(self):
+        return {**self._mods.snapshot(), "channel": self.channel}
+
+    def _loose_notice(self, event):
+        """A notice after the turn: a line the transcript keeps travels as a tail item, a log line unstamped."""
+        if not event.get("uuid"):
+            return {**event, "channel": self.channel}
+        if self._tail_count is not None:
+            self._tail_count += 1
+        return {"type": "tail", "items": [event], "channel": self.channel}
+
+    def _mod_client(self):
+        resident = self._resident
+        if resident is None or not resident.connected or not self._mods.attached:
+            return None
+        return resident.client
+
+    async def mod_render(self, component, instance_id, props, columns, rows, offset):
+        client = self._mod_client()
+        if client is None:
+            return None
+        pane = next((pane for pane in self._mods.panes if pane.get("id") == instance_id), None)
+        site = {
+            "title": (pane or {}).get("title") or instance_id,
+            "focused": self._mods.focused_id == instance_id,
+            "working": self.running,
+            "columns": columns,
+            "rows": rows,
+            "offset": offset,
+        }
+        return await mods.render(client, component, instance_id, props, site)
+
+    async def mod_client_module(self, plugin):
+        client = self._mod_client()
+        return await mods.client_module(client, plugin) if client is not None else None
+
+    async def _mod_answer(self, subtype, data):
+        """Ask the attached clients what the CLI wants from the surface; the first answer that settles it wins."""
+        request = mods.request_event(subtype, data)
+        if request is None or not self._sinks:
+            return None
+        ask = {"future": asyncio.get_running_loop().create_future(), "kind": request["kind"], "pending": len(self._sinks)}
+        self._mod_asks[request["id"]] = ask
+        try:
+            await self._send({**request, "channel": self.channel})
+            return await asyncio.wait_for(asyncio.shield(ask["future"]), mods.ANSWER_TIMEOUT)
+        except asyncio.TimeoutError:
+            return None
+        finally:
+            self._mod_asks.pop(request["id"], None)
+
+    def answer_mod(self, rid, answer):
+        ask = self._mod_asks.get(rid)
+        if ask is None or ask["future"].done():
+            return False
+        ask["pending"] -= 1
+        settled = mods.settled(ask["kind"], answer)
+        if settled is not None:
+            ask["future"].set_result(settled)
+        elif ask["pending"] <= 0:
+            ask["future"].set_result(None)
+        return True
+
+    async def mod_act(self, action, fields):
+        client = self._mod_client()
+        if client is None:
+            return None
+        async with self._mod_lock:
+            answer = await mods.act(client, action, fields)
+        if answer is None:
+            return None
+        if action == "site_focus":
+            redirect = mods.redirected_focus(fields, answer)
+            if redirect is not None:
+                await self._emit(redirect)
+        elif action in mods.ROSTER_ACTIONS:
+            roster = await mods.panes(client)
+            if roster is not None:
+                await self._emit(roster)
+        return answer
 
     def _track(self, event):
         kind = event.get("type")
@@ -365,11 +470,30 @@ class LiveSession:
     async def cancel_queued(self, mid):
         item = next((it for it in self._queued if it["id"] == mid), None)
         if item is None:
-            return False
+            return await self._withdraw(mid)
         self._queued.remove(item)
         self._cancelled.add(mid)
         self._seen_ids.add(mid)
         await self._emit({"type": "dequeued", "ids": [mid], "text": "", "consumed": 0})
+        if self._result_seen and not self._queued and self._unconsumed <= 0:
+            self._inbox.put_nowait(_CLOSE)
+        return True
+
+    async def _withdraw(self, mid):
+        """Take back a message the CLI holds in its own queue, while it has not started on it."""
+        item = next((it for it in self._inflight if it["id"] == mid and it.get("cli_uuid")), None)
+        resident = self._resident
+        if item is None or resident is None or not resident.connected:
+            return False
+        answer = await mods.request(resident.client, "cancel_async_message", message_uuid=item["cli_uuid"])
+        if not (answer or {}).get("cancelled"):
+            return False
+        item["withdrawn"] = True
+        self._inflight = [it for it in self._inflight if it is not item]
+        self._unconsumed -= 1
+        self._seen_ids.add(mid)
+        await self._emit({"type": "dequeued", "ids": [mid], "text": "", "consumed": 0})
+        self._publish_queue()
         if self._result_seen and not self._queued and self._unconsumed <= 0:
             self._inbox.put_nowait(_CLOSE)
         return True
@@ -442,6 +566,7 @@ class LiveSession:
         self._transport = None
         self._stopping = False
         self._drained.clear()
+        self._turn_open = True
         self._worker = asyncio.create_task(self._run(runner_factory))
         self._publish_activity(self.activity)
         for item in carried:

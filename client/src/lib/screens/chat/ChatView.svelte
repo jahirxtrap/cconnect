@@ -6,12 +6,14 @@
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import Trash from "@lucide/svelte/icons/trash";
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
+  import { isEditing } from "$lib/data/paneFocus.svelte";
   import { type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
+  import { sessionIdPreview } from "$lib/data/models";
   import { isPreviewable } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -30,10 +32,15 @@
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import { fileDrop } from "$lib/ui/fileDrop";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import ModBand from "$lib/screens/mods/ModBand.svelte";
+  import type { ModCompletions, ModDecoration, ModStroke } from "$lib/data/modModels";
+  import { BAND_ID, type ModHost } from "$lib/screens/mods/modSurface.svelte";
+  import { copyText } from "$lib/platform/clipboard";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
   import ChatToolbar from "./ChatToolbar.svelte";
@@ -44,6 +51,7 @@
   import SidePanel from "./SidePanel.svelte";
   import TabSwitcher from "./TabSwitcher.svelte";
   import TaskIndicator from "./TaskIndicator.svelte";
+  import { panes } from "./panes.svelte";
   import { tabs, type Tab } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
   import { pastedName } from "$lib/data/pastedFile";
@@ -71,7 +79,6 @@
   }: Props = $props();
 
   const SIDE_PEEK = 58;
-  const SESSION_ID_PREVIEW = 8;
 
   const chat = $derived(tabs.stateFor(tab));
 
@@ -167,7 +174,7 @@
   });
 
   const viewLabel = $derived(
-    chat.viewOnly ? (chat.viewOnly.title ?? chat.viewOnly.sessionId.slice(0, SESSION_ID_PREVIEW)) : "",
+    chat.viewOnly ? (chat.viewOnly.title ?? sessionIdPreview(chat.viewOnly.sessionId)) : "",
   );
 
   $effect(() => {
@@ -192,13 +199,13 @@
       return {
         dot: "bg-red",
         spinner: false,
-        text: chat.sessionId?.slice(0, SESSION_ID_PREVIEW) ?? t("NEW_CHAT"),
+        text: chat.sessionId ? sessionIdPreview(chat.sessionId) : t("NEW_CHAT"),
       };
     if (activity === "persistent") return { dot: "bg-accent", spinner: false, text: t("PERSISTENT_ALIVE") };
     return {
       dot: "bg-green",
       spinner: false,
-      text: chat.sessionId?.slice(0, SESSION_ID_PREVIEW) ?? t("NEW_CHAT"),
+      text: chat.sessionId ? sessionIdPreview(chat.sessionId) : t("NEW_CHAT"),
     };
   });
 
@@ -209,9 +216,115 @@
       return true;
     }),
   );
+
+  let judgedPane: string | null = null;
+
+  const keysFree = () => {
+    const active = document.activeElement;
+    if (!active || active === document.body || composer?.holdsKeys()) return true;
+    return !active.closest("[data-mod-site]") && !isEditing();
+  };
+
+  $effect(() => {
+    const requested = chat.mods.state.focusRequestedId;
+    if (requested === null) judgedPane = null;
+    if (!requested || requested === judgedPane || !primary || document.visibilityState !== "visible") return;
+    judgedPane = requested;
+    untrack(() => {
+      if (chat.draft.trim() || dialogOpen || activity === "waiting" || !keysFree()) {
+        const held = document.activeElement?.closest("[data-mod-site]");
+        chat.mods.act("focus", { id: held ? chat.mods.state.focusedId : null });
+        return;
+      }
+      panes.setKind("mods");
+      chat.mods.act("focus", { id: requested });
+      chat.mods.raised = requested;
+    });
+  });
+
+  let composer = $state<Composer | null>(null);
+  let lastSelection = "";
+
+  const composerFree = () => !chat.sideOpen && !chat.viewOnly && !dialogOpen;
+
+  const onselectionchange = () => {
+    const text = window.getSelection()?.toString() ?? "";
+    if (text.trim()) lastSelection = text;
+  };
+
+  let wasBusy = false;
+
+  $effect(() => {
+    if (wasBusy && !busy) lastSelection = "";
+    wasBusy = busy;
+  });
+
+  $effect(() => {
+    const mods = chat.mods;
+    const host: ModHost = {
+      read: () => ({ text: chat.draft, cursor: composer?.caret() ?? chat.draft.length }),
+      fill: (text, mode) => {
+        if (!composerFree() || !composer) return false;
+        composer.place(text, mode);
+        return true;
+      },
+      suggest: (text) => {
+        if (!composerFree() || busy || chat.draft) return false;
+        mods.suggestion = text;
+        return true;
+      },
+      copy: (text) => copyText(text),
+      selection: () => lastSelection,
+    };
+    mods.host = host;
+    return () => {
+      if (mods.host === host) mods.host = null;
+    };
+  });
+
+  $effect(() => {
+    if (chat.draft || busy) chat.mods.suggestion = null;
+  });
+
+  const bandKey = (event: KeyboardEvent, empty: boolean) =>
+    empty &&
+    /^[0-9]$/.test(event.key) &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    chat.mods.hotkey("AbovePrompt", BAND_ID, event.key);
+
+  let reported = "";
+  let completions = $state<ModCompletions | null>(null);
+  let decorations = $state<ModDecoration[]>([]);
+
+  const promptEdit = (text: string, cursor: number, stroke: ModStroke | null) => {
+    reported = text;
+    completions = null;
+    void chat.mods.edit(text, cursor, stroke, "person").then((box) => {
+      if (!box || box.superseded || chat.draft !== text) return;
+      decorations = box.decorations;
+      if (box.text === text) return;
+      reported = box.text;
+      composer?.adopt(box.text, box.cursor);
+    });
+    void chat.mods.complete(text, cursor).then((found) => {
+      if (chat.draft === text) completions = found;
+    });
+  };
+
+  $effect(() => {
+    const draft = chat.draft;
+    if (!chat.mods.state.surface || chat.sideOpen || draft === reported) return;
+    reported = draft;
+    completions = null;
+    decorations = [];
+    void chat.mods.edit(draft, draft.length, null, "app");
+  });
 </script>
 
 <svelte:window onpaste={onPaste} />
+<svelte:document {onselectionchange} />
 
 <AppTopBar title={t("APP_NAME")} subtitle={status.text} {navigationIcon}>
   {#snippet subtitleLeading()}
@@ -306,6 +419,7 @@
             ? null
             : (item) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text))}
           sessionId={chat.sessionId}
+          mods={chat.mods}
           expandedIds={chat.expandedIds}
           savedTop={chat.scrollTop}
           onScrollTop={(top) => (chat.scrollTop = top)}
@@ -314,6 +428,13 @@
         />
       {/key}
     </div>
+    {#if chat.mods.toasts.length}
+      <div class="absolute right-0 bottom-0 left-0 z-20 flex flex-col gap-1.5 px-3 pb-3">
+        {#each chat.mods.toasts as toast (toast.id)}
+          <NoticeCard text={toast.text} onDismiss={() => chat.mods.dismissToast(toast.id)} />
+        {/each}
+      </div>
+    {/if}
     {#if chat.sideOpen}
       <SidePanel
         messages={chat.showWorking === "label" ? chat.sideMessages : chat.sideMessages.filter((item) => item.role !== "working")}
@@ -335,7 +456,21 @@
 
   {#if !chat.viewOnly}
     <div class="shrink-0" bind:clientHeight={composerHeight}>
+      <ModBand
+        mods={chat.mods}
+        draft={!!chat.draft}
+        working={busy}
+        hidden={chat.sideOpen}
+        {instant}
+        active={focused}
+      />
       <Composer
+        bind:this={composer}
+        ghost={chat.sideOpen ? null : chat.mods.suggestion}
+        onKey={chat.sideOpen ? undefined : bandKey}
+        onEdit={chat.sideOpen ? undefined : promptEdit}
+        completions={chat.sideOpen ? null : completions}
+        decorations={chat.sideOpen ? [] : decorations}
         {focused}
         blocked={chat.link === "disconnected" ||
           chat.link === "connecting" ||
@@ -554,7 +689,7 @@
   {@const target = chat.viewOnly}
   <ConfirmDialog
     title={t("DELETE")}
-    text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? target.sessionId.slice(0, SESSION_ID_PREVIEW))}
+    text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? sessionIdPreview(target.sessionId))}
     confirmLabel={t("DELETE")}
     onConfirm={() => {
       void chat.purgeViewOnly();

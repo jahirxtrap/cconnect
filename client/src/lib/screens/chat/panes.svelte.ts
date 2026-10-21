@@ -14,7 +14,8 @@ export type RightKind =
   | "claude"
   | "shared"
   | "project"
-  | "browser";
+  | "browser"
+  | "mods";
 
 const KINDS: RightKind[] = [
   "terminal",
@@ -25,6 +26,7 @@ const KINDS: RightKind[] = [
   "shared",
   "project",
   "browser",
+  "mods",
 ];
 
 const SCOPE: Record<RightKind, Pane> = {
@@ -36,6 +38,7 @@ const SCOPE: Record<RightKind, Pane> = {
   shared: "shared",
   project: "chat",
   browser: "browser",
+  mods: "mods",
 };
 
 interface StoredRight {
@@ -169,6 +172,15 @@ class Panes {
       this.#dropBlankChats();
     }
     this.focus("right");
+    this.commit();
+  }
+
+  retire(kind: RightKind) {
+    if (this.#tool === kind) this.#tool = KINDS[0];
+    if (this.kind !== kind) return;
+    this.kind = KINDS[0];
+    this.open = false;
+    this.focus("center");
     this.commit();
   }
 

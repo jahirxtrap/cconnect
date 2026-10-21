@@ -13,6 +13,8 @@
 
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import FolderOpen from "@lucide/svelte/icons/folder-open";
+  import MessageSquareText from "@lucide/svelte/icons/message-square-text";
   import Plus from "@lucide/svelte/icons/plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
@@ -24,7 +26,7 @@
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
   import { joined, SEPARATOR } from "$lib/data/format";
-  import { projectLabel, projectNameOf } from "$lib/data/models";
+  import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, openExternal } from "$lib/platform";
@@ -32,11 +34,14 @@
   import {
     claudeApi,
     type CatalogPlugin,
+    type ChatMod,
     type Extensions,
     type Marketplace,
     type McpServer,
     type Memories,
     type Plugin,
+    type PluginOption,
+    type PluginReview,
     type ServiceStatus,
     type Skill,
   } from "$lib/services/claudeApi";
@@ -55,6 +60,7 @@
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
@@ -62,6 +68,7 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import PluginOptionsDialog from "./PluginOptionsDialog.svelte";
   import { componentLabel, componentTone, incidentLabel, indicatorLabel, indicatorTone } from "./serviceStatus";
 
   interface Props {
@@ -98,6 +105,12 @@
   let skillFiles = $state<string[] | null>(null);
 
   let pluginMenu = $state<Plugin | null>(null);
+  let pluginReview = $state<PluginReview | null>(null);
+  let optionsFor = $state<Plugin | null>(null);
+  let optionFields = $state<PluginOption[] | null>(null);
+  let chatModsOpen = $state(false);
+  let localCandidate = $state<ChatMod | null>(null);
+  let pickingFolder = $state(false);
   let confirmUninstall = $state<Plugin | null>(null);
   let marketMenu = $state<Marketplace | null>(null);
   let confirmMarketRemove = $state<Marketplace | null>(null);
@@ -187,6 +200,35 @@
 
   const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
 
+  const reviewKey = $derived(pluginMenu?.mod ? pluginKey(pluginMenu) : null);
+
+  const chatTitle = (mod: ChatMod) => {
+    const session = chat.list?.sessions.find((item) => item.sessionId === mod.sessionId);
+    return session ? sessionLabel(session) : sessionIdPreview(mod.sessionId);
+  };
+
+  const openOptions = async (plugin: Plugin) => {
+    optionsFor = plugin;
+    optionFields = null;
+    const fields = await claudeApi.pluginOptions(pluginKey(plugin));
+    if (optionsFor !== plugin) return;
+    if (fields) optionFields = fields;
+    else {
+      optionsFor = null;
+      actionError = t("CONNECTION_ERROR");
+    }
+  };
+
+  const saveOptions = (plugin: Plugin, values: Record<string, string>) =>
+    void runAction(() => claudeApi.setPluginOptions(pluginKey(plugin), values)).then(() => (optionsFor = null));
+
+  const installLocal = (path: string) => {
+    localCandidate = null;
+    chatModsOpen = false;
+    catalogMarket = null;
+    void runAction(() => claudeApi.addLocalPlugin(path));
+  };
+
   const filteredSkills = $derived.by(() => {
     const query = skillQuery.trim().toLowerCase();
     const list = skills ?? [];
@@ -240,6 +282,16 @@
     const skill = skillSheet;
     skillFiles = null;
     if (skill) void claudeApi.skillFiles(skill.plugin, skill.id).then((files) => (skillFiles = files));
+  });
+
+  $effect(() => {
+    const key = reviewKey;
+    pluginReview = null;
+    if (!key) return;
+    void claudeApi.pluginReview(key).then((review) => {
+      if (key !== reviewKey) return;
+      pluginReview = review ?? { hooks: [], calls: [], commands: [], errors: [t("CONNECTION_ERROR")] };
+    });
   });
 </script>
 
@@ -356,7 +408,12 @@
           <ListRow
             padding={ROW_PADDING}
             title={plugin.name}
-            subtitle={joined(plugin.marketplace, plugin.version, plugin.scope)}
+            subtitle={joined(
+              plugin.mod && t("MOD"),
+              plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace,
+              plugin.version,
+              plugin.scope,
+            )}
             onclick={() => (pluginMenu = plugin)}
           >
             {#snippet trailing()}
@@ -530,19 +587,51 @@
         {/if}
       </OutlinedPanel>
     {/if}
+    {#if plugin.mod}
+      <OutlinedPanel class="mb-3">
+        {#if !pluginReview}
+          <LinearProgress />
+        {:else}
+          {@const sections = [
+            { label: t("COMMANDS"), items: pluginReview.commands.map((name) => `/${name}`) },
+            { label: t("MOD_HOOKS"), items: pluginReview.hooks },
+            { label: t("MOD_CALLS"), items: pluginReview.calls },
+          ].filter((section) => section.items.length)}
+          <div class="flex flex-col gap-2">
+            {#each sections as section (section.label)}
+              <div>
+                <p class="text-label-md text-accent">{section.label}</p>
+                <p class="font-mono text-body-sm wrap-anywhere text-on-surface-variant">{section.items.join(", ")}</p>
+              </div>
+            {/each}
+            {#each pluginReview.errors as error (error)}
+              <p class="text-body-sm wrap-anywhere text-error">{error}</p>
+            {/each}
+            {#if !sections.length && !pluginReview.errors.length}
+              <p class="text-body-sm text-on-surface-variant">{t("MOD_REVIEW_EMPTY")}</p>
+            {/if}
+          </div>
+        {/if}
+      </OutlinedPanel>
+    {/if}
     <div class="flex flex-col gap-2.5">
       {#if dialogBusy === "toggle" || dialogBusy === "update"}
         <LinearProgress />
       {/if}
-      <ActionButton
-        text={t("UPDATE_ACTION")}
-        enabled={!busy}
-        onclick={() => {
-          dialogBusy = "update";
-          void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
-        }}
-        class="w-full"
-      />
+      {#if plugin.options}
+        <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => void openOptions(plugin)} class="w-full" />
+      {/if}
+      {#if !plugin.local}
+        <ActionButton
+          text={t("UPDATE_ACTION")}
+          enabled={!busy}
+          onclick={() => {
+            dialogBusy = "update";
+            void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
+          }}
+          class="w-full"
+        />
+      {/if}
       {#if dialogBusy === "uninstall"}
         <LinearProgress />
       {/if}
@@ -592,6 +681,28 @@
             }}
           />
         {/each}
+        <MenuItem
+          text={t("CHAT_MODS")}
+          onclick={() => {
+            marketPicker = false;
+            chatModsOpen = true;
+          }}
+        >
+          {#snippet leading()}
+            <MessageSquareText size={20} class="shrink-0 text-on-surface-variant" />
+          {/snippet}
+        </MenuItem>
+        <MenuItem
+          text={t("PLUGIN_FROM_FOLDER")}
+          onclick={() => {
+            marketPicker = false;
+            pickingFolder = true;
+          }}
+        >
+          {#snippet leading()}
+            <FolderOpen size={20} class="shrink-0 text-on-surface-variant" />
+          {/snippet}
+        </MenuItem>
       </PopupMenu>
     {/snippet}
     {#snippet buttons()}
@@ -659,6 +770,79 @@
       {/if}
     </OutlinedPanel>
   </CompactDialog>
+{/if}
+
+{#if chatModsOpen}
+  {@const mods = extensions?.chatMods ?? []}
+  <CompactDialog title={t("CHAT_MODS")} onDismiss={() => (chatModsOpen = false)}>
+    {#snippet buttons()}
+      <Button onclick={() => (chatModsOpen = false)} variant="outlined">{t("CANCEL")}</Button>
+    {/snippet}
+    {#if !mods.length}
+      <p class="text-body-sm text-on-surface-variant">{t("CHAT_MODS_EMPTY")}</p>
+    {/if}
+    {#each mods as mod (mod.path)}
+      <ListRow
+        class="rounded-lg"
+        padding="py-2.5 pr-3 pl-3"
+        subtitleLines={2}
+        title={mod.name + (mod.version ? ` - ${mod.version}` : "")}
+        subtitle={joined(chatTitle(mod), mod.description)}
+        onclick={() => (localCandidate = mod)}
+      >
+        {#snippet trailing()}
+          {@render stateDot(mod.installed)}
+        {/snippet}
+      </ListRow>
+    {/each}
+  </CompactDialog>
+{/if}
+
+{#if localCandidate}
+  {@const mod = localCandidate}
+  <CompactDialog title={mod.name} onDismiss={() => (localCandidate = null)}>
+    {#snippet buttons()}
+      <Button onclick={() => (localCandidate = null)} variant="outlined">{t("CANCEL")}</Button>
+      <Button enabled={!mod.installed} onclick={() => installLocal(mod.path)}>{t("INSTALL")}</Button>
+    {/snippet}
+    <OutlinedPanel>
+      {#if mod.description}
+        <p class="text-body-sm text-on-surface-variant">{mod.description}</p>
+      {/if}
+      <p class="text-body-sm wrap-anywhere text-on-surface-variant">{mod.path}</p>
+      <p class="text-label-md text-accent">{mod.installed ? t("CHAT_MOD_INSTALLED") : t("CHAT_MOD_INSTALL_HINT")}</p>
+    </OutlinedPanel>
+  </CompactDialog>
+{/if}
+
+{#if pickingFolder}
+  <PathPickerDialog
+    onConfirm={(path) => {
+      pickingFolder = false;
+      installLocal(path);
+    }}
+    onDismiss={() => (pickingFolder = false)}
+  />
+{/if}
+
+{#if optionsFor}
+  {@const plugin = optionsFor}
+  {#if optionFields}
+    <PluginOptionsDialog
+      title={plugin.name}
+      fields={optionFields}
+      {busy}
+      onConfirm={(values) => saveOptions(plugin, values)}
+      onDismiss={() => (optionsFor = null)}
+    />
+  {:else}
+    <CompactDialog title={plugin.name} onDismiss={() => (optionsFor = null)}>
+      {#snippet buttons()}
+        <Button onclick={() => (optionsFor = null)} variant="outlined">{t("CANCEL")}</Button>
+      {/snippet}
+      <CenteredProgress class="py-6" />
+    </CompactDialog>
+  {/if}
 {/if}
 
 {#if marketMenu}

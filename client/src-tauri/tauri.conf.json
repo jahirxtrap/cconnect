@@ -29,6 +29,8 @@
     "security": {
       "csp": {
         "default-src": "'self'",
+        "script-src": "'self' blob:",
+        "worker-src": "'self' blob:",
         "img-src": "'self' data: blob: http: https:",
         "media-src": "'self' data: blob: http: https:",
         "object-src": "'self' data: blob:",

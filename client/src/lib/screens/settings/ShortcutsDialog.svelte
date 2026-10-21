@@ -30,10 +30,11 @@
     shared: "SCOPE_SHARED",
     browser: "BROWSER",
     project: "PROJECT_FILES",
+    mods: "MODS",
     global: "SCOPE_GENERAL",
   };
 
-  const ORDER: ShortcutScope[] = ["chat", "terminal", "shared", "browser", "project", "global"];
+  const ORDER: ShortcutScope[] = ["chat", "terminal", "mods", "shared", "browser", "project", "global"];
 
   const MODIFIER_CODES = [
     "ControlLeft",

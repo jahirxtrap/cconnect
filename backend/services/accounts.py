@@ -51,7 +51,7 @@ _IDENTITY_KEYS = ("oauthAccount", "userID")
 
 # Keys a secondary account always takes from the primary instead of keeping its own.
 _SHARED_KEYS = ("mcpServers",)
-_SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces") + cli_settings.json_keys()
+_SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces", "pluginConfigs") + cli_settings.json_keys()
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 
 

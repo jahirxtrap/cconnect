@@ -23,7 +23,7 @@
     items: StripTab[];
     activeId: string | null;
     onSelect: (id: string) => void;
-    onNew: () => void;
+    onNew?: () => void;
     newShortcut?: string;
     onClose: (id: string) => void;
     onMove?: (id: string, index: number) => void;
@@ -330,11 +330,13 @@
         </button>
       </div>
     {/each}
-    <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex h-8 shrink-0 items-center">
-      <TooltipIconButton label={newLabel ?? t("NEW_TAB")} shortcut={newShortcut} onclick={onNew} class="size-8">
-        <Plus size={18} />
-      </TooltipIconButton>
-    </div>
+    {#if onNew}
+      <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex h-8 shrink-0 items-center">
+        <TooltipIconButton label={newLabel ?? t("NEW_TAB")} shortcut={newShortcut} onclick={onNew} class="size-8">
+          <Plus size={18} />
+        </TooltipIconButton>
+      </div>
+    {/if}
   </div>
   {#if trailing}
     <div class="flex min-w-0 shrink items-center pr-1">{@render trailing()}</div>

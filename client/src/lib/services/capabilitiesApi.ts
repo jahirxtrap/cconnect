@@ -19,6 +19,13 @@ export interface CommandOption {
   aliases: string[];
 }
 
+type CommandShape = Pick<CommandOption, "name" | "argumentHint">;
+
+export const takesArguments = (command: Pick<CommandOption, "argumentHint">): boolean => command.argumentHint !== "";
+
+export const commandText = (command: CommandShape): string =>
+  takesArguments(command) ? `/${command.name} ` : `/${command.name}`;
+
 export interface McpTool {
   name: string;
   description: string;

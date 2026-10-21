@@ -8,6 +8,7 @@
   import ClaudeDetail, { type ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import BrowserView from "$lib/screens/browser/BrowserView.svelte";
+  import ModsView from "$lib/screens/mods/ModsView.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
   import NotesActions from "$lib/screens/notes/NotesActions.svelte";
@@ -117,6 +118,10 @@
 {:else if panes.kind === "browser"}
   <PaneSurface>
     <BrowserView trailing={sideActions} {focused} />
+  </PaneSurface>
+{:else if panes.kind === "mods"}
+  <PaneSurface>
+    <ModsView chat={panes.focusedChat} />
   </PaneSurface>
 {:else if panes.kind === "claude"}
   <PaneSurface>

@@ -74,6 +74,7 @@ import {
 } from "$lib/services/sessionsApi";
 import type { SharedFile } from "$lib/app/dragPayload.svelte";
 import { uploadAttachment, UPLOAD_DIR } from "$lib/services/uploadApi";
+import { ModSurface } from "$lib/screens/mods/modSurface.svelte";
 
 const DEFAULTS = {
   permissionMode: "bypassPermissions",
@@ -95,6 +96,8 @@ const optionNotificationLabel = (option: InteractionOption): string | null => {
   if (option.id === "allow") return t("PERMISSION_ALLOW");
   if (option.id === "allow_always") return t("PERMISSION_ALLOW_ALWAYS");
   if (option.id === "deny") return t("PERMISSION_DENY");
+  if (option.id === "enable") return t("MOD_HOT_RELOAD_ENABLE");
+  if (option.id === "decline") return t("MOD_HOT_RELOAD_DECLINE");
   return null;
 };
 const MESSAGE_TAIL_CAP = 500;
@@ -311,6 +314,13 @@ export class ChatState {
     (side, parent, event) => this.#onEvent(side, parent, event),
     () => this.environment,
   );
+  readonly mods = new ModSurface({
+    render: (site, rid) => this.#socket.sendModRender(site, rid),
+    act: (action, fields, rid) => this.#socket.sendModAction(action, fields, rid),
+    answer: (id, answer) => this.#socket.sendModAnswer(id, answer),
+    clientModule: (plugin, rid) => this.#socket.sendModClientModule(plugin, rid),
+  });
+  modsAvailable = $state<boolean | null>(null);
   #nextId = 1;
   #assistantId: number | null = null;
   #thinkingId: number | null = null;
@@ -358,6 +368,7 @@ export class ChatState {
 
   dispose() {
     this.#socket.close();
+    this.mods.reset();
   }
 
   reconnect() {
@@ -786,6 +797,7 @@ export class ChatState {
                 icon: event.icon,
                 blocks: event.blocks,
                 submitLabel: event.submitLabel,
+                variant: event.variant,
                 values: componentDefaults(event.blocks),
               },
             }),
@@ -1433,6 +1445,7 @@ export class ChatState {
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
       this.compactWindow = snapshot.autoCompact ? snapshot.autoCompactWindow : null;
+      this.modsAvailable = snapshot.persistentSessions && snapshot.modSurfaces === true;
       this.list?.applySettings(snapshot);
       this.serverVisibility = {
         simple: snapshot.simpleMode,
@@ -1867,6 +1880,7 @@ export class ChatState {
     if (kind === "component") {
       return (title ?? this.#componentHeadline(blocks))?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
     }
+    if (kind === "mods") return t("MOD_HOT_RELOAD_QUESTION");
     if (toolName !== "ExitPlanMode") return toolName?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null;
     const heading = (input ?? "")
       .split("\n")
@@ -1913,6 +1927,7 @@ export class ChatState {
       case "ready": {
         void this.#consumeInitialSession(event.project);
         this.connection = "connected";
+        this.mods.reset();
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         if (event.cwd && event.cwd !== this.cwd) {
@@ -2003,10 +2018,40 @@ export class ChatState {
         this.#thinkingId = null;
         this.#append(newMessage(this.#nextId++, "notification", { text: event.summary, result: event.status }));
         break;
-      case "session_message":
+      case "notice":
         this.#assistantId = null;
         this.#thinkingId = null;
-        this.#append(newMessage(this.#nextId++, "session_message", { text: event.text, toolName: event.name }));
+        this.#append(newMessage(this.#nextId++, "notice", { text: event.text, toolName: event.name, result: event.level }));
+        break;
+      case "mods":
+        this.mods.applyState(event.state);
+        break;
+      case "mod_toast":
+        this.mods.toast(event.plugin, event.text, event.timeoutMs);
+        break;
+      case "mod_invalidate":
+        this.mods.invalidate();
+        break;
+      case "mod_tree":
+        this.mods.receive(event.rid, event.component, event.instanceId, event.drawn);
+        break;
+      case "mod_reply":
+        this.mods.reply(event.rid, event.answer);
+        break;
+      case "mod_request":
+        void this.mods.answer(event.request);
+        break;
+      case "mod_focus":
+        this.mods.focus(event.component, event.instanceId, event.plugin, event.key);
+        break;
+      case "mod_scroll":
+        this.mods.scroll(event.component, event.instanceId, event.offset, event.followEnd);
+        break;
+      case "session_message":
+      case "plugin_message":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(newMessage(this.#nextId++, event.type, { text: event.text, toolName: event.name }));
         break;
       case "agent_report":
         this.#assistantId = null;
@@ -2273,8 +2318,11 @@ export class ChatState {
             submitKey: event.submitKey,
             dismiss: event.dismiss,
             present: event.present,
+            variant: event.variant,
+            mod: event.mod,
             values: componentDefaults(event.blocks),
           };
+          if (event.mod) this.mods.seed("AskUserQuestion", event.mod.instanceId, event.mod.drawn);
           const toolUseId = event.toolUseId;
           this.messages = [
             ...this.messages.filter((item) => !(item.role === "tool" && item.toolUseId === toolUseId)),
