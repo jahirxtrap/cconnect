@@ -38,6 +38,7 @@ const SPECIFIER = /(\bfrom\s*|\bimport\s*)(["'])([^"'\n]+)\2/g;
 const scope = self as unknown as {
   postMessage: (message: unknown) => void;
   onmessage: ((event: MessageEvent<Inbound>) => void) | null;
+  requestAnimationFrame?: (run: () => void) => number;
   h?: unknown;
   Fragment?: unknown;
   __surface__?: { run: () => unknown };
@@ -51,7 +52,12 @@ const scheduled = new Set<string>();
 const timers = new Map<string, Set<ReturnType<typeof setInterval>>>();
 let driver: Driver | null = null;
 let rendering: string | null = null;
-let flush: ReturnType<typeof setTimeout> | null = null;
+let flushing = false;
+
+const nextFrame = (run: () => void) => {
+  if (scope.requestAnimationFrame) scope.requestAnimationFrame(run);
+  else queueMicrotask(run);
+};
 
 const reasonOf = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
@@ -123,7 +129,7 @@ const render = (id: string) => {
 };
 
 const flushScheduled = () => {
-  flush = null;
+  flushing = false;
   const ids = [...scheduled];
   scheduled.clear();
   for (const id of ids) render(id);
@@ -137,7 +143,9 @@ const schedule = (id: string) => {
     return;
   }
   scheduled.add(id);
-  flush ??= setTimeout(flushScheduled, FRAME_MS);
+  if (flushing) return;
+  flushing = true;
+  nextFrame(flushScheduled);
 };
 
 const host = {

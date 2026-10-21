@@ -169,8 +169,9 @@
 
   const availableCommands = $derived.by(() => {
     const all = chat.capabilities?.commands ?? [];
-    if (chat.sideOpen || !chat.connected || busy) return [];
-    return chat.sessionId !== null ? all : all.filter((command) => command.kind === "usage");
+    if (chat.sideOpen || !chat.connected) return [];
+    const usable = chat.sessionId !== null ? all : all.filter((command) => command.kind === "usage");
+    return busy ? usable.filter((command) => command.kind === "prompt") : usable;
   });
 
   const viewLabel = $derived(

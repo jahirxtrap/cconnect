@@ -1,6 +1,7 @@
 import { untrack } from "svelte";
 
 import { accountsStore } from "$lib/data/accountsStore.svelte";
+import { loads } from "$lib/data/inflight";
 import { type AccountsSnapshot } from "$lib/services/accountsApi";
 import { backend } from "$lib/services/backend.svelte";
 import {
@@ -55,7 +56,23 @@ class ClaudeStatus {
   #usageRun: Promise<void> | null = null;
   #usageAgain = false;
 
-  async loadCli() {
+  loadCli() {
+    return loads.track(this.#loadCli());
+  }
+
+  loadExtensions() {
+    return loads.track(this.#loadExtensions());
+  }
+
+  loadService(force = false) {
+    return loads.track(this.#loadService(force));
+  }
+
+  loadUsage(force = false) {
+    return loads.track(this.#loadUsage(force));
+  }
+
+  async #loadCli() {
     const at = this.#sync();
     if (!backend.configured) {
       this.cli = null;
@@ -72,7 +89,7 @@ class ClaudeStatus {
     this.userPrompt = userPrompt;
   }
 
-  async loadExtensions() {
+  async #loadExtensions() {
     const at = this.#sync();
     if (!backend.configured) {
       this.extensions = null;
@@ -91,7 +108,7 @@ class ClaudeStatus {
     this.mcpServers = mcpServers;
   }
 
-  async loadService(force = false) {
+  async #loadService(force: boolean) {
     const at = this.#sync();
     this.loading = untrack(() => this.service) === null;
     const value = backend.configured ? await claudeApi.status(force) : null;
@@ -100,7 +117,7 @@ class ClaudeStatus {
     this.loading = false;
   }
 
-  async loadUsage(force = false): Promise<void> {
+  async #loadUsage(force: boolean): Promise<void> {
     if (this.#usageRun) {
       this.#usageAgain ||= force;
       return this.#usageRun;
@@ -110,7 +127,7 @@ class ClaudeStatus {
     this.#usageRun = null;
     if (!this.#usageAgain) return;
     this.#usageAgain = false;
-    await this.loadUsage(true);
+    await this.#loadUsage(true);
   }
 
   async #runUsage(force: boolean) {

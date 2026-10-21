@@ -1,4 +1,5 @@
-const MIN_REFRESH_MS = 600;
+import { tick } from "svelte";
+import { loads } from "$lib/data/inflight";
 
 class ClaudeRefresh {
   tick = $state(0);
@@ -8,7 +9,8 @@ class ClaudeRefresh {
     if (this.refreshing) return;
     this.refreshing = true;
     this.tick++;
-    await new Promise((done) => setTimeout(done, MIN_REFRESH_MS));
+    await tick();
+    await loads.settled();
     this.refreshing = false;
   }
 }

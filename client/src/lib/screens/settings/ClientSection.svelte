@@ -21,7 +21,6 @@
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
-  import { band } from "$lib/screens/mods/modSurface.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
@@ -40,11 +39,6 @@
   const rowSummary = (id: string) => {
     const entry = entryFor(id);
     return entry ? entryHint(entry) : "";
-  };
-
-  const setBandHandle = (value: boolean) => {
-    settings.modBandHandle = value;
-    if (!value && band.hidden) band.toggle();
   };
 
   useSettingsDialog("client", (target) => (dialog = target));
@@ -119,10 +113,13 @@
     icon={Puzzle}
     title={t("MOD_BAND_HANDLE")}
     summary={rowSummary("mod_band_handle")}
-    onclick={() => setBandHandle(!settings.modBandHandle)}
+    onclick={() => (settings.modBandHandle = !settings.modBandHandle)}
   >
     {#snippet trailing()}
-      <CompactSwitch checked={settings.modBandHandle} onCheckedChange={setBandHandle} />
+      <CompactSwitch
+        checked={settings.modBandHandle}
+        onCheckedChange={(value) => (settings.modBandHandle = value)}
+      />
     {/snippet}
   </PreferenceRow>
   {#if !layout.mobile}

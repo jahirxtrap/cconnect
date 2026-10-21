@@ -125,7 +125,7 @@
 
   const canSubmit = $derived(!blocked && (!!draft.trim() || attachments.length > 0));
   const busy = $derived(streaming || uploading);
-  const commandsReady = $derived(commands.length > 0 && !streaming);
+  const commandsReady = $derived(commands.length > 0);
 
   let recalled: string[] = [];
   let recalledAt = $state(-1);

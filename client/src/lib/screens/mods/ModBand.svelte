@@ -74,7 +74,8 @@
   const modeShown = $derived(shows(mode?.tree) || strings(mode?.props?.modes).length > 0);
   const footer = $derived(status.length > 0 || hintShown || modeShown);
   const answered = $derived(!mods.state.surface || mods.drawn("AbovePrompt", BAND_ID));
-  const drawn = $derived(answered && (drawnBand || footer) && (settings.modBandHandle || !band.hidden));
+  const drawn = $derived(answered && (drawnBand || footer));
+  const shown = $derived(!hidden && (settings.modBandHandle || !band.hidden));
   const present = $derived(mods.state.surface || status.length > 0);
   const duration = $derived(instant ? 0 : TOGGLE_MS);
 </script>
@@ -147,7 +148,7 @@
 
 <div class="px-3 pt-3">
   {#if present}
-    {#if !hidden}
+    {#if shown}
       <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
       <div
         bind:this={card}

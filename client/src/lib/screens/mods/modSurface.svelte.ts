@@ -55,7 +55,6 @@ class BandState {
 export const band = new BandState();
 
 const TOAST_MS = 4000;
-const RESIZE_MS = 150;
 const REPLY_MS = 15000;
 
 type Hooked = "probing" | boolean;
@@ -86,14 +85,17 @@ export class ModSurface {
   #mounted = new Map<string, ModRenderSite>();
   #signatures = new Map<string, string>();
   #latest = new Map<string, number>();
-  #pending = new Map<string, ReturnType<typeof setTimeout>>();
   #timers = new Map<number, ReturnType<typeof setTimeout>>();
   #hooked = new Map<ModComponent, Hooked>();
   #waiting = new Map<ModComponent, Set<string>>();
   #replies = new Map<number, (answer: unknown) => void>();
+  #owed = new Set<string>();
+  #redraw = new Set<string>();
+  #onDrawn: (() => void)[] = [];
   #rid = 0;
   #toastId = 0;
   #seq = 0;
+  #stale = false;
 
   constructor(private readonly port: ModPort) {
     this.clients = new ModClients(this);
@@ -127,15 +129,13 @@ export class ModSurface {
     const key = keyOf(site.component, site.instanceId);
     const signature = JSON.stringify(site);
     this.#mounted.set(key, site);
-    clearTimeout(this.#pending.get(key));
     untrack(() => {
       if (this.#signatures.get(key) === signature && key in this.#drawn) return;
       this.#signatures.set(key, signature);
-      if (key in this.#drawn) this.#pending.set(key, setTimeout(() => this.#request(key), RESIZE_MS));
+      if (this.#owed.has(key)) this.#redraw.add(key);
       else this.#request(key);
     });
     return () => {
-      clearTimeout(this.#pending.get(key));
       if (this.#mounted.get(key) !== site) return;
       this.#mounted.delete(key);
       this.#signatures.delete(key);
@@ -184,7 +184,8 @@ export class ModSurface {
   }
 
   applyState(state: ModState) {
-    const attached = state.surface && !this.state.surface;
+    const attached = state.surface && (this.#stale || !this.state.surface);
+    this.#stale = false;
     this.state = state;
     this.clients.prune((site) => site.component !== "Pane" || state.panes.some((pane) => pane.id === site.instance_id));
     if (!state.surface) {
@@ -212,11 +213,20 @@ export class ModSurface {
     this.#drawn[key] = drawn;
     this.#drawnColumns[key] = this.#sentColumns.get(key) ?? 0;
     this.clients.announce(drawn.clientModules);
-    if (this.#hooked.get(component) !== "probing") return;
-    this.#hooked.set(component, drawn.hooked);
-    const waiting = this.#waiting.get(component);
-    this.#waiting.delete(component);
-    if (drawn.hooked) for (const next of waiting ?? []) this.#request(next);
+    if (this.#hooked.get(component) === "probing") {
+      this.#hooked.set(component, drawn.hooked);
+      const waiting = this.#waiting.get(component);
+      this.#waiting.delete(component);
+      if (drawn.hooked) for (const next of waiting ?? []) this.#request(next);
+    }
+    this.#owed.delete(key);
+    if (this.#redraw.delete(key)) this.#request(key);
+    if (!this.#owed.size) for (const resolve of this.#onDrawn.splice(0)) resolve();
+  }
+
+  whenDrawn(): Promise<void> {
+    if (!this.#owed.size) return Promise.resolve();
+    return new Promise((resolve) => this.#onDrawn.push(resolve));
   }
 
   focus(component: ModComponent, instanceId: string, plugin: string, key: string) {
@@ -262,22 +272,30 @@ export class ModSurface {
     this.toasts = this.toasts.filter((item) => item.id !== id);
   }
 
-  reset() {
-    for (const timer of [...this.#pending.values(), ...this.#timers.values()]) clearTimeout(timer);
+  rebind() {
+    for (const timer of this.#timers.values()) clearTimeout(timer);
     for (const resolve of this.#replies.values()) resolve(null);
-    this.#pending.clear();
     this.#timers.clear();
     this.#latest.clear();
     this.#signatures.clear();
     this.#hooked.clear();
     this.#waiting.clear();
     this.#replies.clear();
-    this.#drawn = {};
     this.toasts = [];
     this.suggestion = null;
     this.focusTarget = null;
     this.scrollTarget = null;
     this.hotScopes.clear();
+    this.#owed.clear();
+    this.#redraw.clear();
+    this.#onDrawn = [];
+    this.#stale = true;
+  }
+
+  reset() {
+    this.rebind();
+    this.#stale = false;
+    this.#drawn = {};
     this.clients.reset();
     this.state = emptyModState();
   }
@@ -314,6 +332,7 @@ export class ModSurface {
     const rid = ++this.#rid;
     this.#latest.set(key, rid);
     this.#sentColumns.set(key, site.columns);
+    this.#owed.add(key);
     this.port.render(site, rid);
   }
 }

@@ -1,3 +1,4 @@
+import { loads } from "$lib/data/inflight";
 import { backend } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
 import { settingsApi, type SettingsPatch, type SettingsSnapshot } from "$lib/services/settingsApi";
@@ -11,7 +12,11 @@ class ServerSettings {
     return this.snapshot !== null;
   }
 
-  async load() {
+  load() {
+    return loads.track(this.#load());
+  }
+
+  async #load() {
     this.loading = true;
     if (!backend.configured) {
       this.snapshot = null;

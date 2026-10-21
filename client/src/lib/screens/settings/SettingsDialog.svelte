@@ -2,8 +2,10 @@
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import X from "@lucide/svelte/icons/x";
   import { Dialog } from "bits-ui";
+  import { tick as svelteTick } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
+  import { loads } from "$lib/data/inflight";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -51,20 +53,19 @@
     section === "general" || section === "server" || section === "claude",
   );
 
-  const MIN_REFRESH_MS = 600;
-
   const refresh = async () => {
     if (refreshing) return;
     refreshing = true;
     refreshTick++;
-    await new Promise((done) => setTimeout(done, MIN_REFRESH_MS));
+    await svelteTick();
+    await loads.settled();
     refreshing = false;
   };
 
 
   $effect(() => {
     if (tick === 0) return;
-    void serverStatus.refresh();
+    void loads.track(serverStatus.refresh());
   });
 
 

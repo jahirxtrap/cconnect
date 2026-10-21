@@ -77,6 +77,9 @@
     onClose: () => void;
   }
 
+  type CatalogSource = { kind: "all" } | { kind: "market"; name: string } | { kind: "chats" };
+  type CatalogEntry = CatalogPlugin & { marketplace: string };
+
   const { kind, onClose }: Props = $props();
 
   const compact = inPane();
@@ -109,18 +112,17 @@
   let pluginReview = $state<PluginReview | null>(null);
   let optionsFor = $state<Plugin | null>(null);
   let optionFields = $state<PluginOption[] | null>(null);
-  let chatModsOpen = $state(false);
   let localCandidate = $state<ChatMod | null>(null);
   let pickingFolder = $state(false);
   let confirmUninstall = $state<Plugin | null>(null);
   let marketMenu = $state<Marketplace | null>(null);
   let confirmMarketRemove = $state<Marketplace | null>(null);
   let addingMarket = $state(false);
-  let catalogMarket = $state<string | null>(null);
-  let catalog = $state<CatalogPlugin[] | null>(null);
+  let catalogSource = $state.raw<CatalogSource | null>(null);
+  let catalog = $state<CatalogEntry[] | null>(null);
   let catalogQuery = $state("");
   let marketPicker = $state(false);
-  let installCandidate = $state<CatalogPlugin | null>(null);
+  let installCandidate = $state<CatalogEntry | null>(null);
   let mcpMenu = $state<McpServer | null>(null);
   let confirmMcpRemove = $state<McpServer | null>(null);
   let addingMcp = $state(false);
@@ -153,15 +155,10 @@
     loaded = true;
   };
 
-  const MIN_REFRESH_MS = 600;
-
   const refresh = async () => {
     if (refreshing) return;
     refreshing = true;
-    const started = Date.now();
     await load();
-    const elapsed = Date.now() - started;
-    if (elapsed < MIN_REFRESH_MS) await new Promise((done) => setTimeout(done, MIN_REFRESH_MS - elapsed));
     refreshing = false;
   };
 
@@ -181,7 +178,7 @@
     if (run !== actionRun) return;
     if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
     await load();
-    if (catalogMarket) catalog = await claudeApi.catalog(catalogMarket);
+    if (catalogSource) catalog = await catalogOf(catalogSource);
     pluginMenu = pluginMenu
       ? (extensions?.plugins.find(
           (item) => item.name === pluginMenu?.name && item.marketplace === pluginMenu?.marketplace,
@@ -192,12 +189,26 @@
     busy = false;
   };
 
-  const openCatalog = async (market: string) => {
-    catalogMarket = market;
+  const marketCatalog = async (name: string): Promise<CatalogEntry[] | null> =>
+    (await claudeApi.catalog(name))?.map((entry) => ({ ...entry, marketplace: name })) ?? null;
+
+  const catalogOf = async (source: CatalogSource): Promise<CatalogEntry[] | null> => {
+    if (source.kind === "market") return marketCatalog(source.name);
+    if (source.kind === "chats") return [];
+    const lists = await Promise.all((extensions?.marketplaces ?? []).map((market) => marketCatalog(market.name)));
+    return lists.length && lists.every((list) => list === null) ? null : lists.flatMap((list) => list ?? []);
+  };
+
+  const openCatalog = async (source: CatalogSource) => {
+    catalogSource = source;
     catalog = null;
     catalogQuery = "";
-    catalog = await claudeApi.catalog(market);
+    const list = await catalogOf(source);
+    if (catalogSource === source) catalog = list;
   };
+
+  const catalogTitle = (source: CatalogSource) =>
+    source.kind === "all" ? t("ALL_MARKETPLACES") : source.kind === "chats" ? t("CHAT_MODS") : source.name;
 
   const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
 
@@ -225,8 +236,7 @@
 
   const installLocal = (path: string) => {
     localCandidate = null;
-    chatModsOpen = false;
-    catalogMarket = null;
+    catalogSource = null;
     void runAction(() => claudeApi.addLocalPlugin(path));
   };
 
@@ -242,14 +252,14 @@
     );
   });
 
-  const filteredCatalog = $derived.by(() => {
+  const catalogMatches = (entry: { name: string; description: string | null }) => {
     const query = catalogQuery.trim().toLowerCase();
-    const list = catalog ?? [];
-    if (!query) return list;
-    return list.filter(
-      (entry) => entry.name.toLowerCase().includes(query) || entry.description?.toLowerCase().includes(query),
-    );
-  });
+    return !query || entry.name.toLowerCase().includes(query) || !!entry.description?.toLowerCase().includes(query);
+  };
+
+  const filteredCatalog = $derived((catalog ?? []).filter(catalogMatches));
+
+  const filteredChatMods = $derived((extensions?.chatMods ?? []).filter(catalogMatches));
 
   const memoryList = $derived([...(memories?.global ?? []), ...(memories?.project ?? [])]);
 
@@ -328,10 +338,7 @@
       <TooltipIconButton
         label={t("INSTALL")}
         class={actionClass}
-        onclick={() => {
-          const market = extensions?.marketplaces[0];
-          if (market) void openCatalog(market.name);
-        }}
+        onclick={() => void openCatalog({ kind: "all" })}
       >
         <Plus />
       </TooltipIconButton>
@@ -578,25 +585,25 @@
     {#snippet buttons()}
       <Button onclick={() => { cancelAction(); pluginMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
-    {#if plugin.description || plugin.version}
-      <OutlinedPanel class="mb-3">
-        {#if plugin.description}
-          <p class="text-body-sm text-on-surface-variant">{plugin.description}</p>
-        {/if}
-        {#if plugin.version}
-          <p class="text-label-md text-accent">{t("VERSION_LABEL", plugin.version)}</p>
-        {/if}
-      </OutlinedPanel>
-    {/if}
-    {#if plugin.mod}
-      <OutlinedPanel class="mb-3">
-        {#if !pluginReview}
-          <LinearProgress />
-        {:else}
-          {@const sections = [
-            { label: t("COMMANDS"), text: modCommands(pluginReview).join(", "), mono: true },
-            { label: t("MOD_CALLS"), text: joined(...modAreas(pluginReview)), mono: false },
-          ].filter((section) => section.text)}
+    {#if plugin.mod && !pluginReview}
+      <CenteredProgress class="py-6" />
+    {:else}
+      {#if plugin.description || plugin.version}
+        <OutlinedPanel class="mb-3">
+          {#if plugin.description}
+            <p class="text-body-sm text-on-surface-variant">{plugin.description}</p>
+          {/if}
+          {#if plugin.version}
+            <p class="text-label-md text-accent">{t("VERSION_LABEL", plugin.version)}</p>
+          {/if}
+        </OutlinedPanel>
+      {/if}
+      {#if plugin.mod && pluginReview}
+        {@const sections = [
+          { label: t("COMMANDS"), text: modCommands(pluginReview).join(", "), mono: true },
+          { label: t("MOD_CALLS"), text: joined(...modAreas(pluginReview)), mono: false },
+        ].filter((section) => section.text)}
+        <OutlinedPanel class="mb-3">
           <div class="flex flex-col gap-2">
             {#each sections as section (section.label)}
               <div>
@@ -613,37 +620,37 @@
               <p class="text-body-sm text-on-surface-variant">{t("MOD_REVIEW_EMPTY")}</p>
             {/if}
           </div>
+        </OutlinedPanel>
+      {/if}
+      <div class="flex flex-col gap-2.5">
+        {#if dialogBusy === "toggle" || dialogBusy === "update"}
+          <LinearProgress />
         {/if}
-      </OutlinedPanel>
-    {/if}
-    <div class="flex flex-col gap-2.5">
-      {#if dialogBusy === "toggle" || dialogBusy === "update"}
-        <LinearProgress />
-      {/if}
-      {#if plugin.options}
-        <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => void openOptions(plugin)} class="w-full" />
-      {/if}
-      {#if !plugin.local}
+        {#if plugin.options}
+          <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => void openOptions(plugin)} class="w-full" />
+        {/if}
+        {#if !plugin.local}
+          <ActionButton
+            text={t("UPDATE_ACTION")}
+            enabled={!busy}
+            onclick={() => {
+              dialogBusy = "update";
+              void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
+            }}
+            class="w-full"
+          />
+        {/if}
+        {#if dialogBusy === "uninstall"}
+          <LinearProgress />
+        {/if}
         <ActionButton
-          text={t("UPDATE_ACTION")}
+          text={t("UNINSTALL")}
           enabled={!busy}
-          onclick={() => {
-            dialogBusy = "update";
-            void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
-          }}
+          onclick={() => (confirmUninstall = plugin)}
           class="w-full"
         />
-      {/if}
-      {#if dialogBusy === "uninstall"}
-        <LinearProgress />
-      {/if}
-      <ActionButton
-        text={t("UNINSTALL")}
-        enabled={!busy}
-        onclick={() => (confirmUninstall = plugin)}
-        class="w-full"
-      />
-    </div>
+      </div>
+    {/if}
   </CompactDialog>
 {/if}
 
@@ -663,9 +670,9 @@
   />
 {/if}
 
-{#if catalogMarket}
-  {@const market = catalogMarket}
-  <CompactDialog title={market} onDismiss={() => (catalogMarket = null)}>
+{#if catalogSource}
+  {@const source = catalogSource}
+  <CompactDialog title={catalogTitle(source)} onDismiss={() => (catalogSource = null)}>
     {#snippet titleTrailing()}
       <PopupMenu open={marketPicker} label={t("MARKETPLACES")} onOpenChange={(open) => (marketPicker = open)}>
         {#snippet triggerChild(props)}
@@ -673,21 +680,30 @@
             <Store size={20} />
           </TooltipIconButton>
         {/snippet}
+        <MenuItem
+          text={t("ALL_MARKETPLACES")}
+          selected={source.kind === "all"}
+          onclick={() => {
+            marketPicker = false;
+            void openCatalog({ kind: "all" });
+          }}
+        />
         {#each extensions?.marketplaces ?? [] as entry (entry.name)}
           <MenuItem
             text={entry.name}
-            selected={entry.name === market}
+            selected={source.kind === "market" && entry.name === source.name}
             onclick={() => {
               marketPicker = false;
-              void openCatalog(entry.name);
+              void openCatalog({ kind: "market", name: entry.name });
             }}
           />
         {/each}
         <MenuItem
           text={t("CHAT_MODS")}
+          selected={source.kind === "chats"}
           onclick={() => {
             marketPicker = false;
-            chatModsOpen = true;
+            void openCatalog({ kind: "chats" });
           }}
         >
           {#snippet leading()}
@@ -708,7 +724,7 @@
       </PopupMenu>
     {/snippet}
     {#snippet buttons()}
-      <Button onclick={() => (catalogMarket = null)} variant="outlined">{t("CANCEL")}</Button>
+      <Button onclick={() => (catalogSource = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
     {#snippet header()}
       <SearchBar
@@ -720,21 +736,40 @@
         <LinearProgress class="mt-2" />
       {/if}
     {/snippet}
-    {#if !catalog}
+    {#if source.kind === "chats"}
+      {#if !extensions?.chatMods.length}
+        <p class="text-body-sm text-on-surface-variant">{t("CHAT_MODS_EMPTY")}</p>
+      {/if}
+      {#each filteredChatMods as mod (mod.path)}
+        <ListRow
+          class="rounded-lg"
+          padding="py-2.5 pr-3 pl-3"
+          subtitleLines={2}
+          title={mod.name + (mod.version ? ` - ${mod.version}` : "")}
+          subtitle={joined(chatTitle(mod), mod.description)}
+          onclick={() => (localCandidate = mod)}
+        >
+          {#snippet trailing()}
+            {@render stateDot(mod.installed)}
+          {/snippet}
+        </ListRow>
+      {/each}
+    {:else if !catalog}
       <CenteredProgress class="py-6" />
     {:else}
-      {#each filteredCatalog as entry (entry.name)}
+      {#each filteredCatalog as entry (`${entry.marketplace}/${entry.name}`)}
         <ListRow
           class="rounded-lg"
           padding="py-2.5 pr-3 pl-3"
           subtitleLines={2}
           title={entry.name + (entry.version ? ` - ${entry.version}` : "")}
-          subtitle={entry.description}
+          subtitle={source.kind === "all" ? joined(entry.marketplace, entry.description) : entry.description}
           onclick={() => {
             if (entry.installed) {
               pluginMenu =
-                extensions?.plugins.find((item) => item.name === entry.name && item.marketplace === market) ?? null;
-              catalogMarket = null;
+                extensions?.plugins.find(
+                  (item) => item.name === entry.name && item.marketplace === entry.marketplace,
+                ) ?? null;
             } else {
               installCandidate = entry;
             }
@@ -756,7 +791,7 @@
       <Button onclick={() => (installCandidate = null)} variant="outlined">{t("CANCEL")}</Button>
       <Button
         onclick={() => {
-          const key = `${entry.name}@${catalogMarket ?? ""}`;
+          const key = `${entry.name}@${entry.marketplace}`;
           installCandidate = null;
           void runAction(() => claudeApi.pluginAction("install", key));
         }}
@@ -771,32 +806,6 @@
         <p class="text-label-md text-accent">{t("VERSION_LABEL", entry.version)}</p>
       {/if}
     </OutlinedPanel>
-  </CompactDialog>
-{/if}
-
-{#if chatModsOpen}
-  {@const mods = extensions?.chatMods ?? []}
-  <CompactDialog title={t("CHAT_MODS")} onDismiss={() => (chatModsOpen = false)}>
-    {#snippet buttons()}
-      <Button onclick={() => (chatModsOpen = false)} variant="outlined">{t("CANCEL")}</Button>
-    {/snippet}
-    {#if !mods.length}
-      <p class="text-body-sm text-on-surface-variant">{t("CHAT_MODS_EMPTY")}</p>
-    {/if}
-    {#each mods as mod (mod.path)}
-      <ListRow
-        class="rounded-lg"
-        padding="py-2.5 pr-3 pl-3"
-        subtitleLines={2}
-        title={mod.name + (mod.version ? ` - ${mod.version}` : "")}
-        subtitle={joined(chatTitle(mod), mod.description)}
-        onclick={() => (localCandidate = mod)}
-      >
-        {#snippet trailing()}
-          {@render stateDot(mod.installed)}
-        {/snippet}
-      </ListRow>
-    {/each}
   </CompactDialog>
 {/if}
 
@@ -829,22 +838,13 @@
 
 {#if optionsFor}
   {@const plugin = optionsFor}
-  {#if optionFields}
-    <PluginOptionsDialog
-      title={plugin.name}
-      fields={optionFields}
-      {busy}
-      onConfirm={(values) => saveOptions(plugin, values)}
-      onDismiss={() => (optionsFor = null)}
-    />
-  {:else}
-    <CompactDialog title={plugin.name} onDismiss={() => (optionsFor = null)}>
-      {#snippet buttons()}
-        <Button onclick={() => (optionsFor = null)} variant="outlined">{t("CANCEL")}</Button>
-      {/snippet}
-      <CenteredProgress class="py-6" />
-    </CompactDialog>
-  {/if}
+  <PluginOptionsDialog
+    title={plugin.name}
+    fields={optionFields}
+    {busy}
+    onConfirm={(values) => saveOptions(plugin, values)}
+    onDismiss={() => (optionsFor = null)}
+  />
 {/if}
 
 {#if marketMenu}

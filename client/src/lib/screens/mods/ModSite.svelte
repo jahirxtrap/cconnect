@@ -45,6 +45,7 @@
   const FOCUSABLE = "button, input, textarea, select, [tabindex]";
   const SCROLL_KEYS = new Set(["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "]);
   const SCROLL_MS = 150;
+  const SCROLL_ENDS = "onscrollend" in window;
 
   let root = $state<HTMLElement | null>(null);
   let body = $state<HTMLElement | null>(null);
@@ -183,28 +184,40 @@
     });
   };
 
+  const reportScroll = () => {
+    if (!body || !cellHeight) return;
+    const at = Math.round(body.scrollTop / cellHeight);
+    offset = at;
+    mods.act("site_scroll", {
+      ...sitePayload(),
+      offset: at,
+      by: at - shownOffset,
+      body_rows: Math.floor(body.clientHeight / cellHeight),
+      content_rows: Math.ceil(body.scrollHeight / cellHeight),
+      keyed: keyedRows(),
+    });
+    shownOffset = at;
+  };
+
+  let ownScroll = false;
+
   const onscroll = () => {
     if (!body) return;
     if (expected !== null && Math.abs(body.scrollTop - expected) <= 1) {
       expected = null;
+      ownScroll = true;
       return;
     }
     expected = null;
+    ownScroll = false;
+    if (SCROLL_ENDS) return;
     clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => {
-      if (!body || !cellHeight) return;
-      const at = Math.round(body.scrollTop / cellHeight);
-      offset = at;
-      mods.act("site_scroll", {
-        ...sitePayload(),
-        offset: at,
-        by: at - shownOffset,
-        body_rows: Math.floor(body.clientHeight / cellHeight),
-        content_rows: Math.ceil(body.scrollHeight / cellHeight),
-        keyed: keyedRows(),
-      });
-      shownOffset = at;
-    }, SCROLL_MS);
+    scrollTimer = setTimeout(reportScroll, SCROLL_MS);
+  };
+
+  const onscrollend = () => {
+    if (ownScroll) ownScroll = false;
+    else reportScroll();
   };
 
   const onkeydown = (event: KeyboardEvent) => {
@@ -263,6 +276,7 @@
       .filter(Boolean)
       .join("; ") || undefined}
     {onscroll}
+    {onscrollend}
     onwheel={release}
     ontouchmove={release}
     onpointerdown={(event) => {

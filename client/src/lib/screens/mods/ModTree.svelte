@@ -52,7 +52,6 @@
   }
 
   const ROOT: Context = { box: null, inText: false, edge: false };
-  const CHANGE_MS = 300;
   const WRAP_CLASS: Record<Wrap, string> = {
     wrap: "whitespace-pre-wrap wrap-anywhere",
     end: "overflow-hidden text-ellipsis whitespace-pre",
@@ -79,7 +78,6 @@
   const hotBoxes = new SvelteSet<string>();
   let drafts = $state<Record<string, string>>({});
   let openMenu = $state<string | null>(null);
-  const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
   const prop = (item: ModNode, key: string): string | null =>
     typeof item.props[key] === "string" ? (item.props[key] as string) : null;
@@ -155,20 +153,14 @@
   const fieldValue = (item: ModNode) => drafts[draftKey(item)] ?? prop(item, "value") ?? "";
 
   const type = (item: ModNode, value: string) => {
-    const key = draftKey(item);
-    drafts[key] = value;
-    clearTimeout(timers.get(key));
-    timers.set(
-      key,
-      setTimeout(() => item.press && port.input(item, "change", value), CHANGE_MS),
-    );
+    drafts[draftKey(item)] = value;
+    if (item.press) port.input(item, "change", value);
   };
 
   const submit = (item: ModNode) => {
     if (!item.press) return;
     const key = draftKey(item);
     const value = fieldValue(item);
-    clearTimeout(timers.get(key));
     delete drafts[key];
     port.input(item, "submit", value);
   };
@@ -241,10 +233,6 @@
       destroy: () => observer.disconnect(),
     };
   };
-
-  $effect(() => () => {
-    for (const timer of timers.values()) clearTimeout(timer);
-  });
 </script>
 
 {#snippet children(item: ModNode, ctx: Context)}{#each item.children as kid, index (index)}{@render render(kid, ctx)}{/each}{/snippet}

@@ -1,3 +1,4 @@
+import { tick } from "svelte";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { serverStatus } from "$lib/data/serverStatus.svelte";
 import {
@@ -16,7 +17,7 @@ import {
   type Role,
   type TodoItem,
 } from "$lib/data/chatModels";
-import { emptyModState } from "$lib/data/modModels";
+import { emptyModState, type ModState } from "$lib/data/modModels";
 import { projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { settings } from "$lib/data/settings.svelte";
@@ -341,6 +342,8 @@ export class ChatState {
   #history: string[] = [];
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
+  #attaching = false;
+  #arrivingMods: ModState | null = null;
 
   constructor(context: ChatContext) {
     this.environmentId = context.environmentId;
@@ -1934,7 +1937,9 @@ export class ChatState {
       case "ready": {
         void this.#consumeInitialSession(event.project);
         this.connection = "connected";
-        this.mods.reset();
+        this.mods.rebind();
+        this.#attaching = true;
+        this.#arrivingMods = null;
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         if (event.cwd && event.cwd !== this.cwd) {
@@ -2031,7 +2036,8 @@ export class ChatState {
         this.#append(newMessage(this.#nextId++, "notice", { text: event.text, toolName: event.name, result: event.level }));
         break;
       case "mods":
-        this.mods.applyState(event.state);
+        if (this.#attaching) this.#arrivingMods = event.state;
+        else this.mods.applyState(event.state);
         break;
       case "mod_toast":
         this.mods.toast(event.plugin, event.text, event.timeoutMs);
@@ -2278,8 +2284,15 @@ export class ChatState {
         }
         break;
       case "attached":
-        this.#frozen = null;
-        this.transcriptLoading = false;
+        this.#attaching = false;
+        if (this.#arrivingMods) this.mods.applyState(this.#arrivingMods);
+        this.#arrivingMods = null;
+        void tick()
+          .then(() => this.mods.whenDrawn())
+          .then(() => {
+            this.#frozen = null;
+            this.transcriptLoading = false;
+          });
         break;
       case "interrupted":
         this.#interrupting = false;
@@ -2296,11 +2309,9 @@ export class ChatState {
         break;
       case "error": {
         this.#resetStreaming();
-        const index = this.messages.findLastIndex((item) => item.role === "user");
-        if (index >= 0) {
-          this.messages = this.messages.map((item, i) =>
-            i === index ? { ...item, sendStatus: "error" as const } : item,
-          );
+        const unanswered = this.messages.at(-1);
+        if (unanswered?.role === "user") {
+          this.messages = [...this.messages.slice(0, -1), { ...unanswered, sendStatus: "error" as const }];
         }
         break;
       }
@@ -2380,6 +2391,8 @@ export class ChatState {
         });
         break;
       case "closed":
+        this.#attaching = false;
+        this.#arrivingMods = null;
         this.#frozen = null;
         this.transcriptLoading = false;
         this.#assistantId = null;
