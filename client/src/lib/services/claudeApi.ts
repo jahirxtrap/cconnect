@@ -101,6 +101,7 @@ export interface UsageWindow {
   percent: number;
   resetsAt: string | null;
   unused: boolean;
+  detail: string | null;
 }
 
 export interface Usage {
@@ -152,6 +153,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         percent: window.percent ?? 0,
         resetsAt: window.resets_at ?? null,
         unused: window.unused === true,
+        detail: window.detail ?? null,
       })),
       error: data.error ?? null,
     };

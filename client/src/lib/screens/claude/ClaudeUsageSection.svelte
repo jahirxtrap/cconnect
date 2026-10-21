@@ -24,8 +24,13 @@
   const accounts = $derived(claudeStatus.accounts);
   const loading = $derived(claudeStatus.usageLoading);
 
-  const usageWindowLabel = (id: string) =>
-    id === "session" ? t("USAGE_SESSION") : id === "weekly_all" ? t("USAGE_ALL_MODELS") : id;
+  const WINDOW_LABELS: Record<string, string> = {
+    session: "USAGE_SESSION",
+    weekly_all: "USAGE_ALL_MODELS",
+    spend: "USAGE_SPEND",
+  };
+
+  const usageWindowLabel = (id: string) => (id in WINDOW_LABELS ? t(WINDOW_LABELS[id]) : id);
 
   const resetsLabel = (resetsAt: string | null) => {
     const millis = resetsAt === null ? null : parseIsoMillis(resetsAt);
@@ -76,7 +81,7 @@
       {#each usage.windows as window (window.id)}
         <MetricBar
           title={usageWindowLabel(window.id)}
-          subtitle={window.unused ? t("USAGE_UNUSED") : resetsLabel(window.resetsAt)}
+          subtitle={window.unused ? t("USAGE_UNUSED") : (window.detail ?? resetsLabel(window.resetsAt))}
           percent={window.percent}
         />
       {/each}
