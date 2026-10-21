@@ -258,11 +258,20 @@ works offline once the language is downloaded; on the desktop app and the
 browser it uses the engine they ship. Attach and the slash commands moved into
 the **+** menu beside it, so the bar keeps two buttons.
 
-Model, effort, permission mode, how much of each turn you see, and which Claude
-CLI the backend drives are all set from the app. The server holds the defaults
-and every client follows them, but each device can decide for itself how much of
-a turn it receives — including a **simple mode** that folds thinking and tool
-detail into a single working block, the way the quick chat already reads.
+**Persistent sessions** keep a chat's Claude process running while you have it
+open: a message is answered without starting the CLI first, and commands can
+keep working in the background between turns. Each one holds its own process
+(around 400 MB of memory, not counting its MCP servers), so you choose how many
+chats may keep one at once and how long it waits after the last device closes the
+chat, and you can close it yourself from the chat's header.
+
+Model, effort, permission mode, how much of each turn you see, when the context
+gets compacted, which of CLAUDE.md and AGENTS.md Claude reads as the project's
+instructions, and which Claude CLI the backend drives are all set from the app.
+The server holds the defaults and every client follows them, but each device can
+decide for itself how much of a turn it receives — including a **simple mode**
+that folds thinking and tool detail into a single working block, the way the
+quick chat already reads.
 
 ## Tabs
 
@@ -274,6 +283,30 @@ on desktop reach for the keyboard (Ctrl+T to open, Ctrl+W to close, Ctrl+Tab to
 cycle). With both panels open a tab drags from one to the other as if the two
 bars were one. The tabs you had open come back when you reopen the app, each
 loading only once you switch to it.
+
+## Mods
+
+Claude Code mods are plugins that change what Claude shows and how it behaves:
+panes that stay beside the chat and update as it works, a band above the
+composer, a status line, notices and commands of their own. CConnect draws them
+in its own style instead of as terminal text, on desktop, web and Android alike.
+
+Panes open in the side panel's **Mods** view, one tab each, and take the same
+shortcuts as the chat's tabs. The band sits on top of the composer with the mods'
+status line under it, and its bar hides and shows it; with **Collapsible mods
+band** off in Settings that is left to a shortcut of your own. Turning **Mods**
+on in the server settings shows what mods report in any chat, while panes and
+the band also need persistent sessions, since the Claude process that stays
+running is the one drawing them. It rides on an internal Claude Code protocol
+that can change between versions, so it is marked experimental.
+
+They install like any plugin, from a marketplace or from a folder. When Claude
+writes one for you in a chat, CConnect asks before turning it on for that
+session (a mod is code, and it runs with the same access you have), and **Mods
+from chats** in the catalog installs it for every chat. In the Claude screen a
+mod's card lists its commands and, in plain words, what it reaches (the
+interface, your files, programs, the internet, requests to Claude), and its
+options are edited from there.
 
 ## Shared
 
@@ -308,7 +341,9 @@ it. Git colours the tree — added, modified, untracked — and inside a file th
 change is painted on the numbered lines themselves, with buttons to walk from
 one to the next. An eye in the file's header moves it to the centre pane, where
 it takes the place of the chat, and from either side it expands to the whole
-window. A toggle folds the tree down to only what changed. From a file you can
+window. A toggle folds the tree down to only what changed. An archive opens in
+the tree like a folder, and a file inside it previews without extracting
+anything. From a file you can
 mention its full path in the chat or copy it. What git ignores stays hidden
 until you unlock it with the security key.
 
@@ -329,10 +364,12 @@ else.
 
 ## Notes
 
-A built-in Markdown editor doubles as a scratchpad: jot things down with a live
-preview, then save, export, or share the note as a file. What you type stays
-between sessions. Syntax highlighting covers everything Shiki knows, here and
-anywhere else code shows up.
+A built-in Markdown editor keeps as many notes as you need, shown as a list or
+as cards and searchable across all of them. A bar formats as you write (tasks you
+tick, bullets, headings, bold, code) with undo and redo, the preview renders the
+note as Markdown, and any of them can be duplicated, saved, exported or shared as
+a file. What you type stays between sessions. Syntax highlighting covers
+everything Shiki knows, here and anywhere else code shows up.
 
 ## Manage Claude Code itself
 
@@ -343,12 +380,13 @@ PC:
   the official changelog without leaving the app.
 - Browse any **marketplace** catalog and install **plugins** from the app;
   enable, disable, update, or uninstall the ones you have.
-- Add or remove **MCP servers** and marketplaces.
+- Add or remove **MCP servers**, with the credentials or environment variables
+  they need, and marketplaces.
 - Read the **skills** your plugins provide, and view or delete Claude's
   **memories**, globally or per project.
 - Keep your own standing instructions in a **user prompt** editable from the
   app — it rides along every conversation, on top of the system conventions in
-  `backend/prompts/CCONNECT.md`.
+  `backend/core/prompts/CCONNECT.md`.
 - See your **plan usage** at a glance — your subscription tier (Pro, Max 5x,
   Max 20x) and a bar per limit window: current session, all models, and the
   per-model weekly caps, each with its reset time.
@@ -432,7 +470,7 @@ agent so they're available out of the box from the phone:
   running in <other-project> going?"_ and Claude summarizes that other
   session's latest activity into Done / Pending / Files touched / Next step,
   without you having to open it.
-- **Editable system prompt.** `backend/prompts/CCONNECT.md` is auto-appended to
+- **Editable system prompt.** `backend/core/prompts/CCONNECT.md` is auto-appended to
   every chat — that's where the file-sharing and progress-check conventions
   live. Your personal additions go in `USER.md`, edited straight from the
   Claude screen.
@@ -514,9 +552,10 @@ The app and the backend declare which versions of each other — and of the
 Claude CLI — they support. When something falls behind, a notice in the chat
 takes you straight to the right place: the app's own update (with its
 changelog), the server requirement, or the CLI update button. Release notes
-for both CConnect and Claude Code are readable in the app. Settings → About also
-exports your settings to copy them into another install — the chats themselves
-stay on the server.
+for both CConnect and Claude Code are readable in the app. Settings → Recovery
+exports your settings to copy them into another install, or keeps copies of them
+in your Google Drive (encrypted with a password if you give one, and with this
+device's notes if you want them along); the chats themselves stay on the server.
 
 ## Browser
 

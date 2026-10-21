@@ -29,7 +29,8 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 - `middleware/` — `public_auth` (Bearer, no-op without a token), `security`, `error_handler`.
 - `routers/` — thin: validate, call a service, return `api_response()`.
 - `services/` — all the logic. `live_sessions` (turn decoupled from the socket), `claude_runtime`
-  (SDK stream → normalized events), `sessions` (transcripts, checkpoints, images), `chat_list`,
+  (SDK stream → normalized events), `persistent_sessions` (the CLI a chat keeps between
+  turns), `mods` (the CLI's internal UI protocol), `sessions` (transcripts, checkpoints, images), `chat_list`,
   `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
   `system_monitor`, `network`, `usage`, `accounts`, `shared`, `git_ops` (the commit panel,
   on top of the single runner in `services/git`, one lock per repository).
@@ -81,10 +82,11 @@ twice — once from disk and once from the replay.
 ## WebSocket protocol (`/api/chat/ws`)
 
 Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`,
-`set_permission_mode`, `interrupt`, `interaction_response`, `load_history`, `ask`, `usage`.
+`set_permission_mode`, `interrupt`, `interaction_response`, `load_history`, `ask`, `usage`,
+`close_resident`, and for mods `mod_render`, `mod_act`, `mod_answer`, `mod_client_module`.
 
 Server → client, all seq'd per session except the control ones (`ready`, `permission_mode`,
-`history_chunk`, `usage`, `ask_*`, `activity`):
+`history_chunk`, `usage`, `ask_*`, `activity`) and the mods ones:
 
 | event | notes |
 |---|---|
@@ -97,6 +99,9 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 | `activity` | per-chat state, rides the channel so a brand-new chat reports before it has an id |
 | `queued` / `dequeued` | message queue |
 | `attached` | replay finished — the client publishes the conversation in one step |
+| `mods` | the whole mods surface (attached, panes, status lines, commands), sent on every attach and on each change |
+| `mod_tree` / `mod_reply` | answer the socket that asked; every `mod_render` gets a `mod_tree`, with a null tree when no CLI is attached |
+| `mod_toast` / `mod_invalidate` / `mod_focus` / `mod_scroll` / `mod_request` | live only, never replayed |
 | `system`, `result`, `done`, `interrupted`, `error` | |
 
 **Context size** travels only in `context` — `result` does not carry it, and the clients
@@ -137,6 +142,24 @@ is rendered **from the transcript** (`_flush_users` greedily matches new user en
 against the leading chips), which is what makes resume and live agree when the CLI joins
 several messages into one entry. The turn is held open until the queue drains and the
 final `result` lands.
+
+## Persistent sessions and mods
+
+With `persistent_sessions` on, a chat keeps its CLI between turns. `persistent_sessions.pool`
+holds one `PersistentSession` per channel, a `ClaudeSDKClient` owned by its own task and
+keyed by cwd, account and scope; `persistent_limit` trims the oldest idle ones, and the
+live session releases its own `persistent_grace` seconds after the last socket detaches.
+A turn whose options differ from the ones the CLI started with (`mark`: model, effort,
+permission mode, mods) closes it and starts a fresh one. When the CLI starts a turn on its
+own, a mod sending a prompt for instance, `own_turn` makes the live session adopt it so it
+streams like any other.
+
+Mods ride on the CLI's internal UI protocol (`services/mods.py`): `ui_attach` as the
+`desktop` surface, `ui_render` per site, and the CLI's notifications, which fold into one
+`Surface` per live session and reach the app as the `mods` snapshot. `mod_surfaces` gates
+all of it. What a mod writes to the transcript shows in any chat, while panes and the band
+need the resident CLI. The protocol is not public and moves between CLI versions, so every
+request goes through `mods.request`, which turns a failure into `None` instead of raising.
 
 ## Settings and visibility
 

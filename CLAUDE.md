@@ -3,11 +3,12 @@
 Mobile, desktop and web interface for Claude Code. The apps drive Claude Code running
 on the user's PC — chats in tabs, projects and sessions, file edits, permission prompts
 and forms, rich blocks, plan proposals, subagents, attachments, a message queue and
-rewind — over HTTP/WS, reachable on the tailnet or publicly through a Tailscale Funnel.
-They also manage the Claude install itself (CLI, plugins, marketplaces, MCP servers,
-skills, memories), a file manager over the shared folder, an explorer of the project
-that shows its git diff and commits it, a PC monitor, an SSH client and a notes
-scratchpad.
+rewind, persistent sessions that keep a chat's CLI running, and the panes and band
+Claude Code mods draw — over HTTP/WS, reachable on the tailnet or publicly through a
+Tailscale Funnel. They also manage the Claude install itself (CLI, plugins,
+marketplaces, MCP servers, skills, memories), a file manager over the shared folder, an
+explorer of the project that shows its git diff and commits it, a PC monitor, an SSH
+client and notes.
 
 **Monorepo with two modules that must stay in sync:**
 

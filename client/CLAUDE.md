@@ -15,7 +15,7 @@ src/
 │   ├── design/             # tokens.css, theme, session colors
 │   ├── i18n/               # en.json / es.json — every user-facing string
 │   ├── platform/           # isTouch, layout, desktop, fieldSizing polyfill
-│   ├── screens/            # chat/, shared/, project/, claude/, monitor/, settings/, terminal/, notes/
+│   ├── screens/            # chat/, shared/, project/, claude/, mods/, browser/, monitor/, settings/, terminal/, notes/
 │   ├── services/           # backend clients: chatSocket, sessionsApi, sharedApi, claudeApi…
 │   └── ui/                 # the shared toolkit
 └── src-tauri/              # Rust side + gen/android (committed)
@@ -75,6 +75,27 @@ mount it; the API is exported (`atBottom`, `scrollToEnd`, `holdAt`, `scrollFromE
   pixel. The 40px fallback height, used until the header measures itself, is load-bearing —
   replacing it with "invisible until measured" produces a blank frame, which reads as a
   flicker.
+
+## Mods (`screens/mods/`)
+
+`ModSurface`, one per chat state, holds the `mods` snapshot and every site's drawing.
+`ModSite` measures a site in cells and asks for its tree, `ModTree` draws it in CConnect's
+style, and `ModClient` hosts a plugin's own client module, which runs in a worker
+(`clientWorker.ts`) under a watchdog that ends it when it stops answering.
+
+- The cell comes from `modGrid.gridOf`, stretched to `room / floor(room / glyph)` so a row
+  fills its box exactly, and reaches every node through context. `ModFit` shrinks a tree
+  with `zoom` only once it was drawn for the current columns (`drawnFor`); a tree drawn for
+  the old width would shrink for nothing in the middle of a resize.
+- One render in flight per site. A site that changes while one is pending is drawn again
+  when the reply lands, so no timer stands between a change and its render.
+- `ready` calls `rebind()`, not `reset()`: what is on screen stays until its replacement
+  arrives, the way `#frozen` keeps the conversation. The `mods` snapshot that comes while
+  attaching is applied at `attached`, and the conversation is published once the renders
+  it triggered are answered (`whenDrawn`). The server answers every `mod_render`, so this
+  waits on events, never on a clock.
+- Android's WebView paints `color-mix(…, transparent)` dark; blend with `withAlpha` from
+  `design/accents.ts` instead.
 
 ## Image preview (`lib/ui/ZoomPane.svelte`)
 
