@@ -8,7 +8,7 @@ from loguru import logger
 
 from core import cli_manager, paths
 from services.chat_list import hub
-from services.sessions import _iter_lines, _project_dir, _session_file
+from services.sessions import _TRAVELLING_TYPES, _iter_lines, _project_dir, _session_file
 
 
 def _resolve_target(reference: str) -> Optional[tuple[str, Optional[str]]]:
@@ -54,6 +54,8 @@ def _transcript_for_progress(path: Path, max_chars: int = 8000) -> tuple[str, bo
 
     for entry in _iter_lines(path):
         etype = entry.get("type")
+        if etype not in _TRAVELLING_TYPES:
+            continue
         message = entry.get("message") or {}
         content = message.get("content")
         if isinstance(content, str):
@@ -66,7 +68,7 @@ def _transcript_for_progress(path: Path, max_chars: int = 8000) -> tuple[str, bo
             if not isinstance(block, dict):
                 continue
             btype = block.get("type")
-            if btype == "text" and etype in ("user", "assistant"):
+            if btype == "text":
                 txt = (block.get("text") or "").strip()
                 if txt:
                     text_msgs.append(f"{etype}: {txt[:600]}")

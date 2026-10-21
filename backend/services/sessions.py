@@ -479,7 +479,7 @@ def forget_pinned(session_id: str) -> None:
 def _transcript_for_title(path: Path, max_chars: int = 2000) -> str:
     parts: list[str] = []
     for entry in _iter_lines(path, max(_last_compact_offset(path), _tail_offset(path, 1 << 20))):
-        if entry.get("type") not in ("user", "assistant"):
+        if entry.get("type") not in _TRAVELLING_TYPES:
             continue
         text = _text_from_content(entry.get("message", {}).get("content"))
         if not text:
@@ -762,7 +762,7 @@ def session_context(cwd: str, session_id: str, max_chars: int = 4000) -> str:
         return ""
     parts: list[str] = []
     for entry in _iter_lines(file):
-        if entry.get("type") not in ("user", "assistant") or entry.get("isMeta") or entry.get("isSidechain"):
+        if entry.get("type") not in _TRAVELLING_TYPES or entry.get("isMeta") or entry.get("isSidechain"):
             continue
         text = _text_from_content(entry.get("message", {}).get("content"))
         if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
@@ -787,6 +787,8 @@ def _tasks_from_transcript(project_key: str, session_id: str) -> Optional[list[d
     tasks: dict[str, dict] = {}
     seen = False
     for entry in _iter_lines(path):
+        if entry.get("type") not in _TRAVELLING_TYPES:
+            continue
         message = entry.get("message")
         content = message.get("content") if isinstance(message, dict) else None
         if not isinstance(content, list):
@@ -922,6 +924,11 @@ def _is_compact_marker(entry: dict) -> bool:
     return (entry.get("type") == "system" and entry.get("subtype") == "compact_boundary") or bool(entry.get("isCompactSummary"))
 
 
+def _reply_id(entry: dict) -> Optional[str]:
+    message = entry.get("message")
+    return message.get("id") if entry.get("type") == "assistant" and isinstance(message, dict) else None
+
+
 def _carries_only_tool_results(entry: dict) -> bool:
     message = entry.get("message")
     content = message.get("content") if isinstance(message, dict) else None
@@ -969,6 +976,8 @@ def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
         active.add(u)
         parent = cur.get("parentUuid") or cur.get("logicalParentUuid")
         cur = by_uuid.get(parent) if parent else None
+    replies = {_reply_id(e) for e in by_uuid.values() if e.get("uuid") in active} - {None}
+    active |= {u for u, e in by_uuid.items() if _reply_id(e) in replies}
     return [
         e for e in entries
         if not e.get("uuid")
@@ -1042,6 +1051,8 @@ def _tool_durations(entries: list[dict]) -> dict[str, int]:
     started: dict[str, int] = {}
     elapsed: dict[str, int] = {}
     for entry in entries:
+        if entry.get("type") not in _TRAVELLING_TYPES:
+            continue
         content = (entry.get("message") or {}).get("content")
         if not isinstance(content, list):
             continue
@@ -1106,7 +1117,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
         _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
         _display_tool_name, _flatten_result_content,
     )
-    entries = list(_iter_lines(sub_file))
+    entries = [entry for entry in _iter_lines(sub_file) if entry.get("type") in _TRAVELLING_TYPES]
     sub_ms = _tool_durations(entries)
     sub_results: dict[str, object] = {}
     for entry in entries:
@@ -1326,12 +1337,13 @@ def get_session_messages(
     agent_results: dict[str, dict] = {}
     notified: dict[str, dict] = {}
     for entry in entries:
-        msg = entry.get("message", {})
-        content = msg.get("content")
         queued = entry.get("content")
-        notified.update(_notified_results(_text_from_content(content)))
         if isinstance(queued, str):
             notified.update(_notified_results(queued))
+        if entry.get("type") not in _TRAVELLING_TYPES:
+            continue
+        content = entry.get("message", {}).get("content")
+        notified.update(_notified_results(_text_from_content(content)))
         tur = entry.get("toolUseResult")
         aid = tur.get("agentId") if isinstance(tur, dict) else None
         if not isinstance(content, list):
@@ -1419,9 +1431,9 @@ def get_session_messages(
                 if not seen:
                     messages.extend(_once(notifs))
             continue
-        message = entry.get("message", {})
-        if entry.get("isSidechain"):
+        if etype not in _TRAVELLING_TYPES or entry.get("isSidechain"):
             continue
+        message = entry.get("message", {})
         if entry.get("isApiErrorMessage"):
             err_text = _text_from_content(message.get("content")).strip()
             if err_text:
