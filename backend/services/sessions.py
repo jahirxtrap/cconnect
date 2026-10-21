@@ -251,59 +251,64 @@ def request_weight(project_key: str, session_id: str, trashed: bool = False) -> 
     return total, media
 
 
-def tail_user_messages(project_key: str, session_id: str) -> list[dict]:
+def session_size(project_key: str, session_id: str) -> int:
+    try:
+        return _session_file(project_key, session_id).stat().st_size
+    except (ValueError, OSError):
+        return 0
+
+
+def user_messages_since(project_key: str, session_id: str, offset: int) -> tuple[list[dict], int]:
+    """The user rows in the complete lines written past `offset`, and the offset those lines end at."""
     try:
         file = _session_file(project_key, session_id)
-    except ValueError:
-        return []
-    if not file.is_file():
-        return []
-    try:
+        if offset > file.stat().st_size:
+            offset = 0
+        out: list[dict] = []
         with file.open("rb") as fh:
-            fh.seek(0, 2)
-            size = fh.tell()
-            fh.seek(max(0, size - 131072))
-            chunk = fh.read().decode("utf-8", errors="ignore")
-    except OSError:
-        return []
-    out: list[dict] = []
-    for line in chunk.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        etype = entry.get("type")
-        if etype == "attachment":
-            att = entry.get("attachment") or {}
-            if att.get("type") == "queued_command":
-                au = entry.get("uuid")
-                qtext = _text_from_content(att.get("prompt")).strip()
-                if au and qtext and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
-                    out.append({"uuid": au, "text": qtext, "ts": _parse_ts(entry.get("timestamp"))})
-            continue
-        if etype != "user" or entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary") or entry.get("isVisibleInTranscriptOnly"):
-            continue
-        u = entry.get("uuid")
-        if not u:
-            continue
+            fh.seek(offset)
+            for raw in fh:
+                if not raw.endswith(b"\n"):
+                    break
+                offset += len(raw)
+                if b'"type":"user"' not in raw and b'"queued_command"' not in raw:
+                    continue
+                try:
+                    row = _user_row(json.loads(raw))
+                except (json.JSONDecodeError, UnicodeDecodeError):
+                    continue
+                if row is not None:
+                    out.append(row)
+    except (ValueError, OSError):
+        return [], offset
+    return out, offset
+
+
+def _user_row(entry: dict) -> Optional[dict]:
+    etype = entry.get("type")
+    if etype == "attachment":
+        att = entry.get("attachment") or {}
+        if att.get("type") != "queued_command":
+            return None
+        text = _text_from_content(att.get("prompt")).strip()
+    elif etype != "user" or entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary") or entry.get("isVisibleInTranscriptOnly"):
+        return None
+    else:
         content = (entry.get("message") or {}).get("content")
         if isinstance(content, str):
             text = content.strip()
         elif isinstance(content, list):
             if any(isinstance(b, dict) and b.get("type") == "tool_result" for b in content):
-                continue
+                return None
             text = "\n".join(
                 b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text"
             ).strip()
         else:
-            continue
-        if not text or _COMMAND_META_RE.search(text) or _INTERRUPT_RE.match(text):
-            continue
-        out.append({"uuid": u, "text": text, "ts": _parse_ts(entry.get("timestamp"))})
-    return out
+            return None
+    uid = entry.get("uuid")
+    if not uid or not text or _COMMAND_META_RE.search(text) or _INTERRUPT_RE.match(text):
+        return None
+    return {"uuid": uid, "text": text, "ts": _parse_ts(entry.get("timestamp"))}
 
 
 def _text_from_content(content: Any) -> str:

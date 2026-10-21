@@ -37,6 +37,7 @@ _TRANSIENT_PATTERNS = (
 _USAGE_PATTERNS = ("rate limit", "rate_limit", "usage limit", "quota", "too many requests")
 _CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
 _SLOW_SECONDS = 15
+_TURN_CLOCK_SKEW_MS = 5000
 _BACKGROUND_RESULT = re.compile(r"moved to the background", re.IGNORECASE)
 
 
@@ -898,13 +899,11 @@ async def run_prompt(
     chips: list[dict] = [{"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000)}]
     pending_announce: list[dict] = list(chips)
     seen_users: set[str] = set()
+    read_offsets: dict[str, int] = {}
+    turn_started_ms = int(time.time() * 1000)
     if drain is not None and resume and cwd:
-        try:
-            from services import sessions as _seed
-            for _u in _seed.tail_user_messages(_seed.project_key_for(cwd), resume):
-                seen_users.add(_u["uuid"])
-        except Exception:
-            pass
+        from services import sessions as _seed
+        read_offsets[resume] = _seed.session_size(_seed.project_key_for(cwd), resume)
 
     def _announce_next() -> list[dict]:
         """The answer to the next message just started, so that message is on screen now."""
@@ -927,13 +926,13 @@ async def run_prompt(
             return []
         try:
             from services import sessions as _q
-            users = _q.tail_user_messages(_q.project_key_for(cwd), sid)
+            users, read_offsets[sid] = _q.user_messages_since(_q.project_key_for(cwd), sid, read_offsets.get(sid, 0))
         except Exception:
             return []
         events: list[dict] = []
         for u in users:
             uid = u["uuid"]
-            if uid in seen_users:
+            if uid in seen_users or (u.get("ts") or turn_started_ms) < turn_started_ms - _TURN_CLOCK_SKEW_MS:
                 continue
             text = u["text"]
             notif = _q._notification_item(text)

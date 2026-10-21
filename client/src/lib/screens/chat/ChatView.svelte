@@ -499,6 +499,14 @@
     <CompactDialog title={t("QUEUED_MESSAGE")} onDismiss={() => (queuedId = null)}>
       {#snippet buttons()}
         <Button onclick={() => (queuedId = null)} variant="outlined">{t("CANCEL")}</Button>
+        <Button
+          onclick={() => {
+            chat.removeQueued(item.id);
+            queuedId = null;
+          }}
+        >
+          {t("DELETE")}
+        </Button>
       {/snippet}
       {#if item.text.trim()}
         <OutlinedPanel>
