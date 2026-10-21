@@ -321,7 +321,7 @@ export class ChatState {
     answer: (id, answer) => this.#socket.sendModAnswer(id, answer),
     clientModule: (plugin, rid) => this.#socket.sendModClientModule(plugin, rid),
   });
-  modsAvailable = $state<boolean | null>(null);
+  modsState = $state<"loading" | "off" | "needs_persistent" | "ready">("loading");
   #nextId = 1;
   #assistantId: number | null = null;
   #thinkingId: number | null = null;
@@ -1446,7 +1446,7 @@ export class ChatState {
       this.permissionMode = snapshot.permissionMode;
       this.streamTokens = snapshot.streaming;
       this.compactWindow = snapshot.autoCompact ? snapshot.autoCompactWindow : null;
-      this.modsAvailable = snapshot.persistentSessions && snapshot.modSurfaces === true;
+      this.modsState = snapshot.modSurfaces !== true ? "off" : snapshot.persistentSessions ? "ready" : "needs_persistent";
       if (snapshot.modSurfaces === false) this.mods.applyState(emptyModState());
       this.list?.applySettings(snapshot);
       this.serverVisibility = {

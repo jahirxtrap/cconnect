@@ -175,15 +175,6 @@ class Panes {
     this.commit();
   }
 
-  retire(kind: RightKind) {
-    if (this.#tool === kind) this.#tool = KINDS[0];
-    if (this.kind !== kind) return;
-    this.kind = KINDS[0];
-    this.open = false;
-    this.focus("center");
-    this.commit();
-  }
-
   showPreview() {
     this.open = true;
     this.previewing = true;

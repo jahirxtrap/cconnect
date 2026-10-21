@@ -212,10 +212,6 @@
 
   $effect(() => panes.adoptLayout(layout.mobile));
 
-  $effect(() => {
-    if (panes.focusedChat.modsAvailable === false) panes.retire("mods");
-  });
-
   $effect(() =>
     navigation.intercept(() => {
       if (!drawer.showing) return false;

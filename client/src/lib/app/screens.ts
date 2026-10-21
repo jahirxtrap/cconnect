@@ -21,7 +21,6 @@ export interface ScreenEntry {
   screenIcon?: IconSource;
   nativeScreen?: boolean;
   paneOnly?: boolean;
-  available?: () => boolean;
 }
 
 export const SCREENS: ScreenEntry[] = [
@@ -58,11 +57,8 @@ export const SCREENS: ScreenEntry[] = [
     icon: Puzzle,
     open: () => panes.setKind("mods"),
     paneOnly: true,
-    available: () => panes.focusedChat.modsAvailable === true,
   },
 ];
-
-export const shownScreen = (screen: ScreenEntry) => screen.available?.() ?? true;
 
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),

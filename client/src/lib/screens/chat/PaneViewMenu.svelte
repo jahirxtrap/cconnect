@@ -1,6 +1,6 @@
 <script lang="ts">
   import MessageSquareText from "@lucide/svelte/icons/message-square-text";
-  import { SCREENS, shownScreen, type ScreenEntry } from "$lib/app/screens";
+  import { SCREENS, type ScreenEntry } from "$lib/app/screens";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -18,9 +18,7 @@
 
   const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
 
-  const screens = $derived(SCREENS.filter(shownScreen));
-
-  const VIEWS = $derived<PaneView[]>(layout.mobile ? screens : [CHAT_VIEW, ...screens]);
+  const VIEWS = $derived<PaneView[]>(layout.mobile ? SCREENS : [CHAT_VIEW, ...SCREENS]);
 
   let menu = $state(false);
 

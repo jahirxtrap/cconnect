@@ -92,6 +92,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
+  { id: "mod_band_handle", label: "MOD_BAND_HANDLE", summary: "MOD_BAND_HANDLE_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "chat_files", label: "CHAT_FILES", summary: "CHAT_FILES_SUMMARY", available: () => !layout.mobile, section: "client", group: "SETTINGS_CLIENT" },
   { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
 

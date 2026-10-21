@@ -6,6 +6,7 @@
   import ListOrdered from "@lucide/svelte/icons/list-ordered";
   import Moon from "@lucide/svelte/icons/moon";
   import Palette from "@lucide/svelte/icons/palette";
+  import Puzzle from "@lucide/svelte/icons/puzzle";
   import Sun from "@lucide/svelte/icons/sun";
   import SunMoon from "@lucide/svelte/icons/sun-moon";
   import Type from "@lucide/svelte/icons/type";
@@ -20,6 +21,7 @@
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import { band } from "$lib/screens/mods/modSurface.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
@@ -38,6 +40,11 @@
   const rowSummary = (id: string) => {
     const entry = entryFor(id);
     return entry ? entryHint(entry) : "";
+  };
+
+  const setBandHandle = (value: boolean) => {
+    settings.modBandHandle = value;
+    if (!value && band.hidden) band.toggle();
   };
 
   useSettingsDialog("client", (target) => (dialog = target));
@@ -106,6 +113,16 @@
         checked={settings.codeLineNumbers}
         onCheckedChange={(value) => (settings.codeLineNumbers = value)}
       />
+    {/snippet}
+  </PreferenceRow>
+  <PreferenceRow
+    icon={Puzzle}
+    title={t("MOD_BAND_HANDLE")}
+    summary={rowSummary("mod_band_handle")}
+    onclick={() => setBandHandle(!settings.modBandHandle)}
+  >
+    {#snippet trailing()}
+      <CompactSwitch checked={settings.modBandHandle} onCheckedChange={setBandHandle} />
     {/snippet}
   </PreferenceRow>
   {#if !layout.mobile}

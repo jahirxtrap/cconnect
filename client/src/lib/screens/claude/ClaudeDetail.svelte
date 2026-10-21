@@ -68,6 +68,7 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { modAreas, modCommands } from "./modAreas";
   import PluginOptionsDialog from "./PluginOptionsDialog.svelte";
   import { componentLabel, componentTone, incidentLabel, indicatorLabel, indicatorTone } from "./serviceStatus";
 
@@ -593,15 +594,16 @@
           <LinearProgress />
         {:else}
           {@const sections = [
-            { label: t("COMMANDS"), items: pluginReview.commands.map((name) => `/${name}`) },
-            { label: t("MOD_HOOKS"), items: pluginReview.hooks },
-            { label: t("MOD_CALLS"), items: pluginReview.calls },
-          ].filter((section) => section.items.length)}
+            { label: t("COMMANDS"), text: modCommands(pluginReview).join(", "), mono: true },
+            { label: t("MOD_CALLS"), text: joined(...modAreas(pluginReview)), mono: false },
+          ].filter((section) => section.text)}
           <div class="flex flex-col gap-2">
             {#each sections as section (section.label)}
               <div>
                 <p class="text-label-md text-accent">{section.label}</p>
-                <p class="font-mono text-body-sm wrap-anywhere text-on-surface-variant">{section.items.join(", ")}</p>
+                <p class="text-body-sm wrap-anywhere text-on-surface-variant {section.mono ? 'font-mono' : ''}">
+                  {section.text}
+                </p>
               </div>
             {/each}
             {#each pluginReview.errors as error (error)}

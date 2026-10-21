@@ -1,6 +1,7 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import { untrack } from "svelte";
+  import { navigation } from "$lib/app/navigation.svelte";
   import type { ModCommand } from "$lib/data/modModels";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -12,6 +13,7 @@
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import TabStrip from "$lib/screens/chat/TabStrip.svelte";
+  import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -27,7 +29,16 @@
 
   let menu = $state(false);
 
+  const MISSING = {
+    off: { text: "MOD_PANES_OFF", setting: "mod_surfaces" },
+    needs_persistent: { text: "MOD_PANES_NEED_PERSISTENT", setting: "persistent_sessions" },
+  } as const;
+
   const mods = $derived(chat.mods);
+  const loading = $derived(chat.modsState === "loading" || chat.transcriptLoading);
+  const missing = $derived(
+    chat.modsState === "off" || chat.modsState === "needs_persistent" ? MISSING[chat.modsState] : null,
+  );
   const pane = $derived(mods.shown);
   const commands = $derived(mods.state.commands);
   const tabs = $derived(mods.state.panes.map((entry) => ({ id: entry.id, title: entry.title })));
@@ -113,7 +124,15 @@
   <PaneHeader title={t("MODS")} actions={commands.length ? commandMenu : undefined} />
 {/if}
 
-{#if !mods.state.surface}
+{#if loading}
+  <CenteredProgress class="min-h-0 flex-1" />
+{:else if missing}
+  <EmptyState text={t(missing.text)} class="min-h-0 flex-1">
+    {#snippet action()}
+      <Button variant="outlined" onclick={() => navigation.openSettings(missing.setting)}>{t("SETTINGS")}</Button>
+    {/snippet}
+  </EmptyState>
+{:else if !mods.state.surface}
   <EmptyState text={t("MOD_PANES_IDLE")} class="min-h-0 flex-1" />
 {:else if !pane}
   <EmptyState text={t("MOD_PANES_EMPTY")} class="min-h-0 flex-1" />

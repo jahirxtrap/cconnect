@@ -19,6 +19,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "view_in_center", kind: "boolean", fallback: true, backup: true },
   { key: "chat_view_full", kind: "boolean", fallback: false, backup: true },
   { key: "show_timestamps", kind: "boolean", fallback: false, backup: true },
+  { key: "mod_band_handle", kind: "boolean", fallback: true, backup: true },
   { key: "minimize_to_tray", kind: "boolean", fallback: false, backup: true },
   { key: "discord_presence", kind: "boolean", fallback: false, backup: true },
   { key: "discord_status", kind: "boolean", fallback: true, backup: true },

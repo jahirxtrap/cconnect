@@ -217,6 +217,13 @@ class Settings {
     this.#write("minimize_to_tray", value);
   }
 
+  get modBandHandle() {
+    return this.#read<boolean>("mod_band_handle");
+  }
+  set modBandHandle(value: boolean) {
+    this.#write("mod_band_handle", value);
+  }
+
   get discord(): DiscordPrefs {
     return {
       enabled: this.#read<boolean>("discord_presence"),

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { slide } from "svelte/transition";
   import { joined } from "$lib/data/format";
+  import { settings } from "$lib/data/settings.svelte";
   import { isEmptyTree, type ModNode } from "$lib/data/modModels";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -24,16 +25,19 @@
   let card = $state<HTMLElement | null>(null);
   let focused = $state(false);
 
-  useShortcut(
-    "mods.band.focus",
-    () => {
-      const site = card?.querySelector<HTMLElement>("[data-mod-site]");
-      if (!site || band.hidden || !drawnBand) return false;
-      site.focus();
-      return true;
-    },
-    () => active,
-  );
+  const focusBand = (): boolean => {
+    const site = card?.querySelector<HTMLElement>("[data-mod-site]");
+    if (!site || band.hidden || !drawnBand) return false;
+    site.focus();
+    return true;
+  };
+
+  const focusFromCard = (event: MouseEvent) => {
+    if ((event.target as HTMLElement).closest("button, a, input, textarea, [data-mod-site]")) return;
+    focusBand();
+  };
+
+  useShortcut("mods.band.focus", focusBand, () => active);
 
   useShortcut(
     "mods.band.toggle",
@@ -70,7 +74,7 @@
   const modeShown = $derived(shows(mode?.tree) || strings(mode?.props?.modes).length > 0);
   const footer = $derived(status.length > 0 || hintShown || modeShown);
   const answered = $derived(!mods.state.surface || mods.drawn("AbovePrompt", BAND_ID));
-  const drawn = $derived(answered && (drawnBand || footer));
+  const drawn = $derived(answered && (drawnBand || footer) && (settings.modBandHandle || !band.hidden));
   const present = $derived(mods.state.surface || status.length > 0);
   const duration = $derived(instant ? 0 : TOGGLE_MS);
 </script>
@@ -144,22 +148,26 @@
 <div class="px-3 pt-3">
   {#if present}
     {#if !hidden}
+      <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
       <div
         bind:this={card}
+        onclick={focusFromCard}
         transition:slide={{ duration }}
         class={drawn
-          ? "relative -mb-[var(--radius-lg)] rounded-t-lg border-2 border-b-0 border-outline-variant bg-surface pb-[calc(var(--radius-lg)+0.625rem)]"
+          ? `relative -mb-[var(--radius-lg)] rounded-t-lg border-2 border-b-0 border-outline-variant bg-surface pb-[calc(var(--radius-lg)+0.625rem)] ${settings.modBandHandle ? "" : "pt-3.5"}`
           : "h-0 overflow-hidden"}
       >
-        <button
-          type="button"
-          aria-label={band.hidden ? t("MOD_BAND_SHOW") : t("MOD_BAND_HIDE")}
-          title={band.hidden ? t("MOD_BAND_SHOW") : t("MOD_BAND_HIDE")}
-          onclick={() => band.toggle()}
-          class="flex w-full cursor-pointer justify-center pt-1.5 pb-1"
-        >
-          <PanelHandle active={focused} />
-        </button>
+        {#if settings.modBandHandle}
+          <button
+            type="button"
+            aria-label={band.hidden ? t("MOD_BAND_SHOW") : t("MOD_BAND_HIDE")}
+            title={band.hidden ? t("MOD_BAND_SHOW") : t("MOD_BAND_HIDE")}
+            onclick={() => band.toggle()}
+            class="flex w-full cursor-pointer justify-center pt-1.5 pb-1"
+          >
+            <PanelHandle active={focused} />
+          </button>
+        {/if}
         {#if band.hidden}
           <div class="h-0 overflow-hidden">{@render site()}{@render footerRow()}</div>
         {:else}

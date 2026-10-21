@@ -139,7 +139,7 @@
     void load();
   });
 
-  useSettingsDialog("server", (target) => (dialog = target));
+  const highlight = useSettingsDialog("server", (target) => (dialog = target));
 </script>
 
 <SettingsGroup label={t("SETTINGS_SERVER")}>
@@ -214,6 +214,7 @@
       title={t("MODS")}
       summary={rowSummary("mod_surfaces")}
       enabled={ready}
+      flash={highlight.is("mod_surfaces")}
       onclick={() => void apply({ mod_surfaces: !modsOn })}
     >
       {#snippet trailing()}
