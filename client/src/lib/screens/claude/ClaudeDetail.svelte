@@ -64,6 +64,8 @@
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
+  import Pressable from "$lib/ui/Pressable.svelte";
+  import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -493,50 +495,56 @@
       {:else if !service || service.error !== null}
         <EmptyState text={t("STATUS_UNKNOWN")} class="h-full" />
       {:else}
-        <div class="flex items-center gap-3 px-4 py-3">
-          <StatusDot class={indicatorTone(service.indicator)} box={18} dot={12} />
-          <p class="text-title-md">{indicatorLabel(service.indicator)}</p>
-        </div>
-        {#each service.components as component (component.name)}
-          <div class="flex items-center gap-3 px-4 py-2">
-            <p class="min-w-0 flex-1 truncate text-body-lg">{component.name}</p>
-            <p class="text-body-sm text-on-surface-variant">{componentLabel(component.status)}</p>
-            <StatusDot class={componentTone(component.status)} box={16} dot={10} />
-          </div>
-        {/each}
-        <p class="px-4 pt-4 pb-1 text-label-lg text-accent">{t("STATUS_INCIDENTS")}</p>
-        {#if !service.incidents.length}
-          <p class="px-4 py-1 text-body-sm text-on-surface-variant">{t("STATUS_NO_INCIDENTS")}</p>
-        {:else}
-          {#each service.incidents as incident (incident.name)}
-            {@const millis = incident.updatedAt === null ? null : parseIsoMillis(incident.updatedAt)}
-            <button
-              type="button"
-              disabled={!incident.shortlink}
-              onclick={() => incident.shortlink && openExternal(incident.shortlink)}
-              class="block w-full px-4 py-2 text-left {incident.shortlink ? 'cursor-pointer' : 'cursor-default'}"
-            >
-              <div class="flex items-center gap-2">
-                <StatusDot class={indicatorTone(incident.impact)} box={14} dot={9} />
-                <span class="min-w-0 flex-1 truncate text-body-lg">{incident.name}</span>
+        {@const indicator = service.indicator}
+        <div class="px-4">
+          <SettingsGroup label={indicatorLabel(indicator)}>
+            {#snippet labelTrailing()}
+              <StatusDot class={indicatorTone(indicator)} box={20} dot={12} />
+            {/snippet}
+            {#each service.components as component (component.name)}
+              <div class="flex items-center gap-3 px-4 py-3">
+                <p class="min-w-0 flex-1 truncate text-body-md">{component.name}</p>
+                <p class="text-body-sm text-on-surface-variant">{componentLabel(component.status)}</p>
+                <StatusDot class={componentTone(component.status)} box={16} dot={10} />
               </div>
-              {#if incident.latest}
-                <p class="mt-1 line-clamp-4 text-body-sm text-on-surface-variant">
-                  {#if incident.status}
-                    <span class="font-bold {indicatorTone(incident.impact).replace('bg-', 'text-')}">
-                      {incidentLabel(incident.status)}
-                    </span>
-                    {SEPARATOR}
-                  {/if}
-                  {incident.latest}
-                </p>
-              {/if}
-              {#if millis !== null}
-                <p class="mt-0.5 text-label-md text-on-surface-variant">{formatDateShort(millis)}</p>
-              {/if}
-            </button>
-          {/each}
-        {/if}
+            {/each}
+          </SettingsGroup>
+          <SettingsGroup label={t("STATUS_INCIDENTS")}>
+            {#if !service.incidents.length}
+              <p class="px-4 py-3 text-body-sm text-on-surface-variant">{t("STATUS_NO_INCIDENTS")}</p>
+            {:else}
+              {#each service.incidents as incident (incident.name)}
+                {@const millis = incident.updatedAt === null ? null : parseIsoMillis(incident.updatedAt)}
+                <Pressable
+                  enabled={!!incident.shortlink}
+                  onclick={() => incident.shortlink && openExternal(incident.shortlink)}
+                  class="flex w-full items-start gap-3 px-4 py-3 text-left"
+                >
+                  <span class="flex h-5 shrink-0 items-center">
+                    <StatusDot class={indicatorTone(incident.impact)} box={16} dot={10} />
+                  </span>
+                  <div class="min-w-0 flex-1">
+                    <p class="truncate text-body-md">{incident.name}</p>
+                    {#if incident.latest}
+                      <p class="mt-0.5 line-clamp-4 text-body-sm text-on-surface-variant">
+                        {#if incident.status}
+                          <span class="font-bold {indicatorTone(incident.impact).replace('bg-', 'text-')}">
+                            {incidentLabel(incident.status)}
+                          </span>
+                          {SEPARATOR}
+                        {/if}
+                        {incident.latest}
+                      </p>
+                    {/if}
+                    {#if millis !== null}
+                      <p class="mt-0.5 text-label-md text-on-surface-variant">{formatDateShort(millis)}</p>
+                    {/if}
+                  </div>
+                </Pressable>
+              {/each}
+            {/if}
+          </SettingsGroup>
+        </div>
       {/if}
     </div>
     </PullToRefresh>

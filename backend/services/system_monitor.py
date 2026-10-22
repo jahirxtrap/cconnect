@@ -7,6 +7,7 @@ multi-worker runs still expose every worker's output through any of them.
 import json
 import logging
 import platform
+import re
 import subprocess
 import sys
 import time
@@ -20,6 +21,33 @@ from core import paths
 
 _READ_CAP = 64 * 1024
 _capture_installed = False
+_HIDDEN = "***"
+_SECRET_PARAMS = (
+    "token",
+    "access_token",
+    "refresh_token",
+    "id_token",
+    "key",
+    "api_key",
+    "apikey",
+    "secret",
+    "client_secret",
+    "password",
+    "code",
+)
+_SECRET_QUERY = re.compile(rf"([?&](?:{'|'.join(_SECRET_PARAMS)})=)[^&\s\"'#]+", re.IGNORECASE)
+_SECRET_SCHEME = re.compile(r"\b(Bearer|Basic)\s+[\w.~+/=-]+", re.IGNORECASE)
+_URL_LOGIN = re.compile(r"(\b[a-z][\w+.-]*://)[^/\s:@]+:[^/\s@]+@", re.IGNORECASE)
+
+
+def _redacted(text: str) -> str:
+    text = _SECRET_QUERY.sub(rf"\g<1>{_HIDDEN}", text)
+    text = _SECRET_SCHEME.sub(rf"\g<1> {_HIDDEN}", text)
+    return _URL_LOGIN.sub(rf"\g<1>{_HIDDEN}@", text)
+
+
+def _redact(record) -> None:
+    record["message"] = _redacted(record["message"])
 
 
 def reset_log_file() -> None:
@@ -58,6 +86,10 @@ def setup_log_capture() -> None:
     if _capture_installed:
         return
     _capture_installed = True
+    logger.remove()
+    if sys.stderr:
+        logger.add(sys.stderr, diagnose=False)
+    logger.configure(patcher=_redact)
     logger.add(_sink, level="INFO", format="{message}")
     for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
         std = logging.getLogger(name)
