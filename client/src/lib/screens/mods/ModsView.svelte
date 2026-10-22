@@ -1,5 +1,6 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+  import Settings from "@lucide/svelte/icons/settings";
   import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import type { ModCommand } from "$lib/data/modModels";
@@ -8,6 +9,8 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { commandText, takesArguments } from "$lib/services/capabilitiesApi";
+  import { pluginKey, type Plugin } from "$lib/services/claudeApi";
+  import PluginOptionsDialog from "$lib/screens/claude/PluginOptionsDialog.svelte";
   import type { ChatState } from "$lib/screens/chat/state.svelte";
   import PaneActions from "$lib/screens/chat/PaneActions.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
@@ -28,6 +31,8 @@
   const { chat }: Props = $props();
 
   let menu = $state(false);
+  let installed = $state<Plugin[]>([]);
+  let optionsFor = $state<Plugin | null>(null);
 
   const MISSING = {
     off: { text: "MOD_PANES_OFF", setting: "mod_surfaces" },
@@ -43,6 +48,21 @@
   const commands = $derived(mods.state.commands);
   const tabs = $derived(mods.state.panes.map((entry) => ({ id: entry.id, title: entry.title })));
   const focused = $derived(panes.focused === "right");
+  const owners = $derived([...new Set(mods.state.panes.flatMap((entry) => entry.plugin ?? []))].sort().join(" "));
+  const configurable = $derived(
+    installed.find((plugin) => plugin.enabled && plugin.options && plugin.name === pane?.plugin) ?? null,
+  );
+
+  $effect(() => {
+    if (!owners) return;
+    let live = true;
+    void chat.claude.extensions().then((found) => {
+      if (live && found) installed = found.plugins;
+    });
+    return () => {
+      live = false;
+    };
+  });
 
   const pick = (command: ModCommand) => {
     if (!takesArguments(command)) {
@@ -103,8 +123,18 @@
   {/if}
 {/snippet}
 
+{#snippet paneActions()}
+  {#if configurable}
+    {@const plugin = configurable}
+    <TooltipIconButton label={t("MOD_OPTIONS", plugin.name)} class="size-8" onclick={() => (optionsFor = plugin)}>
+      <Settings />
+    </TooltipIconButton>
+  {/if}
+  {@render commandMenu()}
+{/snippet}
+
 {#snippet trailing()}
-  <PaneActions actions={commandMenu} />
+  <PaneActions actions={paneActions} />
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -158,3 +188,13 @@
   {/key}
 {/if}
 </div>
+
+{#if optionsFor}
+  {@const plugin = optionsFor}
+  <PluginOptionsDialog
+    api={chat.claude}
+    plugin={pluginKey(plugin)}
+    title={plugin.name}
+    onDismiss={() => (optionsFor = null)}
+  />
+{/if}

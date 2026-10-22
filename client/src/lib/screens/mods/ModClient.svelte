@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { strokeOf, type ModComponent, type ModNode } from "$lib/data/modModels";
+  import { clientKeyOf, type ModComponent, type ModNode } from "$lib/data/modModels";
   import { t } from "$lib/i18n/index.svelte";
   import type { ClientInstance, ClientKey, ClientPointer } from "./modClients.svelte";
   import { siteGrid, siteScale } from "./modGrid";
@@ -16,6 +16,11 @@
   const { mods, site, node }: Props = $props();
 
   const BUTTONS: Record<number, ClientPointer["button"]> = { 0: "left", 1: "middle", 2: "right" };
+  const HELD: Array<[number, number]> = [
+    [1, 0],
+    [2, 2],
+    [4, 1],
+  ];
   const PERCENT = /^\d{1,3}%$/;
   const cells = siteGrid();
   const scale = siteScale();
@@ -25,7 +30,8 @@
   let width = $state(0);
   let height = $state(0);
   let last = { x: 0, y: 0 };
-  let moving = false;
+  let moved: PointerEvent | null = null;
+  let frame = 0;
 
   const plugin = $derived(node.client ?? node.owner ?? "");
   const key = $derived(typeof node.props.key === "string" ? node.props.key : "");
@@ -102,6 +108,7 @@
   });
 
   const pointer = (type: ClientPointer["type"], event: PointerEvent, button?: number) => {
+    if (type !== "move") flush();
     if (!instance?.listensPointer || !region || !cells().cell) return;
     const at = type === "enter" || type === "leave" ? last : cellOf(event);
     instance.pointer({
@@ -112,13 +119,18 @@
     });
   };
 
+  const held = (buttons: number) => HELD.find(([mask]) => buttons & mask)?.[1];
+
+  const flush = () => {
+    cancelAnimationFrame(frame);
+    const event = moved;
+    moved = null;
+    if (event) pointer("move", event, held(event.buttons));
+  };
+
   const onpointermove = (event: PointerEvent) => {
-    if (moving) return;
-    moving = true;
-    requestAnimationFrame(() => {
-      moving = false;
-      pointer("move", event, event.buttons ? event.button : undefined);
-    });
+    if (!moved) frame = requestAnimationFrame(flush);
+    moved = event;
   };
 
   const onkeydown = (event: KeyboardEvent) => {
@@ -128,7 +140,7 @@
       region?.blur();
       return;
     }
-    const sent: ClientKey | null = strokeOf(event);
+    const sent: ClientKey | null = clientKeyOf(event);
     if (!sent) return;
     if (instance.key(sent)) {
       event.preventDefault();
@@ -149,8 +161,15 @@
     : ''}"
   {onkeydown}
   onpointerdown={(event) => {
-    if (instance?.listensPointer) region?.setPointerCapture(event.pointerId);
+    if (instance?.listensPointer) {
+      event.preventDefault();
+      region?.focus();
+      region?.setPointerCapture(event.pointerId);
+    }
     pointer("down", event, event.button);
+  }}
+  oncontextmenu={(event) => {
+    if (instance?.listensPointer) event.preventDefault();
   }}
   {onpointermove}
   onpointerup={(event) => pointer("up", event, event.button)}

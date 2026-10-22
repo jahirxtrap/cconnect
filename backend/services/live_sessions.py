@@ -13,7 +13,7 @@ import uuid
 
 from loguru import logger
 
-from services import mods, persistent_sessions, todos as todos_store
+from services import cli_info, mods, persistent_sessions, todos as todos_store
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -50,6 +50,9 @@ class LiveSession:
         self._compacting = False
         self._health = None
         self._announced = object()
+        self._published_id = None
+        self._prompt_id = None
+        self._prompt_text = ""
         self._transport = None
         self._stopping = False
         self._drained = asyncio.Event()
@@ -63,6 +66,7 @@ class LiveSession:
         self._mods = mods.Surface()
         self._mod_asks = {}
         self._mod_lock = asyncio.Lock()
+        self._roster_lock = asyncio.Lock()
         self._turn_open = False
         self.turn_start_index = 0
 
@@ -170,6 +174,7 @@ class LiveSession:
         self._resident = await persistent_sessions.pool.take(self.channel, shape)
         self._resident.listener = self._emit
         self._resident.answerer = self._mod_answer
+        self._resident.changed = lambda: self._publish_activity(self.activity)
         await persistent_sessions.pool.trim(persistent_sessions.limit(), registry.busy_channels() | {self.channel})
         return self._resident
 
@@ -179,8 +184,6 @@ class LiveSession:
 
     async def release_resident(self):
         self._cancel_cooldown()
-        if self._resident is None:
-            return
         self._resident = None
         await persistent_sessions.pool.drop(self.channel)
         self._publish_activity(self.activity)
@@ -214,6 +217,10 @@ class LiveSession:
         if kind == "own_turn":
             if self.adopter is not None and not self.running:
                 asyncio.create_task(self.adopter())
+            return None
+        if kind == "commands":
+            cli_info.refresh_later(self.state.account)
+            await self._send({**event, "channel": self.channel})
             return None
         if kind in mods.STATE_EVENTS:
             self._mods.apply(event)
@@ -306,7 +313,7 @@ class LiveSession:
         client = self._mod_client()
         if client is None:
             return None
-        async with self._mod_lock:
+        async with self._roster_lock if action in mods.ROSTER_ACTIONS else self._mod_lock:
             answer = await mods.act(client, action, fields)
         if answer is None:
             return None
@@ -359,7 +366,11 @@ class LiveSession:
     def _publish_activity(self, activity):
         from services.chat_list import hub
 
-        hub.set_activity(self.state.session_id, activity)
+        session_id = self.state.session_id
+        if self._published_id and self._published_id != session_id:
+            hub.set_activity(self._published_id, None)
+        self._published_id = session_id
+        hub.set_activity(session_id, activity)
         if activity == self._announced:
             return
         self._announced = activity
@@ -479,14 +490,17 @@ class LiveSession:
             self._inbox.put_nowait(_CLOSE)
         return True
 
-    async def _withdraw(self, mid):
-        """Take back a message the CLI holds in its own queue, while it has not started on it."""
-        item = next((it for it in self._inflight if it["id"] == mid and it.get("cli_uuid")), None)
+    async def _take_back(self, item):
+        """Ask the CLI to hand back a message it holds in its own queue, while it has not started on it."""
         resident = self._resident
-        if item is None or resident is None or not resident.connected:
+        if not item.get("cli_uuid") or resident is None or not resident.connected:
             return False
         answer = await mods.request(resident.client, "cancel_async_message", message_uuid=item["cli_uuid"])
-        if not (answer or {}).get("cancelled"):
+        return bool((answer or {}).get("cancelled"))
+
+    async def _withdraw(self, mid):
+        item = next((it for it in self._inflight if it["id"] == mid), None)
+        if item is None or item.get("taken") or not await self._take_back(item):
             return False
         item["withdrawn"] = True
         self._inflight = [it for it in self._inflight if it is not item]
@@ -534,6 +548,7 @@ class LiveSession:
         await self._emit({"type": "dequeued", "ids": [mid], "text": "", "consumed": 0})
 
     async def commit_user(self, mid, text):
+        self._prompt_id, self._prompt_text = mid, text
         if mid:
             self._seen_ids.add(mid)
         if mid and (text or "").strip().startswith("/"):
@@ -564,6 +579,7 @@ class LiveSession:
         self._ending = False
         self._health = None
         self._transport = None
+        self._prompt_id = None
         self._stopping = False
         self._drained.clear()
         self._turn_open = True
@@ -634,14 +650,16 @@ class LiveSession:
                 self._stopping = True
                 if await self._ask_cli_to_stop():
                     return
+            undelivered = self._transport is None
             worker.cancel()
             try:
                 await worker
             except asyncio.CancelledError:
                 pass
             if worker.cancelled():
-                self._requeue_inflight()
-                self._publish_queue()
+                await self._reclaim_inflight()
+                if undelivered and self._prompt_id:
+                    await self._emit({"type": "dequeued", "ids": [self._prompt_id], "text": self._prompt_text, "consumed": 0})
                 if not announced:
                     await self._emit({"type": "interrupted"})
         finally:
@@ -663,12 +681,11 @@ class LiveSession:
         self._stopping = not self._drained.is_set()
         return True
 
-    def _requeue_inflight(self) -> bool:
-        leftover = [it for it in self._inflight if it.get("id") not in self._seen_ids]
-        self._inflight = []
-        self._unconsumed = 0
-        if not leftover:
-            return False
+    async def _reclaim_inflight(self):
+        """Queue again what the CLI hands back unread; whatever it already holds is never sent twice."""
+        returned = [it for it in self._inflight if it.get("id") not in self._seen_ids and await self._take_back(it)]
+        self._inflight = [it for it in self._inflight if it not in returned]
+        await self._flush_inflight()
         pending = []
         while not self._inbox.empty():
             try:
@@ -677,10 +694,10 @@ class LiveSession:
                 break
             if it is not _CLOSE:
                 pending.append(it)
-        self._queued = leftover + pending
+        self._queued = returned + pending
         for it in self._queued:
             self._inbox.put_nowait(it)
-        return True
+        self._publish_queue()
 
     async def _flush_inflight(self):
         stuck = [item["id"] for item in self._inflight if item.get("id")]
@@ -711,10 +728,7 @@ class LiveSession:
             logger.error(f"live session worker failed: {type(exc).__name__}: {exc}")
             if not self._stopping:
                 await self._emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})
-            if self._requeue_inflight():
-                self._publish_queue()
-            else:
-                await self._flush_inflight()
+            await self._reclaim_inflight()
             await self._emit({"type": "interrupted" if self._stopping else "done"})
             self._settle()
         else:

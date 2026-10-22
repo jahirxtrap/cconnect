@@ -12,6 +12,18 @@ export interface VisibilityPrefs {
   working: string | null;
 }
 
+export interface BrowserShield {
+  enabled: boolean;
+  lists: string[];
+  allowed: string[];
+}
+
+export interface BrowserProxy {
+  mode: string;
+  url: string;
+  bypass: string;
+}
+
 export interface DiscordPrefs {
   enabled: boolean;
   status: boolean;
@@ -222,6 +234,32 @@ class Settings {
   }
   set modBandHandle(value: boolean) {
     this.#write("mod_band_handle", value);
+  }
+
+  get browserShield(): BrowserShield {
+    return {
+      enabled: this.#read<boolean>("browser_adblock"),
+      lists: this.#list("browser_adblock_lists"),
+      allowed: this.#list("browser_adblock_allowed"),
+    };
+  }
+  set browserShield(value: BrowserShield) {
+    this.#write("browser_adblock", value.enabled);
+    this.#write("browser_adblock_lists", value.lists.join(","));
+    this.#write("browser_adblock_allowed", value.allowed.join(","));
+  }
+
+  get browserProxy(): BrowserProxy {
+    return {
+      mode: this.#read<string>("browser_proxy"),
+      url: this.#read<string>("browser_proxy_url"),
+      bypass: this.#read<string>("browser_proxy_bypass"),
+    };
+  }
+  set browserProxy(value: BrowserProxy) {
+    this.#write("browser_proxy", value.mode);
+    this.#write("browser_proxy_url", value.url);
+    this.#write("browser_proxy_bypass", value.bypass);
   }
 
   get discord(): DiscordPrefs {

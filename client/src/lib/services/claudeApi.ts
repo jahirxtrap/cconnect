@@ -14,6 +14,8 @@ export interface Plugin {
   local: boolean;
 }
 
+export const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
+
 export interface Marketplace {
   name: string;
   repo: string | null;
@@ -375,5 +377,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     );
   },
 });
+
+export type ClaudeApi = ReturnType<typeof createClaudeApi>;
 
 export const claudeApi = createClaudeApi(http, () => backend.active);

@@ -9,7 +9,10 @@ import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.view.MotionEvent
 import android.webkit.JavascriptInterface
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
@@ -63,6 +66,24 @@ class MainActivity : TauriActivity() {
   private val link by lazy { BackgroundLink(this) { content } }
 
   private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+
+  private var pendingFiles: ValueCallback<Array<Uri>>? = null
+
+  private val pageFiles = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    pendingFiles?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(result.resultCode, result.data))
+    pendingFiles = null
+  }
+
+  private val browser by lazy {
+    Browser(this, { content }) { intent, callback ->
+      pendingFiles?.onReceiveValue(null)
+      pendingFiles = callback
+      runCatching { pageFiles.launch(intent) }.onFailure {
+        pendingFiles = null
+        callback.onReceiveValue(null)
+      }
+    }
+  }
 
   private val createDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri: Uri? ->
     val pending = pendingSave ?: return@registerForActivityResult
@@ -159,18 +180,24 @@ class MainActivity : TauriActivity() {
   override fun onResume() {
     super.onResume()
     link.onForeground()
+    browser.resume()
     content?.evaluateJavascript("window.__cconnectResume && window.__cconnectResume()", null)
   }
 
   override fun onPause() {
     super.onPause()
     link.onBackground()
+    browser.pause()
   }
 
   override fun onDestroy() {
     link.closeAll()
+    browser.closeAll()
     super.onDestroy()
   }
+
+  override fun dispatchTouchEvent(event: MotionEvent): Boolean =
+    browser.dispatch(event) || super.dispatchTouchEvent(event)
 
   private fun leave() {
     backCallback.isEnabled = false
@@ -189,6 +216,7 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(Voice(), "AndroidVoice")
     webView.addJavascriptInterface(googleAuth, "AndroidGoogleAuth")
     webView.addJavascriptInterface(link, "AndroidLink")
+    webView.addJavascriptInterface(browser, "AndroidBrowser")
     PastedContent(webView).install()
     deliverShare()
   }

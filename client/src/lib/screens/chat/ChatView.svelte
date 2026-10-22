@@ -4,6 +4,7 @@
   import Flame from "@lucide/svelte/icons/flame";
   import History from "@lucide/svelte/icons/history";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
+  import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import Trash from "@lucide/svelte/icons/trash";
   import { untrack, type Snippet } from "svelte";
@@ -55,6 +56,7 @@
   import { tabs, type Tab } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
   import { pastedName } from "$lib/data/pastedFile";
+  import { elementLabel, splitElements } from "$lib/data/pickedElements";
 
   interface Props {
     tab: Tab;
@@ -482,6 +484,8 @@
         draft={chat.sideOpen ? chat.sideDraft : chat.draft}
         onDraft={(value) => (chat.sideOpen ? (chat.sideDraft = value) : (chat.draft = value))}
         attachments={chat.sideOpen ? [] : chat.attachments}
+        elements={chat.sideOpen ? [] : chat.elements}
+        onRemoveElement={(id) => chat.removeElement(id)}
         uploading={!chat.sideOpen && chat.uploading}
         queue={chat.sideOpen ? [] : chat.visibleQueue}
         onOpenQueued={(item) => (queuedId = item.id)}
@@ -644,10 +648,18 @@
           {t("DELETE")}
         </Button>
       {/snippet}
-      {#if item.text.trim()}
+      {@const queued = splitElements(item.text)}
+      {#if queued.text.trim()}
         <OutlinedPanel>
-          <p class="selectable text-body-md wrap-anywhere whitespace-pre-wrap">{item.text}</p>
+          <p class="selectable text-body-md wrap-anywhere whitespace-pre-wrap">{queued.text}</p>
         </OutlinedPanel>
+      {/if}
+      {#if queued.elements.length}
+        <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto">
+          {#each queued.elements as element, index (index)}
+            <Chip name={elementLabel(element)} icon={SquareMousePointer} />
+          {/each}
+        </div>
       {/if}
       {#if item.attachments.length}
         <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto">

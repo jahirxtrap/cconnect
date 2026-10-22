@@ -33,6 +33,7 @@ class PersistentSession:
         self.turn: Optional[TurnBinding] = None
         self.listener: Optional[Callable[[dict], Awaitable[None]]] = None
         self.answerer: Optional[mods.Answerer] = None
+        self.changed: Optional[Callable[[], None]] = None
         self._reader: Optional[asyncio.Task] = None
         self._owner: Optional[asyncio.Task] = None
         self._stop = asyncio.Event()
@@ -97,6 +98,7 @@ class PersistentSession:
                 self.inbox = asyncio.Queue()
                 if not ready.done():
                     ready.set_result(None)
+                self._changed()
                 await self._stop.wait()
         except BaseException as exc:
             if not ready.done():
@@ -105,11 +107,16 @@ class PersistentSession:
                 logger.warning(f"persistent session ended: {type(exc).__name__}: {exc}")
         finally:
             self.client = None
+            self._changed()
+
+    def _changed(self) -> None:
+        if self.changed is not None:
+            self.changed()
 
     def listen(self) -> asyncio.Queue:
         """The client's messages, read once and shared by every turn on this session."""
         if self._reader is None or self._reader.done():
-            self._reader = asyncio.create_task(self._pump(self.client, self.inbox))
+            self._reader = asyncio.create_task(self._pump(self.client, self.inbox, self._stop))
         return self.inbox
 
     async def attach_surface(self) -> None:
@@ -148,7 +155,7 @@ class PersistentSession:
                 inbox.put_nowait(None)
                 return
 
-    async def _pump(self, client: Any, inbox: asyncio.Queue) -> None:
+    async def _pump(self, client: Any, inbox: asyncio.Queue, stop: asyncio.Event) -> None:
         try:
             async for message in client.receive_messages():
                 if mods.handles(message):
@@ -170,6 +177,7 @@ class PersistentSession:
             pass
         finally:
             self._idle.set()
+            stop.set()
             await inbox.put(None)
             await self._notify({"type": "mod_surface", "attached": False})
 

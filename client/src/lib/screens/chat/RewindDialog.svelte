@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { readableText } from "$lib/data/pickedElements";
   import { t } from "$lib/i18n/index.svelte";
   import type { RewindPoint, RewindPreview } from "$lib/services/sessionsApi";
   import Button from "$lib/ui/Button.svelte";
@@ -45,7 +46,7 @@
     {/snippet}
 
     <OutlinedPanel>
-      <p class="selectable line-clamp-3 text-body-md">{target.text || target.id}</p>
+      <p class="selectable line-clamp-3 text-body-md">{readableText(target.text) || target.id}</p>
       {#if both}
         <p class="mt-1 flex items-center gap-1 text-label-md text-on-surface-variant">
           {#if preview === null}
@@ -90,7 +91,7 @@
       <div class="flex flex-col gap-2 pb-2">
         {#each ordered as point (point.id)}
           <OutlinedPanel onclick={() => onSelect(point)} class="w-full text-left">
-            <p class="selectable line-clamp-2 text-body-md">{point.text || point.id}</p>
+            <p class="selectable line-clamp-2 text-body-md">{readableText(point.text) || point.id}</p>
           </OutlinedPanel>
         {/each}
       </div>

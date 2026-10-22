@@ -19,6 +19,7 @@ import {
   toModComponent,
   toModDrawn,
   toModRequest,
+  toModSiteTargets,
   toModState,
   type ModAction,
   type ModActionFields,
@@ -26,6 +27,7 @@ import {
   type ModDrawn,
   type ModRenderSite,
   type ModRequest,
+  type ModSiteTarget,
   type ModState,
 } from "$lib/data/modModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
@@ -33,6 +35,7 @@ import { nativeSockets, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
 import type { TerminalInfo } from "./terminalApi";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
+import { toCommands, type CommandOption, type CommandWire } from "./capabilitiesApi";
 import { backoffFor, CONNECT_TIMEOUT_MS } from "./socket";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
@@ -113,8 +116,9 @@ export type ServerEvent =
   | { type: "notification"; summary: string; status: string | null }
   | { type: "notice"; name: string | null; text: string; level: string | null }
   | { type: "mods"; state: ModState }
+  | { type: "commands"; commands: CommandOption[] }
   | { type: "mod_toast"; plugin: string | null; text: string; timeoutMs: number | null }
-  | { type: "mod_invalidate" }
+  | { type: "mod_invalidate"; instances: ModSiteTarget[] | null }
   | { type: "mod_tree"; rid: number; component: ModComponent; instanceId: string; drawn: ModDrawn }
   | { type: "mod_reply"; rid: number; answer: unknown }
   | { type: "mod_request"; request: ModRequest }
@@ -779,6 +783,8 @@ export class ChatSocket {
         return { type: "notice", name: text(wire, "name"), text: text(wire, "text") ?? "", level: text(wire, "level") };
       case "mods":
         return { type: "mods", state: toModState(wire) };
+      case "commands":
+        return { type: "commands", commands: toCommands(list(wire, "commands") as CommandWire[]) };
       case "mod_toast":
         return {
           type: "mod_toast",
@@ -787,7 +793,7 @@ export class ChatSocket {
           timeoutMs: int(wire, "timeout_ms"),
         };
       case "mod_invalidate":
-        return { type: "mod_invalidate" };
+        return { type: "mod_invalidate", instances: toModSiteTargets(wire.instances) };
       case "mod_tree":
         return {
           type: "mod_tree",

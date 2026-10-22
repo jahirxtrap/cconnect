@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import zipfile
 
@@ -19,6 +20,8 @@ import sys
 from base64 import b64encode
 from pathlib import Path
 from typing import Optional
+
+from loguru import logger
 
 from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
@@ -234,6 +237,14 @@ def _merge_dir(source: Path, target: Path) -> tuple[list[Path], bool]:
     return adopted, merged
 
 
+def _remove_tree(target: Path) -> bool:
+    for item in target.rglob("*"):
+        if item.is_file() and not os.access(item, os.W_OK):
+            item.chmod(stat.S_IWRITE)
+    shutil.rmtree(target, ignore_errors=True)
+    return not target.exists()
+
+
 def _link_dir(source: Path, target: Path) -> None:
     if paths.is_link(target):
         if target.resolve() == source.resolve():
@@ -241,18 +252,20 @@ def _link_dir(source: Path, target: Path) -> None:
         _unlink_dir(target)
     elif target.is_dir():
         adopted, merged = _merge_dir(target, source)
-        if not merged:
+        if not merged or not _remove_tree(target):
+            logger.warning(f"accounts: {target} could not be emptied to share {source}")
             return
-        shutil.rmtree(target, ignore_errors=True)
         for path in adopted:
             sessions.normalize_entrypoint(path)
     source.mkdir(parents=True, exist_ok=True)
     if _WINDOWS:
-        subprocess.run(
+        made = subprocess.run(
             ["cmd", "/c", "mklink", "/J", str(target), str(source)],
             capture_output=True, text=True, encoding="utf-8", errors="replace",
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
+        if made.returncode != 0:
+            logger.warning(f"accounts: {target} could not be linked to {source}: {made.stderr.strip()}")
     else:
         target.symlink_to(source, target_is_directory=True)
 

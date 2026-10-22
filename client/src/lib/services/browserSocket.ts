@@ -1,9 +1,13 @@
+import { http } from "./http";
 import { ReconnectingSocket } from "./socket";
+
+export const stopBrowser = () => http.post("/browser/stop");
 
 export interface BrowserTab {
   id: string;
   url: string;
   title: string;
+  favicon?: string;
 }
 
 export interface BrowserState {
@@ -36,6 +40,7 @@ export interface BrowserHooks {
   onPicked: (pick: BrowserPick) => void;
   onCursor: (shape: string) => void;
   onClipboard: (text: string) => void;
+  onError: () => void;
 }
 
 export interface BrowserViewport {
@@ -45,6 +50,7 @@ export interface BrowserViewport {
 }
 
 export interface BrowserLink {
+  watch: (enabled: boolean) => void;
   navigate: (url: string) => void;
   back: () => void;
   forward: () => void;
@@ -53,7 +59,7 @@ export interface BrowserLink {
   device: (name: string) => void;
   pick: (enabled: boolean) => void;
   clip: (cut: boolean) => void;
-  newTab: () => void;
+  newTab: (url?: string) => void;
   switchTab: (id: string) => void;
   closeTab: (id: string) => void;
   reorder: (ids: string[]) => void;
@@ -63,10 +69,15 @@ export interface BrowserLink {
   close: () => void;
 }
 
-export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport): BrowserLink => {
+export const browserLink = (
+  hooks: BrowserHooks,
+  viewport: () => BrowserViewport,
+  watching: boolean,
+): BrowserLink => {
   let disposed = false;
   let decoding = false;
   let pending: ArrayBuffer | null = null;
+  let watched = watching;
 
   const draw = (buffer: ArrayBuffer) => {
     if (decoding) {
@@ -86,8 +97,10 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
   };
 
   const socket = new ReconnectingSocket("/browser/ws", {
-    onOpen: () => socket.send({ type: "attach", ...viewport() }),
-    onBinary: draw,
+    onOpen: () => socket.send({ type: "attach", watch: watched, ...viewport() }),
+    onBinary: (buffer) => {
+      if (watched) draw(buffer);
+    },
     onMessage: (data) => {
       if (data.type === "picked") {
         hooks.onPicked(data as unknown as BrowserPick);
@@ -99,6 +112,10 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
       }
       if (data.type === "clipboard") {
         hooks.onClipboard((data.text as string) || "");
+        return;
+      }
+      if (data.type === "error") {
+        hooks.onError();
         return;
       }
       if (data.type !== "state") return;
@@ -126,6 +143,11 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
   const post = (payload: Record<string, unknown>) => socket.send(payload);
 
   return {
+    watch: (enabled) => {
+      if (enabled === watched) return;
+      watched = enabled;
+      post({ type: "watch", enabled, ...viewport() });
+    },
     navigate: (url) => post({ type: "navigate", url }),
     back: () => post({ type: "back" }),
     forward: () => post({ type: "forward" }),
@@ -134,7 +156,7 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
     device: (name) => post({ type: "device", name }),
     pick: (enabled) => post({ type: "pick", enabled }),
     clip: (cut) => post({ type: "clip", cut }),
-    newTab: () => post({ type: "new_tab" }),
+    newTab: (url = "") => post({ type: "new_tab", url }),
     switchTab: (id) => post({ type: "switch_tab", id }),
     closeTab: (id) => post({ type: "close_tab", id }),
     reorder: (ids) => post({ type: "reorder", ids }),

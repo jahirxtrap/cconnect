@@ -6,11 +6,13 @@
   import Mic from "@lucide/svelte/icons/mic";
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import Plus from "@lucide/svelte/icons/plus";
+  import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import SquareSlash from "@lucide/svelte/icons/square-slash";
   import X from "@lucide/svelte/icons/x";
   import type { Snippet } from "svelte";
   import type { QueuedMessage } from "$lib/data/chatModels";
   import {
+    SPACE_KEY,
     strokeOf,
     type ModCompletionRow,
     type ModCompletions,
@@ -33,8 +35,9 @@
   import { hscrollbar } from "$lib/ui/scrollbar";
   import StopIcon from "$lib/ui/StopIcon.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
-  import type { Attachment } from "./state.svelte";
+  import type { Attachment, ComposerElement } from "./state.svelte";
   import { pastedName } from "$lib/data/pastedFile";
+  import { elementLabel, splitElements } from "$lib/data/pickedElements";
   import { keepFocus } from "$lib/ui/keepFocus";
 
   interface Props {
@@ -43,6 +46,8 @@
     draft: string;
     onDraft: (value: string) => void;
     attachments: Attachment[];
+    elements: ComposerElement[];
+    onRemoveElement: (id: number) => void;
     uploading: boolean;
     queue: QueuedMessage[];
     onOpenQueued: (item: QueuedMessage) => void;
@@ -72,6 +77,8 @@
     draft,
     onDraft,
     attachments,
+    elements,
+    onRemoveElement,
     uploading,
     queue,
     onOpenQueued,
@@ -102,8 +109,13 @@
 
   const accent = $derived(sessionColorOf(sessionColor));
 
-  const queueLabel = (item: QueuedMessage) =>
-    item.text || item.attachments.map((path) => path.split(/[\\/]/).pop()).join(", ");
+  const queueLabel = (item: QueuedMessage) => {
+    const { text, elements: picked } = splitElements(item.text);
+    return (
+      text ||
+      [...picked.map(elementLabel), ...item.attachments.map((path) => path.split(/[\\/]/).pop())].join(", ")
+    );
+  };
 
   let field = $state<HTMLTextAreaElement | null>(null);
 
@@ -123,7 +135,8 @@
     picker.click();
   };
 
-  const canSubmit = $derived(!blocked && (!!draft.trim() || attachments.length > 0));
+  const canSubmit = $derived(!blocked && (!!draft.trim() || attachments.length > 0 || elements.length > 0));
+  const chipped = $derived(attachments.length > 0 || elements.length > 0);
   const busy = $derived(streaming || uploading);
   const commandsReady = $derived(commands.length > 0);
 
@@ -321,7 +334,7 @@
 
   const typedStroke = (event: InputEvent): ModStroke | null =>
     event.inputType === "insertText" && event.data?.length === 1
-      ? { key: event.data === " " ? "space" : event.data }
+      ? { key: event.data === " " ? SPACE_KEY : event.data }
       : null;
 
   const oninput = (event: Event) => {
@@ -499,11 +512,25 @@
       </div>
     {/if}
 
-    {#if attachments.length}
+    {#if chipped}
       <div
         use:hscrollbar={{ wheel: true }}
         class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}"
       >
+        {#each elements as item (item.id)}
+          <Chip name={elementLabel(item)} icon={SquareMousePointer}>
+            {#snippet trailing()}
+              <button
+                type="button"
+                onclick={() => onRemoveElement(item.id)}
+                aria-label={t("DELETE")}
+                class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+              >
+                <X size={16} />
+              </button>
+            {/snippet}
+          </Chip>
+        {/each}
         {#each attachments as item (item.id)}
           <Chip name={item.name} icon={fileIcon(item.name)}>
             {#snippet trailing()}
@@ -525,7 +552,7 @@
       </div>
     {/if}
 
-    <div class="relative px-3.5 {queue.length || attachments.length ? 'pt-1.5' : 'pt-3.5'}">
+    <div class="relative px-3.5 {queue.length || chipped ? 'pt-1.5' : 'pt-3.5'}">
       {#if ghost && !draft && !listening}
         <button
           type="button"

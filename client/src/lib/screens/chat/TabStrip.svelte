@@ -36,6 +36,8 @@
     dot?: boolean;
     focused?: boolean;
     trailing?: Snippet;
+    leading?: Snippet<[string]>;
+    lead?: Snippet;
   }
 
   const {
@@ -55,6 +57,8 @@
     dot = true,
     focused = false,
     trailing,
+    leading,
+    lead,
   }: Props = $props();
 
   const SPACING = 6;
@@ -287,6 +291,9 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div onpointerdown={onPaneDown} class="{PANE_HEADER_CLASS} {paneFocusBorder(focused)}">
+  {#if lead}
+    <div class="flex h-8 shrink-0 items-center pl-1">{@render lead()}</div>
+  {/if}
   <div
     bind:this={strip}
     use:hscrollbar={{ wheel: true }}
@@ -310,7 +317,9 @@
           ? 'bg-surface-variant text-on-surface'
           : 'text-on-surface-variant hover:bg-on-surface/6'}"
       >
-        {#if dot}
+        {#if leading}
+          {@render leading(tab.id)}
+        {:else if dot}
           <span
             class="size-2 shrink-0 rounded-full"
             style={sessionColorOf(tab.color)

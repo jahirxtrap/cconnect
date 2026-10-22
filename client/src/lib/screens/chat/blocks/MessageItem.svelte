@@ -4,6 +4,7 @@
   import Inbox from "@lucide/svelte/icons/inbox";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import Puzzle from "@lucide/svelte/icons/puzzle";
+  import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import type { Snippet } from "svelte";
   import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
@@ -14,6 +15,7 @@
   import { plural, t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
   import { userContent } from "$lib/data/userContent";
+  import { elementLabel } from "$lib/data/pickedElements";
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
   import Chip from "$lib/ui/Chip.svelte";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
@@ -89,14 +91,18 @@
   {@const content = userContent(message)}
   {@const body = typeof props.text === "string" ? props.text : content.body}
   {@const showTime = message.timestamp !== null && settings.showTimestamps}
-  <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {content.attachments.length ? 'chat-gap' : ''}">
+  {@const chips = content.attachments.length + content.elements.length}
+  <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {chips ? 'chat-gap' : ''}">
     {#if body}
       <p class="text-body-md wrap-anywhere whitespace-pre-wrap">{body}</p>
     {/if}
-    {#if content.attachments.length || showTime || message.sendStatus === "error"}
+    {#if chips || showTime || message.sendStatus === "error"}
       <div class="flex w-full items-end">
-        {#if content.attachments.length}
+        {#if chips}
           <div use:hscrollbar class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+            {#each content.elements as element, index (index)}
+              <Chip name={elementLabel(element)} icon={SquareMousePointer} />
+            {/each}
             {#each content.attachments as attachment (attachment.url)}
               <Chip
                 name={attachment.name}

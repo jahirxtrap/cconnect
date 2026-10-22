@@ -88,7 +88,7 @@
   const target = (item: ModNode) => ({ ...item.press!, key: prop(item, "key") ?? undefined });
 
   const hooksPort: Port = {
-    press: (item) => mods.press(item),
+    press: (item) => void mods.press(item, site),
     input: (item, kind, value) => mods.act("input", { ...target(item), kind, value }),
     select: (item, value) => mods.act("select", { ...target(item), value }),
   };
@@ -203,7 +203,7 @@
     if (listed && !listed.includes(href)) return;
     event.preventDefault();
     event.stopPropagation();
-    mods.act("press", { ...target(item), href });
+    void mods.press(item, site, href);
   };
 
   const middle = (span: HTMLElement, text: string) => {

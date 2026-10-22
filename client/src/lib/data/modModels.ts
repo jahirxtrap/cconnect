@@ -232,6 +232,16 @@ const FILL_MODES: ModFillMode[] = ["replace", "append", "insert"];
 export const toModComponent = (value: unknown): ModComponent =>
   MOD_COMPONENTS.find((component) => component === value) ?? "Pane";
 
+export const toModSiteTargets = (value: unknown): ModSiteTarget[] | null =>
+  Array.isArray(value)
+    ? value.flatMap((item) => {
+        const wire = record(item);
+        const component = wire ? MOD_COMPONENTS.find((name) => name === wire.component) : undefined;
+        const instanceId = wire ? string(wire, "instance_id") : null;
+        return component && instanceId ? [{ component, instanceId }] : [];
+      })
+    : null;
+
 export const toModRequest = (raw: Wire): ModRequest | null => {
   const id = string(raw, "id");
   const kind = REQUEST_KINDS.find((item) => item === raw.kind);
@@ -253,10 +263,10 @@ const KEY_NAMES: Record<string, string> = {
   Tab: "tab",
   Backspace: "backspace",
   Delete: "delete",
-  " ": "space",
 };
+export const SPACE_KEY = "space";
 
-export const strokeOf = (event: KeyboardEvent): ModStroke | null => {
+export const clientKeyOf = (event: KeyboardEvent): ModStroke | null => {
   const key = KEY_NAMES[event.key] ?? (event.key.length === 1 ? event.key : null);
   if (!key) return null;
   return {
@@ -265,6 +275,11 @@ export const strokeOf = (event: KeyboardEvent): ModStroke | null => {
     ...(event.shiftKey && { shift: true as const }),
     ...(event.metaKey && { meta: true as const }),
   };
+};
+
+export const strokeOf = (event: KeyboardEvent): ModStroke | null => {
+  const stroke = clientKeyOf(event);
+  return stroke?.key === " " ? { ...stroke, key: SPACE_KEY } : stroke;
 };
 
 export const toModCompletions = (raw: unknown, end: number): ModCompletions | null => {

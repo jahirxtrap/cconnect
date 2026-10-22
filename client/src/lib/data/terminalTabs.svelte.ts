@@ -1,3 +1,4 @@
+import { programName } from "$lib/design/shellIcons";
 import { backend } from "$lib/services/backend.svelte";
 import {
   closeTerminal,
@@ -15,11 +16,25 @@ export interface TerminalTab {
   title: string;
   local: boolean;
   pty?: PtyInfo | null;
+  shell?: string | null;
+  os?: string | null;
+  reported?: string | null;
   environment: string | null;
 }
 
 const NEW_COLS = 80;
 const NEW_ROWS = 24;
+const RUNNING_COMMAND = /^[a-z]:\\.+?\.exe - (.+)$/i;
+const PATH_LIKE = /^(?:[a-z]:)?[\\/]/i;
+
+const reportedTitle = (raw: string, shell: string | null | undefined): string | null => {
+  const title = raw.trim();
+  const command = RUNNING_COMMAND.exec(title);
+  if (command) return command[1].trim();
+  if (!PATH_LIKE.test(title)) return title || null;
+  const name = programName(title);
+  return name === programName(shell) ? null : name;
+};
 
 const connectors = new Map<string, TerminalConnector>();
 
@@ -49,9 +64,17 @@ class TerminalTabs {
   openLocal(session: TerminalInfo) {
     const key = securityKeys.current;
     this.open(
-      { id: session.id, title: session.title, local: true, pty: session.pty },
+      { id: session.id, title: session.title, local: true, pty: session.pty, shell: session.shell },
       (hooks, cols, rows) => localLink(session.id, key, hooks, cols, rows),
     );
+  }
+
+  titleOf(tab: TerminalTab) {
+    return (tab.reported && reportedTitle(tab.reported, tab.local ? tab.shell : null)) || tab.title;
+  }
+
+  report(id: string, title: string) {
+    this.#items = this.#items.map((tab) => (tab.id === id ? { ...tab, reported: title } : tab));
   }
 
   async create(cwd: string[]) {
@@ -69,7 +92,14 @@ class TerminalTabs {
     const known = new Set(kept.filter((tab) => tab.environment === environment).map((tab) => tab.id));
     for (const session of sessions) {
       if (!session.alive || known.has(session.id)) continue;
-      const tab = { id: session.id, title: session.title, local: true, pty: session.pty, environment };
+      const tab = {
+        id: session.id,
+        title: session.title,
+        local: true,
+        pty: session.pty,
+        shell: session.shell,
+        environment,
+      };
       kept.push(tab);
       connectors.set(this.#key(tab), (hooks, cols, rows) =>
         localLink(session.id, securityKeys.current, hooks, cols, rows),

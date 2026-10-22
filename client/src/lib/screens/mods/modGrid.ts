@@ -10,9 +10,9 @@ const MIN_COLUMNS = 20;
 const MOD_GRID = Symbol("mod-grid");
 const MOD_SCALE = Symbol("mod-scale");
 
-export const gridOf = (room: number, glyph: number, line: number): ModGrid => {
+export const gridOf = (room: number, glyph: number, line: number, reserve = 0): ModGrid => {
   if (!glyph) return { columns: 0, cell: 0, line };
-  const fit = Math.floor(room / glyph);
+  const fit = Math.floor((room - reserve) / glyph);
   return fit < MIN_COLUMNS ? { columns: MIN_COLUMNS, cell: glyph, line } : { columns: fit, cell: room / fit, line };
 };
 

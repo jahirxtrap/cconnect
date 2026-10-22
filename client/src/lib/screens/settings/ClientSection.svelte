@@ -1,6 +1,7 @@
 <script lang="ts">
   import Clock from "@lucide/svelte/icons/clock";
   import Expand from "@lucide/svelte/icons/expand";
+  import Globe from "@lucide/svelte/icons/globe";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Languages from "@lucide/svelte/icons/languages";
   import ListOrdered from "@lucide/svelte/icons/list-ordered";
@@ -16,12 +17,14 @@
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
+  import { deviceBrowsing } from "$lib/screens/browser/deviceEngine";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
+  import BrowserDialog from "./BrowserDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
@@ -137,6 +140,14 @@
       {/snippet}
     </PreferenceRow>
   {/if}
+  {#if deviceBrowsing}
+    <PreferenceRow
+      icon={Globe}
+      title={t("BROWSER")}
+      summary={rowSummary("browser")}
+      onclick={() => (dialog = "browser")}
+    />
+  {/if}
   {#if isDesktop}
     <PreferenceRow
       icon={DiscordIcon}
@@ -195,4 +206,6 @@
   <ShortcutsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "discord"}
   <DiscordDialog onDismiss={() => (dialog = null)} />
+{:else if dialog === "browser"}
+  <BrowserDialog onDismiss={() => (dialog = null)} />
 {/if}

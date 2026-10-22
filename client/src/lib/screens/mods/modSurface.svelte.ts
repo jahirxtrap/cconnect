@@ -17,6 +17,7 @@ import {
   type ModRenderSite,
   type ModRequest,
   type ModScroll,
+  type ModSiteTarget,
   type ModState,
   type ModStroke,
   type ModToast,
@@ -68,6 +69,16 @@ const lastButton = (node: ModChild, hotkey: string): ModNode | null => {
   return found;
 };
 
+const pressable = (node: ModChild, plugin: string, key: string): ModNode | null => {
+  if (typeof node === "string") return null;
+  if (node.press?.plugin === plugin && node.props.key === key) return node;
+  for (const child of node.children) {
+    const found = pressable(child, plugin, key);
+    if (found) return found;
+  }
+  return null;
+};
+
 export class ModSurface {
   state = $state<ModState>(emptyModState());
   toasts = $state<ModToast[]>([]);
@@ -91,6 +102,8 @@ export class ModSurface {
   #replies = new Map<number, (answer: unknown) => void>();
   #owed = new Set<string>();
   #redraw = new Set<string>();
+  #pressing = new Map<string, number>();
+  #landing = new Map<string, (() => void)[]>();
   #onDrawn: (() => void)[] = [];
   #rid = 0;
   #toastId = 0;
@@ -132,8 +145,7 @@ export class ModSurface {
     untrack(() => {
       if (this.#signatures.get(key) === signature && key in this.#drawn) return;
       this.#signatures.set(key, signature);
-      if (this.#owed.has(key)) this.#redraw.add(key);
-      else this.#request(key);
+      this.#request(key);
     });
     return () => {
       if (this.#mounted.get(key) !== site) return;
@@ -169,17 +181,28 @@ export class ModSurface {
     this.#replies.get(rid)?.(answer);
   }
 
-  press(node: ModNode) {
+  async press(node: ModNode, site: ModSiteTarget, href?: string) {
     if (!node.press) return;
     const key = typeof node.props.key === "string" ? node.props.key : undefined;
-    this.act("press", { ...node.press, key });
+    const at = keyOf(site.component, site.instanceId);
+    const link = href === undefined ? {} : { href };
+    this.#pressing.set(at, (this.#pressing.get(at) ?? 0) + 1);
+    try {
+      if ((await this.#reached({ ...node.press, key, ...link })) || !key) return;
+      await this.#landed(at);
+      const tree = this.tree(site.component, site.instanceId);
+      const fresh = tree ? pressable(tree, node.press.plugin, key) : null;
+      if (fresh?.press && fresh.press.handle !== node.press.handle) await this.#reached({ ...fresh.press, key, ...link });
+    } finally {
+      this.#release(at);
+    }
   }
 
   hotkey(component: ModComponent, instanceId: string, key: string): boolean {
     if (component === "AbovePrompt" && band.hidden) return false;
     const tree = this.tree(component, instanceId);
     const button = tree ? lastButton(tree, key.toLowerCase()) : null;
-    if (button) this.press(button);
+    if (button) void this.press(button, { component, instanceId });
     return button !== null;
   }
 
@@ -195,7 +218,14 @@ export class ModSurface {
     } else if (attached) this.invalidate();
   }
 
-  invalidate() {
+  invalidate(sites: ModSiteTarget[] | null = null) {
+    if (sites) {
+      for (const site of sites) {
+        const key = keyOf(site.component, site.instanceId);
+        if (this.#mounted.has(key)) this.#request(key);
+      }
+      return;
+    }
     this.#hooked.clear();
     this.#waiting.clear();
     for (const key of this.#mounted.keys()) this.#request(key);
@@ -220,6 +250,7 @@ export class ModSurface {
       if (drawn.hooked) for (const next of waiting ?? []) this.#request(next);
     }
     this.#owed.delete(key);
+    this.#land(key);
     if (this.#redraw.delete(key)) this.#request(key);
     if (!this.#owed.size) for (const resolve of this.#onDrawn.splice(0)) resolve();
   }
@@ -288,6 +319,7 @@ export class ModSurface {
     this.hotScopes.clear();
     this.#owed.clear();
     this.#redraw.clear();
+    for (const key of [...this.#landing.keys()]) this.#land(key);
     this.#onDrawn = [];
     this.#stale = true;
   }
@@ -314,7 +346,42 @@ export class ModSurface {
     });
   }
 
+  async #reached(fields: ModActionFields): Promise<boolean> {
+    const answer = (await this.ask("press", fields)) as { handled?: boolean } | null;
+    return answer?.handled !== false;
+  }
+
+  #landed(key: string): Promise<void> {
+    if (!this.#owed.has(key)) this.#draw(key);
+    if (!this.#owed.has(key)) return Promise.resolve();
+    return new Promise((resolve) => this.#landing.set(key, [...(this.#landing.get(key) ?? []), resolve]));
+  }
+
+  #land(key: string) {
+    const waiting = this.#landing.get(key);
+    this.#landing.delete(key);
+    for (const resolve of waiting ?? []) resolve();
+  }
+
+  #release(key: string) {
+    const left = (this.#pressing.get(key) ?? 1) - 1;
+    if (left > 0) {
+      this.#pressing.set(key, left);
+      return;
+    }
+    this.#pressing.delete(key);
+    if (this.#redraw.delete(key)) this.#request(key);
+  }
+
   #request(key: string) {
+    if (this.#owed.has(key) || this.#pressing.has(key)) {
+      this.#redraw.add(key);
+      return;
+    }
+    this.#draw(key);
+  }
+
+  #draw(key: string) {
     const site = this.#mounted.get(key);
     if (!site || !this.state.surface) return;
     const hooked = this.#hooked.get(site.component);

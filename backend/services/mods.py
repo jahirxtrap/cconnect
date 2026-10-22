@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from loguru import logger
 
-from services import settings_store
+from services import cli_info, settings_store
 
 SURFACE = "desktop"
 CLIENT_ID = "cconnect"
@@ -141,16 +141,27 @@ def commands(listed: Any) -> dict:
     }
 
 
+def _invalidated(raw: Any) -> Optional[list[dict]]:
+    if not isinstance(raw, list):
+        return None
+    return [
+        {"component": item["component"], "instance_id": item["instance_id"]}
+        for item in raw
+        if isinstance(item, dict) and item.get("component") and item.get("instance_id") and item.get("surface", SURFACE) == SURFACE
+    ]
+
+
 def events(subtype: Optional[str], data: Any) -> list[dict]:
     """What a CLI system message shows; with mods off, only the lines the transcript keeps."""
     if not isinstance(data, dict):
         return []
     if subtype == "informational":
         return [kept_notice(data.get("content"), data.get("level"), data.get("uuid"))]
+    if subtype == "commands_changed":
+        listed = {"type": "commands", "commands": cli_info.commands({"commands": data.get("commands")})}
+        return [listed, commands(data.get("commands"))] if enabled() else [listed]
     if not enabled():
         return []
-    if subtype == "commands_changed":
-        return [commands(data.get("commands"))]
     if subtype == "ui_log":
         return [notice(data.get("text"), data.get("plugin"))]
     if subtype == "ui_status":
@@ -160,7 +171,7 @@ def events(subtype: Optional[str], data: Any) -> list[dict]:
     if subtype == "ui_panes":
         return [roster(data)]
     if subtype == "ui_invalidate":
-        return [{"type": "mod_invalidate"}]
+        return [{"type": "mod_invalidate", "instances": _invalidated(data.get("instances"))}]
     if subtype == "ui_focus":
         return [{
             "type": "mod_focus",

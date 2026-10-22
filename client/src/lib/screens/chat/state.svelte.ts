@@ -20,6 +20,7 @@ import {
 import { emptyModState, type ModState } from "$lib/data/modModels";
 import { projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
+import { withElements, type PickedElement } from "$lib/data/pickedElements";
 import { settings } from "$lib/data/settings.svelte";
 import { terminalTabs } from "$lib/data/terminalTabs.svelte";
 
@@ -66,6 +67,7 @@ import {
   type CommandOption,
 } from "$lib/services/capabilitiesApi";
 import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
+import { createClaudeApi } from "$lib/services/claudeApi";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi } from "$lib/services/settingsApi";
 import {
@@ -118,6 +120,8 @@ interface AttachmentBase {
 export type Attachment =
   | (AttachmentBase & { file: File; path?: undefined })
   | (AttachmentBase & { path: string; file?: undefined });
+
+export type ComposerElement = PickedElement & { id: number };
 
 export interface ChatOverrides {
   model: string;
@@ -239,6 +243,7 @@ export class ChatState {
     mediaBytes: number | null;
   } | null>(null);
   attachments = $state<Attachment[]>([]);
+  elements = $state<ComposerElement[]>([]);
   uploading = $state(false);
   oldestLoadedIndex = $state<number | null>(null);
   transcriptLoading = $state(false);
@@ -267,6 +272,7 @@ export class ChatState {
       this.messages.length === 0 &&
       this.queue.length === 0 &&
       this.attachments.length === 0 &&
+      this.elements.length === 0 &&
       this.draft.trim() === "",
   );
 
@@ -313,6 +319,7 @@ export class ChatState {
   #sessions = createSessionsApi(this.#http);
   #capabilities = createCapabilitiesApi(this.#http);
   #settings = createSettingsApi(this.#http);
+  readonly claude = createClaudeApi(this.#http, () => this.environment);
   #socket = new ChatSocket(
     (side, parent, event) => this.#onEvent(side, parent, event),
     () => this.environment,
@@ -331,6 +338,7 @@ export class ChatState {
   #outgoing = 0;
   #outgoingTag = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
   #attachmentId = 0;
+  #elementId = 0;
   #sent = new Set<string>();
   #unacked = new Set<string>();
   #silent = new Set<string>();
@@ -498,6 +506,16 @@ export class ChatState {
     this.attachments = this.attachments.filter((item) => item.id !== id);
   }
 
+  addElement(element: PickedElement) {
+    if (this.uploading) return;
+    this.elements = [...this.elements, { ...element, id: this.#elementId++ }];
+  }
+
+  removeElement(id: number) {
+    if (this.uploading) return;
+    this.elements = this.elements.filter((item) => item.id !== id);
+  }
+
   userHistory(): string[] {
     return this.#history;
   }
@@ -515,10 +533,12 @@ export class ChatState {
   }
 
   async sendPrompt(text: string) {
-    const body = text.trim();
+    const typed = text.trim();
+    const body = withElements(typed, this.elements);
     const pending = this.attachments;
     if (!body && !pending.length) return;
     if (!pending.length) {
+      this.elements = [];
       this.send(body);
       return;
     }
@@ -549,7 +569,7 @@ export class ChatState {
         this.#uploadAbort = null;
         this.uploading = false;
         this.attachments = this.attachments.map((current) => ({ ...current, progress: 0 }));
-        this.pendingInput = body || null;
+        this.pendingInput = typed || null;
         return;
       }
       uploaded.push(path);
@@ -558,6 +578,7 @@ export class ChatState {
     this.#uploadAbort = null;
     this.uploading = false;
     this.attachments = [];
+    this.elements = [];
     this.send(body, uploaded);
   }
 
@@ -2039,11 +2060,14 @@ export class ChatState {
         if (this.#attaching) this.#arrivingMods = event.state;
         else this.mods.applyState(event.state);
         break;
+      case "commands":
+        if (this.capabilities) this.capabilities = { ...this.capabilities, commands: event.commands };
+        break;
       case "mod_toast":
         this.mods.toast(event.plugin, event.text, event.timeoutMs);
         break;
       case "mod_invalidate":
-        this.mods.invalidate();
+        this.mods.invalidate(event.instances);
         break;
       case "mod_tree":
         this.mods.receive(event.rid, event.component, event.instanceId, event.drawn);

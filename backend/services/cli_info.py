@@ -135,6 +135,13 @@ async def refresh() -> None:
     await server_info()
 
 
+def refresh_later(account: Optional[str] = None) -> None:
+    """Read the CLI again in the background, serving the current snapshot until it answers."""
+    task = asyncio.create_task(server_info(refresh=True, account=account))
+    _warm_tasks.add(task)
+    task.add_done_callback(_warm_tasks.discard)
+
+
 def invalidate() -> None:
     _snapshots.clear()
     _fetched_at.clear()

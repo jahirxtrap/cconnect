@@ -1,4 +1,5 @@
 import { previewKindOf } from "./previewKind";
+import { splitElements, type PickedElement } from "./pickedElements";
 import { downloadUrl } from "$lib/services/sharedApi";
 import type { ChatMessage } from "./chatModels";
 
@@ -10,6 +11,7 @@ export interface UserAttachment {
 export interface UserContent {
   body: string;
   attachments: UserAttachment[];
+  elements: PickedElement[];
 }
 
 const IMAGE_MARKER_RE = /\[Image #\d+\]/g;
@@ -28,7 +30,8 @@ const basename = (value: string) => value.split("/").pop() ?? value;
 export const userContent = (message: ChatMessage): UserContent => {
   const media: UserAttachment[] = [];
   const files: UserAttachment[] = [];
-  let body = message.text;
+  const split = splitElements(message.text);
+  let body = split.text;
 
   const push = (path: string, url: string) => {
     const name = basename(path);
@@ -66,5 +69,9 @@ export const userContent = (message: ChatMessage): UserContent => {
       .join("\n");
   }
 
-  return { body: body.replace(IMAGE_MARKER_RE, "").trim(), attachments: [...media, ...files] };
+  return {
+    body: body.replace(IMAGE_MARKER_RE, "").trim(),
+    attachments: [...media, ...files],
+    elements: split.elements,
+  };
 };

@@ -45,20 +45,30 @@
 
   const density = () => window.devicePixelRatio || 1;
 
-  const paint = async (index: number, available: number, factor: number) => {
-    const page = pages[index];
-    const canvas = canvases[index];
+  const sheet = (page: PDFPageProxy, available: number, factor: number) => {
     const base = page.getViewport({ scale: 1 });
     const cap = Math.sqrt(PAGE_PIXELS / (base.width * base.height));
-    const rendered = page.getViewport({ scale: Math.min((available / base.width) * factor, cap) });
-    factors[index] = 0;
-    canvas.width = Math.floor(rendered.width);
-    canvas.height = Math.floor(rendered.height);
+    const viewport = page.getViewport({ scale: Math.min((available / base.width) * factor, cap) });
+    const canvas = document.createElement("canvas");
+    canvas.style.display = "block";
+    canvas.style.width = "100%";
+    canvas.style.height = "auto";
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    return { canvas, viewport };
+  };
+
+  const paint = async (index: number, available: number, factor: number) => {
+    const page = pages[index];
+    const { canvas, viewport } = sheet(page, available, factor);
     const context = canvas.getContext("2d");
     if (!context) return;
-    task = page.render({ canvas, canvasContext: context, viewport: rendered });
+    factors[index] = 0;
+    task = page.render({ canvas, canvasContext: context, viewport });
     await task.promise;
     task = null;
+    canvases[index].replaceWith(canvas);
+    canvases[index] = canvas;
     factors[index] = factor;
   };
 
@@ -119,10 +129,7 @@
     const factor = density();
     for (let number = 1; number <= document_.numPages; number++) {
       const page = await document_.getPage(number);
-      const canvas = document.createElement("canvas");
-      canvas.style.display = "block";
-      canvas.style.width = "100%";
-      canvas.style.height = "auto";
+      const { canvas } = sheet(page, available, factor);
       container.appendChild(canvas);
       pages.push(page);
       canvases.push(canvas);

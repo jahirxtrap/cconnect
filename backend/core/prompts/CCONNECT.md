@@ -14,6 +14,14 @@ The app renders markdown images inline, so you can show a picture in the chat in
 only linking it: `![alt]({{SHARED_URL}}/<filename>)` for a file you wrote there, or
 `![alt](https://...)` for an external one. The user can open one to save or share it.
 
+# Picked elements
+
+A `<browser-element>` block in a message is an element the user picked in a browser beside
+the chat: the page it sits on (`url`, `title`), a CSS `selector`, its rendered `size` and its
+HTML, cut at 2000 characters. `browser="server"` is the browser your browser tools drive, so
+you can open that page and look further; `browser="device"` runs on the user's own device and
+you cannot reach it, so work from what the block carries.
+
 # The chat
 
 The user is reading a chat, not a terminal, and decides how much of the turn is visible:

@@ -7,6 +7,7 @@
   import { activeScope } from "$lib/app/activeScope.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { osIcon } from "$lib/design/osIcons";
+  import { shellIcon } from "$lib/design/shellIcons";
   import { sshAddress, sshStore } from "$lib/data/sshStore.svelte";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -92,7 +93,7 @@
 
   const connectSsh = (profile: (typeof sshStore.profiles)[number]) => {
     terminalTabs.open(
-      { id: `ssh:${profile.id}`, title: profile.name || profile.host, local: false },
+      { id: `ssh:${profile.id}`, title: profile.name || profile.host, local: false, os: profile.os },
       (hooks, cols, rows) => sshLink(profile, hooks, cols, rows),
     );
     focusActive();
@@ -150,6 +151,16 @@
   });
 </script>
 
+{#snippet tabIcon(id: string)}
+  {@const tab = terminalTabs.items.find((item) => item.id === id)}
+  {@const Icon = tab ? (tab.local ? shellIcon(tab.shell) : osIcon(tab.os)) : null}
+  {#if Icon}
+    <Icon class="size-4 shrink-0" aria-hidden="true" />
+  {:else}
+    <SquareTerminal size={16} class="shrink-0" />
+  {/if}
+{/snippet}
+
 {#snippet headerActions()}
   <PaneActions actions={terminalActions} />
 {/snippet}
@@ -205,7 +216,7 @@
   onpointerdowncapture={() => paneFocus.set("terminal")}
 >
   <TabStrip
-    items={terminalTabs.items}
+    items={terminalTabs.items.map((tab) => ({ id: tab.id, title: terminalTabs.titleOf(tab) }))}
     activeId={terminalTabs.activeId}
     onSelect={select}
     onNew={() => void create()}
@@ -217,6 +228,7 @@
     dot={false}
     {focused}
     trailing={headerActions}
+    leading={tabIcon}
   />
 
   <div class="relative min-h-0 flex-1" style="background: {TERMINAL_BACKGROUND}">
@@ -230,6 +242,7 @@
             autofocus={false}
             reserved={RESERVED_KEYS}
             pty={tab.pty}
+            onTitle={(title) => terminalTabs.report(tab.id, title)}
           />
         </div>
       {/if}
@@ -300,7 +313,7 @@
   {@const tab = closing}
   <ConfirmDialog
     title={t("CLOSE")}
-    text={t("CLOSE_TERMINAL_CONFIRM", tab.title)}
+    text={t("CLOSE_TERMINAL_CONFIRM", terminalTabs.titleOf(tab))}
     confirmLabel={t("CLOSE")}
     onConfirm={() => confirmClose(tab)}
     onDismiss={() => (closing = null)}

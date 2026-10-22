@@ -7,12 +7,15 @@ same browser shows up in the pane as one more tab.
 import asyncio
 import base64
 import json
+import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import sys
 import urllib.error
 import urllib.request
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -41,15 +44,17 @@ _MIN_HEIGHT = 240
 _MAX_SCALE = 3.0
 _HOME = "about:blank"
 _PAGE_EVENTS = ("Page.frameNavigated", "Page.navigatedWithinDocument", "Page.loadEventFired")
+_ICON_BYTES = 64 * 1024
+_ICON_TIMEOUT = 5.0
+_ICON_SCRIPT = """(() => {
+  const link = document.querySelector('link[rel~="icon" i]');
+  if (link && link.href) return link.href;
+  return /^https?:$/.test(location.protocol) ? location.origin + '/favicon.ico' : '';
+})()"""
 
-_PHONE_AGENT = (
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko)"
-    " Chrome/125.0.0.0 Mobile Safari/537.36"
-)
-_TABLET_AGENT = (
-    "Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko)"
-    " Version/17.0 Mobile/15E148 Safari/604.1"
-)
+_ANDROID = "14"
+_FALLBACK_MAJOR = "141"
+_MAJOR = re.compile(r"Chrome/(\d+)")
 _DESCRIBE = """function() {
   const parts = [];
   let node = this;
@@ -69,7 +74,7 @@ _DESCRIBE = """function() {
   return JSON.stringify({
     selector: parts.join(' > '),
     text: (this.innerText || '').trim().slice(0, 200),
-    html: this.outerHTML.slice(0, 800),
+    html: this.outerHTML.slice(0, 2000),
     width: Math.round(box.width),
     height: Math.round(box.height)
   });
@@ -109,9 +114,35 @@ _HIGHLIGHT = {
 }
 
 _DEVICES: dict[str, dict[str, Any]] = {
-    "mobile": {"width": 390, "height": 844, "scale": 3, "touch": True, "agent": _PHONE_AGENT},
-    "tablet": {"width": 820, "height": 1180, "scale": 2, "touch": True, "agent": _TABLET_AGENT},
+    "mobile": {"width": 390, "height": 844, "scale": 3, "model": "Pixel 8", "phone": True},
+    "tablet": {"width": 820, "height": 1180, "scale": 2, "model": "Pixel Tablet", "phone": False},
 }
+
+
+def _agent_of(device: dict, major: str) -> dict:
+    """The user agent and client hints of an Android Chrome on that device."""
+    brands = [
+        {"brand": "Chromium", "version": major},
+        {"brand": "Google Chrome", "version": major},
+        {"brand": "Not?A_Brand", "version": "99"},
+    ]
+    mobile = "Mobile " if device["phone"] else ""
+    return {
+        "userAgent": (
+            f"Mozilla/5.0 (Linux; Android {_ANDROID}; {device['model']}) AppleWebKit/537.36"
+            f" (KHTML, like Gecko) Chrome/{major}.0.0.0 {mobile}Safari/537.36"
+        ),
+        "platform": "Linux armv8l",
+        "userAgentMetadata": {
+            "brands": brands,
+            "fullVersionList": [{**brand, "version": f"{brand['version']}.0.0.0"} for brand in brands],
+            "platform": "Android",
+            "platformVersion": f"{_ANDROID}.0.0",
+            "architecture": "",
+            "model": device["model"],
+            "mobile": device["phone"],
+        },
+    }
 
 _WINDOWS_CANDIDATES = (
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -176,6 +207,25 @@ def _endpoint(port: int) -> Optional[str]:
         return None
 
 
+def _fetch_icon(url: str, agent: str) -> str:
+    if url.startswith("data:image/"):
+        return url if len(url) <= _ICON_BYTES else ""
+    if not url.startswith(("http://", "https://")):
+        return ""
+    request = urllib.request.Request(url, headers={"User-Agent": agent} if agent else {})
+    try:
+        with urllib.request.urlopen(request, timeout=_ICON_TIMEOUT) as response:
+            kind = response.headers.get_content_type()
+            body = response.read(_ICON_BYTES + 1)
+    except (urllib.error.URLError, OSError, ValueError):
+        return ""
+    if not kind.startswith("image/"):
+        kind = mimetypes.guess_type(url.split("?", 1)[0])[0] or ""
+    if not body or len(body) > _ICON_BYTES or not kind.startswith("image/"):
+        return ""
+    return f"data:{kind};base64,{base64.b64encode(body).decode('ascii')}"
+
+
 @dataclass
 class _Tab:
     id: str
@@ -183,6 +233,8 @@ class _Tab:
     session: str
     url: str = ""
     title: str = ""
+    icon: str = ""
+    favicon: str = ""
 
 
 class _Cdp:
@@ -262,6 +314,8 @@ class BrowserSession:
         self._loaded = asyncio.Event()
         self._back = False
         self._forward = False
+        self._agent = ""
+        self._icons: set[asyncio.Task] = set()
 
     @property
     def running(self) -> bool:
@@ -294,7 +348,8 @@ class BrowserSession:
             "canGoForward": self._forward,
             "activeTab": self._active,
             "tabs": [
-                {"id": item.id, "url": item.url, "title": item.title} for item in self._tabs.values()
+                {"id": item.id, "url": item.url, "title": item.title, "favicon": item.favicon}
+                for item in self._tabs.values()
             ],
         }
 
@@ -483,6 +538,7 @@ class BrowserSession:
             asyncio.create_task(self._pump()),
             asyncio.create_task(self._consume()),
         ]
+        self._agent = (await self._cdp.call("Browser.getVersion")).get("userAgent") or ""
         logger.info(f"browser: attached to {binary}")
 
     async def _discover(self):
@@ -527,7 +583,32 @@ class BrowserSession:
         await self._cdp.call(
             "Runtime.evaluate", {"expression": _CURSOR_SCRIPT}, tab.session
         )
+        if self._device:
+            await self._emulate(tab.session)
+            if url and not url.startswith("about:"):
+                await self._cdp.call("Page.reload", {}, tab.session)
+        self._spawn(self._favicon(tab))
         return tab
+
+    def _spawn(self, work):
+        task = asyncio.create_task(work)
+        self._icons.add(task)
+        task.add_done_callback(self._icons.discard)
+
+    async def _favicon(self, tab: _Tab):
+        try:
+            found = await self._cdp.call(
+                "Runtime.evaluate", {"expression": _ICON_SCRIPT, "returnByValue": True}, tab.session
+            )
+        except (RuntimeError, ConnectionClosed, OSError, AttributeError):
+            return
+        url = (found.get("result") or {}).get("value") or ""
+        if url == tab.icon:
+            return
+        tab.icon = url
+        tab.favicon = await asyncio.to_thread(_fetch_icon, url, self._agent) if url else ""
+        if self._tabs.get(tab.id) is tab:
+            self._publish(("state", self.status()))
 
     async def _drop(self, target_id: str):
         self._known.discard(target_id)
@@ -599,31 +680,38 @@ class BrowserSession:
         async with self._lock:
             self._device = name if name in _DEVICES else ""
             await self._stop_stream()
-            await self._apply_agent()
+            tabs = list(self._tabs.values())
+            for tab in tabs:
+                await self._emulate(tab.session)
             await self._start_stream()
+        for tab in tabs:
+            with suppress(RuntimeError):
+                await self._cdp.call("Page.reload", {}, tab.session)
         self._publish(("state", self.status()))
 
-    async def _apply_agent(self):
-        page = self._page
-        if not page:
-            return
+    def _major(self) -> str:
+        found = _MAJOR.search(self._agent)
+        return found.group(1) if found else _FALLBACK_MAJOR
+
+    async def _emulate(self, session: str):
         device = _DEVICES.get(self._device)
-        touch = bool(device and device["touch"])
+        touch = device is not None
         await self._cdp.call(
             "Emulation.setTouchEmulationEnabled",
             {"enabled": touch, "maxTouchPoints": 5 if touch else 1},
-            page,
+            session,
         )
         await self._cdp.call(
             "Emulation.setEmitTouchEventsForMouse",
             {"enabled": touch, "configuration": "mobile" if touch else "desktop"},
-            page,
+            session,
         )
         await self._cdp.call(
             "Emulation.setUserAgentOverride",
-            {"userAgent": device["agent"] if device else ""},
-            page,
+            _agent_of(device, self._major()) if device else {"userAgent": ""},
+            session,
         )
+        await self._cdp.call("Emulation.setDeviceMetricsOverride", self._metrics()[2], session)
 
     async def _start_stream(self):
         page = self._page
@@ -750,6 +838,10 @@ class BrowserSession:
                 tab.title = info.get("title") or ""
                 self._publish(("state", self.status()))
             return
+        if method == "Page.loadEventFired":
+            loaded = next((item for item in self._tabs.values() if item.session == session), None)
+            if loaded is not None:
+                self._spawn(self._favicon(loaded))
         if method in _PAGE_EVENTS and session == self._page:
             if method == "Page.loadEventFired":
                 self._loaded.set()
@@ -814,7 +906,7 @@ class BrowserSession:
                 await asyncio.wait_for(cdp.call("Browser.close"), _CLOSE_TIMEOUT)
             except (ConnectionClosed, OSError, RuntimeError, asyncio.TimeoutError):
                 pass
-        for task in tasks:
+        for task in [*tasks, *self._icons]:
             task.cancel()
         if cdp is not None:
             try:

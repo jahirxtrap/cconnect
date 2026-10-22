@@ -16,9 +16,10 @@
     reserved?: string[];
     pty?: PtyInfo | null;
     onStatus?: (status: TerminalStatus) => void;
+    onTitle?: (title: string) => void;
   }
 
-  const { connect, autofocus = true, reserved = [], pty = null, onStatus }: Props = $props();
+  const { connect, autofocus = true, reserved = [], pty = null, onStatus, onTitle }: Props = $props();
 
   const windowsPty = $derived(
     pty && pty.backend !== "pty"
@@ -133,6 +134,7 @@
       current.send(Uint8Array.from(data, (char) => char.charCodeAt(0) & 0xff)),
     );
     const resized = term.onResize(({ cols, rows }) => current.resize(cols, rows));
+    const titled = term.onTitleChange((title) => onTitle?.(title));
 
     const screen = container.querySelector<HTMLElement>(".xterm-screen");
     let pointer: number | null = null;
@@ -242,6 +244,7 @@
       typed.dispose();
       binary.dispose();
       resized.dispose();
+      titled.dispose();
       webgl?.dispose();
       current.close();
       term.dispose();

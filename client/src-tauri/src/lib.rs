@@ -1,13 +1,21 @@
+#[cfg(target_os = "android")]
+mod android;
+#[cfg(desktop)]
+mod browser;
 mod local_server;
 mod oauth;
 mod presence;
 mod secret;
+mod shield;
 mod ssh;
 mod system;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+mod webkit;
 
 use tauri::Manager;
 
-const MAIN_WINDOW: &str = "main";
+pub(crate) const MAIN_WINDOW: &str = "main";
+pub(crate) const PAGE_SCRIPT: &str = include_str!("page.js");
 #[cfg(desktop)]
 const TRAY_ID: &str = "cconnect";
 
@@ -106,6 +114,13 @@ pub fn run() {
                 .build(),
         );
         builder = builder.plugin(tauri_plugin_drag::init());
+        builder = builder.manage(browser::BrowserKeys::default());
+        builder = builder.on_page_load(|webview, payload| {
+            use tauri::Manager;
+            if webview.label() == MAIN_WINDOW && matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
+                browser::hide_all(webview.app_handle());
+            }
+        });
     }
 
     #[cfg(mobile)]
@@ -119,6 +134,8 @@ pub fn run() {
             hide_helper_windows();
             #[cfg(desktop)]
             present_window(_app);
+            #[cfg(target_os = "android")]
+            android::install(_app.handle());
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -131,6 +148,7 @@ pub fn run() {
         .manage(local_server::LocalServerState::default())
         .manage(oauth::OauthState::default())
         .manage(presence::Presence::default())
+        .manage(shield::Shield::default())
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_connect,
             ssh::ssh_send,
@@ -150,7 +168,47 @@ pub fn run() {
             oauth::oauth_wait,
             oauth::oauth_cancel,
             presence::presence_set,
-            presence::presence_clear
+            presence::presence_clear,
+            #[cfg(desktop)]
+            browser::browser_open,
+            #[cfg(desktop)]
+            browser::browser_bounds,
+            #[cfg(desktop)]
+            browser::browser_visible,
+            #[cfg(desktop)]
+            browser::browser_navigate,
+            #[cfg(desktop)]
+            browser::browser_back,
+            #[cfg(desktop)]
+            browser::browser_forward,
+            #[cfg(desktop)]
+            browser::browser_reload,
+            #[cfg(desktop)]
+            browser::browser_focus,
+            #[cfg(desktop)]
+            browser::browser_close,
+            #[cfg(desktop)]
+            browser::browser_pick,
+            #[cfg(desktop)]
+            browser::browser_zoom,
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            browser::browser_agent,
+            #[cfg(desktop)]
+            browser::browser_layer,
+            #[cfg(desktop)]
+            browser::browser_cdp,
+            #[cfg(desktop)]
+            browser::browser_release,
+            #[cfg(desktop)]
+            browser::browser_keys,
+            #[cfg(desktop)]
+            browser::browser_restart,
+            #[cfg(desktop)]
+            browser::browser_clear_data,
+            #[cfg(desktop)]
+            browser::browser_data_size,
+            shield::browser_shield,
+            shield::browser_shield_update
         ])
         .build(tauri::generate_context!())
         .expect("error while running CConnect")

@@ -1,25 +1,38 @@
 <script lang="ts">
   import { t } from "$lib/i18n/index.svelte";
-  import type { PluginOption } from "$lib/services/claudeApi";
+  import type { ClaudeApi, PluginOption } from "$lib/services/claudeApi";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
-  import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
 
   interface Props {
+    api: ClaudeApi;
+    plugin: string;
     title: string;
-    fields: PluginOption[] | null;
-    busy: boolean;
-    onConfirm: (values: Record<string, string>) => void;
     onDismiss: () => void;
   }
 
-  const { title, fields, busy, onConfirm, onDismiss }: Props = $props();
+  const { api, plugin, title, onDismiss }: Props = $props();
 
+  let fields = $state<PluginOption[] | null>(null);
+  let busy = $state(false);
+  let error = $state<string | null>(null);
   let values = $state<Record<string, string>>({});
+
+  $effect(() => {
+    let live = true;
+    void api.pluginOptions(plugin).then((found) => {
+      if (!live) return;
+      if (found) fields = found;
+      else error = t("CONNECTION_ERROR");
+    });
+    return () => {
+      live = false;
+    };
+  });
 
   const valueOf = (field: PluginOption) => values[field.key] ?? field.value;
 
@@ -46,20 +59,27 @@
       Object.keys(changed).length > 0 &&
       !fields.some((field) => missing(field) || invalid(field)),
   );
+
+  const save = async () => {
+    busy = true;
+    error = null;
+    const result = await api.setPluginOptions(plugin, changed);
+    busy = false;
+    if (result.ok) onDismiss();
+    else error = result.message || t("CONNECTION_ERROR");
+  };
 </script>
 
 <CompactDialog {title} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button enabled={ready} onclick={() => onConfirm(changed)}>{t("SAVE")}</Button>
+    <Button enabled={ready} onclick={() => void save()}>{t("SAVE")}</Button>
   {/snippet}
-  {#if !fields}
-    <CenteredProgress class="py-6" />
-  {:else}
-    <div class="flex flex-col gap-3.5">
-      {#if busy}
-        <LinearProgress />
-      {/if}
+  <div class="flex flex-col gap-3.5">
+    {#if error}
+      <p class="text-body-sm wrap-anywhere text-error">{error}</p>
+    {/if}
+    {#if fields}
       {#each fields as field (field.key)}
         {#if field.type === "boolean"}
           <SwitchRow
@@ -97,6 +117,8 @@
           </div>
         {/if}
       {/each}
-    </div>
-  {/if}
+    {:else if !error}
+      <CenteredProgress class="py-6" />
+    {/if}
+  </div>
 </CompactDialog>

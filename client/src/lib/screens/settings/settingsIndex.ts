@@ -9,6 +9,7 @@ import { webApp } from "$lib/platform/pwa.svelte";
 import { describe, shortcuts, SHORTCUTS } from "$lib/platform/shortcuts.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
 import { driveAvailable } from "$lib/services/drive/config";
+import { deviceBrowsing } from "$lib/screens/browser/deviceEngine";
 import { SETTINGS_SECTIONS, type SettingsSection } from "./sections";
 import {
   accountSummary,
@@ -63,6 +64,7 @@ export type SettingsDialog =
   | "accent"
   | "shortcuts"
   | "discord"
+  | "browser"
   | "generation"
   | "permissions"
   | "persistent"
@@ -95,6 +97,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "mod_band_handle", label: "MOD_BAND_HANDLE", summary: "MOD_BAND_HANDLE_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "chat_files", label: "CHAT_FILES", summary: "CHAT_FILES_SUMMARY", available: () => !layout.mobile, section: "client", group: "SETTINGS_CLIENT" },
   { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
+  { id: "browser", label: "BROWSER", summary: "BROWSER_SUMMARY", available: () => deviceBrowsing, section: "client", group: "SETTINGS_CLIENT", dialog: "browser" },
 
   { id: "notifications", label: "NOTIFICATIONS", value: notificationsValue, section: "background", group: "BACKGROUND_GROUP", dialog: "notifications" },
   { id: "battery", label: "BATTERY_OPTIMIZATION", summary: "BATTERY_OPTIMIZATION_SUMMARY", available: () => androidBackground() !== null, section: "background", group: "BACKGROUND_GROUP" },

@@ -79,29 +79,42 @@ async def browser_ws(ws: WebSocket):
 
     session = browser.session
     queue = session.subscribe()
+    watching = opening.get("watch") is not False
 
     async def outgoing():
         while True:
             kind, body = await queue.get()
             if kind == "frame":
-                await ws.send_bytes(body)
+                if watching:
+                    await ws.send_bytes(body)
             else:
                 await send_event(ws, {"type": kind, **body})
 
+    async def watch(payload: dict):
+        try:
+            await session.ensure(
+                int(payload.get("width") or 0),
+                int(payload.get("height") or 0),
+                float(payload.get("scale") or 1.0),
+            )
+        except (RuntimeError, OSError) as exc:
+            await send_event(ws, {"type": "error", "reason": str(exc)})
+        await send_event(ws, {"type": "state", **session.status()})
+
     pump = asyncio.create_task(outgoing())
-    try:
-        await session.ensure(
-            int(opening.get("width") or 0),
-            int(opening.get("height") or 0),
-            float(opening.get("scale") or 1.0),
-        )
-    except (RuntimeError, OSError) as exc:
-        await send_event(ws, {"type": "error", "reason": str(exc)})
-    await send_event(ws, {"type": "state", **session.status()})
+    if watching:
+        await watch(opening)
+    else:
+        await send_event(ws, {"type": "state", **session.status()})
 
     try:
         while True:
             payload = await ws.receive_json()
+            if payload.get("type") == "watch":
+                watching = payload.get("enabled") is True
+                if watching:
+                    await watch(payload)
+                continue
             try:
                 await _dispatch(session, payload)
             except (RuntimeError, OSError, AttributeError, KeyError) as exc:

@@ -286,11 +286,13 @@ def user_messages_since(project_key: str, session_id: str, offset: int) -> tuple
 
 def _user_row(entry: dict) -> Optional[dict]:
     etype = entry.get("type")
+    source = None
     if etype == "attachment":
         att = entry.get("attachment") or {}
         if att.get("type") != "queued_command":
             return None
         text = _text_from_content(att.get("prompt")).strip()
+        source = att.get("source_uuid")
     elif etype != "user" or entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary") or entry.get("isVisibleInTranscriptOnly"):
         return None
     else:
@@ -308,7 +310,7 @@ def _user_row(entry: dict) -> Optional[dict]:
     uid = entry.get("uuid")
     if not uid or not text or _COMMAND_META_RE.search(text) or _INTERRUPT_RE.match(text):
         return None
-    return {"uuid": uid, "text": text, "ts": _parse_ts(entry.get("timestamp"))}
+    return {"uuid": uid, "text": text, "ts": _parse_ts(entry.get("timestamp")), "source": source}
 
 
 def _text_from_content(content: Any) -> str:

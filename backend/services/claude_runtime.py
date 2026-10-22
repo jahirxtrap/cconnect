@@ -108,6 +108,12 @@ def _suggestions_guide() -> str:
     return _prompt_file("SUGGESTIONS.md")
 
 
+def _mods_guide() -> str:
+    if not mods.enabled():
+        return ""
+    return _prompt_file("MODS.md")
+
+
 def _browser_guide(capabilities: list[str]) -> str:
     if "browser" not in capabilities or not settings_store.get("browser_view"):
         return ""
@@ -132,7 +138,7 @@ def _join(text: str, block: str) -> str:
 
 def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]]) -> list[str]:
     caps = list(capabilities or ())
-    guides = [_blocks_guide(caps), _browser_guide(caps), _suggestions_guide()]
+    guides = [_blocks_guide(caps), _browser_guide(caps), _suggestions_guide(), _mods_guide()]
     user = claude_assets.get_user_prompt().strip()
     if user:
         guides.append(
@@ -932,6 +938,7 @@ async def run_prompt(
 
     chips: list[dict] = [] if adopt else [{"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000)}]
     pending_announce: list[dict] = list(chips)
+    handed: dict[str, dict] = {}
     seen_users: set[str] = set()
     carried_seen: set[str] = set()
     read_offsets: dict[str, int] = {}
@@ -995,7 +1002,14 @@ async def run_prompt(
             seen_users.add(uid)
             wanted = _flat(text)
             begin = end = None
-            for start in range(len(chips)):
+            source = u.get("source")
+            if source:
+                begin = next(
+                    (index for index, chip in enumerate(chips) if (chip.get("item") or {}).get("cli_uuid") == source),
+                    None,
+                )
+                end = None if begin is None else begin + 1
+            for start in range(len(chips) if begin is None else 0):
                 acc = ""
                 for i in range(start, len(chips)):
                     acc = chips[i]["sent"] if i == start else acc + "\n" + chips[i]["sent"]
@@ -1028,6 +1042,8 @@ async def run_prompt(
                 "consumed": sum(1 for c in taken if c["drained"]),
                 "ts": u.get("ts") or next((c.get("ts") for c in taken if c.get("ts")), None),
             })
+            for chip in skipped + taken:
+                chip["announced"] = True
         return events
 
     async def _prompt_stream():
@@ -1045,6 +1061,7 @@ async def run_prompt(
                     icontent = item["text"]
                     sent = item["text"]
                 item["cli_uuid"] = str(uuid.uuid4())
+                handed[item["cli_uuid"]] = item
                 chip = {"id": item.get("id"), "sent": sent, "drained": True, "ts": item.get("ts"), "item": item}
                 chips.append(chip)
                 pending_announce.append(chip)
@@ -1171,6 +1188,19 @@ async def run_prompt(
                             context_tokens = total
                             yield {"type": "context", "context_tokens": total}
             elif isinstance(message, UserMessage):
+                taken = handed.pop(getattr(message, "uuid", None) or "", None)
+                if taken is not None:
+                    taken["taken"] = True
+                    chip = next((c for c in chips if c.get("item") is taken and not c.get("announced")), None)
+                    if chip is not None:
+                        chip["announced"] = True
+                        yield {
+                            "type": "dequeued",
+                            "ids": [chip["id"]] if chip.get("id") else [],
+                            "text": chip.get("sent") or "",
+                            "consumed": 0,
+                            "ts": int(time.time() * 1000),
+                        }
                 if emit is not None:
                     for _b in getattr(message, "content", None) or []:
                         if type(_b).__name__ == "ToolResultBlock":

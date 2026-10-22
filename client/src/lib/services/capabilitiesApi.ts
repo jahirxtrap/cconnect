@@ -102,6 +102,15 @@ interface ModelWire {
   auto_mode?: boolean;
 }
 
+export interface CommandWire {
+  name?: string;
+  description?: string;
+  kind?: string;
+  require_confirmation?: boolean;
+  argument_hint?: string;
+  aliases?: string[];
+}
+
 interface CapabilitiesWire extends VersionWire {
   permission_modes?: Array<{ id?: string; label?: string }>;
   models?: ModelWire[];
@@ -110,14 +119,7 @@ interface CapabilitiesWire extends VersionWire {
   output_styles?: string[];
   fast_mode?: { state?: string; disabled_reason?: string | null };
   colors?: string[];
-  commands?: Array<{
-    name?: string;
-    description?: string;
-    kind?: string;
-    require_confirmation?: boolean;
-    argument_hint?: string;
-    aliases?: string[];
-  }>;
+  commands?: CommandWire[];
   accounts?: Array<{ id?: string; label?: string; provider?: boolean }>;
   defaults?: { permission_mode?: string; effort?: string; model?: string; account?: string };
   mcp_tools?: Array<{ name?: string; description?: string; group?: string; group_description?: string }>;
@@ -131,6 +133,18 @@ const toVersion = (data: VersionWire): VersionInfo => ({
   gated: data.exposure?.gated === true,
   authorized: data.exposure?.authorized !== false,
 });
+
+export const toCommands = (raw: CommandWire[] | undefined): CommandOption[] =>
+  (raw ?? [])
+    .filter((command) => command.name)
+    .map((command) => ({
+      name: command.name!,
+      description: command.description ?? "",
+      kind: command.kind ?? "prompt",
+      requireConfirmation: command.require_confirmation === true,
+      argumentHint: command.argument_hint ?? "",
+      aliases: command.aliases ?? [],
+    }));
 
 const toOptions = (raw: Array<{ id?: string; label?: string }> | undefined): LabeledOption[] =>
   (raw ?? []).filter((option) => option.id).map((option) => ({ id: option.id!, label: option.label ?? option.id! }));
@@ -196,16 +210,7 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
         disabledReason: data.fast_mode?.disabled_reason ?? null,
       },
       colors: data.colors ?? [],
-      commands: (data.commands ?? [])
-        .filter((command) => command.name)
-        .map((command) => ({
-          name: command.name!,
-          description: command.description ?? "",
-          kind: command.kind ?? "prompt",
-          requireConfirmation: command.require_confirmation === true,
-          argumentHint: command.argument_hint ?? "",
-          aliases: command.aliases ?? [],
-        })),
+      commands: toCommands(data.commands),
       accounts: (data.accounts ?? [])
         .filter((option) => option.id)
         .map((option) => ({

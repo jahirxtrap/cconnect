@@ -77,13 +77,15 @@ class Navigation {
 
     $effect(() => {
       const onPopState = () => {
+        const leaving = this.#leaving;
+        this.#leaving = false;
         if (consumingDismiss()) return;
         if (dismissTop()) return;
         if (this.previewOverlay) {
           this.preview = null;
           return;
         }
-        if (this.#dismiss()) {
+        if (this.#dismiss(leaving)) {
           window.history.pushState(null, "", this.#url());
           return;
         }
@@ -99,6 +101,7 @@ class Navigation {
   navigate(target: Route) {
     if (this.route === target && this.sub === null) return;
     this.sub = null;
+    this.#leaving = false;
     window.history.pushState(null, "", target);
     this.route = target;
   }
@@ -170,20 +173,20 @@ class Navigation {
     if (this.previewOverlay) window.history.back();
   }
 
-  intercept(handler: () => boolean) {
-    this.#interceptors.push(handler);
+  intercept(handler: () => boolean, { system = false }: { system?: boolean } = {}) {
+    const entry = { handler, system };
+    this.#interceptors.push(entry);
     return () => {
-      this.#interceptors = this.#interceptors.filter((item) => item !== handler);
+      this.#interceptors = this.#interceptors.filter((item) => item !== entry);
     };
   }
 
-  close(): boolean {
+  close(leaving = false): boolean {
     if (this.previewOverlay) {
       this.closePreview();
       return true;
     }
-    if (this.#dismiss()) return true;
-    return false;
+    return this.#dismiss(leaving);
   }
 
   forward() {
@@ -192,10 +195,11 @@ class Navigation {
   }
 
   back() {
-    if (this.close()) return;
+    if (this.close(true)) return;
     if (this.routeLocked) return;
     this.settingsHighlight = null;
     this.sharedTarget = null;
+    this.#leaving = true;
     window.history.back();
   }
 
@@ -204,16 +208,19 @@ class Navigation {
     return window.location.pathname === path ? path + window.location.search : path;
   }
 
-  #dismiss(): boolean {
+  #dismiss(leaving = false): boolean {
     for (let index = this.#interceptors.length - 1; index >= 0; index--) {
-      if (this.#interceptors[index]()) return true;
+      const { handler, system } = this.#interceptors[index];
+      if (!(leaving && system) && handler()) return true;
     }
     return false;
   }
 
   #closingSettings = false;
 
-  #interceptors: (() => boolean)[] = [];
+  #leaving = false;
+
+  #interceptors: { handler: () => boolean; system: boolean }[] = [];
 }
 
 export const navigation = new Navigation();

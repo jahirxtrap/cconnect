@@ -230,7 +230,8 @@ html[data-theme="dark"] {
 }
 
 html.scanning,
-html.scanning body {
+html.scanning body,
+html.browsing body {
   background: transparent;
 }
 

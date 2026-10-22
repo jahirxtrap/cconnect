@@ -56,12 +56,17 @@
   let padded = $state<HTMLElement | null>(null);
   let bodyInner = $state(0);
   let bodyOuter = $state(0);
+  let barInner = $state(0);
+  let barOuter = $state(0);
+  let paddedOuter = $state(0);
   let padding = $state(0);
   let following = false;
   let offset = $state(0);
 
   const glyph = $derived(probeWidth / PROBE.length);
-  const grid = $derived(gridOf(width, glyph, cellHeight));
+  const scrollbar = $derived(barOuter - barInner);
+  const barShown = $derived(bodyOuter > paddedOuter);
+  const grid = $derived(gridOf(width, glyph, cellHeight, barShown ? 0 : scrollbar));
   const columns = $derived(grid.columns);
   const cellWidth = $derived(grid.cell);
   const rows = $derived(
@@ -263,6 +268,12 @@
     bind:clientHeight={cellHeight}
     class="pointer-events-none invisible absolute top-0 left-0 font-mono whitespace-pre">{PROBE}</span
   >
+  <div
+    aria-hidden="true"
+    bind:offsetWidth={barOuter}
+    bind:clientWidth={barInner}
+    class="pointer-events-none invisible absolute top-0 left-0 size-12 overflow-y-scroll {thin ? 'scrollbar-thin' : ''}"
+  ></div>
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     bind:this={body}
@@ -286,6 +297,7 @@
   >
     <div
       bind:this={padded}
+      bind:offsetWidth={paddedOuter}
       style={edge ? `padding-right: max(0px, calc(${edge} - ${bodyOuter - bodyInner}px))` : undefined}
       class="flex min-h-full flex-col {bodyClass}"
     >

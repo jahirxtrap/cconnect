@@ -33,6 +33,7 @@
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import {
     claudeApi,
+    pluginKey,
     type CatalogPlugin,
     type ChatMod,
     type Extensions,
@@ -40,7 +41,6 @@
     type McpServer,
     type Memories,
     type Plugin,
-    type PluginOption,
     type PluginReview,
     type ServiceStatus,
     type Skill,
@@ -111,7 +111,6 @@
   let pluginMenu = $state<Plugin | null>(null);
   let pluginReview = $state<PluginReview | null>(null);
   let optionsFor = $state<Plugin | null>(null);
-  let optionFields = $state<PluginOption[] | null>(null);
   let localCandidate = $state<ChatMod | null>(null);
   let pickingFolder = $state(false);
   let confirmUninstall = $state<Plugin | null>(null);
@@ -210,29 +209,12 @@
   const catalogTitle = (source: CatalogSource) =>
     source.kind === "all" ? t("ALL_MARKETPLACES") : source.kind === "chats" ? t("CHAT_MODS") : source.name;
 
-  const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
-
   const reviewKey = $derived(pluginMenu?.mod ? pluginKey(pluginMenu) : null);
 
   const chatTitle = (mod: ChatMod) => {
     const session = chat.list?.sessions.find((item) => item.sessionId === mod.sessionId);
     return session ? sessionLabel(session) : sessionIdPreview(mod.sessionId);
   };
-
-  const openOptions = async (plugin: Plugin) => {
-    optionsFor = plugin;
-    optionFields = null;
-    const fields = await claudeApi.pluginOptions(pluginKey(plugin));
-    if (optionsFor !== plugin) return;
-    if (fields) optionFields = fields;
-    else {
-      optionsFor = null;
-      actionError = t("CONNECTION_ERROR");
-    }
-  };
-
-  const saveOptions = (plugin: Plugin, values: Record<string, string>) =>
-    void runAction(() => claudeApi.setPluginOptions(pluginKey(plugin), values)).then(() => (optionsFor = null));
 
   const installLocal = (path: string) => {
     localCandidate = null;
@@ -627,7 +609,7 @@
           <LinearProgress />
         {/if}
         {#if plugin.options}
-          <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => void openOptions(plugin)} class="w-full" />
+          <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => (optionsFor = plugin)} class="w-full" />
         {/if}
         {#if !plugin.local}
           <ActionButton
@@ -839,10 +821,9 @@
 {#if optionsFor}
   {@const plugin = optionsFor}
   <PluginOptionsDialog
+    api={claudeApi}
+    plugin={pluginKey(plugin)}
     title={plugin.name}
-    fields={optionFields}
-    {busy}
-    onConfirm={(values) => saveOptions(plugin, values)}
     onDismiss={() => (optionsFor = null)}
   />
 {/if}
