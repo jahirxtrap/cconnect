@@ -777,6 +777,58 @@ def session_context(cwd: str, session_id: str, max_chars: int = 4000) -> str:
     return "\n".join(parts)[-max_chars:]
 
 
+_BRANCH_KEYS = ("uuid", "parentUuid", "logicalParentUuid", "isSidechain", "type", "subtype", "isCompactSummary")
+
+
+def _conversation_row(entry: dict) -> Optional[dict]:
+    if entry.get("isSidechain"):
+        return None
+    if entry.get("isCompactSummary"):
+        role, text = "summary", _compact_summary_text(entry)
+    elif entry.get("type") == "assistant":
+        content = (entry.get("message") or {}).get("content")
+        blocks = content if isinstance(content, list) else []
+        role = "assistant"
+        text = "\n".join(b.get("text", "") for b in blocks if isinstance(b, dict) and b.get("type") == "text").strip()
+    else:
+        role, text = "user", (_user_row(entry) or {}).get("text") or ""
+    return {"role": role, "text": text, "ts": _parse_ts(entry.get("timestamp"))} if text else None
+
+
+def _skeleton(entry: dict) -> dict:
+    kept = {key: entry[key] for key in _BRANCH_KEYS if key in entry}
+    message = entry.get("message")
+    if isinstance(message, dict):
+        content = message.get("content")
+        blocks = [{"type": b.get("type")} for b in content if isinstance(b, dict)] if isinstance(content, list) else None
+        kept["message"] = {"id": message.get("id"), "content": blocks}
+    return kept
+
+
+def conversation(cwd: str, session_id: str) -> list[dict]:
+    try:
+        file = _session_file(project_key_for(cwd), session_id)
+    except ValueError:
+        return []
+    if not file.is_file():
+        return []
+    segments: list[list[dict]] = [[]]
+    for entry in _iter_lines(file):
+        skeleton = _skeleton(entry)
+        row = _conversation_row(entry)
+        if row is not None:
+            skeleton["row"] = row
+        if skeleton.get("type") == "system" and skeleton.get("subtype") == "compact_boundary":
+            segments.append([])
+        segments[-1].append(skeleton)
+    return [
+        skeleton["row"]
+        for segment in segments
+        for skeleton in _active_entries(segment, session_id)
+        if "row" in skeleton
+    ]
+
+
 _TASK_CREATED_RE = re.compile(r"Task #(\d+) created", re.IGNORECASE)
 
 

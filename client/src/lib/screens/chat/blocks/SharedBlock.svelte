@@ -3,6 +3,7 @@
   import type { SharedFile } from "$lib/data/chatModels";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { contextServer } from "$lib/services/serverContext";
   import { downloadAllShared, saveSharedItemsAs } from "$lib/services/sharedFiles";
   import Button from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
@@ -28,7 +29,8 @@
 
   const ACTION_CLASS = "h-8 text-body-md font-normal";
 
-  const listed = $derived(files.map((file) => ({ ...file, url: backend.resolveShared(file.url) })));
+  const server = contextServer();
+  const listed = $derived(files.map((file) => ({ ...file, url: backend.resolveShared(file.url, server()) })));
 </script>
 
 <Collapsible

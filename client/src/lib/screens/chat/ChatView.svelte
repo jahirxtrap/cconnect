@@ -22,7 +22,8 @@
   import { onNativePaste } from "$lib/platform/pastedContent";
   import { backend } from "$lib/services/backend.svelte";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
-  import { downloadUrl, relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
+  import { provideServer } from "$lib/services/serverContext";
+  import { downloadUrl, relativeFromUrl } from "$lib/services/sharedApi";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -41,6 +42,7 @@
   import ModBand from "$lib/screens/mods/ModBand.svelte";
   import type { ModCompletions, ModDecoration, ModStroke } from "$lib/data/modModels";
   import { BAND_ID, type ModHost } from "$lib/screens/mods/modSurface.svelte";
+  import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
   import { copyText } from "$lib/platform/clipboard";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
@@ -83,6 +85,8 @@
   const SIDE_PEEK = 58;
 
   const chat = $derived(tabs.stateFor(tab));
+
+  provideServer(() => chat.environment);
 
   let confirmCommand = $state<CommandOption | null>(null);
   let rewindOpen = $state(false);
@@ -153,7 +157,7 @@
     openFilePreview({
       url,
       name: filename,
-      onDelete: relative ? () => void sharedApi.remove(relative) : null,
+      onDelete: relative ? () => void chat.shared.remove(relative) : null,
     });
   };
 
@@ -262,6 +266,12 @@
     wasBusy = busy;
   });
 
+  const pickSuggestion = $derived(
+    chat.viewOnly || chat.streaming
+      ? null
+      : (item: SuggestionItem) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text)),
+  );
+
   $effect(() => {
     const mods = chat.mods;
     const host: ModHost = {
@@ -278,6 +288,7 @@
       },
       copy: (text) => copyText(text),
       selection: () => lastSelection,
+      pickSuggestion,
     };
     mods.host = host;
     return () => {
@@ -418,9 +429,7 @@
           bind:follow={chat.followBottom}
           onSharedLink={openShared}
           onSharedMenu={(url, filename) => (sharedLink = { url, filename })}
-          onSuggest={chat.viewOnly || chat.streaming
-            ? null
-            : (item) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text))}
+          onSuggest={pickSuggestion}
           sessionId={chat.sessionId}
           mods={chat.mods}
           expandedIds={chat.expandedIds}
@@ -624,7 +633,7 @@
       openFilePreview({
         url: target.url,
         name: target.filename,
-        onDelete: relative ? () => void sharedApi.remove(relative) : null,
+        onDelete: relative ? () => void chat.shared.remove(relative) : null,
       })}
     onOpenInShared={relative && isArchive(target.filename)
       ? () => navigation.openShared(relative)
@@ -670,11 +679,11 @@
               icon={isArchive(name) ? FolderArchive : FileIcon}
               onclick={() => {
                 queuedId = null;
-                openFilePreview({ url: downloadUrl(attachment), name, onDelete: null });
+                openFilePreview({ url: downloadUrl(attachment, chat.environment), name, onDelete: null });
               }}
               onmenu={() => {
                 queuedId = null;
-                sharedLink = { url: downloadUrl(attachment), filename: name };
+                sharedLink = { url: downloadUrl(attachment, chat.environment), filename: name };
               }}
             />
           {/each}

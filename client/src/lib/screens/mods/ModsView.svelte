@@ -15,6 +15,7 @@
   import PaneActions from "$lib/screens/chat/PaneActions.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
+  import { provideServer } from "$lib/services/serverContext";
   import TabStrip from "$lib/screens/chat/TabStrip.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -29,6 +30,8 @@
   }
 
   const { chat }: Props = $props();
+
+  provideServer(() => chat.environment);
 
   let menu = $state(false);
   let installed = $state<Plugin[]>([]);

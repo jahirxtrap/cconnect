@@ -2,6 +2,7 @@ import type { DeviceBounds } from "./deviceBrowser.svelte";
 import { browserCall } from "./deviceEngine";
 
 const SAMPLE = 24;
+const HANDLES = "[role=separator]";
 const SEE_THROUGH = "browsing";
 const CLEAR = "rgba(0, 0, 0, 0)";
 const MASK = ["mask-image", "mask-size", "mask-position", "mask-repeat", "mask-composite"] as const;
@@ -26,6 +27,12 @@ export const coverOf = (surface: HTMLElement, hole: DeviceBounds): DeviceBounds[
       const hit = document.elementFromPoint(x, y);
       if (hit && hit !== surface && !surface.contains(hit)) layers.add(branchOf(hit, surface));
     }
+  }
+  for (const handle of document.querySelectorAll(HANDLES)) {
+    const box = handle.getBoundingClientRect();
+    const inside =
+      box.left < hole.x + hole.width && box.right > hole.x && box.top < hole.y + hole.height && box.bottom > hole.y;
+    if (inside) layers.add(handle);
   }
   return [...layers].map((layer) => rounded(layer.getBoundingClientRect()));
 };

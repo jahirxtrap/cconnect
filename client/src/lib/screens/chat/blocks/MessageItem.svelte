@@ -17,6 +17,7 @@
   import { userContent } from "$lib/data/userContent";
   import { elementLabel } from "$lib/data/pickedElements";
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import { contextServer } from "$lib/services/serverContext";
   import Chip from "$lib/ui/Chip.svelte";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
@@ -71,6 +72,8 @@
     mods = null,
   }: Props = $props();
 
+  const server = contextServer();
+
   const rowId = $derived(String(message.id));
   const spinnerProps = $derived({ word: t("WORKING"), message: null, suffix: "", mode: running ? "requesting" : "responding" });
   const top = $derived(gluedTop ? NO_GAP : gapAbove(prevRole, message.role));
@@ -88,7 +91,7 @@
 {/snippet}
 
 {#snippet userRow(props: Record<string, unknown>)}
-  {@const content = userContent(message)}
+  {@const content = userContent(message, server())}
   {@const body = typeof props.text === "string" ? props.text : content.body}
   {@const showTime = message.timestamp !== null && settings.showTimestamps}
   {@const chips = content.attachments.length + content.elements.length}
@@ -194,7 +197,7 @@
 
 <div class="w-full" style="padding-top: {top}; padding-bottom: {bottom}">
   {#if message.role === "user"}
-    {@const props = { text: userContent(message).body, origin: { kind: "composer" }, isExpanded: false }}
+    {@const props = { text: userContent(message, server()).body, origin: { kind: "composer" }, isExpanded: false }}
     {#if mods?.state.surface}
       <ModInline {mods} component="UserMessage" instanceId={rowId} {props} engine={userRow} inset />
     {:else}

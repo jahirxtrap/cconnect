@@ -1,5 +1,6 @@
 import { previewKindOf } from "./previewKind";
 import { splitElements, type PickedElement } from "./pickedElements";
+import type { Profile } from "$lib/services/backend.svelte";
 import { downloadUrl } from "$lib/services/sharedApi";
 import type { ChatMessage } from "./chatModels";
 
@@ -27,7 +28,7 @@ const isMentionLine = (line: string) =>
 
 const basename = (value: string) => value.split("/").pop() ?? value;
 
-export const userContent = (message: ChatMessage): UserContent => {
+export const userContent = (message: ChatMessage, profile: Profile): UserContent => {
   const media: UserAttachment[] = [];
   const files: UserAttachment[] = [];
   const split = splitElements(message.text);
@@ -39,7 +40,7 @@ export const userContent = (message: ChatMessage): UserContent => {
   };
 
   if (message.attachments) {
-    for (const path of message.attachments) push(path, downloadUrl(path));
+    for (const path of message.attachments) push(path, downloadUrl(path, profile));
     body = body
       .split("\n")
       .filter((line) => !isMentionLine(line))
@@ -55,7 +56,7 @@ export const userContent = (message: ChatMessage): UserContent => {
           const path = sharedPath(raw);
           if (path === null) continue;
           const name = basename(path);
-          const url = downloadUrl(path);
+          const url = downloadUrl(path, profile);
           if (previewKindOf(name) === "image") {
             const fallback = images[imageIndex];
             imageIndex++;

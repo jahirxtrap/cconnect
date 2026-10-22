@@ -405,7 +405,12 @@
       {...marks(child)}
       onclickcapture={(event) => linkPress(child, event)}
     >
-      <MarkdownText text={prop(child, "text") ?? ""} dense class="min-w-0" />
+      <MarkdownText
+        text={prop(child, "text") ?? ""}
+        dense
+        class="min-w-0"
+        onSuggest={mods.host?.pickSuggestion ?? null}
+      />
     </div>
   {:else if child.type === "Code"}
     <ModCode

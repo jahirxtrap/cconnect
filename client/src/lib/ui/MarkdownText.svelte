@@ -14,6 +14,7 @@
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
   import { createSegmenter, type Segment } from "$lib/markdown/render";
   import { backend, sharedRootOf } from "$lib/services/backend.svelte";
+  import { contextServer } from "$lib/services/serverContext";
   import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
   import ConfirmDialog from "./ConfirmDialog.svelte";
@@ -41,8 +42,9 @@
   const ALERT_KINDS = ["note", "tip", "important", "warning", "caution"];
 
   const segments = createSegmenter();
-  const sharedRoot = $derived(sharedRootOf(backend.active));
-  const resolved = $derived(backend.resolveShared(text));
+  const server = contextServer();
+  const sharedRoot = $derived(sharedRootOf(server()));
+  const resolved = $derived(backend.resolveShared(text, server()));
   const parts = $derived(segments(resolved));
   const shared = (url: string) => url.startsWith(sharedRoot);
 

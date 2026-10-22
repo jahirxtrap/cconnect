@@ -22,6 +22,7 @@ import {
   type ModStroke,
   type ModToast,
 } from "$lib/data/modModels";
+import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
 import { store } from "$lib/platform/storage";
 import { ModClients } from "./modClients.svelte";
 
@@ -38,6 +39,7 @@ export interface ModHost {
   suggest: (text: string) => boolean;
   copy: (text: string) => Promise<boolean>;
   selection: () => string;
+  pickSuggestion: ((item: SuggestionItem) => void) | null;
 }
 
 export const BAND_ID = "above-prompt";
@@ -88,7 +90,7 @@ export class ModSurface {
   raised = $state<string | null>(null);
   readonly hotScopes = new SvelteSet<string>();
   readonly clients: ModClients;
-  host: ModHost | null = null;
+  host = $state.raw<ModHost | null>(null);
   #drawn = $state<Record<string, ModDrawn>>({});
   #drawnColumns = $state<Record<string, number>>({});
   #sentColumns = new Map<string, number>();

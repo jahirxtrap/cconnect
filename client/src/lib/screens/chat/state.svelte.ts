@@ -68,6 +68,7 @@ import {
 } from "$lib/services/capabilitiesApi";
 import { ChatSocket, type ServerEvent } from "$lib/services/chatSocket";
 import { createClaudeApi } from "$lib/services/claudeApi";
+import { createSharedApi } from "$lib/services/sharedApi";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi } from "$lib/services/settingsApi";
 import {
@@ -320,6 +321,7 @@ export class ChatState {
   #capabilities = createCapabilitiesApi(this.#http);
   #settings = createSettingsApi(this.#http);
   readonly claude = createClaudeApi(this.#http, () => this.environment);
+  readonly shared = createSharedApi(this.#http);
   #socket = new ChatSocket(
     (side, parent, event) => this.#onEvent(side, parent, event),
     () => this.environment,

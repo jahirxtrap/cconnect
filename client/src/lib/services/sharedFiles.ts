@@ -14,7 +14,7 @@ const fetchTracked = async (
   url: string,
   onProgress: (value: number) => void,
   signal: AbortSignal,
-  profile: Profile = backend.active,
+  profile: Profile = backend.sharedProfileOf(url),
 ): Promise<Blob | null> => {
   try {
     const response = await fetch(url, { headers: securityKeys.fileHeadersFor(profile), signal });
@@ -39,7 +39,7 @@ const fetchTracked = async (
 
 const TEXT_TYPE = "text/markdown";
 
-const headersJson = (profile: Profile = backend.active) => JSON.stringify(securityKeys.fileHeadersFor(profile));
+const headersJson = (url: string) => JSON.stringify(securityKeys.fileHeadersFor(backend.sharedProfileOf(url)));
 
 const saveBlob = async (blob: Blob, filename: string): Promise<string | null> => {
   if (!isTauri) {
@@ -105,7 +105,7 @@ export const downloadShared = (url: string, filename: string) => {
     return transfers.download(
       filename,
       (onProgress, signal, keep) => {
-        const id = bridge.enqueue(url, filename, headersJson());
+        const id = bridge.enqueue(url, filename, headersJson(url));
         if (!id) return Promise.resolve(false);
         keep(id);
         return trackAndroidDownload(bridge, id, onProgress, signal);
@@ -196,7 +196,7 @@ const saveBlobAs = async (blob: Blob, filename: string) => {
 export const saveSharedAs = async (url: string, filename: string) => {
   const bridge = androidDownloads();
   if (bridge) {
-    bridge.saveAs(url, filename, headersJson());
+    bridge.saveAs(url, filename, headersJson(url));
     return;
   }
   if (!isTauri) {
@@ -258,7 +258,7 @@ export const shareAllShared = async (items: SharedItem[]) => {
 export const shareShared = async (url: string, filename: string) => {
   const bridge = androidDownloads();
   if (bridge) {
-    bridge.share(url, filename, headersJson());
+    bridge.share(url, filename, headersJson(url));
     return;
   }
   let blob: Blob | null = null;
@@ -283,7 +283,7 @@ export const openTransfer = async (saved: string, url: string, filename: string)
 export const openSharedExternally = async (url: string, filename: string) => {
   const bridge = androidDownloads();
   if (bridge) {
-    bridge.open(url, filename, headersJson());
+    bridge.open(url, filename, headersJson(url));
     return;
   }
   const blob = await fetchTracked(url, () => {}, new AbortController().signal);

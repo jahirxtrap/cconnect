@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  export const RAIL_WIDTH = 64;
+  export const LEFT_MIN_WIDTH = 220;
+</script>
+
 <script lang="ts">
   import Activity from "@lucide/svelte/icons/activity";
   import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
@@ -9,7 +14,6 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import type { SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
-  import { layout } from "$lib/platform/layout.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
@@ -21,8 +25,11 @@
     accent: string;
     expanded: boolean;
     width: number;
+    max: number;
     onExpanded: (value: boolean) => void;
-    onWidth: (value: number, committed: boolean) => void;
+    resizing: boolean;
+    onWidth: (value: number) => void;
+    onDragging: (active: boolean) => void;
     onNewTab: (categoryId: string | null) => void;
     onOpenSession: (session: SessionInfo) => void;
     onOpenRight: (session: SessionInfo) => void;
@@ -39,8 +46,11 @@
     accent,
     expanded,
     width,
+    max,
     onExpanded,
+    resizing,
     onWidth,
+    onDragging,
     onNewTab,
     onOpenSession,
     onOpenRight,
@@ -51,21 +61,13 @@
     onNewCategory,
     onOrganize,
   }: Props = $props();
-
-  const RAIL_WIDTH = 64;
-  const MIN_WIDTH = 220;
-  const MAX_FRACTION = 0.5;
-
-  let dragging = $state(false);
-
-  const shownWidth = $derived(Math.round(Math.min(Math.max(width, MIN_WIDTH), layout.width * MAX_FRACTION)));
 </script>
 
 <div
-  class="relative h-full shrink-0 overflow-hidden bg-surface {dragging
+  class="relative h-full shrink-0 overflow-hidden bg-surface {resizing
     ? ''
     : 'transition-[width] duration-200'}"
-  style="width: {expanded ? shownWidth : RAIL_WIDTH}px; {accent}"
+  style="width: {expanded ? width : RAIL_WIDTH}px; {accent}"
 >
   {#if expanded}
     <ChatList
@@ -89,14 +91,11 @@
       class="absolute inset-y-0 right-0 z-10 w-1 cursor-col-resize"
       use:resizeHandle={{
         axis: "x",
-        value: () => shownWidth,
-        min: MIN_WIDTH,
-        max: () => layout.width * MAX_FRACTION,
-        onResize: (value) => onWidth(value, false),
-        onDragging: (active) => {
-          dragging = active;
-          if (!active) onWidth(shownWidth, true);
-        },
+        value: () => width,
+        min: LEFT_MIN_WIDTH,
+        max: () => max,
+        onResize: onWidth,
+        onDragging,
       }}
     ></div>
   {:else}

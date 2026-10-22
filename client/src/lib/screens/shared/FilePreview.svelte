@@ -152,7 +152,7 @@
       return;
     }
     failed = false;
-    void fetch(target, { headers: securityKeys.fileHeadersFor(backend.active) })
+    void fetch(target, { headers: securityKeys.fileHeadersFor(backend.sharedProfileOf(target)) })
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
         arrived = { base: requested, name, body: await response.text() };

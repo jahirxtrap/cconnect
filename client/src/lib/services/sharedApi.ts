@@ -48,7 +48,7 @@ export const sharedPrefix = (profile: Profile = backend.active) => `${baseUrlOf(
 export const downloadUrl = (path: string, profile: Profile = backend.active) =>
   `${sharedPrefix(profile)}${encodePath(path)}`;
 
-export const relativeFromUrl = (url: string, profile: Profile = backend.active): string | null => {
+export const relativeFromUrl = (url: string, profile: Profile = backend.sharedProfileOf(url)): string | null => {
   const prefix = sharedPrefix(profile);
   if (!url.startsWith(prefix)) return null;
   return url.slice(prefix.length).split("?")[0].split("/").map(decodeSegment).join("/");

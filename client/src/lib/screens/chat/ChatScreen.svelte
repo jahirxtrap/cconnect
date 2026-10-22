@@ -30,7 +30,7 @@
   import PaneSurface from "./PaneSurface.svelte";
   import ChatList from "./ChatList.svelte";
   import { panes } from "./panes.svelte";
-  import LeftPane from "./LeftPane.svelte";
+  import LeftPane, { LEFT_MIN_WIDTH, RAIL_WIDTH } from "./LeftPane.svelte";
   import MoveSessionDialog from "./MoveSessionDialog.svelte";
   import OrganizeDialog from "./OrganizeDialog.svelte";
   import TabStrip from "./TabStrip.svelte";
@@ -55,7 +55,6 @@
   );
 
   const MIN_SIDE_WIDTH = 280;
-  const MAX_PANEL_FRACTION = 0.5;
 
   const NOTICE_KEYS: Record<CompatNotice, string> = {
     app_outdated: "COMPAT_APP_OUTDATED",
@@ -67,10 +66,39 @@
   let expanded = $state(settings.leftExpanded);
   let leftWidth = $state(settings.leftWidth);
   let rightWidth = $state(settings.rightWidth);
-  let rightDragging = $state(false);
+  let resizing = $state(false);
+  let pinned: { left: number; right: number } | null = null;
 
-  const sideMax = $derived(layout.width * MAX_PANEL_FRACTION);
-  const panelWidth = $derived(Math.round(Math.min(Math.max(rightWidth, MIN_SIDE_WIDTH), sideMax)));
+  const sideRoom = $derived(layout.width - MIN_SIDE_WIDTH);
+
+  const fitWidths = (left: number, leftMin: number, right: number, rightMin: number) => {
+    const excess = left + right - sideRoom;
+    const slack = left - leftMin + right - rightMin;
+    if (excess <= 0 || slack <= 0) return { left, right };
+    const share = Math.min(excess, slack) / slack;
+    return { left: left - (left - leftMin) * share, right: right - (right - rightMin) * share };
+  };
+
+  const leftMin = $derived(expanded ? LEFT_MIN_WIDTH : RAIL_WIDTH);
+  const leftWanted = $derived(expanded ? Math.max(leftWidth, LEFT_MIN_WIDTH) : RAIL_WIDTH);
+  const sides = $derived(fitWidths(leftWanted, leftMin, Math.max(rightWidth, MIN_SIDE_WIDTH), MIN_SIDE_WIDTH));
+  const panelWidth = $derived(Math.round(sides.right));
+  const leftShown = $derived(Math.round(panes.open ? sides.left : fitWidths(leftWanted, leftMin, 0, 0).left));
+
+  const pushed = (value: number, kept: number, min: number) => Math.max(min, Math.min(kept, sideRoom - value));
+
+  const pinWidths = (active: boolean) => {
+    resizing = active;
+    if (active) {
+      pinned = { left: leftShown, right: panelWidth };
+      if (expanded) leftWidth = leftShown;
+      rightWidth = panelWidth;
+      return;
+    }
+    pinned = null;
+    if (expanded) settings.leftWidth = leftWidth;
+    settings.rightWidth = rightWidth;
+  };
 
   const centerView = $derived(panes.centerView && !layout.mobile);
   const centerPreview = $derived(centerView && panes.previewing);
@@ -132,7 +160,7 @@
 
   $effect(() => {
     layout.rightInset = navigation.chatActive && !layout.mobile && panes.open ? panelWidth : 0;
-    layout.rightInsetAnimated = !rightDragging;
+    layout.rightInsetAnimated = !resizing;
     return () => (layout.rightInset = 0);
   });
 
@@ -237,12 +265,15 @@
       {chat}
       accent={leftAccent}
       {expanded}
-      width={leftWidth}
+      width={leftShown}
+      max={sideRoom - (panes.open ? MIN_SIDE_WIDTH : 0)}
+      {resizing}
       onExpanded={setExpanded}
-      onWidth={(value, committed) => {
+      onWidth={(value) => {
         leftWidth = value;
-        if (committed) settings.leftWidth = value;
+        if (panes.open && pinned) rightWidth = pushed(value, pinned.right, MIN_SIDE_WIDTH);
       }}
+      onDragging={pinWidths}
       onNewTab={(categoryId) => panes.newTab(categoryId)}
       onOpenSession={(session) => panes.openSession(session)}
       onOpenRight={(session) => panes.openInRight(session)}
@@ -327,7 +358,7 @@
   {#if !layout.mobile}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="relative h-full shrink-0 overflow-hidden {rightDragging
+      class="relative h-full shrink-0 overflow-hidden {resizing
         ? ''
         : 'transition-[width] duration-200'}"
       style="width: {panes.open ? panelWidth : 0}px; {rightAccent}"
@@ -344,13 +375,12 @@
             invert: true,
             value: () => panelWidth,
             min: MIN_SIDE_WIDTH,
-            max: () => sideMax,
-            onResize: (value) => (rightWidth = value),
-            onDragging: (active) => {
-              if (active) rightWidth = panelWidth;
-              rightDragging = active;
-              if (!active) settings.rightWidth = rightWidth;
+            max: () => sideRoom - leftMin,
+            onResize: (value) => {
+              rightWidth = value;
+              if (expanded && pinned) leftWidth = pushed(value, pinned.left, LEFT_MIN_WIDTH);
             },
+            onDragging: pinWidths,
           }}
         ></div>
         <PaneContent

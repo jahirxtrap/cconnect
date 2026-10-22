@@ -89,9 +89,13 @@ class Backend {
     return (profile && this.schemes[profile.id]) || "";
   }
 
-  resolveShared(text: string): string {
-    const scheme = this.schemeOf(this.active);
-    return scheme ? text.split(scheme).join(sharedRootOf(this.active)) : text;
+  resolveShared(text: string, profile: Profile = this.active): string {
+    const scheme = this.schemeOf(profile);
+    return scheme ? text.split(scheme).join(sharedRootOf(profile)) : text;
+  }
+
+  sharedProfileOf(url: string): Profile {
+    return this.environments.find((profile) => url.startsWith(`${sharedRootOf(profile)}/`)) ?? this.active;
   }
 
   readonly active = $derived(
