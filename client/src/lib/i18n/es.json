@@ -232,6 +232,8 @@
   "MCP_SERVERS": "Servidores MCP",
   "MARKETPLACES": "Marketplaces",
   "ALL_MARKETPLACES": "Todos los marketplaces",
+  "MARKETPLACE_AUTO_UPDATE": "Actualizar automáticamente",
+  "MARKETPLACE_AUTO_UPDATE_SUMMARY": "Traer su catálogo cada vez que se abre Instalar",
   "MEMORIES": "Memorias",
   "SERVICE_STATUS": "Estado",
   "STATUS_OPERATIONAL": "Todos los sistemas operativos",

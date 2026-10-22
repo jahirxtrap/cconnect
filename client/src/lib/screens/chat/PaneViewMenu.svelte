@@ -25,7 +25,7 @@
   const current = $derived(VIEWS.find((view) => view.kind === panes.kind) ?? VIEWS[0]);
 </script>
 
-<PopupMenu open={menu} onOpenChange={(value) => (menu = value)} label={t("PANEL_VIEW")} align="end">
+<PopupMenu open={menu} onOpenChange={(value) => (menu = value)} label={t("PANEL_VIEW")}>
   {#snippet triggerChild(props)}
     <TooltipIconButton label={t("PANEL_VIEW")} class={className} {...props}>
       <current.icon />

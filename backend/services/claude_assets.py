@@ -6,10 +6,11 @@ import re
 from pathlib import Path
 
 from core import paths
-from services import claude_manage
+from services import claude_manage, cli_settings
 
 _CLAUDE_DIR = Path.home() / ".claude"
 SKILLS_DIR = _CLAUDE_DIR / "skills"
+KNOWN_MARKETPLACES = _CLAUDE_DIR / "plugins" / "known_marketplaces.json"
 LOCAL_MARKETPLACE = "skills-dir"
 _CHAT_MODS_DIR = _CLAUDE_DIR / "dev-mods"
 _MANIFEST = Path(".claude-plugin") / "plugin.json"
@@ -80,10 +81,21 @@ def _enabled_plugins() -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def known_marketplaces() -> dict:
+    return _read_json(KNOWN_MARKETPLACES)
+
+
+def _auto_update(info: dict, declared: dict) -> bool:
+    for value in (declared.get("autoUpdate"), info.get("autoUpdate")):
+        if isinstance(value, bool):
+            return value
+    return (info.get("source") or {}).get("repo") == claude_manage.OFFICIAL_MARKETPLACE
+
+
 def list_marketplaces() -> list[dict]:
-    known = _read_json(_CLAUDE_DIR / "plugins" / "known_marketplaces.json")
+    declared = cli_settings.declared_marketplaces()
     items = []
-    for name, info in known.items():
+    for name, info in known_marketplaces().items():
         if not isinstance(info, dict):
             continue
         source = info.get("source") or {}
@@ -91,13 +103,14 @@ def list_marketplaces() -> list[dict]:
             "name": name,
             "repo": source.get("repo") or source.get("url"),
             "last_updated": info.get("lastUpdated"),
+            "auto_update": _auto_update(info, declared.get(name, {})),
         })
     items.sort(key=lambda m: m["name"])
     return items
 
 
 def _catalog_descriptions(marketplace: str) -> dict[str, str]:
-    known = _read_json(_CLAUDE_DIR / "plugins" / "known_marketplaces.json")
+    known = known_marketplaces()
     location = (known.get(marketplace) or {}).get("installLocation")
     if not location:
         return {}
@@ -303,7 +316,7 @@ def read_skill(plugin: str | None, skill_id: str, file: str = "SKILL.md") -> str
 
 
 def marketplace_catalog(name: str) -> list[dict]:
-    known = _read_json(_CLAUDE_DIR / "plugins" / "known_marketplaces.json")
+    known = known_marketplaces()
     info = known.get(name)
     if not isinstance(info, dict):
         raise ValueError("unknown marketplace")

@@ -54,7 +54,7 @@ class McpAddBody(BaseModel):
     env: list[str] = Field(default_factory=list)
 
 
-class McpToggleBody(BaseModel):
+class ToggleBody(BaseModel):
     name: str
     enabled: bool
 
@@ -144,6 +144,11 @@ def marketplace_action(body: MarketplaceActionBody):
     return api_response(data=claude_manage.marketplace_action(body.action, body.target))
 
 
+@router.post("/claude/marketplaces/auto-update")
+def marketplace_auto_update(body: ToggleBody):
+    return api_response(data=claude_manage.set_marketplace_auto_update(body.name, body.enabled))
+
+
 @router.get("/claude/marketplaces/{name}/catalog")
 def marketplace_catalog(name: str):
     try:
@@ -190,7 +195,7 @@ def add_mcp(body: McpAddBody):
 
 
 @router.post("/claude/mcp/toggle")
-def toggle_mcp(body: McpToggleBody):
+def toggle_mcp(body: ToggleBody):
     return api_response(data=claude_manage.mcp_set_enabled(body.name, body.enabled))
 
 

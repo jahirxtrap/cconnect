@@ -232,6 +232,8 @@
   "MCP_SERVERS": "MCP servers",
   "MARKETPLACES": "Marketplaces",
   "ALL_MARKETPLACES": "All marketplaces",
+  "MARKETPLACE_AUTO_UPDATE": "Update automatically",
+  "MARKETPLACE_AUTO_UPDATE_SUMMARY": "Fetch its catalog every time Install opens",
   "MEMORIES": "Memories",
   "SERVICE_STATUS": "Status",
   "STATUS_OPERATIONAL": "All systems operational",

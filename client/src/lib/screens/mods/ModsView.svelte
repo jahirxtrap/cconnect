@@ -16,7 +16,7 @@
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import TabStrip from "$lib/screens/chat/TabStrip.svelte";
-  import Button from "$lib/ui/Button.svelte";
+  import ActionButton from "$lib/ui/ActionButton.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -106,7 +106,7 @@
 
 {#snippet commandMenu()}
   {#if commands.length}
-    <PopupMenu open={menu} label={t("COMMANDS")} align="end" onOpenChange={(open) => (menu = open)}>
+    <PopupMenu open={menu} label={t("COMMANDS")} onOpenChange={(open) => (menu = open)}>
       {#snippet triggerChild(props)}
         <TooltipIconButton label={t("COMMANDS")} class="size-8" {...props}>
           <EllipsisVertical />
@@ -159,7 +159,7 @@
 {:else if missing}
   <EmptyState text={t(missing.text)} class="min-h-0 flex-1">
     {#snippet action()}
-      <Button variant="outlined" onclick={() => navigation.openSettings(missing.setting)}>{t("SETTINGS")}</Button>
+      <ActionButton text={t("SETTINGS")} onclick={() => navigation.openSettings(missing.setting)} />
     {/snippet}
   </EmptyState>
 {:else if !mods.state.surface}

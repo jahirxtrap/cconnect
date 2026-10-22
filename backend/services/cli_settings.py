@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
-import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
+
+from services import files
 
 _SETTINGS_FILE = "settings.json"
 
@@ -102,15 +103,7 @@ def _read() -> dict:
 
 
 def _write(data: dict) -> None:
-    path = _path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    staged = path.with_name(f".{_SETTINGS_FILE}.writing")
-    try:
-        staged.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        os.replace(staged, path)
-    except BaseException:
-        staged.unlink(missing_ok=True)
-        raise
+    files.write_json(_path(), data)
 
 
 def _valid(value: Any, expected: type) -> bool:
@@ -121,6 +114,22 @@ def _stored(key: str) -> Any:
     defn = SETTINGS[key]
     value = _read().get(defn.json_key)
     return value if _valid(value, defn.type) else None
+
+
+def declared_marketplaces() -> dict[str, dict]:
+    declared = _read().get("extraKnownMarketplaces")
+    if not isinstance(declared, dict):
+        return {}
+    return {name: entry for name, entry in declared.items() if isinstance(entry, dict)}
+
+
+def declare_auto_update(name: str, enabled: bool) -> None:
+    data = _read()
+    declared = data.get("extraKnownMarketplaces")
+    if not isinstance(declared, dict) or not isinstance(declared.get(name), dict):
+        return
+    declared[name] = {**declared[name], "autoUpdate": enabled}
+    _write(data)
 
 
 def bypass_disabled() -> bool:

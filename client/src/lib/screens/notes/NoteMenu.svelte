@@ -32,7 +32,7 @@
   const filename = $derived(t("NOTES_FILENAME"));
 </script>
 
-<PopupMenu {open} {onOpenChange} label={t("MORE_OPTIONS")} align="center">
+<PopupMenu {open} {onOpenChange} label={t("MORE_OPTIONS")}>
   {#snippet triggerChild(props)}
     <TooltipIconButton
       label={t("MORE_OPTIONS")}

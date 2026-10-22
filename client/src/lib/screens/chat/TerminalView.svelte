@@ -18,7 +18,7 @@
   import { isTauri } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { listTerminals, listTerminalsWith, type TerminalInfo } from "$lib/services/terminalApi";
-  import Button from "$lib/ui/Button.svelte";
+  import ActionButton from "$lib/ui/ActionButton.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -174,7 +174,6 @@
         if (value) void refresh();
       }}
       label={t("MORE")}
-      align="end"
     >
       {#snippet triggerChild(props)}
         <TooltipIconButton label={t("MORE")} class="size-8" {...props}>
@@ -256,14 +255,13 @@
       >
         {#snippet action()}
           {#if online && unlocked === false}
-            <Button
+            <ActionButton
+              text={t("UNLOCK")}
               onclick={() => {
                 rejected = false;
                 unlocking = true;
               }}
-            >
-              {t("UNLOCK")}
-            </Button>
+            />
           {/if}
         {/snippet}
       </EmptyState>

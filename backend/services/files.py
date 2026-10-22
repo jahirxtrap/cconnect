@@ -1,5 +1,6 @@
 """Path safety and the entry shape every file listing in the API answers with."""
 
+import json
 import os
 from pathlib import Path
 
@@ -10,6 +11,17 @@ def resolve(base: Path, relpath: str) -> Path:
     if target != root and root not in target.parents:
         raise ValueError("path escapes the root")
     return target
+
+
+def write_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    staged = path.with_name(f".{path.name}.writing")
+    try:
+        staged.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        os.replace(staged, path)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
 
 
 def count_children(path: Path) -> int:

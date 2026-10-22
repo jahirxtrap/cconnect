@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 from core import cli_manager, paths
-from services import accounts, claude_assets
+from services import accounts, claude_assets, cli_settings, files
 
 _PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "update"})
 _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
@@ -187,6 +187,19 @@ def marketplace_action(action: str, target: str) -> dict:
     if action not in _MARKETPLACE_ACTIONS:
         return {"ok": False, "message": f"invalid action: {action}"}
     return _shared(_run(["plugin", "marketplace", action, target]))
+
+
+def set_marketplace_auto_update(name: str, enabled: bool) -> dict:
+    known = claude_assets.known_marketplaces()
+    if not isinstance(known.get(name), dict):
+        return {"ok": False, "message": "marketplace not found"}
+    known[name] = {**known[name], "autoUpdate": enabled}
+    try:
+        files.write_json(claude_assets.KNOWN_MARKETPLACES, known)
+        cli_settings.declare_auto_update(name, enabled)
+    except OSError as exc:
+        return {"ok": False, "message": str(exc)}
+    return _shared({"ok": True, "message": ""})
 
 
 async def ensure_official_marketplace() -> None:

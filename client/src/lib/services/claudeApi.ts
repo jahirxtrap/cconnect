@@ -19,6 +19,7 @@ export const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplac
 export interface Marketplace {
   name: string;
   repo: string | null;
+  autoUpdate: boolean;
 }
 
 export interface ChatMod {
@@ -230,7 +231,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         })),
       marketplaces: (data.marketplaces ?? [])
         .filter((item: Wire) => item.name)
-        .map((item: Wire) => ({ name: item.name, repo: item.repo ?? null })),
+        .map((item: Wire) => ({ name: item.name, repo: item.repo ?? null, autoUpdate: item.auto_update === true })),
       chatMods: (data.chat_mods ?? [])
         .filter((item: Wire) => item.name && item.path)
         .map((item: Wire) => ({
@@ -341,6 +342,10 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
 
   async marketplaceAction(action: string, target: string): Promise<ActionResult> {
     return toAction(await client.post<Wire>("/claude/marketplaces/action", { action, target }));
+  },
+
+  async marketplaceAutoUpdate(name: string, enabled: boolean): Promise<ActionResult> {
+    return toAction(await client.post<Wire>("/claude/marketplaces/auto-update", { name, enabled }));
   },
 
   async catalog(marketplace: string): Promise<CatalogPlugin[] | null> {

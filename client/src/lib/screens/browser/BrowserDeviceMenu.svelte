@@ -29,7 +29,6 @@
   open={menu}
   onOpenChange={(value) => (menu = value)}
   label={t("BROWSER_DEVICE")}
-  align="end"
 >
   {#snippet triggerChild(props)}
     <TooltipIconButton label={t("BROWSER_DEVICE")} class="size-8" {...props}>

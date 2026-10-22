@@ -218,7 +218,6 @@
     open={menu}
     onOpenChange={(value) => (menu = value)}
     label={t("MORE_OPTIONS")}
-    align="center"
   >
     {#snippet triggerChild(props)}
       <TooltipIconButton label={t("MORE_OPTIONS")} class={button.class} {...props}>

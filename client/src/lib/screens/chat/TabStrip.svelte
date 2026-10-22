@@ -299,7 +299,7 @@
     use:hscrollbar={{ wheel: true }}
     role="tablist"
     data-strip={group}
-    class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto px-1 py-1.5"
+    class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1.5 {lead ? 'pr-1' : 'px-1'}"
   >
     {#each items as tab (tab.id)}
       {@const active = tab.id === activeId}

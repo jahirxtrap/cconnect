@@ -65,6 +65,7 @@
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -121,6 +122,7 @@
   let catalog = $state<CatalogEntry[] | null>(null);
   let catalogQuery = $state("");
   let marketPicker = $state(false);
+  let updatingMarkets = $state(false);
   let installCandidate = $state<CatalogEntry | null>(null);
   let mcpMenu = $state<McpServer | null>(null);
   let confirmMcpRemove = $state<McpServer | null>(null);
@@ -170,12 +172,7 @@
     void load();
   };
 
-  const runAction = async (action: () => Promise<{ ok: boolean; message: string }>) => {
-    const run = ++actionRun;
-    busy = true;
-    const result = await action();
-    if (run !== actionRun) return;
-    if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
+  const reload = async () => {
     await load();
     if (catalogSource) catalog = await catalogOf(catalogSource);
     pluginMenu = pluginMenu
@@ -184,9 +181,32 @@
         ) ?? null)
       : null;
     mcpMenu = mcpMenu ? (mcpServers?.find((item) => item.name === mcpMenu?.name) ?? null) : null;
+    marketMenu = marketMenu ? (extensions?.marketplaces.find((item) => item.name === marketMenu?.name) ?? null) : null;
+  };
+
+  const runAction = async (action: () => Promise<{ ok: boolean; message: string }>) => {
+    const run = ++actionRun;
+    busy = true;
+    const result = await action();
+    if (run !== actionRun) return;
+    if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
+    await reload();
     dialogBusy = null;
     busy = false;
   };
+
+  const updateMarkets = async (names: string[], report: boolean) => {
+    if (updatingMarkets || !names.length) return;
+    updatingMarkets = true;
+    const results = await Promise.all(names.map((name) => claudeApi.marketplaceAction("update", name)));
+    const failed = results.find((result) => !result.ok);
+    if (report && failed) actionError = failed.message || t("CONNECTION_ERROR");
+    await reload();
+    updatingMarkets = false;
+  };
+
+  const marketNames = (wanted: (market: Marketplace) => boolean) =>
+    (extensions?.marketplaces ?? []).filter(wanted).map((market) => market.name);
 
   const marketCatalog = async (name: string): Promise<CatalogEntry[] | null> =>
     (await claudeApi.catalog(name))?.map((entry) => ({ ...entry, marketplace: name })) ?? null;
@@ -204,6 +224,11 @@
     catalogQuery = "";
     const list = await catalogOf(source);
     if (catalogSource === source) catalog = list;
+  };
+
+  const browse = () => {
+    void openCatalog({ kind: "all" });
+    void updateMarkets(marketNames((market) => market.autoUpdate), false);
   };
 
   const catalogTitle = (source: CatalogSource) =>
@@ -320,7 +345,7 @@
       <TooltipIconButton
         label={t("INSTALL")}
         class={actionClass}
-        onclick={() => void openCatalog({ kind: "all" })}
+        onclick={browse}
       >
         <Plus />
       </TooltipIconButton>
@@ -656,6 +681,17 @@
   {@const source = catalogSource}
   <CompactDialog title={catalogTitle(source)} onDismiss={() => (catalogSource = null)}>
     {#snippet titleTrailing()}
+      {#if source.kind !== "chats"}
+        <TooltipIconButton
+          label={t("UPDATE_ACTION")}
+          class="[&_svg]:size-5"
+          enabled={!updatingMarkets}
+          onclick={() =>
+            void updateMarkets(source.kind === "market" ? [source.name] : marketNames(() => true), true)}
+        >
+          <RotateCw size={20} />
+        </TooltipIconButton>
+      {/if}
       <PopupMenu open={marketPicker} label={t("MARKETPLACES")} onOpenChange={(open) => (marketPicker = open)}>
         {#snippet triggerChild(props)}
           <TooltipIconButton label={t("MARKETPLACES")} class="[&_svg]:size-5" {...props}>
@@ -714,7 +750,7 @@
         oninput={(value) => (catalogQuery = value)}
         placeholder={t("SEARCH")}
       />
-      {#if busy}
+      {#if busy || updatingMarkets}
         <LinearProgress class="mt-2" />
       {/if}
     {/snippet}
@@ -840,6 +876,13 @@
       </OutlinedPanel>
     {/if}
     <div class="flex flex-col gap-2.5">
+      <SwitchRow
+        title={t("MARKETPLACE_AUTO_UPDATE")}
+        summary={t("MARKETPLACE_AUTO_UPDATE_SUMMARY")}
+        checked={market.autoUpdate}
+        enabled={!busy}
+        onChange={(checked) => void runAction(() => claudeApi.marketplaceAutoUpdate(market.name, checked))}
+      />
       {#if dialogBusy === "update"}
         <LinearProgress />
       {/if}

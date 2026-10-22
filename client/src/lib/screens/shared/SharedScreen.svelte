@@ -831,7 +831,6 @@
       open={barMenu}
       onOpenChange={(value) => (barMenu = value)}
       label={t("MORE_OPTIONS")}
-      align="center"
     >
       {#snippet triggerChild(props)}
         <TooltipIconButton label={t("MORE_OPTIONS")} class={actionClass} {...props}>
@@ -1122,7 +1121,6 @@
         onOpenChange={(value) => (actionsMenu = value)}
         label={t("MORE")}
         side="top"
-        align="center"
         triggerClass="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {narrow
           ? 'w-8'
           : 'px-3 text-label-lg'}"
