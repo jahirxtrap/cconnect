@@ -32,11 +32,14 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   (SDK stream → normalized events), `persistent_sessions` (the CLI a chat keeps between
   turns), `mods` (the CLI's internal UI protocol), `sessions` (transcripts, checkpoints, images), `chat_list`,
   `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
-  `system_monitor`, `network`, `usage`, `accounts`, `shared`, `git_ops` (the commit panel,
-  on top of the single runner in `services/git`, one lock per repository).
+  `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
+  `usage`, `accounts`, `shared`, `git_ops` (the commit panel, on top of the single runner in
+  `services/git`, one lock per repository), `browser` (the server's Chromium, started only
+  while a socket watches one of its tabs).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
 - `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
-  substituted per request), `BLOCKS.md`, `BROWSER.md` and `SUGGESTIONS.md`. Versioned, so
+  substituted per request), `BLOCKS.md`, `BROWSER.md`, `MODS.md` (only what this app adds
+  for a mod Claude writes, appended while mods are on) and `SUGGESTIONS.md`. Versioned, so
   the user-owned `USER.md` and the per-project prompts live in `data/config/prompts/`
   instead (never deleted — emptied). `{{SHARED_URL}}` resolves to `config.SHARED_SCHEME`
   (`cconnect://shared`) and never to a host: the prompt is fixed when the CLI session is
@@ -73,7 +76,9 @@ manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompt, plugins,
 marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`, `/api/system/*`,
 `/api/network/*`, `/api/git/*` (repositories under a project, identities, the written
 message, commit, revert, pull, push). Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list),
-`WS /api/system/ws`, `WS /api/shared/ws`, `WS /api/network/speedtest/ws`.
+`WS /api/system/ws`, `WS /api/shared/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws`
+(frames and state of the server's Chromium; `watch` decides whether it runs, and an opening
+without it watches, which is what an app older than 1.10.3 sends).
 
 Transcript slices are cursor-based (`before_index`), and while a live session still has
 events to replay the tail is cut at its `turn_start_index` so the same turn never arrives
@@ -95,7 +100,9 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 | `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
 | `compacting` / `compact` / `compact_summary` | `compacting` comes from a PreCompact hook pushed out-of-band, because the SDK stream is blocked while it compacts |
 | `context` | context size; see below |
-| `status` (`retrying`/`slow`/`ok`/`failed`) | transient API trouble, suppressed while compacting, while a tool is in flight and while awaiting the user |
+| `status` (`retrying`/`slow`/`ok`/`failed`) | transient API trouble, suppressed while compacting, while a tool is in flight, while a task the CLI reported (`task_started` until its `task_notification` or terminal `task_updated`) is alive and while awaiting the user |
+| `task_running` / `agent_result` | a backgrounded agent or task started, and its end; the app shows the block as running in between |
+| `commands` | the session's slash commands, sent again when `/reload-plugins` changes them |
 | `activity` | per-chat state, rides the channel so a brand-new chat reports before it has an id |
 | `queued` / `dequeued` | message queue |
 | `attached` | replay finished — the client publishes the conversation in one step |
@@ -166,13 +173,16 @@ request goes through `mods.request`, which turns a failure into `None` instead o
 Model, effort, permission mode, streaming, CLI source and per-block visibility live in the
 SQLite KV store and are **backend-owned**, so every client shares one config.
 `show_thinking` / `show_tool_use` / `show_file_change` / `show_compact` take
-`full | label | off` and are applied identically on the live stream and on resume.
+`full | label | off` and are applied identically on the live stream and on resume. `label`
+strips a tool's result, never an agent's subtasks: those still arrive, with their `parent`.
 
 ## MCP server (`mcps/`)
 
 Tools auto-register: each module exposes `tools = [...]`, or `make_tools(context)` when the
 tool needs the running turn (returning `[]` removes it from that turn — the safest gate).
-Bundled: `check_progress`, `compact`, `usage`, `show_component`, `ask_component`.
+Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own messages, numbered,
+before a compaction too, without the tool calls), `session_info`, `show_component`,
+`ask_component`, and the browser and terminal tools behind their settings.
 
 `ask_component` and `show_component` share one element list (`mcps/components.py`). The
 contract is flat: every value travels as a string, an `id` means the element carries a

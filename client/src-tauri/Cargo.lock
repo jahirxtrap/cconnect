@@ -615,7 +615,7 @@ dependencies = [
 
 [[package]]
 name = "cconnect"
-version = "1.10.2"
+version = "1.10.3"
 dependencies = [
  "adblock",
  "base64 0.23.1",

@@ -1,16 +1,15 @@
-- Mods stays among the right panel's views whatever the chat, so switching tabs no longer closes it: when mods are off or the server keeps no persistent sessions, it says so with a button straight to that setting
-- Clicking anywhere on the mods band, its status line included, moves the keyboard into it the way the composer takes it from anywhere in its box
-- Collapsible mods band, on by default in the Client settings, takes the bar off the top of the band when you turn it off and leaves its shortcut to hide and show it
-- A mod's card in the Claude screen lists its commands and, in plain words, what it reaches — the interface, your files, programs, the internet, requests to Claude — instead of the raw names of its hooks and calls
-- A new tab opens in the project picked in the left panel instead of the environment's default folder
-- Extra usage in the Claude screen goes by its name and shows what you have spent out of your limit
-- A message that went through no longer shows as failed when something goes wrong on the server after Claude has answered it
-- Clicking a chat or switching between chats no longer flickers the mods band, open or collapsed
-- A mod's sheet in the plugins screen opens whole once it has loaded, and its options open in a single dialog
-- The plugin catalog opens on every marketplace at once, each plugin marked with the one it comes from, and Mods from chats lists there like any other marketplace; cancelling a plugin you opened from it takes you back to the list
-- Slash commands show up while Claude is working, and the one you pick waits in the queue like any message
-- Mods redraw while you resize their panel instead of after you let go, and hear about a scroll as soon as it ends
-- Pull to refresh stays until the reload has actually finished instead of a fixed moment
+- The browser panel also browses on this device, with the system's own engine on the desktop and on Android, and a button at the start of its tabs switches to the server's, whose Chromium now starts only once you open one of its tabs
+- This device's browser keeps a profile of its own with an ad blocker on by default, and Browser in the Client settings picks its lists, sets a proxy and clears the browsing data
+- Phone and Tablet in the device menu load the page as those devices do, and a picked element reaches the composer as a chip with the page it came from instead of pasting its code into your message
+- Each terminal tab takes the name of the program running in it and the icon of its shell
+- Mods are drawn the way Claude Desktop draws them, and their options open from a gear in the Mods view or, for every mod at once, from Mod options under ⋮
+- Mod buttons answer the first click while the mod keeps redrawing, sliders and boards follow the pointer while you drag, and a mod's commands show up as soon as /reload-plugins brings them in
+- Agents and tasks running in the background show as working until they finish, without the notice that the response is taking longer than usual, and an agent's subtasks open with tools set to Label only
+- Claude reads back what was said earlier in the chat, before a compaction too
+- Interrupting no longer sends again a message Claude had already received, and closing a persistent session from the chat's header closes it
+- Marketplaces can update by themselves every time Install opens, and your other accounts get your plugins again on Windows
+- Dragging a text selection on Android no longer flickers or paints parts of the screen black
+- The panels make room for each other when you widen one, server logs hide tokens and passwords, and zooming a PDF on the phone no longer blanks the page on the way
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/

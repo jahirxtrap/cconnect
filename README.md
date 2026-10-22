@@ -559,17 +559,35 @@ device's notes if you want them along); the chats themselves stay on the server.
 
 ## Browser
 
-A browser opens in the same panel, driven by Claude and watched by you. It
-carries its own tabs, back and forward, a reload, a device picker for a phone
-or tablet viewport, and a pick-an-element mode that hands Claude whatever you
-click. Claude reaches it through three tools — open a page, read what is on it,
-take a screenshot — so it can check its own work on a site instead of guessing;
-the tools appear only while the panel is enabled in Settings → Tools, and you
-can take the mouse and the keyboard back at any moment.
+The browser panel opens pages in two places, and a button at the start of its
+tabs switches between them:
 
-It runs on the machine hosting the backend, in a Chrome or Edge already
-installed there, so a page that needs your session stays logged in. The panel
-is the only way in: there is no browser screen to open on its own.
+- **This device**: the desktop app and Android browse with the system's own
+  engine (WebView2, WebKit or the Android WebView), in a profile of their own
+  apart from the app's, so scrolling, video and signing in work as in any
+  browser. On the phone, going back steps back through the page first.
+- **Server**: a Chrome or Edge already installed on the machine hosting the
+  backend, streamed to the panel, so it reaches that machine's `localhost` and
+  a page that needs your session there stays logged in. It starts only once you
+  open one of its tabs, and it is the only side the web app has.
+
+Both carry tabs with the site's icon, back and forward, a reload, a device menu
+that loads the page as a phone or a tablet (shrunk to fit the panel), and a
+pick-an-element mode that puts what you click in the composer as a chip
+carrying the page it came from (left out on touch screens).
+
+This device's browser has an ad blocker built in and on by default (EasyList,
+EasyPrivacy and uBlock Origin's filters, with Annoyances and Cookie notices to
+add) that leaves local and tailnet addresses alone; the shield in its toolbar
+counts what it blocked and turns it off for a site. **Browser** in the Client
+settings picks the lists, sets a proxy (the system's, none, or one of your own
+with the addresses that skip it) and clears the browsing data.
+
+Claude reaches the server side through three tools (open a page, read what is
+on it, take a screenshot) so it can check its own work on a site instead of
+guessing; the tools appear only while the panel is enabled in Settings → Tools,
+and you can take the mouse and the keyboard back at any moment. The panel is
+the only way in: there is no browser screen to open on its own.
 
 ## Terminal
 

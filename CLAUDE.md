@@ -7,8 +7,8 @@ rewind, persistent sessions that keep a chat's CLI running, and the panes and ba
 Claude Code mods draw — over HTTP/WS, reachable on the tailnet or publicly through a
 Tailscale Funnel. They also manage the Claude install itself (CLI, plugins,
 marketplaces, MCP servers, skills, memories), a file manager over the shared folder, an
-explorer of the project that shows its git diff and commits it, a PC monitor, an SSH
-client and notes.
+explorer of the project that shows its git diff and commits it, a browser that opens pages
+on the device or on the PC, a PC monitor, an SSH client and notes.
 
 **Monorepo with two modules that must stay in sync:**
 

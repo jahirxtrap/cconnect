@@ -94,8 +94,37 @@ style, and `ModClient` hosts a plugin's own client module, which runs in a worke
   attaching is applied at `attached`, and the conversation is published once the renders
   it triggered are answered (`whenDrawn`). The server answers every `mod_render`, so this
   waits on events, never on a clock.
+- Text takes the interface font, as Claude Desktop draws it; monospace is only for art:
+  multi-line text with art in it, runs of unwrapped Texts in a column, and rows that hold a
+  box-drawing glyph (`monoRun`, `monoText`).
+- Box-drawing glyphs are SVG masks per cell, never the font's glyphs, which leave seams once
+  the cell is stretched. The horizontal arm sits where the font of that text draws `─`
+  (`ruleAxes`, measured per site), so a line passes through the `•` and `●` beside it.
 - Android's WebView paints `color-mix(…, transparent)` dark; blend with `withAlpha` from
   `design/accents.ts` instead.
+
+## Browser (`screens/browser/`)
+
+Two sides share one panel and one tab strip, switched by `BrowserSideSwitch`:
+
+- **This device** (`deviceBrowser.svelte.ts`): native webviews driven through
+  `deviceEngine.browserCall`, which reaches `src-tauri/src/browser.rs` on the desktop and the
+  `AndroidBrowser` bridge of `Browser.kt` on Android. The page is a separate view under the
+  app's, placed every frame over the panel's surface; a surface that is not visible (the
+  phone keeps its side panel mounted under `invisible`) gets no page. On Windows the app's
+  region is carved around it (`browserLayer.ts`), so menus and dialogs float over the live
+  page; elsewhere the page hides while something covers it.
+- **Server** (`services/browserSocket.ts`): the backend's Chromium, streamed as frames. It
+  only runs while the socket `watch`es, so opening the panel does not start it.
+
+The device menu emulates through CDP on Windows, sets the WebKit agent and page zoom on
+macOS and Linux, and on Android scales the view (`browser_zoom`) with an Android agent. The
+ad blocker (`src-tauri/src/shield.rs`, the `adblock` crate) answers per request on Windows
+and Android (JNI from `android.rs`) and compiles to content-blocking rules on macOS and
+Linux (`webkit.rs`); local and tailnet hosts are never blocked. A proxy change needs
+`browser_restart`, since WebView2 only takes it as a launch argument. A picked element
+travels in the prompt as `<browser-element>` (`data/pickedElements.ts`) and shows as a chip;
+picking is left out on touch screens.
 
 ## Image preview (`lib/ui/ZoomPane.svelte`)
 
@@ -134,8 +163,14 @@ steps.
 
 ## Android
 
-`src-tauri/gen/android/` **is committed** — it holds `MainActivity.kt`, `PastedContent.kt`
-and the manifest, so edits there are real source, not generated scratch.
+`src-tauri/gen/android/` **is committed** — it holds `MainActivity.kt`, `PastedContent.kt`,
+`Browser.kt` and the manifest, so edits there are real source, not generated scratch.
+
+`MainActivity` deletes `app_webview/variations_seed*` before the WebView starts. That file is
+the experiment config the WebView downloads on the first launch and applies from the next
+one, and with it the WebView paints layers pure black while a text selection is dragged
+(7 of 39 frames black with it, 0 of 78 without, on WebView 157). If the black returns,
+check whether the WebView moved that file.
 
 `setOnReceiveContentListener` rejects a MIME type starting with `*`: passing `*/*` throws
 `IllegalArgumentException` while the WebView is being created and kills the app on launch,
