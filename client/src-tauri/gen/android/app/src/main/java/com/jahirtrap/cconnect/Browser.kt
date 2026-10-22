@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Environment
@@ -76,6 +77,9 @@ class Browser(
   private class Tab(val id: String, val view: WebView) {
     @Volatile var source = ""
     val blocked = AtomicInteger()
+    var bounds: JSONObject? = null
+    var zoom = 1f
+    var agent: String? = null
   }
 
   private val main = Handler(Looper.getMainLooper())
@@ -94,7 +98,9 @@ class Browser(
     val args = JSONObject(json)
     return when (command) {
       "browser_open" -> ui { open(args) }
-      "browser_bounds" -> ui { tab(args)?.let { place(it.view, args) } }
+      "browser_bounds" -> ui { tab(args)?.let { place(it, args) } }
+      "browser_zoom" -> ui { tab(args)?.let { zoom(it, args.getDouble("zoom").toFloat()) } }
+      "browser_agent" -> ui { tab(args)?.let { agent(it, args.optString("agent").ifEmpty { null }) } }
       "browser_visible" -> ui { visible(args.getString("id"), args.getBoolean("visible")) }
       "browser_navigate" -> ui { tab(args)?.view?.loadUrl(args.getString("url")) }
       "browser_back" -> ui { tab(args)?.view?.takeIf { it.canGoBack() }?.goBack() }
@@ -127,6 +133,7 @@ class Browser(
     val at = IntArray(2).also(view::getLocationInWindow)
     val local = MotionEvent.obtain(event)
     local.offsetLocation(-at[0].toFloat(), -at[1].toFloat())
+    local.transform(Matrix().apply { setScale(1 / view.scaleX, 1 / view.scaleY) })
     view.dispatchTouchEvent(local)
     local.recycle()
     if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) gesture = null
@@ -181,19 +188,37 @@ class Browser(
     view.webChromeClient = PageChrome(tab)
     view.setDownloadListener { url, agent, disposition, mime, _ -> download(url, agent, disposition, mime) }
     parent.addView(view, 0, FrameLayout.LayoutParams(0, 0))
-    place(view, args)
+    place(tab, args)
     tabs[id] = tab
     view.loadUrl(args.getString("url"))
   }
 
-  private fun place(view: WebView, args: JSONObject) {
+  private fun place(tab: Tab, args: JSONObject) {
     val origin = content()
-    view.layoutParams = (view.layoutParams as FrameLayout.LayoutParams).apply {
-      width = px(args.getDouble("width"))
-      height = px(args.getDouble("height"))
+    tab.bounds = args
+    tab.view.pivotX = 0f
+    tab.view.pivotY = 0f
+    tab.view.scaleX = tab.zoom
+    tab.view.scaleY = tab.zoom
+    tab.view.layoutParams = (tab.view.layoutParams as FrameLayout.LayoutParams).apply {
+      width = px(args.getDouble("width") / tab.zoom)
+      height = px(args.getDouble("height") / tab.zoom)
       leftMargin = px(args.getDouble("x")) + (origin?.left ?: 0)
       topMargin = px(args.getDouble("y")) + (origin?.top ?: 0)
     }
+  }
+
+  private fun zoom(tab: Tab, value: Float) {
+    if (value <= 0f || value == tab.zoom) return
+    tab.zoom = value
+    tab.bounds?.let { place(tab, it) }
+  }
+
+  private fun agent(tab: Tab, value: String?) {
+    if (value == tab.agent) return
+    tab.agent = value
+    tab.view.settings.userAgentString = value
+    tab.view.reload()
   }
 
   private fun visible(id: String, on: Boolean) {

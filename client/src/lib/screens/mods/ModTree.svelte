@@ -12,11 +12,17 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ModClient from "./ModClient.svelte";
   import ModCode from "./ModCode.svelte";
+  import { siteGrid } from "./modGrid";
   import {
+    LINE_STYLE,
     blockStyle,
     borderOf,
     boxStyle,
     middleCut,
+    monoRun,
+    monoText,
+    plainText,
+    strokeStyle,
     svgSource,
     textRuns,
     textStyle,
@@ -45,13 +51,20 @@
 
   const { node, mods, site, port: given, engine, flush = false }: Props = $props();
 
+  const grid = siteGrid();
+
   interface Context {
     box: string | null;
     inText: boolean;
     edge: boolean;
+    mono: ReadonlySet<ModChild> | null;
+    art: boolean;
+    row: boolean;
+    column: boolean;
   }
 
-  const ROOT: Context = { box: null, inText: false, edge: false };
+  const ROOT: Context = { box: null, inText: false, edge: false, mono: null, art: false, row: false, column: true };
+  const ART_CLASS = "font-mono [font-variant-ligatures:none]";
   const WRAP_CLASS: Record<Wrap, string> = {
     wrap: "whitespace-pre-wrap wrap-anywhere",
     end: "overflow-hidden text-ellipsis whitespace-pre",
@@ -60,13 +73,13 @@
   };
   const BLOCK_CLASS = "inline-block h-[1lh] overflow-hidden align-top whitespace-pre [-webkit-text-fill-color:transparent]";
   const BUTTON_CLASS =
-    "ripple flex max-w-full shrink-0 cursor-pointer items-center gap-1.5 self-start rounded-md px-2.5 py-1 text-label-md whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-label-md whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
   const BUTTON_LOOK = {
     primary: "bg-accent text-on-accent",
     secondary: "bg-surface-variant",
   };
   const PLAIN_CLASS =
-    "ripple flex max-w-full shrink-0 cursor-pointer items-center gap-1.5 self-start rounded-sm whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap select-none enabled:hover:bg-on-surface/8 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
   const KEYCAP_CLASS =
     "inline-flex h-[1.125rem] min-w-[1.125rem] shrink-0 items-center justify-center rounded-sm border border-outline-variant bg-surface-variant px-1 font-mono text-label-sm leading-none text-on-surface-variant uppercase";
 
@@ -145,8 +158,6 @@
     return buttons === 0 ? null : buttons === kids.length ? "chips" : "mixed";
   };
 
-  const plainText = (item: ModNode): string | null =>
-    item.children.every((kid) => typeof kid === "string") ? (item.children as string[]).join("") : null;
 
   const draftKey = (item: ModNode) => `${item.press?.plugin}:${prop(item, "key")}`;
 
@@ -246,40 +257,58 @@
   {#if typeof child === "string"}
     {#each textRuns(child) as run, index (index)}{#if run.fill}<span class={BLOCK_CLASS} style={blockStyle(run)}
           >{run.text}</span
-        >{:else}{run.text}{/if}{/each}
+        >{:else if run.stroke}<span class={BLOCK_CLASS} style={strokeStyle(run, ctx.art ? grid().axes.mono : grid().axes.plain)}
+          >{run.text}</span
+        >{:else if run.line}<span class={ART_CLASS} style={LINE_STYLE}>{run.text}</span>{:else}{run.text}{/if}{/each}
   {:else if child.type === "Box"}
     {@const own = boxId(child)}
     {@const drawn = shown(child, own ?? ctx.box)}
     {@const bare = ctx.edge && !borderOf(drawn)}
     {@const props = bare ? unpadded(drawn) : drawn}
+    {@const column = props.flexDirection === "column" || props.flexDirection === "column-reverse"}
     <div style={boxStyle(props, buttonRow(child, props))} class="min-h-0 min-w-0" {...marks(child)} {...pointer(child, own)}>
-      {@render children(child, { ...ctx, box: own ?? ctx.box, edge: bare && props.flexDirection === "column" })}
+      {@render children(child, {
+        ...ctx,
+        box: own ?? ctx.box,
+        edge: bare && props.flexDirection === "column",
+        mono: monoRun(child),
+        row: !column && props.alignItems === undefined,
+        column,
+      })}
     </div>
   {:else if child.type === "Text"}
     {@const props = shown(child, ctx.box)}
     {@const wrap = ctx.inText ? null : wrapOf(props)}
-    {@const inner = { ...ctx, inText: true }}
+    {@const mono = !!ctx.mono?.has(child) || monoText(child)}
+    {@const inner = { ...ctx, inText: true, art: ctx.art || mono }}
+    {@const look = [
+      mono && ART_CLASS,
+      !ctx.inText && ctx.row && "self-center",
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {#if wrap === "start"}
-      <span style={textStyle(props)} class="min-w-0 {WRAP_CLASS.start}" {...pointer(child, null)}
+      <span style={textStyle(props)} class="min-w-0 {WRAP_CLASS.start} {look}" {...pointer(child, null)}
         ><bdi class="[direction:ltr] [unicode-bidi:isolate]">{@render children(child, inner)}</bdi></span
       >
     {:else if wrap === "middle" && plainText(child) !== null}
       <span
         style={textStyle(props)}
-        class="min-w-0 {WRAP_CLASS.middle}"
+        class="min-w-0 {WRAP_CLASS.middle} {look}"
         use:middle={plainText(child) ?? ""}
         {...pointer(child, null)}
       ></span>
     {:else}
       <span
         style={textStyle(props)}
-        class="min-w-0 {wrap ? WRAP_CLASS[wrap === 'middle' ? 'end' : wrap] : ''}"
+        class="min-w-0 {wrap ? WRAP_CLASS[wrap === 'middle' ? 'end' : wrap] : ''} {look}"
         {...pointer(child, null)}>{@render children(child, inner)}</span
       >
     {/if}
   {:else if child.type === "Button"}
     {@const props = shown(child, ctx.box)}
     {@const hotkey = prop(child, "hotkey")}
+    {@const align = ctx.column ? "self-start" : ctx.row ? "self-center" : ""}
     {#if props.role === "dismiss"}
       <TooltipIconButton
         label={prop(child, "label") ?? t("CLOSE")}
@@ -291,7 +320,7 @@
     {:else if props.plain}
       <button
         type="button"
-        class={PLAIN_CLASS}
+        class="{PLAIN_CLASS} {align}"
         style={buttonStyle(props)}
         disabled={child.press === null}
         {...marks(child)}
@@ -305,7 +334,7 @@
     {:else}
       <button
         type="button"
-        class="{BUTTON_CLASS} {props.variant === 'primary' ? BUTTON_LOOK.primary : BUTTON_LOOK.secondary}"
+        class="{BUTTON_CLASS} {props.variant === 'primary' ? BUTTON_LOOK.primary : BUTTON_LOOK.secondary} {align}"
         style={buttonStyle(props)}
         disabled={child.press === null}
         {...marks(child)}
@@ -427,7 +456,7 @@
       width={count(child, "width")}
       height={count(child, "height")}
       draggable="false"
-      class="max-w-full shrink-0 self-start"
+      class="h-auto max-w-full shrink-0 self-start"
     />
   {:else if child.type === "Client"}
     <ModClient {mods} {site} node={child} />

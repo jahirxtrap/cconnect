@@ -104,8 +104,6 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
         _reset(carry)
         if kind == "tool_result" and mode != "full":
             return {key: value for key, value in event.items() if key != "content"}
-        if kind == "agent":
-            return {**event, "label": mode == "label"}
         return event
 
     if kind == "file_change":

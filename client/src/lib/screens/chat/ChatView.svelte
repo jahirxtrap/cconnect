@@ -414,7 +414,7 @@
       {#key tab.id}
         <MessageList
           messages={chat.view}
-          pendingToolIds={chat.pendingToolIds}
+          pendingToolIds={chat.runningToolIds}
           streaming={chat.streaming}
           compacting={chat.compacting || activity === "compacting"}
           streamStatus={chat.streamStatus}

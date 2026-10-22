@@ -668,6 +668,8 @@
   "MOD_BAND_SHOW": "Show the mods band",
   "MOD_PANE_BLANK": "Nothing to show",
   "MOD_OPTIONS": "{1} options",
+  "MODS_OPTIONS": "Mod options",
+  "NO_MODS_OPTIONS": "No mods with options",
   "MOD_SELECT_NONE": "None",
   "MOD_CLIENT_FAILED": "Render error",
   "MOD_HOT_RELOAD_QUESTION": "Turn on the mods Claude writes in this session?",

@@ -668,6 +668,8 @@
   "MOD_BAND_SHOW": "Mostrar la banda de mods",
   "MOD_PANE_BLANK": "Sin contenido",
   "MOD_OPTIONS": "Opciones de {1}",
+  "MODS_OPTIONS": "Opciones de mods",
+  "NO_MODS_OPTIONS": "Sin mods con opciones",
   "MOD_SELECT_NONE": "Ninguno",
   "MOD_CLIENT_FAILED": "Error al dibujar",
   "MOD_HOT_RELOAD_QUESTION": "¿Activar los mods que escribe Claude en esta sesión?",

@@ -3,7 +3,7 @@ import { settings } from "$lib/data/settings.svelte";
 import { isDesktop, systemName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 import { backend } from "$lib/services/backend.svelte";
-import { browserCall, browserListen } from "./deviceEngine";
+import { browserCall, browserListen, deviceBrowsing } from "./deviceEngine";
 
 export interface DeviceTab {
   id: string;
@@ -108,8 +108,10 @@ const SEARCH_URL = "https://www.google.com/search?q=";
 const LOCAL_HOST = /^(localhost|127(\.\d+){3}|\[::1\])(:\d+)?(\/|$)/i;
 const HOST_LIKE = /^[^\s/]+\.[^\s/]+|^[^\s/]+:\d+/;
 export const nativePick = systemName() === "windows";
-export const devicePresets = isDesktop;
+export const devicePresets = deviceBrowsing;
 const native = nativePick;
+const android = deviceBrowsing && !isDesktop;
+const ownMajor = navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] ?? FALLBACK_MAJOR;
 
 const addressOf = (input: string): string | null => {
   const target = input.trim();
@@ -503,9 +505,9 @@ class DeviceBrowser {
     const name = this.device;
     if ((this.#emulated.get(id) ?? "") === name) return;
     this.#emulated.set(id, name);
-    void browserCall("browser_agent", { id, agent: PRESETS[name]?.webkitAgent ?? null }).catch(() =>
-      this.#emulated.delete(id),
-    );
+    const preset = PRESETS[name];
+    const agent = !preset ? null : android ? agentOf(preset, ownMajor) : preset.webkitAgent;
+    void browserCall("browser_agent", { id, agent }).catch(() => this.#emulated.delete(id));
   }
 
   #zoom(id: string, zoom: number) {

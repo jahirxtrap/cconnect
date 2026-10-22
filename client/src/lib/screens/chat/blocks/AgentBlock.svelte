@@ -9,7 +9,6 @@
   interface Props {
     message: ChatMessage;
     running: boolean;
-    labelMode?: boolean;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
     onSharedLink?: (url: string, filename: string) => void;
@@ -18,7 +17,6 @@
   const {
     message,
     running,
-    labelMode = false,
     expanded = null,
     onToggle = null,
     onSharedLink,
@@ -49,7 +47,7 @@
   icon={Bot}
   preview={message.text}
   {stat}
-  labelOnly={message.labelOnly || labelMode || !message.children.length}
+  labelOnly={!message.children.length}
   {running}
   {expanded}
   {onToggle}
@@ -63,6 +61,7 @@
         prevRole={message.children[index - 1]?.role ?? null}
         nextRole={message.children[index + 1]?.role ?? null}
         running={false}
+        nested
         {onSharedLink}
       />
     {/each}

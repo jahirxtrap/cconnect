@@ -40,6 +40,7 @@
     nextRole: Role | null;
     running: boolean;
     gluedTop?: boolean;
+    nested?: boolean;
     labelMode?: boolean;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
@@ -60,6 +61,7 @@
     nextRole,
     running,
     gluedTop = false,
+    nested = false,
     labelMode = false,
     expanded = null,
     onToggle = null,
@@ -76,8 +78,8 @@
 
   const rowId = $derived(String(message.id));
   const spinnerProps = $derived({ word: t("WORKING"), message: null, suffix: "", mode: running ? "requesting" : "responding" });
-  const top = $derived(gluedTop ? NO_GAP : gapAbove(prevRole, message.role));
-  const bottom = $derived(gapBelow(message.role, nextRole));
+  const top = $derived(gluedTop || (nested && prevRole === null) ? NO_GAP : gapAbove(prevRole, message.role));
+  const bottom = $derived(nested ? NO_GAP : gapBelow(message.role, nextRole));
 </script>
 
 {#snippet working(props: Record<string, unknown>)}
@@ -313,7 +315,7 @@
       <CompactBlock compact={message.compact} {expanded} {onToggle} />
     {/if}
   {:else if message.role === "agent"}
-    <AgentBlock {message} {running} {labelMode} {expanded} {onToggle} {onSharedLink} />
+    <AgentBlock {message} {running} {expanded} {onToggle} {onSharedLink} />
   {:else if message.role === "agent_report"}
     <Collapsible
       label={message.toolName || t("AGENT_REPORT")}

@@ -25,10 +25,13 @@ import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
+import java.io.File
 import org.json.JSONObject
 
 private const val SHARE_ATTEMPTS = 20
 private const val SHARE_RETRY_MS = 400L
+private const val WEBVIEW_DATA = "app_webview"
+private const val WEBVIEW_SEED = "variations_seed"
 
 class MainActivity : TauriActivity() {
   override val handleBackNavigation = false
@@ -92,6 +95,7 @@ class MainActivity : TauriActivity() {
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
+    dropWebViewExperiments()
     enableEdgeToEdge()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
     downloads = Downloads(this) { url, filename, headers ->
@@ -110,6 +114,10 @@ class MainActivity : TauriActivity() {
     setIntent(intent)
     takeShare(intent)
     deliverShare()
+  }
+
+  private fun dropWebViewExperiments() {
+    File(dataDir, WEBVIEW_DATA).listFiles { file -> file.name.startsWith(WEBVIEW_SEED) }?.forEach(File::delete)
   }
 
   private fun askNotifications() {

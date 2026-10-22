@@ -450,6 +450,10 @@
               {@render stateDot(skill.enabled)}
             {/snippet}
           </ListRow>
+        {:else}
+          {#if skillQuery.trim()}
+            <EmptyState text={t("NO_RESULTS")} class="h-full" />
+          {/if}
         {/each}
       {:else if kind === "mcp"}
         {#each mcpServers ?? [] as server (server.name)}
@@ -763,9 +767,6 @@
       {/if}
     {/snippet}
     {#if source.kind === "chats"}
-      {#if !extensions?.chatMods.length}
-        <p class="text-body-sm text-on-surface-variant">{t("CHAT_MODS_EMPTY")}</p>
-      {/if}
       {#each filteredChatMods as mod (mod.path)}
         <ListRow
           class="rounded-lg"
@@ -779,6 +780,8 @@
             {@render stateDot(mod.installed)}
           {/snippet}
         </ListRow>
+      {:else}
+        <EmptyState text={t(extensions?.chatMods.length ? "NO_RESULTS" : "CHAT_MODS_EMPTY")} class="py-8" />
       {/each}
     {:else if !catalog}
       <CenteredProgress class="py-6" />
@@ -805,6 +808,8 @@
             {@render stateDot(entry.installed)}
           {/snippet}
         </ListRow>
+      {:else}
+        <EmptyState text={t("NO_RESULTS")} class="py-8" />
       {/each}
     {/if}
   </CompactDialog>

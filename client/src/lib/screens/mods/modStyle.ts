@@ -1,3 +1,4 @@
+import type { ModChild, ModNode } from "$lib/data/modModels";
 import { DIM, modColor } from "./modTheme";
 
 type Props = Record<string, unknown>;
@@ -202,7 +203,86 @@ export const middleCut = (text: string, room: number): string => {
 
 const EIGHTH = 12.5;
 const HALF = 50;
-const BLOCK_RANGE = /[▀-▟]/;
+const ART_GLYPHS = /[─-▟]/u;
+
+export const svgSource = (source: string): string => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+
+const armPath = (arm: string, axis: number): string =>
+  ({ l: `M0 ${axis}H1`, r: `M1 ${axis}H2`, u: `M1 0V${axis}`, d: `M1 ${axis}V2` })[arm] ?? "";
+
+const BOX_ARMS: Record<string, string> = {
+  "─": "lr",
+  "━": "LR",
+  "│": "ud",
+  "┃": "UD",
+  "┌": "rd",
+  "┐": "ld",
+  "└": "ru",
+  "┘": "lu",
+  "┏": "RD",
+  "┓": "LD",
+  "┗": "RU",
+  "┛": "LU",
+  "├": "udr",
+  "┤": "udl",
+  "┬": "lrd",
+  "┴": "lru",
+  "┼": "lrud",
+  "┣": "UDR",
+  "┫": "UDL",
+  "┳": "LRD",
+  "┻": "LRU",
+  "╋": "LRUD",
+  "╴": "l",
+  "╵": "u",
+  "╶": "r",
+  "╷": "d",
+  "╸": "L",
+  "╹": "U",
+  "╺": "R",
+  "╻": "D",
+};
+
+const BOX_ARCS: Record<string, (axis: number) => string> = {
+  "╭": (axis) => `M2 ${axis}Q1 ${axis} 1 2`,
+  "╮": (axis) => `M0 ${axis}Q1 ${axis} 1 2`,
+  "╯": (axis) => `M0 ${axis}Q1 ${axis} 1 0`,
+  "╰": (axis) => `M2 ${axis}Q1 ${axis} 1 0`,
+};
+
+const VIEW_HEIGHT = 2;
+const AXIS_STEPS = 100;
+
+const strokeMask = (path: string, width: number, rendering: string): string =>
+  svgSource(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 ${VIEW_HEIGHT}" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="#000" stroke-width="${width}" stroke-linecap="square" vector-effect="non-scaling-stroke" shape-rendering="${rendering}"/></svg>`,
+  );
+
+const armsMask = (arms: string, axis: number): string =>
+  strokeMask(
+    [...arms.toLowerCase()].map((arm) => armPath(arm, axis)).join(""),
+    arms === arms.toUpperCase() ? 2 : 1,
+    "crispEdges",
+  );
+
+const strokeSets = new Map<number, Record<string, string>>();
+
+const strokesAt = (fraction: number): Record<string, string> => {
+  const axis = Math.round(fraction * VIEW_HEIGHT * AXIS_STEPS) / AXIS_STEPS;
+  let set = strokeSets.get(axis);
+  if (!set) {
+    set = {
+      ...Object.fromEntries(Object.entries(BOX_ARMS).map(([glyph, arms]) => [glyph, armsMask(arms, axis)])),
+      ...Object.fromEntries(
+        Object.entries(BOX_ARCS).map(([glyph, path]) => [glyph, strokeMask(path(axis), 1, "geometricPrecision")]),
+      ),
+    };
+    strokeSets.set(axis, set);
+  }
+  return set;
+};
+
+const STROKED = new Set([...Object.keys(BOX_ARMS), ...Object.keys(BOX_ARCS)]);
 
 const edge = (side: string, percent: number) =>
   `linear-gradient(to ${side}, currentColor ${percent}%, transparent ${percent}%)`;
@@ -227,19 +307,23 @@ const BLOCKS: Record<string, string> = {
 export interface TextRun {
   text: string;
   fill: string | null;
+  stroke: string | null;
+  line: boolean;
   cells: number;
 }
 
 export const textRuns = (text: string): TextRun[] => {
-  if (!BLOCK_RANGE.test(text)) return [{ text, fill: null, cells: 0 }];
+  if (!ART_GLYPHS.test(text)) return [{ text, fill: null, stroke: null, line: false, cells: 0 }];
   const runs: TextRun[] = [];
   for (const glyph of text) {
     const fill = BLOCKS[glyph] ?? null;
+    const stroke = STROKED.has(glyph) ? glyph : null;
+    const line = !fill && !stroke && ART_GLYPHS.test(glyph);
     const last = runs.at(-1);
-    if (last && last.fill === fill) {
+    if (last && last.fill === fill && last.stroke === stroke && last.line === line) {
       last.text += glyph;
       last.cells += 1;
-    } else runs.push({ text: glyph, fill, cells: 1 });
+    } else runs.push({ text: glyph, fill, stroke, line, cells: 1 });
   }
   return runs;
 };
@@ -247,4 +331,62 @@ export const textRuns = (text: string): TextRun[] => {
 export const blockStyle = (run: TextRun): string =>
   `width: calc(${run.cells} * var(--mod-cell, 1ch)); background: ${run.fill} 0 0 / var(--mod-cell, 1ch) 100% repeat-x`;
 
-export const svgSource = (source: string): string => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
+export const strokeStyle = (run: TextRun, axis: number): string =>
+  `width: calc(${run.cells} * var(--mod-cell, 1ch)); background-color: currentColor; mask: url("${strokesAt(axis)[run.stroke ?? ""]}") 0 0 / var(--mod-cell, 1ch) 100% repeat-x`;
+
+export const LINE_STYLE = "font-size: calc(var(--mod-mono-scale, 1) * var(--text-body-md))";
+
+const ART_RULES = /[-=_~]{3,}|[-=]{2,}>|<[-=]{2,}/u;
+const ART_GAPS = /\S( {2,})(?=\S)/gu;
+
+const artLine = (line: string): boolean => {
+  if (ART_GLYPHS.test(line) || ART_RULES.test(line)) return true;
+  const gaps = [...line.matchAll(ART_GAPS)].map((match) => match[1].length);
+  return gaps.length >= 2 || gaps.some((gap) => gap >= 3);
+};
+
+export const plainText = (node: ModNode): string | null =>
+  node.children.every((kid) => typeof kid === "string") ? (node.children as string[]).join("") : null;
+
+const unwrappedText = (child: ModNode): string | null => {
+  const wrap = child.props.wrap;
+  return child.type !== "Text" || wrap === undefined || wrap === "wrap" ? null : plainText(child);
+};
+
+const artRow = (box: ModNode): ReadonlySet<ModChild> | null => {
+  const texts = box.children.filter((kid): kid is ModNode => typeof kid !== "string" && kid.type === "Text");
+  return texts.some((kid) => ART_GLYPHS.test(plainText(kid) ?? "")) ? new Set(texts) : null;
+};
+
+export const monoRun = (box: ModNode): ReadonlySet<ModChild> | null => {
+  const direction = box.props.flexDirection;
+  if (direction !== "column" && direction !== "column-reverse") return artRow(box);
+  const marked = new Set<ModChild>();
+  let run: ModNode[] = [];
+  let art = false;
+  const close = () => {
+    if (art) run.forEach((node) => marked.add(node));
+    run = [];
+    art = false;
+  };
+  for (const kid of box.children) {
+    if (typeof kid === "string") {
+      if (kid.trim()) close();
+      continue;
+    }
+    const text = unwrappedText(kid);
+    if (text === null) close();
+    else {
+      run.push(kid);
+      art ||= artLine(text);
+    }
+  }
+  close();
+  return marked.size ? marked : null;
+};
+
+export const monoText = (node: ModNode): boolean => {
+  const text = plainText(node);
+  return text !== null && text.includes("\n") && text.split("\n").some(artLine);
+};
+

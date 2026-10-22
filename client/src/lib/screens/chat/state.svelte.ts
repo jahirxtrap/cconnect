@@ -158,6 +158,8 @@ export class ChatState {
   requestBytes = $state<number | null>(null);
   mediaBytes = $state<number | null>(null);
   pendingToolIds = $state<string[]>([]);
+  backgroundToolIds = $state<string[]>([]);
+  readonly runningToolIds = $derived([...this.pendingToolIds, ...this.backgroundToolIds]);
 
   environmentId = $state<string | null>(null);
   sessionId = $state<string | null>(null);
@@ -1544,6 +1546,7 @@ export class ChatState {
     this.requestBytes = null;
     this.mediaBytes = null;
     this.pendingToolIds = [];
+    this.backgroundToolIds = [];
     this.oldestLoadedIndex = null;
     this.transcriptLoading = false;
     this.transcriptPaging = false;
@@ -1594,6 +1597,7 @@ export class ChatState {
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
+    this.backgroundToolIds = [];
     this.contextTokens = page.contextTokens;
     this.requestBytes = page.requestBytes;
     this.mediaBytes = page.mediaBytes;
@@ -1635,6 +1639,7 @@ export class ChatState {
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
+    this.backgroundToolIds = [];
     if (page.prompts) this.#history = page.prompts;
   }
 
@@ -2105,16 +2110,21 @@ export class ChatState {
             text: event.description ?? "",
             toolName: event.subagentType,
             toolUseId: event.id,
-            labelOnly: event.labelOnly,
             agentRun: { model: event.model, effort: event.effort },
           }),
         );
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];
         break;
+      case "task_running":
+        if (event.id && !this.backgroundToolIds.includes(event.id)) {
+          this.backgroundToolIds = [...this.backgroundToolIds, event.id];
+        }
+        break;
       case "agent_result": {
         const agentId = event.id;
         if (agentId) {
           this.pendingToolIds = this.pendingToolIds.filter((id) => id !== agentId);
+          this.backgroundToolIds = this.backgroundToolIds.filter((id) => id !== agentId);
           this.messages = this.messages.map((item) =>
             item.toolUseId === agentId
               ? {

@@ -101,8 +101,8 @@ export type ServerEvent =
       description: string | null;
       model: string | null;
       effort: string | null;
-      labelOnly: boolean;
     }
+  | { type: "task_running"; id: string | null }
   | {
       type: "agent_result";
       id: string | null;
@@ -850,8 +850,9 @@ export class ChatSocket {
           description: text(wire, "description"),
           model: text(wire, "model"),
           effort: text(wire, "effort"),
-          labelOnly: flag(wire, "label"),
         };
+      case "task_running":
+        return { type: "task_running", id: text(wire, "id") };
       case "agent_result":
         return {
           type: "agent_result",

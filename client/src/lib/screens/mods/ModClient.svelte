@@ -56,7 +56,6 @@
       .join("; "),
   );
 
-  const grid = $derived(typeof node.props.width === "number");
 
   const port = $derived({
     press: (target: ModNode) => void instance?.trigger(target, { type: "press" }),
@@ -156,7 +155,7 @@
   bind:clientHeight={height}
   tabindex="0"
   style={regionStyle}
-  class="relative min-h-0 min-w-0 shrink-0 overflow-hidden outline-none {grid ? 'font-mono' : ''} {instance?.listensPointer
+  class="relative min-h-0 min-w-0 shrink-0 overflow-hidden outline-none {instance?.listensPointer
     ? 'touch-none'
     : ''}"
   {onkeydown}

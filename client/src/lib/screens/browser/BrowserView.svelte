@@ -27,7 +27,7 @@
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
-  import { isDesktop } from "$lib/platform";
+  import { isDesktop, isTouch } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { store } from "$lib/platform/storage";
   import { inPane, paneRole } from "$lib/screens/chat/paneSurface";
@@ -353,7 +353,8 @@
     document.addEventListener("scroll", mark, true);
     let frame = requestAnimationFrame(function follow() {
       const area = node.getBoundingClientRect();
-      deviceBrowser.place(boundsOf(area), !layer.supported && covered(area));
+      const visible = getComputedStyle(node).visibility !== "hidden";
+      deviceBrowser.place(visible ? boundsOf(area) : null, !layer.supported && covered(area));
       const shown = deviceBrowser.shown;
       const aiming = nativePick && deviceBrowser.picking;
       const moved = JSON.stringify(shown) !== JSON.stringify(hole) || aiming !== aimed;
@@ -616,14 +617,16 @@
     >
       <RotateCw size={18} />
     </TooltipIconButton>
-    <TooltipIconButton
-      label={t("BROWSER_PICK")}
-      shortcut="browser.pick"
-      class={picking ? "size-8 text-accent" : "size-8"}
-      onclick={togglePick}
-    >
-      <SquareMousePointer size={18} />
-    </TooltipIconButton>
+    {#if !isTouch}
+      <TooltipIconButton
+        label={t("BROWSER_PICK")}
+        shortcut="browser.pick"
+        class={picking ? "size-8 text-accent" : "size-8"}
+        onclick={togglePick}
+      >
+        <SquareMousePointer size={18} />
+      </TooltipIconButton>
+    {/if}
     {#if onServer || devicePresets}
       <BrowserDeviceMenu
         device={onServer ? page.device : deviceBrowser.device}

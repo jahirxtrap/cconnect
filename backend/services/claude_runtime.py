@@ -39,14 +39,21 @@ _USAGE_PATTERNS = ("rate limit", "rate_limit", "usage limit", "quota", "too many
 _CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
 _SLOW_SECONDS = 15
 _TURN_CLOCK_SKEW_MS = 5000
-_BACKGROUND_RESULT = re.compile(r"moved to the background", re.IGNORECASE)
+_TASK_ENDED = frozenset({"completed", "failed", "stopped", "killed"})
 
 
-def _result_text(block: Any) -> str:
-    raw = getattr(block, "content", None)
-    if isinstance(raw, str):
-        return raw
-    return " ".join(str(part.get("text", "")) for part in raw or [] if isinstance(part, dict))
+def _track_task(tasks: set, subtype: Any, data: dict) -> None:
+    task_id = data.get("task_id")
+    if not task_id:
+        return
+    patch = data.get("patch")
+    ended = subtype == "task_notification" or (
+        subtype == "task_updated" and isinstance(patch, dict) and patch.get("status") in _TASK_ENDED
+    )
+    if subtype == "task_started":
+        tasks.add(task_id)
+    elif ended:
+        tasks.discard(task_id)
 _MODEL_VARIANT = re.compile(r"\[[^\]]*\]$")
 
 
@@ -257,6 +264,8 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
     """Typed events for the `system` subtypes the app renders; the rest are dropped."""
     if not isinstance(data, dict):
         return []
+    if subtype == "task_started" and data.get("is_backgrounded") and data.get("tool_use_id") and vis["tool_use"] != "off":
+        return [{"type": "task_running", "id": data["tool_use_id"]}]
     if subtype == "task_notification" and vis["tool_use"] != "off":
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         return [{
@@ -311,7 +320,7 @@ def _todo_items(todos: Any) -> list[dict]:
     ]
 
 
-def _agent_event(block_id: Any, raw_input: dict, mode: str) -> dict:
+def _agent_event(block_id: Any, raw_input: dict) -> dict:
     return {
         "type": "agent",
         "id": block_id,
@@ -319,7 +328,6 @@ def _agent_event(block_id: Any, raw_input: dict, mode: str) -> dict:
         "description": raw_input.get("description"),
         "model": raw_input.get("model"),
         "effort": raw_input.get("effort"),
-        "label": mode == "label",
     }
 
 
@@ -429,7 +437,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 if mode == "off":
                     _mark_working(events, vis)
                 if mode != "off":
-                    events.append(_agent_event(getattr(block, "id", None), raw_input, mode))
+                    events.append(_agent_event(getattr(block, "id", None), raw_input))
                 continue
             if name == "TodoWrite" and isinstance(raw_input, dict):
                 events.append({"type": "todos", "items": _todo_items(raw_input.get("todos"))})
@@ -859,7 +867,7 @@ async def run_prompt(
         "last": 0.0,
         "compacting": False,
         "awaiting_user": False,
-        "background": False,
+        "tasks": set(),
         "pending": set(),
     }
     hooks_map: dict[str, Any] = {
@@ -906,7 +914,7 @@ async def run_prompt(
                     not status_state["slow"]
                     and not status_state["compacting"]
                     and not status_state["awaiting_user"]
-                    and not status_state["background"]
+                    and not status_state["tasks"]
                     and not status_state["pending"]
                     and loop.time() - status_state["last"] > _SLOW_SECONDS
                 ):
@@ -1177,7 +1185,6 @@ async def run_prompt(
                                 tool_started[_bid] = loop.time()
                                 if emit is not None:
                                     status_state["pending"].add(_bid)
-                                    status_state["background"] = False
                     for event in _blocks_to_events(message.content, vis(), skip_streamed=partial, hidden_tool_ids=hidden_tool_ids):
                         if parent:
                             event["parent"] = parent
@@ -1205,8 +1212,6 @@ async def run_prompt(
                     for _b in getattr(message, "content", None) or []:
                         if type(_b).__name__ == "ToolResultBlock":
                             status_state["pending"].discard(getattr(_b, "tool_use_id", None))
-                            if _BACKGROUND_RESULT.search(_result_text(_b)):
-                                status_state["background"] = True
                 tu_mode = vis()["tool_use"]
                 if tu_mode != "off":
                     for block in getattr(message, "content", None) or []:
@@ -1231,6 +1236,8 @@ async def run_prompt(
             elif isinstance(message, SystemMessage):
                 subtype = getattr(message, "subtype", None)
                 data = getattr(message, "data", None)
+                if emit is not None and isinstance(data, dict):
+                    _track_task(status_state["tasks"], subtype, data)
                 if subtype == "status":
                     busy = isinstance(data, dict) and data.get("status") == "compacting"
                     if emit is not None:

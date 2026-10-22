@@ -21,9 +21,11 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ModSite from "./ModSite.svelte";
+  import ModsOptionsDialog from "./ModsOptionsDialog.svelte";
 
   interface Props {
     chat: ChatState;
@@ -36,6 +38,7 @@
   let menu = $state(false);
   let installed = $state<Plugin[]>([]);
   let optionsFor = $state<Plugin | null>(null);
+  let listing = $state(false);
 
   const MISSING = {
     off: { text: "MOD_PANES_OFF", setting: "mod_surfaces" },
@@ -107,23 +110,30 @@
   });
 </script>
 
-{#snippet commandMenu()}
-  {#if commands.length}
-    <PopupMenu open={menu} label={t("COMMANDS")} onOpenChange={(open) => (menu = open)}>
-      {#snippet triggerChild(props)}
-        <TooltipIconButton label={t("COMMANDS")} class="size-8" {...props}>
-          <EllipsisVertical />
-        </TooltipIconButton>
+{#snippet moreMenu()}
+  <PopupMenu open={menu} label={t("MORE")} onOpenChange={(open) => (menu = open)}>
+    {#snippet triggerChild(props)}
+      <TooltipIconButton label={t("MORE")} class="size-8" {...props}>
+        <EllipsisVertical />
+      </TooltipIconButton>
+    {/snippet}
+    {#if commands.length}
+      <MenuSub text={t("COMMANDS")}>
+        {#each commands as command (`${command.plugin}:${command.name}`)}
+          <MenuItem
+            text="/{command.name}"
+            description={command.description || command.plugin}
+            onclick={() => pick(command)}
+          />
+        {/each}
+      </MenuSub>
+    {/if}
+    <MenuItem text={t("MODS_OPTIONS")} onclick={() => (listing = true)}>
+      {#snippet trailing()}
+        <Settings size={16} class="shrink-0 text-on-surface-variant" />
       {/snippet}
-      {#each commands as command (`${command.plugin}:${command.name}`)}
-        <MenuItem
-          text="/{command.name}"
-          description={command.description || command.plugin}
-          onclick={() => pick(command)}
-        />
-      {/each}
-    </PopupMenu>
-  {/if}
+    </MenuItem>
+  </PopupMenu>
 {/snippet}
 
 {#snippet paneActions()}
@@ -133,7 +143,7 @@
       <Settings />
     </TooltipIconButton>
   {/if}
-  {@render commandMenu()}
+  {@render moreMenu()}
 {/snippet}
 
 {#snippet trailing()}
@@ -154,7 +164,7 @@
     {trailing}
   />
 {:else}
-  <PaneHeader title={t("MODS")} actions={commands.length ? commandMenu : undefined} />
+  <PaneHeader title={t("MODS")} actions={missing ? undefined : moreMenu} />
 {/if}
 
 {#if loading}
@@ -200,4 +210,8 @@
     title={plugin.name}
     onDismiss={() => (optionsFor = null)}
   />
+{/if}
+
+{#if listing}
+  <ModsOptionsDialog api={chat.claude} onDismiss={() => (listing = false)} />
 {/if}

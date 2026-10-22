@@ -1667,7 +1667,7 @@ def get_session_messages(
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
                     if vis["tool_use"] != "off":
-                        block_event = _agent_event(bid, inp, vis["tool_use"])
+                        block_event = _agent_event(bid, inp)
                         done =notified.get(bid or "") or agent_results.get(bid or "")
                         if done is not None:
                             block_event["agent_result"] = _agent_result(done, vis)

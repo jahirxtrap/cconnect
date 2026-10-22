@@ -2,7 +2,7 @@
   import { untrack, type Snippet } from "svelte";
   import { isEmptyTree, type ModComponent, type ModElement, type ModKeyed } from "$lib/data/modModels";
   import ModFit from "./ModFit.svelte";
-  import { gridOf, provideGrid } from "./modGrid";
+  import { gridOf, gridStyle, provideGrid, ruleAxes } from "./modGrid";
   import ModTree from "./ModTree.svelte";
   import type { ModSurface } from "./modSurface.svelte";
 
@@ -49,6 +49,7 @@
 
   let root = $state<HTMLElement | null>(null);
   let body = $state<HTMLElement | null>(null);
+  let probe = $state<HTMLElement | null>(null);
   let probeWidth = $state(0);
   let cellHeight = $state(0);
   let width = $state(0);
@@ -66,9 +67,9 @@
   const glyph = $derived(probeWidth / PROBE.length);
   const scrollbar = $derived(barOuter - barInner);
   const barShown = $derived(bodyOuter > paddedOuter);
-  const grid = $derived(gridOf(width, glyph, cellHeight, barShown ? 0 : scrollbar));
+  const axes = $derived(glyph ? ruleAxes(root, probe, cellHeight) : undefined);
+  const grid = $derived(gridOf(width, glyph, cellHeight, barShown ? 0 : scrollbar, axes));
   const columns = $derived(grid.columns);
-  const cellWidth = $derived(grid.cell);
   const rows = $derived(
     fixedRows ?? (cellHeight ? Math.max(1, Math.floor((viewHeight - padding) / cellHeight)) : 0),
   );
@@ -259,11 +260,12 @@
   {onkeydown}
   {onfocusin}
   {onfocusout}
-  style={cellWidth ? `--mod-cell: ${cellWidth}px; --mod-line: ${cellHeight}px` : undefined}
+  style={gridStyle(grid)}
   class="relative flex min-h-0 flex-col text-body-md text-on-surface outline-none {className}"
 >
   <span
     aria-hidden="true"
+    bind:this={probe}
     bind:clientWidth={probeWidth}
     bind:clientHeight={cellHeight}
     class="pointer-events-none invisible absolute top-0 left-0 font-mono whitespace-pre">{PROBE}</span

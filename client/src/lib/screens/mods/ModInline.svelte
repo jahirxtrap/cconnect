@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import type { ModComponent } from "$lib/data/modModels";
-  import { gridOf, provideGrid } from "./modGrid";
+  import { gridOf, gridStyle, provideGrid, ruleAxes } from "./modGrid";
   import ModTree from "./ModTree.svelte";
   import type { ModSurface } from "./modSurface.svelte";
 
@@ -31,13 +31,15 @@
 
   let host = $state<HTMLElement | null>(null);
   let room = $state(0);
+  let probe = $state<HTMLElement | null>(null);
   let probeWidth = $state(0);
   let lineHeight = $state(0);
   let entered = $state(false);
   const seen = $derived(eager || entered);
 
   const drawing = $derived(mods.drawing(component, instanceId));
-  const grid = $derived(gridOf(room, probeWidth / PROBE.length, lineHeight));
+  const axes = $derived(probeWidth ? ruleAxes(host, probe, lineHeight) : undefined);
+  const grid = $derived(gridOf(room, probeWidth / PROBE.length, lineHeight, 0, axes));
   const columns = $derived(grid.columns);
   const shown = $derived(drawing?.props ?? props);
   const site = $derived({ component, instanceId });
@@ -67,11 +69,12 @@
 
 <div
   bind:this={host}
-  style={grid.cell ? `--mod-cell: ${grid.cell}px; --mod-line: ${lineHeight}px` : undefined}
+  style={gridStyle(grid)}
   class="relative min-w-0 {className}"
 >
   <span
     aria-hidden="true"
+    bind:this={probe}
     bind:clientWidth={probeWidth}
     bind:clientHeight={lineHeight}
     class="pointer-events-none invisible absolute top-0 left-0 font-mono text-body-md whitespace-pre">{PROBE}</span
