@@ -21,9 +21,11 @@
 
   const { connect, autofocus = true, reserved = [], pty = null, onStatus, onTitle }: Props = $props();
 
+  const ptyBackend = $derived(pty?.backend ?? null);
+  const ptyBuild = $derived(pty?.build ?? null);
   const windowsPty = $derived(
-    pty && pty.backend !== "pty"
-      ? { backend: pty.backend, ...(pty.build === null ? {} : { buildNumber: pty.build }) }
+    ptyBackend && ptyBackend !== "pty"
+      ? { backend: ptyBackend, ...(ptyBuild === null ? {} : { buildNumber: ptyBuild }) }
       : null,
   );
 
