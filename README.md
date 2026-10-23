@@ -571,17 +571,27 @@ tabs switches between them:
   a page that needs your session there stays logged in. It starts only once you
   open one of its tabs, and it is the only side the web app has.
 
-Both carry tabs with the site's icon, back and forward, a reload, a device menu
-that loads the page as a phone or a tablet (shrunk to fit the panel), and a
-pick-an-element mode that puts what you click in the composer as a chip
-carrying the page it came from (left out on touch screens).
+Both carry tabs with the site's icon, back and forward, a reload and a home
+button. Home is a start page of CConnect's with a search box and your
+favorites, which you add from ⋮ or from the **+** on that page with the name and
+address you choose, and rename or delete from the tile itself.
+
+⋮ beside the address holds the rest: **Viewport** loads the page as a phone or a
+tablet (shrunk to fit the panel), or on Android as the mobile or the desktop
+site; **Zoom** is remembered per site, with Ctrl + / − / 0 on the desktop; and
+from there you pick an element (a chip carrying the page it came from, left out
+on touch screens), attach a screenshot of the page to the chat, open it outside
+CConnect, copy its link or add it to your favorites. On Android the page takes
+your touches where you put them, and pulling down from its top reloads it.
 
 This device's browser has an ad blocker built in and on by default (EasyList,
 EasyPrivacy and uBlock Origin's filters, with Annoyances and Cookie notices to
-add) that leaves local and tailnet addresses alone; the shield in its toolbar
-counts what it blocked and turns it off for a site. **Browser** in the Client
-settings picks the lists, sets a proxy (the system's, none, or one of your own
-with the addresses that skip it) and clears the browsing data.
+add) that leaves local and tailnet addresses alone; the shield inside the
+address bar turns it off for a site, and its tooltip counts what it blocked.
+**Clear site data** and **Clear browsing data** under ⋮ ask before deleting
+anything. **Browser** in the Client settings picks the lists, sets a proxy (the
+system's, none, or one of your own with the addresses that skip it) and clears
+the browsing data the same way.
 
 Claude reaches the server side through three tools (open a page, read what is
 on it, take a screenshot) so it can check its own work on a site instead of

@@ -86,7 +86,18 @@ style, and `ModClient` hosts a plugin's own client module, which runs in a worke
 - The cell comes from `modGrid.gridOf`, stretched to `room / floor(room / glyph)` so a row
   fills its box exactly, and reaches every node through context. `ModFit` shrinks a tree
   with `zoom` only once it was drawn for the current columns (`drawnFor`); a tree drawn for
-  the old width would shrink for nothing in the middle of a resize.
+  the old width would shrink for nothing in the middle of a resize. Until the narrower
+  drawing lands, the old one keeps the width it was drawn for (`hold`) and the site clips it,
+  instead of reflowing into a box it was not drawn for.
+- Every `Text` is `min-w-0`, as Yoga lays out an Ink row: a row of one-column glyphs that the
+  font draws wider than the cell (Flightdeck's strip of `■`) shrinks into its cells. Without
+  it the row pushes the tree wide and `ModFit` zooms the whole mod out.
+- The band (`fit`) asks the mod for fewer columns when a row of short texts does not fit, so
+  the mod falls back to its narrower line instead of wrapping. `needs` keeps how wide each
+  column count was drawn, which is what stops it going back and forth.
+- A site's rows include its padding from the very first render: `padding` is derived from
+  the element, not measured in an effect, or the first drawing asks for a row too many and
+  the pane flashes a different layout on every tab switch.
 - One render in flight per site. A site that changes while one is pending is drawn again
   when the reply lands, so no timer stands between a change and its render.
 - `ready` calls `rebind()`, not `reset()`: what is on screen stays until its replacement
@@ -117,8 +128,14 @@ Two sides share one panel and one tab strip, switched by `BrowserSideSwitch`:
 - **Server** (`services/browserSocket.ts`): the backend's Chromium, streamed as frames. It
   only runs while the socket `watch`es, so opening the panel does not start it.
 
-The device menu emulates through CDP on Windows, sets the WebKit agent and page zoom on
-macOS and Linux, and on Android scales the view (`browser_zoom`) with an Android agent. The
+Viewport under ⋮ (`BrowserOptionsMenu`) emulates through CDP on Windows and sets the WebKit
+agent and page zoom on macOS and Linux; on Android it only switches the agent between the
+mobile and the desktop site, and the page stays at 1:1 so a touch lands where it falls. Zoom
+is kept per host (`settings.browserZoom`). Home is a state of the tab (`home`, stored with
+the tabs), not an address, so going back leaves it for the page underneath. On Android,
+`Browser.kt` owns a pull while it is out: the moves feed the indicator and none reach the
+page until the finger passes back above where the pull started, and its views take no
+window insets, or a page pads its bottom bar for a system bar it does not sit on. The
 ad blocker (`src-tauri/src/shield.rs`, the `adblock` crate) answers per request on Windows
 and Android (JNI from `android.rs`) and compiles to content-blocking rules on macOS and
 Linux (`webkit.rs`); local and tailnet hosts are never blocked. A proxy change needs
@@ -175,6 +192,14 @@ check whether the WebView moved that file.
 `setOnReceiveContentListener` rejects a MIME type starting with `*`: passing `*/*` throws
 `IllegalArgumentException` while the WebView is being created and kills the app on launch,
 with nothing on screen. Wildcards are only allowed in the subtype (`image/*`, `video/*`, …).
+
+The keyboard only offers images to the composer because `RustWebView.onCreateInputConnection`
+calls `PastedContent.inputConnection`, and wry writes that method into the generated
+`RustWebView.kt` from `WRY_RUSTWEBVIEW_CLASS_EXTENSION`. A build runs cargo twice (the CLI's
+own build, then Gradle's `BuildTask`), so the variable lives in `client/.cargo/config.toml`:
+set for only one of them, the other regenerates the class without the method, and the APK
+ships without it while the source on disk still has it. Check the compiled class (`dexdump`
+on the APK's `classes*.dex`), never the generated file.
 
 ```bash
 NDK_HOME="<sdk>/ndk/<version>" npm run tauri android build -- --debug --apk --target aarch64

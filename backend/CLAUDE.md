@@ -98,7 +98,7 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 | `assistant_text` / `thinking` / `todos` / `task` | streamed content and indicators |
 | `tool_use` / `tool_result` | `file_change` replaces them for Edit/Write/MultiEdit/NotebookEdit, with the diff already classified |
 | `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
-| `compacting` / `compact` / `compact_summary` | `compacting` comes from a PreCompact hook pushed out-of-band, because the SDK stream is blocked while it compacts |
+| `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase |
 | `context` | context size; see below |
 | `status` (`retrying`/`slow`/`ok`/`failed`) | transient API trouble, suppressed while compacting, while a tool is in flight, while a task the CLI reported (`task_started` until its `task_notification` or terminal `task_updated`) is alive and while awaiting the user |
 | `task_running` / `agent_result` | a backgrounded agent or task started, and its end; the app shows the block as running in between |
@@ -114,7 +114,7 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 **Context size** travels only in `context` — `result` does not carry it, and the clients
 *assign* the value, so a `null` clears the ring. The live number is
 `input_tokens + cache_read + cache_creation` from each `AssistantMessage.usage`, emitted
-only when it changes; on a `compact_boundary` it is `compactMetadata.postTokens`. A manual
+only when it changes; on a live `compact_boundary` it is `compact_metadata.post_tokens`. A manual
 `/compact` emits no live boundary, so the router derives it from `latest_compact()` after
 the turn. Opening a session that isn't running still takes it from the transcript
 (`sessions.last_context_tokens`), which reports the last usage in the file — so a session
@@ -140,6 +140,11 @@ The CLI's format is not a contract and it moves. What currently holds:
   falls back to the first post-boundary entry with usage.
 - Non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,
   `custom-title`, `mode`, `last-prompt`…) are everywhere: filter by type, never by position.
+- The SDK writes `"entrypoint":"sdk-py"`, which hides a session from `claude --resume`.
+  Every turn rewrites it to `"cli"` padded with spaces to the same length, in place, only
+  over the bytes that turn wrote, and in a worker thread. A transcript runs to hundreds of
+  MB, and rewriting it whole on the event loop froze the server for ~10 s at the end of
+  every turn (and could drop lines the CLI appended meanwhile).
 
 ## Message queue
 
