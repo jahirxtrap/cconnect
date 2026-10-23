@@ -633,6 +633,7 @@
   "FONT": "Fuente",
   "FONT_TEXT": "Texto",
   "FONT_CODE": "Monoespaciada",
+  "FONT_SYMBOLS": "Símbolos",
   "FONT_EMOJI": "Emojis",
   "SHOW_TIMESTAMPS": "Hora y fecha",
   "SHOW_TIMESTAMPS_SUMMARY": "Mostrar la hora y la fecha en el chat",

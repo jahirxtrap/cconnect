@@ -72,6 +72,13 @@
     start: "overflow-hidden text-ellipsis whitespace-pre [direction:rtl] text-left",
     middle: "overflow-hidden whitespace-pre",
   };
+  const ART_WRAP = "whitespace-pre";
+
+  const wrapClass = (wrap: Wrap | null, mono: boolean): string => {
+    if (!wrap) return "";
+    if (wrap === "wrap" && mono) return ART_WRAP;
+    return WRAP_CLASS[wrap === "middle" ? "end" : wrap];
+  };
   const BLOCK_CLASS = "inline-block h-[1lh] overflow-hidden align-top whitespace-pre [-webkit-text-fill-color:transparent]";
   const BUTTON_CLASS =
     "ripple flex max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-label-md whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
@@ -304,7 +311,7 @@
     {:else}
       <span
         style={textStyle(props)}
-        class="min-w-0 {wrap ? WRAP_CLASS[wrap === 'middle' ? 'end' : wrap] : ''} {look}"
+        class="min-w-0 {wrapClass(wrap, mono)} {look}"
         {...pointer(child, null)}>{@render children(child, inner)}</span
       >
     {/if}

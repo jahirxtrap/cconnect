@@ -43,6 +43,10 @@ export const fontOptions: Record<FontKind, () => SelectOption[]> = {
     { value: "jetbrains", label: "JetBrains Mono", font: FONT_FAMILIES.code.jetbrains },
     { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.code.system },
   ],
+  symbols: () => [
+    { value: "dejavu", label: "DejaVu Sans" },
+    { value: "system", label: t("FONT_SYSTEM") },
+  ],
   emoji: () => [
     { value: "system", label: t("FONT_SYSTEM") },
     { value: "flat", label: "Fluent Emoji Flat" },

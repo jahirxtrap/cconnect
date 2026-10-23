@@ -6,7 +6,7 @@ import "@fontsource-variable/jetbrains-mono";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/700.css";
 
-export const FONT_KINDS = ["text", "code", "emoji"] as const;
+export const FONT_KINDS = ["text", "code", "symbols", "emoji"] as const;
 
 export type FontKind = (typeof FONT_KINDS)[number];
 
@@ -23,6 +23,10 @@ export const FONT_FAMILIES: Record<FontKind, Record<string, string>> = {
     jetbrains: '"JetBrains Mono Variable"',
     system: "ui-monospace, monospace",
   },
+  symbols: {
+    dejavu: '"DejaVu Sans"',
+    system: '"Segoe UI Symbol", "Apple Symbols"',
+  },
   emoji: {
     system: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"',
     flat: '"Fluent Emoji Flat"',
@@ -30,7 +34,7 @@ export const FONT_FAMILIES: Record<FontKind, Record<string, string>> = {
   },
 };
 
-export const DEFAULT_FONTS: Record<FontKind, string> = { text: "geist", code: "geist", emoji: "system" };
+export const DEFAULT_FONTS: Record<FontKind, string> = { text: "geist", code: "geist", symbols: "dejavu", emoji: "system" };
 
 export const knownFont = (kind: FontKind, value: string | null): value is string =>
   value !== null && Object.hasOwn(FONT_FAMILIES[kind], value);

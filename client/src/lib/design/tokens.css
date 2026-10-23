@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 @font-face {
+  font-family: "DejaVu Sans";
+  src: url("./fonts/dejavu_sans_symbols.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
   font-family: "Fluent Emoji Flat";
   src: url("./fonts/fluent_emoji_flat.woff2") format("woff2");
   font-display: swap;
@@ -88,14 +94,15 @@
   --text-headline--line-height: 28px;
   --text-headline--font-weight: 600;
 
-  --font-sans: var(--family-text), var(--family-emoji), sans-serif;
-  --font-mono: var(--family-code), var(--family-emoji), monospace;
+  --font-sans: var(--family-text), var(--family-symbols), sans-serif, var(--family-emoji);
+  --font-mono: var(--family-code), var(--family-symbols), monospace, var(--family-emoji);
 }
 
 :root {
   --c-accent: #3f51b5;
   --c-accent-selection: rgba(63, 81, 181, 0.32);
   --c-accent-quote: rgba(63, 81, 181, 0.6);
+  --font-terminal: var(--family-code), monospace, var(--family-emoji), var(--family-symbols);
 }
 
 @supports (width: round(1px, 1px)) {

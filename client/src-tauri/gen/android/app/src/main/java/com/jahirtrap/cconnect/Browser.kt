@@ -25,6 +25,7 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -35,6 +36,9 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ProfileStore
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
+import androidx.webkit.ScriptHandler
+import androidx.webkit.UserAgentMetadata
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebStorageCompat
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -64,7 +68,18 @@ private const val PULL_EVENT = "browser-pull"
 private const val ANSWER_SECONDS = 10L
 private const val PNG_QUALITY = 100
 private const val BLOCKED_STATUS = 403
+private const val DESKTOP_VIEWPORT = "width=980"
+private const val DESKTOP_PLATFORM = "Linux"
+private const val DESKTOP_ARCHITECTURE = "x86"
+private const val DESKTOP_BITNESS = 64
 private val WEB_SCHEMES = setOf("http", "https", "about", "data", "blob", "javascript")
+private val DESKTOP_SCRIPT = """
+  new MutationObserver(() => {
+    for (const meta of document.querySelectorAll('meta[name="viewport" i]')) {
+      if (meta.content !== "$DESKTOP_VIEWPORT") meta.content = "$DESKTOP_VIEWPORT";
+    }
+  }).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["name", "content"] });
+""".trimIndent()
 
 private class Page(context: Context, private val overscrolled: (WebView) -> Unit) : WebView(context) {
   override fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean) {
@@ -90,12 +105,14 @@ class Browser(
     @Volatile var source = ""
     val blocked = AtomicInteger()
     var agent: String? = null
+    var desktop: ScriptHandler? = null
   }
 
   private val main = Handler(Looper.getMainLooper())
   private val tabs = LinkedHashMap<String, Tab>()
   private val profiled by lazy { WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE) }
   private val documentStart by lazy { WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) }
+  private val agentMetadata by lazy { WebViewFeature.isFeatureSupported(WebViewFeature.USER_AGENT_METADATA) }
   private val script by lazy { BrowserNative.pageScript() }
   private var hole: RectF? = null
   private var cover: List<RectF> = emptyList()
@@ -282,9 +299,25 @@ class Browser(
   private fun agent(tab: Tab, value: String?) {
     if (value == tab.agent) return
     tab.agent = value
-    tab.view.settings.userAgentString = value
+    val desktop = value != null
+    val settings = tab.view.settings
+    if (desktop && agentMetadata) WebSettingsCompat.setUserAgentMetadata(settings, desktopMetadata(settings))
+    settings.userAgentString = value
+    tab.desktop?.remove()
+    tab.desktop =
+      if (desktop && documentStart) WebViewCompat.addDocumentStartJavaScript(tab.view, DESKTOP_SCRIPT, setOf("*")) else null
     tab.view.reload()
   }
+
+  private fun desktopMetadata(settings: WebSettings): UserAgentMetadata =
+    UserAgentMetadata.Builder(WebSettingsCompat.getUserAgentMetadata(settings))
+      .setMobile(false)
+      .setPlatform(DESKTOP_PLATFORM)
+      .setPlatformVersion("")
+      .setModel("")
+      .setArchitecture(DESKTOP_ARCHITECTURE)
+      .setBitness(DESKTOP_BITNESS)
+      .build()
 
   private fun visible(id: String, on: Boolean) {
     val tab = tabs[id] ?: return

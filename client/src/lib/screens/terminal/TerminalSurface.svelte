@@ -85,7 +85,7 @@
     if (!container) return;
 
     const term = new Terminal({
-      fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--font-mono").trim(),
+      fontFamily: getComputedStyle(document.documentElement).getPropertyValue("--font-terminal").trim(),
       fontSize: FONT_SIZE,
       lineHeight: LINE_HEIGHT,
       cursorBlink: true,

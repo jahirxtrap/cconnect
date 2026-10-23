@@ -367,6 +367,7 @@ body {
   background: var(--c-background);
   color: var(--c-on-background);
   font-family: var(--font-sans);
+  font-variant-emoji: unicode;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   user-select: none;
