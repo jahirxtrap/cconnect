@@ -6,7 +6,8 @@ import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { formatDays, joined } from "$lib/data/format";
 import { ACCENTS } from "$lib/design/accents";
-import { theme, type FontStyle } from "$lib/design/theme.svelte";
+import { FONT_FAMILIES, FONT_KINDS, type FontKind } from "$lib/design/fonts";
+import { theme } from "$lib/design/theme.svelte";
 import { i18n, t } from "$lib/i18n/index.svelte";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
@@ -16,12 +17,6 @@ import { localServer, localServerStateOf } from "$lib/services/localServer.svelt
 import { notifier } from "$lib/services/notifier.svelte";
 import { RETENTION_FOREVER_DAYS } from "$lib/services/settingsApi";
 import type { SelectOption } from "$lib/ui/SelectDialog.svelte";
-
-export const FONT_FAMILIES: Record<FontStyle, string> = {
-  system: "system-ui, sans-serif",
-  flat: '"CConnect Flat", system-ui, sans-serif',
-  color: '"CConnect Color", system-ui, sans-serif',
-};
 
 export const themeOptions = (): SelectOption[] => [
   { value: "system", label: t("THEME_SYSTEM") },
@@ -35,11 +30,25 @@ export const localeOptions = (): SelectOption[] => [
   { value: "es", label: "Español" },
 ];
 
-export const fontOptions = (): SelectOption[] => [
-  { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.system },
-  { value: "flat", label: t("FONT_FLAT"), font: FONT_FAMILIES.flat },
-  { value: "color", label: t("FONT_COLOR"), font: FONT_FAMILIES.color },
-];
+export const fontOptions: Record<FontKind, () => SelectOption[]> = {
+  text: () => [
+    { value: "geist", label: "Geist Sans", font: FONT_FAMILIES.text.geist },
+    { value: "plex", label: "IBM Plex Sans", font: FONT_FAMILIES.text.plex },
+    { value: "inter", label: "Inter", font: FONT_FAMILIES.text.inter },
+    { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.text.system },
+  ],
+  code: () => [
+    { value: "geist", label: "Geist Mono", font: FONT_FAMILIES.code.geist },
+    { value: "plex", label: "IBM Plex Mono", font: FONT_FAMILIES.code.plex },
+    { value: "jetbrains", label: "JetBrains Mono", font: FONT_FAMILIES.code.jetbrains },
+    { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.code.system },
+  ],
+  emoji: () => [
+    { value: "system", label: t("FONT_SYSTEM") },
+    { value: "flat", label: "Fluent Emoji Flat" },
+    { value: "color", label: "Fluent Emoji Color" },
+  ],
+};
 
 const chosen = (options: SelectOption[], value: string): string =>
   options.find((option) => option.value === value)?.label ?? value;
@@ -48,7 +57,8 @@ export const themeValue = (): string => chosen(themeOptions(), theme.mode);
 
 export const localeValue = (): string => chosen(localeOptions(), i18n.locale);
 
-export const fontValue = (): string => chosen(fontOptions(), theme.fontStyle);
+export const fontValue = (): string =>
+  joined(...FONT_KINDS.map((kind) => chosen(fontOptions[kind](), theme.fonts[kind])));
 
 export const accentValue = (): string =>
   theme.dynamicColor && theme.systemAccent ? t("ACCENT_DYNAMIC") : (ACCENTS[theme.accentIndex]?.name ?? "");

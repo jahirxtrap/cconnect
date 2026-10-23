@@ -69,15 +69,11 @@ export interface BrowserLink {
   close: () => void;
 }
 
-export const browserLink = (
-  hooks: BrowserHooks,
-  viewport: () => BrowserViewport,
-  watching: boolean,
-): BrowserLink => {
+export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport): BrowserLink => {
   let disposed = false;
   let decoding = false;
   let pending: ArrayBuffer | null = null;
-  let watched = watching;
+  let watched = false;
 
   const draw = (buffer: ArrayBuffer) => {
     if (decoding) {

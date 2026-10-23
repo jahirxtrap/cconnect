@@ -1,44 +1,14 @@
 @import "tailwindcss";
 
 @font-face {
-  font-family: "CConnect Flat";
-  src: url("./fonts/cconnect_flat_regular.ttf") format("truetype");
-  font-weight: 400;
+  font-family: "Fluent Emoji Flat";
+  src: url("./fonts/fluent_emoji_flat.woff2") format("woff2");
   font-display: swap;
 }
 
 @font-face {
-  font-family: "CConnect Flat";
-  src: url("./fonts/cconnect_flat_bold.ttf") format("truetype");
-  font-weight: 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "CConnect Color";
-  src: url("./fonts/cconnect_color_regular.ttf") format("truetype");
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "CConnect Color";
-  src: url("./fonts/cconnect_color_bold.ttf") format("truetype");
-  font-weight: 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "CConnect Mono";
-  src: url("./fonts/cconnect_mono_regular.ttf") format("truetype");
-  font-weight: 400;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "CConnect Mono";
-  src: url("./fonts/cconnect_mono_bold.ttf") format("truetype");
-  font-weight: 700;
+  font-family: "Fluent Emoji Color";
+  src: url("./fonts/fluent_emoji_color.woff2") format("woff2");
   font-display: swap;
 }
 
@@ -118,8 +88,8 @@
   --text-headline--line-height: 28px;
   --text-headline--font-weight: 600;
 
-  --font-sans: "CConnect Flat", system-ui, sans-serif;
-  --font-mono: "CConnect Mono", ui-monospace, monospace;
+  --font-sans: var(--family-text), var(--family-emoji), sans-serif;
+  --font-mono: var(--family-code), var(--family-emoji), monospace;
 }
 
 :root {
@@ -137,25 +107,6 @@
     --chat-pad-xs: round(2px, var(--px-grid, 1px));
     --chat-pager-gap: round(14px, var(--px-grid, 1px));
   }
-}
-
-[data-font="flat"] {
-  --font-sans: "CConnect Flat", system-ui, sans-serif;
-  --font-mono: "CConnect Mono", ui-monospace, monospace;
-}
-
-[data-font="color"] {
-  --font-sans: "CConnect Color", system-ui, sans-serif;
-  --font-mono: "CConnect Mono", ui-monospace, monospace;
-}
-
-[data-font="system"] {
-  --font-sans: system-ui, sans-serif;
-  --font-mono: ui-monospace, monospace;
-}
-
-[data-font] {
-  font-family: var(--font-sans);
 }
 
 :root,

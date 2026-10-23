@@ -13,7 +13,7 @@
   import Type from "@lucide/svelte/icons/type";
   import { settings } from "$lib/data/settings.svelte";
   import { DYNAMIC_ACCENT } from "$lib/design/accents";
-  import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
+  import { theme, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
@@ -21,22 +21,21 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
-  import SelectDialog, { type SelectOption } from "$lib/ui/SelectDialog.svelte";
+  import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import BrowserDialog from "./BrowserDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
+  import FontDialog from "./FontDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
-  import { fontOptions, localeOptions, themeOptions } from "./settingsValues";
+  import { localeOptions, themeOptions } from "./settingsValues";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
 
   let dialog = $state<SettingsDialog | null>(null);
 
   const themes = $derived(themeOptions());
   const locales = $derived(localeOptions());
-  const fonts = $derived(fontOptions());
-
   const themeIcon = $derived(theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : SunMoon);
 
   const rowSummary = (id: string) => {
@@ -77,7 +76,7 @@
     onclick={() => (dialog = "font")}
   >
     {#snippet trailing()}
-      <span class="flex h-7 w-9 items-center justify-center text-[22px]" data-font={theme.fontStyle}>😃</span>
+      <span class="flex h-7 w-9 items-center justify-center text-[22px]">😃</span>
     {/snippet}
   </PreferenceRow>
   <PreferenceRow
@@ -175,19 +174,7 @@
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "font"}
-  {#snippet fontPreview(option: SelectOption)}
-    <span class="flex h-7 w-9 items-center justify-center text-[22px]" style="font-family: {option.font}"
-      >😃</span
-    >
-  {/snippet}
-  <SelectDialog
-    title={t("FONT")}
-    options={fonts}
-    selected={theme.fontStyle}
-    onSelect={(value) => theme.setFontStyle(value as FontStyle)}
-    onDismiss={() => (dialog = null)}
-    optionTrailing={fontPreview}
-  />
+  <FontDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "accent"}
   <AccentDialog
     title={t("ACCENT")}

@@ -4,6 +4,7 @@
   import Upload from "@lucide/svelte/icons/upload";
   import { importSettings } from "$lib/data/backup";
   import { DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
+  import { DEFAULT_FONTS, FONT_KINDS } from "$lib/design/fonts";
   import { theme } from "$lib/design/theme.svelte";
   import { i18n, t } from "$lib/i18n/index.svelte";
   import { driveAvailable } from "$lib/services/drive/config";
@@ -32,7 +33,7 @@
     theme.setMode("system");
     theme.setDynamicColor(false);
     theme.setAccent(DEFAULT_ACCENT_INDEX);
-    theme.setFontStyle("flat");
+    for (const kind of FONT_KINDS) theme.setFont(kind, DEFAULT_FONTS[kind]);
     i18n.set("system");
     void settingsApi.reset();
     onChanged();

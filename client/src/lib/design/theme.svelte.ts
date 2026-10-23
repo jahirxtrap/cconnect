@@ -1,9 +1,16 @@
 import { accentAt, DEFAULT_ACCENT_INDEX, withAlpha } from "./accents";
+import { DEFAULT_FONTS, FONT_FAMILIES, FONT_KINDS, knownFont, type FontKind } from "./fonts";
 import { isTauri } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 
 export type ThemeMode = "system" | "light" | "dark";
-export type FontStyle = "flat" | "color" | "system";
+
+const fontKey = (kind: FontKind) => `theme.font_${kind}`;
+
+const storedFont = (kind: FontKind): string => {
+  const value = store.get<string | null>(fontKey(kind), null);
+  return knownFont(kind, value) ? value : DEFAULT_FONTS[kind];
+};
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -22,7 +29,7 @@ const androidSystemBars = () =>
 class Theme {
   mode = $state<ThemeMode>(store.get("theme.mode", "system"));
   accentIndex = $state<number>(store.get("theme.accent", DEFAULT_ACCENT_INDEX));
-  fontStyle = $state<FontStyle>(store.get("theme.font", "system"));
+  fonts = $state(Object.fromEntries(FONT_KINDS.map((kind) => [kind, storedFont(kind)])) as Record<FontKind, string>);
   dynamicColor = $state<boolean>(store.get("theme.dynamic", false));
   systemDark = $state(false);
   systemAccent = $state<string | null>(null);
@@ -53,7 +60,7 @@ class Theme {
       root.style.setProperty("--c-accent", this.accent);
       root.style.setProperty("--c-accent-selection", withAlpha(this.accent, SELECTION_ALPHA));
       root.style.setProperty("--c-accent-quote", withAlpha(this.accent, QUOTE_ALPHA));
-      root.dataset.font = this.fontStyle;
+      for (const kind of FONT_KINDS) root.style.setProperty(`--family-${kind}`, FONT_FAMILIES[kind][this.fonts[kind]]);
       this.#applySystemBars(this.dark);
     });
   }
@@ -91,9 +98,10 @@ class Theme {
       .addEventListener("change", () => this.#publishPixelGrid(), { once: true });
   }
 
-  setFontStyle(style: FontStyle) {
-    this.fontStyle = style;
-    store.set("theme.font", style);
+  setFont(kind: FontKind, value: string) {
+    if (!knownFont(kind, value)) return;
+    this.fonts[kind] = value;
+    store.set(fontKey(kind), value);
   }
 }
 

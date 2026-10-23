@@ -1,6 +1,7 @@
 import { i18n, type Locale } from "$lib/i18n/index.svelte";
 import type { AuthKind } from "./auth";
-import { theme, type FontStyle, type ThemeMode } from "$lib/design/theme.svelte";
+import { FONT_KINDS } from "$lib/design/fonts";
+import { theme, type ThemeMode } from "$lib/design/theme.svelte";
 import { notes, type Note } from "$lib/screens/notes/notes.svelte";
 import { backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
@@ -45,7 +46,7 @@ export const exportSettings = (options: BackupOptions = {}): string =>
         theme_mode: theme.mode,
         dynamic_color: theme.dynamicColor,
         accent_index: theme.accentIndex,
-        font_style: theme.fontStyle,
+        ...Object.fromEntries(FONT_KINDS.map((kind) => [`font_${kind}`, theme.fonts[kind]])),
         // The Compose client stores "" for "follow the system".
         language: i18n.locale === "system" ? "" : i18n.locale,
         ...Object.fromEntries(BACKED_UP.map(({ key }) => [key, settings.exported(key)])),
@@ -107,8 +108,10 @@ const applySettings = (values: Wire) => {
   if (dynamic !== null) theme.setDynamicColor(dynamic);
   const accent = number(values, "accent_index");
   if (accent !== null) theme.setAccent(accent);
-  const font = text(values, "font_style");
-  if (font === "system" || font === "flat" || font === "color") theme.setFontStyle(font as FontStyle);
+  for (const kind of FONT_KINDS) {
+    const font = text(values, `font_${kind}`);
+    if (font !== null) theme.setFont(kind, font);
+  }
   const language = text(values, "language");
   if (language !== null) i18n.set((language || "system") as Locale);
 

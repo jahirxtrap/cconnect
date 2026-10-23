@@ -116,26 +116,43 @@
 
   const onServer = $derived(side === "server");
 
-  const titleOf = (title: string, url: string) => title || (url.startsWith("about:") ? "" : url) || t("NEW_TAB");
+  const blank = (url: string) => !url || url.startsWith("about:");
+
+  const titleOf = (title: string, url: string) => title || (blank(url) ? "" : url) || t("NEW_TAB");
 
   const entryOf = (id: string, title: string, url: string, favicon: string, home: boolean): BrowserEntry =>
     home ? { id, title: t("NEW_TAB"), url, favicon: "" } : { id, title: titleOf(title, url), url, favicon };
 
+  const DRAFT_TAB = "draft";
+
   let serverHome = $state(false);
+  let serverDraft = $state(false);
   const deviceEntries = $derived<BrowserEntry[]>(
     deviceBrowser.tabs.map((tab) => entryOf(tab.id, tab.title, tab.url, tab.favicon, tab.home)),
   );
   const serverEntries = $derived<BrowserEntry[]>(
     page.running
       ? page.tabs.map((tab) =>
-          entryOf(tab.id, tab.title, tab.url, tab.favicon ?? "", serverHome && tab.id === page.activeTab),
+          entryOf(
+            tab.id,
+            tab.title,
+            tab.url,
+            tab.favicon ?? "",
+            (serverHome && tab.id === page.activeTab) || blank(tab.url),
+          ),
         )
-      : [],
+      : serverDraft
+        ? [entryOf(DRAFT_TAB, "", "", "", true)]
+        : [],
   );
   const entries = $derived(onServer ? serverEntries : deviceEntries);
-  const activeId = $derived(onServer ? page.activeTab : deviceBrowser.activeId);
+  const activeId = $derived(
+    onServer ? (page.running || !serverDraft ? page.activeTab : DRAFT_TAB) : deviceBrowser.activeId,
+  );
   const active = $derived(entries.find((entry) => entry.id === activeId) ?? null);
-  const serverAtHome = $derived(serverHome || (!ready && !page.running && !launching && page.available));
+  const serverAtHome = $derived(
+    serverHome || (page.running ? blank(page.url) : !ready && !launching && page.available),
+  );
   const atHome = $derived(onServer ? serverAtHome : deviceBrowser.atHome);
   const canGoBack = $derived(
     onServer
@@ -256,9 +273,14 @@
       link?.newTab(url);
       return;
     }
+    failed = false;
+    if (!url) {
+      serverDraft = true;
+      return;
+    }
     launching = true;
     link?.watch(true);
-    if (url) link?.navigate(url);
+    link?.navigate(url);
   };
 
   const openOnDevice = (url: string) => {
@@ -274,7 +296,8 @@
 
   const closeTab = (id: string) => {
     if (!onServer) deviceBrowser.closeTab(id);
-    else if (deviceBrowsing && serverEntries.length === 1) void stopBrowser();
+    else if (id === DRAFT_TAB) serverDraft = false;
+    else if (serverEntries.length === 1) void stopBrowser();
     else link?.closeTab(id);
   };
 
@@ -313,7 +336,9 @@
 
   const receive = (next: BrowserState) => {
     page = dragging ? { ...next, tabs: page.tabs } : next;
-    if (next.running) launching = false;
+    if (!next.running) return;
+    launching = false;
+    serverDraft = false;
   };
 
   $effect(() => {
@@ -338,7 +363,6 @@
         },
       },
       viewport,
-      !deviceBrowsing,
     );
     link = created;
     return () => {
@@ -350,7 +374,7 @@
   });
 
   $effect(() => {
-    const wanted = !deviceBrowsing || (onServer && (page.running || launching));
+    const wanted = onServer && (page.running || launching);
     link?.watch(wanted);
     if (!wanted) ready = false;
   });
@@ -576,7 +600,15 @@
     });
   };
 
-  const selectTab = (id: string) => (onServer ? link?.switchTab(id) : deviceBrowser.switchTab(id));
+  const selectTab = (id: string) => {
+    if (!onServer) {
+      deviceBrowser.switchTab(id);
+      return;
+    }
+    if (id === DRAFT_TAB) return;
+    serverHome = false;
+    link?.switchTab(id);
+  };
 
   const cycle = (step: number) => {
     if (entries.length < 2) return;
