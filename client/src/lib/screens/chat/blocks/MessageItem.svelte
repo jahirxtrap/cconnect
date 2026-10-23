@@ -16,7 +16,8 @@
   import { formatClock } from "$lib/data/time";
   import { userContent } from "$lib/data/userContent";
   import { elementLabel } from "$lib/data/pickedElements";
-  import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
+  import { agentFieldsOf, diffLinesOf } from "$lib/services/chatSocket";
   import { contextServer } from "$lib/services/serverContext";
   import Chip from "$lib/ui/Chip.svelte";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
@@ -32,7 +33,8 @@
   import InteractionBlock from "./InteractionBlock.svelte";
   import PlanBlock from "./PlanBlock.svelte";
   import ToolBlock from "./ToolBlock.svelte";
-  import { gapAbove, gapBelow, NO_GAP } from "./gaps";
+  import { cardGap, gapAbove, gapBelow, NO_GAP } from "./gaps";
+  import { rowSite } from "./rowSite";
 
   interface Props {
     message: ChatMessage;
@@ -40,6 +42,7 @@
     nextRole: Role | null;
     running: boolean;
     gluedTop?: boolean;
+    spaced?: boolean;
     nested?: boolean;
     labelMode?: boolean;
     expanded?: boolean | null;
@@ -48,7 +51,7 @@
     onAnswer?: (requestId: string, optionId: string) => void;
     onSharedLink?: (url: string, filename: string) => void;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
-    onSuggest?: ((item: SuggestionItem) => void) | null;
+    onSuggest?: SuggestionPicker | null;
     component?: Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     mods?: ModSurface | null;
   }
@@ -61,6 +64,7 @@
     nextRole,
     running,
     gluedTop = false,
+    spaced = false,
     nested = false,
     labelMode = false,
     expanded = null,
@@ -78,7 +82,8 @@
 
   const rowId = $derived(String(message.id));
   const spinnerProps = $derived({ word: t("WORKING"), message: null, suffix: "", mode: running ? "requesting" : "responding" });
-  const top = $derived(gluedTop || (nested && prevRole === null) ? NO_GAP : gapAbove(prevRole, message.role));
+  const gap = $derived(gapAbove(prevRole, message.role));
+  const top = $derived(gluedTop || (nested && prevRole === null) ? NO_GAP : spaced ? cardGap(gap) : gap);
   const bottom = $derived(nested ? NO_GAP : gapBelow(message.role, nextRole));
 </script>
 
@@ -157,6 +162,35 @@
   />
 {/snippet}
 
+{#snippet fileChangeRow(props: Record<string, unknown>)}
+  <FileChangeBlock
+    path={typeof props.path === "string" ? props.path : (message.path ?? "")}
+    diffLines={Array.isArray(props.diff_lines) ? diffLinesOf(props) : (message.diffLines ?? [])}
+    labelOnly={message.labelOnly || labelMode}
+    {expanded}
+    {onToggle}
+  />
+{/snippet}
+
+{#snippet agentRow(props: Record<string, unknown>)}
+  {@const fields = agentFieldsOf(props)}
+  <AgentBlock
+    message={{
+      ...message,
+      text: fields.description ?? message.text,
+      toolName: fields.subagentType ?? message.toolName,
+      agentRun:
+        fields.model || fields.effort
+          ? { model: fields.model ?? message.agentRun?.model ?? null, effort: fields.effort ?? message.agentRun?.effort ?? null }
+          : message.agentRun,
+    }}
+    {running}
+    {expanded}
+    {onToggle}
+    {onSharedLink}
+  />
+{/snippet}
+
 {#snippet toolResult(output: string)}
   {@const props = {
     tool_use_id: message.toolUseId ?? rowId,
@@ -209,7 +243,7 @@
     {@const props = message.ephemeral
       ? { command: "", args: "", text: message.text, isErrored: false }
       : { text: message.text, isFirstOfReply: prevRole !== "assistant" }}
-    {@const site = message.ephemeral ? "CommandOutput" : "AssistantMessage"}
+    {@const site = rowSite(message) ?? "AssistantMessage"}
     {#if mods?.state.surface}
       <ModInline {mods} component={site} instanceId={rowId} {props} engine={assistantRow} inset />
     {:else}
@@ -301,13 +335,20 @@
       {/if}
     {/if}
   {:else if message.role === "file_change"}
-    <FileChangeBlock
-      path={message.path ?? ""}
-      diffLines={message.diffLines ?? []}
-      labelOnly={message.labelOnly || labelMode}
-      {expanded}
-      {onToggle}
-    />
+    {@const props = {
+      tool_use_id: message.toolUseId ?? rowId,
+      tool: message.toolName ?? "",
+      input: { file_path: message.path ?? "" },
+      isRunning: running,
+      isErrored: false,
+      isInterrupted: false,
+      isExpanded: !!expanded,
+    }}
+    {#if mods?.state.surface}
+      <ModInline {mods} component="ToolUse" instanceId={rowId} {props} engine={fileChangeRow} inset />
+    {:else}
+      {@render fileChangeRow(props)}
+    {/if}
   {:else if message.role === "shared"}
     <SharedBlock files={message.files ?? []} {onSharedLink} {onSharedMenu} {expanded} {onToggle} />
   {:else if message.role === "compact"}
@@ -315,7 +356,20 @@
       <CompactBlock compact={message.compact} {expanded} {onToggle} />
     {/if}
   {:else if message.role === "agent"}
-    <AgentBlock {message} {running} {expanded} {onToggle} {onSharedLink} />
+    {@const props = {
+      tool_use_id: message.toolUseId ?? rowId,
+      tool: "Agent",
+      input: { description: message.text, subagent_type: message.toolName ?? "" },
+      isRunning: running,
+      isErrored: false,
+      isInterrupted: false,
+      isExpanded: !!expanded,
+    }}
+    {#if mods?.state.surface}
+      <ModInline {mods} component="ToolUse" instanceId={rowId} {props} engine={agentRow} inset />
+    {:else}
+      {@render agentRow(props)}
+    {/if}
   {:else if message.role === "agent_report"}
     <Collapsible
       label={message.toolName || t("AGENT_REPORT")}

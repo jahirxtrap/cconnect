@@ -1,11 +1,11 @@
 <script lang="ts">
   import CornerDownRight from "@lucide/svelte/icons/corner-down-right";
   import PenLine from "@lucide/svelte/icons/pen-line";
-  import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { SuggestionItem, SuggestionPicker } from "$lib/markdown/cconnectBlock";
 
   interface Props {
     items: SuggestionItem[];
-    onSelect?: ((item: SuggestionItem) => void) | null;
+    onSelect?: SuggestionPicker | null;
     class?: string;
   }
 
@@ -16,8 +16,8 @@
   {#each items as item (item.text)}
     <button
       type="button"
-      disabled={!onSelect}
-      onclick={() => onSelect?.(item)}
+      disabled={!onSelect || (item.mode === "send" && !onSelect.sends)}
+      onclick={() => onSelect?.pick(item)}
       class="inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-full border-2 border-outline-variant px-3 py-1 text-left text-body-sm transition-colors select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none enabled:hover:bg-on-surface/8 disabled:cursor-default disabled:opacity-40"
     >
       {#if item.mode === "draft"}

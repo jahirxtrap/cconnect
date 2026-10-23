@@ -2198,6 +2198,7 @@ export class ChatState {
         this.#append(
           newMessage(this.#nextId++, "file_change", {
             toolUseId: event.id,
+            toolName: event.tool,
             path: event.path,
             diffLines: event.diffLines,
             labelOnly: event.labelOnly,

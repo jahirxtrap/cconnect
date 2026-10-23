@@ -22,7 +22,7 @@ import {
   type ModStroke,
   type ModToast,
 } from "$lib/data/modModels";
-import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
 import { settings } from "$lib/data/settings.svelte";
 import { ModClients } from "./modClients.svelte";
 
@@ -39,7 +39,7 @@ export interface ModHost {
   suggest: (text: string) => boolean;
   copy: (text: string) => Promise<boolean>;
   selection: () => string;
-  pickSuggestion: ((item: SuggestionItem) => void) | null;
+  pickSuggestion: SuggestionPicker | null;
 }
 
 export const BAND_ID = "above-prompt";

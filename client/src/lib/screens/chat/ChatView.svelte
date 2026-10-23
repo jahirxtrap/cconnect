@@ -42,7 +42,7 @@
   import ModBand from "$lib/screens/mods/ModBand.svelte";
   import type { ModCompletions, ModDecoration, ModStroke } from "$lib/data/modModels";
   import { BAND_ID, type ModHost } from "$lib/screens/mods/modSurface.svelte";
-  import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { copyText } from "$lib/platform/clipboard";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
@@ -172,6 +172,13 @@
     chat.streaming || ["waiting", "working", "slow", "compacting"].includes(activity ?? ""),
   );
   const idle = $derived(chat.link === "connected" && !chat.transcriptLoading && !busy);
+  const blocked = $derived(
+    chat.link === "disconnected" ||
+      chat.link === "connecting" ||
+      !chat.capabilitiesReady ||
+      chat.switchingAccount ||
+      !chat.capabilities?.models.length,
+  );
 
   const availableCommands = $derived.by(() => {
     const all = chat.capabilities?.commands ?? [];
@@ -266,10 +273,13 @@
     wasBusy = busy;
   });
 
-  const pickSuggestion = $derived(
+  const pickSuggestion = $derived<SuggestionPicker | null>(
     chat.viewOnly || chat.streaming
       ? null
-      : (item: SuggestionItem) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text)),
+      : {
+          pick: (item) => (item.mode === "draft" ? (chat.pendingInput = item.text) : chat.submit(item.text)),
+          sends: !blocked,
+        },
   );
 
   $effect(() => {
@@ -484,11 +494,7 @@
         completions={chat.sideOpen ? null : completions}
         decorations={chat.sideOpen ? [] : decorations}
         {focused}
-        blocked={chat.link === "disconnected" ||
-          chat.link === "connecting" ||
-          !chat.capabilitiesReady ||
-          chat.switchingAccount ||
-          !chat.capabilities?.models.length}
+        {blocked}
         streaming={chat.sideOpen ? chat.sideStreaming : busy}
         draft={chat.sideOpen ? chat.sideDraft : chat.draft}
         onDraft={(value) => (chat.sideOpen ? (chat.sideDraft = value) : (chat.draft = value))}

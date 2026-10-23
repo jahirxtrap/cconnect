@@ -59,4 +59,6 @@ export const gapBelow = (current: Role, next: Role | null): string => {
   return BIG;
 };
 
+export const cardGap = (gap: string): string => (gap === NONE ? SMALL : gap);
+
 export const NO_GAP = NONE;

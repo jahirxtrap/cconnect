@@ -68,7 +68,7 @@ export type ServerEvent =
       ms: number | null;
     }
   | { type: "tool_result"; toolUseId: string | null; content: string | null; ms: number | null }
-  | { type: "file_change"; id: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
+  | { type: "file_change"; id: string | null; tool: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
   | { type: "shared"; id: string | null; files: SharedFile[] }
   | { type: "compacting" }
   | { type: "compacting_ended" }
@@ -207,6 +207,16 @@ const flag = (raw: Wire, key: string): boolean => raw[key] === true;
 const number = (raw: Wire, key: string): number | null =>
   typeof raw[key] === "number" ? (raw[key] as number) : null;
 const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
+
+export const diffLinesOf = (raw: Wire): DiffLine[] =>
+  list(raw, "diff_lines").map((line) => ({ kind: diffKindOf(text(line, "kind")), text: text(line, "text") ?? "" }));
+
+export const agentFieldsOf = (raw: Wire) => ({
+  subagentType: text(raw, "subagent_type"),
+  description: text(raw, "description"),
+  model: text(raw, "model"),
+  effort: text(raw, "effort"),
+});
 const strings = (raw: Wire, key: string): string[] =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
 
@@ -723,11 +733,9 @@ export class ChatSocket {
         return {
           type: "file_change",
           id: text(wire, "id"),
+          tool: text(wire, "name"),
           path: text(wire, "path") ?? "",
-          diffLines: list(wire, "diff_lines").map((line) => ({
-            kind: diffKindOf(text(line, "kind")),
-            text: text(line, "text") ?? "",
-          })),
+          diffLines: diffLinesOf(wire),
           labelOnly: flag(wire, "label"),
         };
       case "shared":
@@ -843,14 +851,7 @@ export class ChatSocket {
           ts: typeof wire.ts === "number" ? wire.ts : null,
         };
       case "agent":
-        return {
-          type: "agent",
-          id: text(wire, "id"),
-          subagentType: text(wire, "subagent_type"),
-          description: text(wire, "description"),
-          model: text(wire, "model"),
-          effort: text(wire, "effort"),
-        };
+        return { type: "agent", id: text(wire, "id"), ...agentFieldsOf(wire) };
       case "task_running":
         return { type: "task_running", id: text(wire, "id") };
       case "agent_result":

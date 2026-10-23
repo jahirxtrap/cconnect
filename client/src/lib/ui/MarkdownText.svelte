@@ -11,7 +11,7 @@
   import { isArchive, visibleName } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
-  import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { createSegmenter, type Segment } from "$lib/markdown/render";
   import { backend, sharedRootOf } from "$lib/services/backend.svelte";
   import { contextServer } from "$lib/services/serverContext";
@@ -25,7 +25,7 @@
     text: string;
     onSharedLink?: ((url: string, filename: string) => void) | null;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
-    onSuggest?: ((item: SuggestionItem) => void) | null;
+    onSuggest?: SuggestionPicker | null;
     dense?: boolean;
     class?: string;
   }

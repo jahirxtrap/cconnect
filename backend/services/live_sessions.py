@@ -13,7 +13,7 @@ import uuid
 
 from loguru import logger
 
-from services import cli_info, mods, persistent_sessions, todos as todos_store
+from services import cli_info, mods, persistent_sessions, todos as todos_store, tool_props
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -276,7 +276,9 @@ class LiveSession:
             "rows": rows,
             "offset": offset,
         }
-        return await mods.render(client, component, instance_id, props, site)
+        sent = tool_props.to_engine(component, props)
+        drawn = await mods.render(client, component, instance_id, sent, site)
+        return {**drawn, "props": tool_props.to_page(component, props, sent, drawn["props"])}
 
     async def mod_client_module(self, plugin):
         client = self._mod_client()

@@ -11,7 +11,7 @@ from typing import Any, Optional
 
 from core import data_migration, paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import mods, settings_store, visibility
+from services import mods, settings_store, tool_calls, visibility
 from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -1178,6 +1178,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
         _display_tool_name, _flatten_result_content,
     )
     entries = [entry for entry in _iter_lines(sub_file) if entry.get("type") in _TRAVELLING_TYPES]
+    tool_calls.remember_entries(entries)
     sub_ms = _tool_durations(entries)
     sub_results: dict[str, object] = {}
     for entry in entries:
@@ -1211,9 +1212,9 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
                         _working(out, vis)
                         continue
                     if vis["file_change"] == "label":
-                        out.append({"type": "file_change", "path": path, "id": bid, "label": True, "parent": parent_id})
+                        out.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, "parent": parent_id})
                         continue
-                    out.append({"type": "file_change", "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id})
+                    out.append({"type": "file_change", "name": name, "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id})
                     continue
             if vis["tool_use"] == "off":
                 _working(out, vis)
@@ -1374,6 +1375,7 @@ def get_session_messages(
     if not file.is_file():
         return []
     entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
+    tool_calls.remember_entries(entries)
     queued_user_texts: set[str] = set()
     real_user_texts: set[str] = set()
 
@@ -1699,10 +1701,11 @@ def get_session_messages(
                             _working(messages, vis)
                             continue
                         if vis["file_change"] == "label":
-                            messages.append({"type": "file_change", "path": path, "id": bid, "label": True})
+                            messages.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True})
                             continue
                         messages.append({
                             "type": "file_change",
+                            "name": name,
                             "path": path,
                             "diff_lines": _build_file_diff(name, inp, path),
                             "id": bid,

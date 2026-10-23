@@ -21,6 +21,11 @@ export interface SuggestionItem {
   mode: SuggestionMode;
 }
 
+export interface SuggestionPicker {
+  pick: (item: SuggestionItem) => void;
+  sends: boolean;
+}
+
 export type CconnectBlock =
   | { type: "gallery"; items: GalleryItem[] }
   | { type: "playlist"; items: PlaylistItem[] }

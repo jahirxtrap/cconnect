@@ -18,7 +18,7 @@ from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server
 from mcps.media import block_types
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, diffs, mods, persistent_sessions, providers, settings_store, visibility
+from services import claude_assets, cli_info, diffs, mods, persistent_sessions, providers, settings_store, tool_calls, visibility
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
@@ -381,7 +381,7 @@ def _file_change_event(block: Any, raw_input: Any, hidden: set[str]) -> dict | N
     bid = getattr(block, "id", None)
     if bid:
         hidden.add(bid)
-    return {"type": "file_change", "id": bid, "path": path, "diff_lines": diff_lines}
+    return {"type": "file_change", "id": bid, "name": name, "path": path, "diff_lines": diff_lines}
 
 
 def _mark_working(events: list[dict], vis: dict) -> None:
@@ -455,7 +455,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                     _mark_working(events, vis)
                 if event is not None and mode != "off":
                     if mode == "label":
-                        event = {"type": "file_change", "id": event.get("id"), "path": event.get("path"), "label": True}
+                        event = {"type": "file_change", "id": event.get("id"), "name": event.get("name"), "path": event.get("path"), "label": True}
                     events.append(event)
             elif name == _SHARE_RULE:
                 bid = getattr(block, "id", None)
@@ -1181,6 +1181,7 @@ async def run_prompt(
                     for _b in message.content or []:
                         if type(_b).__name__ == "ToolUseBlock":
                             _bid = getattr(_b, "id", None)
+                            tool_calls.remember(_bid, tool=getattr(_b, "name", None), input=getattr(_b, "input", None))
                             if _bid:
                                 tool_started[_bid] = loop.time()
                                 if emit is not None:
@@ -1208,10 +1209,16 @@ async def run_prompt(
                             "consumed": 0,
                             "ts": int(time.time() * 1000),
                         }
+                results = [b for b in getattr(message, "content", None) or [] if type(b).__name__ == "ToolResultBlock"]
+                for _b in results:
+                    tool_calls.remember(
+                        getattr(_b, "tool_use_id", None),
+                        errored=bool(getattr(_b, "is_error", False)),
+                        output=getattr(message, "tool_use_result", None) if len(results) == 1 else None,
+                    )
                 if emit is not None:
-                    for _b in getattr(message, "content", None) or []:
-                        if type(_b).__name__ == "ToolResultBlock":
-                            status_state["pending"].discard(getattr(_b, "tool_use_id", None))
+                    for _b in results:
+                        status_state["pending"].discard(getattr(_b, "tool_use_id", None))
                 tu_mode = vis()["tool_use"]
                 if tu_mode != "off":
                     for block in getattr(message, "content", None) or []:

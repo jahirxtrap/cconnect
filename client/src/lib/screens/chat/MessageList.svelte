@@ -4,14 +4,15 @@
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
-  import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import Collapsible from "./blocks/Collapsible.svelte";
   import DateSeparator from "./blocks/DateSeparator.svelte";
-  import { gapAbove, gapBelow, NO_GAP } from "./blocks/gaps";
+  import { cardGap, gapAbove, gapBelow, NO_GAP } from "./blocks/gaps";
   import MessageItem from "./blocks/MessageItem.svelte";
+  import { rowSite } from "./blocks/rowSite";
   import StatusProgress from "./blocks/StatusProgress.svelte";
   import StickyHeader from "./blocks/StickyHeader.svelte";
   import { runSummary, toolRuns, type ToolRun } from "./toolRuns";
@@ -35,7 +36,7 @@
     follow?: boolean;
     onSharedLink: (url: string, filename: string) => void;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
-    onSuggest?: ((item: SuggestionItem) => void) | null;
+    onSuggest?: SuggestionPicker | null;
     sessionId: string | null;
     expandedIds: Record<number, boolean>;
     savedTop: number;
@@ -120,10 +121,29 @@
   const groupHides = (run: ToolRun, id: number) =>
     id !== run.anchor && (!!mods?.tree("ToolGroup", run.id) || (groupFolded(run) && !openGroups[run.id]));
 
+  const rowTree = (item: ChatMessage | undefined) => {
+    const site = item ? rowSite(item) : null;
+    return !!item && !!site && !!mods?.tree(site, String(item.id));
+  };
+
+  const carded = (item: ChatMessage | undefined) => {
+    const run = item ? runOf.get(item.id) : undefined;
+    return (!!run && !!mods?.tree("ToolGroup", run.id)) || rowTree(item);
+  };
+
+  const spacedAt = (index: number) => {
+    const item = visible[index];
+    const prev = visible[index - 1];
+    const run = runOf.get(item.id);
+    const inside = !!run && !!prev && runOf.get(prev.id) === run;
+    return inside ? rowTree(item) || rowTree(prev) : carded(item) || carded(prev);
+  };
+
   const groupSpacing = (run: ToolRun, index: number, glued: boolean) => {
     if (!mods?.tree("ToolGroup", run.id) && !groupFolded(run)) return undefined;
     const last = visible.findIndex((item) => item.id === run.members.at(-1));
-    const top = glued ? NO_GAP : gapAbove(visible[index - 1]?.role ?? null, visible[index].role);
+    const gap = gapAbove(visible[index - 1]?.role ?? null, visible[index].role);
+    const top = glued ? NO_GAP : spacedAt(index) ? cardGap(gap) : gap;
     const bottom = gapBelow(visible[last].role, visible[last + 1]?.role ?? null);
     return `padding-top: ${top}; padding-bottom: ${bottom}`;
   };
@@ -233,6 +253,7 @@
     nextRole={visible[index + 1]?.role ?? null}
     running={runningAt(item, index)}
     gluedTop={separated}
+    spaced={spacedAt(index)}
     labelMode={modeFor(item.role) === "label"}
     expanded={expandedIds[item.id] ?? false}
     onToggle={() => toggleExpanded(item.id)}

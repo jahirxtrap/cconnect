@@ -3,7 +3,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import { isVideo } from "$lib/data/previewKind";
-  import type { CconnectBlock, SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { mediaSrc } from "$lib/services/mediaSource";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
@@ -14,7 +14,7 @@
     data: CconnectBlock;
     onOpen: (url: string, filename: string) => void;
     compact?: boolean;
-    onSuggest?: ((item: SuggestionItem) => void) | null;
+    onSuggest?: SuggestionPicker | null;
   }
 
   const { data, onOpen, compact = false, onSuggest = null }: Props = $props();
