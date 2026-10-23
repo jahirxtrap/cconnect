@@ -103,6 +103,10 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                 from services import attachments as attachments_service
                 prompt_text, prompt_images = attachments_service.compose_prompt(text, attachments)
             resumed_sid = state.session_id
+            written_from = (
+                sessions_service.session_size(sessions_service.project_key_for(state.cwd), resumed_sid)
+                if state.cwd and resumed_sid else 0
+            )
             resume_at = rewind_service.get_pending(resumed_sid)
             resident = await session.resident()
             try:
@@ -153,7 +157,12 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     yield event
             finally:
                 if state.cwd and state.session_id:
-                    sessions_service.normalize_session_entrypoint(state.cwd, state.session_id)
+                    await asyncio.to_thread(
+                        sessions_service.normalize_session_entrypoint,
+                        state.cwd,
+                        state.session_id,
+                        written_from if state.session_id == resumed_sid else 0,
+                    )
             if state.cwd and state.session_id:
                 # The token counts and summary are written to the transcript only after the turn.
                 if is_compact_cmd:

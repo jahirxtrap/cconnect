@@ -24,7 +24,8 @@ _COMMAND_NAME_RE = re.compile(r"<command-name>\s*([^<]+?)\s*</command-name>")
 _COMPACT_MARK = b'"compact_boundary"'
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
 
-_SDK_ENTRYPOINT_RE = re.compile(r'"entrypoint":"sdk-[A-Za-z]+"')
+_SDK_ENTRYPOINT_RE = re.compile(rb'"entrypoint":"sdk-[A-Za-z]+"')
+_CLI_ENTRYPOINT = b'"entrypoint":"cli"'
 
 _TRAVELLING_TYPES = {"user", "assistant"}
 _MEDIA_TYPES = {"image", "document"}
@@ -67,28 +68,28 @@ def _open_transcript(path: Path, mode: str):
     return path.open(mode, encoding="utf-8", errors="surrogateescape", newline="")
 
 
-def normalize_session_entrypoint(cwd: str, session_id: str):
+def normalize_session_entrypoint(cwd: str, session_id: str, start: int = 0):
     if not _SESSION_RE.match(session_id or ""):
         return
-    normalize_entrypoint(_base() / project_key_for(cwd) / f"{session_id}.jsonl")
+    normalize_entrypoint(_base() / project_key_for(cwd) / f"{session_id}.jsonl", start)
 
 
-def normalize_entrypoint(path: Path):
-    """Rewrite the SDK's "sdk-*" entrypoint to "cli"; `claude --resume` hides sdk sessions."""
+def normalize_entrypoint(path: Path, start: int = 0):
+    """Rewrite the SDK's "sdk-*" entrypoint to "cli" in place, from `start` on; `claude --resume` hides sdk sessions."""
     if not path.is_file():
         return
-    with _open_transcript(path, "r") as src:
-        if not any(_SDK_ENTRYPOINT_RE.search(line) for line in src):
-            return
-    staged = path.with_name(f".{path.name}.entrypoint")
-    try:
-        with _open_transcript(path, "r") as src, _open_transcript(staged, "w") as dst:
-            for line in src:
-                dst.write(_SDK_ENTRYPOINT_RE.sub('"entrypoint":"cli"', line))
-        os.replace(staged, path)
-    except BaseException:
-        staged.unlink(missing_ok=True)
-        raise
+    with path.open("r+b") as fh:
+        fh.seek(start)
+        offset = start
+        found: list[tuple[int, int]] = []
+        for raw in fh:
+            if not raw.endswith(b"\n"):
+                break
+            found.extend((offset + match.start(), match.end() - match.start()) for match in _SDK_ENTRYPOINT_RE.finditer(raw))
+            offset += len(raw)
+        for at, width in found:
+            fh.seek(at)
+            fh.write(_CLI_ENTRYPOINT.ljust(width))
 
 
 def _project_dir(project_key: str) -> Path:

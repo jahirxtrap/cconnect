@@ -71,6 +71,7 @@ import { createClaudeApi } from "$lib/services/claudeApi";
 import { createSharedApi } from "$lib/services/sharedApi";
 import { createHttp } from "$lib/services/http";
 import { createSettingsApi } from "$lib/services/settingsApi";
+import { listTerminals } from "$lib/services/terminalApi";
 import {
   createSessionsApi,
   type RewindPoint,
@@ -1825,6 +1826,7 @@ export class ChatState {
   }
 
   #onHistoryChunk(sessionId: string, startIndex: number, items: SessionMessage[], hasMore: boolean) {
+    if (!this.transcriptPaging) return;
     if (sessionId !== this.sessionId) {
       this.transcriptLoading = false;
       this.transcriptPaging = false;
@@ -2222,7 +2224,9 @@ export class ChatState {
         this.activity = event.state;
         break;
       case "terminal_opened":
-        terminalTabs.openLocal(event.session);
+        void listTerminals().then((listed) => {
+          if (listed) terminalTabs.openLocal(event.session);
+        });
         break;
       case "compact":
         this.#assistantId = null;
@@ -2239,6 +2243,9 @@ export class ChatState {
         ];
         this.compacting = false;
         this.#history = [];
+        this.oldestLoadedIndex = 0;
+        this.transcriptExhausted = true;
+        this.transcriptPaging = false;
         break;
       case "compact_summary":
         this.messages = this.messages.map((item) =>

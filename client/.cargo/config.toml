@@ -1,0 +1,2 @@
+[env]
+WRY_RUSTWEBVIEW_CLASS_EXTENSION = "override fun onCreateInputConnection(outAttrs: android.view.inputmethod.EditorInfo): android.view.inputmethod.InputConnection? = PastedContent.inputConnection(this, super.onCreateInputConnection(outAttrs), outAttrs)"

@@ -6,11 +6,6 @@ import org.gradle.api.logging.LogLevel
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.TaskAction
 
-private val RUST_WEBVIEW_EXTENSION =
-    "override fun onCreateInputConnection(outAttrs: android.view.inputmethod.EditorInfo): " +
-        "android.view.inputmethod.InputConnection? = " +
-        "PastedContent.inputConnection(this, super.onCreateInputConnection(outAttrs), outAttrs)"
-
 open class BuildTask : DefaultTask() {
     @Input
     var rootDirRel: String? = null
@@ -58,7 +53,6 @@ open class BuildTask : DefaultTask() {
         project.exec {
             workingDir(File(project.projectDir, rootDirRel))
             executable(executable)
-            environment("WRY_RUSTWEBVIEW_CLASS_EXTENSION", RUST_WEBVIEW_EXTENSION)
             args(args)
             if (project.logger.isEnabled(LogLevel.DEBUG)) {
                 args("-vv")

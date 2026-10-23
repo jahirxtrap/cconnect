@@ -1252,15 +1252,15 @@ async def run_prompt(
                         yield {"type": "compacting_ended"}
                 elif subtype == "compact_boundary":
                     compacting_shown = False
-                    meta = (data or {}).get("compactMetadata", {}) if isinstance(data, dict) else {}
+                    meta = (data.get("compact_metadata") or {}) if isinstance(data, dict) else {}
                     yield {
                         "type": "compact",
                         "trigger": meta.get("trigger"),
-                        "pre_tokens": meta.get("preTokens"),
-                        "post_tokens": meta.get("postTokens"),
+                        "pre_tokens": meta.get("pre_tokens"),
+                        "post_tokens": meta.get("post_tokens"),
                         "summary": "",
                     }
-                    context_tokens = meta.get("postTokens") or None
+                    context_tokens = meta.get("post_tokens") or None
                     yield {"type": "context", "context_tokens": context_tokens}
                 else:
                     for event in _system_events(subtype, data, vis()):
