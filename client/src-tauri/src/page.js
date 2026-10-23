@@ -71,5 +71,17 @@
   window.addEventListener('focus', (event) => {
     if (event.target === window) post('focused');
   });
+  const NOTCH = 100;
+  let wheeled = 0;
+  if (window.top === window) {
+    window.addEventListener('wheel', (event) => {
+      if (!event.ctrlKey || event.defaultPrevented) return;
+      event.preventDefault();
+      wheeled += event.deltaY;
+      if (Math.abs(wheeled) < NOTCH) return;
+      post('zoom', wheeled < 0 ? 1 : -1);
+      wheeled = 0;
+    }, { passive: false });
+  }
   Object.defineProperty(window, '__cconnect', { value: { pick: (on) => (on ? start() : stop()), describe } });
 })();

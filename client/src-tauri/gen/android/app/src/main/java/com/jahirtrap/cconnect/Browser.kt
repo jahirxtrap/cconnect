@@ -6,8 +6,8 @@ import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.Matrix
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Environment
@@ -25,10 +25,13 @@ import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import android.webkit.WebStorage
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.webkit.ProfileStore
 import androidx.webkit.ProxyConfig
 import androidx.webkit.ProxyController
@@ -41,6 +44,7 @@ import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 import org.json.JSONArray
 import org.json.JSONObject
@@ -56,10 +60,18 @@ private const val PICKING_EVENT = "browser-picking"
 private const val PICKED_EVENT = "browser-picked"
 private const val FOCUSED_EVENT = "browser-focused"
 private const val SHIELD_EVENT = "browser-shield"
+private const val PULL_EVENT = "browser-pull"
 private const val ANSWER_SECONDS = 10L
-private const val ICON_QUALITY = 100
+private const val PNG_QUALITY = 100
 private const val BLOCKED_STATUS = 403
 private val WEB_SCHEMES = setOf("http", "https", "about", "data", "blob", "javascript")
+
+private class Page(context: Context, private val overscrolled: (WebView) -> Unit) : WebView(context) {
+  override fun onOverScrolled(scrollX: Int, scrollY: Int, clampedX: Boolean, clampedY: Boolean) {
+    super.onOverScrolled(scrollX, scrollY, clampedX, clampedY)
+    if (clampedY && scrollY == 0) overscrolled(this)
+  }
+}
 
 object BrowserNative {
   @JvmStatic external fun blocks(url: String, source: String, accept: String): Boolean
@@ -77,8 +89,6 @@ class Browser(
   private class Tab(val id: String, val view: WebView) {
     @Volatile var source = ""
     val blocked = AtomicInteger()
-    var bounds: JSONObject? = null
-    var zoom = 1f
     var agent: String? = null
   }
 
@@ -91,6 +101,10 @@ class Browser(
   private var cover: List<RectF> = emptyList()
   private var shown: String? = null
   private var gesture: WebView? = null
+  private var atTop = false
+  private var overscrolled = false
+  private var pullFrom: Float? = null
+  private var pulled = 0f
   private var routed: String? = null
 
   @JavascriptInterface
@@ -99,7 +113,6 @@ class Browser(
     return when (command) {
       "browser_open" -> ui { open(args) }
       "browser_bounds" -> ui { tab(args)?.let { place(it, args) } }
-      "browser_zoom" -> ui { tab(args)?.let { zoom(it, args.getDouble("zoom").toFloat()) } }
       "browser_agent" -> ui { tab(args)?.let { agent(it, args.optString("agent").ifEmpty { null }) } }
       "browser_visible" -> ui { visible(args.getString("id"), args.getBoolean("visible")) }
       "browser_navigate" -> ui { tab(args)?.view?.loadUrl(args.getString("url")) }
@@ -122,22 +135,77 @@ class Browser(
         done()
       }
       "browser_clear_data" -> wait(::clear)
+      "browser_clear_site" -> wait { done -> clearSite(args.getString("host"), done) }
+      "browser_capture" -> ask { reply -> reply(tab(args)?.let(::capture) ?: "null") }
       "browser_data_size" -> profileDirs().sumOf(::size).toString()
       else -> "null"
     }
   }
 
   fun dispatch(event: MotionEvent): Boolean {
-    if (event.actionMasked == MotionEvent.ACTION_DOWN) gesture = target(event.x, event.y)
+    if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+      gesture = target(event.x, event.y)
+      atTop = gesture?.canScrollVertically(-1) == false
+      overscrolled = false
+      pullFrom = null
+    }
     val view = gesture ?: return false
-    val at = IntArray(2).also(view::getLocationInWindow)
-    val local = MotionEvent.obtain(event)
-    local.offsetLocation(-at[0].toFloat(), -at[1].toFloat())
-    local.transform(Matrix().apply { setScale(1 / view.scaleX, 1 / view.scaleY) })
-    view.dispatchTouchEvent(local)
-    local.recycle()
-    if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) gesture = null
+    val held = pull(view, event)
+    val released = event.actionMasked == MotionEvent.ACTION_UP
+    if (!held || released) {
+      val at = IntArray(2).also(view::getLocationInWindow)
+      val local = MotionEvent.obtain(event)
+      local.offsetLocation(-at[0].toFloat(), -at[1].toFloat())
+      if (held) local.action = MotionEvent.ACTION_CANCEL
+      view.dispatchTouchEvent(local)
+      local.recycle()
+    }
+    val single = event.actionMasked == MotionEvent.ACTION_MOVE && event.pointerCount == 1
+    if (!held && single && overscrolled && pullFrom == null) pullFrom = event.y
+    if (released || event.actionMasked == MotionEvent.ACTION_CANCEL) gesture = null
     return true
+  }
+
+  private fun pull(view: WebView, event: MotionEvent): Boolean {
+    val from = pullFrom ?: return false
+    val tab = tabs.values.firstOrNull { it.view === view } ?: return false
+    when (event.actionMasked) {
+      MotionEvent.ACTION_MOVE -> {
+        pulled = event.y - from
+        if (event.pointerCount == 1 && pulled >= 0f) {
+          emitPull(tab, pulled, false)
+          return true
+        }
+        overscrolled = false
+        endPull(tab, 0f)
+      }
+      MotionEvent.ACTION_UP -> {
+        endPull(tab, pulled)
+        return true
+      }
+      else -> endPull(tab, 0f)
+    }
+    return false
+  }
+
+  private fun endPull(tab: Tab, distance: Float) {
+    if (pullFrom == null) return
+    pullFrom = null
+    pulled = 0f
+    emitPull(tab, distance, true)
+  }
+
+  private fun emitPull(tab: Tab, distance: Float, done: Boolean) =
+    emit(
+      PULL_EVENT,
+      JSONObject()
+        .put("id", tab.id)
+        .put("distance", (distance / activity.resources.displayMetrics.density).toDouble())
+        .put("done", done),
+    )
+
+  private fun onOverscroll(view: WebView) {
+    if (view === gesture && atTop) overscrolled = true
   }
 
   fun pause() = tabs.values.forEach { it.view.onPause() }
@@ -151,12 +219,19 @@ class Browser(
     return "null"
   }
 
-  private fun wait(block: (() -> Unit) -> Unit): String {
+  private fun ask(block: ((String) -> Unit) -> Unit): String {
+    val answer = AtomicReference("null")
     val done = CountDownLatch(1)
-    main.post { runCatching { block(done::countDown) }.onFailure { done.countDown() } }
+    val reply = { value: String ->
+      answer.set(value)
+      done.countDown()
+    }
+    main.post { runCatching { block(reply) }.onFailure { done.countDown() } }
     done.await(ANSWER_SECONDS, TimeUnit.SECONDS)
-    return "null"
+    return answer.get()
   }
+
+  private fun wait(block: (() -> Unit) -> Unit): String = ask { reply -> block { reply("null") } }
 
   private fun tab(args: JSONObject) = tabs[args.getString("id")]
 
@@ -171,7 +246,8 @@ class Browser(
     }
     route(args.optJSONObject("proxy"))
     val parent = content()?.parent as? ViewGroup ?: return
-    val view = WebView(activity)
+    val view = Page(activity, ::onOverscroll)
+    ViewCompat.setOnApplyWindowInsetsListener(view) { _, _ -> WindowInsetsCompat.CONSUMED }
     if (profiled) WebViewCompat.setProfile(view, PROFILE)
     val tab = Tab(id, view)
     view.settings.apply {
@@ -195,23 +271,12 @@ class Browser(
 
   private fun place(tab: Tab, args: JSONObject) {
     val origin = content()
-    tab.bounds = args
-    tab.view.pivotX = 0f
-    tab.view.pivotY = 0f
-    tab.view.scaleX = tab.zoom
-    tab.view.scaleY = tab.zoom
     tab.view.layoutParams = (tab.view.layoutParams as FrameLayout.LayoutParams).apply {
-      width = px(args.getDouble("width") / tab.zoom)
-      height = px(args.getDouble("height") / tab.zoom)
+      width = px(args.getDouble("width"))
+      height = px(args.getDouble("height"))
       leftMargin = px(args.getDouble("x")) + (origin?.left ?: 0)
       topMargin = px(args.getDouble("y")) + (origin?.top ?: 0)
     }
-  }
-
-  private fun zoom(tab: Tab, value: Float) {
-    if (value <= 0f || value == tab.zoom) return
-    tab.zoom = value
-    tab.bounds?.let { place(tab, it) }
   }
 
   private fun agent(tab: Tab, value: String?) {
@@ -319,9 +384,48 @@ class Browser(
   private fun size(file: File): Long =
     if (file.isDirectory) file.listFiles().orEmpty().sumOf(::size) else file.length()
 
-  private fun cookies(url: String): String? =
-    if (profiled) ProfileStore.getInstance().getOrCreateProfile(PROFILE).cookieManager.getCookie(url)
-    else CookieManager.getInstance().getCookie(url)
+  private fun cookieManager(): CookieManager =
+    if (profiled) ProfileStore.getInstance().getOrCreateProfile(PROFILE).cookieManager else CookieManager.getInstance()
+
+  private fun webStorage(): WebStorage =
+    if (profiled) ProfileStore.getInstance().getOrCreateProfile(PROFILE).webStorage else WebStorage.getInstance()
+
+  private fun cookies(url: String): String? = cookieManager().getCookie(url)
+
+  private fun related(name: String?, host: String) =
+    name != null && (name == host || name.endsWith(".$host") || host.endsWith(".$name"))
+
+  private fun clearSite(host: String, done: () -> Unit) {
+    val manager = cookieManager()
+    val labels = host.split('.')
+    val domains = (0 until labels.size - 1).map { labels.drop(it).joinToString(".") }
+    listOf("https://$host", "https://www.$host", "http://$host").forEach { url ->
+      manager.getCookie(url)
+        ?.split(';')
+        ?.map { it.substringBefore('=').trim() }
+        ?.filter(String::isNotEmpty)
+        ?.forEach { name ->
+          manager.setCookie(url, "$name=; Max-Age=0; Path=/")
+          domains.forEach { domain -> manager.setCookie(url, "$name=; Max-Age=0; Path=/; Domain=.$domain") }
+        }
+    }
+    manager.flush()
+    val storage = webStorage()
+    storage.getOrigins { origins ->
+      origins?.keys?.map(Any?::toString)?.filter { related(Uri.parse(it).host, host) }?.forEach(storage::deleteOrigin)
+      done()
+    }
+  }
+
+  private fun capture(tab: Tab): String? {
+    val view = tab.view
+    if (view.width <= 0 || view.height <= 0) return null
+    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+    view.draw(Canvas(bitmap))
+    val bytes = ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }.toByteArray()
+    bitmap.recycle()
+    return JSONObject.quote(Base64.encodeToString(bytes, Base64.NO_WRAP))
+  }
 
   private fun download(url: String, agent: String, disposition: String?, mime: String?) {
     runCatching {
@@ -418,7 +522,7 @@ class Browser(
     }
 
     override fun onReceivedIcon(view: WebView, icon: Bitmap) {
-      val bytes = ByteArrayOutputStream().also { icon.compress(Bitmap.CompressFormat.PNG, ICON_QUALITY, it) }.toByteArray()
+      val bytes = ByteArrayOutputStream().also { icon.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }.toByteArray()
       report(tab, JSONObject().put("favicon", "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)))
     }
 

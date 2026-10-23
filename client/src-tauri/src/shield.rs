@@ -73,6 +73,11 @@ impl Shield {
         }
         self.filters.read().ok()?.clone()
     }
+
+    #[cfg(windows)]
+    pub fn active(&self) -> bool {
+        self.current().is_some()
+    }
 }
 
 fn chosen(lists: &[String]) -> Vec<String> {
@@ -154,7 +159,9 @@ fn stale(updated: Option<u64>) -> bool {
 fn applied<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     crate::webkit::guard_all(app);
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
+    #[cfg(windows)]
+    crate::browser::filter_all(app);
+    #[cfg(not(any(target_os = "macos", target_os = "linux", windows)))]
     let _ = app;
 }
 

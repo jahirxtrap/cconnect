@@ -17,6 +17,7 @@ const OPEN_EVENT: &str = "browser-open";
 const PICKED_EVENT: &str = "browser-picked";
 const PICKING_EVENT: &str = "browser-picking";
 const FOCUSED_EVENT: &str = "browser-focused";
+const ZOOM_EVENT: &str = "browser-zoom";
 #[cfg(windows)]
 const KEY_EVENT: &str = "browser-key";
 #[cfg(windows)]
@@ -126,9 +127,9 @@ fn code_of(key: u32) -> Option<String> {
         0x28 => "ArrowDown",
         0x2E => "Delete",
         0xBA => "Semicolon",
-        0xBB => "Equal",
+        0xBB | 0x6B => "Equal",
         0xBC => "Comma",
-        0xBD => "Minus",
+        0xBD | 0x6D => "Minus",
         0xBE => "Period",
         0xBF => "Slash",
         0xC0 => "Backquote",
@@ -144,7 +145,7 @@ fn code_of(key: u32) -> Option<String> {
     match key {
         0x30..=0x39 => Some(format!("Digit{}", key - 0x30)),
         0x41..=0x5A => Some(format!("Key{}", char::from(key as u8))),
-        0x60..=0x69 => Some(format!("Numpad{}", key - 0x60)),
+        0x60..=0x69 => Some(format!("Digit{}", key - 0x60)),
         0x70..=0x87 => Some(format!("F{}", key - 0x6F)),
         _ => None,
     }
@@ -196,6 +197,13 @@ fn signal<R: Runtime>(webview: &Webview<R>, id: &str, json: &str) {
         }
         Some("focused") => {
             let _ = app.emit_to(crate::MAIN_WINDOW, FOCUSED_EVENT, serde_json::json!({ "id": id }));
+        }
+        Some("zoom") => {
+            let _ = app.emit_to(
+                crate::MAIN_WINDOW,
+                ZOOM_EVENT,
+                serde_json::json!({ "id": id, "step": data.as_i64().unwrap_or(0) }),
+            );
         }
         _ => {}
     }
@@ -318,8 +326,7 @@ fn guard<R: Runtime>(target: &Webview<R>, core: &webview2_com::Microsoft::Web::W
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        ICoreWebView2_2, COREWEBVIEW2_WEB_RESOURCE_CONTEXT, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL,
-        COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
+        ICoreWebView2_2, COREWEBVIEW2_WEB_RESOURCE_CONTEXT, COREWEBVIEW2_WEB_RESOURCE_CONTEXT_DOCUMENT,
     };
     use webview2_com::{DOMContentLoadedEventHandler, NavigationStartingEventHandler, WebResourceRequestedEventHandler};
     use windows_core::{w, Interface, PWSTR};
@@ -403,14 +410,39 @@ fn guard<R: Runtime>(target: &Webview<R>, core: &webview2_com::Microsoft::Web::W
         }
         Ok(())
     }));
+    filter(core, target.app_handle().state::<crate::shield::Shield>().active());
     let mut token = 0i64;
     unsafe {
-        let _ = core.AddWebResourceRequestedFilter(w!("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
         let _ = core.add_WebResourceRequested(&requests, &mut token);
         let _ = core.add_NavigationStarting(&starts, &mut token);
         if let Ok(core) = core.cast::<ICoreWebView2_2>() {
             let _ = core.add_DOMContentLoaded(&loaded, &mut token);
         }
+    }
+}
+
+#[cfg(windows)]
+fn filter(core: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2, on: bool) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL;
+    use windows_core::w;
+
+    unsafe {
+        let _ = core.RemoveWebResourceRequestedFilter(w!("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+        if on {
+            let _ = core.AddWebResourceRequestedFilter(w!("*"), COREWEBVIEW2_WEB_RESOURCE_CONTEXT_ALL);
+        }
+    }
+}
+
+#[cfg(windows)]
+pub(crate) fn filter_all<R: Runtime>(app: &AppHandle<R>) {
+    let on = app.state::<crate::shield::Shield>().active();
+    for tab in tabs_of(app) {
+        let _ = tab.with_webview(move |platform| {
+            if let Ok(core) = unsafe { platform.controller().CoreWebView2() } {
+                filter(&core, on);
+            }
+        });
     }
 }
 
@@ -826,6 +858,36 @@ pub async fn browser_pick<R: Runtime>(app: AppHandle<R>, id: String, enabled: bo
     page(&app, &id)?
         .eval(format!("window.__cconnect && window.__cconnect.pick({enabled})"))
         .map_err(|error| error.to_string())
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tauri::command]
+pub async fn browser_capture<R: Runtime>(app: AppHandle<R>, id: String) -> Result<String, String> {
+    use base64::Engine;
+
+    let (sender, receiver) = tokio::sync::oneshot::channel::<Option<Vec<u8>>>();
+    crate::webkit::capture(
+        &page(&app, &id)?,
+        Box::new(move |png| {
+            let _ = sender.send(png);
+        }),
+    );
+    let png = receiver.await.map_err(|_| "no answer".to_string())?.ok_or_else(|| "no capture".to_string())?;
+    Ok(base64::engine::general_purpose::STANDARD.encode(png))
+}
+
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[tauri::command]
+pub async fn browser_clear_site<R: Runtime>(app: AppHandle<R>, id: String, host: String) -> Result<(), String> {
+    let (sender, receiver) = tokio::sync::oneshot::channel::<()>();
+    crate::webkit::clear_site(
+        &page(&app, &id)?,
+        host,
+        Box::new(move || {
+            let _ = sender.send(());
+        }),
+    );
+    receiver.await.map_err(|_| "no answer".to_string())
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]

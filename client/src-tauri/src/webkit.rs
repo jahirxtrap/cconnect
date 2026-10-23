@@ -43,6 +43,19 @@ pub fn agent<R: Runtime>(webview: &Webview<R>, agent: Option<String>) {
     let _ = webview.with_webview(move |platform| platform::agent(platform, agent.as_deref()));
 }
 
+pub fn capture<R: Runtime>(webview: &Webview<R>, done: Box<dyn FnOnce(Option<Vec<u8>>) + Send>) {
+    let _ = webview.with_webview(move |platform| platform::capture(platform, done));
+}
+
+pub fn clear_site<R: Runtime>(webview: &Webview<R>, host: String, done: Box<dyn FnOnce() + Send>) {
+    let _ = webview.with_webview(move |platform| platform::clear_site(platform, &host, done));
+}
+
+fn related(name: &str, host: &str) -> bool {
+    let name = name.trim_start_matches('.').to_lowercase();
+    name == host || name.ends_with(&format!(".{host}")) || host.ends_with(&format!(".{name}"))
+}
+
 #[cfg(target_os = "macos")]
 pub use platform::route;
 
@@ -54,18 +67,27 @@ pub fn route<R: Runtime>(webview: &Webview<R>, proxy: &crate::browser::Proxy) {
 
 #[cfg(target_os = "macos")]
 mod platform {
+    use std::cell::Cell;
     use std::ffi::{c_char, c_int, c_void, CStr, CString};
+    use std::ptr::NonNull;
     use std::rc::Rc;
 
     use block2::RcBlock;
     use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
     use objc2::MainThreadMarker;
-    use objc2_foundation::{ns_string, NSArray, NSError, NSObject, NSObjectNSKeyValueCoding, NSString, NSURL, NSUUID};
-    use objc2_web_kit::{WKContentRuleList, WKContentRuleListStore, WKUserContentController, WKWebView, WKWebsiteDataStore};
+    use objc2_app_kit::{NSBitmapImageFileType, NSBitmapImageRep, NSBitmapImageRepPropertyKey, NSImage};
+    use objc2_foundation::{
+        ns_string, NSArray, NSDictionary, NSError, NSObject, NSObjectNSKeyValueCoding, NSString, NSURL, NSUUID,
+    };
+    use objc2_web_kit::{
+        WKContentRuleList, WKContentRuleListStore, WKUserContentController, WKWebView, WKWebsiteDataRecord,
+        WKWebsiteDataStore,
+    };
     use tauri::webview::PlatformWebview;
     use tauri::Url;
 
-    use super::current;
+    use super::{current, related};
     use crate::browser::{Proxy, PROFILE_STORE};
     use crate::shield::{ours, RuleList};
 
@@ -161,6 +183,59 @@ mod platform {
         }
     }
 
+    fn png_of(image: &NSImage) -> Option<Vec<u8>> {
+        let tiff = image.TIFFRepresentation()?;
+        let rep = NSBitmapImageRep::imageRepWithData(&tiff)?;
+        let properties = NSDictionary::<NSBitmapImageRepPropertyKey, AnyObject>::new();
+        let png = unsafe { rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &properties) }?;
+        Some(png.to_vec())
+    }
+
+    pub fn capture(platform: PlatformWebview, done: Box<dyn FnOnce(Option<Vec<u8>>) + Send>) {
+        let Some(view) = (unsafe { Retained::retain(platform.inner().cast::<WKWebView>()) }) else {
+            return done(None);
+        };
+        let pending = Cell::new(Some(done));
+        let taken = RcBlock::new(move |image: *mut NSImage, _: *mut NSError| {
+            if let Some(done) = pending.take() {
+                done(unsafe { image.as_ref() }.and_then(png_of));
+            }
+        });
+        unsafe { view.takeSnapshotWithConfiguration_completionHandler(None, &taken) };
+    }
+
+    pub fn clear_site(platform: PlatformWebview, host: &str, done: Box<dyn FnOnce() + Send>) {
+        let view = unsafe { Retained::retain(platform.inner().cast::<WKWebView>()) };
+        let (Some(view), Some(mtm)) = (view, MainThreadMarker::new()) else {
+            return done();
+        };
+        let store = unsafe { view.configuration().websiteDataStore() };
+        let types = unsafe { WKWebsiteDataStore::allWebsiteDataTypes(mtm) };
+        let (target, kinds, host) = (store.clone(), types.clone(), host.to_string());
+        let pending = Rc::new(Cell::new(Some(done)));
+        let fetched = RcBlock::new(move |records: NonNull<NSArray<WKWebsiteDataRecord>>| {
+            let records = unsafe { records.as_ref() };
+            let chosen: Vec<Retained<WKWebsiteDataRecord>> = records
+                .iter()
+                .filter(|record| related(&unsafe { record.displayName() }.to_string(), &host))
+                .collect();
+            let pending = pending.clone();
+            let removed = RcBlock::new(move || {
+                if let Some(done) = pending.take() {
+                    done();
+                }
+            });
+            unsafe {
+                target.removeDataOfTypes_forDataRecords_completionHandler(
+                    &kinds,
+                    &NSArray::from_retained_slice(&chosen),
+                    &removed,
+                )
+            };
+        });
+        unsafe { store.fetchDataRecordsOfTypes_completionHandler(&types, &fetched) };
+    }
+
     fn store(dir: &str) -> Option<Retained<WKContentRuleListStore>> {
         let mtm = MainThreadMarker::new()?;
         let url = NSURL::fileURLWithPath_isDirectory(&NSString::from_str(dir), true);
@@ -254,13 +329,15 @@ mod platform {
     use webkit2gtk::glib::object::ObjectType;
     use webkit2gtk::glib::translate::{FromGlibPtrFull, ToGlibPtr};
     use webkit2gtk::glib::{self, Bytes, Object};
+    use webkit2gtk::gio::Cancellable;
     use webkit2gtk::{
-        NetworkProxyMode, NetworkProxySettings, SettingsExt, UserContentManager, UserContentManagerExt,
-        WebContextExt, WebViewExt, WebsiteDataManagerExt,
+        NetworkProxyMode, NetworkProxySettings, SettingsExt, SnapshotOptions, SnapshotRegion, UserContentManager,
+        UserContentManagerExt, WebContextExt, WebViewExt, WebsiteData, WebsiteDataManagerExt,
+        WebsiteDataManagerExtManual, WebsiteDataTypes,
     };
     use webkit2gtk_sys as sys;
 
-    use super::current;
+    use super::{current, related};
     use crate::shield::{ours, RuleList};
 
     struct Pending {
@@ -406,6 +483,37 @@ mod platform {
             settings.set_user_agent(agent);
         }
         view.reload();
+    }
+
+    fn png_of(surface: cairo::Surface) -> Option<Vec<u8>> {
+        let image = cairo::ImageSurface::try_from(surface).ok()?;
+        let mut png = Vec::new();
+        image.write_to_png(&mut png).ok()?;
+        Some(png)
+    }
+
+    pub fn capture(platform: PlatformWebview, done: Box<dyn FnOnce(Option<Vec<u8>>) + Send>) {
+        platform
+            .inner()
+            .snapshot(SnapshotRegion::Visible, SnapshotOptions::NONE, None::<&Cancellable>, move |result| {
+                done(result.ok().and_then(png_of))
+            });
+    }
+
+    pub fn clear_site(platform: PlatformWebview, host: &str, done: Box<dyn FnOnce() + Send>) {
+        let Some(manager) = platform.inner().context().and_then(|context| context.website_data_manager()) else {
+            return done();
+        };
+        let (owner, host) = (manager.clone(), host.to_string());
+        manager.fetch(WebsiteDataTypes::ALL, None::<&Cancellable>, move |result| {
+            let records: Vec<WebsiteData> = result
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|data| data.name().is_some_and(|name| related(&name, &host)))
+                .collect();
+            let chosen: Vec<&WebsiteData> = records.iter().collect();
+            owner.remove(WebsiteDataTypes::ALL, &chosen, None::<&Cancellable>, move |_| done());
+        });
     }
 
     pub fn route(platform: PlatformWebview, mode: &str, url: &str, bypass: &[String]) {

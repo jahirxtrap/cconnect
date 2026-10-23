@@ -193,6 +193,10 @@ pub fn run() {
             browser::browser_zoom,
             #[cfg(any(target_os = "macos", target_os = "linux"))]
             browser::browser_agent,
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            browser::browser_capture,
+            #[cfg(any(target_os = "macos", target_os = "linux"))]
+            browser::browser_clear_site,
             #[cfg(desktop)]
             browser::browser_layer,
             #[cfg(desktop)]
