@@ -4,6 +4,7 @@
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import Screen from "$lib/app/Screen.svelte";
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
+  import { pendingRefresh } from "$lib/data/inflight";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
@@ -25,9 +26,14 @@
 
   const tick = $derived(refreshTick);
 
+  let finishRefresh = () => {};
+
   const refresh = () => {
+    const pending = pendingRefresh();
+    finishRefresh = pending.finish;
     refreshing = true;
     refreshTick++;
+    void pending.held.then(() => (refreshing = false));
   };
 
   useRefreshTick(refresh);
@@ -97,7 +103,7 @@
           {tick}
           flash={highlight.is("server")}
           onLoadingChange={(value) => {
-            if (!value) refreshing = false;
+            if (!value) finishRefresh();
           }}
         />
       </div>

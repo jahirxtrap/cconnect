@@ -14,7 +14,6 @@
     expanded?: boolean;
     labelClass?: string;
     iconClass?: string;
-    wide?: boolean;
     onclick?: (() => void) | null;
   }
 
@@ -28,7 +27,6 @@
     expanded = false,
     labelClass = "text-on-surface-variant",
     iconClass = "text-accent",
-    wide = false,
     onclick = null,
   }: Props = $props();
 </script>
@@ -37,9 +35,9 @@
   type="button"
   disabled={labelOnly}
   onclick={() => onclick?.()}
-  class="flex w-full items-center text-left transition-colors select-none {wide
-    ? 'px-4'
-    : 'rounded-sm'} {labelOnly ? 'cursor-default' : 'cursor-pointer hover:bg-on-surface/8'}"
+  class="flex w-full items-center rounded-sm text-left transition-colors select-none group-data-[stuck]/head:rounded-none group-data-[stuck]/head:px-4 {labelOnly
+    ? 'cursor-default'
+    : 'cursor-pointer hover:bg-on-surface/8'}"
 >
   {#if IconComponent}
     <IconComponent size={16} class="mr-[6px] shrink-0 {iconClass}" />
@@ -50,10 +48,10 @@
     >{/if}</span>
   <span class="min-w-2 flex-1"></span>
   {#if stat}
-    <span class="mr-1.5 shrink-0 text-body-sm text-on-surface-variant">{stat}</span>
+    <span class="mr-1.5 shrink-0 text-body-sm text-on-surface-variant group-data-[stuck]/head:hidden">{stat}</span>
   {/if}
   {#if running}
-    <LoadingIndicator size={16} class="text-accent {labelOnly ? '' : 'mr-0.5'}" />
+    <LoadingIndicator size={16} class="text-accent group-data-[stuck]/head:hidden {labelOnly ? '' : 'mr-0.5'}" />
   {/if}
   {#if !labelOnly}
     {#if expanded}

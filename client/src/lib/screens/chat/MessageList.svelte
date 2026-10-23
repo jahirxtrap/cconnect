@@ -14,7 +14,6 @@
   import MessageItem from "./blocks/MessageItem.svelte";
   import { rowSite } from "./blocks/rowSite";
   import StatusProgress from "./blocks/StatusProgress.svelte";
-  import StickyHeader from "./blocks/StickyHeader.svelte";
   import { runSummary, toolRuns, type ToolRun } from "./toolRuns";
 
   interface Visibility {
@@ -156,18 +155,6 @@
   let shownSession: string | null = untrack(() => sessionId);
   let heldFromEnd: number | null = null;
 
-  const messageOf = (node: HTMLElement) => visible.find((item) => item.id === Number(node.dataset.mid)) ?? null;
-
-  const collapseSticky = async (id: number) => {
-    if (!scroller) return;
-    expandedIds[id] = false;
-    await tick();
-    const node = scroller.find(`[data-mid="${id}"]`);
-    const block = node?.querySelector<HTMLElement>("[data-block]") ?? node;
-    if (block) scroller.bringToTop(block);
-    scroller.refreshHeader();
-  };
-
   const anchorGrowth = async (grow: () => void) => {
     const pinnedToEnd = scroller?.atBottom() ?? false;
     grow();
@@ -177,7 +164,10 @@
     scroller?.scrollToEnd();
   };
 
-  const toggleExpanded = (id: number) => void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
+  const toggleExpanded = async (id: number) => {
+    if (await scroller?.collapsePinned(id, () => (expandedIds[id] = false))) return;
+    void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
+  };
 
   const separatorAt = (index: number) => {
     if (!settings.showTimestamps) return false;
@@ -321,10 +311,4 @@
     {:else if streamStatus === "slow" || streamStatus === "failed"}
       <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
     {/if}
-  {#snippet header(node: HTMLElement)}
-    {@const message = messageOf(node)}
-    {#if message}
-      <StickyHeader {message} onCollapse={() => collapseSticky(message.id)} />
-    {/if}
-  {/snippet}
 </ChatScroller>

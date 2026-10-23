@@ -19,6 +19,8 @@ export const systemName = (): SystemName => SYSTEM;
 
 export const platformName = (): SystemName | "web" => (isTauri ? SYSTEM : "web");
 
+export const subpixelText = SYSTEM === "windows" || SYSTEM === "linux";
+
 export const openExternal = (url: string) => {
   const fallback = () => void window.open(url, "_blank", "noopener");
   if (!isTauri) {

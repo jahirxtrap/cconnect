@@ -5,7 +5,7 @@
   import { tick as svelteTick } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
-  import { loads } from "$lib/data/inflight";
+  import { holdRefresh, loads } from "$lib/data/inflight";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -57,8 +57,7 @@
     if (refreshing) return;
     refreshing = true;
     refreshTick++;
-    await svelteTick();
-    await loads.settled();
+    await holdRefresh(svelteTick().then(() => loads.settled()));
     refreshing = false;
   };
 

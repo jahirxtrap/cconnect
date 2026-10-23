@@ -8,7 +8,6 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
-  import StickyHeader from "./blocks/StickyHeader.svelte";
   import { cubicOut } from "svelte/easing";
 
   interface Props {
@@ -99,8 +98,6 @@
   let follow = $state(true);
   let scroller = $state<ChatScroller | null>(null);
 
-  const messageOf = (node: HTMLElement) => messages.find((item) => item.id === Number(node.dataset.mid)) ?? null;
-
   const expandedIds = $state<Record<number, boolean>>({});
 
   const anchorGrowth = async (grow: () => void) => {
@@ -112,17 +109,11 @@
     scroller?.scrollToEnd();
   };
 
-  const toggleExpanded = (id: number) => void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
-
-  const collapseSticky = async (id: number) => {
-    if (!scroller) return;
-    expandedIds[id] = false;
-    await tick();
-    const node = scroller.find(`[data-mid="${id}"]`);
-    const block = node?.querySelector<HTMLElement>("[data-block]") ?? node;
-    if (block) scroller.bringToTop(block);
-    scroller.refreshHeader();
+  const toggleExpanded = async (id: number) => {
+    if (await scroller?.collapsePinned(id, () => (expandedIds[id] = false))) return;
+    void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
   };
+
   let lastPrompt: number | null = null;
   let exitFrom = 0;
 
@@ -208,12 +199,6 @@
           />
         </div>
       {/each}
-      {#snippet header(node: HTMLElement)}
-        {@const message = messageOf(node)}
-        {#if message}
-          <StickyHeader {message} onCollapse={() => collapseSticky(message.id)} />
-        {/if}
-      {/snippet}
     </ChatScroller>
   </div>
 </div>

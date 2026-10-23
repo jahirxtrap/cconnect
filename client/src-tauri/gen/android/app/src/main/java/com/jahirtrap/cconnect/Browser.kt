@@ -188,8 +188,8 @@ class Browser(
     val tab = tabs.values.firstOrNull { it.view === view } ?: return false
     when (event.actionMasked) {
       MotionEvent.ACTION_MOVE -> {
-        pulled = event.y - from
-        if (event.pointerCount == 1 && pulled >= 0f) {
+        if (event.pointerCount == 1) {
+          pulled = (event.y - from).coerceAtLeast(0f)
           emitPull(tab, pulled, false)
           return true
         }

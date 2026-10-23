@@ -1,5 +1,5 @@
 import { tick } from "svelte";
-import { loads } from "$lib/data/inflight";
+import { holdRefresh, loads } from "$lib/data/inflight";
 
 class ClaudeRefresh {
   tick = $state(0);
@@ -9,8 +9,7 @@ class ClaudeRefresh {
     if (this.refreshing) return;
     this.refreshing = true;
     this.tick++;
-    await tick();
-    await loads.settled();
+    await holdRefresh(tick().then(() => loads.settled()));
     this.refreshing = false;
   }
 }

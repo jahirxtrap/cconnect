@@ -28,6 +28,7 @@
   } from "./deviceBrowser.svelte";
   import { deviceBrowsing } from "./deviceEngine";
   import { joined } from "$lib/data/format";
+  import { pendingRefresh } from "$lib/data/inflight";
   import type { ElementSource } from "$lib/data/pickedElements";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { isEditing } from "$lib/data/paneFocus.svelte";
@@ -210,6 +211,7 @@
   let clearing = $state<{ site: string | null } | null>(null);
   let favoriting = $state<{ url: string; title: string } | null>(null);
   let pullRefreshing = $state(false);
+  let finishPull = () => {};
 
   const pull = new PullState();
 
@@ -397,8 +399,11 @@
         return;
       }
       if (!pull.release(distance)) return;
+      const pending = pendingRefresh();
+      finishPull = pending.finish;
       pullRefreshing = true;
       deviceBrowser.reload();
+      void pending.held.then(() => (pullRefreshing = false));
     };
     return () => {
       deviceBrowser.onPicked = null;
@@ -409,7 +414,7 @@
   });
 
   $effect(() => {
-    if (pullRefreshing && !deviceBrowser.active?.loading) pullRefreshing = false;
+    if (pullRefreshing && !deviceBrowser.active?.loading) finishPull();
   });
 
   $effect(() => {

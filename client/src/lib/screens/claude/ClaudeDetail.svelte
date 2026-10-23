@@ -26,6 +26,7 @@
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
   import { joined, SEPARATOR } from "$lib/data/format";
+  import { holdRefresh } from "$lib/data/inflight";
   import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
@@ -161,7 +162,7 @@
   const refresh = async () => {
     if (refreshing) return;
     refreshing = true;
-    await load();
+    await holdRefresh(load());
     refreshing = false;
   };
 

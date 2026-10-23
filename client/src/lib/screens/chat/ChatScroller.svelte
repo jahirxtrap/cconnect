@@ -1,11 +1,11 @@
 <script lang="ts">
   import ChevronsDown from "@lucide/svelte/icons/chevrons-down";
-  import type { Snippet } from "svelte";
+  import { tick, type Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { snapToDevicePixel } from "$lib/ui/gridHeight";
   import { keepFocus } from "$lib/ui/keepFocus";
   import { LOAD_MORE_PX } from "$lib/ui/paging";
   import { scrollbarWidth } from "$lib/ui/scrollbar";
+  import { provideStickyHeads } from "./blocks/stickyHeads";
 
   interface Props {
     follow?: boolean;
@@ -16,7 +16,6 @@
     onNearTop?: (() => void) | null;
     onMove?: (() => void) | null;
     children: Snippet;
-    header?: Snippet<[HTMLElement]>;
   }
 
   let {
@@ -28,14 +27,12 @@
     onNearTop = null,
     onMove = null,
     children,
-    header,
   }: Props = $props();
 
   const AT_BOTTOM_PX = 4;
   const OWN_TOP_PX = 1;
   const SCROLL_BUTTON_GAP = 12;
   const HALF = 2;
-  const HEADER_FALLBACK = 40;
 
   let container = $state<HTMLDivElement | null>(null);
   let content = $state<HTMLDivElement | null>(null);
@@ -45,9 +42,10 @@
   let ownTop = -1;
   let pendingTop: number | null = null;
 
-  let pinned = $state<HTMLElement | null>(null);
-  let pinnedPush = $state(0);
-  let headerHeight = $state(0);
+  let pinned: HTMLElement | null = null;
+  let stuck: HTMLElement | null = null;
+
+  provideStickyHeads(true);
 
   const endOf = () => (container ? container.scrollHeight - container.clientHeight : 0);
 
@@ -120,34 +118,36 @@
 
   const updatePinned = () => {
     const edge = topEdge();
-    const start = header ? firstVisible() : null;
-    if (edge === undefined || !start) {
-      pinned = null;
-      return;
+    let row: HTMLElement | null = null;
+    let block: HTMLElement | null = null;
+    for (let node = edge === undefined ? null : firstVisible(); node; node = node.nextElementSibling as HTMLElement | null) {
+      const candidate = node.querySelector<HTMLElement>("[data-block]");
+      if (!candidate) continue;
+      if (candidate.getBoundingClientRect().top - (edge ?? 0) >= 0) break;
+      if (!candidate.querySelector("[data-block-body]")) continue;
+      row = node;
+      block = candidate;
     }
-    let candidate: HTMLElement | null = null;
-    let push = 0;
-    let node: HTMLElement | null = start;
-    while (node) {
-      const block = node.querySelector<HTMLElement>("[data-block]");
-      if (!block) {
-        node = node.nextElementSibling as HTMLElement | null;
-        continue;
-      }
-      const box = block.getBoundingClientRect();
-      if (box.top - edge >= 0) break;
-      if (block.querySelector("[data-block-body]")) {
-        const height = headerHeight > 0 ? headerHeight : HEADER_FALLBACK;
-        candidate = node;
-        push = Math.min(0, snapToDevicePixel(box.bottom - edge - height));
-      }
-      node = node.nextElementSibling as HTMLElement | null;
-    }
-    pinned = candidate;
-    pinnedPush = push;
+    pinned = row;
+    const head = block?.querySelector<HTMLElement>(":scope > [data-block-head]") ?? null;
+    if (head === stuck) return;
+    stuck?.removeAttribute("data-stuck");
+    head?.setAttribute("data-stuck", "");
+    stuck = head;
   };
 
   export const refreshHeader = () => updatePinned();
+
+  export const collapsePinned = async (id: number, collapse: () => void) => {
+    if (pinned?.dataset.mid !== String(id)) return false;
+    collapse();
+    await tick();
+    const node = find(`[data-mid="${id}"]`);
+    const block = node?.querySelector<HTMLElement>("[data-block]") ?? node;
+    if (block) bringToTop(block);
+    updatePinned();
+    return true;
+  };
 
   const measureScrollbar = () => {
     if (!container) return;
@@ -195,22 +195,12 @@
   <div
     bind:this={container}
     {onscroll}
-    class="selectable flex h-full flex-col overflow-x-hidden overflow-y-auto"
+    class="selectable isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
   >
     <div bind:this={content} class="shrink-0">
       {@render children()}
     </div>
   </div>
-
-  {#if pinned && header}
-    <div
-      bind:clientHeight={headerHeight}
-      style="transform: translateY({pinnedPush}px); right: {verticalScrollbar}px"
-      class="absolute top-0 left-0 z-10"
-    >
-      {@render header(pinned)}
-    </div>
-  {/if}
 
   {#if !follow && hasContent && viewport > 0 && belowFold > viewport / HALF}
     <button
