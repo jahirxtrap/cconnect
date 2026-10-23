@@ -2,6 +2,7 @@ import { backend } from "$lib/services/backend.svelte";
 import { consumingDismiss, dismissTop } from "$lib/app/dismissStack";
 import type { PreviewKind } from "$lib/data/previewKind";
 import { isTauri } from "$lib/platform";
+import { layout } from "$lib/platform/layout.svelte";
 
 export const ROUTES = [
   "/settings",
@@ -35,6 +36,8 @@ export interface PreviewRequest {
 
 const WEB_BLOCKED: Route[] = ["/terminal", "/browser", "/project"];
 
+const CENTERED: Route[] = ["/settings", "/claude", "/monitor", "/shared", "/terminal", "/notes"];
+
 const blocked = (route: Route) => !isTauri && WEB_BLOCKED.includes(route);
 
 const currentRoute = (): Route => {
@@ -53,6 +56,8 @@ class Navigation {
   readonly previewOverlay = $derived(this.preview !== null && !this.previewPane);
 
   readonly chatActive = $derived(this.route === "/");
+
+  readonly centered = $derived(!layout.mobile && CENTERED.includes(this.route));
 
   routeLocked = $state(false);
 
@@ -100,10 +105,16 @@ class Navigation {
 
   navigate(target: Route) {
     if (this.route === target && this.sub === null) return;
+    const sibling = this.centered && target !== "/";
     this.sub = null;
     this.#leaving = false;
-    window.history.pushState(null, "", target);
+    if (sibling) window.history.replaceState(null, "", target);
+    else window.history.pushState(null, "", target);
     this.route = target;
+  }
+
+  showChat() {
+    if (this.centered) this.navigate("/");
   }
 
   openSub(value: string) {

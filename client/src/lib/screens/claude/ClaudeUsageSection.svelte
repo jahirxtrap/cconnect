@@ -5,9 +5,9 @@
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
 
   interface Props {
     tick?: number;
@@ -67,9 +67,9 @@
 <SettingsGroup label={t("USAGE")}>
   {#snippet labelTrailing()}
     {#if loading}
-      <LoadingIndicator size={20} />
+      <StatusDot loading />
     {:else if label}
-      <p class="text-label-lg text-on-surface-variant">{label}</p>
+      <p class="text-body-sm text-on-surface-variant">{label}</p>
     {/if}
   {/snippet}
   {#if loading}

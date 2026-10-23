@@ -42,7 +42,7 @@
     {#if !preset}
       <InputField value={custom} oninput={(value) => (custom = value)} singleLine label={t("MOVE_PROJECT_PATH")} autofocus>
         {#snippet trailing()}
-          <TooltipIconButton label={t("CHOOSE")} onclick={pick} class="size-6 [&_svg]:size-[18px]">
+          <TooltipIconButton label={t("CHOOSE")} onclick={pick}>
             <Folder />
           </TooltipIconButton>
         {/snippet}

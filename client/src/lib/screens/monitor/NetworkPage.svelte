@@ -158,10 +158,10 @@
   });
 </script>
 
-<div class="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+<div class="min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
   <SettingsGroup label={t("NETWORK_STATE")}>
     {#snippet labelTrailing()}
-      <StatusDot class={connectivityDot} box={20} dot={12} />
+      <StatusDot class={connectivityDot} />
     {/snippet}
     <PreferenceRow
       icon={Globe}
@@ -176,7 +176,7 @@
   </SettingsGroup>
 
   {#if notice}
-    <p class="px-4 py-2 text-body-sm text-error">{notice}</p>
+    <p class="px-1 pt-2 text-body-sm text-error">{notice}</p>
   {/if}
 
   <SettingsGroup label={t("NETWORK_INTERFACES")}>
@@ -195,18 +195,14 @@
       >
         {#snippet trailing()}
           {#if busy === item.name}
-            <LoadingIndicator size={20} />
+            <LoadingIndicator size={16} />
           {:else if controllable}
             <CompactSwitch
               checked={item.up}
               onCheckedChange={() => void run(item.name, () => networkApi.setInterface(item.name, !item.up))}
             />
           {:else}
-            <StatusDot
-              class={item.internet ? "bg-green" : item.up ? "bg-orange" : "bg-outline-variant"}
-              box={20}
-              dot={12}
-            />
+            <StatusDot class={item.internet ? "bg-green" : item.up ? "bg-orange" : "bg-outline-variant"} box={20} />
           {/if}
         {/snippet}
       </PreferenceRow>
@@ -216,7 +212,7 @@
   <SettingsGroup label={t("NETWORK_WIFI")}>
     {#snippet labelTrailing()}
       {#if scanning}
-        <LoadingIndicator size={20} />
+        <StatusDot loading />
       {/if}
     {/snippet}
     {#if status.wifiRadio !== null}
@@ -228,7 +224,7 @@
       >
         {#snippet trailing()}
           {#if busy === "radio"}
-            <LoadingIndicator size={20} />
+            <LoadingIndicator size={16} />
           {:else}
             <CompactSwitch
               checked={radioOn}
@@ -258,15 +254,15 @@
         >
           {#snippet trailing()}
             {#if busy === network.ssid}
-              <LoadingIndicator size={20} />
+              <LoadingIndicator size={16} />
             {:else if network.active}
-              <StatusDot class="bg-green" box={20} dot={12} />
+              <StatusDot class="bg-green" box={20} />
             {/if}
           {/snippet}
         </PreferenceRow>
       {/each}
     {/if}
-    <div class="px-4 py-3">
+    <div class="px-3 py-2.5">
       <ActionButton text={t("REFRESH")} enabled={!scanning} onclick={() => void refreshScan()} class="w-full" />
     </div>
   </SettingsGroup>
@@ -296,9 +292,9 @@
         {/if}
       {/if}
       {#if testing}
-        <div class="px-4 py-3">
+        <div class="px-3 py-2.5">
           <div class="flex items-center">
-            <span class="min-w-0 flex-1 text-body-lg">{stageLabel}</span>
+            <span class="min-w-0 flex-1 text-body-md font-medium">{stageLabel}</span>
             <span class="text-body-md text-on-surface-variant">
               {formatDecimal(testProgress * PERCENT, 0)}%
             </span>
@@ -306,7 +302,7 @@
           <LinearProgress value={testProgress} class="mt-2" />
         </div>
       {:else}
-        <div class="px-4 py-3">
+        <div class="px-3 py-2.5">
           <ActionButton text={t("NETWORK_RUN_TEST")} onclick={startSpeedtest} class="w-full" />
         </div>
       {/if}

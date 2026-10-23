@@ -29,7 +29,7 @@
   <div class="flex flex-col gap-2.5">
     <InputField value={path} oninput={(value) => (path = value)} singleLine label={t("MOVE_PROJECT_PATH")} autofocus>
       {#snippet trailing()}
-        <TooltipIconButton label={t("CHOOSE")} onclick={pick} class="size-6 [&_svg]:size-[18px]">
+        <TooltipIconButton label={t("CHOOSE")} onclick={pick}>
           <Folder />
         </TooltipIconButton>
       {/snippet}

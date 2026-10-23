@@ -84,7 +84,7 @@
     checked={hints}
     onChange={(value) => (hints = value)}
   />
-  <div class="my-2 h-px bg-outline-variant"></div>
+  <div class="h-2"></div>
   {#if tools.length}
     <p class="mb-2 text-body-sm text-on-surface-variant">{t("MCP_TOOLS_DESC")}</p>
     {#each entries as entry (entry.key)}

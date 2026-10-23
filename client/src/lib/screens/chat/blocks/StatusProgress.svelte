@@ -17,18 +17,20 @@
   const label = $derived(failed ? t("STATUS_FAILED") : compacting ? t("COMPACTING") : t("STATUS_SLOW"));
 </script>
 
-<div class="w-full px-4 py-3 {tone === 'red' ? 'bg-red/15' : tone === 'blue' ? 'bg-blue/15' : 'bg-orange/15'}">
-  <div class="flex items-center gap-2 {tone === 'red' ? 'text-red' : tone === 'blue' ? 'text-blue' : 'text-orange'}">
-    {#if failed}
-      <TriangleAlert size={18} class="shrink-0" />
-    {:else if compacting}
-      <Archive size={18} class="shrink-0" />
-    {:else}
-      <Clock3 size={18} class="shrink-0" />
+<div class="w-full px-(--page-inset)">
+  <div class="rounded-panel px-3 py-2.5 {tone === 'red' ? 'bg-red/15' : tone === 'blue' ? 'bg-blue/15' : 'bg-orange/15'}">
+    <div class="flex items-center gap-2.5 {tone === 'red' ? 'text-red' : tone === 'blue' ? 'text-blue' : 'text-orange'}">
+      {#if failed}
+        <TriangleAlert size={16} class="shrink-0" />
+      {:else if compacting}
+        <Archive size={16} class="shrink-0" />
+      {:else}
+        <Clock3 size={16} class="shrink-0" />
+      {/if}
+      <span class="text-body-md">{label}</span>
+    </div>
+    {#if !failed}
+      <LinearProgress tone={compacting ? "blue" : "orange"} class="mt-2" />
     {/if}
-    <span class="text-body-md">{label}</span>
   </div>
-  {#if !failed}
-    <LinearProgress tone={compacting ? "blue" : "orange"} class="mt-2" />
-  {/if}
 </div>

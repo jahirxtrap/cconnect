@@ -1,10 +1,17 @@
 <script lang="ts">
+  import AppWindow from "@lucide/svelte/icons/app-window";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import Flame from "@lucide/svelte/icons/flame";
+  import FolderInput from "@lucide/svelte/icons/folder-input";
+  import Palette from "@lucide/svelte/icons/palette";
+  import PanelRight from "@lucide/svelte/icons/panel-right";
+  import Pencil from "@lucide/svelte/icons/pencil";
   import Plus from "@lucide/svelte/icons/plus";
+  import Sparkles from "@lucide/svelte/icons/sparkles";
+  import Tag from "@lucide/svelte/icons/tag";
+  import Trash2 from "@lucide/svelte/icons/trash-2";
   import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import { isTouch } from "$lib/platform";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -14,7 +21,9 @@
   interface Props {
     title: string;
     selected: boolean;
+    color?: string | null;
     activity?: string | null;
+    resident?: boolean;
     onOpen: () => void;
     onRename: () => void;
     onAutoRename: () => void;
@@ -23,6 +32,7 @@
     onOpenRight?: (() => void) | null;
     onMove: (preset: string | null) => void;
     onDelete: () => void;
+    trash?: boolean;
     categories?: ChatCategory[];
     currentCategoryId?: string | null;
     onPlace?: (categoryId: string | null) => void;
@@ -34,7 +44,9 @@
   const {
     title,
     selected,
+    color = null,
     activity = null,
+    resident = false,
     onOpen,
     onRename,
     onAutoRename,
@@ -43,6 +55,7 @@
     onOpenRight = null,
     onMove,
     onDelete,
+    trash = false,
     categories = [],
     currentCategoryId = null,
     onPlace = () => {},
@@ -51,6 +64,18 @@
     currentProjectKey = null,
   }: Props = $props();
 
+  const SPINNERS: Record<string, string> = {
+    renaming: "text-purple",
+    compacting: "text-blue",
+    slow: "text-yellow",
+    working: "text-accent",
+  };
+
+  const DOTS: Record<string, string> = {
+    waiting: "bg-orange",
+    failed: "bg-red",
+  };
+
   let menu = $state(false);
   let pointer = "mouse";
 
@@ -58,13 +83,15 @@
     menu = false;
     action();
   };
+
+  const revealed = $derived(isTouch || selected || menu);
 </script>
 
 <div
   data-press
-  class="group flex items-center rounded-item pr-1 transition-colors {selected
-    ? 'bg-accent/14 hover:bg-accent/21'
-    : 'hover:bg-on-surface/8'}"
+  class="group flex h-8 items-center gap-2 rounded-md pr-1.5 pl-2.5 transition-colors {selected
+    ? 'bg-surface-variant'
+    : 'hover:bg-hover'}"
   onpointerdown={(event) => (pointer = event.pointerType)}
   oncontextmenu={(event) => {
     event.preventDefault();
@@ -73,55 +100,42 @@
   }}
   role="presentation"
 >
+  <span
+    class="flex size-4 shrink-0 items-center justify-center"
+    title={activity === "persistent" ? t("PERSISTENT_ALIVE") : undefined}
+  >
+    <StatusDot
+      loading={!!activity && activity in SPINNERS}
+      spinnerClass={activity ? SPINNERS[activity] : undefined}
+      class={activity && DOTS[activity] ? DOTS[activity] : "bg-faint"}
+      color={activity && DOTS[activity] ? null : color}
+      ring={resident || activity === "persistent"}
+    />
+  </span>
   <Pressable
     onclick={onOpen}
     hover={false}
-    class="min-w-0 flex-1 truncate px-2 py-2 text-body-md {selected ? 'font-semibold text-accent' : ''}"
+    class="min-w-0 flex-1 truncate py-1.5 text-body-md {selected ? 'text-on-surface' : 'text-on-surface-variant'}"
   >
     {title}
   </Pressable>
-  {#if activity === "waiting"}
-    <span class="flex shrink-0 items-center"><StatusDot class="bg-orange" box={16} dot={9} /></span>
-  {:else if activity === "failed"}
-    <span class="flex shrink-0 items-center"><StatusDot class="bg-red" box={16} dot={9} /></span>
-  {:else if activity === "renaming"}
-    <span class="inline-flex size-4 shrink-0 items-center justify-center">
-      <LoadingIndicator size={9} fill class="text-purple" />
-    </span>
-  {:else if activity === "compacting"}
-    <span class="inline-flex size-4 shrink-0 items-center justify-center">
-      <LoadingIndicator size={9} fill class="text-blue" />
-    </span>
-  {:else if activity === "slow"}
-    <span class="inline-flex size-4 shrink-0 items-center justify-center">
-      <LoadingIndicator size={9} fill class="text-yellow" />
-    </span>
-  {:else if activity === "working"}
-    <span class="inline-flex size-4 shrink-0 items-center justify-center">
-      <LoadingIndicator size={9} fill />
-    </span>
-  {:else if activity === "persistent"}
-    <span class="inline-flex size-4 shrink-0 items-center justify-center" title={t("PERSISTENT_ALIVE")}>
-      <Flame size={12} class="text-accent" />
-    </span>
-  {/if}
-  <div>
+  <div class={revealed ? "" : "opacity-0 group-hover:opacity-100"}>
     <PopupMenu open={menu} label={t("MORE_OPTIONS")} onOpenChange={(value) => (menu = value)}>
       {#snippet trigger()}
         <span
-          class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/10"
+          class="inline-flex size-6 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
         >
           <EllipsisVertical size={16} />
         </span>
       {/snippet}
-      <MenuItem text={t("RENAME")} onclick={() => run(onRename)} />
-      <MenuItem text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
-      <MenuItem text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
-      <MenuItem text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
+      <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => run(onRename)} />
+      <MenuItem icon={Sparkles} text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
+      <MenuItem icon={Palette} text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
+      <MenuItem icon={AppWindow} text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
       {#if onOpenRight}
-        <MenuItem text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
+        <MenuItem icon={PanelRight} text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
       {/if}
-      <MenuSub text={t("CATEGORY")}>
+      <MenuSub icon={Tag} text={t("CATEGORY")}>
         {#if categories.length}
           <MenuItem
             text={t("NO_CATEGORY")}
@@ -136,13 +150,9 @@
             />
           {/each}
         {/if}
-        <MenuItem text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)}>
-          {#snippet trailing()}
-            <Plus size={16} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
+        <MenuItem icon={Plus} text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)} />
       </MenuSub>
-      <MenuSub text={t("PROJECT")}>
+      <MenuSub icon={FolderInput} text={t("PROJECT")}>
         {#each projects as project (project.projectKey)}
           {@const current = project.projectKey === currentProjectKey}
           <MenuItem
@@ -151,13 +161,9 @@
             onclick={() => run(() => (current || !project.path ? undefined : onMove(project.path)))}
           />
         {/each}
-        <MenuItem text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))}>
-          {#snippet trailing()}
-            <Plus size={16} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
+        <MenuItem icon={Plus} text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))} />
       </MenuSub>
-      <MenuItem text={t("DELETE")} onclick={() => run(onDelete)} />
+      <MenuItem icon={Trash2} danger text={t(trash ? "TRASH" : "DELETE")} onclick={() => run(onDelete)} />
     </PopupMenu>
   </div>
 </div>

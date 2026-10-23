@@ -8,7 +8,7 @@
   import AppTitle from "$lib/ui/AppTitle.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -26,9 +26,9 @@
   const { favorites, nameOf, onSearch, onAdd, onRename, onRemove }: Props = $props();
 
   const TITLE_SCALE = 1.25;
-  const ICON = "shrink-0 text-on-surface-variant";
+  const ADD_ICON_SIZE = 20;
   const TILE = "items-center gap-2";
-  const BADGE = "flex size-10 items-center justify-center rounded-full bg-surface-variant";
+  const BADGE = "flex size-10 items-center justify-center rounded-lg bg-surface-variant text-on-surface-variant";
   const LABEL = "w-full truncate text-center text-body-sm";
 
   let query = $state("");
@@ -42,7 +42,7 @@
   };
 </script>
 
-<div class="scrollbar-thin absolute inset-0 overflow-y-auto bg-background">
+<div class="scrollbar-thin absolute inset-0 overflow-y-auto bg-background [--c-card:var(--c-surface)]">
   <div class="flex min-h-full flex-col items-center justify-center gap-8 p-6">
     <AppTitle scale={TITLE_SCALE} />
     <InputField
@@ -56,47 +56,43 @@
       enterKeyHint="go"
       class="w-full max-w-xl"
     />
-    <div class="grid w-full max-w-xl grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-3">
+    <div class="grid w-full max-w-xl grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
       {#each favorites as favorite (favorite.url)}
         <div class="relative">
-          <OutlinedPanel
+          <CardPanel
             onclick={() => onSearch(favorite.url)}
             onlongclick={() => (menuUrl = favorite.url)}
             oncontextmenu={() => (menuUrl = favorite.url)}
             class={TILE}
           >
             <span class={BADGE}>
-              <BrowserTabIcon src={favorite.icon} />
+              <BrowserTabIcon src={favorite.icon} large />
             </span>
             <span class={LABEL}>{nameOf(favorite)}</span>
-          </OutlinedPanel>
-          <div class="absolute top-1.5 right-1.5">
+          </CardPanel>
+          <div class="absolute top-1 right-1">
             <PopupMenu
               open={menuUrl === favorite.url}
               label={t("MORE_OPTIONS")}
               onOpenChange={(open) => (menuUrl = open ? favorite.url : null)}
             >
               {#snippet triggerChild(props)}
-                <TooltipIconButton label={t("MORE_OPTIONS")} class="size-8 [&_svg]:size-5" {...props}>
+                <TooltipIconButton label={t("MORE_OPTIONS")} class="size-6" {...props}>
                   <EllipsisVertical />
                 </TooltipIconButton>
               {/snippet}
-              <MenuItem text={t("RENAME")} onclick={() => (renaming = favorite)}>
-                {#snippet leading()}<Pencil size={20} class={ICON} />{/snippet}
-              </MenuItem>
-              <MenuItem text={t("DELETE")} onclick={() => onRemove(favorite)}>
-                {#snippet leading()}<Trash2 size={20} class={ICON} />{/snippet}
-              </MenuItem>
+              <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => (renaming = favorite)} />
+              <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => onRemove(favorite)} />
             </PopupMenu>
           </div>
         </div>
       {/each}
-      <OutlinedPanel onclick={onAdd} class={TILE}>
+      <CardPanel onclick={onAdd} class={TILE}>
         <span class={BADGE}>
-          <Plus size={16} class="shrink-0" />
+          <Plus size={ADD_ICON_SIZE} class="shrink-0" />
         </span>
         <span class={LABEL}>{t("ADD")}</span>
-      </OutlinedPanel>
+      </CardPanel>
     </div>
   </div>
 </div>

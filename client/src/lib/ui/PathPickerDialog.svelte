@@ -51,7 +51,7 @@
 <CompactDialog title={t("CHOOSE")} subtitle={listing?.path ?? ""} {onDismiss}>
   {#snippet titleTrailing()}
     {#if isDesktop}
-      <TooltipIconButton label={t("BROWSE")} onclick={() => void local()} class="size-8 [&_svg]:size-[18px]">
+      <TooltipIconButton label={t("BROWSE")} onclick={() => void local()}>
         <FolderSearch />
       </TooltipIconButton>
     {/if}

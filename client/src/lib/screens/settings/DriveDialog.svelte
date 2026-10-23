@@ -16,7 +16,7 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import DriveRestoreDialog from "./DriveRestoreDialog.svelte";
   import DriveUploadDialog from "./DriveUploadDialog.svelte";
@@ -83,7 +83,7 @@
   {#snippet header()}
     {#if googleSession.user}
       {@const user = googleSession.user}
-      <OutlinedPanel>
+      <CardPanel>
         <div class="flex items-center gap-3">
           {#if user.photo}
             <img
@@ -93,7 +93,7 @@
               class="size-9 shrink-0 rounded-full"
             />
           {:else}
-            <CircleUser size={24} class="shrink-0 text-on-surface-variant" />
+            <CircleUser size={20} class="shrink-0 text-on-surface-variant" />
           {/if}
           <div class="min-w-0 flex-1">
             <p class="truncate text-body-md">{user.name || user.email}</p>
@@ -101,13 +101,12 @@
           </div>
           <TooltipIconButton
             label={t("DRIVE_DISCONNECT")}
-            class="size-8 [&_svg]:size-[18px]"
             onclick={() => (disconnecting = true)}
           >
             <LogOut />
           </TooltipIconButton>
         </div>
-      </OutlinedPanel>
+      </CardPanel>
     {/if}
   {/snippet}
 
@@ -134,7 +133,7 @@
         {@const Icon = copy.encrypted ? FileLock2 : File}
         <div
           data-press
-          class="flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8 {driveBackups.busy
+          class="flex min-h-10 items-center rounded-md pr-1 transition-colors hover:bg-hover {driveBackups.busy
             ? 'opacity-50'
             : ''}"
         >
@@ -147,7 +146,6 @@
           </div>
           <TooltipIconButton
             label={t("RESTORE")}
-            class="[&_svg]:size-[18px]"
             enabled={!driveBackups.busy}
             onclick={() => {
               rejected = false;
@@ -158,7 +156,6 @@
           </TooltipIconButton>
           <TooltipIconButton
             label={t("DELETE")}
-            class="[&_svg]:size-[18px]"
             enabled={!driveBackups.busy}
             onclick={() => (deleting = copy)}
           >
@@ -218,6 +215,7 @@
     title={t("DELETE")}
     text={t("DRIVE_DELETE_CONFIRM", summary(copy))}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => void remove(copy)}
     onDismiss={() => (deleting = null)}
   />

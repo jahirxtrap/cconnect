@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { FIELD_BOX_CLASS, FIELD_INPUT_CLASS } from "./field";
+
   interface Props {
     value: string;
     editing: boolean;
@@ -21,30 +23,34 @@
   });
 </script>
 
-<input
-  bind:this={field}
-  {value}
-  readonly={!editing}
-  class="w-full truncate rounded-md border-2 px-3 py-2 text-body-md transition-colors outline-none {editing
-    ? 'cursor-text border-accent'
-    : 'cursor-pointer border-transparent hover:bg-on-surface/8'} {className}"
-  oninput={(event) => oninput(event.currentTarget.value)}
-  onclick={() => {
-    if (!editing) onEdit();
-  }}
-  onblur={() => {
-    if (editing) onCommit();
-  }}
-  onkeydown={(event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onCommit();
-      return;
-    }
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onCancel();
-    }
-  }}
-/>
+{#if editing}
+  <div class="{FIELD_BOX_CLASS} ring-accent {className}">
+    <input
+      bind:this={field}
+      {value}
+      class={FIELD_INPUT_CLASS}
+      oninput={(event) => oninput(event.currentTarget.value)}
+      onblur={onCommit}
+      onkeydown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          onCommit();
+          return;
+        }
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          onCancel();
+        }
+      }}
+    />
+  </div>
+{:else}
+  <button
+    type="button"
+    onclick={onEdit}
+    class="flex w-full cursor-pointer items-center rounded-md px-3 py-2 text-left text-body-md transition-colors select-none hover:bg-hover {className}"
+  >
+    <span class="min-w-0 truncate">{value}</span>
+  </button>
+{/if}

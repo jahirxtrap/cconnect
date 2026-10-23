@@ -18,7 +18,7 @@
   import Button from "$lib/ui/Button.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
@@ -214,9 +214,9 @@
     >
       {#snippet trailing()}
         {#if busy === account.id}
-          <LoadingIndicator size={20} />
+          <LoadingIndicator size={16} />
         {:else}
-          <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} box={20} dot={12} />
+          <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} box={20} />
         {/if}
       {/snippet}
     </PreferenceRow>
@@ -297,6 +297,7 @@
       {#if !account.primary}
         <ActionButton
           text={t("DELETE")}
+          danger
           onclick={() => {
             const target = account;
             actions = null;
@@ -341,7 +342,7 @@
       class="mt-1.5 w-full"
     />
     {#if importing}
-      <LoadingIndicator size={20} class="mt-3" />
+      <LoadingIndicator size={16} class="mt-3" />
     {/if}
     {#if importFailed}
       <p class="mt-2 text-body-sm text-red">{t("ACCOUNT_IMPORT_FAILED")}</p>
@@ -406,7 +407,7 @@
       </div>
     {/if}
     {#if probe?.found}
-      <OutlinedPanel class="mt-3">
+      <CardPanel class="mt-3">
         <p class="text-body-sm text-on-surface-variant">
           {t("ACCOUNT_PROVIDER_FOUND", `${probe.models.length}`)}
         </p>
@@ -420,7 +421,7 @@
             </p>
           {/if}
         </div>
-      </OutlinedPanel>
+      </CardPanel>
     {:else if probe && !probing}
       <p class="mt-3 text-body-sm text-red">{t("ACCOUNT_PROVIDER_MISSING")}</p>
     {/if}
@@ -458,6 +459,7 @@
     title={account.label}
     text={t("DELETE")}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       const target = account;
       deleting = null;
@@ -496,8 +498,8 @@
     <div class="mt-3">
       <InputField value={code} oninput={(value) => (code = value)} label={t("ACCOUNT_CODE")} singleLine>
         {#snippet trailing()}
-          <TooltipIconButton label={t("PASTE")} tooltip={false} onclick={pasteCode} class="size-6 [&_svg]:size-[18px]">
-            <ClipboardPaste class="text-on-surface-variant" />
+          <TooltipIconButton label={t("PASTE")} tooltip={false} onclick={pasteCode}>
+            <ClipboardPaste />
           </TooltipIconButton>
         {/snippet}
       </InputField>

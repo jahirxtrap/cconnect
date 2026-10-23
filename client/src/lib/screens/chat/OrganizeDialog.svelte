@@ -20,6 +20,7 @@
   import ProjectPathDialog from "./ProjectPathDialog.svelte";
   import TrashDialog from "./TrashDialog.svelte";
   import { DRAG_PRESS_MS } from "$lib/ui/press";
+  import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
   import type { ChatState } from "./state.svelte";
 
   interface Props {
@@ -198,7 +199,7 @@
       onSelect={(value) => void chat.setDefaultCategory(value)}
     />
 
-    <p class="mt-1 mb-1.5 text-label-lg">{t("CATEGORIES")}</p>
+    <p class="mt-1 mb-1.5 px-1 {SECTION_LABEL_CLASS}">{t("CATEGORIES")}</p>
     {#each chat.categories as category, index (category.id)}
       {@const dragging = draggingId === category.id}
       {@const hidden = chat.isCategoryHidden(category.id)}
@@ -208,7 +209,7 @@
         style="z-index: {dragging ? 1 : 0}"
       >
         <div
-          class="flex items-center rounded-item pr-1 {dragging ? 'bg-on-surface/8' : ''}"
+          class="flex items-center rounded-item pr-1 {dragging ? 'bg-hover' : ''}"
           style="transform: translateY({dragging ? dragDy : shiftOf(index)}px); transition: {dragging || settling
             ? 'none'
             : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
@@ -233,6 +234,7 @@
             onCancel={() => (editing = null)}
           />
         </div>
+        {#if !settings.lockedProject}
         <PopupMenu
           open={ownerMenu === category.id}
           label={t("PROJECT")}
@@ -240,7 +242,7 @@
         >
           {#snippet trigger()}
             <span
-              class="inline-flex max-w-32 cursor-pointer items-center gap-1 truncate rounded-full px-2 py-1 text-label-sm text-on-surface-variant transition-colors hover:bg-on-surface/10"
+              class="inline-flex h-7 max-w-32 cursor-pointer items-center gap-1.5 truncate rounded-full px-2.5 text-body-sm text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
             >
               <Folder size={14} class="shrink-0" />
               <span class="truncate">{ownerLabel(category)}</span>
@@ -251,7 +253,7 @@
             selected={!category.projectKey}
             onclick={() => void chat.setCategoryProject(category, "")}
           />
-          {#each sortedProjects as project (project.projectKey)}
+          {#each chat.historyProjects as project (project.projectKey)}
             <MenuItem
               text={projectLabel(project)}
               selected={category.projectKey === project.projectKey}
@@ -259,10 +261,10 @@
             />
           {/each}
         </PopupMenu>
+        {/if}
         <TooltipIconButton
           label={hidden ? t("SHOW") : t("HIDE")}
-          class="size-8 [&_svg]:size-4"
-          onclick={() => chat.toggleCategoryHidden(category.id)}
+                   onclick={() => chat.toggleCategoryHidden(category.id)}
         >
           {#if hidden}
             <EyeOff />
@@ -270,7 +272,7 @@
             <Eye />
           {/if}
         </TooltipIconButton>
-        <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingCategory = category)}>
+        <TooltipIconButton label={t("DELETE")} onclick={() => (deletingCategory = category)}>
           <Trash />
         </TooltipIconButton>
         </div>
@@ -283,7 +285,7 @@
     />
 
     {#if !settings.lockedProject}
-      <p class="mt-1 mb-1.5 text-label-lg">{t("PROJECTS")}</p>
+      <p class="mt-1 mb-1.5 px-1 {SECTION_LABEL_CLASS}">{t("PROJECTS")}</p>
       {#each sortedProjects as project (project.projectKey)}
         {@const hidden = chat.isProjectHidden(project.projectKey)}
         <div class="flex items-center pr-1">
@@ -303,15 +305,13 @@
           <TooltipIconButton
             label={t("RESET_NAME")}
             enabled={project.customName}
-            class="size-8 [&_svg]:size-4"
-            onclick={() => void chat.renameProject(project, "")}
+                       onclick={() => void chat.renameProject(project, "")}
           >
             <RotateCcw />
           </TooltipIconButton>
           <TooltipIconButton
             label={hidden ? t("SHOW") : t("HIDE")}
-            class="size-8 [&_svg]:size-4"
-            onclick={() => chat.toggleProjectHidden(project.projectKey)}
+                       onclick={() => chat.toggleProjectHidden(project.projectKey)}
           >
             {#if hidden}
               <EyeOff />
@@ -319,7 +319,7 @@
               <Eye />
             {/if}
           </TooltipIconButton>
-          <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (deletingProject = project)}>
+          <TooltipIconButton label={t("DELETE")} onclick={() => (deletingProject = project)}>
             <Trash />
           </TooltipIconButton>
         </div>
@@ -362,6 +362,7 @@
     title={t("DELETE")}
     text={t("DELETE_CATEGORY_CONFIRM", target.name)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       void chat.deleteCategory(target);
       deletingCategory = null;
@@ -376,6 +377,7 @@
     title={t("DELETE")}
     text={t("DELETE_PROJECT_CONFIRM", projectLabel(target))}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       void chat.deleteProject(target.projectKey);
       deletingProject = null;

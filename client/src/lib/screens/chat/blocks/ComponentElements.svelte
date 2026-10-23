@@ -22,7 +22,7 @@
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import OptionRow from "$lib/ui/OptionRow.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import Slider from "$lib/ui/Slider.svelte";
@@ -82,7 +82,7 @@
       .join(", ");
 
   const PICKER_ROW =
-    "flex w-full items-center gap-2 rounded-item py-1.5 pr-1 pl-2 transition-colors hover:bg-on-surface/8";
+    "flex w-full items-center gap-2 rounded-item px-3 py-1.5 transition-colors hover:bg-hover";
   const PICKER_MAIN =
     "flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-on-surface disabled:cursor-default";
 
@@ -130,9 +130,9 @@
     tooltip={false}
     enabled={!data.submitted && filled}
     onclick={() => onValue(element.id ?? "", "")}
-    class="size-6 [&_svg]:size-4"
+    class="size-6"
   >
-    <X size={16} class="text-on-surface" />
+    <X />
   </TooltipIconButton>
 {/snippet}
 
@@ -170,7 +170,7 @@
     {:else if element.type === "select"}
       {@const dropdown = element.display === "dropdown" && !element.multiple}
       {#if element.label?.trim() && !dropdown}
-        <p class="text-body-md">
+        <p class="text-label-lg">
           {element.label}{#if element.required}<span class="text-error">&nbsp;*</span>{/if}
         </p>
       {/if}
@@ -195,9 +195,9 @@
             multi={element.multiple}
           />
           {#if selected && option.preview?.trim()}
-            <OutlinedPanel class="w-full">
+            <CardPanel class="w-full">
               <MarkdownText text={option.preview.replace(/\n+$/, "")} dense />
-            </OutlinedPanel>
+            </CardPanel>
           {/if}
         {/each}
       {/if}
@@ -225,7 +225,7 @@
       />
     {:else if element.type === "slider"}
       {#if element.label?.trim()}
-        <p class="text-body-md">
+        <p class="text-label-lg">
           {element.label}{#if element.required}<span class="text-error">&nbsp;*</span>{/if}
         </p>
       {/if}
@@ -321,7 +321,7 @@
         <button
           type="button"
           onclick={() => (openNotes[element.id ?? ""] = true)}
-          class="flex w-full cursor-pointer items-center gap-2 rounded-item px-2 py-1.5 text-left text-label-lg text-accent transition-colors select-none hover:bg-on-surface/8"
+          class="flex w-full cursor-pointer items-center gap-2 rounded-item px-3 py-1.5 text-left text-label-lg text-accent transition-colors select-none hover:bg-hover"
         >
           <NotepadText size={18} class="shrink-0" />
           <span class="truncate">{element.label?.trim() || t("ADD_NOTES")}</span>

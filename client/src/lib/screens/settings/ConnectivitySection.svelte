@@ -7,6 +7,7 @@
   import { isTauri } from "$lib/platform";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import TrailingIcon from "$lib/ui/TrailingIcon.svelte";
   import EnvironmentsDialog from "./EnvironmentsDialog.svelte";
   import { entryFor, entryHint } from "./settingsIndex";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
@@ -36,7 +37,7 @@
       onclick={() => navigation.openSshHosts()}
     >
       {#snippet trailing()}
-        <ChevronRight size={24} class="text-on-surface-variant" />
+        <TrailingIcon icon={ChevronRight} />
       {/snippet}
     </PreferenceRow>
   {/if}

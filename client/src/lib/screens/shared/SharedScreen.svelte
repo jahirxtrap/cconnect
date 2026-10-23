@@ -15,11 +15,14 @@
   import Folder from "@lucide/svelte/icons/folder";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import FolderInput from "@lucide/svelte/icons/folder-input";
+  import FolderOpen from "@lucide/svelte/icons/folder-open";
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
   import PackageOpen from "@lucide/svelte/icons/package-open";
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Save from "@lucide/svelte/icons/save";
+  import SearchX from "@lucide/svelte/icons/search-x";
+  import ServerOff from "@lucide/svelte/icons/server-off";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
   import Upload from "@lucide/svelte/icons/upload";
@@ -63,7 +66,6 @@
   import { dragTransfer, type SharedFile } from "$lib/app/dragPayload.svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
   import EnvironmentAction from "$lib/screens/chat/EnvironmentAction.svelte";
-  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -78,14 +80,16 @@
   import { fileDrop } from "$lib/ui/fileDrop";
   import { entryIcon, kindIcon, kindLabel } from "$lib/ui/fileIcons";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import ListRow from "$lib/ui/ListRow.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
+  import { TOOLTIP_CLASS } from "$lib/ui/menuSurface";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import Pressable from "$lib/ui/Pressable.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
+  import { joinedCorners } from "$lib/ui/joinedCorners";
+  import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
-  import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import PathBar from "./PathBar.svelte";
   import CompressDialog from "./CompressDialog.svelte";
@@ -119,8 +123,6 @@
 
   const compact = inPane();
 
-  const actionClass = paneActionClass(compact);
-
   let width = $state(0);
 
   const narrow = $derived(width < COMPACT_WIDTH);
@@ -130,6 +132,7 @@
   const SLIDE_MS = 150;
   const EDGE_ZONE = 96;
   const EDGE_STEP = 24;
+  const WIDE_WIDTH = 800;
   const SORT_KEYS: SortKey[] = ["name", "date", "type", "size"];
   const SORT_LABELS: Record<SortKey, string> = {
     name: "SORT_NAME",
@@ -198,7 +201,7 @@
   let anchor = -1;
   let markBase: string[] = [];
 
-  const environment = $derived(backend.active);
+  const wide = $derived(!compact && !layout.mobile && width >= WIDE_WIDTH);
 
   const child = (name: string) => (path ? `${path}/${name}` : name);
 
@@ -217,6 +220,9 @@
     projectKeys.has(path) ? projectNameOf(projects, path) : name;
 
   const pathLabel = (target: string) => entryLabel(target, target.split("/").pop() ?? "");
+
+  const crumbPath = $derived(archive === null ? path : [archive, archiveDir].filter(Boolean).join("/"));
+  const crumbLabel = $derived(ceiling ? projectNameOf(projects, ceiling) : null);
 
   $effect(() => {
     const locked = ceiling;
@@ -319,6 +325,9 @@
       !transfer.folders.some((folder) => path === folder || path.startsWith(`${folder}/`)) &&
       (transfer.kind !== "move" || path !== transfer.sourceDir),
   );
+  const selectionBar = $derived(selecting && (wide || selected.length > 0));
+  const querying = $derived(searching && searchQuery.trim().length > 0);
+  const uploadable = $derived(!querying && archive === null && !transfer && !serverStatus.unavailable);
 
   const selectAll = () => {
     selecting = true;
@@ -349,8 +358,35 @@
     else path = path.split("/").slice(0, -1).join("/");
   };
 
+  const navigateTo = (target: string) => {
+    const current = archive;
+    if (current !== null && (target === current || target.startsWith(`${current}/`))) {
+      archiveDir = target.slice(current.length).replace(/^\/+/, "");
+    } else {
+      archive = null;
+      archiveDir = "";
+      path = target;
+    }
+  };
+
+  const toggleSearch = () => {
+    searching = !searching;
+    if (!searching) searchQuery = "";
+  };
+
+  const search = (value: string) => {
+    searchQuery = value;
+    searching = value.length > 0;
+  };
+
   const toggle = (name: string) => {
     selected = selected.includes(name) ? selected.filter((item) => item !== name) : [...selected, name];
+  };
+
+  const contextSelect = (entry: SharedEntry) => {
+    if (touchGesture || transfer) return;
+    selecting = true;
+    toggle(entry.file);
   };
 
   const openEntry = (entry: SharedEntry) => {
@@ -448,6 +484,91 @@
     await reload();
   };
 
+  const shareSelection = () => {
+    const files = selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name }));
+    if (files.length === 1) void shareShared(files[0].url, files[0].name);
+    else void shareAllShared(files);
+    exitSelection();
+  };
+
+  const saveSelection = () => {
+    selectedEntries.forEach((entry) => void downloadShared(downloadUrl(child(entry.file)), entry.name));
+    exitSelection();
+  };
+
+  const saveSelectionAs = () => {
+    void saveSharedItemsAs(
+      selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name })),
+    );
+    exitSelection();
+  };
+
+  const attachSelection = () => {
+    const target = panes.focusedTab;
+    if (target) tabs.stateFor(target).addSharedAttachments(sharedSelection());
+    exitSelection();
+  };
+
+  const copySelectionPaths = () => {
+    void sharedApi
+      .absolutePaths(selectedEntries.map((entry) => child(entry.file)))
+      .then((paths) => paths && copyText(paths.join("\n")));
+    exitSelection();
+  };
+
+  const bringHere = (entry: SharedEntry) => {
+    void sharedApi.materialize(child(entry.file)).then(reload);
+    exitSelection();
+  };
+
+  const viewEntry = (entry: SharedEntry) => {
+    const relative = child(entry.file);
+    openFilePreview({
+      url: downloadUrl(relative),
+      name: entry.name,
+      onDelete: () => void sharedApi.remove(relative).then(reload),
+    });
+    exitSelection();
+  };
+
+  const openExternally = (entry: SharedEntry) => {
+    void openSharedExternally(downloadUrl(child(entry.file)), entry.name);
+    exitSelection();
+  };
+
+  const extractArchive = (entry: SharedEntry) => {
+    extractRequest = {
+      archive: child(entry.file),
+      members: null,
+      base: "",
+      stem: archiveStem(entry.name),
+    };
+  };
+
+  const extractMembers = (current: string) => {
+    extractRequest = {
+      archive: current,
+      members: selectedEntries.map((entry) => innerChild(entry.name)),
+      base: archiveDir,
+      stem: archiveStem(visibleName(current.split("/").pop() ?? current)),
+    };
+  };
+
+  const viewArchived = (current: string) => {
+    if (!single) return;
+    openFilePreview({
+      url: archiveFileUrl(current, innerChild(single.name)),
+      name: single.name,
+      onDelete: null,
+    });
+    exitSelection();
+  };
+
+  const saveArchived = (current: string) => {
+    selectedEntries.forEach((entry) => void downloadShared(archiveFileUrl(current, innerChild(entry.name)), entry.name));
+    exitSelection();
+  };
+
   const selectSort = (field: SortKey) => {
     sortField = field;
     settings.sharedSortField = sortField;
@@ -466,11 +587,18 @@
     settings.sharedHiddenKinds = [...next];
   };
 
+  const iconOf = (entry: SharedEntry) => entryIcon(child(entry.name), entry.isDir, projectKeys, UPLOAD_DIR);
+
+
+  const rowTone = (isSelected: boolean, dropping: boolean) =>
+    dropping ? "bg-accent-soft" : isSelected ? "bg-surface-variant" : "";
+
+  const dateOf = (entry: SharedEntry) => formatDateShort(entry.modified * MILLIS_PER_SECOND);
+
   const detailOf = (entry: SharedEntry) =>
     entry.isDir ? plural("ITEM_COUNT", entry.items) : entry.missing ? "" : formatSize(entry.size);
 
-  const subtitleOf = (entry: SharedEntry) =>
-    entry.missing ? t("LINK_MISSING") : entry.link || formatDateShort(entry.modified * MILLIS_PER_SECOND);
+  const subtitleOf = (entry: SharedEntry) => (entry.missing ? t("LINK_MISSING") : entry.link || dateOf(entry));
 
   const rowAt = (x: number, y: number) => {
     const element = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-row]");
@@ -604,6 +732,13 @@
     void sharedApi.move(sources, child(target)).then(reload);
   };
 
+  const onClickCapture = (event: MouseEvent) => {
+    if (!swallowClick) return;
+    swallowClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   const engaged = $derived(activeScope() === "shared");
 
   const shortcutsEnabled = $derived(
@@ -706,7 +841,7 @@
 
   $effect(() => {
     if (compact) return;
-    const visible = transfer !== null || (selecting && selected.length > 0);
+    const visible = transfer !== null || selectionBar;
     layout.bottomInset = visible ? bottomBar : 0;
     return () => (layout.bottomInset = 0);
   });
@@ -791,107 +926,234 @@
   });
 </script>
 
+{#snippet selectAllAction()}
+  <TooltipIconButton
+    label={t("SELECT_ALL")}
+    shortcut="shared.selectAll"
+    onclick={selectAll}
+  >
+    <SelectionDot selected={allSelected} size={compact ? 18 : 24} />
+  </TooltipIconButton>
+{/snippet}
 
-<div
-  bind:clientWidth={width}
-  class="flex h-full flex-col"
-  role="application"
-  aria-label={t("SHARED")}
->
-  {#snippet selectAllAction()}
-    <TooltipIconButton
-      label={t("SELECT_ALL")}
-      class={actionClass}
-      shortcut="shared.selectAll"
-      onclick={selectAll}
-    >
-      <SelectionDot selected={allSelected} size={compact ? 18 : 24} />
-    </TooltipIconButton>
-  {/snippet}
+{#snippet cancelAction()}
+  <TooltipIconButton label={t("CANCEL")} onclick={exitSelection}>
+    <X />
+  </TooltipIconButton>
+{/snippet}
 
-  {#snippet cancelAction()}
-    <TooltipIconButton label={t("CANCEL")} class={actionClass} onclick={exitSelection}>
-      <X />
-    </TooltipIconButton>
-  {/snippet}
-
-  {#snippet browseActions()}
-    {#if !transfer && archive === null}
-      <TooltipIconButton
-        label={t("UPLOAD_FILES")}
-        class={actionClass}
-        enabled={!serverStatus.unavailable}
-        onclick={() => picker?.click()}
-      >
-        <Upload />
+{#snippet moreMenu()}
+  <PopupMenu
+    open={barMenu}
+    onOpenChange={(value) => (barMenu = value)}
+    label={t("MORE_OPTIONS")}
+  >
+    {#snippet triggerChild(props)}
+      <TooltipIconButton label={t("MORE_OPTIONS")} {...props}>
+        <EllipsisVertical />
       </TooltipIconButton>
+    {/snippet}
+    <MenuSub text={t("SORT_BY")} icon={ArrowDownUp}>
+      {#each SORT_KEYS as key (key)}
+        <MenuItem
+          text={t(SORT_LABELS[key])}
+          selected={key === sortField}
+          closeOnSelect={false}
+          onclick={() => selectSort(key)}
+        />
+      {/each}
+      <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
+        {#snippet trailing()}
+          <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
+        {/snippet}
+      </MenuItem>
+    </MenuSub>
+    <MenuSub text={t("SHOW_KINDS")} icon={Filter}>
+      {#each FILE_KINDS as kind (kind)}
+        <MenuItem
+          text={t(kindLabel(kind))}
+          icon={kindIcon(kind)}
+          closeOnSelect={false}
+          onclick={() => toggleKind(kind)}
+        >
+          {#snippet trailing()}
+            <CompactSwitch checked={!hiddenKinds.has(kind)} onCheckedChange={() => toggleKind(kind)} />
+          {/snippet}
+        </MenuItem>
+      {/each}
+    </MenuSub>
+    {#if archive === null}
+      <MenuItem
+        text={t("NEW_FOLDER")}
+        icon={FolderPlus}
+        enabled={!serverStatus.unavailable}
+        onclick={() => (creatingFolder = true)}
+      />
     {/if}
-    <EnvironmentAction />
+  </PopupMenu>
+{/snippet}
+
+{#snippet browseActions()}
+  {#if !transfer && archive === null}
+    <TooltipIconButton
+      label={t("UPLOAD_FILES")}
+      enabled={!serverStatus.unavailable}
+      onclick={() => picker?.click()}
+    >
+      <Upload />
+    </TooltipIconButton>
+  {/if}
+  <EnvironmentAction />
+  {@render moreMenu()}
+{/snippet}
+
+{#snippet headerControls()}
+  {#if archive === null}
+    <SearchBar value={searchQuery} oninput={search} placeholder={t("SEARCH")} class={HEADER_SEARCH_CLASS} />
+  {/if}
+{/snippet}
+
+{#snippet emptyAction()}
+  <Button onclick={() => picker?.click()}>
+    <Upload size={16} class="shrink-0" />
+    {t("UPLOAD_FILES")}
+  </Button>
+{/snippet}
+
+{#snippet linkNote(entry: SharedEntry, className: string)}
+  {@const LinkIcon = entry.missing ? CircleX : Link2}
+  <span class="flex min-w-0 items-center gap-1.5 text-caption {entry.missing ? 'text-red' : 'text-faint'} {className}">
+    <LinkIcon size={12} class="shrink-0" />
+    <span class="truncate">{entry.missing ? t("LINK_MISSING") : entry.link}</span>
+  </span>
+{/snippet}
+
+{#snippet entryLine(entry: SharedEntry, index: number)}
+  {@const isSelected = selected.includes(entry.file)}
+  {@const dropping = dropTarget === entry.file}
+  {@const Icon = iconOf(entry)}
+  {@const corners = isSelected
+    ? joinedCorners(selected.includes(ordered[index - 1]?.file), selected.includes(ordered[index + 1]?.file))
+    : joinedCorners(false, false)}
+  <div data-row={index} data-name={entry.file} class="{corners} {rowTone(isSelected, dropping)}">
+    <Pressable
+      onclick={() => openEntry(entry)}
+      oncontextmenu={() => contextSelect(entry)}
+      hover={!isSelected && !dropping}
+      class="flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-1.5"
+    >
+      {#if selecting}
+        <SelectionDot selected={isSelected} />
+      {/if}
+      <Icon size={18} class="shrink-0 text-on-surface-variant" />
+      <span class="flex min-w-0 flex-1 flex-col">
+        <span class="truncate text-body-md">{entryLabel(child(entry.file), entry.name)}</span>
+        {#if entry.link}
+          {@render linkNote(entry, "")}
+        {:else}
+          <span class="truncate text-caption text-faint">{subtitleOf(entry)}</span>
+        {/if}
+      </span>
+      <span class="shrink-0 text-caption text-faint">{detailOf(entry)}</span>
+    </Pressable>
+  </div>
+{/snippet}
+
+{#snippet selectionItems()}
+  {#if single && single.link && !single.missing}
+    <MenuItem text={t("BRING_HERE")} icon={HardDriveDownload} onclick={() => single && bringHere(single)} />
+  {/if}
+  {#if single && !single.isDir && isPreviewable(single.name)}
+    <MenuItem text={t("VIEW")} icon={Eye} onclick={() => single && viewEntry(single)} />
+  {/if}
+  {#if single}
+    <MenuItem text={t("RENAME")} icon={Pencil} onclick={() => (renaming = single)} />
+  {/if}
+  {#if canShare}
+    <MenuItem text={t("SAVE")} icon={Download} onclick={saveSelection} />
+    <MenuItem text={t("SAVE_AS")} icon={Save} onclick={saveSelectionAs} />
+  {/if}
+  {#if single && !single.isDir}
+    <MenuItem text={t("OPEN_EXTERNALLY")} icon={ExternalLink} onclick={() => single && openExternally(single)} />
+  {/if}
+  {#if sharedSelection().length}
+    <MenuItem text={t("ATTACH_TO_CHAT")} icon={Paperclip} onclick={attachSelection} />
+  {/if}
+  <MenuItem text={t("COPY_PATH")} icon={ClipboardCopy} onclick={copySelectionPaths} />
+  <MenuItem
+    text={t("COMPRESS")}
+    icon={FolderArchive}
+    onclick={() => (compressing = selectedEntries.map((entry) => child(entry.file)))}
+  />
+  {#if single && !single.isDir && isArchive(single.name)}
+    <MenuItem text={t("EXTRACT")} icon={PackageOpen} onclick={() => single && extractArchive(single)} />
+  {/if}
+{/snippet}
+
+{#snippet selectionActions()}
+  {#if archive !== null}
+    {@const current = archive}
+    <ToolbarAction {narrow} icon={PackageOpen} label={t("EXTRACT")} onclick={() => extractMembers(current)} />
+    <ToolbarAction
+      {narrow}
+      icon={Eye}
+      label={t("VIEW")}
+      enabled={!!single && !single.isDir && isPreviewable(single.name)}
+      onclick={() => viewArchived(current)}
+    />
+    <ToolbarAction {narrow} icon={Download} label={t("SAVE")} enabled={canShare} onclick={() => saveArchived(current)} />
+  {:else}
+    <ToolbarAction
+      {narrow}
+      shortcut="shared.cut"
+      icon={FolderInput}
+      label={t("MOVE")}
+      onclick={() => startTransfer("move")}
+    />
+    <ToolbarAction
+      {narrow}
+      shortcut="shared.copy"
+      icon={Copy}
+      label={t("COPY")}
+      onclick={() => startTransfer("copy")}
+    />
+    <ToolbarAction {narrow} icon={Share2} label={t("SHARE")} enabled={canShare} onclick={shareSelection} />
+    <ToolbarAction
+      {narrow}
+      shortcut="shared.delete"
+      icon={Trash}
+      label={t("DELETE")}
+      onclick={() => (confirmingDelete = true)}
+    />
     <PopupMenu
-      open={barMenu}
-      onOpenChange={(value) => (barMenu = value)}
-      label={t("MORE_OPTIONS")}
+      open={actionsMenu}
+      onOpenChange={(value) => (actionsMenu = value)}
+      label={t("MORE")}
+      side="top"
     >
       {#snippet triggerChild(props)}
-        <TooltipIconButton label={t("MORE_OPTIONS")} class={actionClass} {...props}>
+        <TooltipIconButton label={t("MORE")} {...props}>
           <EllipsisVertical />
         </TooltipIconButton>
       {/snippet}
-      <MenuSub text={t("SORT_BY")}>
-        {#snippet leading()}
-          <ArrowDownUp size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-        {#each SORT_KEYS as key (key)}
-          <MenuItem
-            text={t(SORT_LABELS[key])}
-            selected={key === sortField}
-            closeOnSelect={false}
-            onclick={() => selectSort(key)}
-          />
-        {/each}
-        <MenuItem text={t("SORT_ASCENDING")} closeOnSelect={false} onclick={toggleSortDirection}>
-          {#snippet trailing()}
-            <CompactSwitch checked={sortAscending} onCheckedChange={toggleSortDirection} />
-          {/snippet}
-        </MenuItem>
-      </MenuSub>
-      <MenuSub text={t("SHOW_KINDS")}>
-        {#snippet leading()}
-          <Filter size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-        {#each FILE_KINDS as kind (kind)}
-          {@const Icon = kindIcon(kind)}
-          <MenuItem text={t(kindLabel(kind))} closeOnSelect={false} onclick={() => toggleKind(kind)}>
-            {#snippet leading()}
-              <Icon size={20} class="shrink-0 text-on-surface-variant" />
-            {/snippet}
-            {#snippet trailing()}
-              <CompactSwitch checked={!hiddenKinds.has(kind)} onCheckedChange={() => toggleKind(kind)} />
-            {/snippet}
-          </MenuItem>
-        {/each}
-      </MenuSub>
-      {#if archive === null}
-        <MenuItem
-          text={t("NEW_FOLDER")}
-          enabled={!serverStatus.unavailable}
-          onclick={() => (creatingFolder = true)}
-        >
-          {#snippet leading()}
-            <FolderPlus size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
-      {/if}
+      {@render selectionItems()}
     </PopupMenu>
-  {/snippet}
+  {/if}
+{/snippet}
 
+<div
+  bind:clientWidth={width}
+  class="flex h-full min-h-0 flex-col"
+  role="application"
+  aria-label={t("SHARED")}
+>
   {#if compact}
     <PaneHeader
       title={selecting ? plural("ITEM_COUNT", selected.length) : t("SHARED")}
       leading={selecting ? selectAllAction : undefined}
       actions={selecting ? cancelAction : browseActions}
     />
-  {:else if selecting}
+  {:else if selecting && !wide}
     <AppTopBar title={plural("ITEM_COUNT", selected.length)}>
       {#snippet navigationIcon()}
         {@render selectAllAction()}
@@ -903,20 +1165,14 @@
   {:else}
     <AppTopBar
       title={t("SHARED")}
-      subtitle={serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : (environment?.name ?? null)}
+      server
+      controls={wide ? headerControls : undefined}
+      actions={browseActions}
     >
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
-          <ArrowLeft size={20} />
+          <ArrowLeft />
         </TooltipIconButton>
-      {/snippet}
-      {#snippet subtitleLeading()}
-        {#if serverStatus.unavailable}
-          <StatusDot class="bg-red" box={8} />
-        {/if}
-      {/snippet}
-      {#snippet actions()}
-        {@render browseActions()}
       {/snippet}
     </AppTopBar>
   {/if}
@@ -931,347 +1187,97 @@
       },
     }}
   >
-  <DropOverlay />
-  <PathBar
-    path={archive === null ? path : [archive, archiveDir].filter(Boolean).join("/")}
-    root={ceiling}
-    label={ceiling ? projectNameOf(projects, ceiling) : null}
-    nameOf={entryLabel}
-    {searching}
-    {narrow}
-    count={shownCount}
-    query={searchQuery}
-    searchable={archive === null}
-    onQueryChange={(value) => (searchQuery = value)}
-    onToggleSearch={() => {
-      searching = !searching;
-      if (!searching) searchQuery = "";
-    }}
-    onNavigate={(target) => {
-      const current = archive;
-      if (current !== null && (target === current || target.startsWith(`${current}/`))) {
-        archiveDir = target.slice(current.length).replace(/^\/+/, "");
-      } else {
-        archive = null;
-        archiveDir = "";
-        path = target;
-      }
-    }}
-  />
+    <DropOverlay />
+    <PathBar
+      path={crumbPath}
+      root={ceiling}
+      label={crumbLabel}
+      nameOf={entryLabel}
+      searching={searching && !wide}
+      {narrow}
+      count={shownCount}
+      query={searchQuery}
+      searchable={archive === null && !wide}
+      onQueryChange={(value) => (searchQuery = value)}
+      onToggleSearch={toggleSearch}
+      onNavigate={navigateTo}
+    />
 
-  <div class="relative min-h-0 flex-1">
-    {#if ordered.length}
-      <!-- svelte-ignore a11y_no_static_element_interactions -->
-      <div
-        bind:this={list}
-        onpointerdown={onPointerDown}
-        onpointermove={onPointerMove}
-        onpointerup={onPointerUp}
-        onpointercancel={endGesture}
-        onclickcapture={(event) => {
-          if (!swallowClick) return;
-          swallowClick = false;
-          event.preventDefault();
-          event.stopPropagation();
-        }}
-        class="h-full overflow-y-auto {marking || dragging ? 'touch-none select-none' : ''}"
-      >
-        {#each ordered as entry, index (entry.file)}
-          {@const isSelected = selected.includes(entry.file)}
-          <div data-row={index} data-name={entry.file}>
-            <ListRow
-              icon={entryIcon(child(entry.name), entry.isDir, projectKeys, UPLOAD_DIR)}
-              iconBadge={entry.link ? (entry.missing ? CircleX : Link2) : null}
-              badgeClass={entry.missing ? "text-red" : "text-on-surface-variant"}
-              title={entryLabel(child(entry.file), entry.name)}
-              subtitle={subtitleOf(entry)}
-              class={dropTarget === entry.file ? "bg-accent/15" : ""}
-              onclick={() => openEntry(entry)}
-              oncontextmenu={() => {
-                if (touchGesture || transfer) return;
-                selecting = true;
-                toggle(entry.file);
-              }}
-            >
-              {#snippet leading()}
-                {#if selecting}
-                  <div class="mr-2 flex w-6 items-center">
-                    <SelectionDot selected={isSelected} />
-                  </div>
-                {/if}
-              {/snippet}
-              {#snippet subtitleTrailing()}
-                <span class="px-2 text-body-sm font-bold text-on-surface-variant">{detailOf(entry)}</span>
-              {/snippet}
-            </ListRow>
+    <div class="flex min-h-0 flex-1 gap-4 px-(--page-inset) pb-(--page-inset)">
+      <div class="flex min-w-0 flex-1 flex-col">
+        {#if ordered.length}
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            bind:this={list}
+            onpointerdown={onPointerDown}
+            onpointermove={onPointerMove}
+            onpointerup={onPointerUp}
+            onpointercancel={endGesture}
+            onclickcapture={onClickCapture}
+            class="min-h-0 overflow-y-auto rounded-lg bg-card p-1 {marking || dragging ? 'touch-none select-none' : ''}"
+          >
+            {#each ordered as entry, index (entry.file)}
+              {@render entryLine(entry, index)}
+            {/each}
           </div>
-        {/each}
+        {:else}
+          <EmptyState
+            loading={!loaded && !serverStatus.unavailable}
+            icon={compact && serverStatus.unavailable ? ServerOff : querying ? SearchX : FolderOpen}
+            text={compact && serverStatus.unavailable
+              ? t("SERVER_UNAVAILABLE")
+              : t(querying ? "NO_RESULTS" : "NO_FILES")}
+            action={uploadable ? emptyAction : undefined}
+            class="flex-1"
+          />
+        {/if}
       </div>
-    {:else}
-      <EmptyState
-        loading={!loaded && !serverStatus.unavailable}
-        text={compact && serverStatus.unavailable
-          ? t("SERVER_UNAVAILABLE")
-          : t(searching && searchQuery.trim() ? "NO_RESULTS" : "NO_FILES")}
-        class="h-full"
-      />
-    {/if}
-
-  </div>
-
-  {#if transfer}
-    <div
-      transition:slide={{ duration: SLIDE_MS }}
-      bind:clientHeight={bottomBar}
-      class="flex gap-3 bg-surface px-4 py-2.5"
-    >
-      <Button onclick={() => (transfer = null)} variant="outlined" class="flex-1">{t("CANCEL")}</Button>
-      <Button onclick={() => void runTransfer()} enabled={transferAllowed} class="flex-1">
-        {transfer.kind === "move" ? t("MOVE_HERE") : transfer.kind === "copy" ? t("COPY_HERE") : t("EXTRACT_HERE")}
-      </Button>
     </div>
-  {:else if selecting && selected.length && archive !== null}
-    {@const current = archive}
-    <div
-      transition:slide={{ duration: SLIDE_MS }}
-      bind:clientHeight={bottomBar}
-      class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
-    >
-      <ToolbarAction
-        {narrow}
-        icon={PackageOpen}
-        label={t("EXTRACT")}
-        onclick={() =>
-          (extractRequest = {
-            archive: current,
-            members: selectedEntries.map((entry) => innerChild(entry.name)),
-            base: archiveDir,
-            stem: archiveStem(visibleName(current.split("/").pop() ?? current)),
-          })}
-      />
-      <ToolbarAction
-        {narrow}
-        icon={Eye}
-        label={t("VIEW")}
-        enabled={!!single && !single.isDir && isPreviewable(single.name)}
-        onclick={() => {
-          if (!single) return;
-          openFilePreview({
-            url: archiveFileUrl(current, innerChild(single.name)),
-            name: single.name,
-            onDelete: null,
-          });
-          exitSelection();
-        }}
-      />
-      <ToolbarAction
-        {narrow}
-        icon={Download}
-        label={t("SAVE")}
-        enabled={canShare}
-        onclick={() => {
-          selectedEntries.forEach((entry) =>
-            void downloadShared(archiveFileUrl(current, innerChild(entry.name)), entry.name),
-          );
-          exitSelection();
-        }}
-      />
-    </div>
-  {:else if selecting && selected.length}
-    <div
-      transition:slide={{ duration: SLIDE_MS }}
-      bind:clientHeight={bottomBar}
-      class="flex items-center justify-end gap-1 border-t border-outline-variant bg-surface px-3 py-2"
-    >
-      <ToolbarAction
-        {narrow}
-        shortcut="shared.cut"
-        icon={FolderInput}
-        label={t("MOVE")}
-        onclick={() => startTransfer("move")}
-      />
-      <ToolbarAction
-        {narrow}
-        shortcut="shared.copy"
-        icon={Copy}
-        label={t("COPY")}
-        onclick={() => startTransfer("copy")}
-      />
-      <ToolbarAction
-        {narrow}
-        icon={Share2}
-        label={t("SHARE")}
-        enabled={canShare}
-        onclick={() => {
-          const files = selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name }));
-          if (files.length === 1) void shareShared(files[0].url, files[0].name);
-          else void shareAllShared(files);
-          exitSelection();
-        }}
-      />
-      <ToolbarAction
-        {narrow}
-        shortcut="shared.delete"
-        icon={Trash}
-        label={t("DELETE")}
-        onclick={() => (confirmingDelete = true)}
-      />
-      <PopupMenu
-        open={actionsMenu}
-        onOpenChange={(value) => (actionsMenu = value)}
-        label={t("MORE")}
-        side="top"
-        triggerClass="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full transition-colors hover:bg-on-surface/8 {narrow
-          ? 'w-8'
-          : 'px-3 text-label-lg'}"
+
+    {#if transfer}
+      <div
+        transition:slide={{ duration: SLIDE_MS }}
+        bind:clientHeight={bottomBar}
+        class="px-(--page-inset) pb-(--page-inset)"
       >
-        {#snippet trigger()}
-          <EllipsisVertical size={narrow ? 20 : 18} class="shrink-0" />
-          {#if !narrow}
-            <span class="truncate">{t("MORE")}</span>
+        <div class="flex items-center gap-2 rounded-lg bg-card p-1 {narrow ? '' : 'justify-end'}">
+          <Button onclick={() => (transfer = null)} variant="outlined" class={narrow ? "grow basis-0" : ""}>
+            {t("CANCEL")}
+          </Button>
+          <Button onclick={() => void runTransfer()} enabled={transferAllowed} class={narrow ? "grow basis-0" : ""}>
+            {transfer.kind === "move" ? t("MOVE_HERE") : transfer.kind === "copy" ? t("COPY_HERE") : t("EXTRACT_HERE")}
+          </Button>
+        </div>
+      </div>
+    {:else if selectionBar}
+      <div
+        transition:slide={{ duration: SLIDE_MS }}
+        bind:clientHeight={bottomBar}
+        class="px-(--page-inset) pb-(--page-inset)"
+      >
+        <div class="flex items-center gap-1 rounded-lg bg-card p-1">
+          {#if wide}
+            {@render selectAllAction()}
+            <p class="min-w-0 flex-1 truncate px-1 text-label-lg">{plural("ITEM_COUNT", selected.length)}</p>
           {/if}
-        {/snippet}
-            {#if single && single.link && !single.missing}
-              <MenuItem
-                text={t("BRING_HERE")}
-                onclick={() => {
-                  const relative = child(single.file);
-                  void sharedApi.materialize(relative).then(reload);
-                  exitSelection();
-                }}
-              >
-                {#snippet leading()}
-                  <HardDriveDownload size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-            {#if single && !single.isDir && isPreviewable(single.name)}
-              <MenuItem
-                text={t("VIEW")}
-                onclick={() => {
-                  const relative = child(single.file);
-                  openFilePreview({
-                    url: downloadUrl(relative),
-                    name: single.name,
-                    onDelete: () => void sharedApi.remove(relative).then(reload),
-                  });
-                  exitSelection();
-                }}
-              >
-                {#snippet leading()}
-                  <Eye size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-            {#if single}
-              <MenuItem text={t("RENAME")} onclick={() => (renaming = single)}>
-                {#snippet leading()}
-                  <Pencil size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-            {#if canShare}
-              <MenuItem
-                text={t("SAVE")}
-                onclick={() => {
-                  selectedEntries.forEach((entry) =>
-                    void downloadShared(downloadUrl(child(entry.file)), entry.name),
-                  );
-                  exitSelection();
-                }}
-              >
-                {#snippet leading()}
-                  <Download size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-              <MenuItem
-                text={t("SAVE_AS")}
-                onclick={() => {
-                  void saveSharedItemsAs(
-                    selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name })),
-                  );
-                  exitSelection();
-                }}
-              >
-                {#snippet leading()}
-                  <Save size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-            {#if single && !single.isDir}
-              <MenuItem
-                text={t("OPEN_EXTERNALLY")}
-                onclick={() => {
-                  void openSharedExternally(downloadUrl(child(single.file)), single.name);
-                  exitSelection();
-                }}
-              >
-                {#snippet leading()}
-                  <ExternalLink size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-            {#if sharedSelection().length}
-              <MenuItem
-                text={t("ATTACH_TO_CHAT")}
-                onclick={() => {
-                  const target = panes.focusedTab;
-                  if (target) tabs.stateFor(target).addSharedAttachments(sharedSelection());
-                  exitSelection();
-                }}
-              >
-                {#snippet leading()}
-                  <Paperclip size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-            <MenuItem
-              text={t("COPY_PATH")}
-              onclick={() => {
-                void sharedApi
-                  .absolutePaths(selectedEntries.map((entry) => child(entry.file)))
-                  .then((paths) => paths && copyText(paths.join("\n")));
-                exitSelection();
-              }}
-            >
-              {#snippet leading()}
-                <ClipboardCopy size={20} class="shrink-0 text-on-surface-variant" />
-              {/snippet}
-            </MenuItem>
-            <MenuItem
-              text={t("COMPRESS")}
-              onclick={() => (compressing = selectedEntries.map((entry) => child(entry.file)))}
-            >
-              {#snippet leading()}
-                <FolderArchive size={20} class="shrink-0 text-on-surface-variant" />
-              {/snippet}
-            </MenuItem>
-            {#if single && !single.isDir && isArchive(single.name)}
-              <MenuItem
-                text={t("EXTRACT")}
-                onclick={() =>
-                  (extractRequest = {
-                    archive: child(single.file),
-                    members: null,
-                    base: "",
-                    stem: archiveStem(single.name),
-                  })}
-              >
-                {#snippet leading()}
-                  <PackageOpen size={20} class="shrink-0 text-on-surface-variant" />
-                {/snippet}
-              </MenuItem>
-            {/if}
-      </PopupMenu>
-    </div>
-  {/if}
+          {#if selected.length}
+            <div class="flex min-w-0 items-center justify-end gap-1 {wide ? '' : 'flex-1'}">
+              {@render selectionActions()}
+            </div>
+          {/if}
+          {#if wide}
+            {@render cancelAction()}
+          {/if}
+        </div>
+      </div>
+    {/if}
   </div>
 </div>
 
 {#if dragging && dragPoint}
   <div
     style="left: {dragPoint.x + 12}px; top: {dragPoint.y + 12}px"
-    class="pointer-events-none fixed z-50 rounded-sm border border-outline-variant bg-surface-variant px-2 py-1 text-body-sm shadow-lg"
+    class="pointer-events-none fixed z-50 {TOOLTIP_CLASS}"
   >
     {plural("ITEM_COUNT", dragging.length)}
   </div>
@@ -1337,6 +1343,7 @@
       ? t(selectedEntries[0].link ? "DELETE_LINK_CONFIRM" : "DELETE_FILE_CONFIRM", selectedEntries[0].name)
       : t("DELETE_ITEMS_CONFIRM", selectedEntries.length)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       const targets = selectedEntries.map((entry) => child(entry.file));
       confirmingDelete = false;
@@ -1469,4 +1476,3 @@
     />
   </CompactDialog>
 {/if}
-

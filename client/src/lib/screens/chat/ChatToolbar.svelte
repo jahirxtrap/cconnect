@@ -81,12 +81,13 @@
     onQuickChat,
   }: Props = $props();
 
-  const ITEM_CLASS =
-    "flex shrink-0 cursor-pointer items-center gap-1 rounded-md bg-surface-variant px-2.5 py-1 text-label-md ripple";
-  const STATE_CLASS =
-    "flex shrink-0 cursor-default items-center gap-1 rounded-md bg-surface-variant px-2.5 py-1 text-label-md";
-  const TOGGLE_CLASS =
-    "flex shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface-variant px-2 py-1 ripple";
+  const CHIP_SHAPE = "flex h-7 shrink-0 items-center rounded-full text-body-sm text-on-surface-variant";
+  const CHIP = `${CHIP_SHAPE} bg-surface-variant`;
+  const ITEM_CLASS = `${CHIP} ripple cursor-pointer gap-1.5 px-2.5 transition-colors hover:text-on-surface`;
+  const STATE_CLASS = `${CHIP} cursor-default gap-1.5 px-2.5`;
+  const toggleClass = (on: boolean) =>
+    `${CHIP_SHAPE} ${on ? "bg-accent-soft" : "bg-surface-variant"} ripple w-7 cursor-pointer justify-center transition-colors hover:text-on-surface`;
+  const TOGGLE_CLASS = toggleClass(false);
   const SLOT = "flex shrink-0 items-center";
 
   let openMenu = $state<"model" | "effort" | "permission" | "account" | "streaming" | null>(null);
@@ -140,13 +141,17 @@
 </script>
 
 <div class="flex h-full min-w-0 flex-1 items-stretch">
-<TooltipWrap label={t("QUICK_CHAT")} class="relative {SLOT} pr-1.5 pl-0.5">
-  <button type="button" use:keepFocus onclick={onQuickChat} aria-label={t("QUICK_CHAT")} class={TOGGLE_CLASS}>
+<TooltipWrap label={t("QUICK_CHAT")} class="{SLOT} pr-1.5 pl-0.5">
+  <button
+    type="button"
+    use:keepFocus
+    onclick={onQuickChat}
+    aria-label={t("QUICK_CHAT")}
+    aria-pressed={quickChatActive}
+    class={toggleClass(quickChatActive)}
+  >
     <MessagesSquare size={16} class="text-accent" />
   </button>
-  {#if quickChatActive}
-    <span class="pointer-events-none absolute top-0 right-0 size-[7px] rounded-full bg-accent"></span>
-  {/if}
 </TooltipWrap>
 
 <div
@@ -155,7 +160,7 @@
 >
   {#if disconnected}
     <span class={STATE_CLASS}>
-      <StatusDot class="bg-red" box={16} dot={10} />
+      <StatusDot class="bg-red" box={16} />
       <span class="whitespace-nowrap">{t("DISCONNECTED")}</span>
     </span>
   {:else if connecting || !ready}
@@ -255,7 +260,7 @@
           }}
         >
           {#snippet leading()}
-            <style.icon size={20} class="shrink-0 {style.tone}" />
+            <style.icon size={16} class="shrink-0 {style.tone}" />
           {/snippet}
         </MenuItem>
       {/each}
@@ -287,7 +292,6 @@
           />
         {/each}
         {#if providerAccounts.length}
-          <div class="my-1 h-px bg-outline-variant"></div>
           {#each providerAccounts as option (option.value)}
             <MenuItem
               text={option.label}

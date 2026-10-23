@@ -1,6 +1,7 @@
 <script lang="ts">
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import type { Snippet } from "svelte";
   import type { IconSource } from "$lib/ui/icons";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
 
@@ -9,10 +10,10 @@
     icon?: IconSource;
     summary?: string;
     stat?: string | null;
+    meta?: Snippet;
     labelOnly?: boolean;
     running?: boolean;
     expanded?: boolean;
-    labelClass?: string;
     iconClass?: string;
     onclick?: (() => void) | null;
   }
@@ -22,42 +23,47 @@
     icon: IconComponent,
     summary = "",
     stat = null,
+    meta,
     labelOnly = false,
     running = false,
     expanded = false,
-    labelClass = "text-on-surface-variant",
     iconClass = "text-accent",
     onclick = null,
   }: Props = $props();
+
+  const GLYPH = 14;
 </script>
 
 <button
   type="button"
   disabled={labelOnly}
   onclick={() => onclick?.()}
-  class="flex w-full items-center rounded-sm text-left transition-colors select-none group-data-[stuck]/head:rounded-none group-data-[stuck]/head:px-4 {labelOnly
+  class="flex h-7 w-full items-center gap-2 px-2.5 text-left transition-colors select-none {labelOnly
     ? 'cursor-default'
-    : 'cursor-pointer hover:bg-on-surface/8'}"
+    : 'cursor-pointer hover:bg-hover'}"
 >
   {#if IconComponent}
-    <IconComponent size={16} class="mr-[6px] shrink-0 {iconClass}" />
+    <IconComponent size={GLYPH} class="shrink-0 {iconClass}" />
   {/if}
-  <span class="min-w-0 truncate text-label-lg text-on-surface-variant"><span
-      class={labelClass}>{label}</span>{#if summary}<span class="ml-1.5 text-on-surface-variant"
-      >{summary}</span
-    >{/if}</span>
+  <span class="min-w-0 truncate text-block {summary ? 'text-on-surface-variant' : 'text-on-surface'}"
+    ><span class="text-on-surface">{label}</span>{#if summary}<span class="ml-2 text-on-surface-variant">{summary}</span
+      >{/if}</span
+  >
   <span class="min-w-2 flex-1"></span>
+  {#if meta}
+    <span class="flex shrink-0 items-center gap-2 text-body-sm group-data-[stuck]/head:hidden">{@render meta()}</span>
+  {/if}
   {#if stat}
-    <span class="mr-1.5 shrink-0 text-body-sm text-on-surface-variant group-data-[stuck]/head:hidden">{stat}</span>
+    <span class="shrink-0 text-body-sm text-faint group-data-[stuck]/head:hidden">{stat}</span>
   {/if}
   {#if running}
-    <LoadingIndicator size={16} class="text-accent group-data-[stuck]/head:hidden {labelOnly ? '' : 'mr-0.5'}" />
+    <LoadingIndicator size={14} class="shrink-0 text-accent group-data-[stuck]/head:hidden" />
   {/if}
   {#if !labelOnly}
     {#if expanded}
-      <ChevronDown size={18} class="shrink-0 text-on-surface-variant" />
+      <ChevronDown size={GLYPH} class="shrink-0 text-faint" />
     {:else}
-      <ChevronRight size={18} class="shrink-0 text-on-surface-variant" />
+      <ChevronRight size={GLYPH} class="shrink-0 text-faint" />
     {/if}
   {/if}
 </button>

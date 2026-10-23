@@ -3,6 +3,7 @@
   import Menu from "@lucide/svelte/icons/menu";
   import { closeFilePreview, expandFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
+  import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { accentAt } from "$lib/design/accents";
   import { sessionColorOf } from "$lib/design/sessionColors";
@@ -83,7 +84,8 @@
   const leftWanted = $derived(expanded ? Math.max(leftWidth, LEFT_MIN_WIDTH) : RAIL_WIDTH);
   const sides = $derived(fitWidths(leftWanted, leftMin, Math.max(rightWidth, MIN_SIDE_WIDTH), MIN_SIDE_WIDTH));
   const panelWidth = $derived(Math.round(sides.right));
-  const leftShown = $derived(Math.round(panes.open ? sides.left : fitWidths(leftWanted, leftMin, 0, 0).left));
+  const rightShown = $derived(panes.open && !navigation.centered);
+  const leftShown = $derived(Math.round(rightShown ? sides.left : fitWidths(leftWanted, leftMin, 0, 0).left));
 
   const pushed = (value: number, kept: number, min: number) => Math.max(min, Math.min(kept, sideRoom - value));
 
@@ -152,6 +154,15 @@
     requestAnimationFrame(() => requestAnimationFrame(() => (layoutTab = id)));
   });
 
+  let layoutCentered = $state(navigation.centered);
+  const routeShift = $derived(navigation.centered !== layoutCentered);
+  const still = $derived(resizing || routeShift);
+
+  $effect(() => {
+    if (!routeShift) return;
+    const centered = navigation.centered;
+    requestAnimationFrame(() => requestAnimationFrame(() => (layoutCentered = centered)));
+  });
 
   $effect(() => {
     layout.bottomInset = panes.centerBusy ? 0 : composerHeight;
@@ -160,7 +171,7 @@
 
   $effect(() => {
     layout.rightInset = navigation.chatActive && !layout.mobile && panes.open ? panelWidth : 0;
-    layout.rightInsetAnimated = !resizing;
+    layout.rightInsetAnimated = !still;
     return () => (layout.rightInset = 0);
   });
 
@@ -205,9 +216,7 @@
     return true;
   };
 
-  const transfersLift = $derived(
-    Math.max(0, layout.transfersInset - composerHeight - layout.safeBottom),
-  );
+  const dockLift = $derived(Math.max(0, layout.dockInset - composerHeight - layout.safeBottom));
 
   $effect(() => {
     const environmentIds = [...new Set(tabs.list.map((tab) => tab.environmentId))];
@@ -266,8 +275,8 @@
       accent={leftAccent}
       {expanded}
       width={leftShown}
-      max={sideRoom - (panes.open ? MIN_SIDE_WIDTH : 0)}
-      {resizing}
+      max={sideRoom - (rightShown ? MIN_SIDE_WIDTH : 0)}
+      resizing={still}
       onExpanded={setExpanded}
       onWidth={(value) => {
         leftWidth = value;
@@ -293,75 +302,82 @@
     data-unfocused={centerFocused ? undefined : true}
     onpointerdowncapture={(event) => focusFrom(event, "center")}
   >
-    {#if !layout.mobile && !panes.centerBusy}
-      <TabStrip
-        items={tabs.center}
-        activeId={tabs.activeId}
-        onSelect={(id) => tabs.select(id)}
-        onNew={() => tabs.newTab()}
-        newShortcut="tab.new"
-        onClose={(id) => panes.close(id)}
-        onMove={(id, index) => tabs.move(id, index)}
-        onDrop={() => tabs.commit()}
-        onPaneDrag={swappable ? (dx, done) => dragPanes(dx, done, "center") : undefined}
-        onTabDrag={swappable ? dragTab : undefined}
-        group="chat"
-        focused={chatFocused}
-        trailing={centerActions}
-      />
+    {#if navigation.centered}
+      <div class="flex min-h-0 flex-1 flex-col">
+        <RouteScreen />
+      </div>
     {/if}
-    {#if centerPreview && navigation.preview}
-      {@const request = navigation.preview}
-      <PaneSurface role="center">
-        <FilePreview
-          embedded
-          url={request.url}
-          filename={request.name}
-          forcedKind={request.kind}
-          onDelete={request.onDelete}
-          onClose={closeFilePreview}
-          onExpand={expandFilePreview}
+    <div class={navigation.centered ? "hidden" : "contents"} inert={navigation.centered}>
+      {#if !layout.mobile && !panes.centerBusy}
+        <TabStrip
+          items={tabs.center}
+          activeId={tabs.activeId}
+          onSelect={(id) => tabs.select(id)}
+          onNew={() => tabs.newTab()}
+          newShortcut="tab.new"
+          onClose={(id) => panes.close(id)}
+          onMove={(id, index) => tabs.move(id, index)}
+          onDrop={() => tabs.commit()}
+          onPaneDrag={swappable ? (dx, done) => dragPanes(dx, done, "center") : undefined}
+          onTabDrag={swappable ? dragTab : undefined}
+          group="chat"
+          focused={chatFocused}
+          trailing={centerActions}
         />
-      </PaneSurface>
-    {:else if centerDiff && opened.project && opened.path}
-      {@const project = chatListFor(backend.active)?.projects.find(
-        (item) => item.projectKey === opened.project,
-      )}
-      <PaneSurface role="center">
-        <ProjectDiffView
-          projectKey={opened.project}
-          path={opened.path}
-          status={opened.status}
-          root={project?.path ?? null}
-          embedded={!opened.full}
-          onExpand={opened.full ? null : () => (opened.full = true)}
-          onClose={closeProjectFile}
+      {/if}
+      {#if centerPreview && navigation.preview}
+        {@const request = navigation.preview}
+        <PaneSurface role="center">
+          <FilePreview
+            embedded
+            url={request.url}
+            filename={request.name}
+            forcedKind={request.kind}
+            onDelete={request.onDelete}
+            onClose={closeFilePreview}
+            onExpand={expandFilePreview}
+          />
+        </PaneSurface>
+      {:else if centerDiff && opened.project && opened.path}
+        {@const project = chatListFor(backend.active)?.projects.find(
+          (item) => item.projectKey === opened.project,
+        )}
+        <PaneSurface role="center">
+          <ProjectDiffView
+            projectKey={opened.project}
+            path={opened.path}
+            status={opened.status}
+            root={project?.path ?? null}
+            embedded={!opened.full}
+            onExpand={opened.full ? null : () => (opened.full = true)}
+            onClose={closeProjectFile}
+          />
+        </PaneSurface>
+      {:else if shownTab}
+        <ChatView
+          tab={shownTab}
+          primary
+          focused={chatFocused}
+          {dockLift}
+          instant={instantLayout}
+          navigationIcon={layout.mobile ? menuButton : undefined}
+          notices={notices.length ? compatNotices : undefined}
+          onComposerHeight={(height) => (composerHeight = height)}
         />
-      </PaneSurface>
-    {:else if shownTab}
-      <ChatView
-        tab={shownTab}
-        primary
-        focused={chatFocused}
-        {transfersLift}
-        instant={instantLayout}
-        navigationIcon={layout.mobile ? menuButton : undefined}
-        notices={compatNotices}
-        onComposerHeight={(height) => (composerHeight = height)}
-      />
-    {/if}
-    {#if panes.dropTarget === "center"}
-      {@render dropHint()}
-    {/if}
+      {/if}
+      {#if panes.dropTarget === "center"}
+        {@render dropHint()}
+      {/if}
+    </div>
   </div>
 
   {#if !layout.mobile}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="relative h-full shrink-0 overflow-hidden {resizing
+      class="relative h-full shrink-0 overflow-hidden {still
         ? ''
         : 'transition-[width] duration-200'}"
-      style="width: {panes.open ? panelWidth : 0}px; {rightAccent}"
+      style="width: {rightShown ? panelWidth : 0}px; {rightAccent}"
       data-unfocused={panes.focused === "right" ? undefined : true}
       onpointerdowncapture={(event) => focusFrom(event, "right")}
     >
@@ -399,25 +415,21 @@
 </div>
 
 {#snippet compatNotices()}
-  {#if notices.length}
-    <div class="absolute right-0 bottom-0 left-0 z-20 flex flex-col gap-1.5 px-3 pb-3">
-      {#each notices as notice (notice)}
-        <NoticeCard
-          text={t(NOTICE_KEYS[notice])}
-          actionLabel={t("SETTINGS")}
-          onAction={() => {
-            dismissed = [...dismissed, notice];
-            if (notice === "unauthorized") navigation.openSettings("environments");
-            else if (notice === "server_outdated") navigation.openSettings("server");
-            else if (notice !== "cli_outdated") navigation.openSettings("about");
-            else if (layout.mobile) navigation.openClaude("cli");
-            else navigation.openSettings("cli");
-          }}
-          onDismiss={() => (dismissed = [...dismissed, notice])}
-        />
-      {/each}
-    </div>
-  {/if}
+  {#each notices as notice (notice)}
+    <NoticeCard
+      text={t(NOTICE_KEYS[notice])}
+      actionLabel={t("SETTINGS")}
+      onAction={() => {
+        dismissed = [...dismissed, notice];
+        if (notice === "unauthorized") navigation.openSettings("environments");
+        else if (notice === "server_outdated") navigation.openSettings("server");
+        else if (notice !== "cli_outdated") navigation.openSettings("about");
+        else if (layout.mobile) navigation.openClaude("cli");
+        else navigation.openSettings("cli");
+      }}
+      onDismiss={() => (dismissed = [...dismissed, notice])}
+    />
+  {/each}
 {/snippet}
 
 {#snippet dropHint()}
@@ -425,12 +437,12 @@
 {/snippet}
 
 {#snippet centerActions()}
-  <PaneActions role="center" />
+  <PaneActions />
 {/snippet}
 
 {#snippet menuButton()}
   <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => (drawer.open = true)}>
-    <Menu size={20} />
+    <Menu />
   </TooltipIconButton>
 {/snippet}
 
@@ -524,6 +536,7 @@
       target.title ?? target.preview ?? target.sessionId,
     )}
     confirmLabel={t(chat.trashEnabled ? "CONFIRM" : "DELETE")}
+    danger={!chat.trashEnabled}
     onConfirm={() => {
       void chat.remove(target);
       deleteTarget = null;

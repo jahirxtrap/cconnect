@@ -153,6 +153,7 @@ export class ChatState {
   compacting = $state(false);
   streamStatus = $state<string | null>(null);
   activity = $state<string | null>(null);
+  resident = $state(false);
   todos = $state<TodoItem[]>([]);
   contextTokens = $state<number | null>(null);
   compactWindow = $state<number | null>(null);
@@ -376,6 +377,7 @@ export class ChatState {
             title: null,
             color: context.color ?? null,
             activity: null,
+            resident: false,
           }
         : null;
     this.transcriptLoading = this.#initial !== null;
@@ -700,6 +702,7 @@ export class ChatState {
           title: null,
           color: this.sessionColor,
           activity: null,
+          resident: false,
         },
         true,
       );
@@ -865,6 +868,7 @@ export class ChatState {
     this.streaming = false;
     this.compacting = false;
     this.activity = null;
+    this.resident = false;
     this.streamStatus = null;
     this.#socket.resetResume();
     this.#startSession(null);
@@ -902,6 +906,7 @@ export class ChatState {
       this.queue = [];
       this.compacting = false;
       this.activity = null;
+      this.resident = false;
       this.streamStatus = null;
       this.transcriptLoading = this.messages.length === 0;
       this.transcriptPaging = false;
@@ -929,6 +934,7 @@ export class ChatState {
         title: null,
         color: null,
         activity: null,
+        resident: false,
       },
     );
   }
@@ -1383,6 +1389,7 @@ export class ChatState {
       title: item.title,
       color: null,
       activity: null,
+      resident: false,
     });
   }
 
@@ -1978,6 +1985,7 @@ export class ChatState {
         }
         this.streaming = event.running;
         this.activity = event.activity;
+        this.resident = event.resident;
         const committed = event.committedCount;
         if (!event.resumed || !event.running) {
           this.messages = this.messages.filter((item) => !item.ephemeral);
@@ -2223,6 +2231,7 @@ export class ChatState {
         break;
       case "activity":
         this.activity = event.state;
+        this.resident = event.resident;
         break;
       case "terminal_opened":
         void listTerminals().then((listed) => {

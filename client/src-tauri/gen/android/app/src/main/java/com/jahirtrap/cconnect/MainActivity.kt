@@ -280,6 +280,12 @@ class MainActivity : TauriActivity() {
 
   inner class SystemBars {
     @JavascriptInterface
+    fun accent(): String {
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return ""
+      return String.format("#%06X", 0xFFFFFF and getColor(android.R.color.system_accent1_500))
+    }
+
+    @JavascriptInterface
     fun setAppearance(dark: Boolean) {
       runOnUiThread {
         WindowCompat.getInsetsController(window, window.decorView).apply {

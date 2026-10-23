@@ -10,7 +10,7 @@
   import ChatScroller from "./ChatScroller.svelte";
   import Collapsible from "./blocks/Collapsible.svelte";
   import DateSeparator from "./blocks/DateSeparator.svelte";
-  import { cardGap, gapAbove, gapBelow, NO_GAP } from "./blocks/gaps";
+  import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./blocks/gaps";
   import MessageItem from "./blocks/MessageItem.svelte";
   import { rowSite } from "./blocks/rowSite";
   import StatusProgress from "./blocks/StatusProgress.svelte";
@@ -80,6 +80,12 @@
 
   const visible = $derived(messages.filter((item) => modeFor(item.role) !== "off"));
 
+  const status = $derived(
+    compacting ? "compacting" : streamStatus === "slow" || streamStatus === "failed" ? streamStatus : null,
+  );
+
+  const roleAfter = (index: number): GapRole | null => visible[index + 1]?.role ?? (status ? "status" : null);
+
   const lastUserAt = $derived(
     visible.reduce((last, item, index) => (item.role === "user" ? index : last), -1),
   );
@@ -142,8 +148,8 @@
     if (!mods?.tree("ToolGroup", run.id) && !groupFolded(run)) return undefined;
     const last = visible.findIndex((item) => item.id === run.members.at(-1));
     const gap = gapAbove(visible[index - 1]?.role ?? null, visible[index].role);
-    const top = glued ? NO_GAP : spacedAt(index) ? cardGap(gap) : gap;
-    const bottom = gapBelow(visible[last].role, visible[last + 1]?.role ?? null);
+    const top = glued ? NO_GAP : rowGap(visible[index - 1]?.role ?? null, visible[index].role, gap, spacedAt(index));
+    const bottom = gapBelow(visible[last].role, roleAfter(last));
     return `padding-top: ${top}; padding-bottom: ${bottom}`;
   };
 
@@ -240,7 +246,7 @@
   <MessageItem
     message={item}
     prevRole={visible[index - 1]?.role ?? null}
-    nextRole={visible[index + 1]?.role ?? null}
+    nextRole={roleAfter(index)}
     running={runningAt(item, index)}
     gluedTop={separated}
     spaced={spacedAt(index)}
@@ -306,9 +312,12 @@
         </div>
       {/if}
     {/each}
-    {#if compacting}
-      <StatusProgress kind="compacting" />
-    {:else if streamStatus === "slow" || streamStatus === "failed"}
-      <StatusProgress kind={streamStatus === "failed" ? "failed" : "slow"} />
+    {#if status}
+      {@const before = visible.at(-1)?.role ?? null}
+      <div
+        style="padding-top: {rowGap(before, 'status', gapAbove(before, 'status'), carded(visible.at(-1)))}; padding-bottom: {gapBelow('status', null)}"
+      >
+        <StatusProgress kind={status} />
+      </div>
     {/if}
 </ChatScroller>

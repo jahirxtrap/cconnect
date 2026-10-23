@@ -6,6 +6,7 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import type { TrashedSession } from "$lib/services/sessionsApi";
   import type { ChatState } from "./state.svelte";
@@ -39,7 +40,6 @@
     <TooltipIconButton
       label={t("EMPTY_TRASH")}
       enabled={items.length > 0}
-      class="size-8 [&_svg]:size-[18px]"
       onclick={() => (emptying = true)}
     >
       <Trash />
@@ -48,29 +48,25 @@
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
-  <div class="scrollbar-thin flex max-h-[420px] flex-col gap-1 overflow-y-auto">
+  <div class="scrollbar-thin flex max-h-[420px] flex-col gap-0.5 overflow-y-auto">
     {#if loading}
       <CenteredProgress class="h-[72px]" />
     {:else if items.length === 0}
-      <p class="px-3 py-2.5 text-body-md text-on-surface-variant">{t("TRASH_EMPTY")}</p>
+      <EmptyState text={t("TRASH_EMPTY")} class="py-6" />
     {/if}
     {#each items as item (item.sessionId)}
-      <div data-press class="flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8">
+      <div data-press class="flex min-h-10 items-center rounded-md pr-1 transition-colors hover:bg-hover">
         <button
           type="button"
-          class="min-w-0 flex-1 cursor-pointer truncate px-3 py-2.5 text-left text-body-md"
+          class="min-w-0 flex-1 cursor-pointer truncate px-3 py-2 text-left text-body-md"
           onclick={() => onView(item)}
         >
           {labelOf(item)}
         </button>
-        <TooltipIconButton
-          label={t("RESTORE")}
-          class="size-8 [&_svg]:size-4"
-          onclick={() => void chat.restoreTrashed(item.sessionId).then(load)}
-        >
+        <TooltipIconButton label={t("RESTORE")} onclick={() => void chat.restoreTrashed(item.sessionId).then(load)}>
           <RotateCcw />
         </TooltipIconButton>
-        <TooltipIconButton label={t("DELETE")} class="size-8 [&_svg]:size-4" onclick={() => (purging = item)}>
+        <TooltipIconButton label={t("DELETE")} onclick={() => (purging = item)}>
           <Trash />
         </TooltipIconButton>
       </div>
@@ -84,6 +80,7 @@
     title={t("DELETE")}
     text={t("DELETE_CONVERSATION_CONFIRM", labelOf(target))}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       void chat.purgeTrashed(target.sessionId).then(load);
       purging = null;
@@ -97,6 +94,7 @@
     title={t("EMPTY_TRASH")}
     text={t("EMPTY_TRASH_CONFIRM")}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       void chat.emptyTrash().then(load);
       emptying = false;

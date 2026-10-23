@@ -34,6 +34,7 @@
     {:else}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button
+        variant="destructive"
         enabled={!!draft.trim()}
         onclick={() => {
           if (onImport?.(draft.trim())) onDismiss();

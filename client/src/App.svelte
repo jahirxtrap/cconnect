@@ -2,7 +2,9 @@
   import { dismissOpen } from "$lib/app/dismissStack";
   import { activeScope } from "$lib/app/activeScope.svelte";
   import CommandPalette from "$lib/app/CommandPalette.svelte";
+  import { commandPalette } from "$lib/app/paletteState.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
+  import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { serverDefaults } from "$lib/data/serverDefaults.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -17,20 +19,11 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { notifier } from "$lib/services/notifier.svelte";
   import { updater } from "$lib/services/updater.svelte";
-  import BrowserScreen from "$lib/screens/browser/BrowserScreen.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
-  import ClaudeScreen from "$lib/screens/claude/ClaudeScreen.svelte";
-  import ProjectFilesScreen from "$lib/screens/project/ProjectFilesScreen.svelte";
-  import NotesScreen from "$lib/screens/notes/NotesScreen.svelte";
-  import MonitorScreen from "$lib/screens/monitor/MonitorScreen.svelte";
   import { monitor } from "$lib/screens/monitor/monitor.svelte";
-  import SettingsDialog from "$lib/screens/settings/SettingsDialog.svelte";
-  import SettingsScreen from "$lib/screens/settings/SettingsScreen.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
-  import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
-  import TerminalScreen from "$lib/screens/terminal/TerminalScreen.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
   import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
@@ -59,16 +52,10 @@
   });
   useShortcut("window.commands", () => {
     if (layout.mobile) return false;
-    commandsOpen = !commandsOpen;
+    commandPalette.open = !commandPalette.open;
   });
 
-  const settingsAsDialog = $derived(!layout.mobile);
-
-  const screenCovers = $derived(
-    navigation.route !== "/" && !(navigation.route === "/settings" && settingsAsDialog),
-  );
-
-  let commandsOpen = $state(false);
+  const screenCovers = $derived(!navigation.chatActive && !navigation.centered);
 
   const scopeChain = (): ShortcutScope[] => {
     if (dismissOpen()) return ["global"];
@@ -138,31 +125,13 @@
   <div class="h-full {screenCovers ? "hidden" : ""}" inert={screenCovers}>
     <ChatScreen />
   </div>
-  {#if navigation.route === "/settings" && !settingsAsDialog}
-    <SettingsScreen />
-  {:else if navigation.route === "/monitor"}
-    <MonitorScreen />
-  {:else if navigation.route === "/notes"}
-    <NotesScreen />
-  {:else if navigation.route === "/claude"}
-    <ClaudeScreen />
-  {:else if navigation.route === "/shared"}
-    <SharedScreen />
-  {:else if navigation.route === "/project"}
-    <ProjectFilesScreen />
-  {:else if navigation.route === "/terminal"}
-    <TerminalScreen />
-  {:else if navigation.route === "/browser"}
-    <BrowserScreen />
+  {#if screenCovers}
+    <RouteScreen />
   {/if}
 </div>
 
-{#if commandsOpen && !layout.mobile}
-  <CommandPalette onDismiss={() => (commandsOpen = false)} />
-{/if}
-
-{#if navigation.route === "/settings" && settingsAsDialog}
-  <SettingsDialog onDismiss={() => navigation.closeSettings()} />
+{#if commandPalette.open}
+  <CommandPalette onDismiss={() => (commandPalette.open = false)} />
 {/if}
 
 <TransfersPanel />

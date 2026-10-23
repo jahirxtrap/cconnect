@@ -1,8 +1,8 @@
 <script lang="ts">
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
-  import Flame from "@lucide/svelte/icons/flame";
   import History from "@lucide/svelte/icons/history";
+  import Power from "@lucide/svelte/icons/power";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import SquarePen from "@lucide/svelte/icons/square-pen";
@@ -33,9 +33,9 @@
   import { dropZone } from "$lib/app/dragPayload.svelte";
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import { fileDrop } from "$lib/ui/fileDrop";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import FloatDock from "$lib/ui/FloatDock.svelte";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -47,6 +47,7 @@
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
   import ChatToolbar from "./ChatToolbar.svelte";
+  import ChatWelcome from "./ChatWelcome.svelte";
   import Composer from "./Composer.svelte";
   import MessageList from "./MessageList.svelte";
   import RewindDialog from "./RewindDialog.svelte";
@@ -64,7 +65,7 @@
     tab: Tab;
     primary?: boolean;
     focused?: boolean;
-    transfersLift?: number;
+    dockLift?: number;
     instant?: boolean;
     navigationIcon?: Snippet;
     notices?: Snippet;
@@ -75,7 +76,7 @@
     tab,
     primary = false,
     focused = true,
-    transfersLift = 0,
+    dockLift = 0,
     instant = false,
     navigationIcon,
     notices,
@@ -215,7 +216,7 @@
         spinner: false,
         text: chat.sessionId ? sessionIdPreview(chat.sessionId) : t("NEW_CHAT"),
       };
-    if (activity === "persistent") return { dot: "bg-accent", spinner: false, text: t("PERSISTENT_ALIVE") };
+    if (activity === "persistent") return { dot: "bg-green", spinner: false, ring: true, text: t("PERSISTENT_ALIVE") };
     return {
       dot: "bg-green",
       spinner: false,
@@ -352,19 +353,20 @@
 
 <AppTopBar title={t("APP_NAME")} subtitle={status.text} {navigationIcon}>
   {#snippet subtitleLeading()}
-    {#if status.spinner}
-      <LoadingIndicator size={8} fill class={"tone" in status ? status.tone : undefined} />
-    {:else}
-      <StatusDot class={status.dot} box={8} />
-    {/if}
+    <StatusDot
+      class={status.dot}
+      loading={status.spinner}
+      spinnerClass={"tone" in status ? status.tone : undefined}
+      ring={chat.resident || "ring" in status}
+    />
   {/snippet}
   {#snippet actions()}
     {#if chat.viewOnly}
       <TooltipIconButton label={t("RESTORE")} onclick={() => void chat.restoreViewOnly()}>
-        <RotateCcw size={20} />
+        <RotateCcw />
       </TooltipIconButton>
       <TooltipIconButton label={t("DELETE")} onclick={() => (purgeViewOpen = true)}>
-        <Trash size={20} />
+        <Trash />
       </TooltipIconButton>
     {:else}
       {#if chat.sessionId !== null && idle}
@@ -375,25 +377,25 @@
             void chat.loadRewindPoints();
           }}
         >
-          <History size={20} />
+          <History />
         </TooltipIconButton>
       {/if}
       {#if activity === "persistent"}
         <TooltipIconButton label={t("PERSISTENT_CLOSE")} onclick={() => chat.closeResident()}>
-          <Flame size={20} class="text-accent" />
+          <Power />
         </TooltipIconButton>
       {/if}
       <TaskIndicator todos={chat.todos} />
     {/if}
     {#if layout.mobile && primary}
       <TabSwitcher />
-      <PaneActions role="center" />
+      <PaneActions />
     {/if}
     <TooltipIconButton
       label={t("NEW_SESSION")}
       onclick={() => (chat.viewOnly ? chat.closeViewOnly() : chat.newSession())}
     >
-      <SquarePen size={20} />
+      <SquarePen />
     </TooltipIconButton>
   {/snippet}
 </AppTopBar>
@@ -414,6 +416,8 @@
   <div class="relative min-h-0 flex-1 overflow-hidden">
     {#if opening}
       <CenteredProgress class="absolute inset-0 z-10" />
+    {:else if !chat.view.length && !chat.sessionId && !chat.streaming}
+      <ChatWelcome path={chat.cwd} />
     {/if}
     <div
       class="overflow-hidden {opening ? 'opacity-0' : ''} {sideDragging || instant
@@ -446,16 +450,17 @@
           savedTop={chat.scrollTop}
           onScrollTop={(top) => (chat.scrollTop = top)}
           {component}
-          bottomInset={transfersLift}
+          bottomInset={dockLift}
         />
       {/key}
     </div>
-    {#if chat.mods.toasts.length}
-      <div class="absolute right-0 bottom-0 left-0 z-20 flex flex-col gap-1.5 px-3 pb-3">
+    {#if notices || chat.mods.toasts.length}
+      <FloatDock stacked>
+        {@render notices?.()}
         {#each chat.mods.toasts as toast (toast.id)}
           <NoticeCard text={toast.text} onDismiss={() => chat.mods.dismissToast(toast.id)} />
         {/each}
-      </div>
+      </FloatDock>
     {/if}
     {#if chat.sideOpen}
       <SidePanel
@@ -469,24 +474,25 @@
         onClose={closeSide}
         onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
         {component}
-        bottomInset={transfersLift}
+        bottomInset={dockLift}
       />
     {/if}
   </div>
 
-  {@render notices?.()}
-
   {#if !chat.viewOnly}
     <div class="shrink-0" bind:clientHeight={composerHeight}>
-      <ModBand
-        mods={chat.mods}
-        draft={!!chat.draft}
-        working={busy}
-        hidden={chat.sideOpen}
-        {instant}
-        active={focused}
-      />
+      {#snippet band()}
+        <ModBand
+          mods={chat.mods}
+          draft={!!chat.draft}
+          working={busy}
+          hidden={chat.sideOpen}
+          {instant}
+          active={focused}
+        />
+      {/snippet}
       <Composer
+        {band}
         bind:this={composer}
         ghost={chat.sideOpen ? null : chat.mods.suggestion}
         onKey={chat.sideOpen ? undefined : bandKey}
@@ -655,6 +661,7 @@
       {#snippet buttons()}
         <Button onclick={() => (queuedId = null)} variant="outlined">{t("CANCEL")}</Button>
         <Button
+          variant="destructive"
           onclick={() => {
             chat.removeQueued(item.id);
             queuedId = null;
@@ -665,9 +672,9 @@
       {/snippet}
       {@const queued = splitElements(item.text)}
       {#if queued.text.trim()}
-        <OutlinedPanel>
+        <CardPanel>
           <p class="selectable text-body-md wrap-anywhere whitespace-pre-wrap">{queued.text}</p>
-        </OutlinedPanel>
+        </CardPanel>
       {/if}
       {#if queued.elements.length}
         <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto">
@@ -719,6 +726,7 @@
     title={t("DELETE")}
     text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? sessionIdPreview(target.sessionId))}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       void chat.purgeViewOnly();
       purgeViewOpen = false;

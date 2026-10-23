@@ -19,7 +19,7 @@
   <button
     type="button"
     onclick={(event) => onToggle(event.currentTarget)}
-    class="flex w-full cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left transition-colors select-none hover:bg-on-surface/8"
+    class="flex w-full cursor-pointer items-center gap-1.5 rounded-md py-1 text-left transition-colors select-none hover:bg-hover"
   >
     {#if open}
       <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />

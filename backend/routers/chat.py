@@ -407,6 +407,7 @@ async def chat_ws(ws: WebSocket):
                     "channel": session.channel,
                     "running": session.running,
                     "activity": session.activity,
+                    "resident": session.resident_alive,
                     "resumed": bool(by_session),
                     "committed_count": session.turn_start_index,
                     "queued": session.queued_items(),

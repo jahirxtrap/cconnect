@@ -1,3 +1,4 @@
+import { layout } from "$lib/platform/layout.svelte";
 import { store } from "$lib/platform/storage";
 
 export type NotesView = "cards" | "list";
@@ -53,6 +54,7 @@ const restored = (): Note[] => {
 class Notes {
   items = $state<Note[]>(restored());
   view = $state<NotesView>(store.get<NotesView>(VIEW_KEY, "cards"));
+  readonly cards = $derived(layout.mobile && this.view === "cards");
   formatted = $state(false);
   searching = $state(false);
   query = $state("");

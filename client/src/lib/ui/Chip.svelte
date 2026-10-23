@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { OUTLINE_CLASS } from "./Button.svelte";
   import type { IconSource } from "./icons";
 
   interface Props {
@@ -18,8 +19,7 @@
     onmenu();
   };
 
-  const BASE_CLASS =
-    "flex max-w-60 shrink-0 items-center gap-1.5 rounded-panel border-2 border-outline-variant px-2 py-1 select-none";
+  const BASE_CLASS = `flex max-w-60 shrink-0 items-center gap-1.5 rounded-full ${OUTLINE_CLASS} px-2.5 py-1 select-none`;
 </script>
 
 {#snippet body()}
@@ -35,7 +35,7 @@
     type="button"
     onclick={() => onclick?.()}
     oncontextmenu={contextMenu}
-    class="{BASE_CLASS} {onclick ? 'cursor-pointer transition-colors hover:bg-on-surface/8' : 'cursor-default'}"
+    class="{BASE_CLASS} {onclick ? 'cursor-pointer transition-colors hover:bg-hover' : 'cursor-default'}"
   >
     {@render body()}
   </button>

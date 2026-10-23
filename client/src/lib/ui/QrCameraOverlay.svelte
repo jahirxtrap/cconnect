@@ -53,7 +53,7 @@
       <AppTopBar title={t("SCAN_QR")}>
         {#snippet navigationIcon()}
           <TooltipIconButton label={t("BACK")} onclick={() => void cancelCameraScan()}>
-            <ArrowLeft size={20} />
+            <ArrowLeft />
           </TooltipIconButton>
         {/snippet}
       </AppTopBar>

@@ -31,13 +31,13 @@
   );
 </script>
 
-{#each grouped as block, index (block.section)}
-  <SectionHeader label={t(sectionLabel(block.section))} divider={index > 0} />
+{#each grouped as block (block.section)}
+  <SectionHeader label={t(sectionLabel(block.section))} />
   {#each block.entries as entry (entry.id)}
     {@const hint = entryHint(entry)}
     <Pressable
       onclick={() => onSelect(entry)}
-      class="flex w-full flex-col items-start rounded-sm px-2 py-1.5"
+      class="flex w-full flex-col items-start rounded-md px-2.5 py-1.5"
     >
       <span class="w-full truncate text-left text-body-md">{t(entry.label)}</span>
       {#if hint}

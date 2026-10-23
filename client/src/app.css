@@ -86,7 +86,7 @@ html[data-theme="dark"] {
 
 @media (hover: hover) {
   .menu-surface [data-highlighted] {
-    @apply bg-on-surface/10;
+    @apply bg-hover;
   }
 }
 
@@ -113,7 +113,7 @@ html[data-theme="dark"] {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--c-on-surface);
+  background: var(--c-on-background);
   pointer-events: none;
   animation: flash-highlight 880ms ease-in-out forwards;
 }
@@ -272,6 +272,54 @@ html.scanning .qr-overlay {
   }
 }
 
+.rounded-viewport {
+  --viewport-left: var(--page-inset);
+  --viewport-right: calc(var(--page-inset) + var(--scrollbar-width, 0px));
+  --viewport-round: var(--radius-panel);
+  --viewport-overlap: 1px;
+  --viewport-center: calc(var(--viewport-round) + var(--viewport-overlap));
+  --viewport-square: calc(var(--viewport-round) + 2 * var(--viewport-overlap));
+  --viewport-corner: #000 calc(var(--viewport-round) - 0.5px), transparent var(--viewport-round);
+  mask-image:
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0),
+    radial-gradient(circle at var(--viewport-center) var(--viewport-center), var(--viewport-corner)),
+    radial-gradient(circle at var(--viewport-overlap) var(--viewport-center), var(--viewport-corner)),
+    radial-gradient(circle at var(--viewport-center) var(--viewport-overlap), var(--viewport-corner)),
+    radial-gradient(circle at var(--viewport-overlap) var(--viewport-overlap), var(--viewport-corner));
+  mask-size:
+    100% calc(100% - 2 * var(--viewport-round)),
+    var(--viewport-left) 100%,
+    var(--viewport-right) 100%,
+    calc(100% - var(--viewport-left) - var(--viewport-right) - 2 * var(--viewport-round)) 100%,
+    var(--viewport-square) var(--viewport-square),
+    var(--viewport-square) var(--viewport-square),
+    var(--viewport-square) var(--viewport-square),
+    var(--viewport-square) var(--viewport-square);
+  mask-position:
+    left 0 top var(--viewport-round),
+    left top,
+    right top,
+    left calc(var(--viewport-left) + var(--viewport-round)) top 0,
+    left calc(var(--viewport-left) - var(--viewport-overlap)) top calc(-1 * var(--viewport-overlap)),
+    right calc(var(--viewport-right) - var(--viewport-overlap)) top calc(-1 * var(--viewport-overlap)),
+    left calc(var(--viewport-left) - var(--viewport-overlap)) bottom calc(-1 * var(--viewport-overlap)),
+    right calc(var(--viewport-right) - var(--viewport-overlap)) bottom calc(-1 * var(--viewport-overlap));
+  mask-repeat: no-repeat;
+}
+
+.dot-ring {
+  mask-image: radial-gradient(
+    closest-side,
+    #000 calc(50% - 0.5px),
+    transparent 50%,
+    transparent calc(75% - 0.5px),
+    #000 75%
+  );
+}
+
 @property --press-alpha {
   syntax: "<number>";
   inherits: false;
@@ -376,6 +424,12 @@ body {
   cursor: default;
 }
 
+@layer base {
+  .lucide-icon {
+    stroke-width: 1.75;
+  }
+}
+
 input,
 textarea,
 .selectable {
@@ -425,6 +479,10 @@ textarea::selection {
 .markdown-dense {
   --md-scale: calc(13 / 14);
   line-height: var(--chat-line-dense);
+}
+
+.markdown-chat {
+  line-height: var(--chat-line-body);
 }
 
 .chat-gap {

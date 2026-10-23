@@ -2,27 +2,36 @@
   import Bold from "@lucide/svelte/icons/bold";
   import Code from "@lucide/svelte/icons/code";
   import Heading from "@lucide/svelte/icons/heading";
+  import Link from "@lucide/svelte/icons/link";
   import List from "@lucide/svelte/icons/list";
+  import ListChecks from "@lucide/svelte/icons/list-checks";
   import Redo2 from "@lucide/svelte/icons/redo-2";
-  import SquareCheck from "@lucide/svelte/icons/square-check";
   import Undo2 from "@lucide/svelte/icons/undo-2";
+  import type { Snippet } from "svelte";
+  import { formatRecent } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { notes, type Note } from "./notes.svelte";
 
   interface Props {
     note: Note;
+    inset?: boolean;
+    actions?: Snippet;
   }
 
-  const { note }: Props = $props();
+  const { note, inset = true, actions }: Props = $props();
 
   const ITEM_RE = /^(\s*)((?:[-*+]\s+\[[ xX]\]\s+)|(?:[-*+]\s+)|(?:\d+[.)]\s+))/;
   const TASK_RE = /^(\s*(?:[-*+]\s+|\d+[.)]\s+)\[)([ xX])(\])/;
+  const TOOL_CLASS = "size-7";
+  const BODY_CLASS = "min-h-0 flex-1 px-3.5 pt-2 pb-3.5";
 
   let field = $state<HTMLTextAreaElement | null>(null);
 
   const entry = $derived(notes.history[note.id]);
+  const editing = $derived(!notes.formatted);
 
   const apply = (value: string, caret: number) => {
     notes.apply(note.id, value);
@@ -49,6 +58,23 @@
     const next = `${value.slice(0, start)}${mark}${value.slice(start)}`;
     apply(next, from + mark.length);
   };
+
+  const link = () => {
+    if (!field) return;
+    const { selectionStart: from, selectionEnd: to, value } = field;
+    const label = value.slice(from, to);
+    const next = `${value.slice(0, from)}[${label}]()${value.slice(to)}`;
+    apply(next, label ? from + label.length + 3 : from + 1);
+  };
+
+  const tools = [
+    { label: "NOTE_HEADING", icon: Heading, run: () => prefix("## ") },
+    { label: "NOTE_BOLD", icon: Bold, run: () => wrap("**") },
+    { label: "NOTE_BULLET", icon: List, run: () => prefix("- ") },
+    { label: "NOTE_TASK", icon: ListChecks, run: () => prefix("- [ ] ") },
+    { label: "NOTE_CODE", icon: Code, run: () => wrap("`") },
+    { label: "NOTE_LINK", icon: Link, run: link },
+  ];
 
   const continued = (marker: string) => {
     const ordered = marker.match(/^(\d+)([.)]\s+)$/);
@@ -112,53 +138,97 @@
   };
 </script>
 
-{#if notes.formatted}
-  <div use:tasks class="tasks-live selectable min-h-0 flex-1 overflow-y-auto p-4">
-    <MarkdownText text={note.body} />
+<div class="flex min-h-0 flex-1 flex-col {inset ? 'px-(--page-inset) pb-(--page-inset)' : ''}">
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card">
+    <div class="no-scrollbar flex shrink-0 items-center overflow-x-auto px-2 pt-2">
+      {#each tools as tool (tool.label)}
+        <TooltipIconButton
+          label={t(tool.label)}
+          tooltip={false}
+          enabled={editing}
+          class={TOOL_CLASS}
+          onclick={tool.run}
+        >
+          <tool.icon />
+        </TooltipIconButton>
+      {/each}
+      <TooltipIconButton
+        label={t("UNDO")}
+        tooltip={false}
+        enabled={!!entry?.past.length}
+        class="ml-2 {TOOL_CLASS}"
+        onclick={undo}
+      >
+        <Undo2 />
+      </TooltipIconButton>
+      <TooltipIconButton
+        label={t("REDO")}
+        tooltip={false}
+        enabled={!!entry?.future.length}
+        class={TOOL_CLASS}
+        onclick={redo}
+      >
+        <Redo2 />
+      </TooltipIconButton>
+      <span class="min-w-0 flex-1"></span>
+      {#if !layout.mobile}
+        <span class="min-w-0 truncate px-2 text-body-sm text-faint">{formatRecent(note.updatedAt)}</span>
+      {/if}
+      {@render actions?.()}
+    </div>
+    {#if notes.formatted}
+      <div use:tasks class="tasks-live selectable overflow-y-auto {BODY_CLASS}">
+        <MarkdownText text={note.body} class="markdown-chat" />
+      </div>
+    {:else}
+      <textarea
+        bind:this={field}
+        value={note.body}
+        oninput={(event) => notes.write(note.id, event.currentTarget.value)}
+        onkeydown={onKeydown}
+        spellcheck="false"
+        class="resize-none bg-transparent text-body-md leading-(--chat-line-body) caret-accent outline-none {BODY_CLASS}"
+      ></textarea>
+    {/if}
   </div>
-{:else}
-  <textarea
-    bind:this={field}
-    value={note.body}
-    oninput={(event) => notes.write(note.id, event.currentTarget.value)}
-    onkeydown={onKeydown}
-    spellcheck="false"
-    class="min-h-0 flex-1 resize-none bg-transparent p-4 font-mono text-body-sm leading-[18px] caret-accent outline-none"
-  ></textarea>
-  <div class="flex shrink-0 items-center gap-1 border-t border-outline-variant bg-surface px-3 py-2">
-    <TooltipIconButton
-      label={t("UNDO")}
-      tooltip={false}
-      class="size-8 [&_svg]:size-5"
-      enabled={!!entry?.past.length}
-      onclick={undo}
-    >
-      <Undo2 />
-    </TooltipIconButton>
-    <TooltipIconButton
-      label={t("REDO")}
-      tooltip={false}
-      class="size-8 [&_svg]:size-5"
-      enabled={!!entry?.future.length}
-      onclick={redo}
-    >
-      <Redo2 />
-    </TooltipIconButton>
-    <div class="mx-1 h-5 w-px shrink-0 bg-outline-variant"></div>
-    <TooltipIconButton label={t("NOTE_TASK")} tooltip={false} class="size-8 [&_svg]:size-5" onclick={() => prefix("- [ ] ")}>
-      <SquareCheck />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("NOTE_BULLET")} tooltip={false} class="size-8 [&_svg]:size-5" onclick={() => prefix("- ")}>
-      <List />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("NOTE_HEADING")} tooltip={false} class="size-8 [&_svg]:size-5" onclick={() => prefix("## ")}>
-      <Heading />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("NOTE_BOLD")} tooltip={false} class="size-8 [&_svg]:size-5" onclick={() => wrap("**")}>
-      <Bold />
-    </TooltipIconButton>
-    <TooltipIconButton label={t("NOTE_CODE")} tooltip={false} class="size-8 [&_svg]:size-5" onclick={() => wrap("`")}>
-      <Code />
-    </TooltipIconButton>
-  </div>
-{/if}
+</div>
+
+<style>
+  .tasks-live :global(.markdown h1),
+  .tasks-live :global(.markdown h2) {
+    font-size: var(--text-headline);
+    line-height: var(--text-headline--line-height);
+  }
+
+  .tasks-live :global(.markdown li.task) {
+    margin-inline-start: var(--spacing);
+  }
+
+  .tasks-live :global(.markdown li.task + li.task) {
+    margin-top: calc(var(--spacing) * 2);
+  }
+
+  .tasks-live :global(.markdown li.task > .li-marker) {
+    width: calc(var(--spacing) * 4);
+    min-width: calc(var(--spacing) * 4);
+    height: calc(var(--spacing) * 4);
+    margin-inline: calc(var(--spacing) * -6) calc(var(--spacing) * 2);
+    overflow: hidden;
+    vertical-align: middle;
+    border-radius: var(--radius-xs);
+    color: transparent;
+  }
+
+  .tasks-live :global(.markdown li.task:not(.task-done) > .li-marker) {
+    box-shadow: inset 0 0 0 1.5px var(--color-outline);
+  }
+
+  .tasks-live :global(.markdown li.task-done) {
+    color: var(--color-faint);
+    text-decoration: line-through;
+  }
+
+  .tasks-live :global(.markdown li.task-done > .li-marker) {
+    background: var(--color-accent);
+  }
+</style>

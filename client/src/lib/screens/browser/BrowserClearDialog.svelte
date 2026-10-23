@@ -23,6 +23,7 @@
   title={t(site ? "BROWSER_SITE_CLEAR" : "BROWSER_DATA_CLEAR_ALL")}
   text={site ? t("BROWSER_SITE_CLEAR_CONFIRM", site) : t("BROWSER_DATA_CLEAR_CONFIRM")}
   confirmLabel={t("BROWSER_DATA_CLEAR")}
+  danger
   onConfirm={() => void clear()}
   {onDismiss}
 />

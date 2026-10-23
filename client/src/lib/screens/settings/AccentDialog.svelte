@@ -8,6 +8,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
+  import { SWATCH_CLASS, SWATCH_GRID_CLASS, swatchBorder } from "$lib/ui/swatch";
 
   interface Props {
     onDismiss: () => void;
@@ -28,8 +29,6 @@
   }: Props = $props();
 
   const DEFAULT_INDEX = 4;
-  const SWATCH_CLASS =
-    "flex size-10 cursor-pointer items-center justify-center rounded-full transition-shadow hover:shadow-[inset_0_0_0_2px_white]";
 
   let picked = $state<number | null>(untrack(() => selected));
   let lastIndex = $state(untrack(() => (selected !== null && selected !== DYNAMIC_ACCENT ? selected : DEFAULT_INDEX)));
@@ -65,15 +64,13 @@
     {/snippet}
   </SwitchRow>
 
-  <div class="grid grid-cols-[repeat(5,2.5rem)] justify-between gap-y-3" class:opacity-40={dynamic}>
+  <div class={SWATCH_GRID_CLASS} class:opacity-40={dynamic}>
     {#if showNone}
       <button
         type="button"
         onclick={() => pick(null)}
         aria-label={t("COLOR_NONE")}
-        class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {picked === null
-          ? 'border-2 border-on-surface'
-          : 'border border-outline-variant'}"
+        class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {swatchBorder(picked === null)}"
       >
         {#if picked === null}
           <Check size={20} />
@@ -91,9 +88,7 @@
           lastIndex = index;
           pick(index);
         }}
-        class="{SWATCH_CLASS} text-white {!dynamic && picked === index
-          ? 'border-2 border-on-surface'
-          : 'border border-outline-variant'}"
+        class="{SWATCH_CLASS} text-white {swatchBorder(!dynamic && picked === index)}"
         style="background: {accent.value}"
       >
         {#if !dynamic && picked === index}

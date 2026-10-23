@@ -114,7 +114,7 @@
 {#snippet footerRow()}
   <div
     class="flex min-w-0 items-center gap-3 px-3.5 text-body-sm text-on-surface-variant {drawnBand && footer
-      ? 'pt-2'
+      ? 'pt-1.5'
       : ''} {footer ? '' : 'h-0 overflow-hidden'}"
   >
     <div class="min-w-0 flex-1">
@@ -127,7 +127,7 @@
         {#each status as entry (entry.plugin)}
           <span class="flex min-w-0 items-baseline gap-1.5">
             {#if entry.plugin}
-              <span class="shrink-0 text-label-sm opacity-70">{entry.plugin}</span>
+              <span class="shrink-0 font-mono text-caption text-accent">{entry.plugin}</span>
             {/if}
             <span class="truncate text-on-surface">{entry.text}</span>
           </span>
@@ -148,7 +148,7 @@
   </div>
 {/snippet}
 
-<div class="px-3 pt-3">
+<div>
   {#if present}
     {#if shown}
       <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
@@ -158,7 +158,7 @@
         onpointerdown={keepTyping}
         transition:slide={{ duration }}
         class={drawn
-          ? `relative -mb-[var(--radius-lg)] rounded-t-lg border-2 border-b-0 border-outline-variant bg-surface pb-[calc(var(--radius-lg)+0.625rem)] ${settings.modBandHandle ? "" : "pt-3.5"}`
+          ? `relative -mb-4 rounded-t-2xl bg-surface-variant pb-6 ${settings.modBandHandle ? "" : "pt-2"}`
           : "h-0 overflow-hidden"}
       >
         {#if settings.modBandHandle}

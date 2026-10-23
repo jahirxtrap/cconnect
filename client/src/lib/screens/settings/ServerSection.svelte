@@ -6,13 +6,12 @@
   interface Props {
     tick: number;
     flash?: boolean;
-    onLoadingChange?: (loading: boolean) => void;
   }
 
-  const { tick, flash = false, onLoadingChange }: Props = $props();
+  const { tick, flash = false }: Props = $props();
 </script>
 
-<ServerGroup {tick} {flash} onLoadingChange={(value) => onLoadingChange?.(value)} />
+<ServerGroup {tick} {flash} />
 
 {#if isDesktop}
   <LocalServerGroup />

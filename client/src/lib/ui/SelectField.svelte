@@ -3,7 +3,9 @@
   import type { Snippet } from "svelte";
   import MenuItem from "./MenuItem.svelte";
   import PopupMenu from "./PopupMenu.svelte";
+  import { FIELD_ACTIONS_CLASS, FIELD_ACTIONS_GAP, FIELD_BOX_CLASS, FIELD_LABEL_CLASS } from "./field";
   import type { SelectOption } from "./SelectDialog.svelte";
+  import TrailingIcon from "./TrailingIcon.svelte";
 
   interface Props {
     label: string;
@@ -29,38 +31,33 @@
     trailing,
   }: Props = $props();
 
-  const ACTIONS_GAP = 8;
-
   let open = $state(false);
   let actionsWidth = $state(0);
 
   const display = $derived(shown ?? options.find((option) => option.value === selected)?.label ?? selected);
   const actionsReserve = $derived(
-    actionsWidth ? `margin-right: ${actionsWidth + ACTIONS_GAP}px` : "",
+    actionsWidth ? `margin-right: ${actionsWidth + FIELD_ACTIONS_GAP}px` : "",
   );
-
-  const FIELD_CLASS =
-    "relative flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors";
 </script>
 
 <div class="{enabled ? '' : 'opacity-40'} {className}">
-  <p class="mb-1.5 text-label-lg">{label}</p>
+  {#if label}
+    <p class={FIELD_LABEL_CLASS}>{label}</p>
+  {/if}
   {#snippet field()}
     <span
-      class="{FIELD_CLASS} {enabled
-        ? 'cursor-pointer'
-        : ''} border-outline-variant group-data-[state=open]:border-accent"
+      class="{FIELD_BOX_CLASS} {enabled ? 'cursor-pointer' : ''} ring-transparent group-data-[state=open]:ring-accent"
     >
       <span style={actionsReserve} class="min-w-0 flex-1 truncate text-left text-body-md">
         {display}
       </span>
       <span
         bind:clientWidth={actionsWidth}
-        class="absolute inset-y-0 right-3 flex items-center gap-2"
+        class={FIELD_ACTIONS_CLASS}
       >
         {@render trailing?.()}
         {#if enabled}
-          <ChevronDown size={24} class="shrink-0 text-on-surface-variant" />
+          <TrailingIcon icon={ChevronDown} />
         {/if}
       </span>
     </span>

@@ -12,6 +12,7 @@
   import { entryFor, entryHint } from "$lib/screens/settings/settingsIndex";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import TrailingIcon from "$lib/ui/TrailingIcon.svelte";
   import type { ClaudeKind } from "./ClaudeDetail.svelte";
 
   interface Props {
@@ -54,7 +55,7 @@
 {#snippet link(icon: typeof Blocks, title: string, summary: string, kind: ClaudeKind)}
   <PreferenceRow {icon} {title} {summary} {enabled} onclick={() => onOpen(kind)}>
     {#snippet trailing()}
-      <ChevronRight size={24} class="text-on-surface-variant" />
+      <TrailingIcon icon={ChevronRight} />
     {/snippet}
   </PreferenceRow>
 {/snippet}

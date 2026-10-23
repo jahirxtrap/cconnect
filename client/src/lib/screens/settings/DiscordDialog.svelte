@@ -4,7 +4,7 @@
   import { presenceLines } from "$lib/platform/discordPresence.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
 
   interface Props {
@@ -40,7 +40,7 @@
       onChange={(value) => settings.setDiscord("enabled", value)}
     />
     {#if prefs.enabled}
-      <OutlinedPanel class="mb-1 w-full gap-0.5">
+      <CardPanel class="mb-1 w-full gap-0.5">
         {#if preview}
           <p class="truncate text-body-md">{preview.details}</p>
           {#if preview.state}
@@ -49,7 +49,7 @@
         {:else}
           <p class="text-body-sm text-on-surface-variant">{t("DISCORD_PREVIEW_HIDDEN")}</p>
         {/if}
-      </OutlinedPanel>
+      </CardPanel>
       {#each FIELDS as item (item.field)}
         <SwitchRow
           title={t(item.label)}

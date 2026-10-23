@@ -95,11 +95,7 @@
   style="--gutter-raw: {gutter}"
   class="code-gutter overflow-y-auto font-mono text-body-sm leading-[18px] {className}"
 >
-  <div
-    class="relative min-h-full py-3 {numbers
-      ? 'after:absolute after:inset-y-0 after:left-[var(--gutter)] after:w-px after:bg-outline-variant'
-      : ''}"
-  >
+  <div class="relative min-h-full py-3">
     {#each lines as line, index (index)}
       {@const number = index + 1}
       {@const here = marking.has(number)}

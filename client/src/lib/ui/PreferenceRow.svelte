@@ -2,6 +2,7 @@
   import type { Snippet } from "svelte";
   import type { IconSource } from "./icons";
   import Pressable from "./Pressable.svelte";
+  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "./preferenceRow";
 
   interface Props {
     icon: IconSource;
@@ -29,13 +30,11 @@
 <Pressable
   {onclick}
   {enabled}
-  class="flex w-full items-center gap-3 px-4 py-3 {enabled ? '' : 'opacity-40'} {flash
-    ? 'flash-highlight'
-    : ''}"
+  class="{PREFERENCE_ROW_CLASS} {enabled ? '' : 'opacity-40'} {flash ? 'flash-highlight' : ''}"
 >
-  <IconComponent size={18} class="shrink-0 text-on-surface-variant" />
+  <IconComponent size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
   <div class="min-w-0 flex-1">
-    <p class="truncate text-body-md">{title}</p>
+    <p class="truncate text-body-md font-medium">{title}</p>
     {#if summary}
       <p class="truncate text-body-sm text-on-surface-variant">{summary}</p>
     {/if}

@@ -8,7 +8,7 @@
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
 
   interface Props {
     points: RewindPoint[];
@@ -40,12 +40,12 @@
   <CompactDialog title={t("REWIND")} onDismiss={() => !busy && onBack()}>
     {#snippet buttons()}
       <Button onclick={onBack} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
-      <Button onclick={() => onRewind(both ? "both" : "conversation")} enabled={!busy}>
+      <Button variant="destructive" onclick={() => onRewind(both ? "both" : "conversation")} enabled={!busy}>
         {t("ACCEPT")}
       </Button>
     {/snippet}
 
-    <OutlinedPanel>
+    <CardPanel>
       <p class="selectable line-clamp-3 text-body-md">{readableText(target.text) || target.id}</p>
       {#if both}
         <p class="mt-1 flex items-center gap-1 text-label-md text-on-surface-variant">
@@ -61,7 +61,7 @@
           {/if}
         </p>
       {/if}
-    </OutlinedPanel>
+    </CardPanel>
 
     <div class="h-2"></div>
     <DialogSelectItem
@@ -90,9 +90,9 @@
     {:else}
       <div class="flex flex-col gap-2 pb-2">
         {#each ordered as point (point.id)}
-          <OutlinedPanel onclick={() => onSelect(point)} class="w-full text-left">
+          <CardPanel onclick={() => onSelect(point)} class="w-full text-left">
             <p class="selectable line-clamp-2 text-body-md">{readableText(point.text) || point.id}</p>
-          </OutlinedPanel>
+          </CardPanel>
         {/each}
       </div>
     {/if}

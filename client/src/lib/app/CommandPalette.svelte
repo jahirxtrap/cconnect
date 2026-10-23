@@ -4,6 +4,7 @@
   import { pushDismiss } from "$lib/app/dismissStack";
   import { t } from "$lib/i18n/index.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS, MENU_ITEM_CLASS } from "$lib/ui/menuSurface";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
@@ -66,9 +67,9 @@
 
 <Dialog.Root open onOpenChange={(value) => !value && onDismiss()}>
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-60 bg-black/60" />
+    <Dialog.Overlay class={DIALOG_OVERLAY_CLASS} />
     <Dialog.Content
-      class="menu-surface fixed inset-x-0 top-24 z-60 mx-auto flex max-h-[min(30rem,70%)] w-[min(36rem,calc(100vw-3rem))] flex-col overflow-hidden rounded-lg border-2 border-outline-variant bg-surface shadow-xl"
+      class="{DIALOG_SURFACE_CLASS} fixed inset-x-0 top-24 z-60 mx-auto flex max-h-[min(30rem,70%)] w-[min(40rem,calc(100vw-3rem))] flex-col overflow-hidden"
     >
       <Dialog.Title class="sr-only">{t("COMMANDS")}</Dialog.Title>
       <div class="shrink-0 p-2">
@@ -81,19 +82,17 @@
         />
       </div>
       <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-        {#each groups as section, index (section.group)}
-          <SectionHeader label={t(GROUP_LABELS[section.group])} divider={index > 0} />
+        {#each groups as section (section.group)}
+          <SectionHeader label={t(GROUP_LABELS[section.group])} />
           {#each section.items as command (command.id)}
             {@const index = matches.indexOf(command)}
             <Pressable
               onclick={() => void launch(index)}
-              class="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-body-md {index ===
-              active
-                ? 'bg-on-surface/10'
-                : ''}"
+              hover={index !== active}
+              class="{MENU_ITEM_CLASS} text-body-md {index === active ? 'bg-hover' : ''}"
             >
               {#if command.icon}
-                <command.icon size={18} class="shrink-0" />
+                <command.icon size={18} class="shrink-0 text-on-surface-variant" />
               {/if}
               <span class="min-w-0 flex-1 truncate text-left">{command.label}</span>
               {#if command.detail}
@@ -102,7 +101,7 @@
                 </span>
               {/if}
               {#if command.hint}
-                <span class="shrink-0 text-body-sm text-on-surface-variant">{command.hint}</span>
+                <span class="shrink-0 text-caption text-faint">{command.hint}</span>
               {/if}
             </Pressable>
           {/each}

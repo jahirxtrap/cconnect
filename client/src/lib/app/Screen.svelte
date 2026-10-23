@@ -32,7 +32,7 @@
   <AppTopBar {title} {subtitle} {actions}>
     {#snippet navigationIcon()}
       <TooltipIconButton label={t("BACK")} onclick={() => navigation.back()}>
-        <ArrowLeft size={20} />
+        <ArrowLeft />
       </TooltipIconButton>
     {/snippet}
   </AppTopBar>

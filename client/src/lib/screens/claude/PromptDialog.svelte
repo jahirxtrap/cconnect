@@ -25,7 +25,7 @@
 <CompactDialog {title} {onDismiss}>
   {#snippet titleTrailing()}
     <TooltipIconButton label={t("CLEAR")} enabled={!!text} onclick={() => (text = "")}>
-      <Eraser size={20} />
+      <Eraser />
     </TooltipIconButton>
   {/snippet}
   {#snippet buttons()}

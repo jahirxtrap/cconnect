@@ -4,9 +4,12 @@
   import X from "@lucide/svelte/icons/x";
   import { Dialog } from "bits-ui";
   import { pushDismiss } from "$lib/app/dismissStack";
+  import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { ReorderDrag } from "$lib/ui/reorderDrag.svelte";
+  import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { panes } from "./panes.svelte";
   import { tabs, type Tab } from "./tabs.svelte";
@@ -54,28 +57,31 @@
   <Dialog.Portal>
     <Dialog.Content
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-surface text-on-surface"
+      class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface"
       aria-label={t("TABS")}
     >
-      <div class="flex shrink-0 items-center px-1.5 py-1.5">
-        <TooltipIconButton label={t("BACK")} onclick={() => (open = false)}>
-          <X size={24} />
-        </TooltipIconButton>
-        <Dialog.Title class="flex-1 pl-1.5 text-title-lg">{t("TABS")}</Dialog.Title>
-        <TooltipIconButton
-          label={t("NEW_TAB")}
-          onclick={() => {
-            panes.newTab();
-            open = false;
-          }}
-        >
-          <Plus size={24} />
-        </TooltipIconButton>
-      </div>
+      <AppTopBar title={t("TABS")}>
+        {#snippet navigationIcon()}
+          <TooltipIconButton label={t("BACK")} onclick={() => (open = false)}>
+            <X />
+          </TooltipIconButton>
+        {/snippet}
+        {#snippet actions()}
+          <TooltipIconButton
+            label={t("NEW_TAB")}
+            onclick={() => {
+              panes.newTab();
+              open = false;
+            }}
+          >
+            <Plus />
+          </TooltipIconButton>
+        {/snippet}
+      </AppTopBar>
       <div class="min-h-0 flex-1 overflow-y-auto px-2 py-1">
         {#each groups as group (group.label)}
           {#if groups.length > 1}
-            <p class="px-1 pt-1 pb-1.5 text-label-md text-on-surface-variant">{group.label}</p>
+            <p class="px-1 pt-1 pb-1.5 {SECTION_LABEL_CLASS}">{group.label}</p>
           {/if}
           <div class="grid grid-cols-2 content-start gap-1.5">
             {#each group.items as tab, index (tab.id)}
@@ -104,26 +110,21 @@
     style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id === drag.draggingId
       ? 1
       : 0}; transition: {drag.transitionOf(tab.id)}"
-    class="flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-item border-2 pr-1 pl-2.5 transition-[background-color,border-color] {tab.id ===
+    class="ripple flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-panel pr-1 pl-2.5 {tab.id ===
     panes.focusedTab?.id
-      ? 'border-accent bg-surface-variant text-on-surface'
-      : 'border-outline-variant text-on-surface-variant'}"
+      ? 'bg-surface-variant text-on-surface'
+      : 'bg-surface text-on-surface-variant'}"
   >
-    <span
-      class="size-2 shrink-0 rounded-full"
-      style={sessionColorOf(tab.color)
-        ? `background: ${sessionColorOf(tab.color)}`
-        : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
-    ></span>
-    <span class="min-w-0 flex-1 truncate text-label-lg">{tab.title ?? t("NEW_CHAT")}</span>
+    <StatusDot class="bg-faint" color={sessionColorOf(tab.color)} />
+    <span class="min-w-0 flex-1 truncate text-body-md">{tab.title ?? t("NEW_CHAT")}</span>
     <button
       type="button"
       onpointerdown={(event) => event.stopPropagation()}
       onclick={() => closeTab(tab.id)}
       aria-label={t("CLOSE_TAB")}
-      class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+      class="inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-hover"
     >
-      <X size={18} />
+      <X size={16} />
     </button>
   </div>
 {/snippet}

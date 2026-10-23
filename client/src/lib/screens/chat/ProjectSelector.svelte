@@ -44,21 +44,26 @@
   const label = $derived(shown ?? nameOf(selected));
 </script>
 
-{#if settings.lockedProject}
-  <span class="flex w-full items-center rounded-item px-2 py-2 {className}">
-    <FolderClosed size={16} class="shrink-0 text-accent" />
-    <span class="ml-2 min-w-0 flex-1 truncate text-left text-body-md">{label}</span>
+{#snippet row(menu: boolean)}
+  <span
+    class="flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-on-surface-variant {menu
+      ? 'cursor-pointer transition-colors hover:bg-hover'
+      : ''} {className}"
+  >
+    <FolderClosed size={16} class="shrink-0" />
+    <span class="min-w-0 flex-1 truncate text-left text-body-md font-medium text-on-surface">{label}</span>
+    {#if menu}
+      <ChevronDown size={16} class="shrink-0" />
+    {/if}
   </span>
+{/snippet}
+
+{#if settings.lockedProject}
+  {@render row(false)}
 {:else}
 <PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
   {#snippet trigger()}
-    <span
-      class="flex w-full cursor-pointer items-center rounded-item px-2 py-2 transition-colors hover:bg-on-surface/6 {className}"
-    >
-      <FolderClosed size={16} class="shrink-0 text-accent" />
-      <span class="ml-2 min-w-0 flex-1 truncate text-left text-body-md">{label}</span>
-      <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
-    </span>
+    {@render row(true)}
   {/snippet}
   {#if onFollow}
     <MenuItem

@@ -1,3 +1,19 @@
+<script lang="ts" module>
+  import type { ProjectDiff } from "$lib/services/projectFilesApi";
+
+  export interface DiffCounts {
+    added: number;
+    removed: number;
+  }
+
+  export const diffCounts = (diff: ProjectDiff | null): DiffCounts | null => {
+    if (!diff) return null;
+    const added = diff.added.length;
+    const removed = Object.values(diff.removed).reduce((total, lines) => total + lines.length, 0);
+    return added || removed ? { added, removed } : null;
+  };
+</script>
+
 <script lang="ts">
   import AtSign from "@lucide/svelte/icons/at-sign";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
@@ -9,7 +25,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { copyText } from "$lib/platform/clipboard";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
-  import FilePreview, { type ToolbarButton } from "$lib/screens/shared/FilePreview.svelte";
+  import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import { projectFileUrl } from "$lib/services/projectFilesApi";
   import { sharedApi } from "$lib/services/sharedApi";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -41,6 +57,7 @@
 
   const fileDiff = $derived(showDiff ? projectDiffs.get(projectKey, path) : null);
   const revision = $derived(projectDiffs.revision(projectKey, path));
+  const counts = $derived(diffCounts(projectDiffs.get(projectKey, path)));
 
   const modified = $derived(status !== "");
   const wholeFile = $derived(status.startsWith("?") || status.includes("D"));
@@ -95,48 +112,44 @@
   });
 </script>
 
-{#snippet diffToggle(button: ToolbarButton, lined: boolean)}
+{#snippet diffToggle(lined: boolean)}
+  {#if counts}
+    <span class="flex shrink-0 items-center gap-2 px-1 font-mono text-caption">
+      {#if counts.added}<span class="text-green">+{counts.added}</span>{/if}
+      {#if counts.removed}<span class="text-red">-{counts.removed}</span>{/if}
+    </span>
+  {/if}
   {#if lined && anchors.length}
     <TooltipIconButton
       label={t("PREVIOUS_CHANGE")}
-      class={button.class}
       enabled={anchorAt !== null && anchorAt > 0}
       onclick={() => step(-1)}
     >
-      <ChevronUp size={button.size} />
+      <ChevronUp />
     </TooltipIconButton>
     <TooltipIconButton
       label={t("NEXT_CHANGE")}
-      class={button.class}
       enabled={anchorAt === null || anchorAt < anchors.length - 1}
       onclick={() => step(1)}
     >
-      <ChevronDown size={button.size} />
+      <ChevronDown />
     </TooltipIconButton>
   {/if}
   <TooltipIconButton
     label={t("DIFF")}
-    class={button.class}
+    active={showDiff}
     onclick={() => {
       showDiff = !showDiff;
       settings.projectDiff = showDiff;
     }}
   >
-    <FileDiff size={button.size} class={showDiff ? "text-accent" : ""} />
+    <FileDiff />
   </TooltipIconButton>
 {/snippet}
 
 {#snippet fileMenu()}
-  <MenuItem text={t("MENTION_IN_CHAT")} onclick={mention}>
-    {#snippet leading()}
-      <AtSign size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-  <MenuItem text={t("LINK_TO_SHARED")} onclick={() => void sharedApi.link(absolute, projectKey)}>
-    {#snippet leading()}
-      <Link2 size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
+  <MenuItem icon={AtSign} text={t("MENTION_IN_CHAT")} onclick={mention} />
+  <MenuItem icon={Link2} text={t("LINK_TO_SHARED")} onclick={() => void sharedApi.link(absolute, projectKey)} />
 {/snippet}
 
 <FilePreview

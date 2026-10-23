@@ -1,5 +1,6 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
+  import Network from "@lucide/svelte/icons/network";
   import Plus from "@lucide/svelte/icons/plus";
   import Pencil from "@lucide/svelte/icons/pencil";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
@@ -8,9 +9,9 @@
   import { osIcon } from "$lib/design/osIcons";
   import { t } from "$lib/i18n/index.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
-  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
+  import Button from "$lib/ui/Button.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
@@ -32,11 +33,7 @@
 </script>
 
 {#snippet addAction()}
-  <TooltipIconButton
-    label={t("ADD_SSH_HOST")}
-    class={paneActionClass(compact)}
-    onclick={() => (adding = true)}
-  >
+  <TooltipIconButton label={t("ADD_SSH_HOST")} onclick={() => (adding = true)}>
     <Plus />
   </TooltipIconButton>
 {/snippet}
@@ -58,33 +55,42 @@
   {/if}
 
   {#if !sshStore.profiles.length}
-    <EmptyState text={t("NO_HOSTS")} class="flex-1" />
+    <EmptyState icon={Network} text={t("NO_HOSTS")} class="flex-1">
+      {#snippet action()}
+        <Button small onclick={() => (adding = true)}>
+          <Plus size={16} />
+          {t("ADD_SSH_HOST")}
+        </Button>
+      {/snippet}
+    </EmptyState>
   {:else}
-    <div class="min-h-0 flex-1 overflow-y-auto">
-      {#each sshStore.profiles as profile (profile.id)}
-        {@const OsIcon = osIcon(profile.os)}
-        <ListRow
-          title={profile.name || profile.host}
-          subtitle={sshAddress(profile)}
-          onclick={() => onSelect(profile)}
-        >
-          {#snippet leading()}
-            {#if OsIcon}
-              <OsIcon class="size-6 shrink-0" aria-hidden="true" />
-            {:else}
-              <SquareTerminal size={24} class="shrink-0 text-on-surface-variant" />
-            {/if}
-          {/snippet}
-          {#snippet trailing()}
-            <TooltipIconButton label={t("EDIT_SSH_HOST")} onclick={() => (editing = profile)} class="[&_svg]:size-5">
-              <Pencil />
-            </TooltipIconButton>
-            <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)} class="[&_svg]:size-5">
-              <Trash />
-            </TooltipIconButton>
-          {/snippet}
-        </ListRow>
-      {/each}
+    <div class="min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
+      <div class="flex flex-col rounded-lg bg-card p-1">
+        {#each sshStore.profiles as profile (profile.id)}
+          {@const OsIcon = osIcon(profile.os)}
+          <ListRow
+            title={profile.name || profile.host}
+            subtitle={sshAddress(profile)}
+            onclick={() => onSelect(profile)}
+          >
+            {#snippet leading()}
+              {#if OsIcon}
+                <OsIcon class="size-4.5 shrink-0" aria-hidden="true" />
+              {:else}
+                <SquareTerminal size={18} class="shrink-0 text-on-surface-variant" />
+              {/if}
+            {/snippet}
+            {#snippet trailing()}
+              <TooltipIconButton label={t("EDIT_SSH_HOST")} onclick={() => (editing = profile)}>
+                <Pencil />
+              </TooltipIconButton>
+              <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)}>
+                <Trash />
+              </TooltipIconButton>
+            {/snippet}
+          </ListRow>
+        {/each}
+      </div>
     </div>
   {/if}
 </div>
@@ -117,6 +123,7 @@
     title={t("DELETE")}
     text={t("DELETE_SSH_HOST_CONFIRM", profile.name || profile.host)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       sshStore.remove(profile.id);
       deleting = null;

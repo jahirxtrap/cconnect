@@ -151,11 +151,14 @@
 <div
   bind:this={panel}
   transition:slide={{ duration: instant ? 0 : PANEL_MS }}
-  class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background {dragging || instant
+  class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background shadow-float {dragging || instant
     ? ''
     : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
   style="height: {shown}%; transform: translateY({hiddenFraction * PERCENT}%); border-top-left-radius: {corner}px; border-top-right-radius: {corner}px"
 >
+  {#if shown >= MAX}
+    <span class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-outline-variant"></span>
+  {/if}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
     onpointerdown={onPointerDown}
@@ -167,21 +170,14 @@
     <div class="flex justify-center pt-2.5 pb-0.5">
       <PanelHandle />
     </div>
-    <div class="flex items-center px-4 pt-0.5 pb-1.5">
-      <MessagesSquare size={18} class="mr-2 shrink-0 text-accent" />
+    <div class="flex items-center gap-2 px-(--page-inset) pt-0.5 pb-1.5">
+      <MessagesSquare size={16} class="shrink-0 text-accent" />
       <p class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">{t("QUICK_CHAT")}</p>
-      <TooltipIconButton
-        label={t("CLEAR")}
-        enabled={messages.length > 0}
-        onclick={onClear}
-        class="size-[18px] [&_svg]:size-[18px]"
-      >
+      <TooltipIconButton label={t("CLEAR")} enabled={messages.length > 0} onclick={onClear} class="size-7">
         <Eraser />
       </TooltipIconButton>
     </div>
   </div>
-  <div class="h-px shrink-0 bg-outline-variant"></div>
-
   <div class="relative min-h-0 flex-1">
     <ChatScroller bind:this={scroller} bind:follow hasContent={messages.length > 0} {bottomInset}>
       {#each messages as item, index (item.id)}

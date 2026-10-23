@@ -3,10 +3,8 @@
   import type { Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { panes } from "./panes.svelte";
-  import PaneActions from "./PaneActions.svelte";
-  import { PANE_HEADER_CLASS, paneFocusBorder } from "./paneChrome";
-  import { paneRole } from "./paneSurface";
+  import { PANE_SUB_CLASS, PANE_TOP_CLASS } from "./paneChrome";
+  import { paneRole, usePaneTail } from "./paneSurface";
 
   interface Props {
     title: string;
@@ -17,23 +15,23 @@
 
   const { title, actions, leading, onBack }: Props = $props();
 
-  const role = paneRole() ?? "right";
-  const focused = $derived(panes.focused === role);
+  const centered = paneRole() === "center";
+  const tailOf = usePaneTail();
+  const tail = $derived(tailOf());
 </script>
 
-<div
-  class="gap-1 pr-1 {leading || onBack ? 'pl-1' : 'pl-3'} {PANE_HEADER_CLASS} {paneFocusBorder(focused)}"
->
-  {#if onBack || leading}
-    <div class="flex shrink-0 items-center">
-      {#if onBack}
-        <TooltipIconButton label={t("BACK")} class="size-8" onclick={onBack}>
-          <ArrowLeft />
-        </TooltipIconButton>
-      {/if}
-      {@render leading?.()}
-    </div>
+<div class={centered || tail ? PANE_TOP_CLASS : PANE_SUB_CLASS}>
+  {#if onBack}
+    <TooltipIconButton label={t("BACK")} onclick={onBack}>
+      <ArrowLeft />
+    </TooltipIconButton>
   {/if}
-  <p class="min-w-0 flex-1 truncate text-label-lg">{title}</p>
-  <PaneActions {actions} {role} />
+  {@render leading?.()}
+  <p class="min-w-0 flex-1 truncate text-label-lg {onBack || leading ? '' : 'pl-1'}">{title}</p>
+  {#if actions}
+    <div class="flex shrink-0 items-center">{@render actions()}</div>
+  {/if}
+  {#if tail}
+    <div class="flex shrink-0 items-center">{@render tail()}</div>
+  {/if}
 </div>

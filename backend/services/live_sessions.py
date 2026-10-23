@@ -369,20 +369,22 @@ class LiveSession:
         from services.chat_list import hub
 
         session_id = self.state.session_id
+        resident = self.resident_alive
         if self._published_id and self._published_id != session_id:
-            hub.set_activity(self._published_id, None)
+            hub.set_activity(self._published_id, None, False)
         self._published_id = session_id
-        hub.set_activity(session_id, activity)
-        if activity == self._announced:
+        hub.set_activity(session_id, activity, resident)
+        announced = (activity, resident)
+        if announced == self._announced:
             return
-        self._announced = activity
+        self._announced = announced
         try:
-            asyncio.get_running_loop().create_task(self._send_activity(activity))
+            asyncio.get_running_loop().create_task(self._send_activity(activity, resident))
         except RuntimeError:
             pass
 
-    async def _send_activity(self, activity):
-        payload = {"type": "activity", "state": activity or "idle", "channel": self.channel}
+    async def _send_activity(self, activity, resident):
+        payload = {"type": "activity", "state": activity or "idle", "resident": resident, "channel": self.channel}
         for sink in list(self._sinks):
             await self._send_one(sink, payload)
 

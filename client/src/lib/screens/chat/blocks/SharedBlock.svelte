@@ -8,7 +8,6 @@
   import Button from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
   import Collapsible from "./Collapsible.svelte";
 
   interface Props {
@@ -27,8 +26,6 @@
     onToggle = null,
   }: Props = $props();
 
-  const ACTION_CLASS = "h-8 text-body-md font-normal";
-
   const server = contextServer();
   const listed = $derived(files.map((file) => ({ ...file, url: backend.resolveShared(file.url, server()) })));
 </script>
@@ -39,24 +36,22 @@
   {expanded}
   {onToggle}
 >
-  <OutlinedPanel>
-    <div class="flex flex-wrap items-center gap-1.5">
-      {#each listed as file (file.url)}
-        <Chip
-          name={file.name}
-          icon={fileIcon(file.name)}
-          onclick={() => onSharedLink?.(file.url, file.name)}
-          onmenu={onSharedMenu ? () => onSharedMenu(file.url, file.name) : null}
-        />
-      {/each}
-    </div>
-    <div class="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-      <Button variant="outlined" class={ACTION_CLASS} onclick={() => void downloadAllShared(listed)}>
-        {t("SAVE")}
-      </Button>
-      <Button variant="outlined" class={ACTION_CLASS} onclick={() => void saveSharedItemsAs(listed)}>
-        {t("SAVE_AS")}
-      </Button>
-    </div>
-  </OutlinedPanel>
+  <div class="flex flex-wrap items-center gap-1.5">
+    {#each listed as file (file.url)}
+      <Chip
+        name={file.name}
+        icon={fileIcon(file.name)}
+        onclick={() => onSharedLink?.(file.url, file.name)}
+        onmenu={onSharedMenu ? () => onSharedMenu(file.url, file.name) : null}
+      />
+    {/each}
+  </div>
+  <div class="mt-2.5 flex flex-wrap gap-2">
+    <Button variant="outlined" small onclick={() => void downloadAllShared(listed)}>
+      {t("SAVE")}
+    </Button>
+    <Button variant="outlined" small onclick={() => void saveSharedItemsAs(listed)}>
+      {t("SAVE_AS")}
+    </Button>
+  </div>
 </Collapsible>

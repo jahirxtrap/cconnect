@@ -30,7 +30,7 @@
     subtitle,
     iconClass = "text-accent",
     dim = false,
-    padding = "py-1.5 pr-2 pl-4",
+    padding,
     subtitleLines = 1,
     onclick,
     onlongclick,
@@ -46,12 +46,12 @@
   {onclick}
   {onlongclick}
   {oncontextmenu}
-  class="flex w-full items-center {padding} {dim ? 'opacity-50' : ''} {className}"
+  class="flex min-h-10 w-full items-center rounded-md {padding ?? `py-2 pl-3 ${trailing ? 'pr-1' : 'pr-3'}`} {dim ? 'opacity-50' : ''} {className}"
 >
   {@render leading?.()}
   {#if IconComponent}
     <span class="relative shrink-0">
-      <IconComponent size={24} class={iconClass} />
+      <IconComponent size={18} class={iconClass} />
       {#if BadgeComponent}
         <span class="absolute -right-0.5 -bottom-0.5 flex items-center justify-center rounded-full bg-background {badgeClass}">
           <BadgeComponent size={12} />
@@ -59,8 +59,8 @@
       {/if}
     </span>
   {/if}
-  <div class="min-w-0 flex-1 {IconComponent || leading ? 'ml-3.5' : ''}">
-    <p class="truncate text-body-lg">{title}</p>
+  <div class="min-w-0 flex-1 {IconComponent || leading ? 'ml-3' : ''}">
+    <p class="truncate text-body-md">{title}</p>
     {#if subtitle}
       <div class="flex items-center">
         <p

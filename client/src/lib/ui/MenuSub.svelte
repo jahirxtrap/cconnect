@@ -3,26 +3,28 @@
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
   import { layout } from "$lib/platform/layout.svelte";
-  import { MENU_PADDING, SUBMENU_CONTENT_CLASS } from "$lib/ui/menuSurface";
+  import type { IconSource } from "./icons";
+  import { MENU_ICON_SIZE, MENU_ITEM_CLASS, MENU_PADDING, SUBMENU_CONTENT_CLASS, menuIconClass } from "./menuSurface";
   import { returnFocus } from "./keepFocus";
 
   interface Props {
     text: string;
+    icon?: IconSource;
     leading?: Snippet;
     children: Snippet;
   }
 
-  const { text, leading, children }: Props = $props();
+  const { text, icon: IconComponent, leading, children }: Props = $props();
 </script>
 
 <DropdownMenu.Sub>
-  <DropdownMenu.SubTrigger
-    onfocusin={returnFocus}
-    class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors outline-none select-none"
-  >
+  <DropdownMenu.SubTrigger onfocusin={returnFocus} class={MENU_ITEM_CLASS}>
+    {#if IconComponent}
+      <IconComponent size={MENU_ICON_SIZE} class={menuIconClass()} />
+    {/if}
     {@render leading?.()}
     <span class="min-w-0 flex-1 truncate text-body-md">{text}</span>
-    <ChevronRight size={16} class="shrink-0 text-on-surface-variant" />
+    <ChevronRight size={MENU_ICON_SIZE} class={menuIconClass()} />
   </DropdownMenu.SubTrigger>
   <DropdownMenu.SubContent
     align="start"

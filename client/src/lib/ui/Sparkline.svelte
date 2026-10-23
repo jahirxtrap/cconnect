@@ -33,7 +33,7 @@
       class="h-full w-full"
       aria-hidden="true"
     >
-      <path d={path.fill} fill="currentColor" class="text-accent/15" />
+      <path d={path.fill} fill="currentColor" class="text-accent-soft" />
       <path
         d={path.line}
         fill="none"

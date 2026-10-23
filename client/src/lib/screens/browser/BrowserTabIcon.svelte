@@ -3,15 +3,25 @@
 
   interface Props {
     src: string;
+    large?: boolean;
   }
 
-  const { src }: Props = $props();
+  const { src, large = false }: Props = $props();
+
+  const SMALL_SIZE = 12;
+  const LARGE_SIZE = 20;
 
   let failed = $state("");
 </script>
 
 {#if src && failed !== src}
-  <img {src} alt="" draggable="false" class="size-4 shrink-0 object-contain" onerror={() => (failed = src)} />
+  <img
+    {src}
+    alt=""
+    draggable="false"
+    class="{large ? 'size-5' : 'size-3'} shrink-0 object-contain"
+    onerror={() => (failed = src)}
+  />
 {:else}
-  <Globe size={16} class="shrink-0" />
+  <Globe size={large ? LARGE_SIZE : SMALL_SIZE} class="shrink-0" />
 {/if}

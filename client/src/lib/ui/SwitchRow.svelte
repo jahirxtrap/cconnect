@@ -29,13 +29,13 @@
   type="button"
   disabled={!enabled}
   onclick={() => onChange(!checked)}
-  class="flex w-full items-center rounded-lg px-3 py-2.5 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-on-surface/8 disabled:opacity-40 {className}"
+  class="flex min-h-13 w-full items-center rounded-md px-3 py-1.5 text-left transition-colors enabled:cursor-pointer enabled:hover:bg-hover disabled:opacity-40 {className}"
 >
   {#if leading}
     <span class="mr-3 flex shrink-0 items-center">{@render leading()}</span>
   {/if}
   <span class="min-w-0 flex-1">
-    <span class="block truncate text-body-md"
+    <span class="block truncate text-body-md font-medium"
       >{title}{#if required}<span class="text-error">&nbsp;*</span>{/if}</span
     >
     {#if summary}

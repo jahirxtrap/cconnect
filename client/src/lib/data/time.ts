@@ -22,6 +22,17 @@ const MILLIS_PER_DAY = 86_400_000;
 export const dayIndex = (millis: number): number =>
   Math.trunc((millis - new Date(millis).getTimezoneOffset() * MILLIS_PER_MINUTE) / MILLIS_PER_DAY);
 
+const RECENT_DAYS = 1;
+
+const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.slice(1);
+
+export const formatRecent = (millis: number): string => {
+  const days = dayIndex(Date.now()) - dayIndex(millis);
+  if (days < 0 || days > RECENT_DAYS) return formatDateShort(millis);
+  const day = capitalized(new Intl.RelativeTimeFormat([], { numeric: "auto" }).format(-days, "day"));
+  return days === 0 ? `${day} ${formatClock(millis)}` : day;
+};
+
 export const formatDayTime = (millis: number): string =>
   new Date(millis).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
 

@@ -10,7 +10,6 @@
   import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
   import { formatTokens } from "$lib/data/format";
   import { fileIcon } from "$lib/ui/fileIcons";
-  import type { IconSource } from "$lib/ui/icons";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
@@ -23,6 +22,7 @@
   import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
+  import { joinedCorners } from "$lib/ui/joinedCorners";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import AgentBlock from "./AgentBlock.svelte";
@@ -33,13 +33,13 @@
   import InteractionBlock from "./InteractionBlock.svelte";
   import PlanBlock from "./PlanBlock.svelte";
   import ToolBlock from "./ToolBlock.svelte";
-  import { cardGap, gapAbove, gapBelow, NO_GAP } from "./gaps";
+  import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
   import { rowSite } from "./rowSite";
 
   interface Props {
     message: ChatMessage;
     prevRole: Role | null;
-    nextRole: Role | null;
+    nextRole: GapRole | null;
     running: boolean;
     gluedTop?: boolean;
     spaced?: boolean;
@@ -83,7 +83,9 @@
   const rowId = $derived(String(message.id));
   const spinnerProps = $derived({ word: t("WORKING"), message: null, suffix: "", mode: running ? "requesting" : "responding" });
   const gap = $derived(gapAbove(prevRole, message.role));
-  const top = $derived(gluedTop || (nested && prevRole === null) ? NO_GAP : spaced ? cardGap(gap) : gap);
+  const top = $derived(
+    gluedTop || (nested && prevRole === null) ? NO_GAP : rowGap(prevRole, message.role, gap, spaced),
+  );
   const bottom = $derived(nested ? NO_GAP : gapBelow(message.role, nextRole));
 </script>
 
@@ -91,7 +93,6 @@
   <Collapsible
     label={`${typeof props.message === "string" && props.message ? props.message : typeof props.word === "string" ? props.word : t("WORKING")}${typeof props.suffix === "string" ? props.suffix : ""}`}
     icon={Bot}
-    iconClass="text-on-surface-variant"
     labelOnly
     {running}
   />
@@ -102,46 +103,50 @@
   {@const body = typeof props.text === "string" ? props.text : content.body}
   {@const showTime = message.timestamp !== null && settings.showTimestamps}
   {@const chips = content.attachments.length + content.elements.length}
-  <div class="flex w-full flex-col bg-surface-variant px-4 py-3 {chips ? 'chat-gap' : ''}">
-    {#if body}
-      <p class="text-body-md wrap-anywhere whitespace-pre-wrap">{body}</p>
-    {/if}
-    {#if chips || showTime || message.sendStatus === "error"}
-      <div class="flex w-full items-end">
-        {#if chips}
-          <div use:hscrollbar class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
-            {#each content.elements as element, index (index)}
-              <Chip name={elementLabel(element)} icon={SquareMousePointer} />
-            {/each}
-            {#each content.attachments as attachment (attachment.url)}
-              <Chip
-                name={attachment.name}
-                icon={fileIcon(attachment.name)}
-                onclick={() => onSharedLink?.(attachment.url, attachment.name)}
-                onmenu={onSharedMenu ? () => onSharedMenu(attachment.url, attachment.name) : null}
-              />
-            {/each}
-          </div>
-        {:else}
-          <div class="flex-1"></div>
-        {/if}
-        {#if showTime}
-          <span class="pl-2 text-label-sm text-on-surface-variant select-none">
-            {formatClock(message.timestamp ?? 0)}
-          </span>
-        {/if}
-        {#if message.sendStatus === "error"}
-          <TriangleAlert size={14} class="ml-1.5 shrink-0 text-error" />
-        {/if}
-      </div>
-    {/if}
+  {@const corners = joinedCorners(prevRole === "user", nextRole === "user", "panel")}
+  <div class="w-full px-(--page-inset)">
+    <div class="flex w-full min-w-0 flex-col {corners} bg-surface-variant px-3 py-2.5 {chips ? 'chat-gap' : ''}">
+      {#if body}
+        <p class="text-body-md leading-(--chat-line-body) wrap-anywhere whitespace-pre-wrap">{body}</p>
+      {/if}
+      {#if chips || showTime || message.sendStatus === "error"}
+        <div class="flex w-full items-end">
+          {#if chips}
+            <div use:hscrollbar class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+              {#each content.elements as element, index (index)}
+                <Chip name={elementLabel(element)} icon={SquareMousePointer} />
+              {/each}
+              {#each content.attachments as attachment (attachment.url)}
+                <Chip
+                  name={attachment.name}
+                  icon={fileIcon(attachment.name)}
+                  onclick={() => onSharedLink?.(attachment.url, attachment.name)}
+                  onmenu={onSharedMenu ? () => onSharedMenu(attachment.url, attachment.name) : null}
+                />
+              {/each}
+            </div>
+          {:else}
+            <div class="flex-1"></div>
+          {/if}
+          {#if showTime}
+            <span class="pl-2 text-caption text-faint select-none">
+              {formatClock(message.timestamp ?? 0)}
+            </span>
+          {/if}
+          {#if message.sendStatus === "error"}
+            <TriangleAlert size={14} class="ml-1.5 shrink-0 text-error" />
+          {/if}
+        </div>
+      {/if}
+    </div>
   </div>
 {/snippet}
 
 {#snippet assistantRow(props: Record<string, unknown>)}
-  <div class="w-full px-4">
+  <div class="w-full px-(--page-inset)">
     <MarkdownText
       text={typeof props.text === "string" ? props.text : message.text}
+      class="markdown-chat"
       {onSharedLink}
       {onSharedMenu}
       {onSuggest}
@@ -165,6 +170,7 @@
 {#snippet fileChangeRow(props: Record<string, unknown>)}
   <FileChangeBlock
     path={typeof props.path === "string" ? props.path : (message.path ?? "")}
+    tool={message.toolName}
     diffLines={Array.isArray(props.diff_lines) ? diffLinesOf(props) : (message.diffLines ?? [])}
     labelOnly={message.labelOnly || labelMode}
     {expanded}
@@ -220,17 +226,6 @@
   {/if}
 {/snippet}
 
-{#snippet line(Icon: IconSource, label: string, tone: string)}
-  {@const body = message.text.trim()}
-  <div class="flex w-full items-center gap-1.5 px-4 select-none">
-    <Icon size={16} class="shrink-0 {tone}" />
-    <p class="line-clamp-2 min-w-0 flex-1 text-label-lg {body ? 'text-on-surface-variant' : tone}">
-      <span class={body ? tone : ""}>{label}</span>
-      {#if body}&nbsp;&nbsp;{body}{/if}
-    </p>
-  </div>
-{/snippet}
-
 <div class="w-full" style="padding-top: {top}; padding-bottom: {bottom}">
   {#if message.role === "user"}
     {@const props = { text: userContent(message, server()).body, origin: { kind: "composer" }, isExpanded: false }}
@@ -257,7 +252,6 @@
         ? plural("TOKENS_COUNT", message.thinkingTokens, formatTokens(message.thinkingTokens))
         : null}
       labelOnly={message.labelOnly || labelMode}
-      iconClass="text-on-surface-variant"
       {running}
       {expanded}
       {onToggle}
@@ -378,7 +372,6 @@
       labelOnly={labelMode || !message.text.trim()}
       {expanded}
       {onToggle}
-      labelClass="text-accent"
     >
       <MarkdownText text={message.text} dense {onSharedLink} {onSharedMenu} />
     </Collapsible>
@@ -391,37 +384,48 @@
       labelOnly={labelMode || !message.text.trim()}
       {expanded}
       {onToggle}
-      labelClass="text-accent"
     >
       <MarkdownText text={message.text} dense />
     </Collapsible>
   {:else if message.role === "notification"}
-    {@render line(Bell, t("NOTIFICATION"), "text-accent")}
-  {:else if message.role === "notice"}
-    {@const tone = message.result === "warning" ? "text-orange" : "text-accent"}
     <Collapsible
-      label={message.toolName || t("NOTICE")}
-      icon={Puzzle}
+      label={t("NOTIFICATION")}
+      icon={Bell}
       preview={message.text}
       labelOnly={labelMode || !message.text.trim()}
       {expanded}
       {onToggle}
-      labelClass={tone}
-      iconClass={tone}
+    >
+      <MarkdownText text={message.text} dense />
+    </Collapsible>
+  {:else if message.role === "notice"}
+    {@const warning = message.result === "warning"}
+    <Collapsible
+      label={message.toolName || t("NOTICE")}
+      icon={warning ? TriangleAlert : Puzzle}
+      preview={message.text}
+      labelOnly={labelMode || !message.text.trim()}
+      {expanded}
+      {onToggle}
+      iconClass={warning ? "text-orange" : "text-accent"}
     >
       <MarkdownText text={message.text} dense />
     </Collapsible>
   {:else if message.role === "api_error"}
-    <div class="flex w-full items-start gap-2 bg-orange/15 px-4 py-3">
-      <TriangleAlert size={18} class="mt-px shrink-0 text-orange" />
-      <p class="min-w-0 flex-1 text-body-md wrap-anywhere whitespace-pre-wrap text-orange">{message.text}</p>
+    <div class="w-full px-(--page-inset)">
+      <div class="flex items-start gap-2 rounded-panel bg-orange/15 px-2.5 py-1.5">
+        <span class="flex h-5 shrink-0 items-center"><TriangleAlert size={14} class="text-orange" /></span>
+        <p class="min-w-0 flex-1 text-block wrap-anywhere whitespace-pre-wrap text-orange">{message.text}</p>
+      </div>
     </div>
   {:else if message.role === "interrupted"}
-    <div class="flex w-full items-center gap-2 bg-orange/15 px-4 py-3">
-      <TriangleAlert size={18} class="shrink-0 text-orange" />
-      <p class="min-w-0 flex-1 text-body-md text-orange">{t("INTERRUPTED")}</p>
+    <div class="w-full px-(--page-inset)">
+      <div class="flex h-7 items-center gap-2 rounded-panel bg-orange/15 px-2.5">
+        <TriangleAlert size={14} class="shrink-0 text-orange" />
+        <p class="min-w-0 flex-1 text-block text-orange">{t("INTERRUPTED")}</p>
+      </div>
     </div>
   {:else if message.role === "system"}
-    <p class="w-full px-4 text-body-sm text-on-surface-variant">{message.text}</p>
+    <p class="w-full px-(--page-inset) text-body-sm text-on-surface-variant">{message.text}</p>
   {/if}
 </div>

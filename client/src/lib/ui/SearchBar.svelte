@@ -1,3 +1,7 @@
+<script module lang="ts">
+  export const HEADER_SEARCH_CLASS = "w-80";
+</script>
+
 <script lang="ts">
   import Search from "@lucide/svelte/icons/search";
   import X from "@lucide/svelte/icons/x";
@@ -29,7 +33,6 @@
   let field = $state<HTMLInputElement | null>(null);
 
   const clears = $derived(value.length > 0);
-  const slotClass = $derived(large ? "size-8" : "size-7");
 
   $effect(() => {
     if (autofocus) field?.focus();
@@ -37,32 +40,26 @@
 </script>
 
 <div
-  class="flex {large
-    ? 'h-10'
-    : 'h-9'} min-w-0 items-center rounded-md bg-surface-variant/60 px-1 {className}"
+  class="flex {large ? 'h-9' : 'h-8'} min-w-0 items-center gap-2 rounded-md bg-surface-variant pr-1 pl-2.5 {className}"
 >
-  <span
-    class="inline-flex {slotClass} shrink-0 items-center justify-center text-on-surface-variant"
-  >
-    <Search size={18} />
-  </span>
+  <Search size={16} class="shrink-0 text-faint" />
   <input
     bind:this={field}
     {value}
     {placeholder}
     {onkeydown}
     oninput={(event) => oninput((event.currentTarget as HTMLInputElement).value)}
-    class="min-w-0 flex-1 bg-transparent px-1 text-body-md caret-accent outline-none placeholder:text-on-surface-variant"
+    class="min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-faint"
   />
   <span class="flex" class:invisible={!clears && !onClose}>
     <TooltipIconButton
       label={t(clears ? "CANCEL" : "CLOSE")}
       tooltip={false}
       enabled={clears || onClose !== null}
-      class="{slotClass} [&_svg]:size-[18px]"
+      class="size-6"
       onclick={() => (clears ? oninput("") : onClose?.())}
     >
-      <X class="text-on-surface-variant" />
+      <X />
     </TooltipIconButton>
   </span>
 </div>

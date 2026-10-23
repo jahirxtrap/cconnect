@@ -69,7 +69,7 @@
         }
       : undefined}
     class="cursor-pointer text-left transition-colors disabled:cursor-default {hover
-      ? 'enabled:hover:bg-on-surface/8'
+      ? 'enabled:hover:bg-hover'
       : ''} {className}"
   >
     {@render children()}

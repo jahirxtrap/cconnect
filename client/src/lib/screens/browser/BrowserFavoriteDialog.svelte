@@ -25,7 +25,7 @@
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={() => url && onConfirm(url, title.trim())} enabled={!!url}>{t("SAVE")}</Button>
   {/snippet}
-  <div class="flex flex-col gap-2.5">
+  <div class="flex flex-col gap-3">
     <InputField value={title} oninput={(value) => (title = value)} singleLine label={t("NAME")} autofocus />
     <InputField value={address} oninput={(value) => (address = value)} singleLine url label={t("URL")} />
   </div>

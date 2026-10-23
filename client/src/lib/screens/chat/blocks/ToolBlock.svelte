@@ -29,6 +29,9 @@
   }: Props = $props();
 
   const SLOW_MS = 1000;
+  const FIELD_PREFIX = /^[\w-]+:\s*/;
+
+  const headline = $derived((input.split("\n").find((line) => line.trim()) ?? "").replace(FIELD_PREFIX, ""));
 
   const empty = $derived(!input.trim() && !result?.trim());
   const elapsed = $derived(took !== null && took >= SLOW_MS ? formatDuration(took) : null);
@@ -37,13 +40,12 @@
 <Collapsible
   label={name ?? t("TOOLS")}
   icon={SquareTerminal}
-  preview={input}
+  preview={headline}
   stat={running ? null : elapsed}
   labelOnly={empty}
   {running}
   {expanded}
   {onToggle}
-  labelClass="text-accent"
 >
   {#if input.trim()}
     <p class="font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface-variant">{input}</p>

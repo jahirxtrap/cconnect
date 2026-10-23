@@ -3,12 +3,16 @@
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
   import { shortcuts } from "$lib/platform/shortcuts.svelte";
+  import type { IconSource } from "./icons";
   import { holdFocus, returnFocus } from "./keepFocus";
+  import { MENU_ICON_SIZE, MENU_ITEM_CLASS, menuIconClass } from "./menuSurface";
 
   interface Props {
     text: string;
     description?: string;
     shortcut?: string;
+    icon?: IconSource;
+    danger?: boolean;
     onclick?: () => void;
     selected?: boolean;
     enabled?: boolean;
@@ -22,6 +26,8 @@
     text,
     description = "",
     shortcut,
+    icon: IconComponent,
+    danger = false,
     onclick,
     selected = false,
     enabled = true,
@@ -41,8 +47,11 @@
   onSelect={onclick}
   onmousedown={holdFocus}
   onfocusin={returnFocus}
-  class="flex w-full cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors outline-none select-none data-disabled:cursor-default data-disabled:opacity-40"
+  class="{MENU_ITEM_CLASS} {danger ? 'text-red' : ''} data-disabled:cursor-default data-disabled:opacity-40"
 >
+  {#if IconComponent}
+    <IconComponent size={MENU_ICON_SIZE} class={menuIconClass(danger)} />
+  {/if}
   {@render leading?.()}
   {#if description}
     <span class="flex min-w-0 flex-1 flex-col">
@@ -53,10 +62,10 @@
     <span class="min-w-0 flex-1 truncate text-body-md {textClass}">{text}</span>
   {/if}
   {#if selected}
-    <Check size={16} class="shrink-0 text-accent" />
+    <Check size={MENU_ICON_SIZE} class="shrink-0 text-accent" />
   {/if}
   {#if hint}
-    <span class="shrink-0 pl-4 text-body-sm text-on-surface-variant">{hint}</span>
+    <span class="shrink-0 pl-4 text-caption text-faint">{hint}</span>
   {/if}
   {@render trailing?.()}
 </DropdownMenu.Item>

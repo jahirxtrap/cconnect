@@ -34,47 +34,18 @@
 
 <PopupMenu {open} {onOpenChange} label={t("MORE_OPTIONS")}>
   {#snippet triggerChild(props)}
-    <TooltipIconButton
-      label={t("MORE_OPTIONS")}
-      tooltip={false}
-      class="size-8 [&_svg]:size-5 {className}"
-      {...props}
-    >
+    <TooltipIconButton label={t("MORE_OPTIONS")} tooltip={false} class={className} {...props}>
       <EllipsisVertical />
     </TooltipIconButton>
   {/snippet}
-  <MenuItem text={t("RENAME")} onclick={() => (renaming = true)}>
-    {#snippet leading()}
-      <Pencil size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-  <MenuItem text={t("SAVE")} onclick={() => saveTextToDownloads(filename, note.body)}>
-    {#snippet leading()}
-      <Download size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-  <MenuItem text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, note.body)}>
-    {#snippet leading()}
-      <Save size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
-  <MenuItem text={t("SHARE")} onclick={() => void shareText(filename, note.body)}>
-    {#snippet leading()}
-      <Share2 size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
+  <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => (renaming = true)} />
+  <MenuItem icon={Download} text={t("SAVE")} onclick={() => saveTextToDownloads(filename, note.body)} />
+  <MenuItem icon={Save} text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, note.body)} />
+  <MenuItem icon={Share2} text={t("SHARE")} onclick={() => void shareText(filename, note.body)} />
   {#if duplicable}
-    <MenuItem text={t("DUPLICATE")} onclick={() => notes.duplicate(note.id)}>
-      {#snippet leading()}
-        <Copy size={20} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
+    <MenuItem icon={Copy} text={t("DUPLICATE")} onclick={() => notes.duplicate(note.id)} />
   {/if}
-  <MenuItem text={t("DELETE")} onclick={() => (deleting = true)}>
-    {#snippet leading()}
-      <Trash2 size={20} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
+  <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => (deleting = true)} />
 </PopupMenu>
 
 {#if renaming}
@@ -94,6 +65,7 @@
     title={t("DELETE")}
     text={t("DELETE_NOTE_CONFIRM", noteTitle(note) || t("NOTE_UNTITLED"))}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       deleting = false;
       onDeleted();

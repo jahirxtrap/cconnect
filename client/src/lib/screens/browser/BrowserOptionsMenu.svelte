@@ -23,6 +23,8 @@
 
   interface Props {
     url: string;
+    favorite: boolean;
+    onFavorite: () => void;
     device: string;
     native: boolean;
     onDevice: (name: string) => void;
@@ -34,14 +36,14 @@
     onCapture: (() => void) | null;
     onOpen: () => void;
     onCopy: () => void;
-    favorite: boolean;
-    onFavorite: () => void;
     onClearSite: (() => void) | null;
     onClearAll: (() => void) | null;
   }
 
   const {
     url,
+    favorite,
+    onFavorite,
     device,
     native,
     onDevice,
@@ -53,8 +55,6 @@
     onCapture,
     onOpen,
     onCopy,
-    favorite,
-    onFavorite,
     onClearSite,
     onClearAll,
   }: Props = $props();
@@ -68,7 +68,6 @@
     { name: "mobile", label: "BROWSER_MOBILE", icon: Smartphone },
     { name: "tablet", label: "BROWSER_TABLET", icon: Tablet },
   ];
-  const ICON = "shrink-0 text-on-surface-variant";
 
   let open = $state(false);
 
@@ -78,69 +77,69 @@
 
 <PopupMenu {open} label={t("MORE_OPTIONS")} onOpenChange={(value) => (open = value)}>
   {#snippet triggerChild(props)}
-    <TooltipIconButton label={t("MORE_OPTIONS")} class={picking ? "size-8 text-accent" : "size-8"} {...props}>
-      <EllipsisVertical size={18} />
+    <TooltipIconButton label={t("MORE_OPTIONS")} active={picking} class="size-7" {...props}>
+      <EllipsisVertical />
     </TooltipIconButton>
   {/snippet}
   {#if onCapture}
-    <MenuItem text={t("BROWSER_CAPTURE")} enabled={!!url} onclick={onCapture}>
-      {#snippet leading()}<Paperclip size={20} class={ICON} />{/snippet}
-    </MenuItem>
+    <MenuItem icon={Paperclip} text={t("BROWSER_CAPTURE")} enabled={!!url} onclick={onCapture} />
   {/if}
-  <MenuItem text={t("OPEN_EXTERNALLY")} enabled={!!url} onclick={onOpen}>
-    {#snippet leading()}<ExternalLink size={20} class={ICON} />{/snippet}
-  </MenuItem>
-  <MenuItem text={t("COPY_LINK")} enabled={!!url} onclick={onCopy}>
-    {#snippet leading()}<ClipboardCopy size={20} class={ICON} />{/snippet}
-  </MenuItem>
+  <MenuItem icon={ExternalLink} text={t("OPEN_EXTERNALLY")} enabled={!!url} onclick={onOpen} />
+  <MenuItem icon={ClipboardCopy} text={t("COPY_LINK")} enabled={!!url} onclick={onCopy} />
   <MenuItem
+    icon={favorite ? StarOff : Star}
     text={t(favorite ? "BROWSER_FAVORITE_REMOVE" : "BROWSER_FAVORITE_ADD")}
     enabled={!!url}
     onclick={onFavorite}
-  >
-    {#snippet leading()}
-      {#if favorite}
-        <StarOff size={20} class={ICON} />
-      {:else}
-        <Star size={20} class={ICON} />
-      {/if}
-    {/snippet}
-  </MenuItem>
-  <MenuSub text={t("BROWSER_DEVICE")}>
-    {#snippet leading()}<current.icon size={20} class={ICON} />{/snippet}
+  />
+  <MenuSub icon={current.icon} text={t("BROWSER_DEVICE")}>
     {#each devices as item (item.name)}
-      <MenuItem text={t(item.label)} selected={item.name === device} onclick={() => onDevice(item.name)}>
-        {#snippet leading()}<item.icon size={20} class={ICON} />{/snippet}
-      </MenuItem>
+      <MenuItem
+        icon={item.icon}
+        text={t(item.label)}
+        selected={item.name === device}
+        onclick={() => onDevice(item.name)}
+      />
     {/each}
   </MenuSub>
   {#if zoom !== null}
-    <MenuSub text={t("BROWSER_ZOOM")}>
-      {#snippet leading()}<ZoomIn size={20} class={ICON} />{/snippet}
-      <MenuItem text={t("BROWSER_ZOOM_IN")} shortcut="browser.zoom.in" closeOnSelect={false} onclick={() => onZoom(1)}>
-        {#snippet leading()}<ZoomIn size={20} class={ICON} />{/snippet}
-      </MenuItem>
-      <MenuItem text={t("BROWSER_ZOOM_OUT")} shortcut="browser.zoom.out" closeOnSelect={false} onclick={() => onZoom(-1)}>
-        {#snippet leading()}<ZoomOut size={20} class={ICON} />{/snippet}
-      </MenuItem>
-      <MenuItem text={t("RESET")} shortcut="browser.zoom.reset" enabled={zoom !== 1} onclick={onZoomReset}>
-        {#snippet leading()}<RotateCcw size={20} class={ICON} />{/snippet}
-      </MenuItem>
+    <MenuSub icon={ZoomIn} text={t("BROWSER_ZOOM")}>
+      <MenuItem
+        icon={ZoomIn}
+        text={t("BROWSER_ZOOM_IN")}
+        shortcut="browser.zoom.in"
+        closeOnSelect={false}
+        onclick={() => onZoom(1)}
+      />
+      <MenuItem
+        icon={ZoomOut}
+        text={t("BROWSER_ZOOM_OUT")}
+        shortcut="browser.zoom.out"
+        closeOnSelect={false}
+        onclick={() => onZoom(-1)}
+      />
+      <MenuItem
+        icon={RotateCcw}
+        text={t("RESET")}
+        shortcut="browser.zoom.reset"
+        enabled={zoom !== 1}
+        onclick={onZoomReset}
+      />
     </MenuSub>
   {/if}
   {#if onPick}
-    <MenuItem text={t("BROWSER_PICK")} shortcut="browser.pick" selected={picking} onclick={onPick}>
-      {#snippet leading()}<SquareMousePointer size={20} class={ICON} />{/snippet}
-    </MenuItem>
+    <MenuItem
+      icon={SquareMousePointer}
+      text={t("BROWSER_PICK")}
+      shortcut="browser.pick"
+      selected={picking}
+      onclick={onPick}
+    />
   {/if}
   {#if onClearSite}
-    <MenuItem text={t("BROWSER_SITE_CLEAR")} onclick={onClearSite}>
-      {#snippet leading()}<Cookie size={20} class={ICON} />{/snippet}
-    </MenuItem>
+    <MenuItem icon={Cookie} danger text={t("BROWSER_SITE_CLEAR")} onclick={onClearSite} />
   {/if}
   {#if onClearAll}
-    <MenuItem text={t("BROWSER_DATA_CLEAR_ALL")} onclick={onClearAll}>
-      {#snippet leading()}<Trash size={20} class={ICON} />{/snippet}
-    </MenuItem>
+    <MenuItem icon={Trash} danger text={t("BROWSER_DATA_CLEAR_ALL")} onclick={onClearAll} />
   {/if}
 </PopupMenu>

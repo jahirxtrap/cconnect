@@ -64,6 +64,8 @@ class Panes {
 
   readonly showingTool = $derived(this.open && this.kind !== "chat");
 
+  readonly split = $derived(this.open && !layout.mobile);
+
   readonly rightTab = $derived(
     this.kind === "chat"
       ? (tabs.right.find((tab) => tab.id === this.rightTabId) ?? tabs.right[0] ?? null)

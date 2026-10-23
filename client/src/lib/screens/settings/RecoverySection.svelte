@@ -75,6 +75,7 @@
     title={t("RESET_SETTINGS")}
     text={t("RESET_SETTINGS_CONFIRM")}
     confirmLabel={t("ACCEPT")}
+    danger
     onConfirm={reset}
     onDismiss={() => (dialog = null)}
   />

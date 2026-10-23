@@ -7,12 +7,10 @@
   import { isTouch } from "$lib/platform";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import SoftKeys from "./SoftKeys.svelte";
   import type TerminalSurface from "./TerminalSurface.svelte";
-  import { TERMINAL_BACKGROUND } from "./theme";
 
   interface Props {
     title: string;
@@ -44,11 +42,7 @@
 </script>
 
 {#snippet sessionStatus()}
-  {#if status === "connecting"}
-    <LoadingIndicator size={8} fill />
-  {:else}
-    <StatusDot class={status === "connected" ? "bg-green" : "bg-red"} box={8} />
-  {/if}
+  <StatusDot class={status === "connected" ? "bg-green" : "bg-red"} loading={status === "connecting"} />
 {/snippet}
 
 {#snippet sessionActions()}
@@ -59,7 +53,7 @@
       onClose();
     }}
   >
-    <X size={20} />
+    <X />
   </TooltipIconButton>
 {/snippet}
 
@@ -72,7 +66,7 @@
   >
     {#snippet navigationIcon()}
       <TooltipIconButton label={t("BACK")} onclick={onClose}>
-        <ArrowLeft size={20} />
+        <ArrowLeft />
       </TooltipIconButton>
     {/snippet}
   </AppTopBar>
@@ -82,13 +76,13 @@
   {:else if status === "failed"}
     <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
   {:else}
-    <div class="min-h-0 flex-1" style="background: {TERMINAL_BACKGROUND}">
+    <div class="mx-(--page-inset) mb-(--page-inset) min-h-0 flex-1 overflow-hidden rounded-panel bg-terminal">
       {#if Surface}
         <Surface bind:this={pane} {connect} onStatus={(next) => (status = next)} />
       {/if}
     </div>
     {#if isTouch}
-      <div class="flex shrink-0 items-center gap-2 border-t border-outline-variant bg-surface px-3 py-2">
+      <div class="flex shrink-0 items-center gap-2 px-(--page-inset) pb-(--page-inset)">
         <SoftKeys onKey={(bytes) => pane?.sendKey(bytes)} />
         <TooltipIconButton
           label={t("KEYBOARD")}

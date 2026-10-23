@@ -34,7 +34,7 @@
     <div class="flex items-center">
       <div class="min-w-0 flex-1">
         {#if title}
-          <p class="text-body-lg">{title}</p>
+          <p class="text-body-md font-medium">{title}</p>
           <p class="truncate text-body-sm text-on-surface-variant">{subtitle}</p>
         {/if}
       </div>

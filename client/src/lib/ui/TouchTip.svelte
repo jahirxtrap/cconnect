@@ -2,6 +2,7 @@
   import { Portal } from "bits-ui";
   import type { Snippet } from "svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { TOOLTIP_CLASS } from "./menuSurface";
 
   interface Props {
     text?: string;
@@ -79,7 +80,7 @@
       bind:clientWidth={width}
       bind:clientHeight={height}
       style="left: {left}px; top: {top}px"
-      class="pointer-events-none fixed z-75 rounded-sm bg-surface-variant px-2 py-1 text-body-sm whitespace-nowrap shadow-lg"
+      class="pointer-events-none fixed z-75 whitespace-nowrap {TOOLTIP_CLASS}"
     >
       {#if children}{@render children()}{:else}{text}{/if}
     </div>

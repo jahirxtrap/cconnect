@@ -1,21 +1,21 @@
 <script lang="ts">
   import Menu from "@lucide/svelte/icons/menu";
   import PanelLeftClose from "@lucide/svelte/icons/panel-left-close";
-  import Settings from "@lucide/svelte/icons/settings";
   import SquarePen from "@lucide/svelte/icons/square-pen";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
   import Settings2 from "@lucide/svelte/icons/settings-2";
+  import { rankLabel } from "$lib/app/commands.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { NAV_SCREENS } from "$lib/app/screens";
+  import ScreenBar from "$lib/app/ScreenBar.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { sessionLabel, type ChatCategory, type SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import SearchBar from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { hscrollbar } from "$lib/ui/scrollbar";
   import ConversationRow from "./ConversationRow.svelte";
   import { CategoryDrag } from "./dragCategories.svelte";
   import { ChatDrag } from "./dragChats.svelte";
@@ -85,6 +85,20 @@
     return loose.length ? [...result, { category: null, sessions: loose }] : result;
   });
 
+  let query = $state("");
+
+  const searching = $derived(query.trim().length > 0);
+
+  const found = $derived.by(() => {
+    if (!searching) return [];
+    const ranked = chat.historySessions
+      .map((session) => ({ session, rank: rankLabel(sessionLabel(session), query) }))
+      .filter((item) => item.rank >= 0);
+    ranked.sort((a, b) => a.rank - b.rank || (b.session.lastActive ?? 0) - (a.session.lastActive ?? 0));
+    return ranked.map((item) => item.session);
+  });
+
+  const shownGroups = $derived<SessionGroup[]>(searching ? [{ category: null, sessions: found }] : groups);
 
   const visibleProjects = $derived(chat.historyProjects);
 
@@ -135,10 +149,10 @@
   });
 </script>
 
-<div class="flex h-full min-h-0 flex-col bg-surface {drawerMode ? '' : 'border-r border-outline-variant'}">
-  <div class="flex h-14 shrink-0 items-center px-2">
+<div class="flex h-full min-h-0 flex-col gap-1 bg-surface pt-2.5 pb-2">
+  <div class="mb-1 flex shrink-0 items-center px-2">
     <EnvironmentSelector
-      class="min-w-0 flex-1"
+      class="flex-1"
       selected={chat.environmentId}
       onSelect={(id) => chat.selectEnvironment(id)}
     />
@@ -149,20 +163,22 @@
         onAfterSelect();
       }}
     >
-      <SquarePen size={18} />
+      <SquarePen />
     </TooltipIconButton>
     {#if onClose}
       <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={onClose}>
         {#if drawerMode}
-          <Menu size={18} />
+          <Menu />
         {:else}
-          <PanelLeftClose size={18} />
+          <PanelLeftClose />
         {/if}
       </TooltipIconButton>
     {/if}
   </div>
 
-  <div class="flex shrink-0 items-center px-2">
+  <SearchBar value={query} oninput={(value) => (query = value)} placeholder={t("SEARCH")} class="mx-2" />
+
+  <div class="mt-1.5 flex shrink-0 items-center px-2">
     <div class="min-w-0 flex-1">
       <ProjectSelector
         projects={visibleProjects}
@@ -170,22 +186,19 @@
         onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
       />
     </div>
-    <TooltipIconButton
-      label={t("ORGANIZE")}
-      class="size-8 [&_svg]:size-4"
-      enabled={!chat.historyUnavailable}
-      onclick={onOrganize}
-    >
+    <TooltipIconButton label={t("ORGANIZE")} enabled={!chat.historyUnavailable} onclick={onOrganize}>
       <Settings2 />
     </TooltipIconButton>
   </div>
 
   <div
     bind:this={list}
-    class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pt-1 pb-2 {drag.active ? 'cursor-pointer' : ''}"
+    class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-2 {drag.active ? 'cursor-pointer' : ''}"
   >
-    {#if chat.historySessions.length}
-      {#each groups as group, groupIndex (group.category?.id ?? "loose")}
+    {#if searching && !found.length}
+      <EmptyState text={t("NO_RESULTS")} class="h-full" />
+    {:else if chat.historySessions.length}
+      {#each shownGroups as group, groupIndex (group.category?.id ?? "loose")}
         {#if !group.category && groupIndex > 0}
           <div data-spacer={groupIndex} class="my-1 shrink-0">
             <div
@@ -209,13 +222,14 @@
             onpointerdown={(event) => startCategoryDrag(event, category.id)}
           >
             <div
-              class="flex w-full items-center pr-1 transition-colors {joined
+              data-press
+              class="flex h-7 w-full items-center pr-1.5 pl-2.5 transition-colors {joined
                 ? 'rounded-t-item'
                 : 'rounded-item'} {drag.highlights(category.id)
-                ? 'bg-accent/14 outline-2 -outline-offset-2 outline-accent'
+                ? 'bg-accent-soft outline-2 -outline-offset-2 outline-accent'
                 : held
-                  ? 'bg-on-surface/8'
-                  : 'hover:bg-on-surface/8'}"
+                  ? 'bg-hover'
+                  : 'hover:bg-hover'}"
               style="transform: translateY({held
                 ? categoryDrag.offset
                 : drag.shiftFor(`cat:${category.id}`) + categoryDrag.shiftFor(category.id)}px); transition: {held ||
@@ -226,28 +240,30 @@
             >
             <button
               type="button"
-              class="flex min-w-0 flex-1 cursor-pointer items-center text-left"
+              class="flex h-full min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
               onclick={() => chat.toggleCategory(category)}
             >
-              {#if collapsed}
-                <ChevronRight size={14} class="ml-1 shrink-0 text-on-surface-variant" />
-              {:else}
-                <ChevronDown size={14} class="ml-1 shrink-0 text-on-surface-variant" />
-              {/if}
+              <span class="flex size-4 shrink-0 items-center justify-center text-on-surface-variant">
+                {#if collapsed}
+                  <ChevronRight size={14} />
+                {:else}
+                  <ChevronDown size={14} />
+                {/if}
+              </span>
               <span
-                class="min-w-0 flex-1 truncate py-1.5 pl-1 text-label-sm uppercase"
+                class="min-w-0 flex-1 truncate text-label-md"
                 style={`color: ${sessionColorOf(category.color) ?? "var(--c-on-surface-variant)"}`}
               >
                 {category.name}
               </span>
-              <span class="flex size-6 shrink-0 items-center justify-center text-label-sm text-on-surface-variant">
+              <span class="flex size-6 shrink-0 items-center justify-center text-caption text-faint">
                 {group.sessions.length}
               </span>
             </button>
             <button
               type="button"
               aria-label={t("NEW_CHAT")}
-              class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+              class="flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
               onpointerdown={(event) => event.stopPropagation()}
               onclick={() => {
                 onNewTab(category.id);
@@ -272,13 +288,13 @@
               class="relative {dragged || carried ? 'z-10' : ''} {drag.active || categoryDrag.active
                 ? 'pointer-events-none'
                 : ''}"
-              onpointerdown={(event) => startDrag(event, session, index)}
+              onpointerdown={(event) => !searching && startDrag(event, session, index)}
             >
             <div
               class={dragged
-                ? "rounded-item bg-on-surface/8"
+                ? "rounded-item bg-hover"
                 : carried
-                  ? `bg-on-surface/8 ${index === group.sessions.length - 1 ? "rounded-b-item" : ""}`
+                  ? `bg-hover ${index === group.sessions.length - 1 ? "rounded-b-item" : ""}`
                   : ""}
               style="transform: translateY({dragged
                 ? drag.offset
@@ -293,7 +309,8 @@
             >
             <ConversationRow
               title={sessionLabel(session)}
-              selected={session.sessionId === chat.sessionId}
+              selected={navigation.route === "/" && session.sessionId === chat.sessionId}
+              color={sessionColorOf(session.color) ?? null}
               onOpen={() => {
                 chat.openSession(session);
                 onAfterSelect();
@@ -312,6 +329,7 @@
                   }
                 : null}
               onDelete={() => onDelete(session)}
+              trash={chat.trashEnabled}
               onMove={(preset) => onMove(session, preset)}
               categories={chat.categoriesFor(session.projectKey)}
               currentCategoryId={chat.placement[session.sessionId]?.categoryId ?? null}
@@ -320,6 +338,7 @@
               projects={chat.historyProjects}
               currentProjectKey={session.projectKey}
               activity={session.activity}
+              resident={session.resident}
             />
             </div>
             </div>
@@ -333,20 +352,7 @@
     {/if}
   </div>
 
-  <div class="flex shrink-0 items-center border-t border-outline-variant px-2 py-1.5">
-    <div
-      use:hscrollbar={{ wheel: true }}
-      class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
-    >
-      {#each NAV_SCREENS as screen (screen.kind)}
-        {@const Icon = screen.screenIcon ?? screen.icon}
-        <TooltipIconButton label={t(screen.screenLabel ?? screen.label)} onclick={screen.open}>
-          <Icon size={17} />
-        </TooltipIconButton>
-      {/each}
-    </div>
-    <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
-      <Settings size={17} />
-    </TooltipIconButton>
+  <div class="flex shrink-0 items-center px-2 pt-1.5">
+    <ScreenBar />
   </div>
 </div>

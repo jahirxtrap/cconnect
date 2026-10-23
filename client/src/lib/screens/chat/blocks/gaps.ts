@@ -1,12 +1,15 @@
 import type { Role } from "$lib/data/chatModels";
 
+export type GapRole = Role | "status";
+
 const BIG = "var(--chat-gap-lg)";
 const SMALL = "var(--chat-gap-sm)";
+const TIGHT = "var(--chat-gap-xs)";
 const NONE = "0px";
 
-const NOTICE: Role[] = ["api_error", "interrupted"];
+const NOTICE: GapRole[] = ["api_error", "interrupted", "status"];
 
-const GROUPED: Role[] = [
+const GROUPED: GapRole[] = [
   "thinking",
   "working",
   "tool",
@@ -23,18 +26,18 @@ const GROUPED: Role[] = [
   "plugin_message",
 ];
 
-const ROW_ALIKE: Partial<Record<Role, Role>> = { notice: "tool" };
+const ROW_ALIKE: Partial<Record<GapRole, GapRole>> = { notice: "tool" };
 
-const isNotice = (role: Role | null): boolean => role !== null && NOTICE.includes(role);
+const isNotice = (role: GapRole | null): boolean => role !== null && NOTICE.includes(role);
 
-const group = (role: Role | null): number => {
+const group = (role: GapRole | null): number => {
   if (role !== null && GROUPED.includes(role)) return 0;
   if (role === "assistant") return 1;
   if (role === "user" || role === "api_error" || role === "interrupted") return 2;
   return 3;
 };
 
-export const gapAbove = (before: Role | null, role: Role): string => {
+export const gapAbove = (before: GapRole | null, role: GapRole): string => {
   const prev = before === null ? null : (ROW_ALIKE[before] ?? before);
   const current = ROW_ALIKE[role] ?? role;
   if (prev === null) return BIG;
@@ -53,12 +56,24 @@ export const gapAbove = (before: Role | null, role: Role): string => {
   return a === 1 || b === 1 ? NONE : SMALL;
 };
 
-export const gapBelow = (current: Role, next: Role | null): string => {
+export const gapBelow = (current: GapRole, next: GapRole | null): string => {
   if (next !== null) return NONE;
   if (isNotice(current) || current === "user") return NONE;
   return BIG;
 };
 
-export const cardGap = (gap: string): string => (gap === NONE ? SMALL : gap);
+const CARDS: GapRole[] = [...GROUPED, ...NOTICE, "summary", "agent_report"];
+
+const isCard = (role: GapRole | null): boolean => role !== null && CARDS.includes(role);
+
+const isBlock = (role: GapRole): boolean => isCard(role) && !isNotice(role);
+
+export const rowGap = (before: GapRole | null, role: GapRole, gap: string, carded = false): string => {
+  if (before === null) return gap;
+  if (before === "user" && role === "user") return NONE;
+  if (isBlock(before) && isBlock(role)) return TIGHT;
+  const continued = gap === NONE && !carded && !isCard(before) && !isCard(role);
+  return continued ? NONE : SMALL;
+};
 
 export const NO_GAP = NONE;

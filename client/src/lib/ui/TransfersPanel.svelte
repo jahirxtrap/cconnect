@@ -10,60 +10,31 @@
   import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { dragSaved, openTransfer } from "$lib/services/sharedFiles";
-  import { snapToDevicePixel } from "./gridHeight";
+  import FloatDock from "./FloatDock.svelte";
+  import { FLOAT_PANEL_WIDTH, FLOAT_SURFACE_CLASS } from "./menuSurface";
   import ProgressRing from "./ProgressRing.svelte";
-  import { borderWidth, scrollableUnder, scrollbarWidth } from "./scrollbar";
   import TooltipIconButton from "./TooltipIconButton.svelte";
-
-  const HALF = 2;
 
   const items = $derived(transfers.items);
   const done = $derived(transfers.finished.length);
   const running = $derived(transfers.active.length);
 
   let panelHeight = $state(0);
-  let scrollbar = $state(0);
 
   $effect(() => {
     layout.transfersInset = items.length ? panelHeight + layout.menuPadding.bottom + layout.bottomInset : 0;
     return () => (layout.transfersInset = 0);
   });
-
-  $effect(() => {
-    void [layout.width, layout.height, layout.rightInset];
-    if (!items.length) return;
-    let tracked: HTMLElement | null = null;
-    let border = 0;
-    let frame = 0;
-    const measure = () => {
-      if (!tracked?.isConnected) {
-        tracked = scrollableUnder(layout.width - layout.safeRight - layout.rightInset - 1, layout.height / HALF);
-        border = tracked ? borderWidth(tracked) : 0;
-      }
-      scrollbar = tracked ? scrollbarWidth(tracked, border) : 0;
-      frame = requestAnimationFrame(measure);
-    };
-    measure();
-    return () => cancelAnimationFrame(frame);
-  });
 </script>
 
 {#if items.length}
-  <div
-    style="padding: {snapToDevicePixel(layout.menuPadding.top)}px {snapToDevicePixel(
-      layout.menuPadding.right + scrollbar + layout.rightInset,
-    )}px {snapToDevicePixel(layout.menuPadding.bottom)}px {layout.menuPadding.left}px"
-    class="pointer-events-none fixed inset-x-0 bottom-0 z-30 flex justify-end {layout.rightInsetAnimated
-      ? 'transition-[padding-right] duration-200'
-      : ''}"
-  >
+  <FloatDock>
     <div
       bind:clientHeight={panelHeight}
-      style="margin-bottom: {snapToDevicePixel(layout.bottomInset)}px"
-      class="menu-surface pointer-events-auto w-full overflow-hidden rounded-lg border border-outline-variant bg-surface-variant shadow-lg sm:w-90"
+      class="menu-surface pointer-events-auto overflow-hidden {FLOAT_PANEL_WIDTH} {FLOAT_SURFACE_CLASS}"
     >
       <div class="flex items-center gap-1 py-1 pr-1 pl-3.5">
-        <p class="min-w-0 flex-1 truncate text-label-lg font-bold text-on-surface-variant">
+        <p class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
           {running ? t("TRANSFERS_ACTIVE", `${done + 1}`, `${items.length}`) : t("TRANSFERS_DONE")}
         </p>
         <TooltipIconButton
@@ -84,7 +55,7 @@
       </div>
 
       {#if !transfers.collapsed}
-        <div role="list" class="scrollbar-thin max-h-64 overflow-y-auto border-t border-outline-variant p-1">
+        <div role="list" class="scrollbar-thin max-h-64 overflow-y-auto p-1 pt-0">
           {#each items as item (item.id)}
             {@const openable = item.status === "done" && item.url.length > 0}
             {@const dragging = isDesktop && item.status === "done" && item.saved.length > 0}
@@ -98,7 +69,7 @@
                 void dragSaved(item.saved);
               }}
               class="flex items-center gap-2.5 rounded-item px-2.5 py-1.5 transition-colors {openable
-                ? 'hover:bg-on-surface/8'
+                ? 'hover:bg-hover'
                 : ''}"
             >
               {#if item.kind === "upload"}
@@ -117,7 +88,7 @@
                 {item.name}
               </button>
               {#if item.status === "active"}
-                <ProgressRing value={item.progress} size={20} stroke={2.5} />
+                <ProgressRing value={item.progress} size={16} stroke={2} />
                 <button
                   type="button"
                   data-press="off"
@@ -137,5 +108,5 @@
         </div>
       {/if}
     </div>
-  </div>
+  </FloatDock>
 {/if}

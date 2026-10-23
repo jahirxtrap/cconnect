@@ -5,10 +5,10 @@
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { entryFor, entryHint } from "$lib/screens/settings/settingsIndex";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import TrailingIcon from "$lib/ui/TrailingIcon.svelte";
   import { indicatorTone } from "./serviceStatus";
 
   interface Props {
@@ -43,17 +43,14 @@
 
 <SettingsGroup label={t("SERVICE_STATUS")}>
   {#snippet labelTrailing()}
-    {#if loading}
-      <LoadingIndicator size={20} />
-    {:else if !service || service.error !== null}
-      <StatusDot class="bg-gray" box={20} dot={12} />
-    {:else}
-      <StatusDot class={indicatorTone(service.indicator)} box={20} dot={12} />
-    {/if}
+    <StatusDot
+      {loading}
+      class={!service || service.error !== null ? "bg-gray" : indicatorTone(service.indicator)}
+    />
   {/snippet}
   <PreferenceRow icon={Activity} title={t("SERVICE_STATUS")} {summary} {enabled} onclick={onOpen}>
     {#snippet trailing()}
-      <ChevronRight size={24} class="text-on-surface-variant" />
+      <TrailingIcon icon={ChevronRight} />
     {/snippet}
   </PreferenceRow>
 </SettingsGroup>

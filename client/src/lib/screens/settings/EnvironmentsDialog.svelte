@@ -95,7 +95,6 @@
       <TooltipIconButton
         label={t("SCAN_QR")}
         onclick={() => void startScan()}
-        class="size-9 [&_svg]:size-5"
       >
         <ScanQrCode />
       </TooltipIconButton>
@@ -117,7 +116,6 @@
           {#if profile.id === backend.active?.id}
             <TooltipIconButton
               label={settings.environmentLocked ? t("UNLOCK_SELECTION") : t("LOCK_SELECTION")}
-              class="[&_svg]:size-[18px]"
               onclick={() => (settings.environmentLocked = !settings.environmentLocked)}
             >
               {#if settings.environmentLocked}
@@ -129,7 +127,6 @@
           {/if}
           <TooltipIconButton
             label={t("EDIT_ENVIRONMENT")}
-            class="[&_svg]:size-[18px]"
             onclick={() => {
               editing = { ...profile };
               isNew = false;
@@ -137,7 +134,7 @@
           >
             <Pencil />
           </TooltipIconButton>
-          <TooltipIconButton label={t("DELETE")} class="[&_svg]:size-[18px]" onclick={() => (deleting = profile)}>
+          <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)}>
             <Trash2 />
           </TooltipIconButton>
         {/snippet}
@@ -175,6 +172,7 @@
     title={t("DELETE")}
     text={t("DELETE_ENVIRONMENT_CONFIRM", profile.name)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => remove(profile)}
     onDismiss={() => (deleting = null)}
   />

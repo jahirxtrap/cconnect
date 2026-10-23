@@ -74,7 +74,7 @@
       singleLine
     >
       {#snippet trailing()}
-        <TooltipIconButton label={t("CHOOSE")} {enabled} onclick={pick} class="size-6 [&_svg]:size-[18px]">
+        <TooltipIconButton label={t("CHOOSE")} {enabled} onclick={pick}>
           <Folder />
         </TooltipIconButton>
       {/snippet}

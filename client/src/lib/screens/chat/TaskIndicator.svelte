@@ -1,12 +1,11 @@
 <script lang="ts">
   import Check from "@lucide/svelte/icons/check";
-  import CircleDot from "@lucide/svelte/icons/circle-dot";
-  import Square from "@lucide/svelte/icons/square";
-  import SquareCheckBig from "@lucide/svelte/icons/square-check-big";
   import { DropdownMenu } from "bits-ui";
   import type { TodoItem } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import MenuScrim from "$lib/ui/MenuScrim.svelte";
+  import { MENU_LIST_CLASS } from "$lib/ui/menuSurface";
+  import TodoMark from "$lib/ui/TodoMark.svelte";
 
   interface Props {
     todos: TodoItem[];
@@ -14,7 +13,7 @@
 
   const { todos }: Props = $props();
 
-  const PIE = 24;
+  const PIE = 18;
   const FULL_TURN = 360;
   const HALF_TURN = 180;
   const QUARTER_TURN = 90;
@@ -42,7 +41,7 @@
   <MenuScrim {open} onDismiss={() => (open = false)} />
   <DropdownMenu.Root {open} onOpenChange={(value) => (open = value)}>
     <DropdownMenu.Trigger
-      class="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
+      class="inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-hover"
       aria-label={t("TASKS")}
     >
       <span class="relative inline-flex items-center justify-center">
@@ -58,7 +57,7 @@
           {/if}
         </svg>
         {#if complete}
-          <Check size={16} class="absolute text-on-accent" />
+          <Check size={12} class="absolute text-on-accent [stroke-width:2.6]" />
         {/if}
       </span>
     </DropdownMenu.Trigger>
@@ -67,27 +66,21 @@
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => event.preventDefault()}
         sideOffset={6}
-        class="menu-surface scrollbar-thin z-70 max-h-96 w-80 overflow-y-auto rounded-md border-2 border-outline-variant bg-surface-variant p-1 shadow-lg"
+        class="{MENU_LIST_CLASS} max-h-96 w-80"
       >
-        <p class="px-3.5 pb-2 text-label-lg font-bold text-on-surface-variant">
-          {t("TASKS")} ({done}/{todos.length})
+        <p class="flex items-center gap-2 px-2.5 pt-1.5 pb-1 text-label-md text-on-surface-variant">
+          <span class="min-w-0 flex-1 truncate">{t("TASKS")}</span>
+          <span class="text-caption text-faint">{done}/{todos.length}</span>
         </p>
-        <div class="mb-1 h-px bg-outline-variant"></div>
         {#each todos as todo, index (index)}
           {@const finished = todo.status === "completed"}
           {@const active = todo.status === "in_progress"}
-          <div class="flex items-start gap-2 rounded-sm px-2 py-1.5">
-            {#if finished}
-              <SquareCheckBig size={20} class="mt-px shrink-0 text-accent" />
-            {:else if active}
-              <CircleDot size={20} class="mt-px shrink-0 text-accent" />
-            {:else}
-              <Square size={20} class="mt-px shrink-0 text-on-surface-variant" />
-            {/if}
+          <div class="flex items-start gap-2.5 px-2.5 py-1.5">
+            <span class="flex h-5 shrink-0 items-center"><TodoMark done={finished} {active} /></span>
             <span
-              class="min-w-0 flex-1 text-body-md {finished
-                ? 'text-on-surface-variant line-through'
-                : ''} {active ? 'font-semibold' : ''}"
+              class="min-w-0 flex-1 text-body-md {finished ? 'text-faint line-through' : ''} {active
+                ? 'text-on-surface'
+                : ''}"
             >
               {active && todo.activeForm ? todo.activeForm : todo.content}
             </span>

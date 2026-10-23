@@ -2,6 +2,7 @@
   import { Dialog } from "bits-ui";
   import type { Snippet } from "svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
+  import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS } from "./menuSurface";
 
   interface Props {
     title: string;
@@ -30,10 +31,10 @@
 
 <Dialog.Root open onOpenChange={(open) => !open && onDismiss()}>
   <Dialog.Portal>
-    <Dialog.Overlay class="fixed inset-0 z-60 bg-black/60" />
+    <Dialog.Overlay class={DIALOG_OVERLAY_CLASS} />
     <Dialog.Content
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="menu-surface safe-inset fixed z-60 m-auto flex h-max max-h-[min(40rem,calc(var(--safe-height)_-_2rem))] w-[min(42rem,calc(100vw-2rem))] flex-col rounded-lg border-2 border-outline-variant bg-surface p-5 shadow-xl"
+      class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-[min(40rem,calc(var(--safe-height)_-_2rem))] w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
       <div class="flex items-center">
         <div class="min-w-0 flex-1">

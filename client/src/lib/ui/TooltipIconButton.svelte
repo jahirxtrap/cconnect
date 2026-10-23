@@ -4,6 +4,7 @@
   import { isTouch } from "$lib/platform";
   import { shortcuts } from "$lib/platform/shortcuts.svelte";
   import { keyboardNavigation } from "./keyboardNavigation.svelte";
+  import { TOOLTIP_CLASS } from "./menuSurface";
   import { LONG_PRESS_MS } from "./press";
   import TouchTip from "./TouchTip.svelte";
 
@@ -13,6 +14,8 @@
     onclick?: () => void;
     enabled?: boolean;
     tooltip?: boolean;
+    active?: boolean;
+    selected?: boolean;
     class?: string;
     children: Snippet;
     [key: string]: unknown;
@@ -24,28 +27,33 @@
     onclick,
     enabled = true,
     tooltip = true,
+    active = false,
+    selected = false,
     class: className = "",
     children,
     ...rest
   }: Props = $props();
 
   const BASE_CLASS =
-    "no-callout inline-flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full transition-colors select-none enabled:hover:bg-on-surface/8 disabled:cursor-default disabled:opacity-40";
+    "no-callout inline-flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full transition-colors select-none disabled:cursor-default disabled:opacity-40";
+  const ACTIVE_CLASS = "text-accent enabled:hover:bg-hover";
+  const SELECTED_CLASS = "bg-surface-variant text-accent";
+  const IDLE_CLASS = "text-on-surface-variant enabled:hover:bg-hover enabled:hover:text-on-surface";
   const PRESS_SLOP = 10;
   const TOUCH_HIDE_MS = 1500;
   const HALF = 2;
 
-  const SIZE_CLASS = /(^|\s)size-\S+/;
+  const SIZE_CLASS = /(^|\s)(size|w|h)-\S+/;
   const ICON_SIZE_CLASS = /\[&_svg\]:size-/;
-  const DEFAULT_SIZE = "size-9";
+  const SMALL_CLASS = /(^|\s)size-[67](\s|$)/;
+  const DEFAULT_SIZE = "size-8";
 
-  const compact = $derived(/(^|\s)size-8(\s|$)/.test(className));
   const iconSize = $derived(
-    ICON_SIZE_CLASS.test(className) ? "" : compact ? "[&_svg]:size-[18px]" : "[&_svg]:size-6",
+    ICON_SIZE_CLASS.test(className) ? "" : SMALL_CLASS.test(className) ? "[&_svg]:size-4" : "[&_svg]:size-4.5",
   );
 
   const TRIGGER_CLASS = $derived(
-    `${BASE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
+    `${BASE_CLASS} ${selected ? SELECTED_CLASS : active ? ACTIVE_CLASS : IDLE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
   );
 
   const hint = $derived(shortcut ? shortcuts.hint(shortcut) : "");
@@ -187,11 +195,11 @@
         <Tooltip.Portal>
           <Tooltip.Content
             sideOffset={4}
-            class="z-75 flex items-center gap-1.5 rounded-sm bg-surface-variant px-2 py-1 text-body-sm shadow-lg"
+            class="z-75 flex items-center gap-1.5 {TOOLTIP_CLASS}"
           >
             <span>{label}</span>
             {#if hint}
-              <span class="text-on-surface-variant">{hint}</span>
+              <span class="text-caption text-faint">{hint}</span>
             {/if}
           </Tooltip.Content>
         </Tooltip.Portal>

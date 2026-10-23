@@ -23,10 +23,12 @@
   import { fileIcon } from "$lib/ui/fileIcons";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
+  import { ringVars } from "$lib/design/theme.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, systemName } from "$lib/platform";
   import { startDictation, voiceAvailable } from "$lib/platform/voice";
   import { commandText, commandToken, takesArguments, type CommandOption } from "$lib/services/capabilitiesApi";
+  import { OUTLINE_CLASS } from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -39,6 +41,7 @@
   import { pastedName } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
   import { keepFocus } from "$lib/ui/keepFocus";
+  import { MENU_LIST_CLASS } from "$lib/ui/menuSurface";
 
   interface Props {
     focused: boolean;
@@ -69,6 +72,7 @@
     completions?: ModCompletions | null;
     decorations?: ModDecoration[];
     controls?: Snippet;
+    band?: Snippet;
   }
 
   const {
@@ -100,14 +104,18 @@
     completions = null,
     decorations = [],
     controls,
+    band,
   }: Props = $props();
 
   let fieldScroll = $state(0);
 
   const ROUND_CLASS =
-    "ripple inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full";
+    "ripple inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors";
+  const ACTION_CLASS = `${ROUND_CLASS} bg-surface-variant text-on-surface-variant hover:text-on-surface`;
+  const FIELD_TEXT = isTouch ? "text-body-lg" : "text-body-md leading-(--chat-line-body)";
 
   const accent = $derived(sessionColorOf(sessionColor));
+  const ring = $derived(accent ? ringVars(accent) : undefined);
 
   const queueLabel = (item: QueuedMessage) => {
     const { text, elements: picked } = splitElements(item.text);
@@ -463,17 +471,15 @@
     use:keepFocus
     onclick={onremove}
     aria-label={t("DELETE")}
-    class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+    class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:text-on-surface"
   >
-    <X size={16} />
+    <X size={14} />
   </button>
 {/snippet}
 
-<div class="relative shrink-0 px-3 pb-3">
+{#snippet entryList()}
   {#if entries.length}
-    <div
-      class="scrollbar-thin absolute inset-x-3 bottom-full z-40 mb-1.5 max-h-64 overflow-y-auto rounded-lg border-2 border-outline-variant bg-surface py-1 shadow-lg"
-    >
+    <div class="absolute inset-x-0 bottom-full z-40 mb-1.5 max-h-64 {MENU_LIST_CLASS}">
       {#each entries as entry (entry.command ? `/${entry.command.name}` : `+${entry.row.text}`)}
         <button
           type="button"
@@ -483,8 +489,8 @@
             const at = pickable.indexOf(entry);
             if (at >= 0) highlighted = at;
           }}
-          class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start px-3.5 py-2 text-left {entry === current
-            ? 'bg-on-surface/8'
+          class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start rounded-md px-2.5 py-1.5 text-left {entry === current
+            ? 'bg-hover'
             : ''}"
         >
           {#if entry.command}
@@ -507,184 +513,173 @@
       {/each}
     </div>
   {/if}
-  <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
+{/snippet}
+
+<div class="relative shrink-0 px-(--page-inset) pt-2.5 pb-4 in-data-[layout=mobile]:pb-3">
+  {@render band?.()}
   <div
-    onclick={focusField}
-    style={accent ? `border-color: ${accent}` : undefined}
-    class="relative cursor-text rounded-lg border-2 bg-surface {accent ? '' : 'border-outline-variant'}"
+    style={ring}
+    class="relative rounded-2xl bg-surface shadow-composer {ring
+      ? ''
+      : '[--c-accent-ring:var(--c-outline-variant)]'}"
   >
-    {#if queue.length}
-      <div
-        use:hscrollbar={{ wheel: true }}
-        class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3"
-      >
-        {#each queue as item (item.id)}
-          <Chip name={queueLabel(item)} icon={Hourglass} onclick={() => onOpenQueued(item)} />
-        {/each}
-      </div>
-    {/if}
-
-    {#if chipped}
-      <div
-        use:hscrollbar={{ wheel: true }}
-        class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}"
-      >
-        {#each elements as item (item.id)}
-          <Chip name={elementLabel(item)} icon={SquareMousePointer}>
-            {#snippet trailing()}
-              {@render removal(() => onRemoveElement(item.id))}
-            {/snippet}
-          </Chip>
-        {/each}
-        {#each attachments as item (item.id)}
-          <Chip name={item.name} icon={fileIcon(item.name)}>
-            {#snippet trailing()}
-              {#if uploading}
-                <ProgressRing value={item.progress} size={16} stroke={2} />
-              {:else}
-                {@render removal(() => onRemoveAttachment(item.id))}
-              {/if}
-            {/snippet}
-          </Chip>
-        {/each}
-      </div>
-    {/if}
-
-    <div class="relative px-3.5 {queue.length || chipped ? 'pt-1.5' : 'pt-3.5'}">
-      {#if ghost && !draft && !listening}
-        <button
-          type="button"
-          use:keepFocus
-          onclick={acceptGhost}
-          class="absolute right-3.5 bottom-0 z-10 cursor-pointer rounded-md border border-outline-variant px-1.5 text-label-sm text-on-surface-variant transition-colors hover:bg-on-surface/8"
+    <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
+    <div onclick={focusField} class="relative cursor-text">
+      {@render entryList()}
+      {#if queue.length}
+        <div
+          use:hscrollbar={{ wheel: true }}
+          class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3"
         >
-          {isTouch ? t("ACCEPT") : "Tab"}
-        </button>
+          {#each queue as item (item.id)}
+            <Chip name={queueLabel(item)} icon={Hourglass} onclick={() => onOpenQueued(item)} />
+          {/each}
+        </div>
       {/if}
-      <div class="relative">
-        {#if decorations.length}
-          <ModDecorations text={draft} {decorations} scrollTop={fieldScroll} class="text-body-lg" />
+
+      {#if chipped}
+        <div
+          use:hscrollbar={{ wheel: true }}
+          class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}"
+        >
+          {#each elements as item (item.id)}
+            <Chip name={elementLabel(item)} icon={SquareMousePointer}>
+              {#snippet trailing()}
+                {@render removal(() => onRemoveElement(item.id))}
+              {/snippet}
+            </Chip>
+          {/each}
+          {#each attachments as item (item.id)}
+            <Chip name={item.name} icon={fileIcon(item.name)}>
+              {#snippet trailing()}
+                {#if uploading}
+                  <ProgressRing value={item.progress} size={16} stroke={2} />
+                {:else}
+                  {@render removal(() => onRemoveAttachment(item.id))}
+                {/if}
+              {/snippet}
+            </Chip>
+          {/each}
+        </div>
+      {/if}
+
+      <div class="relative px-3.5 pb-1.5 {queue.length || chipped ? 'pt-1.5' : 'pt-3'}">
+        {#if ghost && !draft && !listening}
+          <button
+            type="button"
+            use:keepFocus
+            onclick={acceptGhost}
+            class="absolute right-3.5 bottom-1.5 z-10 cursor-pointer rounded-sm px-1.5 text-caption text-on-surface-variant {OUTLINE_CLASS} transition-colors hover:bg-hover"
+          >
+            {isTouch ? t("ACCEPT") : "Tab"}
+          </button>
         {/if}
-        <textarea
-          bind:this={field}
-          value={draft}
-          {oninput}
-          {onkeydown}
-          {onpaste}
-          {ondragenter}
-          onscroll={(event) => (fieldScroll = event.currentTarget.scrollTop)}
-          rows="1"
-          placeholder={listening ? t("VOICE_LISTENING") : (ghost ?? t("TYPE_MESSAGE"))}
-          class="field-auto no-scrollbar relative block max-h-36 w-full resize-none bg-transparent text-body-lg caret-accent outline-none placeholder:text-on-surface-variant {ghost &&
-          !draft &&
-          !listening
-            ? 'pr-16'
-            : ''} {decorations.length ? 'text-transparent' : ''}"
-        ></textarea>
-      </div>
-      {#if heard}
-        <p class="pt-1 text-body-md wrap-anywhere text-on-surface-variant">{heard}</p>
-      {/if}
-    </div>
-
-    <div class="flex items-center gap-1 px-2.5 pt-1.5 pb-2.5">
-      {#if onCloseSide}
-        <button
-          type="button"
-          use:keepFocus
-          onclick={onCloseSide}
-          aria-label={t("CLOSE")}
-          title={t("CLOSE")}
-          class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant"
-        >
-          <X size={18} />
-        </button>
-      {:else}
-        <PopupMenu
-          open={actionsOpen}
-          side="top"
-          triggerClass="shrink-0"
-          onOpenChange={(open) => (actionsOpen = open)}
-        >
-          {#snippet trigger()}
-            <span
-              aria-label={t("ACTIONS")}
-              title={t("ACTIONS")}
-              class="{ROUND_CLASS} bg-surface-variant text-on-surface-variant"
-            >
-              <Plus size={18} />
-            </span>
-          {/snippet}
-          {#if phone}
-            <MenuItem text={t("ATTACH_CAMERA")} enabled={!uploading} onclick={() => pickFrom("image/*", "environment")}>
-              {#snippet leading()}
-                <Camera size={16} class="shrink-0 text-on-surface-variant" />
-              {/snippet}
-            </MenuItem>
-            <MenuItem text={t("ATTACH_PHOTOS")} enabled={!uploading} onclick={() => pickFrom("image/*")}>
-              {#snippet leading()}
-                <ImageIcon size={16} class="shrink-0 text-on-surface-variant" />
-              {/snippet}
-            </MenuItem>
+        <div class="relative">
+          {#if decorations.length}
+            <ModDecorations text={draft} {decorations} scrollTop={fieldScroll} class={FIELD_TEXT} />
           {/if}
-          <MenuItem text={t("ATTACH_FILES")} enabled={!uploading} onclick={() => pickFrom()}>
-            {#snippet leading()}
-              <Paperclip size={16} class="shrink-0 text-on-surface-variant" />
-            {/snippet}
-          </MenuItem>
-          <MenuItem text={t("COMMANDS")} onclick={openCommands}>
-            {#snippet leading()}
-              <SquareSlash size={16} class="shrink-0 text-on-surface-variant" />
-            {/snippet}
-          </MenuItem>
-        </PopupMenu>
-      {/if}
+          <textarea
+            bind:this={field}
+            value={draft}
+            {oninput}
+            {onkeydown}
+            {onpaste}
+            {ondragenter}
+            onscroll={(event) => (fieldScroll = event.currentTarget.scrollTop)}
+            rows="1"
+            placeholder={listening ? t("VOICE_LISTENING") : (ghost ?? t("TYPE_MESSAGE"))}
+            class="field-auto no-scrollbar relative block max-h-36 w-full resize-none bg-transparent caret-accent outline-none placeholder:text-faint {FIELD_TEXT} {ghost &&
+            !draft &&
+            !listening
+              ? 'pr-16'
+              : ''} {decorations.length ? 'text-transparent' : ''}"
+          ></textarea>
+        </div>
+        {#if heard}
+          <p class="pt-1 text-body-md wrap-anywhere text-on-surface-variant">{heard}</p>
+        {/if}
+      </div>
 
-      {#if controls}
-        {@render controls()}
-      {:else}
-        <div class="flex-1"></div>
-      {/if}
+      <div class="flex items-center gap-1.5 px-2 pt-1.5 pb-2">
+        {#if onCloseSide}
+          <button
+            type="button"
+            use:keepFocus
+            onclick={onCloseSide}
+            aria-label={t("CLOSE")}
+            title={t("CLOSE")}
+            class={ACTION_CLASS}
+          >
+            <X size={18} />
+          </button>
+        {:else}
+          <PopupMenu
+            open={actionsOpen}
+            side="top"
+            triggerClass="shrink-0"
+            onOpenChange={(open) => (actionsOpen = open)}
+          >
+            {#snippet trigger()}
+              <span aria-label={t("ACTIONS")} title={t("ACTIONS")} class={ACTION_CLASS}>
+                <Plus size={18} />
+              </span>
+            {/snippet}
+            {#if phone}
+              <MenuItem
+                icon={Camera}
+                text={t("ATTACH_CAMERA")}
+                enabled={!uploading}
+                onclick={() => pickFrom("image/*", "environment")}
+              />
+              <MenuItem icon={ImageIcon} text={t("ATTACH_PHOTOS")} enabled={!uploading} onclick={() => pickFrom("image/*")} />
+            {/if}
+            <MenuItem icon={Paperclip} text={t("ATTACH_FILES")} enabled={!uploading} onclick={() => pickFrom()} />
+            <MenuItem icon={SquareSlash} text={t("COMMANDS")} onclick={openCommands} />
+          </PopupMenu>
+        {/if}
 
-      {#if voiceAvailable()}
+        {#if controls}
+          {@render controls()}
+        {:else}
+          <div class="flex-1"></div>
+        {/if}
+
+        {#if voiceAvailable()}
+          <button
+            type="button"
+            use:keepFocus
+            onclick={toggleVoice}
+            aria-label={t(listening ? "VOICE_STOP" : "VOICE_START")}
+            title={t(listening ? "VOICE_STOP" : "VOICE_START")}
+            class={listening ? `${ROUND_CLASS} bg-accent text-on-accent` : ACTION_CLASS}
+          >
+            <Mic size={18} />
+          </button>
+        {/if}
+        {#if busy}
+          <button
+            type="button"
+            use:keepFocus
+            onclick={onInterrupt}
+            aria-label={t("STOP")}
+            title={t("STOP")}
+            class="{ROUND_CLASS} bg-surface-variant text-on-surface"
+          >
+            <StopIcon size={14} />
+          </button>
+        {/if}
         <button
           type="button"
+          disabled={!canSubmit}
           use:keepFocus
-          onclick={toggleVoice}
-          aria-label={t(listening ? "VOICE_STOP" : "VOICE_START")}
-          title={t(listening ? "VOICE_STOP" : "VOICE_START")}
-          class="{ROUND_CLASS} {listening
-            ? 'bg-accent text-on-accent'
-            : 'bg-surface-variant text-on-surface-variant'}"
+          onclick={submit}
+          aria-label={t("SEND")}
+          title={t("SEND")}
+          class="{ROUND_CLASS} {canSubmit ? 'bg-accent text-on-accent' : 'bg-surface-variant text-faint'} disabled:cursor-default"
         >
-          <Mic size={18} />
+          <ArrowUp size={18} />
         </button>
-      {/if}
-      {#if busy}
-        <button
-          type="button"
-          use:keepFocus
-          onclick={onInterrupt}
-          aria-label={t("STOP")}
-          title={t("STOP")}
-          class="{ROUND_CLASS} bg-surface-variant text-on-surface"
-        >
-          <StopIcon size={14} />
-        </button>
-      {/if}
-      <button
-        type="button"
-        disabled={!canSubmit}
-        use:keepFocus
-        onclick={submit}
-        aria-label={t("SEND")}
-        title={t("SEND")}
-        class="{ROUND_CLASS} {canSubmit
-          ? 'bg-accent text-on-accent'
-          : 'bg-surface-variant text-on-surface-variant'} disabled:cursor-default"
-      >
-        <ArrowUp size={18} />
-      </button>
+      </div>
     </div>
   </div>
 

@@ -7,6 +7,7 @@
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import TouchTip from "$lib/ui/TouchTip.svelte";
   import { holdFocus, keepFocus } from "$lib/ui/keepFocus";
+  import { TOOLTIP_CLASS } from "$lib/ui/menuSurface";
 
   interface Props {
     tokens: number;
@@ -90,7 +91,7 @@
     use:keepFocus
     onclick={toggle}
     aria-label={t("CONTEXT_USAGE")}
-    class="ripple mr-0.5 ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full"
+    class="ripple mr-0.5 ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center self-center rounded-full"
   >
     {@render ring()}
   </button>
@@ -100,11 +101,11 @@
 {:else}
   <Tooltip.Provider>
     <Tooltip.Root delayDuration={0}>
-      <Tooltip.Trigger onmousedown={holdFocus} class="ripple mr-0.5 ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full">
+      <Tooltip.Trigger onmousedown={holdFocus} class="ripple mr-0.5 ml-1.5 flex size-6 shrink-0 cursor-pointer items-center justify-center self-center rounded-full">
         {@render ring()}
       </Tooltip.Trigger>
       <Tooltip.Portal>
-        <Tooltip.Content sideOffset={4} class="z-75 rounded-sm bg-surface-variant px-2 py-1.5 text-body-sm shadow-lg">
+        <Tooltip.Content sideOffset={4} class="z-75 {TOOLTIP_CLASS}">
           {@render detail()}
         </Tooltip.Content>
       </Tooltip.Portal>

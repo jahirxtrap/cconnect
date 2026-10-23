@@ -154,7 +154,7 @@
   ></div>
 {/if}
 <aside
-  class="fixed inset-y-0 left-0 z-40 border-r border-outline-variant bg-surface {onScreen
+  class="fixed inset-y-0 left-0 z-40 overflow-hidden rounded-r-2xl bg-surface {onScreen
     ? ''
     : 'invisible'} {dragging ? '' : 'transition-[transform,visibility] duration-200'}"
   style="width: {sheetWidth}px; padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); transform: translateX({dragging

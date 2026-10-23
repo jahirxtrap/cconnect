@@ -15,7 +15,7 @@
 <button
   type="button"
   {onclick}
-  class="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2 py-1 text-left transition-colors hover:bg-on-surface/8"
+  class="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-3 py-1 text-left transition-colors hover:bg-hover"
 >
   <SelectionDot {selected} {multi} />
   <span class="min-w-0 flex-1">

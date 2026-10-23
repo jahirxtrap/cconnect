@@ -10,16 +10,17 @@
     confirmLabel: string;
     onConfirm: () => void;
     onDismiss: () => void;
+    danger?: boolean;
     children?: Snippet;
   }
 
-  const { title, text, confirmLabel, onConfirm, onDismiss, children }: Props = $props();
+  const { title, text, confirmLabel, onConfirm, onDismiss, danger = false, children }: Props = $props();
 </script>
 
 <CompactDialog {title} description={text} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={onConfirm}>{confirmLabel}</Button>
+    <Button onclick={onConfirm} variant={danger ? "destructive" : "filled"}>{confirmLabel}</Button>
   {/snippet}
   {#if children}
     {@render children()}

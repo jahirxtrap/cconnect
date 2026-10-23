@@ -32,7 +32,6 @@
   icon={Archive}
   stat={stats}
   labelOnly={!hasSummary}
-  labelClass="text-accent"
   bodyClass=""
   {expanded}
   {onToggle}

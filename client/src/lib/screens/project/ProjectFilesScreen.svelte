@@ -4,6 +4,7 @@
   import ArrowUp from "@lucide/svelte/icons/arrow-up";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import FolderClosed from "@lucide/svelte/icons/folder-closed";
+  import FolderGit2 from "@lucide/svelte/icons/folder-git-2";
   import GitCompare from "@lucide/svelte/icons/git-compare";
   import History from "@lucide/svelte/icons/history";
   import Lock from "@lucide/svelte/icons/lock";
@@ -13,7 +14,6 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
-  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { isArchive, joined } from "$lib/data/format";
   import { openFilePreview } from "$lib/app/filePreview";
@@ -38,15 +38,16 @@
   import Pressable from "$lib/ui/Pressable.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
+  import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CommitBar from "./CommitBar.svelte";
-  import ProjectDiffView from "./ProjectDiffView.svelte";
+  import ProjectDiffView, { diffCounts } from "./ProjectDiffView.svelte";
   import { closeProjectFile, opened, openProjectFile } from "./openFile.svelte";
   import { projectDiffs } from "./projectDiffs.svelte";
-  import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import ProjectSelector from "$lib/screens/chat/ProjectSelector.svelte";
-  import { inPane } from "$lib/screens/chat/paneSurface";
+  import { PANE_TOP_CLASS } from "$lib/screens/chat/paneChrome";
+  import { inPane, usePaneTail } from "$lib/screens/chat/paneSurface";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
 
   interface Props {
@@ -58,11 +59,12 @@
 
   const ARCHIVE_MARK = "!";
   const INDENT = 14;
-  const BASE_INDENT = 8;
+  const ROW_CLASS = "flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left";
+  const LIST_CLASS = "min-h-0 flex-1 overflow-y-auto rounded-panel bg-card p-1";
   const SEARCH_DELAY_MS = 200;
   const MILLIS_PER_SECOND = 1000;
-  const RAIL_X = 20;
-  const RAIL_GAP = 12;
+  const RAIL_X = 18;
+  const RAIL_GAP = 18;
   const HEAD_SIZE = 16;
   const DOT_SIZE = 8;
   const DOT_BOX = 20;
@@ -70,6 +72,8 @@
   const HALF = 2;
 
   const compact = inPane();
+  const tailOf = usePaneTail();
+  const tail = $derived(tailOf());
   const watch = new ProjectWatch();
 
   const expandable = $derived(compact && !layout.mobile);
@@ -133,6 +137,12 @@
         Number((repoCounts[second.path] ?? 0) > 0) - Number((repoCounts[first.path] ?? 0) > 0) ||
         first.name.localeCompare(second.name),
     ),
+  );
+
+  const changeCount = $derived(
+    changed === null
+      ? null
+      : (activeRepo ? files.length : Object.values(repoCounts).reduce((total, count) => total + count, 0)) || null,
   );
 
   const commitPaths = $derived(chosen.map((entry) => entry.repoPath));
@@ -250,6 +260,12 @@
     else showChanges(!showChanged);
   };
 
+  const pickView = (index: number) => {
+    if (index === 0) showChanges(false);
+    else if (showLog) showLog = false;
+    else showChanges(true);
+  };
+
   useShortcut("project.changes", () => {
     if (activeScope() !== "project" || viewing || !projectKey) return false;
     toggleChanges();
@@ -280,6 +296,7 @@
     entry.isDir
       ? files.some((item) => inFolder(entry, item) && picked[item.path] === true)
       : picked[entry.path] === true;
+
   let unlocking = $state(false);
   let rejected = $state(false);
   let loading = $state(false);
@@ -387,9 +404,13 @@
     return listed;
   });
 
+  const fold = (path: string) => {
+    expanded = { ...expanded, [path]: !expanded[path] };
+  };
+
   const entryClass = (entry: ProjectEntry) =>
     entry.ignored
-      ? "text-on-surface-variant/60"
+      ? "text-faint"
       : !entry.status
         ? ""
         : entry.status.startsWith("?")
@@ -397,6 +418,9 @@
           : entry.status.includes("D")
             ? "text-red"
             : "text-blue";
+
+  const countsOf = (entry: ProjectEntry) =>
+    projectKey ? diffCounts(projectDiffs.get(projectKey, entry.path)) : null;
 
   const archiveOf = (path: string) => path.split(ARCHIVE_MARK)[0];
   const innerOf = (path: string) => path.split(ARCHIVE_MARK).slice(1).join(ARCHIVE_MARK);
@@ -435,10 +459,6 @@
       return;
     }
     openProjectFile(projectKey, entry.path, entry.status);
-  };
-
-  const fold = (path: string) => {
-    expanded = { ...expanded, [path]: !expanded[path] };
   };
 
   const activate = (entry: ProjectEntry) => {
@@ -625,19 +645,18 @@
   {#if tracked}
     <TooltipIconButton
       label={t("SEARCH")}
-      class={compact ? "size-8" : ""}
+      active={searching}
       onclick={() => {
         searching = !searching;
         if (!searching) query = "";
       }}
     >
-      <Search class={searching ? "text-accent" : ""} />
+      <Search />
     </TooltipIconButton>
   {/if}
   {#if locked}
     <TooltipIconButton
       label={t("UNLOCK")}
-      class={compact ? "size-8" : ""}
       onclick={() => {
         rejected = false;
         unlocking = true;
@@ -649,22 +668,38 @@
   {#if projectKey && showChanged && activeRepo}
     <TooltipIconButton
       label={t("GIT_HISTORY")}
-      class={paneActionClass(compact)}
+      active={showLog}
       onclick={() => (showLog = !showLog)}
     >
-      <History class={showLog ? "text-accent" : ""} />
+      <History />
     </TooltipIconButton>
   {/if}
-  {#if projectKey}
-    <TooltipIconButton
-      label={t("CHANGED_FILES")}
-      class={paneActionClass(compact)}
-      shortcut="project.changes"
-      onclick={toggleChanges}
-    >
-      <GitCompare class={showChanged && !showLog ? "text-accent" : ""} />
-    </TooltipIconButton>
-  {/if}
+{/snippet}
+
+{#snippet viewBar()}
+  <div class={tail ? PANE_TOP_CLASS : "flex shrink-0 items-center gap-1 px-(--page-inset) pb-2"}>
+    {#if compact && (insideRepo || pinned)}
+      <TooltipIconButton label={t("BACK")} onclick={stepUp}>
+        <ArrowLeft />
+      </TooltipIconButton>
+    {/if}
+    <SegmentedButtons
+      options={[t("FILES"), t("DIFF")]}
+      selected={showChanged ? 1 : 0}
+      counts={[null, changeCount]}
+      onSelect={pickView}
+    />
+    <div class="min-w-0 flex-1"></div>
+    <div class="flex shrink-0 items-center">
+      {#if compact}
+        {#if selectable}
+          {@render selectAllAction()}
+        {/if}
+        {@render headerActions()}
+      {/if}
+      {@render tail?.()}
+    </div>
+  </div>
 {/snippet}
 
 {#snippet commitRow(commit: GitCommit, index: number, last: boolean)}
@@ -673,7 +708,7 @@
   {@const rail = local ? "bg-green" : "bg-accent"}
   {@const dot = local ? "fill-green" : "fill-accent"}
   {@const ring = local ? "stroke-green" : "stroke-accent"}
-  <div class="relative py-1.5 pr-4" style="padding-left: {RAIL_X + RAIL_GAP}px">
+  <div class="relative py-1.5 pr-2.5" style="padding-left: {RAIL_X + RAIL_GAP}px">
     <span
       style="left: {RAIL_X}px; top: {head ? `calc(50% + ${HEAD_SIZE / HALF}px)` : '0px'}; bottom: {last
         ? '50%'
@@ -715,10 +750,7 @@
 {/snippet}
 
 {#snippet projectRow(item: ProjectInfo)}
-  <Pressable
-    onclick={() => tabs.setPanelProject(item.projectKey)}
-    class="flex w-full items-center gap-2 px-4 py-1.5 text-left"
-  >
+  <Pressable onclick={() => tabs.setPanelProject(item.projectKey)} class={ROW_CLASS}>
     <FolderClosed size={16} class="shrink-0 text-on-surface-variant" />
     <span class="min-w-0 flex-1 truncate text-body-md">{projectLabel(item)}</span>
   </Pressable>
@@ -727,52 +759,59 @@
 {#snippet repoRow(item: GitRepo)}
   {@const count = repoCounts[item.path] ?? 0}
   {@const Icon = projectIcon(item.path, true, true)}
-  <Pressable onclick={() => enterRepo(item)} class="flex w-full items-center gap-1.5 px-4 py-1.5 text-left">
+  <Pressable onclick={() => enterRepo(item)} class={ROW_CLASS}>
     <Icon size={16} class="shrink-0 text-on-surface-variant" />
     <span class="min-w-0 flex-1 truncate text-body-md">{item.name}</span>
-    {#if item.behind}
-      <span class="flex shrink-0 items-center text-label-md text-on-surface-variant">
-        <ArrowDown size={13} />{item.behind}
-      </span>
-    {/if}
-    {#if item.ahead}
-      <span class="flex shrink-0 items-center text-label-md text-accent"><ArrowUp size={13} />{item.ahead}</span>
-    {/if}
-    <span class="shrink-0 truncate text-label-md text-on-surface-variant">
-      {item.branch || t("GIT_DETACHED")}
+    <span class="flex min-w-0 items-center gap-2 text-caption text-on-surface-variant">
+      {#if item.behind}
+        <span class="flex shrink-0 items-center"><ArrowDown size={12} />{item.behind}</span>
+      {/if}
+      {#if item.ahead}
+        <span class="flex shrink-0 items-center text-accent"><ArrowUp size={12} />{item.ahead}</span>
+      {/if}
+      <span class="truncate">{item.branch || t("GIT_DETACHED")}</span>
+      {#if count}
+        <span class="shrink-0 text-accent">{count}</span>
+      {/if}
     </span>
-    {#if count}
-      <span class="shrink-0 text-label-md text-accent">{count}</span>
-    {/if}
   </Pressable>
 {/snippet}
 
+{#snippet nameWithFolder(entry: ProjectEntry, folder: string, tone: string)}
+  <span class="min-w-0 flex-1 truncate text-body-md {tone}">
+    {entry.name}{#if folder}<span class="ml-2 text-caption text-faint">{folder}</span>{/if}
+  </span>
+{/snippet}
+
 {#snippet pathRow(entry: ProjectEntry)}
+  {@const Icon = fileIcon(entry.path)}
+  {@const current = entry.path === opened.path}
   <Pressable
     onclick={() => !entry.status.includes("D") && open(entry)}
-    class="flex w-full items-center gap-2 px-4 py-1.5 text-left"
+    hover={!current}
+    class="{ROW_CLASS} {current ? 'bg-surface-variant' : ''}"
   >
-    {@const Icon = fileIcon(entry.path)}
     <Icon size={16} class="shrink-0 text-on-surface-variant" />
-    <span class="min-w-0 flex-1 truncate text-body-md {entryClass(entry)}">{entry.path}</span>
+    {@render nameWithFolder(entry, folderOf(entry.path), entryClass(entry))}
   </Pressable>
 {/snippet}
 
 {#snippet selectAllAction()}
   <TooltipIconButton
     label={t("SELECT_ALL")}
-    class={paneActionClass(compact)}
     shortcut="project.selectAll"
     onclick={selectAll}
   >
-    <SelectionDot selected={files.length > 0 && chosen.length === files.length} size={compact ? 18 : 24} />
+    <SelectionDot selected={files.length > 0 && chosen.length === files.length} size={compact ? 16 : 18} />
   </TooltipIconButton>
 {/snippet}
 
-{#snippet changedRow(entry: ProjectEntry, depth: number, open: boolean, action: () => void)}
+{#snippet changedRow(entry: ProjectEntry, depth: number, unfolded: boolean)}
+  {@const counts = entry.isDir ? null : countsOf(entry)}
+  {@const current = !entry.isDir && entry.path === opened.path}
   <div
     data-press
-    class="flex w-full items-center transition-colors hover:bg-on-surface/8"
+    class="flex h-8 w-full items-center rounded-md transition-colors {current ? 'bg-surface-variant' : 'hover:bg-hover'}"
     oncontextmenu={(event) => {
       event.preventDefault();
       if (!locked) settings.projectCommitOpen = true;
@@ -785,35 +824,46 @@
         type="button"
         onclick={() => togglePick(entry)}
         aria-label={entry.name}
-        class="flex shrink-0 cursor-pointer items-center py-1.5 pl-4"
+        class="flex h-full shrink-0 cursor-pointer items-center pl-2.5"
       >
         <SelectionDot selected={marked(entry)} size={16} />
       </button>
     {/if}
-    <div class="min-w-0 flex-1">
-      {@render fileRow(entry, depth, open, action, false, committing ? 4 : BASE_INDENT)}
-    </div>
+    <Pressable
+      onclick={() => (entry.isDir ? fold(entry.path) : open(entry))}
+      hover={false}
+      class="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2 text-left"
+    >
+      {@render rowLabel(entry, depth, unfolded)}
+      {#if counts}
+        <span class="flex shrink-0 items-center gap-2 text-caption">
+          {#if counts.added}<span class="text-green">+{counts.added}</span>{/if}
+          {#if counts.removed}<span class="text-red">-{counts.removed}</span>{/if}
+        </span>
+      {/if}
+    </Pressable>
   </div>
 {/snippet}
 
-{#snippet fileRow(
-  entry: ProjectEntry,
-  depth: number,
-  open: boolean,
-  action: () => void,
-  hover = true,
-  base = BASE_INDENT,
-)}
+{#snippet rowLabel(entry: ProjectEntry, depth: number, open: boolean)}
   {@const Icon = projectIcon(entry.path, entry.isDir, entry.repo)}
-  <Pressable onclick={action} {hover} class="flex w-full items-center gap-1.5 py-1.5 pr-4 text-left">
-    <span style="width: {base + depth * INDENT}px" class="shrink-0"></span>
-    <span class="flex size-4 shrink-0 items-center justify-center">
-      {#if entry.isDir || opensArchive(entry)}
-        <ChevronRight size={14} class="text-on-surface-variant {open ? 'rotate-90' : ''}" />
-      {/if}
-    </span>
-    <Icon size={16} class="shrink-0 text-on-surface-variant" />
-    <span class="min-w-0 flex-1 truncate text-body-md {entryClass(entry)}">{entry.name}</span>
+  <span style="margin-left: {depth * INDENT}px" class="flex size-4 shrink-0 items-center justify-center">
+    {#if entry.isDir || opensArchive(entry)}
+      <ChevronRight size={14} class="text-on-surface-variant {open ? 'rotate-90' : ''}" />
+    {/if}
+  </span>
+  <Icon size={16} class="shrink-0 text-on-surface-variant" />
+  <span class="min-w-0 flex-1 truncate text-body-md {entryClass(entry)}">{entry.name}</span>
+{/snippet}
+
+{#snippet fileRow(entry: ProjectEntry, depth: number, open: boolean, action: () => void)}
+  {@const current = !entry.isDir && entry.path === opened.path}
+  <Pressable
+    onclick={action}
+    hover={!current}
+    class="flex h-8 w-full items-center gap-1.5 rounded-md px-2 text-left {current ? 'bg-surface-variant' : ''}"
+  >
+    {@render rowLabel(entry, depth, open)}
   </Pressable>
 {/snippet}
 
@@ -821,14 +871,7 @@
   class="relative flex h-full min-h-0 flex-col"
   onpointerdowncapture={() => paneFocus.set("project")}
 >
-  {#if compact}
-    <PaneHeader
-      title={insideRepo && activeRepo ? activeRepo.name : t("PROJECT_FILES")}
-      leading={selectable ? selectAllAction : undefined}
-      onBack={insideRepo || pinned ? stepUp : undefined}
-      actions={headerActions}
-    />
-  {:else}
+  {#if !compact}
     <AppTopBar
       title={t("PROJECT_FILES")}
       subtitle={(insideRepo && activeRepo ? activeRepo.name : project?.name) ?? null}
@@ -849,8 +892,12 @@
     </AppTopBar>
   {/if}
 
+  {#if projectKey}
+    {@render viewBar()}
+  {/if}
+
   {#if projects.length}
-    <div class="px-2 pt-2">
+    <div class="shrink-0 px-(--page-inset) pb-2">
       <ProjectSelector
         {projects}
         selected={pinned || null}
@@ -862,95 +909,110 @@
     </div>
   {/if}
 
-  {#if searching}
-    <div class="px-3 py-2">
+  <div class="flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset) pb-(--page-inset)">
+    {#if searching}
       <SearchBar
         value={query}
         oninput={(value) => (query = value)}
         placeholder={t("SEARCH")}
         autofocus
         large={!compact}
+        class="shrink-0"
         onClose={() => {
           searching = false;
           query = "";
         }}
       />
-    </div>
-  {/if}
+    {/if}
 
-  <div class="min-h-0 flex-1 overflow-y-auto pb-2" onscroll={onListScroll}>
     {#if loading}
-      <CenteredProgress class="h-full" />
+      <CenteredProgress class="min-h-0 flex-1" />
     {:else if !projectKey}
       {#if serverStatus.unavailable}
-        <EmptyState text={t("SERVER_UNAVAILABLE")} class="h-full" />
+        <EmptyState text={t("SERVER_UNAVAILABLE")} class="min-h-0 flex-1" />
+      {:else if projects.length}
+        <div class={LIST_CLASS}>
+          {#each projects as item (item.projectKey)}
+            {@render projectRow(item)}
+          {/each}
+        </div>
       {:else}
-        {#each projects as item (item.projectKey)}
-          {@render projectRow(item)}
-        {:else}
-          <EmptyState text={t("NO_PROJECTS")} class="h-full" />
-        {/each}
+        <EmptyState icon={FolderClosed} text={t("NO_PROJECTS")} class="min-h-0 flex-1" />
       {/if}
     {:else if showChanged && repos === null}
-      <CenteredProgress class="h-full" />
+      <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged && !activeRepo}
-      {#each repoRows as item (item.path)}
-        {@render repoRow(item)}
+      {#if repoRows.length}
+        <div class={LIST_CLASS}>
+          {#each repoRows as item (item.path)}
+            {@render repoRow(item)}
+          {/each}
+        </div>
       {:else}
-        <EmptyState text={t("NOT_A_REPOSITORY")} class="h-full" />
-      {/each}
+        <EmptyState icon={FolderGit2} text={t("NOT_A_REPOSITORY")} class="min-h-0 flex-1" />
+      {/if}
     {:else if showLog}
       {#if commits === null}
-        <CenteredProgress class="h-full" />
+        <CenteredProgress class="min-h-0 flex-1" />
+      {:else if commits.length}
+        <div class={LIST_CLASS} onscroll={onListScroll}>
+          {#each commits as commit, index (commit.hash)}
+            {@render commitRow(commit, index, index === commits.length - 1)}
+          {/each}
+        </div>
       {:else}
-        {#each commits as commit, index (commit.hash)}
-          {@render commitRow(commit, index, index === commits.length - 1)}
-        {:else}
-          <EmptyState text={t("GIT_NO_COMMITS")} class="h-full" />
-        {/each}
+        <EmptyState icon={History} text={t("GIT_NO_COMMITS")} class="min-h-0 flex-1" />
       {/if}
     {:else if showChanged && changed === null}
-      <CenteredProgress class="h-full" />
+      <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged}
-      {#each changedRows as row (row.entry.path)}
-        {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
-          row.entry.isDir ? fold(row.entry.path) : open(row.entry),
-        )}
+      {#if files.length}
+        <div class={LIST_CLASS}>
+          {#each changedRows as row (row.entry.path)}
+            {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true)}
+          {/each}
+        </div>
       {:else}
-        <EmptyState text={t("NO_CHANGES")} class="h-full" />
-      {/each}
+        <EmptyState icon={GitCompare} text={t("NO_CHANGES")} class="min-h-0 flex-1" />
+      {/if}
     {:else if results !== null}
-      {#each results as entry (entry.path)}
-        {@render pathRow(entry)}
+      {#if results.length}
+        <div class={LIST_CLASS}>
+          {#each results as entry (entry.path)}
+            {@render pathRow(entry)}
+          {/each}
+        </div>
       {:else}
-        <EmptyState text={t("NO_RESULTS")} class="h-full" />
-      {/each}
+        <EmptyState icon={Search} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
+      {/if}
+    {:else if rows.length}
+      <div class={LIST_CLASS}>
+        {#each rows as row (row.entry.path)}
+          {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
+            activate(row.entry),
+          )}
+        {/each}
+      </div>
     {:else}
-      {#each rows as row (row.entry.path)}
-        {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
-          activate(row.entry),
-        )}
-      {:else}
-        <EmptyState text={t("NO_FILES")} class="h-full" />
-      {/each}
+      <EmptyState icon={FolderClosed} text={t("NO_FILES")} class="min-h-0 flex-1" />
+    {/if}
+
+    {#if showChanged && activeRepo && projectKey}
+      <CommitBar
+        {projectKey}
+        repo={activeRepo}
+        paths={commitPaths}
+        {locked}
+        {instant}
+        onDone={() => {
+          gitTick++;
+          watch.refresh();
+        }}
+      />
     {/if}
   </div>
 
-  {#if showChanged && activeRepo && projectKey}
-    <CommitBar
-      {projectKey}
-      repo={activeRepo}
-      paths={commitPaths}
-      {locked}
-      {instant}
-      onDone={() => {
-        gitTick++;
-        watch.refresh();
-      }}
-    />
-  {/if}
-
-  {#if opened.path !== null && projectKey && !elsewhere}
+  {#if showingFile && opened.path !== null && projectKey}
     <div class={fullFile ? "" : "absolute inset-0 z-10"}>
       <ProjectDiffView
         {projectKey}

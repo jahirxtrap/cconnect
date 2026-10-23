@@ -6,7 +6,6 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -56,27 +55,23 @@
 
 <SettingsGroup label={t("LOCAL_SERVER")}>
   {#snippet labelTrailing()}
-    {#if phase === "starting"}
-      <LoadingIndicator size={20} />
-    {:else}
-      <StatusDot class={tone} box={20} dot={12} />
-    {/if}
+    <StatusDot class={tone} loading={phase === "starting"} />
   {/snippet}
 
   <PreferenceRow icon={Server} title={t("LOCAL_SERVER")} {summary} onclick={() => (dialog = true)}>
     {#snippet trailing()}
       <TooltipIconButton label={t("RESTART")} enabled={live} onclick={() => (confirm = "restart")}>
-        <ServerCog size={20} />
+        <ServerCog />
       </TooltipIconButton>
       <TooltipIconButton label={t("STOP")} enabled={live} onclick={() => (confirm = "stop")}>
-        <Power size={20} />
+        <Power />
       </TooltipIconButton>
       <TooltipIconButton
         label={t("RUN")}
         enabled={phase === "stopped" || phase === "failed"}
         onclick={() => localServer.start()}
       >
-        <Play size={20} />
+        <Play />
       </TooltipIconButton>
     {/snippet}
   </PreferenceRow>

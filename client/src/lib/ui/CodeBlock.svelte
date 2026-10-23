@@ -59,7 +59,7 @@
       type="button"
       onclick={copy}
       aria-label="copy"
-      class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-on-surface/8"
+      class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-hover"
     >
       {#if copied}
         <Check size={14} class="text-accent" />

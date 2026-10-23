@@ -87,12 +87,12 @@
     secondary: "bg-surface-variant",
   };
   const PLAIN_CLASS =
-    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap select-none enabled:hover:bg-on-surface/8 focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap select-none enabled:hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
   const KEYCAP_CLASS =
-    "inline-flex h-[1.125rem] min-w-[1.125rem] shrink-0 items-center justify-center rounded-sm border border-outline-variant bg-surface-variant px-1 font-mono text-label-sm leading-none text-on-surface-variant uppercase";
+    "inline-flex h-[1.125rem] min-w-[1.125rem] shrink-0 items-center justify-center rounded-sm bg-surface-variant px-1 font-mono text-label-sm leading-none text-on-surface-variant uppercase";
 
   const FIELD_CLASS =
-    "min-h-8 min-w-[12ch] flex-1 resize-none rounded-md border border-outline-variant bg-surface px-2.5 py-1 text-on-surface outline-none placeholder:text-on-surface-variant focus:border-accent disabled:opacity-40";
+    "min-h-8 min-w-[12ch] flex-1 resize-none rounded-md bg-surface-variant px-2.5 py-1 text-on-surface ring-1 ring-transparent outline-none ring-inset placeholder:text-on-surface-variant focus:ring-accent disabled:opacity-40";
   const FIELD_BUTTON_CLASS =
     "ripple flex h-8 shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-3 text-label-md whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
 

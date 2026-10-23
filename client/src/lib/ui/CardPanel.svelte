@@ -17,7 +17,10 @@
   {onclick}
   {onlongclick}
   {oncontextmenu}
-  class="flex w-full flex-col rounded-panel border-2 border-outline-variant px-3.5 py-2.5 text-left {className}"
+  hover={false}
+  class="flex w-full flex-col rounded-panel bg-card px-3.5 py-3 text-left {onclick || onlongclick || oncontextmenu
+    ? 'ripple'
+    : ''} {className}"
 >
   {@render children()}
 </Pressable>

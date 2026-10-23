@@ -4,7 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { backend, address } from "$lib/services/backend.svelte";
   import AppLogo from "$lib/ui/AppLogo.svelte";
-  import AppTitle from "$lib/ui/AppTitle.svelte";
+  import { SUBTITLE_CLASS, TITLE_CLASS } from "$lib/ui/AppTopBar.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
 
@@ -16,9 +16,12 @@
 
   const { selected, onSelect, class: className = "" }: Props = $props();
 
+  const LOGO_SIZE = 28;
+
   let open = $state(false);
 
   const profile = $derived(backend.find(selected));
+  const locked = $derived(!profile || settings.environmentLocked);
 
   const options = $derived(
     backend.environments.map((profile) => ({
@@ -29,26 +32,21 @@
   );
 </script>
 
-{#if profile && settings.environmentLocked}
-  <div class="flex items-center rounded-md px-2 py-1 {className}">
-    <AppLogo />
-    <div class="ml-2 min-w-0 flex-1">
-      <p class="truncate text-title-md leading-[18px]">{profile.name}</p>
-      <p class="truncate text-label-sm leading-[12px] text-on-surface-variant">{address(profile)}</p>
-    </div>
-  </div>
-{:else if profile}
-  <Pressable onclick={() => (open = true)} class="flex items-center rounded-md px-2 py-1 {className}">
-    <AppLogo />
-    <div class="ml-2 min-w-0 flex-1">
-      <p class="truncate text-title-md leading-[18px]">{profile.name}</p>
-      <p class="truncate text-label-sm leading-[12px] text-on-surface-variant">{address(profile)}</p>
-    </div>
-    <ChevronDown size={24} class="shrink-0 text-on-surface-variant" />
-  </Pressable>
-{:else}
-  <AppTitle class="px-2 {className}" />
-{/if}
+<Pressable
+  onclick={locked ? undefined : () => (open = true)}
+  class="flex h-10 min-w-0 items-center gap-2.5 rounded-md px-2.5 {className}"
+>
+  <AppLogo size={LOGO_SIZE} />
+  <span class="flex min-w-0 flex-1 flex-col text-left">
+    <span class={TITLE_CLASS}>{profile?.name ?? t("APP_NAME")}</span>
+    {#if profile}
+      <span class={SUBTITLE_CLASS}>{address(profile)}</span>
+    {/if}
+  </span>
+  {#if !locked}
+    <ChevronDown size={16} class="shrink-0 text-on-surface-variant" />
+  {/if}
+</Pressable>
 
 {#if open}
   <SelectDialog

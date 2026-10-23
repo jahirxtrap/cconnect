@@ -62,10 +62,11 @@ export const collectCommands = (): Command[] => {
     run: screen.open,
   }));
 
-  const settings: Command[] = SETTINGS_SECTIONS.map((section) => ({
+  const settings: Command[] = SETTINGS_SECTIONS.filter((section) => section.id !== "claude").map((section) => ({
     id: `settings:${section.id}`,
     group: "settings",
     label: t(section.label),
+    icon: section.icon,
     run: () => navigation.openSettings(section.id === "general" ? null : section.id),
   }));
 

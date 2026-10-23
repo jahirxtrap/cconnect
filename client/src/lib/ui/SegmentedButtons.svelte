@@ -3,25 +3,35 @@
     options: string[];
     selected: number;
     onSelect: (index: number) => void;
+    counts?: (number | null)[];
+    fill?: boolean;
     class?: string;
   }
 
-  const { options, selected, onSelect, class: className = "" }: Props = $props();
+  const { options, selected, onSelect, counts = [], fill = false, class: className = "" }: Props = $props();
 </script>
 
-<div class="flex w-full {className}" role="tablist">
+<div
+  class="{fill ? 'flex w-full' : 'inline-flex'} shrink-0 gap-0.5 rounded-full bg-surface-variant p-0.5 {className}"
+  role="tablist"
+>
   {#each options as option, index (option)}
+    {@const count = counts[index] ?? null}
     <button
       type="button"
       role="tab"
       aria-selected={index === selected}
       onclick={() => onSelect(index)}
-      class="min-w-0 flex-1 cursor-pointer truncate border-2 border-outline-variant px-3 py-1.5 text-label-lg transition-colors first:rounded-l-sm last:rounded-r-sm not-first:-ml-0.5 {index ===
-      selected
-        ? 'z-10 bg-accent/18 text-accent hover:bg-accent/25'
-        : 'text-on-surface-variant hover:bg-on-surface/8'}"
+      class="inline-flex h-7 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-body-sm whitespace-nowrap transition-colors {fill
+        ? 'flex-1'
+        : ''} {index === selected
+        ? 'bg-outline-variant text-on-surface'
+        : 'text-on-surface-variant hover:text-on-surface'}"
     >
-      {option}
+      <span class="truncate">{option}</span>
+      {#if count !== null}
+        <span class="text-caption">{count}</span>
+      {/if}
     </button>
   {/each}
 </div>

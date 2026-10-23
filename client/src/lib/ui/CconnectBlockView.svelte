@@ -7,7 +7,7 @@
   import { mediaSrc } from "$lib/services/mediaSource";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
-  import OutlinedPanel from "./OutlinedPanel.svelte";
+  import CardPanel from "./CardPanel.svelte";
   import SuggestionChips from "./SuggestionChips.svelte";
 
   interface Props {
@@ -22,7 +22,7 @@
   const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
   const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
   const ARROW_CLASS =
-    "pointer-events-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface transition-opacity disabled:cursor-default disabled:opacity-50";
+    "ripple pointer-events-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface transition-opacity disabled:cursor-default disabled:opacity-50";
   const IMAGE_WIDTH = $derived(compact ? "13.333rem" : "23.333rem");
   const PEEK = "2.5rem";
   const RAIL_WIDTH = $derived(`min(100%, calc(${IMAGE_WIDTH} + ${PEEK} * 2))`);
@@ -63,7 +63,7 @@
     type="button"
     onclick={() => onOpen(url, fileName(url))}
     aria-label={fileName(url)}
-    class="absolute top-2 right-2 z-10 inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface opacity-90 transition-opacity hover:opacity-100"
+    class="absolute top-2 right-2 z-10 inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-float text-on-surface shadow-float opacity-90 transition-opacity hover:opacity-100"
   >
     <Maximize2 size={16} />
   </button>
@@ -142,14 +142,14 @@
     </div>
   {/if}
 {:else if data.type === "playlist"}
-  <OutlinedPanel class="w-full gap-2">
+  <CardPanel class="w-full gap-2">
     {#each data.items as item (item.url)}
       <div class="flex w-full min-w-0 flex-col gap-1">
         <span class="truncate text-body-sm text-on-surface-variant">{item.title ?? fileName(item.url)}</span>
         <audio use:mediaSrc={{ url: item.url }} controls class="w-full"></audio>
       </div>
     {/each}
-  </OutlinedPanel>
+  </CardPanel>
 {:else if data.type === "suggestions"}
   <SuggestionChips items={data.items} onSelect={onSuggest} />
 {:else if data.type === "pdf"}
@@ -165,7 +165,7 @@
   {:else}
     <div class="relative w-full select-none">
       <div
-        class="flex w-full overflow-hidden rounded-panel border-2 border-outline-variant"
+        class="flex w-full overflow-hidden rounded-panel bg-card"
         style="height: {DOC_HEIGHT}"
       >
         <PdfView url={data.url} onerror={() => (pdfFailed = true)} />
@@ -180,7 +180,7 @@
       title={data.title ?? fileName(data.url)}
       sandbox="allow-scripts allow-popups"
       referrerpolicy="no-referrer"
-      class="w-full rounded-panel border-2 border-outline-variant bg-surface {MEDIA_HEIGHT}"
+      class="w-full rounded-panel bg-card {MEDIA_HEIGHT}"
     ></iframe>
     {@render expand(data.url)}
   </div>

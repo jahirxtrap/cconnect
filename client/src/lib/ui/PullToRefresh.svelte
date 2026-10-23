@@ -7,14 +7,25 @@
   interface Props {
     refreshing?: boolean;
     onRefresh?: (() => void) | null;
+    scroller?: HTMLDivElement | null;
+    onscroll?: () => void;
+    onscrollend?: () => void;
+    class?: string;
     children: Snippet;
   }
 
-  const { refreshing = false, onRefresh = null, children }: Props = $props();
+  let {
+    refreshing = false,
+    onRefresh = null,
+    scroller = $bindable(null),
+    onscroll,
+    onscrollend,
+    class: className = "",
+    children,
+  }: Props = $props();
 
   const pull = new PullState();
 
-  let scroller = $state<HTMLDivElement | null>(null);
   let tracking = false;
   let distance = 0;
   let lastY = 0;
@@ -71,7 +82,7 @@
 </script>
 
 <div class="relative min-h-0 flex-1">
-  <div bind:this={scroller} use:touches class="h-full overflow-y-auto">
+  <div bind:this={scroller} use:touches {onscroll} {onscrollend} class="h-full overflow-y-auto {className}">
     {@render children()}
   </div>
   <PullIndicator fraction={pull.fraction} {refreshing} />

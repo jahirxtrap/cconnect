@@ -6,22 +6,30 @@
 
   interface Props {
     path: string;
+    tool?: string | null;
     diffLines: DiffLine[];
     labelOnly: boolean;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
   }
 
-  const { path, diffLines, labelOnly, expanded = null, onToggle = null }: Props = $props();
+  const { path, tool = null, diffLines, labelOnly, expanded = null, onToggle = null }: Props = $props();
+
+  const added = $derived(diffLines.filter((line) => line.kind === "add").length);
+  const removed = $derived(diffLines.filter((line) => line.kind === "del").length);
 </script>
 
 <Collapsible
-  label={path}
+  label={tool ?? path}
+  preview={tool ? path : null}
   icon={FilePen}
   labelOnly={labelOnly || !diffLines.length}
   {expanded}
   {onToggle}
-  labelClass="text-accent"
 >
-  <DiffView {diffLines} class="rounded-sm bg-surface-variant py-1" />
+  {#snippet meta()}
+    {#if added}<span class="text-green">+{added}</span>{/if}
+    {#if removed}<span class="text-red">-{removed}</span>{/if}
+  {/snippet}
+  <DiffView {diffLines} />
 </Collapsible>

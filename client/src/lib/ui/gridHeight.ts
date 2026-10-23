@@ -7,6 +7,11 @@ const ceilToDevicePixel = (value: number) => {
   return Math.ceil((value - LAYOUT_UNIT / scale) * scale) / scale;
 };
 
+const floorToDevicePixel = (value: number) => {
+  const scale = density();
+  return Math.floor((value + LAYOUT_UNIT / scale) * scale) / scale;
+};
+
 const floorToLayoutUnit = (value: number) => Math.max(0, Math.floor(value / LAYOUT_UNIT) * LAYOUT_UNIT);
 
 export const snapToDevicePixel = (value: number) => {
@@ -26,5 +31,15 @@ export const gridHeight = (node: HTMLElement) => {
   const observer = new ResizeObserver(read);
   observer.observe(node);
   read();
+  return { destroy: () => observer.disconnect() };
+};
+
+export const gridWidth = (node: HTMLElement) => {
+  const parent = node.parentElement;
+  if (!parent) return {};
+  const observer = new ResizeObserver(([entry]) => {
+    node.style.width = `${floorToDevicePixel(entry.contentRect.width)}px`;
+  });
+  observer.observe(parent);
   return { destroy: () => observer.disconnect() };
 };

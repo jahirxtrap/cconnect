@@ -57,8 +57,6 @@
   {:else}
     {#each shown as plugin (pluginKey(plugin))}
       <ListRow
-        class="rounded-lg"
-        padding="py-2.5 pr-3 pl-3"
         subtitleLines={2}
         title={plugin.name}
         subtitle={plugin.description}

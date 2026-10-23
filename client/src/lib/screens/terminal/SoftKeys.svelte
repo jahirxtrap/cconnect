@@ -40,7 +40,7 @@
       title={key.title}
       aria-label={key.title}
       onclick={() => onKey(key.bytes)}
-      class="inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-full px-3 text-label-md text-on-surface-variant transition-colors hover:bg-on-surface/8"
+      class="ripple inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-md bg-surface-variant px-3 font-mono text-body-sm text-on-surface-variant transition-colors hover:text-on-surface"
     >
       {#if key.icon}
         {@const Icon = key.icon}

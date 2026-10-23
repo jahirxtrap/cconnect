@@ -116,7 +116,7 @@
         singleLine
       >
         {#snippet trailing()}
-          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("command")} class="size-6 [&_svg]:size-[18px]">
+          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("command")}>
             <Folder />
           </TooltipIconButton>
         {/snippet}
@@ -124,7 +124,7 @@
     {:else}
       <InputField value={dir} oninput={(value) => (dir = value)} label={t("LOCAL_SERVER_FOLDER")} singleLine>
         {#snippet trailing()}
-          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("dir")} class="size-6 [&_svg]:size-[18px]">
+          <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("dir")}>
             <Folder />
           </TooltipIconButton>
         {/snippet}
@@ -145,7 +145,7 @@
           singleLine
         >
           {#snippet trailing()}
-            <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("python")} class="size-6 [&_svg]:size-[18px]">
+            <TooltipIconButton label={t("CHOOSE")} onclick={() => void pick("python")}>
               <Folder />
             </TooltipIconButton>
           {/snippet}

@@ -7,7 +7,7 @@
   import { copyText, pasteText } from "$lib/platform/clipboard";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
   import type { PtyInfo } from "$lib/services/terminalApi";
-  import { FONT_SIZE, LINE_HEIGHT, TERMINAL_BACKGROUND, terminalTheme } from "./theme";
+  import { FONT_SIZE, LINE_HEIGHT, terminalTheme } from "./theme";
   import "@xterm/xterm/css/xterm.css";
 
   interface Props {
@@ -256,6 +256,6 @@
   });
 </script>
 
-<div class="h-full w-full overflow-hidden p-2" style="background: {TERMINAL_BACKGROUND}">
+<div class="h-full w-full overflow-hidden bg-terminal px-3.5 py-3">
   <div bind:this={host} class="h-full w-full overflow-hidden touch-none"></div>
 </div>

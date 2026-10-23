@@ -20,6 +20,8 @@
   import { mediaSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
+  import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
+  import { paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import {
@@ -42,11 +44,6 @@
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import PdfView from "./PdfView.svelte";
 
-  export interface ToolbarButton {
-    class: string;
-    size: number;
-  }
-
   interface Props {
     url: string;
     filename: string;
@@ -55,7 +52,7 @@
     embedded?: boolean;
     onExpand?: (() => void) | null;
     menuItems?: Snippet;
-    actions?: Snippet<[ToolbarButton, boolean]>;
+    actions?: Snippet<[boolean]>;
     onCopyPath?: (() => void) | null;
     added?: number[];
     removed?: Record<number, string[]>;
@@ -97,7 +94,8 @@
 
   const NUL = String.fromCharCode(0);
 
-  const button = $derived<ToolbarButton>({ class: embedded ? "size-8" : "", size: embedded ? 18 : 20 });
+  const centered = paneRole() === "center";
+
 
   let arrived = $state<{ base: string; name: string; body: string } | null>(null);
   let shown = $state<Shown | null>(null);
@@ -196,22 +194,25 @@
 </script>
 
 {#snippet toolbar()}
-  {@render actions?.(button, lined)}
+  {@render actions?.(lined)}
+  {#if centered}
+    <CenterViewToggle />
+  {/if}
   {#if onExpand}
-    <TooltipIconButton label={t("EXPAND")} class={button.class} onclick={onExpand}>
-      <Maximize2 size={button.size} />
+    <TooltipIconButton label={t("EXPAND")} onclick={onExpand}>
+      <Maximize2 />
     </TooltipIconButton>
   {/if}
   {#if kind === "markdown"}
     <TooltipIconButton
       label={t("FORMATTED_VIEW")}
-      class={button.class}
+      active={formatted}
       onclick={() => {
         formatted = !formatted;
         settings.markdownPreviewFormatted = formatted;
       }}
     >
-      <Type size={button.size} class={formatted ? "text-accent" : ""} />
+      <Type />
     </TooltipIconButton>
   {/if}
   <PopupMenu
@@ -220,72 +221,32 @@
     label={t("MORE_OPTIONS")}
   >
     {#snippet triggerChild(props)}
-      <TooltipIconButton label={t("MORE_OPTIONS")} class={button.class} {...props}>
-        <EllipsisVertical size={button.size} />
+      <TooltipIconButton label={t("MORE_OPTIONS")} {...props}>
+        <EllipsisVertical />
       </TooltipIconButton>
     {/snippet}
     {@render menuItems?.()}
     {#if attach}
-      <MenuItem text={t("ATTACH_TO_CHAT")} onclick={attach}>
-        {#snippet leading()}
-          <Paperclip size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
+      <MenuItem text={t("ATTACH_TO_CHAT")} icon={Paperclip} onclick={attach} />
     {/if}
-    <MenuItem text={t("SAVE")} onclick={() => void downloadShared(url, filename)}>
-      {#snippet leading()}
-        <Download size={20} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
-    <MenuItem text={t("SAVE_AS")} onclick={() => void saveSharedAs(url, filename)}>
-      {#snippet leading()}
-        <Save size={20} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
-    <MenuItem text={t("OPEN_EXTERNALLY")} onclick={() => void openSharedExternally(url, filename)}>
-      {#snippet leading()}
-        <ExternalLink size={20} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
+    <MenuItem text={t("SAVE")} icon={Download} onclick={() => void downloadShared(url, filename)} />
+    <MenuItem text={t("SAVE_AS")} icon={Save} onclick={() => void saveSharedAs(url, filename)} />
+    <MenuItem
+      text={t("OPEN_EXTERNALLY")}
+      icon={ExternalLink}
+      onclick={() => void openSharedExternally(url, filename)}
+    />
     {#if copyPath}
-      <MenuItem text={t("COPY_PATH")} onclick={copyPath}>
-        {#snippet leading()}
-          <ClipboardCopy size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
+      <MenuItem text={t("COPY_PATH")} icon={ClipboardCopy} onclick={copyPath} />
     {/if}
-    <MenuItem text={t("SHARE")} onclick={() => void shareShared(url, filename)}>
-      {#snippet leading()}
-        <Share2 size={20} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
+    <MenuItem text={t("SHARE")} icon={Share2} onclick={() => void shareShared(url, filename)} />
     {#if onDelete}
-      <MenuItem text={t("DELETE")} onclick={() => (confirmingDelete = true)}>
-        {#snippet leading()}
-          <Trash size={20} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
+      <MenuItem text={t("DELETE")} icon={Trash} danger onclick={() => (confirmingDelete = true)} />
     {/if}
   </PopupMenu>
 {/snippet}
 
-<div
-  class="bg-background text-on-background {embedded
-    ? 'flex h-full min-h-0 flex-col'
-    : 'safe-area above-keyboard fixed inset-0 z-50 flex flex-col'}"
->
-  {#if embedded}
-    <PaneHeader title={filename} onBack={onClose} actions={toolbar} />
-  {:else}
-    <AppTopBar title={t("VIEW")} subtitle={filename} actions={toolbar}>
-      {#snippet navigationIcon()}
-        <TooltipIconButton label={t("BACK")} onclick={onClose}>
-          <ArrowLeft size={20} />
-        </TooltipIconButton>
-      {/snippet}
-    </AppTopBar>
-  {/if}
-
+{#snippet body()}
   {#if kind === "image"}
     <ZoomPane class="min-h-0 flex-1">
       <img
@@ -370,13 +331,36 @@
       />
     {/key}
   {/if}
-</div>
+{/snippet}
+
+{#if embedded}
+  <div class="flex h-full min-h-0 flex-col bg-background text-on-surface">
+    <PaneHeader title={filename} onBack={onClose} actions={toolbar} />
+    <div class="mx-2 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-card">
+      {@render body()}
+    </div>
+  </div>
+{:else}
+  <div class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface">
+    <AppTopBar title={t("VIEW")} subtitle={filename} actions={toolbar}>
+      {#snippet navigationIcon()}
+        <TooltipIconButton label={t("BACK")} onclick={onClose}>
+          <ArrowLeft />
+        </TooltipIconButton>
+      {/snippet}
+    </AppTopBar>
+    <div class="flex min-h-0 flex-1 flex-col">
+      {@render body()}
+    </div>
+  </div>
+{/if}
 
 {#if confirmingDelete && onDelete}
   <ConfirmDialog
     title={t("DELETE")}
     text={t("DELETE_FILE_CONFIRM", filename)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       confirmingDelete = false;
       onDelete();

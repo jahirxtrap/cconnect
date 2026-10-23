@@ -31,6 +31,7 @@ export interface SessionInfo {
   title: string | null;
   color: string | null;
   activity: string | null;
+  resident: boolean;
 }
 
 export interface SharedEntry {
@@ -65,6 +66,7 @@ export const parseSession = (raw: Wire): SessionInfo => ({
   title: text(raw.title),
   color: text(raw.color),
   activity: text(raw.activity),
+  resident: raw.resident === true,
 });
 
 export const parseCategory = (raw: Wire): ChatCategory => ({

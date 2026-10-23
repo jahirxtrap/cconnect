@@ -17,12 +17,12 @@
 
 <TooltipIconButton
   label={t(onServer ? "BROWSER_SIDE_SERVER" : "BROWSER_SIDE_DEVICE")}
-  class="size-8"
+  class="size-7"
   onclick={() => onSelect(onServer ? "device" : "server")}
 >
   {#if onServer}
-    <Server size={18} />
+    <Server />
   {:else}
-    <MonitorSmartphone size={18} />
+    <MonitorSmartphone />
   {/if}
 </TooltipIconButton>

@@ -2,6 +2,7 @@
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Settings from "@lucide/svelte/icons/settings";
+  import SquareSlash from "@lucide/svelte/icons/square-slash";
   import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import type { ModCommand } from "$lib/data/modModels";
@@ -13,7 +14,6 @@
   import { pluginKey, type Plugin } from "$lib/services/claudeApi";
   import PluginOptionsDialog from "$lib/screens/claude/PluginOptionsDialog.svelte";
   import type { ChatState } from "$lib/screens/chat/state.svelte";
-  import PaneActions from "$lib/screens/chat/PaneActions.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { provideServer } from "$lib/services/serverContext";
@@ -116,12 +116,12 @@
 {#snippet moreMenu()}
   <PopupMenu open={menu} label={t("MORE")} onOpenChange={(open) => (menu = open)}>
     {#snippet triggerChild(props)}
-      <TooltipIconButton label={t("MORE")} class="size-8" {...props}>
+      <TooltipIconButton label={t("MORE")} {...props}>
         <EllipsisVertical />
       </TooltipIconButton>
     {/snippet}
     {#if commands.length}
-      <MenuSub text={t("COMMANDS")}>
+      <MenuSub icon={SquareSlash} text={t("COMMANDS")}>
         {#each commands as command (`${command.plugin}:${command.name}`)}
           <MenuItem
             text="/{command.name}"
@@ -131,31 +131,19 @@
         {/each}
       </MenuSub>
     {/if}
-    <MenuItem text={t("RELOAD_PLUGINS")} onclick={() => chat.submit(RELOAD_COMMAND)}>
-      {#snippet trailing()}
-        <RotateCw size={16} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
-    <MenuItem text={t("MODS_OPTIONS")} onclick={() => (listing = true)}>
-      {#snippet trailing()}
-        <Settings size={16} class="shrink-0 text-on-surface-variant" />
-      {/snippet}
-    </MenuItem>
+    <MenuItem icon={RotateCw} text={t("RELOAD_PLUGINS")} onclick={() => chat.submit(RELOAD_COMMAND)} />
+    <MenuItem icon={Settings} text={t("MODS_OPTIONS")} onclick={() => (listing = true)} />
   </PopupMenu>
 {/snippet}
 
-{#snippet paneActions()}
+{#snippet trailing()}
   {#if configurable}
     {@const plugin = configurable}
-    <TooltipIconButton label={t("MOD_OPTIONS", plugin.name)} class="size-8" onclick={() => (optionsFor = plugin)}>
+    <TooltipIconButton label={t("MOD_OPTIONS", plugin.name)} onclick={() => (optionsFor = plugin)}>
       <Settings />
     </TooltipIconButton>
   {/if}
   {@render moreMenu()}
-{/snippet}
-
-{#snippet trailing()}
-  <PaneActions actions={paneActions} />
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -168,6 +156,7 @@
     onClose={(id) => mods.act("close", { id })}
     emptyTitle={t("MODS")}
     dot={false}
+    sub
     {focused}
     {trailing}
   />

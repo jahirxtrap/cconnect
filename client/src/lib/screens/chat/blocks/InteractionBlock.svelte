@@ -9,7 +9,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import SummaryLine from "$lib/ui/SummaryLine.svelte";
 
   interface Props {
@@ -64,7 +64,7 @@
   };
 </script>
 
-<div class="w-full px-4">
+<div class="w-full px-(--page-inset)">
   {#snippet header()}
     {#if isPlan}
       <Lightbulb size={16} class="shrink-0 text-accent" />
@@ -90,12 +90,12 @@
     {/if}
   {/snippet}
 
-  <OutlinedPanel>
+  <CardPanel>
   {#if isPlan}
     <button
       type="button"
       onclick={toggle}
-      class="flex w-full cursor-pointer items-center gap-1.5 rounded-sm text-left transition-colors select-none hover:bg-on-surface/8"
+      class="flex w-full cursor-pointer items-center gap-2 rounded-md text-left transition-colors select-none hover:bg-hover"
     >
       {@render header()}
     </button>
@@ -125,7 +125,6 @@
       {#each data.options as option (option.id)}
         <Button
           variant="outlined"
-          class="h-8 text-body-md font-normal"
           onclick={() => onAnswer(data.requestId, option.id)}
         >
           {optionLabel(option)}
@@ -135,5 +134,5 @@
   {:else}
     <SummaryLine icon={Play} fill text={chosen ? optionLabel(chosen) : (data.resolved ?? "")} class="mt-1" />
   {/if}
-  </OutlinedPanel>
+  </CardPanel>
 </div>

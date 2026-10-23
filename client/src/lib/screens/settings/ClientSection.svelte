@@ -76,7 +76,7 @@
     onclick={() => (dialog = "font")}
   >
     {#snippet trailing()}
-      <span class="flex h-7 w-9 items-center justify-center text-[22px]">😃</span>
+      <span class="flex h-7 w-9 items-center justify-center text-title-lg">😃</span>
     {/snippet}
   </PreferenceRow>
   <PreferenceRow

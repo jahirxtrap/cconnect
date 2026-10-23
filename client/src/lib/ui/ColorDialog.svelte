@@ -5,6 +5,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
+  import { SWATCH_CLASS, SWATCH_GRID_CLASS, swatchBorder } from "./swatch";
 
   export interface ColorOption {
     value: string;
@@ -22,8 +23,6 @@
 
   const { title, options, selected, onSelect, onDismiss }: Props = $props();
 
-  const SWATCH_CLASS =
-    "flex size-10 cursor-pointer items-center justify-center rounded-full transition-shadow hover:shadow-[inset_0_0_0_2px_white]";
 
   let picked = $state<string | null>(untrack(() => selected || null));
 </script>
@@ -38,14 +37,12 @@
       }}>{t("SAVE")}</Button
     >
   {/snippet}
-  <div class="grid grid-cols-[repeat(5,2.5rem)] justify-between gap-y-3">
+  <div class={SWATCH_GRID_CLASS}>
     <button
       type="button"
       onclick={() => (picked = null)}
       aria-label={t("COLOR_NONE")}
-      class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {picked === null
-        ? 'border-2 border-on-surface'
-        : 'border border-outline-variant'}"
+      class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {swatchBorder(picked === null)}"
     >
       {#if picked === null}
         <Check size={20} />
@@ -60,9 +57,7 @@
         aria-label={option.label}
         title={option.label}
         style="background: {option.color}"
-        class="{SWATCH_CLASS} text-white {picked === option.value
-          ? 'border-2 border-on-surface'
-          : 'border border-outline-variant'}"
+        class="{SWATCH_CLASS} text-white {swatchBorder(picked === option.value)}"
       >
         {#if picked === option.value}
           <Check size={20} />

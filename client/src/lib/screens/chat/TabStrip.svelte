@@ -11,7 +11,10 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { DRAG_PRESS_MS } from "$lib/ui/press";
   import { hscrollbar } from "$lib/ui/scrollbar";
-  import { PANE_HEADER_CLASS, paneFocusBorder } from "./paneChrome";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
+  import { PANE_HEADER_CLASS, PANE_SUB_CLASS, paneDim, paneTabClass } from "./paneChrome";
+  import { panes } from "./panes.svelte";
+  import { usePaneTail } from "./paneSurface";
 
   export interface StripTab {
     id: string;
@@ -34,6 +37,7 @@
     newLabel?: string;
     emptyTitle?: string;
     dot?: boolean;
+    sub?: boolean;
     focused?: boolean;
     trailing?: Snippet;
     leading?: Snippet<[string]>;
@@ -55,13 +59,14 @@
     newLabel,
     emptyTitle,
     dot = true,
+    sub = false,
     focused = false,
     trailing,
     leading,
     lead,
   }: Props = $props();
 
-  const SPACING = 6;
+  const SPACING = 4;
   const DRAG_THRESHOLD = 8;
   const EDGE = 56;
   const STEP = 12;
@@ -73,6 +78,9 @@
   let grabX = 0;
   let pointerX = 0;
 
+  const tailOf = usePaneTail();
+  const tail = $derived(tailOf());
+  const dimmed = $derived(!focused && !sub && panes.split);
   const held = $derived(drag.group === group ? drag.id : "");
   const mine = $derived(held !== "" && items.some((tab) => tab.id === held));
 
@@ -290,16 +298,16 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div onpointerdown={onPaneDown} class="{PANE_HEADER_CLASS} {paneFocusBorder(focused)}">
+<div onpointerdown={onPaneDown} class={sub && !tail ? PANE_SUB_CLASS : `${PANE_HEADER_CLASS} ${paneDim(dimmed)}`}>
   {#if lead}
-    <div class="flex h-8 shrink-0 items-center pl-1">{@render lead()}</div>
+    <div class="flex shrink-0 items-center">{@render lead()}</div>
   {/if}
   <div
     bind:this={strip}
     use:hscrollbar={{ wheel: true }}
     role="tablist"
     data-strip={group}
-    class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto py-1.5 {lead ? 'pr-1' : 'px-1'}"
+    class="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
   >
     {#each items as tab (tab.id)}
       {@const active = tab.id === activeId}
@@ -313,41 +321,43 @@
         onpointerdown={(event) => onPointerDown(event, tab.id)}
         onkeydown={(event) => event.key === "Enter" && onSelect(tab.id)}
         style="transform: translateX({dragging ? drag.dx : 0}px); z-index: {dragging ? 1 : 0}"
-        class="flex h-8 shrink-0 cursor-pointer touch-none items-center gap-1.5 rounded-item pr-1 pl-2.5 transition-colors select-none {active
-          ? 'bg-surface-variant text-on-surface'
-          : 'text-on-surface-variant hover:bg-on-surface/6'}"
+        class="flex shrink-0 cursor-pointer touch-none items-center gap-2 rounded-full transition-colors select-none {sub
+          ? 'h-7 pr-1 pl-2.5 text-body-sm'
+          : 'h-8 pr-1.5 pl-3 text-body-md'} {paneTabClass(active, focused)}"
       >
         {#if leading}
           {@render leading(tab.id)}
         {:else if dot}
-          <span
-            class="size-2 shrink-0 rounded-full"
-            style={sessionColorOf(tab.color)
-              ? `background: ${sessionColorOf(tab.color)}`
-              : "background: rgba(var(--c-on-surface-variant-rgb), 0.4)"}
-          ></span>
+          <StatusDot class="bg-faint" color={sessionColorOf(tab.color)} />
         {/if}
-        <span class="max-w-[170px] truncate text-label-lg">{tab.title ?? emptyTitle ?? t("NEW_CHAT")}</span>
+        <span class="max-w-44 truncate">{tab.title ?? emptyTitle ?? t("NEW_CHAT")}</span>
         <button
           type="button"
           onpointerdown={(event) => event.stopPropagation()}
           onclick={() => onClose(tab.id)}
           aria-label={t("CLOSE_TAB")}
-          class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/10"
+          class="inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant opacity-60 transition hover:bg-hover hover:opacity-100"
         >
           <X size={14} />
         </button>
       </div>
     {/each}
     {#if onNew}
-      <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex h-8 shrink-0 items-center">
-        <TooltipIconButton label={newLabel ?? t("NEW_TAB")} shortcut={newShortcut} onclick={onNew} class="size-8">
-          <Plus size={18} />
+      <div bind:this={plus} style="transform: translateX({plusShift}px)" class="flex shrink-0 items-center">
+        <TooltipIconButton
+          label={newLabel ?? t("NEW_TAB")}
+          shortcut={newShortcut}
+          onclick={onNew}
+        >
+          <Plus />
         </TooltipIconButton>
       </div>
     {/if}
   </div>
   {#if trailing}
-    <div class="flex min-w-0 shrink items-center pr-1">{@render trailing()}</div>
+    <div class="flex min-w-0 shrink items-center">{@render trailing()}</div>
+  {/if}
+  {#if tail}
+    <div class="flex shrink-0 items-center">{@render tail()}</div>
   {/if}
 </div>

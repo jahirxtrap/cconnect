@@ -51,8 +51,6 @@
   {running}
   {expanded}
   {onToggle}
-  labelClass="text-accent"
-  bodyClass="pt-1 -mx-4 pl-3"
 >
   <div class="flex flex-col">
     {#each message.children as child, index (child.id)}

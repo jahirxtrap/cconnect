@@ -4,17 +4,12 @@
 </script>
 
 <script lang="ts">
-  import Activity from "@lucide/svelte/icons/activity";
-  import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
   import PanelLeftOpen from "@lucide/svelte/icons/panel-left-open";
-  import Settings from "@lucide/svelte/icons/settings";
   import SquarePen from "@lucide/svelte/icons/square-pen";
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
-  import NotepadText from "@lucide/svelte/icons/notepad-text";
   import { navigation } from "$lib/app/navigation.svelte";
+  import ScreenBar from "$lib/app/ScreenBar.svelte";
   import type { SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
-  import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
   import ChatList from "./ChatList.svelte";
@@ -64,7 +59,7 @@
 </script>
 
 <div
-  class="relative h-full shrink-0 overflow-hidden bg-surface {resizing
+  class="relative h-full shrink-0 overflow-hidden border-r border-outline-variant bg-surface {resizing
     ? ''
     : 'transition-[width] duration-200'}"
   style="width: {expanded ? width : RAIL_WIDTH}px; {accent}"
@@ -74,7 +69,7 @@
       {chat}
       drawerMode={false}
       onClose={() => onExpanded(false)}
-      onAfterSelect={() => {}}
+      onAfterSelect={() => navigation.showChat()}
       {onNewTab}
       {onOpenSession}
       {onOpenRight}
@@ -99,32 +94,21 @@
       }}
     ></div>
   {:else}
-    <div class="flex h-full flex-col items-center border-r border-outline-variant py-2">
+    <div class="flex h-full flex-col items-center pt-2.5 pb-2">
       <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => onExpanded(true)}>
-        <PanelLeftOpen size={20} />
+        <PanelLeftOpen />
       </TooltipIconButton>
-      <TooltipIconButton label={t("NEW_SESSION")} onclick={() => chat.newSession()}>
-        <SquarePen size={20} />
+      <TooltipIconButton
+        label={t("NEW_SESSION")}
+        onclick={() => {
+          chat.newSession();
+          navigation.showChat();
+        }}
+      >
+        <SquarePen />
       </TooltipIconButton>
       <div class="flex-1"></div>
-      <TooltipIconButton label={t("SHARED")} onclick={() => navigation.openShared()}>
-        <FolderSymlink size={20} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("CLAUDE")} onclick={() => navigation.navigate("/claude")}>
-        <ClaudeIcon size={20} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("MONITOR")} onclick={() => navigation.navigate("/monitor")}>
-        <Activity size={20} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("TERMINAL")} onclick={() => navigation.navigate("/terminal")}>
-        <SquareTerminal size={20} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("NOTES")} onclick={() => navigation.navigate("/notes")}>
-        <NotepadText size={20} />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("SETTINGS")} onclick={() => navigation.openSettings()}>
-        <Settings size={20} />
-      </TooltipIconButton>
+      <ScreenBar vertical />
     </div>
   {/if}
 </div>

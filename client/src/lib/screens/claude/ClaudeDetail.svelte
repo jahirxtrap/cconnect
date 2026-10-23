@@ -9,6 +9,17 @@
   ] as const;
 
   export type ClaudeKind = (typeof CLAUDE_KINDS)[number];
+
+  export const CLAUDE_TABS: Record<ClaudeKind, string> = {
+    plugins: "PLUGINS",
+    skills: "SKILLS",
+    mcp: "MCP",
+    marketplaces: "MARKETPLACES",
+    memories: "MEMORIES",
+    status: "SERVICE_STATUS",
+  };
+
+  export const STATUS_PAGE = "https://status.claude.com";
 </script>
 
 <script lang="ts">
@@ -21,7 +32,6 @@
   import Store from "@lucide/svelte/icons/store";
   import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { paneActionClass } from "$lib/screens/chat/paneChrome";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
@@ -60,7 +70,9 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
+  import SelectChip from "$lib/ui/SelectChip.svelte";
+  import ClaudeCard, { TAG_CLASS } from "./ClaudeCard.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
@@ -79,20 +91,23 @@
   interface Props {
     kind: ClaudeKind;
     onClose: () => void;
+    embedded?: boolean;
+    query?: string;
   }
 
   type CatalogSource = { kind: "all" } | { kind: "market"; name: string } | { kind: "chats" };
   type CatalogEntry = CatalogPlugin & { marketplace: string };
+  type PluginFilter = { kind: "all" } | { kind: "mods" } | { kind: "market"; name: string };
 
-  const { kind, onClose }: Props = $props();
+  const { kind, onClose, embedded = false, query = "" }: Props = $props();
 
   const compact = inPane();
-  const actionClass = paneActionClass(compact);
 
-  const STATUS_PAGE = "https://status.claude.com";
-  const ROW_PADDING = "py-2 pr-4 pl-4";
   const SKILL_FILE = "SKILL.md";
   const TRANSPORTS = ["stdio", "http", "sse"];
+  const CARD_REM = 18;
+  const PANEL_REM = 22.5;
+  const GAP_REM = 1;
 
   const chat = $derived(tabs.state);
 
@@ -135,6 +150,30 @@
   let mcpTransport = $state(TRANSPORTS[0]);
   let mcpAuth = $state<AuthInput>(emptyAuth());
   let mcpEnv = $state("");
+  let areaWidth = $state(0);
+  let viewHeight = $state(0);
+
+  const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+
+  const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "marketplaces"];
+
+  const sidePanel = $derived(
+    embedded && PANEL_KINDS.includes(kind) && areaWidth >= (CARD_REM + GAP_REM + PANEL_REM) * rem(),
+  );
+
+  const skillKey = (skill: Skill) => `${skill.plugin}/${skill.id}`;
+
+  const panelTitle = $derived(
+    kind === "plugins"
+      ? pluginMenu?.name
+      : kind === "skills"
+        ? skillSheet?.name
+        : kind === "mcp"
+          ? mcpMenu?.name
+          : kind === "marketplaces"
+            ? marketMenu?.name
+            : undefined,
+  );
 
   const title = $derived(
     kind === "plugins"
@@ -250,18 +289,51 @@
     void runAction(() => claudeApi.addLocalPlugin(path));
   };
 
-  const filteredSkills = $derived.by(() => {
-    const query = skillQuery.trim().toLowerCase();
-    const list = skills ?? [];
-    if (!query) return list;
-    return list.filter(
-      (skill) =>
-        skill.name.toLowerCase().includes(query) ||
-        skill.description?.toLowerCase().includes(query) ||
-        skill.pluginName?.toLowerCase().includes(query),
-    );
+  const needle = $derived((embedded ? query : skillQuery).trim().toLowerCase());
+
+  const matches = (...fields: (string | null | undefined)[]) =>
+    !needle || fields.some((field) => field?.toLowerCase().includes(needle));
+
+  let pluginFilter = $state.raw<PluginFilter>({ kind: "all" });
+
+  const pluginMatches = (plugin: Plugin, filter: PluginFilter) =>
+    filter.kind === "all" ||
+    (filter.kind === "mods" ? plugin.mod : !plugin.local && plugin.marketplace === filter.name);
+
+  const pluginFilters = $derived.by((): { filter: PluginFilter; label: string; count: number }[] => {
+    const list = extensions?.plugins ?? [];
+    const markets = [
+      ...new Set(list.flatMap((plugin) => (!plugin.local && plugin.marketplace ? [plugin.marketplace] : []))),
+    ];
+    const entries: { filter: PluginFilter; label: string; count: number }[] = [
+      { filter: { kind: "all" }, label: t("ALL"), count: list.length },
+      { filter: { kind: "mods" }, label: t("MODS"), count: list.filter((plugin) => plugin.mod).length },
+      ...markets.map((name) => {
+        const filter: PluginFilter = { kind: "market", name };
+        return { filter, label: name, count: list.filter((plugin) => pluginMatches(plugin, filter)).length };
+      }),
+    ];
+    return entries.filter((item) => item.filter.kind === "all" || item.count > 0);
   });
 
+  const sameFilter = (a: PluginFilter, b: PluginFilter) =>
+    a.kind === b.kind && (a.kind !== "market" || (b.kind === "market" && a.name === b.name));
+
+  const filteredPlugins = $derived(
+    (extensions?.plugins ?? []).filter(
+      (plugin) => pluginMatches(plugin, pluginFilter) && matches(plugin.name, plugin.description, plugin.marketplace),
+    ),
+  );
+
+  const filteredSkills = $derived(
+    (skills ?? []).filter((skill) => matches(skill.name, skill.description, skill.pluginName)),
+  );
+
+  const filteredMcp = $derived((mcpServers ?? []).filter((server) => matches(server.name, server.detail)));
+
+  const filteredMarkets = $derived(
+    (extensions?.marketplaces ?? []).filter((market) => matches(market.name, market.repo)),
+  );
   const catalogMatches = (entry: { name: string; description: string | null }) => {
     const query = catalogQuery.trim().toLowerCase();
     return !query || entry.name.toLowerCase().includes(query) || !!entry.description?.toLowerCase().includes(query);
@@ -271,7 +343,56 @@
 
   const filteredChatMods = $derived((extensions?.chatMods ?? []).filter(catalogMatches));
 
-  const memoryList = $derived([...(memories?.global ?? []), ...(memories?.project ?? [])]);
+  const memoryList = $derived(
+    [...(memories?.global ?? []), ...(memories?.project ?? [])].filter((memory) =>
+      matches(memory.name, memory.description),
+    ),
+  );
+
+  const shownCount = $derived(
+    kind === "plugins"
+      ? filteredPlugins.length
+      : kind === "skills"
+        ? filteredSkills.length
+        : kind === "mcp"
+          ? filteredMcp.length
+          : kind === "marketplaces"
+            ? filteredMarkets.length
+            : memoryList.length,
+  );
+
+  $effect(() => {
+    if (!sidePanel || !loaded) return;
+    if (kind === "plugins") {
+      const current = pluginMenu;
+      if (!current || !filteredPlugins.some((plugin) => pluginKey(plugin) === pluginKey(current)))
+        pluginMenu = filteredPlugins[0] ?? null;
+    } else if (kind === "skills") {
+      const current = skillSheet;
+      if (!current || !filteredSkills.some((skill) => skillKey(skill) === skillKey(current)))
+        skillSheet = filteredSkills[0] ?? null;
+    } else if (kind === "mcp") {
+      const current = mcpMenu;
+      if (!current || !filteredMcp.some((server) => server.name === current.name)) mcpMenu = filteredMcp[0] ?? null;
+    } else if (kind === "marketplaces") {
+      const current = marketMenu;
+      if (!current || !filteredMarkets.some((market) => market.name === current.name))
+        marketMenu = filteredMarkets[0] ?? null;
+    }
+  });
+
+  let sideShown = false;
+
+  $effect(() => {
+    const shown = sidePanel;
+    if (sideShown && !shown) {
+      pluginMenu = null;
+      skillSheet = null;
+      mcpMenu = null;
+      marketMenu = null;
+    }
+    sideShown = shown;
+  });
 
   const scopeLabel = (scope: string) => (scope === "global" ? t("MEMORY_GLOBAL") : t("MEMORIES"));
 
@@ -318,12 +439,31 @@
 
 {#snippet stateDot(enabled: boolean)}
   <span class="ml-3 inline-flex">
-    <StatusDot class={enabled ? "bg-green" : "bg-outline-variant"} box={16} dot={10} />
+    <StatusDot class={enabled ? "bg-green" : "bg-faint"} box={16} />
   </span>
 {/snippet}
 
-<div class="flex h-full flex-col">
-  {#if compact}
+<div class="flex min-h-0 flex-1 flex-col">
+  {#if embedded}
+    {#if kind !== "status"}
+      <div class="flex shrink-0 items-center gap-1.5 px-(--page-inset) pb-3">
+        {#if kind === "plugins" && loaded}
+          <div class="no-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto">
+            {#each pluginFilters as item (item.label)}
+              <SelectChip
+                label={item.label}
+                count={item.count}
+                selected={sameFilter(item.filter, pluginFilter)}
+                onclick={() => (pluginFilter = item.filter)}
+              />
+            {/each}
+          </div>
+        {/if}
+        <div class="flex-1"></div>
+        <div class="flex shrink-0 items-center">{@render headerActions()}</div>
+      </div>
+    {/if}
+  {:else if compact}
     <PaneHeader {title} onBack={onClose} actions={headerActions} />
   {:else}
     <AppTopBar
@@ -334,7 +474,7 @@
     >
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>
-          <ArrowLeft size={20} />
+          <ArrowLeft />
         </TooltipIconButton>
       {/snippet}
       {#snippet actions()}
@@ -345,21 +485,16 @@
 
   {#snippet headerActions()}
     {#if kind === "plugins"}
-      <TooltipIconButton
-        label={t("INSTALL")}
-        class={actionClass}
-        onclick={browse}
-      >
+      <TooltipIconButton label={t("INSTALL")} onclick={browse}>
         <Plus />
       </TooltipIconButton>
     {:else if kind === "marketplaces"}
-      <TooltipIconButton label={t("ADD")} class={actionClass} onclick={() => (addingMarket = true)}>
+      <TooltipIconButton label={t("ADD")} onclick={() => (addingMarket = true)}>
         <Plus />
       </TooltipIconButton>
     {:else if kind === "mcp"}
       <TooltipIconButton
         label={t("ADD")}
-        class={actionClass}
         onclick={() => {
           mcpName = "";
           mcpTarget = "";
@@ -372,18 +507,13 @@
         <Plus />
       </TooltipIconButton>
     {:else if kind === "status"}
-      <TooltipIconButton
-        label={t("STATUS_OPEN_PAGE")}
-        class={actionClass}
-        onclick={() => openExternal(STATUS_PAGE)}
-      >
+      <TooltipIconButton label={t("STATUS_OPEN_PAGE")} onclick={() => openExternal(STATUS_PAGE)}>
         <ExternalLink />
       </TooltipIconButton>
     {/if}
     {#if kind === "status" && !isTouch}
       <TooltipIconButton
         label={t("REFRESH")}
-        class={actionClass}
         shortcut="window.refresh"
         onclick={() => void refresh()}
       >
@@ -393,7 +523,7 @@
   {/snippet}
 
   {#if kind === "memories" && chat.historyProjects.length}
-    <div class="px-4 py-1.5">
+    <div class="px-(--page-inset) pb-3 {embedded ? 'max-w-md' : ''}">
       <SelectField
         label={t("PROJECT")}
         selected={memoriesProject ?? ""}
@@ -406,8 +536,8 @@
     </div>
   {/if}
 
-  {#if kind === "skills" && loaded}
-    <div class="px-4 py-1.5">
+  {#if kind === "skills" && loaded && !embedded}
+    <div class="px-(--page-inset) pb-2">
       <SearchBar
         value={skillQuery}
         oninput={(value) => (skillQuery = value)}
@@ -418,13 +548,115 @@
 
   {#if !loaded}
     <CenteredProgress class="flex-1" />
+  {:else if embedded && kind !== "status"}
+    <div bind:clientHeight={viewHeight} class="flex min-h-0 flex-1 flex-col">
+    <PullToRefresh {refreshing} onRefresh={null}>
+      <div class="px-(--page-inset) pb-(--page-inset)">
+      <div bind:clientWidth={areaWidth} class="flex items-start" style="gap: {GAP_REM}rem">
+        <div class="min-w-0 flex-1">
+          <div
+            class="grid content-start gap-2"
+            style="grid-template-columns: repeat(auto-fill, minmax(min({CARD_REM}rem, 100%), 1fr))"
+          >
+            {#if kind === "plugins"}
+              {#each filteredPlugins as plugin (pluginKey(plugin))}
+                <ClaudeCard
+                  title={plugin.name}
+                  tag={plugin.mod ? t("MOD") : null}
+                  enabled={plugin.enabled}
+                  source={joined(plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace, plugin.version, plugin.scope)}
+                  description={plugin.description}
+                  selected={sidePanel && !!pluginMenu && pluginKey(pluginMenu) === pluginKey(plugin)}
+                  onclick={() => (pluginMenu = plugin)}
+                />
+              {/each}
+            {:else if kind === "skills"}
+              {#each filteredSkills as skill (skillKey(skill))}
+                <ClaudeCard
+                  title={skill.name}
+                  enabled={skill.enabled}
+                  source={skill.pluginName}
+                  description={skill.description}
+                  selected={sidePanel && !!skillSheet && skillKey(skillSheet) === skillKey(skill)}
+                  onclick={() => (skillSheet = skill)}
+                />
+              {/each}
+            {:else if kind === "mcp"}
+              {#each filteredMcp as server (server.name)}
+                <ClaudeCard
+                  title={server.name}
+                  enabled={server.enabled}
+                  source={server.type}
+                  description={server.detail}
+                  selected={sidePanel && mcpMenu?.name === server.name}
+                  onclick={() => (mcpMenu = server)}
+                />
+              {/each}
+            {:else if kind === "marketplaces"}
+              {#each filteredMarkets as market (market.name)}
+                <ClaudeCard
+                  title={market.name}
+                  source={market.repo}
+                  selected={sidePanel && marketMenu?.name === market.name}
+                  onclick={() => (marketMenu = market)}
+                />
+              {/each}
+            {:else}
+              {#each memoryList as memory (`${memory.scope}/${memory.name}`)}
+                <ClaudeCard
+                  title={memory.name}
+                  source={scopeLabel(memory.scope)}
+                  description={memory.description}
+                  onclick={() => openMemory(memory.scope, memory.name)}
+                />
+              {/each}
+            {/if}
+          </div>
+          {#if !shownCount}
+            <EmptyState text={t(!needle && kind === "memories" ? "NO_FILES" : "NO_RESULTS")} class="py-10" />
+          {/if}
+        </div>
+        {#if sidePanel && panelTitle}
+          <div
+            class="sticky top-0 flex shrink-0"
+            style="width: {PANEL_REM}rem; max-height: calc({viewHeight}px - var(--page-inset))"
+          >
+            <CardPanel class="scrollbar-thin min-h-0 flex-1 gap-3.5 overflow-y-auto">
+              <div class="flex items-center gap-2.5">
+                <p class="min-w-0 truncate text-title-lg">{panelTitle}</p>
+                {#if kind === "plugins" && pluginMenu}
+                  {#if pluginMenu.mod}
+                    <span class={TAG_CLASS}>{t("MOD")}</span>
+                  {/if}
+                  <span class="ml-auto flex shrink-0">{@render pluginSwitch(pluginMenu)}</span>
+                {:else if kind === "mcp" && mcpMenu}
+                  <span class="ml-auto flex shrink-0">{@render mcpSwitch(mcpMenu)}</span>
+                {/if}
+              </div>
+              <div class="flex flex-1 flex-col gap-3.5 [--c-card:var(--c-hover)]">
+                {#if kind === "plugins" && pluginMenu}
+                  {@render pluginBody(pluginMenu)}
+                {:else if kind === "skills" && skillSheet}
+                  {@render skillBody(skillSheet)}
+                {:else if kind === "mcp" && mcpMenu}
+                  {@render mcpBody(mcpMenu)}
+                {:else if kind === "marketplaces" && marketMenu}
+                  {@render marketBody(marketMenu)}
+                {/if}
+              </div>
+            </CardPanel>
+          </div>
+        {/if}
+      </div>
+      </div>
+    </PullToRefresh>
+    </div>
   {:else}
     <PullToRefresh {refreshing} onRefresh={kind === "status" ? () => void refresh() : null}>
-    <div class="pb-4">
+    <div class="{kind === 'status' ? 'px-(--page-inset)' : 'px-2'} pb-(--page-inset)">
       {#if kind === "plugins"}
-        {#each extensions?.plugins ?? [] as plugin (pluginKey(plugin))}
+        {#each filteredPlugins as plugin (pluginKey(plugin))}
           <ListRow
-            padding={ROW_PADDING}
             title={plugin.name}
             subtitle={joined(
               plugin.mod && t("MOD"),
@@ -442,7 +674,6 @@
       {:else if kind === "skills"}
         {#each filteredSkills as skill (`${skill.plugin}/${skill.id}`)}
           <ListRow
-            padding={ROW_PADDING}
             title={skill.name}
             subtitle={skill.description ?? skill.pluginName}
             onclick={() => (skillSheet = skill)}
@@ -452,14 +683,13 @@
             {/snippet}
           </ListRow>
         {:else}
-          {#if skillQuery.trim()}
+          {#if needle}
             <EmptyState text={t("NO_RESULTS")} class="h-full" />
           {/if}
         {/each}
       {:else if kind === "mcp"}
-        {#each mcpServers ?? [] as server (server.name)}
+        {#each filteredMcp as server (server.name)}
           <ListRow
-            padding={ROW_PADDING}
             title={server.name}
             subtitle={joined(server.type, server.detail)}
             onclick={() => (mcpMenu = server)}
@@ -470,13 +700,8 @@
           </ListRow>
         {/each}
       {:else if kind === "marketplaces"}
-        {#each extensions?.marketplaces ?? [] as market (market.name)}
-          <ListRow
-            padding={ROW_PADDING}
-            title={market.name}
-            subtitle={market.repo}
-            onclick={() => (marketMenu = market)}
-          >
+        {#each filteredMarkets as market (market.name)}
+          <ListRow title={market.name} subtitle={market.repo} onclick={() => (marketMenu = market)}>
             {#snippet trailing()}
               {@render stateDot(true)}
             {/snippet}
@@ -501,32 +726,32 @@
         <EmptyState text={t("STATUS_UNKNOWN")} class="h-full" />
       {:else}
         {@const indicator = service.indicator}
-        <div class="px-4">
+        <div class={embedded ? "grid grid-cols-[repeat(auto-fit,minmax(min(24rem,100%),1fr))] items-start gap-4" : ""}>
           <SettingsGroup label={indicatorLabel(indicator)}>
             {#snippet labelTrailing()}
-              <StatusDot class={indicatorTone(indicator)} box={20} dot={12} />
+              <StatusDot class={indicatorTone(indicator)} />
             {/snippet}
             {#each service.components as component (component.name)}
-              <div class="flex items-center gap-3 px-4 py-3">
+              <div class="flex min-h-10 items-center gap-3 px-3 py-2">
                 <p class="min-w-0 flex-1 truncate text-body-md">{component.name}</p>
                 <p class="text-body-sm text-on-surface-variant">{componentLabel(component.status)}</p>
-                <StatusDot class={componentTone(component.status)} box={16} dot={10} />
+                <StatusDot class={componentTone(component.status)} box={16} />
               </div>
             {/each}
           </SettingsGroup>
           <SettingsGroup label={t("STATUS_INCIDENTS")}>
             {#if !service.incidents.length}
-              <p class="px-4 py-3 text-body-sm text-on-surface-variant">{t("STATUS_NO_INCIDENTS")}</p>
+              <p class="px-3 py-2.5 text-body-sm text-on-surface-variant">{t("STATUS_NO_INCIDENTS")}</p>
             {:else}
               {#each service.incidents as incident (incident.name)}
                 {@const millis = incident.updatedAt === null ? null : parseIsoMillis(incident.updatedAt)}
                 <Pressable
                   enabled={!!incident.shortlink}
                   onclick={() => incident.shortlink && openExternal(incident.shortlink)}
-                  class="flex w-full items-start gap-3 px-4 py-3 text-left"
+                  class="flex w-full items-start gap-3 rounded-md px-3 py-2.5 text-left"
                 >
                   <span class="flex h-5 shrink-0 items-center">
-                    <StatusDot class={indicatorTone(incident.impact)} box={16} dot={10} />
+                    <StatusDot class={indicatorTone(incident.impact)} box={16} />
                   </span>
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-body-md">{incident.name}</p>
@@ -556,121 +781,130 @@
   {/if}
 </div>
 
-{#if skillSheet && !navigation.preview}
+{#snippet skillBody(skill: Skill)}
+  {#if !skillFiles}
+    <CenteredProgress class="py-6" />
+  {:else}
+    {@const references = skillFiles.filter((file) => file !== SKILL_FILE)}
+    <div>
+      {#if skill.description}
+        <CardPanel class="mb-2.5">
+          <p class="text-body-sm text-on-surface-variant">{skill.description}</p>
+        </CardPanel>
+      {/if}
+      <CardPanel onclick={() => openSkillFile(skill, SKILL_FILE, `${skill.id} - ${SKILL_FILE}`)}>
+        <p class="text-body-md">{SKILL_FILE}</p>
+      </CardPanel>
+      {#if references.length}
+        <p class="mt-3 mb-1.5 text-label-lg text-accent">{t("REFERENCES")}</p>
+        <div class="flex flex-col gap-1.5">
+          {#each references as file (file)}
+            <CardPanel onclick={() => openSkillFile(skill, file, file.split("/").pop() ?? file)}>
+              <p class="text-body-md">{file.split("/").pop()}</p>
+              <p class="text-body-sm text-on-surface-variant">{file}</p>
+            </CardPanel>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
+{/snippet}
+
+{#if skillSheet && !sidePanel && !navigation.preview}
   {@const skill = skillSheet}
   <CompactDialog title={skill.name} onDismiss={() => (skillSheet = null)}>
     {#snippet buttons()}
       <Button onclick={() => (skillSheet = null)} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
-    {#if !skillFiles}
-      <CenteredProgress class="py-6" />
-    {:else}
-      {#if skill.description}
-        <OutlinedPanel class="mb-2.5">
-          <p class="text-body-sm text-on-surface-variant">{skill.description}</p>
-        </OutlinedPanel>
-      {/if}
-      <OutlinedPanel onclick={() => openSkillFile(skill, SKILL_FILE, `${skill.id} - ${SKILL_FILE}`)}>
-        <p class="text-body-lg">{SKILL_FILE}</p>
-      </OutlinedPanel>
-      {@const references = skillFiles.filter((file) => file !== SKILL_FILE)}
-      {#if references.length}
-        <p class="mt-3 mb-1.5 text-label-lg text-accent">{t("REFERENCES")}</p>
-        <div class="flex flex-col gap-1.5">
-          {#each references as file (file)}
-            <OutlinedPanel onclick={() => openSkillFile(skill, file, file.split("/").pop() ?? file)}>
-              <p class="text-body-md">{file.split("/").pop()}</p>
-              <p class="text-body-sm text-on-surface-variant">{file}</p>
-            </OutlinedPanel>
-          {/each}
-        </div>
-      {/if}
-    {/if}
+    {@render skillBody(skill)}
   </CompactDialog>
 {/if}
 
-{#if pluginMenu}
+{#snippet pluginSwitch(plugin: Plugin)}
+  <CompactSwitch
+    checked={plugin.enabled}
+    enabled={!busy}
+    onCheckedChange={() => {
+      dialogBusy = "toggle";
+      void runAction(() => claudeApi.pluginAction(plugin.enabled ? "disable" : "enable", pluginKey(plugin)));
+    }}
+  />
+{/snippet}
+
+{#snippet facts(rows: { label: string; text: string | null }[])}
+  {#if rows.length}
+    <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-2.5 gap-y-2 text-body-sm">
+      {#each rows as fact (fact.label)}
+        <dt class="text-faint">{fact.label}</dt>
+        <dd class="wrap-anywhere">{fact.text}</dd>
+      {/each}
+    </dl>
+  {/if}
+{/snippet}
+
+{#snippet pluginBody(plugin: Plugin)}
+  {#if plugin.mod && !pluginReview}
+    <CenteredProgress class="py-6" />
+  {:else}
+    {@const rows = [
+      { label: t("MARKETPLACE"), text: plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace },
+      { label: t("VERSION"), text: plugin.version ?? "" },
+      { label: t("COMMANDS"), text: pluginReview && plugin.mod ? modCommands(pluginReview).join(SEPARATOR) : "" },
+      { label: t("MOD_CALLS"), text: pluginReview && plugin.mod ? joined(...modAreas(pluginReview)) : "" },
+    ].filter((fact) => fact.text)}
+    {#if plugin.description}
+      <p class="text-body-md text-on-surface-variant">{plugin.description}</p>
+    {/if}
+    {@render facts(rows)}
+    {#if plugin.mod && pluginReview}
+      {#each pluginReview.errors as error (error)}
+        <p class="text-body-sm wrap-anywhere text-error">{error}</p>
+      {/each}
+      {#if !rows.some((fact) => fact.label === t("COMMANDS") || fact.label === t("MOD_CALLS")) && !pluginReview.errors.length}
+        <p class="text-body-sm text-on-surface-variant">{t("MOD_REVIEW_EMPTY")}</p>
+      {/if}
+    {/if}
+    {#if dialogBusy}
+      <LinearProgress />
+    {/if}
+    <div class="mt-auto flex flex-col gap-2.5">
+      {#if plugin.options}
+        <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => (optionsFor = plugin)} class="w-full" />
+      {/if}
+      {#if !plugin.local}
+        <ActionButton
+          text={t("UPDATE_ACTION")}
+          enabled={!busy}
+          onclick={() => {
+            dialogBusy = "update";
+            void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
+          }}
+          class="w-full"
+        />
+      {/if}
+      <ActionButton
+        text={t("UNINSTALL")}
+        enabled={!busy}
+        danger
+        onclick={() => (confirmUninstall = plugin)}
+        class="w-full"
+      />
+    </div>
+  {/if}
+{/snippet}
+
+{#if pluginMenu && !sidePanel}
   {@const plugin = pluginMenu}
   <CompactDialog title={plugin.name} onDismiss={() => { cancelAction(); pluginMenu = null; }}>
     {#snippet titleTrailing()}
-      <CompactSwitch
-        checked={plugin.enabled}
-        enabled={!busy}
-        onCheckedChange={() => {
-          dialogBusy = "toggle";
-          void runAction(() => claudeApi.pluginAction(plugin.enabled ? "disable" : "enable", pluginKey(plugin)));
-        }}
-      />
+      {@render pluginSwitch(plugin)}
     {/snippet}
     {#snippet buttons()}
       <Button onclick={() => { cancelAction(); pluginMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
-    {#if plugin.mod && !pluginReview}
-      <CenteredProgress class="py-6" />
-    {:else}
-      {#if plugin.description || plugin.version}
-        <OutlinedPanel class="mb-3">
-          {#if plugin.description}
-            <p class="text-body-sm text-on-surface-variant">{plugin.description}</p>
-          {/if}
-          {#if plugin.version}
-            <p class="text-label-md text-accent">{t("VERSION_LABEL", plugin.version)}</p>
-          {/if}
-        </OutlinedPanel>
-      {/if}
-      {#if plugin.mod && pluginReview}
-        {@const sections = [
-          { label: t("COMMANDS"), text: modCommands(pluginReview).join(", "), mono: true },
-          { label: t("MOD_CALLS"), text: joined(...modAreas(pluginReview)), mono: false },
-        ].filter((section) => section.text)}
-        <OutlinedPanel class="mb-3">
-          <div class="flex flex-col gap-2">
-            {#each sections as section (section.label)}
-              <div>
-                <p class="text-label-md text-accent">{section.label}</p>
-                <p class="text-body-sm wrap-anywhere text-on-surface-variant {section.mono ? 'font-mono' : ''}">
-                  {section.text}
-                </p>
-              </div>
-            {/each}
-            {#each pluginReview.errors as error (error)}
-              <p class="text-body-sm wrap-anywhere text-error">{error}</p>
-            {/each}
-            {#if !sections.length && !pluginReview.errors.length}
-              <p class="text-body-sm text-on-surface-variant">{t("MOD_REVIEW_EMPTY")}</p>
-            {/if}
-          </div>
-        </OutlinedPanel>
-      {/if}
-      <div class="flex flex-col gap-2.5">
-        {#if dialogBusy === "toggle" || dialogBusy === "update"}
-          <LinearProgress />
-        {/if}
-        {#if plugin.options}
-          <ActionButton text={t("PLUGIN_OPTIONS")} enabled={!busy} onclick={() => (optionsFor = plugin)} class="w-full" />
-        {/if}
-        {#if !plugin.local}
-          <ActionButton
-            text={t("UPDATE_ACTION")}
-            enabled={!busy}
-            onclick={() => {
-              dialogBusy = "update";
-              void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
-            }}
-            class="w-full"
-          />
-        {/if}
-        {#if dialogBusy === "uninstall"}
-          <LinearProgress />
-        {/if}
-        <ActionButton
-          text={t("UNINSTALL")}
-          enabled={!busy}
-          onclick={() => (confirmUninstall = plugin)}
-          class="w-full"
-        />
-      </div>
-    {/if}
+    <div class="flex flex-col gap-3.5">
+      {@render pluginBody(plugin)}
+    </div>
   </CompactDialog>
 {/if}
 
@@ -680,6 +914,7 @@
     title={t("UNINSTALL")}
     text={t("DELETE_FILE_CONFIRM", plugin.name)}
     confirmLabel={t("UNINSTALL")}
+    danger
     onConfirm={() => {
       const key = pluginKey(plugin);
       confirmUninstall = null;
@@ -697,18 +932,17 @@
       {#if source.kind !== "chats"}
         <TooltipIconButton
           label={t("UPDATE_ACTION")}
-          class="[&_svg]:size-5"
           enabled={!updatingMarkets}
           onclick={() =>
             void updateMarkets(source.kind === "market" ? [source.name] : marketNames(() => true), true)}
         >
-          <RotateCw size={20} />
+          <RotateCw />
         </TooltipIconButton>
       {/if}
       <PopupMenu open={marketPicker} label={t("MARKETPLACES")} onOpenChange={(open) => (marketPicker = open)}>
         {#snippet triggerChild(props)}
-          <TooltipIconButton label={t("MARKETPLACES")} class="[&_svg]:size-5" {...props}>
-            <Store size={20} />
+          <TooltipIconButton label={t("MARKETPLACES")} {...props}>
+            <Store />
           </TooltipIconButton>
         {/snippet}
         <MenuItem
@@ -730,28 +964,22 @@
           />
         {/each}
         <MenuItem
+          icon={MessageSquareText}
           text={t("CHAT_MODS")}
           selected={source.kind === "chats"}
           onclick={() => {
             marketPicker = false;
             void openCatalog({ kind: "chats" });
           }}
-        >
-          {#snippet leading()}
-            <MessageSquareText size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
+        />
         <MenuItem
+          icon={FolderOpen}
           text={t("PLUGIN_FROM_FOLDER")}
           onclick={() => {
             marketPicker = false;
             pickingFolder = true;
           }}
-        >
-          {#snippet leading()}
-            <FolderOpen size={20} class="shrink-0 text-on-surface-variant" />
-          {/snippet}
-        </MenuItem>
+        />
       </PopupMenu>
     {/snippet}
     {#snippet buttons()}
@@ -770,8 +998,6 @@
     {#if source.kind === "chats"}
       {#each filteredChatMods as mod (mod.path)}
         <ListRow
-          class="rounded-lg"
-          padding="py-2.5 pr-3 pl-3"
           subtitleLines={2}
           title={mod.name + (mod.version ? ` - ${mod.version}` : "")}
           subtitle={joined(chatTitle(mod), mod.description)}
@@ -789,8 +1015,6 @@
     {:else}
       {#each filteredCatalog as entry (`${entry.marketplace}/${entry.name}`)}
         <ListRow
-          class="rounded-lg"
-          padding="py-2.5 pr-3 pl-3"
           subtitleLines={2}
           title={entry.name + (entry.version ? ` - ${entry.version}` : "")}
           subtitle={source.kind === "all" ? joined(entry.marketplace, entry.description) : entry.description}
@@ -832,12 +1056,12 @@
         {t("INSTALL")}
       </Button>
     {/snippet}
-    <OutlinedPanel>
+    <CardPanel>
       <p class="text-body-sm text-on-surface-variant">{entry.description ?? entry.name}</p>
       {#if entry.version}
         <p class="text-label-md text-accent">{t("VERSION_LABEL", entry.version)}</p>
       {/if}
-    </OutlinedPanel>
+    </CardPanel>
   </CompactDialog>
 {/if}
 
@@ -848,13 +1072,13 @@
       <Button onclick={() => (localCandidate = null)} variant="outlined">{t("CANCEL")}</Button>
       <Button enabled={!mod.installed} onclick={() => installLocal(mod.path)}>{t("INSTALL")}</Button>
     {/snippet}
-    <OutlinedPanel>
+    <CardPanel>
       {#if mod.description}
         <p class="text-body-sm text-on-surface-variant">{mod.description}</p>
       {/if}
       <p class="text-body-sm wrap-anywhere text-on-surface-variant">{mod.path}</p>
       <p class="text-label-md text-accent">{mod.installed ? t("CHAT_MOD_INSTALLED") : t("CHAT_MOD_INSTALL_HINT")}</p>
-    </OutlinedPanel>
+    </CardPanel>
   </CompactDialog>
 {/if}
 
@@ -878,43 +1102,48 @@
   />
 {/if}
 
-{#if marketMenu}
+{#snippet marketBody(market: Marketplace)}
+  {#if market.repo}
+    <p class="text-body-sm wrap-anywhere text-on-surface-variant">{market.repo}</p>
+  {/if}
+  <SwitchRow
+    title={t("MARKETPLACE_AUTO_UPDATE")}
+    summary={t("MARKETPLACE_AUTO_UPDATE_SUMMARY")}
+    checked={market.autoUpdate}
+    enabled={!busy}
+    onChange={(checked) => void runAction(() => claudeApi.marketplaceAutoUpdate(market.name, checked))}
+  />
+  {#if dialogBusy === "update"}
+    <LinearProgress />
+  {/if}
+  <div class="mt-auto flex flex-col gap-2.5">
+    <ActionButton
+      text={t("UPDATE_ACTION")}
+      enabled={!busy}
+      onclick={() => {
+        dialogBusy = "update";
+        void runAction(() => claudeApi.marketplaceAction("update", market.name));
+      }}
+      class="w-full"
+    />
+    <ActionButton
+      text={t("DELETE")}
+      enabled={!busy}
+      danger
+      onclick={() => (confirmMarketRemove = market)}
+      class="w-full"
+    />
+  </div>
+{/snippet}
+
+{#if marketMenu && !sidePanel}
   {@const market = marketMenu}
   <CompactDialog title={market.name} onDismiss={() => { cancelAction(); marketMenu = null; }}>
     {#snippet buttons()}
       <Button onclick={() => { cancelAction(); marketMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
-    {#if market.repo}
-      <OutlinedPanel class="mb-3">
-        <p class="text-body-sm text-on-surface-variant">{market.repo}</p>
-      </OutlinedPanel>
-    {/if}
-    <div class="flex flex-col gap-2.5">
-      <SwitchRow
-        title={t("MARKETPLACE_AUTO_UPDATE")}
-        summary={t("MARKETPLACE_AUTO_UPDATE_SUMMARY")}
-        checked={market.autoUpdate}
-        enabled={!busy}
-        onChange={(checked) => void runAction(() => claudeApi.marketplaceAutoUpdate(market.name, checked))}
-      />
-      {#if dialogBusy === "update"}
-        <LinearProgress />
-      {/if}
-      <ActionButton
-        text={t("UPDATE_ACTION")}
-        enabled={!busy}
-        onclick={() => {
-          dialogBusy = "update";
-          void runAction(() => claudeApi.marketplaceAction("update", market.name));
-        }}
-        class="w-full"
-      />
-      <ActionButton
-        text={t("DELETE")}
-        enabled={!busy}
-        onclick={() => (confirmMarketRemove = market)}
-        class="w-full"
-      />
+    <div class="flex flex-col gap-3.5">
+      {@render marketBody(market)}
     </div>
   </CompactDialog>
 {/if}
@@ -925,6 +1154,7 @@
     title={t("DELETE")}
     text={t("DELETE_FILE_CONFIRM", market.name)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       const name = market.name;
       confirmMarketRemove = null;
@@ -948,42 +1178,49 @@
   />
 {/if}
 
-{#if mcpMenu}
+{#snippet mcpSwitch(server: McpServer)}
+  <CompactSwitch
+    checked={server.enabled}
+    enabled={!busy}
+    onCheckedChange={() => {
+      dialogBusy = "toggle";
+      void runAction(() => claudeApi.mcpToggle(server.name, !server.enabled));
+    }}
+  />
+{/snippet}
+
+{#snippet mcpBody(server: McpServer)}
+  {@render facts(
+    [
+      { label: t("TRANSPORT"), text: server.type ?? "" },
+      { label: t("COMMAND_OR_URL"), text: server.detail ?? "" },
+    ].filter((fact) => fact.text),
+  )}
+  {#if dialogBusy === "toggle"}
+    <LinearProgress />
+  {/if}
+  <div class="mt-auto flex flex-col gap-2.5">
+    <ActionButton
+      text={t("DELETE")}
+      enabled={!busy}
+      danger
+      onclick={() => (confirmMcpRemove = server)}
+      class="w-full"
+    />
+  </div>
+{/snippet}
+
+{#if mcpMenu && !sidePanel}
   {@const server = mcpMenu}
   <CompactDialog title={server.name} onDismiss={() => { cancelAction(); mcpMenu = null; }}>
     {#snippet titleTrailing()}
-      <CompactSwitch
-        checked={server.enabled}
-        enabled={!busy}
-        onCheckedChange={() => {
-          dialogBusy = "toggle";
-          void runAction(() => claudeApi.mcpToggle(server.name, !server.enabled));
-        }}
-      />
+      {@render mcpSwitch(server)}
     {/snippet}
     {#snippet buttons()}
       <Button onclick={() => { cancelAction(); mcpMenu = null; }} variant="outlined">{t("CANCEL")}</Button>
     {/snippet}
-    {#if server.detail || server.type}
-      <OutlinedPanel class="mb-3">
-        {#if server.type}
-          <p class="text-label-md text-accent">{server.type}</p>
-        {/if}
-        {#if server.detail}
-          <p class="wrap-anywhere text-body-sm text-on-surface-variant">{server.detail}</p>
-        {/if}
-      </OutlinedPanel>
-    {/if}
-    <div class="flex flex-col gap-2.5">
-      {#if dialogBusy === "toggle"}
-        <LinearProgress />
-      {/if}
-      <ActionButton
-        text={t("DELETE")}
-        enabled={!busy}
-        onclick={() => (confirmMcpRemove = server)}
-        class="w-full"
-      />
+    <div class="flex flex-col gap-3.5">
+      {@render mcpBody(server)}
     </div>
   </CompactDialog>
 {/if}
@@ -994,6 +1231,7 @@
     title={t("DELETE")}
     text={t("DELETE_FILE_CONFIRM", server.name)}
     confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       const name = server.name;
       confirmMcpRemove = null;

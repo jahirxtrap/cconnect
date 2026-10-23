@@ -1,6 +1,6 @@
 <script lang="ts">
-  import MessageSquareText from "@lucide/svelte/icons/message-square-text";
-  import { SCREENS, type ScreenEntry } from "$lib/app/screens";
+  import LayoutDashboard from "@lucide/svelte/icons/layout-dashboard";
+  import { paneMenuViews } from "$lib/app/screens";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -8,34 +8,34 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { panes } from "./panes.svelte";
 
-  type PaneView = Pick<ScreenEntry, "kind" | "label" | "icon">;
-
   interface Props {
-    class?: string;
+    all?: boolean;
   }
 
-  const { class: className = "size-8" }: Props = $props();
+  const { all = false }: Props = $props();
 
-  const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
-
-  const VIEWS = $derived<PaneView[]>(layout.mobile ? SCREENS : [CHAT_VIEW, ...SCREENS]);
+  const views = $derived(paneMenuViews(layout.mobile, all));
+  const current = $derived(views.find((view) => view.kind === panes.kind) ?? null);
 
   let menu = $state(false);
-
-  const current = $derived(VIEWS.find((view) => view.kind === panes.kind) ?? VIEWS[0]);
 </script>
 
 <PopupMenu open={menu} onOpenChange={(value) => (menu = value)} label={t("PANEL_VIEW")}>
   {#snippet triggerChild(props)}
-    <TooltipIconButton label={t("PANEL_VIEW")} class={className} {...props}>
-      <current.icon />
+    <TooltipIconButton label={t("PANEL_VIEW")} selected={!!current && !layout.mobile} active={!!current} {...props}>
+      {#if current}
+        <current.icon />
+      {:else}
+        <LayoutDashboard />
+      {/if}
     </TooltipIconButton>
   {/snippet}
-  {#each VIEWS as view (view.kind)}
-    <MenuItem text={t(view.label)} onclick={() => panes.setKind(view.kind)}>
-      {#snippet leading()}
-        <view.icon size={20} class="shrink-0 {panes.kind === view.kind ? 'text-accent' : 'text-on-surface-variant'}" />
-      {/snippet}
-    </MenuItem>
+  {#each views as view (view.kind)}
+    <MenuItem
+      icon={view.icon}
+      text={t(view.label)}
+      selected={panes.kind === view.kind}
+      onclick={() => panes.setKind(view.kind)}
+    />
   {/each}
 </PopupMenu>

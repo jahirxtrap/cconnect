@@ -40,8 +40,8 @@
     onDone,
   }: Props = $props();
 
-  const ACTION_CLASS = "size-8";
-  const DOT_SIZE = 18;
+  const ACTION_CLASS = "size-7";
+  const DOT_SIZE = 16;
   const PANEL_MS = 350;
   const LINE_HEIGHT = 20;
   const MIN_HEIGHT = LINE_HEIGHT * 2;
@@ -138,9 +138,10 @@
     await publish();
     force = false;
   };
+
 </script>
 
-<div class="relative flex shrink-0 flex-col border-t border-outline-variant">
+<div class="relative flex shrink-0 flex-col rounded-panel bg-card">
   {#if open}
     <div
       role="separator"
@@ -156,8 +157,8 @@
       }}
     ></div>
   {/if}
-  <div class="flex min-h-10 items-center py-1 pr-1 pl-3">
-    <GitBranch size={14} class="mr-1.5 shrink-0 text-on-surface-variant" />
+  <div class="flex min-h-10 items-center gap-1 py-1 pr-1.5 pl-3">
+    <GitBranch size={14} class="shrink-0 text-on-surface-variant" />
     <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
       {joined(repo.branch || t("GIT_DETACHED"), repo.relative !== "." && repo.relative)}
     </span>
@@ -213,7 +214,7 @@
         placeholder={t("GIT_MESSAGE_PLACEHOLDER")}
         minLines={height / LINE_HEIGHT}
         maxLines={height / LINE_HEIGHT}
-        enabled={running === ""}
+        enabled={idle}
       />
 
       <SelectField
@@ -221,15 +222,15 @@
         selected={author}
         options={[{ value: "", label: t("GIT_AUTHOR_DEFAULT") }, ...options]}
         {shown}
-        enabled={running === ""}
+        enabled={idle}
         onSelect={(value) => (author = value)}
       />
 
-      <div class="flex items-center">
+      <div class="flex items-center gap-1">
         <button
           type="button"
           data-press="off"
-          disabled={running !== ""}
+          disabled={!idle}
           onclick={() => (amend = !amend)}
           class="flex h-8 min-w-0 flex-1 cursor-pointer items-center gap-2 text-left disabled:cursor-default disabled:opacity-40"
         >
@@ -279,6 +280,7 @@
     title={t("GIT_REVERT")}
     text={plural("GIT_REVERT_CONFIRM", paths.length)}
     confirmLabel={t("GIT_REVERT")}
+    danger
     onConfirm={() => void resolve("revert")}
     onDismiss={() => (asking = null)}
   />

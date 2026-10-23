@@ -19,11 +19,12 @@
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
-  import OutlinedPanel from "$lib/ui/OutlinedPanel.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import SelectChip from "$lib/ui/SelectChip.svelte";
   import SummaryLine from "$lib/ui/SummaryLine.svelte";
   import { componentIcon } from "$lib/ui/componentIcons";
   import { animateScrollLeft } from "$lib/ui/animateScroll";
+  import { gridWidth } from "$lib/ui/gridHeight";
   import { hscrollbar } from "$lib/ui/scrollbar";
   import ComponentElements from "./ComponentElements.svelte";
   import { keyed } from "./componentKeys";
@@ -151,7 +152,7 @@
   const pending = $derived(pages.length > 1 && current < pages.length - 1);
   const shownActions = $derived((actions?.options ?? []).filter((option) => !pending || option.style === "plain"));
 
-  let asking = $state<{ confirm: ComponentConfirm; run: () => void } | null>(null);
+  let asking = $state<{ confirm: ComponentConfirm; run: () => void; danger?: boolean } | null>(null);
 
   const act = (confirm: ComponentConfirm | null, run: () => void) => {
     if (confirm) asking = { confirm, run };
@@ -162,6 +163,7 @@
     (asking = {
       confirm: { title: t("CANCEL"), text: t("COMPONENT_DISCARD_CONFIRM"), confirmLabel: t("DISCARD") },
       run: () => onDismiss("close"),
+      danger: true,
     });
 
   const shownValue = (element: ComponentElement, raw: string) => {
@@ -208,6 +210,7 @@
       run();
     }}
     onDismiss={() => (asking = null)}
+    danger={item.danger}
   />
 {/if}
 
@@ -249,6 +252,7 @@
     <div class="mt-2.5 overflow-hidden" style={pageHeight === null ? "" : `height: ${pageHeight}px`}>
       <div
         bind:this={pager}
+        use:gridWidth
         onscroll={onPagerScroll}
         onscrollend={stopSliding}
         style="gap: var(--chat-pager-gap)"
@@ -288,7 +292,6 @@
         {@const Icon = componentIcon(option.icon)}
         <Button
           variant={option.style === "primary" ? "filled" : "outlined"}
-          class="h-8 text-body-md font-normal"
           enabled={ready || option.style === "plain"}
           onclick={() => act(option.confirm, () => onSubmit(option.value))}
         >
@@ -323,7 +326,7 @@
 {/snippet}
 
 {#if asDialog}
-  <CompactDialog title={heading || t("QUESTIONS_TITLE")} onDismiss={close}>
+  <CompactDialog title={heading || t("QUESTIONS_TITLE")} onDismiss={() => onDismiss("close")}>
     {#snippet buttons()}
       {@render controls(false)}
     {/snippet}
@@ -332,8 +335,8 @@
     </div>
   </CompactDialog>
 {:else}
-  <div class="w-full px-4">
-    <OutlinedPanel>
+  <div class="w-full px-(--page-inset)">
+    <CardPanel>
       {#if heading || closable}
         {@const Icon = componentIcon(data.icon) ?? (answerable ? CircleQuestionMark : null)}
         <div class="flex items-center gap-1.5">
@@ -350,7 +353,7 @@
               type="button"
               onclick={close}
               aria-label={t("CANCEL")}
-              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+              class="inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
             >
               <X size={16} />
             </button>
@@ -365,6 +368,6 @@
         <div class="h-2"></div>
         {@render controls(true)}
       {/if}
-    </OutlinedPanel>
+    </CardPanel>
   </div>
 {/if}

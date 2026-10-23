@@ -10,6 +10,7 @@
   import Puzzle from "@lucide/svelte/icons/puzzle";
   import Server from "@lucide/svelte/icons/server";
   import { joined } from "$lib/data/format";
+  import { loads } from "$lib/data/inflight";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
@@ -20,7 +21,6 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import OutputPanel from "$lib/ui/OutputPanel.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
@@ -38,10 +38,9 @@
   interface Props {
     tick?: number;
     flash?: boolean;
-    onLoadingChange?: (value: boolean) => void;
   }
 
-  const { tick = 0, flash = false, onLoadingChange }: Props = $props();
+  const { tick = 0, flash = false }: Props = $props();
 
   let dialog = $state<SettingsDialog | null>(null);
   let repo = $state<ServerUpdate | null>(null);
@@ -114,12 +113,13 @@
   const loading = $derived(serverSettings.loading);
   const ready = $derived(serverSettings.ready);
 
-  const load = async () => {
-    onLoadingChange?.(true);
-    await serverSettings.load();
-    if (backend.configured) repo = await systemApi.updateStatus();
-    onLoadingChange?.(false);
-  };
+  const load = () =>
+    loads.track(
+      (async () => {
+        await serverSettings.load();
+        if (backend.configured) repo = await systemApi.updateStatus();
+      })(),
+    );
 
   const rowSummary = (id: string) => {
     if (!ready) return loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE");
@@ -144,11 +144,7 @@
 
 <SettingsGroup label={t("SETTINGS_SERVER")}>
   {#snippet labelTrailing()}
-    {#if loading}
-      <LoadingIndicator size={20} />
-    {:else}
-      <StatusDot class={ready ? "bg-green" : "bg-red"} box={20} dot={12} />
-    {/if}
+    <StatusDot class={ready ? "bg-green" : "bg-red"} {loading} />
   {/snippet}
 
   <PreferenceRow

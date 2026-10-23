@@ -2,6 +2,7 @@
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Network from "@lucide/svelte/icons/network";
+  import Settings2 from "@lucide/svelte/icons/settings-2";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import { tick } from "svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
@@ -27,11 +28,9 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { sshLink } from "$lib/screens/terminal/sshLink";
   import SoftKeys from "$lib/screens/terminal/SoftKeys.svelte";
-  import { TERMINAL_BACKGROUND } from "$lib/screens/terminal/theme";
   import TerminalSurface from "$lib/screens/terminal/TerminalSurface.svelte";
   import SshHostsList from "$lib/screens/terminal/SshHostsList.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
-  import PaneActions from "./PaneActions.svelte";
   import TabStrip from "./TabStrip.svelte";
 
   interface Props {
@@ -161,10 +160,6 @@
   {/if}
 {/snippet}
 
-{#snippet headerActions()}
-  <PaneActions actions={terminalActions} />
-{/snippet}
-
 {#snippet terminalActions()}
   {#if isTauri}
     <PopupMenu
@@ -176,42 +171,37 @@
       label={t("MORE")}
     >
       {#snippet triggerChild(props)}
-        <TooltipIconButton label={t("MORE")} class="size-8" {...props}>
+        <TooltipIconButton label={t("MORE")} {...props}>
           <EllipsisVertical />
         </TooltipIconButton>
       {/snippet}
       {#if sshStore.profiles.length}
-        <MenuSub text={t("SSH_HOSTS")}>
+        <MenuSub icon={Network} text={t("SSH_HOSTS")}>
           {#each sshStore.profiles as profile (profile.id)}
             {@const OsIcon = osIcon(profile.os)}
             <MenuItem
+              icon={OsIcon ? undefined : SquareTerminal}
               text={profile.name || profile.host}
               description={sshAddress(profile)}
               onclick={() => connectSsh(profile)}
             >
               {#snippet leading()}
                 {#if OsIcon}
-                  <OsIcon class="size-5 shrink-0" aria-hidden="true" />
-                {:else}
-                  <SquareTerminal size={20} class="shrink-0 text-on-surface-variant" />
+                  <OsIcon class="size-4 shrink-0" aria-hidden="true" />
                 {/if}
               {/snippet}
             </MenuItem>
           {/each}
         </MenuSub>
       {/if}
-      <MenuItem text={t("MANAGE_SSH_HOSTS")} onclick={() => (managing = true)}>
-        {#snippet trailing()}
-          <Network size={16} class="shrink-0 text-on-surface-variant" />
-        {/snippet}
-      </MenuItem>
+      <MenuItem icon={Settings2} text={t("MANAGE_SSH_HOSTS")} onclick={() => (managing = true)} />
     </PopupMenu>
   {/if}
 {/snippet}
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex h-full flex-col bg-background"
+  class="relative flex min-h-0 flex-1 flex-col"
   onpointerdowncapture={() => paneFocus.set("terminal")}
 >
   <TabStrip
@@ -225,14 +215,16 @@
     newShortcut="terminal.tab.new"
     emptyTitle={t("TERMINAL")}
     dot={false}
+    sub
     {focused}
-    trailing={headerActions}
+    trailing={terminalActions}
     leading={tabIcon}
   />
 
   <div
-    class="relative min-h-0 flex-1"
-    style={terminalTabs.items.length ? `background: ${TERMINAL_BACKGROUND}` : undefined}
+    class="relative min-h-0 flex-1 {terminalTabs.items.length
+      ? 'mx-2 mb-2 overflow-hidden rounded-panel bg-terminal'
+      : ''}"
   >
     {#each terminalTabs.items as tab (tab.id)}
       {@const connect = terminalTabs.connectorOf(tab.id)}
@@ -253,6 +245,7 @@
     {#if !terminalTabs.items.length}
       <EmptyState
         loading={online && unlocked === null}
+        icon={SquareTerminal}
         text={!online ? t("SERVER_UNAVAILABLE") : unlocked ? t("NO_TERMINALS") : t("TERMINAL_LOCKED")}
         class="absolute inset-0"
       >
@@ -272,7 +265,7 @@
   </div>
 
   {#if layout.touch && terminalTabs.activeId}
-    <div class="flex shrink-0 items-center gap-2 border-t border-outline-variant bg-surface px-3 py-2">
+    <div class="flex shrink-0 items-center gap-2 px-2 pb-2">
       <SoftKeys onKey={(bytes) => panes[terminalTabs.activeId ?? ""]?.sendKey(bytes)} />
       <TooltipIconButton
         label={t("KEYBOARD")}
@@ -316,6 +309,7 @@
     title={t("CLOSE")}
     text={t("CLOSE_TERMINAL_CONFIRM", terminalTabs.titleOf(tab))}
     confirmLabel={t("CLOSE")}
+    danger
     onConfirm={() => confirmClose(tab)}
     onDismiss={() => (closing = null)}
   />

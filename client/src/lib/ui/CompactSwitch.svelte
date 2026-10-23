@@ -18,6 +18,6 @@
   class="inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none data-[state=checked]:bg-accent data-[state=unchecked]:bg-outline-variant disabled:cursor-default disabled:opacity-40"
 >
   <Switch.Thumb
-    class="pointer-events-none block size-4 rounded-full bg-surface shadow-sm transition-transform data-[state=checked]:translate-x-4.5 data-[state=unchecked]:translate-x-0.5"
+    class="pointer-events-none block size-3.5 rounded-full bg-surface transition-transform data-[state=checked]:translate-x-4.75 data-[state=unchecked]:translate-x-0.75"
   />
 </Switch.Root>

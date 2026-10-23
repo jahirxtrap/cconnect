@@ -3,6 +3,7 @@
   import { subpixelText } from "$lib/platform";
   import { gridHeight } from "$lib/ui/gridHeight";
   import type { IconSource } from "$lib/ui/icons";
+  import { insideCard, provideCardFrame } from "./cards";
   import CollapsibleHead from "./CollapsibleHead.svelte";
   import { provideStickyHeads, stickyHeads } from "./stickyHeads";
 
@@ -11,9 +12,9 @@
     icon?: IconSource;
     preview?: string | null;
     stat?: string | null;
+    meta?: Snippet;
     labelOnly?: boolean;
     running?: boolean;
-    labelClass?: string;
     iconClass?: string;
     bodyClass?: string;
     expanded?: boolean | null;
@@ -26,9 +27,9 @@
     icon: IconComponent,
     preview = null,
     stat = null,
+    meta,
     labelOnly = false,
     running = false,
-    labelClass = "text-on-surface-variant",
     iconClass = "text-accent",
     bodyClass = "pt-1",
     expanded = null,
@@ -38,6 +39,13 @@
 
   const sticky = stickyHeads();
   provideStickyHeads(false);
+
+  const nested = insideCard();
+  provideCardFrame();
+
+  const layer = subpixelText ? "" : "will-change-transform";
+
+  const headClass = sticky ? `group/head sticky top-0 z-20 bg-card data-[stuck]:shadow-sm ${layer}` : "";
 
   let localExpanded = $state(false);
 
@@ -51,27 +59,26 @@
   };
 </script>
 
-<div data-block class="w-full px-4">
-  <div
-    data-block-head
-    class={sticky
-      ? `group/head sticky top-0 z-20 -mx-4 bg-background px-4 data-[stuck]:px-0 data-[stuck]:shadow-sm ${subpixelText ? "" : "will-change-transform"}`
-      : ""}
-  >
+<div data-block class="mx-(--page-inset) overflow-clip rounded-panel {nested ? 'bg-surface-nested' : 'bg-card'}">
+  <div data-block-head class={headClass}>
     <CollapsibleHead
       {label}
       icon={IconComponent}
       {summary}
       {stat}
+      {meta}
       {labelOnly}
       {running}
-      {labelClass}
       {iconClass}
       expanded={isExpanded}
       onclick={toggle}
     />
   </div>
   {#if isExpanded && children && !labelOnly}
-    <div use:gridHeight data-block-body class={bodyClass}>{@render children()}</div>
+    <div use:gridHeight data-block-body>
+      <div class="{bodyClass} px-2.5 pb-2.5 [--page-inset:0px]">
+        {@render children()}
+      </div>
+    </div>
   {/if}
 </div>

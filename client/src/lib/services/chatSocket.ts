@@ -53,8 +53,9 @@ export type ServerEvent =
       committedCount: number | null;
       queued: QueuedMessage[];
       activity: string | null;
+      resident: boolean;
     }
-  | { type: "activity"; state: string | null }
+  | { type: "activity"; state: string | null; resident: boolean }
   | { type: "terminal_opened"; session: TerminalInfo }
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
@@ -678,6 +679,7 @@ export class ChatSocket {
         committedCount: int(wire, "committed_count"),
         queued: queuedItems(wire),
         activity: text(wire, "activity"),
+        resident: flag(wire, "resident"),
       });
       return;
     }
@@ -754,7 +756,7 @@ export class ChatSocket {
         return { type: "terminal_opened", session: wire as unknown as TerminalInfo };
       case "activity": {
         const state = text(wire, "state");
-        return { type: "activity", state: state === "idle" ? null : state };
+        return { type: "activity", state: state === "idle" ? null : state, resident: flag(wire, "resident") };
       }
       case "compact":
       case "compact_summary":

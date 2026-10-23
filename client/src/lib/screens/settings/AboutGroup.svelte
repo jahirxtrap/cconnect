@@ -32,6 +32,7 @@
   import GithubIcon from "$lib/ui/GithubIcon.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
+  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -102,10 +103,15 @@
 
 {#snippet profileRow(profile: Profile | null, label: string)}
   {#if profile}
-    <Pressable onclick={() => open(profile.url)} class="flex w-full items-center gap-3 px-4 py-3">
-      <img src={profile.avatarUrl} alt="" class="size-7 shrink-0 rounded-full" />
+    <Pressable onclick={() => open(profile.url)} class={PREFERENCE_ROW_CLASS}>
+      <img
+        src={profile.avatarUrl}
+        alt=""
+        class="shrink-0 rounded-full"
+        style="width: {PREFERENCE_ICON_SIZE}px; height: {PREFERENCE_ICON_SIZE}px"
+      />
       <div class="min-w-0 flex-1">
-        <p class="truncate text-body-md">{profile.name ?? profile.login}</p>
+        <p class="truncate text-body-md font-medium">{profile.name ?? profile.login}</p>
         <p class="truncate text-body-sm text-on-surface-variant">{label}</p>
       </div>
       <ExternalIndicator />
@@ -116,11 +122,11 @@
 <SettingsGroup label={t("ABOUT")}>
   <Pressable
     onclick={() => open(release?.url ?? RELEASES_URL)}
-    class="flex w-full items-center gap-3 px-4 py-3 {flash ? 'flash-highlight' : ''}"
+    class="{PREFERENCE_ROW_CLASS} {flash ? 'flash-highlight' : ''}"
   >
-      <AppLogo size={28} />
+      <AppLogo size={PREFERENCE_ICON_SIZE} />
       <div class="min-w-0 flex-1">
-      <p class="truncate text-body-md">{t("APP_NAME")}</p>
+      <p class="truncate text-body-md font-medium">{t("APP_NAME")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>
@@ -228,11 +234,11 @@
     {/snippet}
     <div class="flex flex-col gap-3">
       <div class="flex items-center gap-3">
-        <Share size={20} class="shrink-0 text-on-surface-variant" />
+        <Share size={18} class="shrink-0 text-on-surface-variant" />
         <p class="min-w-0 flex-1 text-body-md">{t("ADD_TO_HOME_SHARE")}</p>
       </div>
       <div class="flex items-center gap-3">
-        <SquarePlus size={20} class="shrink-0 text-on-surface-variant" />
+        <SquarePlus size={18} class="shrink-0 text-on-surface-variant" />
         <p class="min-w-0 flex-1 text-body-md">{t("ADD_TO_HOME_ADD")}</p>
       </div>
     </div>

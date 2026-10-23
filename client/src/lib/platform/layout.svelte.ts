@@ -2,7 +2,7 @@ import { watchAndroidInsets } from "./androidInsets";
 import { isTouch } from "./index";
 
 export const COMPACT_WIDTH = 600;
-const MENU_GAP = 8;
+export const MENU_GAP = 8;
 
 interface VirtualKeyboard extends EventTarget {
   overlaysContent: boolean;
@@ -19,6 +19,7 @@ class Layout {
   rightInset = $state(0);
   rightInsetAnimated = $state(true);
   transfersInset = $state(0);
+  docks = $state<Record<string, number>>({});
   keyboard = $state(0);
   safeTop = $state(0);
   safeBottom = $state(0);
@@ -26,6 +27,7 @@ class Layout {
   safeRight = $state(0);
 
   readonly mobile = $derived(this.height > this.width || this.width < COMPACT_WIDTH);
+  readonly dockInset = $derived(Math.max(0, ...Object.values(this.docks)));
   readonly touch = isTouch;
 
   readonly menuPadding = $derived({
@@ -47,6 +49,10 @@ class Layout {
     });
 
     if (!native && virtualKeyboard) virtualKeyboard.overlaysContent = true;
+
+    $effect(() => {
+      document.documentElement.dataset.layout = this.mobile ? "mobile" : "wide";
+    });
 
     $effect(() => {
       const measure = () => {

@@ -6,6 +6,7 @@
   import type { Snippet } from "svelte";
   import type { HTMLInputAttributes } from "svelte/elements";
   import { t } from "$lib/i18n/index.svelte";
+  import { FIELD_ACTIONS_CLASS, FIELD_ACTIONS_GAP, FIELD_BOX_CLASS, FIELD_INPUT_CLASS, FIELD_LABEL_CLASS } from "./field";
 
   interface Props {
     value: string;
@@ -54,18 +55,15 @@
   }: Props = $props();
 
   const LINE_HEIGHT = 20;
-  const ACTIONS_GAP = 8;
 
   const showClear = $derived(onClear !== null && (clearAlways || value.length > 0));
 
-  const FIELD_CLASS =
-    "min-w-0 flex-1 bg-transparent text-body-md caret-accent outline-none placeholder:text-on-surface-variant";
 
   let field = $state<HTMLInputElement | HTMLTextAreaElement | null>(null);
   let actionsWidth = $state(0);
 
   const actionsReserve = $derived(
-    actionsWidth ? `margin-right: ${actionsWidth + ACTIONS_GAP}px` : "",
+    actionsWidth ? `margin-right: ${actionsWidth + FIELD_ACTIONS_GAP}px` : "",
   );
   let revealed = $state(false);
 
@@ -80,14 +78,14 @@
 
 <div class="{enabled ? '' : 'opacity-40'} {className}">
   {#if label}
-    <p class="mb-1.5 text-label-lg">
+    <p class={FIELD_LABEL_CLASS}>
       {label}{#if required}<span class="text-error">&nbsp;*</span>{/if}
     </p>
   {/if}
   <div
-    class="relative flex w-full items-center rounded-md border-2 px-3 py-2 transition-colors {error
-      ? 'border-error'
-      : 'border-outline-variant focus-within:border-accent'}"
+    class="{FIELD_BOX_CLASS} {error
+      ? 'ring-error'
+      : 'ring-transparent focus-within:ring-accent'}"
   >
     {#if singleLine}
       {#key masked}
@@ -105,7 +103,7 @@
           {onkeydown}
           oninput={handle}
           style={actionsReserve}
-          class={FIELD_CLASS}
+          class={FIELD_INPUT_CLASS}
         />
       {/key}
     {:else}
@@ -113,7 +111,7 @@
         {#if placeholder && !value}
           <span
             style="line-height: {LINE_HEIGHT}px"
-            class="pointer-events-none absolute inset-x-0 top-0 truncate text-body-md text-on-surface-variant"
+            class="pointer-events-none absolute inset-x-0 top-0 truncate text-body-md text-faint"
           >
             {placeholder}
           </span>
@@ -127,14 +125,14 @@
           style="min-height: {minLines * LINE_HEIGHT}px{maxLines
             ? `; max-height: ${maxLines * LINE_HEIGHT}px`
             : ''}"
-          class="{FIELD_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
+          class="{FIELD_INPUT_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
         ></textarea>
       </div>
     {/if}
     {#if onClear || secret || trailing}
       <span
         bind:clientWidth={actionsWidth}
-        class="absolute inset-y-0 right-3 flex items-center gap-2"
+        class={FIELD_ACTIONS_CLASS}
       >
         {#if onClear}
           <span class="flex" class:invisible={!showClear}>
@@ -143,9 +141,8 @@
               tooltip={false}
               enabled={showClear}
               onclick={() => onClear?.()}
-              class="size-6 [&_svg]:size-[18px]"
             >
-              <X size={18} class="text-on-surface-variant" />
+              <X />
             </TooltipIconButton>
           </span>
         {/if}
@@ -154,12 +151,11 @@
             label={t(revealed ? "HIDE" : "SHOW")}
             tooltip={false}
             onclick={() => (revealed = !revealed)}
-            class="size-6 [&_svg]:size-[18px]"
           >
             {#if revealed}
-              <EyeOff size={18} class="text-on-surface-variant" />
+              <EyeOff />
             {:else}
-              <Eye size={18} class="text-on-surface-variant" />
+              <Eye />
             {/if}
           </TooltipIconButton>
         {/if}

@@ -19,12 +19,14 @@
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
   import ChatView from "./ChatView.svelte";
-  import PaneActions from "./PaneActions.svelte";
   import PaneHeader from "./PaneHeader.svelte";
   import PaneSurface from "./PaneSurface.svelte";
+  import PaneTools from "./PaneTools.svelte";
   import TabStrip from "./TabStrip.svelte";
   import TerminalView from "./TerminalView.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
   import { panes } from "./panes.svelte";
+  import { providePaneTail } from "./paneSurface";
   import { tabs } from "./tabs.svelte";
 
   interface Props {
@@ -48,6 +50,10 @@
   };
 
   const focused = $derived(panes.focused === "right");
+  const chatShown = $derived(panes.kind === "chat" && !!panes.rightTab);
+  const oneRow = $derived(layout.mobile && !chatShown);
+
+  providePaneTail(() => (oneRow ? paneTail : null));
 
   $effect(() => {
     if (panes.kind !== "claude") claudeDetail = null;
@@ -70,8 +76,8 @@
   );
 </script>
 
-{#if panes.kind === "chat" && panes.rightTab}
-  <PaneSurface>
+<PaneSurface plain={chatShown}>
+  {#if chatShown && panes.rightTab}
     <TabStrip
       items={tabs.right}
       activeId={panes.rightTab?.id ?? null}
@@ -85,86 +91,79 @@
       {onTabDrag}
       group="chat"
       {focused}
-      trailing={sideActions}
+      trailing={chatActions}
     />
-    <ChatView tab={panes.rightTab} {focused} />
-  </PaneSurface>
-{:else if panes.kind === "notes"}
-  <PaneSurface>
-    <PaneHeader
-      title={openNote ? noteTitle(openNote) || t("NOTE_UNTITLED") : t("NOTES")}
-      actions={notesActions}
-      onBack={openNote ? closeNote : undefined}
-    />
-    {#if openNote}
-      <NotesEditor note={openNote} />
-    {:else}
-      <NotesList onOpen={(id) => (noteId = id)} />
-    {/if}
-  </PaneSurface>
-{:else if panes.kind === "shared"}
-  <PaneSurface>
-    <SharedScreen />
-  </PaneSurface>
-{:else if panes.kind === "project"}
-  <PaneSurface>
-    <ProjectFilesScreen {instant} elsewhere={centerView} />
-  </PaneSurface>
-{:else if panes.kind === "monitor"}
-  <PaneSurface>
-    <PaneHeader title={t("MONITOR")} actions={monitorActions} />
-    <MonitorContent />
-  </PaneSurface>
-{:else if panes.kind === "browser"}
-  <PaneSurface>
-    <BrowserView trailing={sideActions} {focused} />
-  </PaneSurface>
-{:else if panes.kind === "mods"}
-  <PaneSurface>
-    <ModsView chat={panes.focusedChat} />
-  </PaneSurface>
-{:else if panes.kind === "claude"}
-  <PaneSurface>
-    {#if claudeDetail}
-      <ClaudeDetail kind={claudeDetail} onClose={() => (claudeDetail = null)} />
-    {:else}
-      <PaneHeader title={t("CLAUDE")} actions={claudeActions} />
-      <PullToRefresh refreshing={claudeRefresh.refreshing} onRefresh={() => void claudeRefresh.run()}>
-        <div class="px-4 pb-4">
-          <ClaudeSections
-            tick={claudeRefresh.tick}
-            onOpen={(kind) => (claudeDetail = kind)}
-            onAccountsChanged={() => void claudeRefresh.run()}
-          />
-        </div>
-      </PullToRefresh>
-    {/if}
-  </PaneSurface>
-{:else}
-  <PaneSurface>
-    <TerminalView cwd={terminalCwd} />
-  </PaneSurface>
-{/if}
-
-{#if panes.previewing && navigation.previewPane && navigation.preview && !centerView}
-  {@const request = navigation.preview}
-  <div class="absolute inset-0 z-20">
-    <PaneSurface>
-      <FilePreview
-        embedded
-        url={request.url}
-        filename={request.name}
-        forcedKind={request.kind}
-        onDelete={request.onDelete}
-        onClose={closeFilePreview}
-        onExpand={expandFilePreview}
+  {:else if !oneRow}
+    <PaneTools />
+  {/if}
+  <div class="relative flex min-h-0 flex-1 flex-col">
+    {#if chatShown && panes.rightTab}
+      <ChatView tab={panes.rightTab} {focused} />
+    {:else if panes.kind === "notes"}
+      <PaneHeader
+        title={openNote ? noteTitle(openNote) || t("NOTE_UNTITLED") : t("NOTES")}
+        actions={notesActions}
+        onBack={openNote ? closeNote : undefined}
       />
-    </PaneSurface>
-  </div>
-{/if}
+      {#if openNote}
+        <NotesEditor note={openNote} />
+      {:else}
+        <NotesList onOpen={(id) => (noteId = id)} />
+      {/if}
+    {:else if panes.kind === "shared"}
+      <SharedScreen />
+    {:else if panes.kind === "project"}
+      <ProjectFilesScreen {instant} elsewhere={centerView} />
+    {:else if panes.kind === "monitor"}
+      <PaneHeader title={t("MONITOR")} actions={monitorActions} />
+      <MonitorContent />
+    {:else if panes.kind === "browser"}
+      <BrowserView {focused} />
+    {:else if panes.kind === "mods"}
+      <ModsView chat={panes.focusedChat} />
+    {:else if panes.kind === "claude"}
+      {#if claudeDetail}
+        <ClaudeDetail kind={claudeDetail} onClose={() => (claudeDetail = null)} />
+      {:else}
+        <PaneHeader title={t("CLAUDE")} actions={claudeActions} />
+        <PullToRefresh refreshing={claudeRefresh.refreshing} onRefresh={() => void claudeRefresh.run()}>
+          <div class="px-2 pb-2">
+            <ClaudeSections
+              tick={claudeRefresh.tick}
+              onOpen={(kind) => (claudeDetail = kind)}
+              onAccountsChanged={() => void claudeRefresh.run()}
+            />
+          </div>
+        </PullToRefresh>
+      {/if}
+    {:else}
+      <TerminalView cwd={terminalCwd} />
+    {/if}
 
-{#snippet sideActions()}
-  <PaneActions />
+    {#if panes.previewing && navigation.previewPane && navigation.preview && !centerView}
+      {@const request = navigation.preview}
+      <div class="absolute inset-0 z-20">
+        <FilePreview
+          embedded
+          url={request.url}
+          filename={request.name}
+          forcedKind={request.kind}
+          onDelete={request.onDelete}
+          onClose={closeFilePreview}
+          onExpand={expandFilePreview}
+        />
+      </div>
+    {/if}
+  </div>
+</PaneSurface>
+
+{#snippet chatActions()}
+  <PaneTools tools={false} />
+{/snippet}
+
+{#snippet paneTail()}
+  <span class="mx-1 h-5 w-px shrink-0 bg-outline-variant"></span>
+  <PaneTools tools={false} />
 {/snippet}
 
 {#snippet notesActions()}

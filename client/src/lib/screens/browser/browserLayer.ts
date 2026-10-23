@@ -40,6 +40,11 @@ export const coverOf = (surface: HTMLElement, hole: DeviceBounds): DeviceBounds[
   return [...layers].map((layer) => rounded(layer.getBoundingClientRect()));
 };
 
+const roundedHole = (hole: DeviceBounds, radius: number) => {
+  const shape = `<svg xmlns="http://www.w3.org/2000/svg" width="${hole.width}" height="${hole.height}"><rect width="100%" height="100%" rx="${radius}"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(shape)}")`;
+};
+
 const painted = (node: HTMLElement) => {
   const style = getComputedStyle(node);
   return style.backgroundImage !== "none" || style.backgroundColor !== CLEAR;
@@ -55,10 +60,11 @@ export class BrowserLayer {
   }
 
   show(surface: HTMLElement, hole: DeviceBounds | null, cover: DeviceBounds[]) {
-    const sent = JSON.stringify([hole, cover]);
+    const radius = parseFloat(getComputedStyle(surface).borderTopLeftRadius) || 0;
+    const sent = JSON.stringify([hole, radius, cover]);
     if (sent !== this.#sent) {
       this.#sent = sent;
-      void browserCall<boolean>("browser_layer", { hole, cover })
+      void browserCall<boolean>("browser_layer", { hole, radius, cover })
         .then((supported) => (this.#supported = supported))
         .catch(() => (this.#supported = false));
     }
@@ -72,10 +78,11 @@ export class BrowserLayer {
       if (!chain.includes(node)) this.#restore(node);
     }
     if (!hole) return;
+    const opening = roundedHole(hole, radius);
     for (const node of chain) {
       if (!this.#kept.has(node)) this.#kept.set(node, MASK.map((name) => node.style.getPropertyValue(name)));
       const box = node.getBoundingClientRect();
-      node.style.setProperty("mask-image", "linear-gradient(#000 0 0), linear-gradient(#000 0 0)");
+      node.style.setProperty("mask-image", `linear-gradient(#000 0 0), ${opening}`);
       node.style.setProperty("mask-size", `100% 100%, ${hole.width}px ${hole.height}px`);
       node.style.setProperty("mask-position", `0 0, ${hole.x - box.left}px ${hole.y - box.top}px`);
       node.style.setProperty("mask-repeat", "no-repeat");
@@ -86,8 +93,8 @@ export class BrowserLayer {
   clear() {
     document.documentElement.classList.remove(SEE_THROUGH);
     for (const node of [...this.#kept.keys()]) this.#restore(node);
-    this.#sent = JSON.stringify([null, []]);
-    void browserCall("browser_layer", { hole: null, cover: [] }).catch(() => undefined);
+    this.#sent = JSON.stringify([null, 0, []]);
+    void browserCall("browser_layer", { hole: null, radius: 0, cover: [] }).catch(() => undefined);
   }
 
   #restore(node: HTMLElement) {

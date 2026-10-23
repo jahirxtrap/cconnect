@@ -24,10 +24,7 @@
   {preview}
   {expanded}
   {onToggle}
-  labelClass="text-accent"
   bodyClass="pt-1.5"
 >
-  <div class="w-full rounded-md bg-surface-variant px-3 py-2.5">
-    <MarkdownText text={markdown} {onSharedLink} />
-  </div>
+  <MarkdownText text={markdown} {onSharedLink} />
 </Collapsible>

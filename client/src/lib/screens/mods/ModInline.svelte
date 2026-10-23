@@ -65,7 +65,7 @@
 
 {#snippet own()}{@render engine(shown)}{/snippet}
 
-{#snippet bled()}<div class="-mx-4">{@render engine(shown)}</div>{/snippet}
+{#snippet bled()}<div class="-mx-(--page-inset)">{@render engine(shown)}</div>{/snippet}
 
 <div
   bind:this={host}
@@ -79,7 +79,7 @@
     bind:clientHeight={lineHeight}
     class="pointer-events-none invisible absolute top-0 left-0 font-mono text-body-md whitespace-pre">{PROBE}</span
   >
-  <div bind:clientWidth={room} class={inset ? "mx-4" : ""}>
+  <div bind:clientWidth={room} class={inset ? "mx-(--page-inset)" : ""}>
     {#if drawing?.tree}
       <div class="text-body-md text-on-surface">
         <ModTree node={drawing.tree} {mods} {site} engine={inset ? bled : own} />

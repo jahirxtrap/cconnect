@@ -7,13 +7,14 @@
     onclick: () => void;
     icon?: IconSource;
     enabled?: boolean;
+    danger?: boolean;
     class?: string;
   }
 
-  const { text, onclick, icon: IconComponent, enabled = true, class: className = "" }: Props = $props();
+  const { text, onclick, icon: IconComponent, enabled = true, danger = false, class: className = "" }: Props = $props();
 </script>
 
-<Button {onclick} {enabled} variant="outlined" class={className}>
+<Button {onclick} {enabled} variant={danger ? "danger" : "outlined"} class={className}>
   {#if IconComponent}
     <IconComponent size={16} class="shrink-0" />
   {/if}

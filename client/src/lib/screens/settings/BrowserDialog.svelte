@@ -137,11 +137,10 @@
         <div>
           <p class="mb-2 text-body-sm text-on-surface-variant">{t("BROWSER_SHIELD_ALLOWED")}</p>
           {#each shield.allowed as host (host)}
-            <div class="flex items-center rounded-item pr-1 transition-colors hover:bg-on-surface/8">
-              <p class="min-w-0 flex-1 truncate px-3 py-2.5 text-body-md">{host}</p>
+            <div class="flex min-h-10 items-center rounded-md pr-1 transition-colors hover:bg-hover">
+              <p class="min-w-0 flex-1 truncate px-3 py-2 text-body-sm">{host}</p>
               <TooltipIconButton
                 label={t("DELETE")}
-                class="[&_svg]:size-[18px]"
                 onclick={() => (shield = { ...shield, allowed: shield.allowed.filter((item) => item !== host) })}
               >
                 <Trash />
@@ -178,7 +177,7 @@
       {#if size !== null}
         <p class="text-body-sm text-on-surface-variant">{t("BROWSER_DATA_SIZE", formatSize(size))}</p>
       {/if}
-      <ActionButton class="mt-2.5 w-full" text={t("BROWSER_DATA_CLEAR")} onclick={() => (clearing = true)} />
+      <ActionButton class="mt-2.5 w-full" text={t("BROWSER_DATA_CLEAR")} danger onclick={() => (clearing = true)} />
     </div>
   </div>
 </CompactDialog>

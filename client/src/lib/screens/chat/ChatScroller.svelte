@@ -195,7 +195,8 @@
   <div
     bind:this={container}
     {onscroll}
-    class="selectable isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
+    style="--scrollbar-width: {verticalScrollbar}px"
+    class="selectable rounded-viewport isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
   >
     <div bind:this={content} class="shrink-0">
       {@render children()}
@@ -211,9 +212,9 @@
       aria-label={t("SCROLL_TO_BOTTOM")}
       style="bottom: {SCROLL_BUTTON_GAP + horizontalScrollbar + bottomInset}px; right: {SCROLL_BUTTON_GAP +
         verticalScrollbar}px"
-      class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-on-background text-background shadow-md transition-opacity hover:opacity-90"
+      class="absolute inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-float text-on-surface-variant shadow-float transition-colors hover:text-on-surface"
     >
-      <ChevronsDown size={24} />
+      <ChevronsDown size={18} />
     </button>
   {/if}
 </div>

@@ -14,17 +14,29 @@ const storedFont = (kind: FontKind): string => {
 
 const prefersDark = () => window.matchMedia("(prefers-color-scheme: dark)");
 
-const SELECTION_ALPHA = 0.32;
-const QUOTE_ALPHA = 0.6;
+const ACCENT_ALPHAS = {
+  selection: 0.32,
+  quote: 0.6,
+  soft: 0.14,
+  ring: 0.4,
+};
+
+const accentProperties = (color: string): [string, string][] => [
+  ["--c-accent", color],
+  ["--color-accent", color],
+  ...Object.entries(ACCENT_ALPHAS).map(([name, alpha]): [string, string] => [`--c-accent-${name}`, withAlpha(color, alpha)]),
+];
+
+export const ringVars = (color: string): string => `--c-accent-ring: ${withAlpha(color, ACCENT_ALPHAS.ring)};`;
 
 export const accentVars = (color: string): string =>
-  `--c-accent: ${color};` +
-  `--color-accent: ${color};` +
-  `--c-accent-selection: ${withAlpha(color, SELECTION_ALPHA)};` +
-  `--c-accent-quote: ${withAlpha(color, QUOTE_ALPHA)};`;
+  accentProperties(color)
+    .map(([name, value]) => `${name}: ${value};`)
+    .join("");
 
 const androidSystemBars = () =>
-  (window as unknown as { AndroidSystemBars?: { setAppearance: (dark: boolean) => void } }).AndroidSystemBars;
+  (window as unknown as { AndroidSystemBars?: { setAppearance: (dark: boolean) => void; accent: () => string } })
+    .AndroidSystemBars;
 
 class Theme {
   mode = $state<ThemeMode>(store.get("theme.mode", "system"));
@@ -57,9 +69,7 @@ class Theme {
     $effect(() => {
       const root = document.documentElement;
       root.dataset.theme = this.dark ? "dark" : "light";
-      root.style.setProperty("--c-accent", this.accent);
-      root.style.setProperty("--c-accent-selection", withAlpha(this.accent, SELECTION_ALPHA));
-      root.style.setProperty("--c-accent-quote", withAlpha(this.accent, QUOTE_ALPHA));
+      for (const [name, value] of accentProperties(this.accent)) root.style.setProperty(name, value);
       for (const kind of FONT_KINDS) root.style.setProperty(`--family-${kind}`, FONT_FAMILIES[kind][this.fonts[kind]]);
       this.#applySystemBars(this.dark);
     });
@@ -81,6 +91,11 @@ class Theme {
   }
 
   async #loadSystemAccent() {
+    const android = androidSystemBars();
+    if (android) {
+      this.systemAccent = android.accent() || null;
+      return;
+    }
     if (!isTauri) return;
     const { invoke } = await import("@tauri-apps/api/core");
     this.systemAccent = await invoke<string | null>("system_accent").catch(() => null);

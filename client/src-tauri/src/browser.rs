@@ -484,8 +484,10 @@ pub struct Area {
 }
 
 #[cfg(windows)]
-fn carve(host: windows_sys::Win32::Foundation::HWND, scale: f64, hole: Option<Area>, cover: &[Area]) {
-    use windows_sys::Win32::Graphics::Gdi::{CombineRgn, CreateRectRgn, DeleteObject, SetWindowRgn, RGN_DIFF};
+fn carve(host: windows_sys::Win32::Foundation::HWND, scale: f64, hole: Option<Area>, radius: f64, cover: &[Area]) {
+    use windows_sys::Win32::Graphics::Gdi::{
+        CombineRgn, CreateRectRgn, CreateRoundRectRgn, DeleteObject, SetWindowRgn, RGN_DIFF,
+    };
 
     const EVERYWHERE: i32 = 0x7FFF;
     let Some(hole) = hole else {
@@ -496,9 +498,17 @@ fn carve(host: windows_sys::Win32::Foundation::HWND, scale: f64, hole: Option<Ar
     let rect = |area: &Area| unsafe {
         CreateRectRgn(edge(area.x), edge(area.y), edge(area.x + area.width), edge(area.y + area.height))
     };
+    let corner = edge(radius * 2.0);
     unsafe {
         let shown = CreateRectRgn(-EVERYWHERE, -EVERYWHERE, EVERYWHERE, EVERYWHERE);
-        let open = rect(&hole);
+        let open = CreateRoundRectRgn(
+            edge(hole.x),
+            edge(hole.y),
+            edge(hole.x + hole.width) + 1,
+            edge(hole.y + hole.height) + 1,
+            corner,
+            corner,
+        );
         for area in cover {
             let covered = rect(area);
             CombineRgn(open, open, covered, RGN_DIFF);
@@ -908,6 +918,7 @@ pub async fn browser_zoom<R: Runtime>(app: AppHandle<R>, id: String, zoom: f64) 
 pub async fn browser_layer<R: Runtime>(
     app: AppHandle<R>,
     hole: Option<Area>,
+    radius: Option<f64>,
     cover: Vec<Area>,
 ) -> Result<bool, String> {
     #[cfg(windows)]
@@ -918,7 +929,7 @@ pub async fn browser_layer<R: Runtime>(
         let scale = main.window().scale_factor().map_err(|error| error.to_string())?;
         main.with_webview(move |platform| {
             if let Some(host) = host_of(&platform) {
-                carve(host, scale, hole, &cover);
+                carve(host, scale, hole, radius.unwrap_or(0.0), &cover);
             }
         })
         .map_err(|error| error.to_string())?;
@@ -926,7 +937,7 @@ pub async fn browser_layer<R: Runtime>(
     }
     #[cfg(not(windows))]
     {
-        let _ = (app, hole, cover);
+        let _ = (app, hole, radius, cover);
         Ok(false)
     }
 }

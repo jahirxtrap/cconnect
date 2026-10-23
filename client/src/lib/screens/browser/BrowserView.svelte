@@ -1,13 +1,17 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ArrowRight from "@lucide/svelte/icons/arrow-right";
+  import Globe from "@lucide/svelte/icons/globe";
   import House from "@lucide/svelte/icons/house";
+  import Lock from "@lucide/svelte/icons/lock";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
+  import Search from "@lucide/svelte/icons/search";
   import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import ShieldOff from "@lucide/svelte/icons/shield-off";
+  import X from "@lucide/svelte/icons/x";
   import { Portal } from "bits-ui";
-  import type { Snippet } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { screenFor } from "$lib/app/screens";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import BrowserClearDialog from "./BrowserClearDialog.svelte";
@@ -51,18 +55,19 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import InputField from "$lib/ui/InputField.svelte";
+  import { keepFocus } from "$lib/ui/keepFocus";
   import { PullState } from "$lib/ui/pull.svelte";
   import PullIndicator from "$lib/ui/PullIndicator.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
-    trailing?: Snippet;
     focused?: boolean;
   }
 
-  const { trailing, focused = false }: Props = $props();
+  const { focused = false }: Props = $props();
 
+  const BROWSER_ICON = screenFor("browser").icon;
+  const SITE_ICON_SIZE = 14;
   const RESIZE_DEBOUNCE_MS = 150;
   const WHEEL_LINE_PX = 40;
   const MIN_WIDTH = 320;
@@ -163,6 +168,7 @@
   const canGoForward = $derived(onServer ? page.canGoForward : !!deviceBrowser.active?.canGoForward);
   const pageUrl = $derived(onServer ? page.url : (deviceBrowser.active?.url ?? ""));
   const shownUrl = $derived(atHome ? "" : pageUrl);
+  const SiteIcon = $derived(!shownUrl ? Search : shownUrl.startsWith("https:") ? Lock : Globe);
   const favorites = $derived(settings.browserFavorites);
   const favorite = $derived(!!shownUrl && favorites.some((item) => item.url === shownUrl));
 
@@ -702,13 +708,21 @@
 {/snippet}
 
 {#snippet addressTools()}
+  {#if address}
+    <span use:keepFocus class="hidden group-focus-within/address:flex">
+      <TooltipIconButton label={t("CANCEL")} tooltip={false} class="size-6" onclick={() => (address = "")}>
+        <X />
+      </TooltipIconButton>
+    </span>
+  {/if}
   {#if shielded}
     {@const exempt = !!host && settings.browserShield.allowed.includes(host)}
     {@const count = deviceBrowser.blocked[deviceBrowser.activeId] ?? 0}
     <TooltipIconButton
       label={exempt || !count ? t("BROWSER_SHIELD_HERE") : joined(t("BROWSER_SHIELD_HERE"), plural("BROWSER_SHIELD_COUNT", count))}
       enabled={!!host}
-      class="size-6 [&_svg]:size-[18px] {exempt ? '' : 'text-accent'}"
+      active={!exempt}
+      class="size-6"
       onclick={() => void deviceBrowser.allowHere(!exempt)}
     >
       {#if exempt}
@@ -752,45 +766,49 @@
     emptyTitle={t("NEW_TAB")}
     newLabel={t("NEW_TAB")}
     dot={false}
+    sub
     leading={tabIcon}
     lead={deviceBrowsing ? sideSwitch : undefined}
     {focused}
-    {trailing}
   />
 
-  <div class="flex shrink-0 items-center border-b border-outline-variant px-2 py-1.5">
+  <div class="flex shrink-0 items-center px-2 pb-2">
     <TooltipIconButton
       label={t("BACK")}
       shortcut="browser.back"
       enabled={canGoBack}
-      class="size-8"
+      class="size-7"
       onclick={goBack}
     >
-      <ArrowLeft size={18} />
+      <ArrowLeft />
     </TooltipIconButton>
     <TooltipIconButton
       label={t("FORWARD")}
       shortcut="browser.forward"
       enabled={canGoForward}
-      class="size-8"
+      class="size-7"
       onclick={() => (onServer ? link?.forward() : deviceBrowser.forward())}
     >
-      <ArrowRight size={18} />
+      <ArrowRight />
     </TooltipIconButton>
     <TooltipIconButton
       label={t("REFRESH")}
       shortcut="browser.reload"
-      class="size-8"
+      class="size-7"
       onclick={() => (onServer ? link?.reload() : deviceBrowser.reload())}
     >
-      <RotateCw size={18} />
+      <RotateCw />
     </TooltipIconButton>
-    <TooltipIconButton label={t("BROWSER_HOME")} enabled={!atHome} class="size-8" onclick={goHome}>
-      <House size={18} />
+    <TooltipIconButton label={t("BROWSER_HOME")} enabled={!atHome} class="size-7" onclick={goHome}>
+      <House />
     </TooltipIconButton>
     <div
       bind:this={addressBox}
-      class="min-w-0 flex-1 px-1"
+      class="group/address mx-1 flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface-variant pl-2.5 ring-1 ring-transparent transition-shadow ring-inset focus-within:ring-accent {shielded
+        ? 'pr-1'
+        : address
+          ? 'pr-2.5 focus-within:pr-1'
+          : 'pr-2.5'}"
       onfocusin={selectAddress}
       onfocusout={() => {
         typing = false;
@@ -798,23 +816,30 @@
         addressBox?.querySelector("input")?.setSelectionRange(0, 0);
       }}
     >
-      <InputField
+      <SiteIcon size={SITE_ICON_SIZE} class="shrink-0 {shownUrl ? 'text-on-surface-variant' : 'text-faint'}" />
+      <input
+        type="text"
+        inputmode="url"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck={false}
+        enterkeyhint="go"
         value={address}
-        oninput={(next) => {
-          address = next;
+        placeholder={t("BROWSER_ADDRESS")}
+        aria-label={t("BROWSER_ADDRESS")}
+        oninput={(event) => {
+          address = event.currentTarget.value;
           typing = true;
         }}
         onkeydown={submit}
-        onClear={() => (address = "")}
-        placeholder={t("BROWSER_ADDRESS")}
-        singleLine
-        url
-        enterKeyHint="go"
-        trailing={addressTools}
+        class="min-w-0 flex-1 bg-transparent text-body-sm text-on-surface-variant caret-accent outline-none placeholder:text-faint focus:text-on-surface"
       />
+      {@render addressTools()}
     </div>
     <BrowserOptionsMenu
       url={shownUrl}
+      {favorite}
+      onFavorite={toggleFavorite}
       device={onServer ? page.device : deviceBrowser.device}
       native={!onServer && androidBrowsing}
       onDevice={(name) => (onServer ? link?.device(name) : deviceBrowser.setDevice(name))}
@@ -826,8 +851,6 @@
       onCapture={() => void capture()}
       onOpen={() => openExternal(shownUrl)}
       onCopy={() => void copyText(shownUrl)}
-      {favorite}
-      onFavorite={toggleFavorite}
       onClearSite={onServer || !host ? null : () => (clearing = { site: host })}
       onClearAll={onServer ? null : () => (clearing = { site: null })}
     />
@@ -835,7 +858,7 @@
 
   <div
     bind:this={surface}
-    class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background"
+    class="relative mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-panel bg-background"
   >
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <canvas
@@ -882,18 +905,20 @@
       {/if}
     {:else if !ready && !connected}
       <EmptyState
+        icon={BROWSER_ICON}
         text={pane && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("CONNECTION_ERROR")}
         class="absolute inset-0 bg-background"
       />
     {:else if !ready && failed}
       <EmptyState
+        icon={BROWSER_ICON}
         text={page.available ? t("BROWSER_FAILED") : t("BROWSER_MISSING")}
         class="absolute inset-0 bg-background"
       />
     {:else if serverAtHome}
       {@render home()}
     {:else if !ready && !page.running && !launching}
-      <EmptyState text={t("BROWSER_MISSING")} class="absolute inset-0 bg-background" />
+      <EmptyState icon={BROWSER_ICON} text={t("BROWSER_MISSING")} class="absolute inset-0 bg-background" />
     {:else if !ready}
       <CenteredProgress class="absolute inset-0 bg-background" />
     {/if}

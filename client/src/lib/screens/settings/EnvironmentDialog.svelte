@@ -20,7 +20,6 @@
   import InputField from "$lib/ui/InputField.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
-  import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
@@ -148,8 +147,8 @@
 <CompactDialog title={isNew ? t("ADD_ENVIRONMENT") : t("EDIT_ENVIRONMENT")} {onDismiss}>
   {#snippet titleTrailing()}
     {#if qrAvailable}
-      <TooltipIconButton label={t("SCAN_QR")} onclick={() => void startScan()} class="size-9 [&_svg]:size-5">
-        <ScanQrCode size={20} />
+      <TooltipIconButton label={t("SCAN_QR")} onclick={() => void startScan()}>
+        <ScanQrCode />
       </TooltipIconButton>
     {/if}
   {/snippet}
@@ -182,9 +181,8 @@
           <TooltipIconButton
             label={t("CHOOSE")}
             onclick={() => (browsing = true)}
-            class="size-6 [&_svg]:size-[18px]"
           >
-            <Folder size={18} class="text-on-surface-variant" />
+            <Folder />
           </TooltipIconButton>
         {/if}
         <TooltipIconButton
@@ -192,12 +190,11 @@
           enabled={!!settings.lockedProject || directory.trim() !== ""}
           onclick={() =>
             (settings.lockedProject = settings.lockedProject ? "" : projectKeyOf(directory.trim()))}
-          class="size-6 [&_svg]:size-[18px]"
         >
           {#if settings.lockedProject}
-            <Lock size={18} class="text-accent" />
+            <Lock class="text-accent" />
           {:else}
-            <LockOpen size={18} class="text-on-surface-variant" />
+            <LockOpen />
           {/if}
         </TooltipIconButton>
       {/snippet}
@@ -209,7 +206,9 @@
     >
       {#snippet trailing()}
         {#if accentIndex !== null}
-          <StatusDot color={accentAt(accentIndex)} box={20} dot={20} />
+          <span class="flex size-8 shrink-0 items-center justify-center">
+            <span class="size-4.5 rounded-full" style="background: {accentAt(accentIndex)}"></span>
+          </span>
         {/if}
       {/snippet}
     </SelectField>

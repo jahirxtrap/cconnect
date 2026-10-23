@@ -36,6 +36,7 @@ class ChatListHub:
     def __init__(self):
         self._sessions: dict[str, dict] = {}
         self._activity: dict[str, str] = {}
+        self._resident: set[str] = set()
         self._projects: dict[str, dict] = {}
         self._sig_cache: dict[str, tuple] = {}
         self._subscribers: set[asyncio.Queue] = set()
@@ -95,7 +96,7 @@ class ChatListHub:
         with self._lock:
             return list(self._sessions.values())
 
-    def set_activity(self, session_id: Optional[str], activity: Optional[str]):
+    def set_activity(self, session_id: Optional[str], activity: Optional[str], resident: Optional[bool] = None):
         if not session_id:
             return
         with self._lock:
@@ -103,18 +104,33 @@ class ChatListHub:
                 self._activity[session_id] = activity
             else:
                 self._activity.pop(session_id, None)
+            if resident is True:
+                self._resident.add(session_id)
+            elif resident is False:
+                self._resident.discard(session_id)
             entry = self._sessions.get(session_id)
-            if entry is None or entry.get("activity") == activity:
+            if entry is None:
                 return
-            entry = {**entry, "activity": activity} if activity else {k: v for k, v in entry.items() if k != "activity"}
-            self._sessions[session_id] = entry
-        self._emit([{"type": "session_changed", "session": entry}])
+            updated = self._with_activity(session_id, entry)
+            if updated == entry:
+                return
+            self._sessions[session_id] = updated
+        self._emit([{"type": "session_changed", "session": updated}])
+
+    def _with_activity(self, session_id: str, entry: dict) -> dict:
+        updated = {key: value for key, value in entry.items() if key not in ("activity", "resident")}
+        activity = self._activity.get(session_id)
+        if activity:
+            updated["activity"] = activity
+        if session_id in self._resident:
+            updated["resident"] = True
+        return updated
 
     def restore_activity(self, session_id: Optional[str]):
         from services.live_sessions import registry
 
         live = registry.get_by_session(session_id)
-        self.set_activity(session_id, live.activity if live else None)
+        self.set_activity(session_id, live.activity if live else None, live.resident_alive if live else False)
 
     async def resync(self):
         await asyncio.to_thread(self._refresh, True)
@@ -226,9 +242,7 @@ class ChatListHub:
                 if meta is None:
                     continue
                 count += 1
-                activity = self._activity.get(sid)
-                if activity:
-                    meta = {**meta, "activity": activity}
+                meta = self._with_activity(sid, meta)
                 sessions[sid] = meta
                 if newest_mtime is None or st.st_mtime > newest_mtime:
                     newest_mtime = st.st_mtime
