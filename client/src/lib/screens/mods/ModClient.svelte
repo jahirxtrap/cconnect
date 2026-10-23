@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { clientKeyOf, type ModComponent, type ModNode } from "$lib/data/modModels";
   import { t } from "$lib/i18n/index.svelte";
+  import { typingOnTouch } from "$lib/ui/keepFocus";
   import type { ClientInstance, ClientKey, ClientPointer } from "./modClients.svelte";
   import { siteGrid, siteScale } from "./modGrid";
   import ModTree from "./ModTree.svelte";
@@ -162,7 +163,7 @@
   onpointerdown={(event) => {
     if (instance?.listensPointer) {
       event.preventDefault();
-      region?.focus();
+      if (!typingOnTouch()) region?.focus();
       region?.setPointerCapture(event.pointerId);
     }
     pointer("down", event, event.button);

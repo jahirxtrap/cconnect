@@ -260,6 +260,7 @@ export class ModClients {
       this.#hashes.set(plugin, hash);
       const frame = this.#frames.get(plugin);
       if (before !== undefined && before !== hash && frame && frame.hash !== hash) this.#reload(frame);
+      else if (!frame && !this.#loading.has(plugin)) this.#retry(plugin);
     }
   }
 
@@ -270,13 +271,7 @@ export class ModClients {
     if (kept) this.unmount(kept);
     const instance = new ClientInstance(id, site, this.mods, props);
     this.#instances.set(id, instance);
-    void this.#frameFor(site.plugin).then((frame) => {
-      if (!frame) {
-        instance.failed("load", `${site.plugin} serves no surface module`);
-        return;
-      }
-      if (this.#instances.get(id) === instance) frame.add(instance);
-    });
+    this.#seat([instance], site.plugin);
     return instance;
   }
 
@@ -315,17 +310,28 @@ export class ModClients {
     return next;
   }
 
+  #seat(instances: ClientInstance[], plugin: string) {
+    void this.#frameFor(plugin).then((frame) => {
+      for (const instance of instances) {
+        if (this.#instances.get(instance.id) !== instance) continue;
+        if (frame) frame.add(instance);
+        else instance.failed("load", `${plugin} serves no surface module`);
+      }
+    });
+  }
+
+  #retry(plugin: string) {
+    const stranded = [...this.#instances.values()].filter(
+      (instance) => instance.site.plugin === plugin && instance.fault !== null,
+    );
+    if (stranded.length) this.#seat(stranded, plugin);
+  }
+
   #reload(frame: Frame) {
     const instances = [...frame.instances.values()];
     frame.close();
     this.#frames.delete(frame.plugin);
-    void this.#frameFor(frame.plugin).then((next) => {
-      for (const instance of instances) {
-        if (this.#instances.get(instance.id) !== instance) continue;
-        if (next) next.add(instance);
-        else instance.failed("load", `${frame.plugin} serves no surface module`);
-      }
-    });
+    this.#seat(instances, frame.plugin);
   }
 
   #hung(frame: Frame) {

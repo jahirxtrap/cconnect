@@ -23,7 +23,7 @@ import {
   type ModToast,
 } from "$lib/data/modModels";
 import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
-import { store } from "$lib/platform/storage";
+import { settings } from "$lib/data/settings.svelte";
 import { ModClients } from "./modClients.svelte";
 
 export interface ModPort {
@@ -44,14 +44,13 @@ export interface ModHost {
 
 export const BAND_ID = "above-prompt";
 
-const BAND_HIDDEN_KEY = "mods.bandHidden";
-
 class BandState {
-  hidden = $state(store.get(BAND_HIDDEN_KEY, false));
+  get hidden() {
+    return settings.modBandHidden;
+  }
 
   toggle() {
-    this.hidden = !this.hidden;
-    store.set(BAND_HIDDEN_KEY, this.hidden);
+    settings.modBandHidden = !settings.modBandHidden;
   }
 }
 
@@ -137,7 +136,11 @@ export class ModSurface {
   }
 
   drawnFor(component: ModComponent, instanceId: string, columns: number): boolean {
-    return this.#drawnColumns[keyOf(component, instanceId)] === columns;
+    return this.drawnColumns(component, instanceId) === columns;
+  }
+
+  drawnColumns(component: ModComponent, instanceId: string): number {
+    return this.#drawnColumns[keyOf(component, instanceId)] ?? 0;
   }
 
   mount(site: ModRenderSite): () => void {

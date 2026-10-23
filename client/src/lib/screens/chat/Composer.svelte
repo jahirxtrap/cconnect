@@ -457,6 +457,18 @@
   };
 </script>
 
+{#snippet removal(onremove: () => void)}
+  <button
+    type="button"
+    use:keepFocus
+    onclick={onremove}
+    aria-label={t("DELETE")}
+    class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
+  >
+    <X size={16} />
+  </button>
+{/snippet}
+
 <div class="relative shrink-0 px-3 pb-3">
   {#if entries.length}
     <div
@@ -520,14 +532,7 @@
         {#each elements as item (item.id)}
           <Chip name={elementLabel(item)} icon={SquareMousePointer}>
             {#snippet trailing()}
-              <button
-                type="button"
-                onclick={() => onRemoveElement(item.id)}
-                aria-label={t("DELETE")}
-                class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
-              >
-                <X size={16} />
-              </button>
+              {@render removal(() => onRemoveElement(item.id))}
             {/snippet}
           </Chip>
         {/each}
@@ -537,14 +542,7 @@
               {#if uploading}
                 <ProgressRing value={item.progress} size={16} stroke={2} />
               {:else}
-                <button
-                  type="button"
-                  onclick={() => onRemoveAttachment(item.id)}
-                  aria-label={t("DELETE")}
-                  class="inline-flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-on-surface/8"
-                >
-                  <X size={16} />
-                </button>
+                {@render removal(() => onRemoveAttachment(item.id))}
               {/if}
             {/snippet}
           </Chip>

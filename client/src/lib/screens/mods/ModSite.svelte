@@ -1,8 +1,10 @@
 <script lang="ts">
   import { untrack, type Snippet } from "svelte";
+  import { SvelteMap } from "svelte/reactivity";
   import { isEmptyTree, type ModComponent, type ModElement, type ModKeyed } from "$lib/data/modModels";
   import ModFit from "./ModFit.svelte";
-  import { gridOf, gridStyle, provideGrid, ruleAxes } from "./modGrid";
+  import { LAYOUT_UNIT } from "$lib/ui/gridHeight";
+  import { fittedColumns, gridOf, gridStyle, provideGrid, ruleAxes } from "./modGrid";
   import ModTree from "./ModTree.svelte";
   import type { ModSurface } from "./modSurface.svelte";
 
@@ -21,6 +23,7 @@
     flush?: boolean;
     thin?: boolean;
     edge?: string | null;
+    fit?: boolean;
   }
 
   const {
@@ -38,6 +41,7 @@
     flush = false,
     thin = false,
     edge = null,
+    fit = false,
   }: Props = $props();
 
   const PROBE = "0000000000";
@@ -60,7 +64,11 @@
   let barInner = $state(0);
   let barOuter = $state(0);
   let paddedOuter = $state(0);
-  let padding = $state(0);
+  const padding = $derived.by(() => {
+    if (!padded) return 0;
+    const style = getComputedStyle(padded);
+    return parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+  });
   let following = false;
   let offset = $state(0);
 
@@ -69,7 +77,17 @@
   const barShown = $derived(bodyOuter > paddedOuter);
   const axes = $derived(glyph ? ruleAxes(root, probe, cellHeight) : undefined);
   const grid = $derived(gridOf(width, glyph, cellHeight, barShown ? 0 : scrollbar, axes));
-  const columns = $derived(grid.columns);
+  const needs = new SvelteMap<number, number>();
+  const columns = $derived(fit ? fittedColumns(grid.columns, width, needs) : grid.columns);
+  const drawnColumns = $derived(mods.drawnColumns(component, instanceId));
+  const span = $derived(needs.get(drawnColumns) ?? 0);
+  const hold = $derived(
+    Math.max(drawnColumns > columns ? drawnColumns * grid.cell : 0, span - width > LAYOUT_UNIT ? span : 0),
+  );
+
+  const measured = (next: number) => {
+    if (needs.get(drawnColumns) !== next) needs.set(drawnColumns, next);
+  };
   const rows = $derived(
     fixedRows ?? (cellHeight ? Math.max(1, Math.floor((viewHeight - padding) / cellHeight)) : 0),
   );
@@ -163,12 +181,6 @@
   $effect(() => {
     const idle = !document.activeElement || document.activeElement === document.body;
     if (focused && root && idle) root.focus({ preventScroll: true });
-  });
-
-  $effect(() => {
-    if (!padded) return;
-    const style = getComputedStyle(padded);
-    padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
   });
 
   $effect(() => () => clearTimeout(scrollTimer));
@@ -305,7 +317,14 @@
     >
       <div bind:clientWidth={width} class="flex min-w-0 flex-1 flex-col">
         {#if tree && !isEmptyTree(tree)}
-          <ModFit room={width} watch={tree} fresh={mods.drawnFor(component, instanceId, columns)}><ModTree node={tree} {mods} {site} {flush} /></ModFit>
+          <ModFit
+            room={width}
+            watch={tree}
+            fresh={mods.drawnFor(component, instanceId, columns)}
+            {hold}
+            onMeasure={fit ? measured : null}
+            ><ModTree node={tree} {mods} {site} {flush} /></ModFit
+          >
         {:else if mods.drawn(component, instanceId)}
           {@render blank?.()}
         {:else}

@@ -6,6 +6,7 @@
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
+  import { keepTyping, typingOnTouch } from "$lib/ui/keepFocus";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import ModInline from "./ModInline.svelte";
   import ModSite from "./ModSite.svelte";
@@ -33,7 +34,7 @@
   };
 
   const focusFromCard = (event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest("button, a, input, textarea, [data-mod-site]")) return;
+    if (typingOnTouch() || (event.target as HTMLElement).closest("button, a, input, textarea, [data-mod-site]")) return;
     focusBand();
   };
 
@@ -101,6 +102,7 @@
       rows={BAND_ROWS}
       flush
       thin
+      fit
       edge={CARD_INSET}
       class="pl-3.5"
       onFocusChange={(held) => (focused = held)}
@@ -153,6 +155,7 @@
       <div
         bind:this={card}
         onclick={focusFromCard}
+        onpointerdown={keepTyping}
         transition:slide={{ duration }}
         class={drawn
           ? `relative -mb-[var(--radius-lg)] rounded-t-lg border-2 border-b-0 border-outline-variant bg-surface pb-[calc(var(--radius-lg)+0.625rem)] ${settings.modBandHandle ? "" : "pt-3.5"}`

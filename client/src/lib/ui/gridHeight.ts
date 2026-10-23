@@ -1,4 +1,4 @@
-const LAYOUT_UNIT = 1 / 64;
+export const LAYOUT_UNIT = 1 / 64;
 
 const density = () => window.devicePixelRatio || 1;
 

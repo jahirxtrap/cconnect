@@ -6,6 +6,7 @@
   import type { ModChild, ModComponent, ModNode } from "$lib/data/modModels";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
+  import { typingOnTouch } from "$lib/ui/keepFocus";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -202,7 +203,9 @@
   };
 
   const pressButton = (event: MouseEvent, item: ModNode) => {
-    (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-mod-site]")?.focus({ preventScroll: true });
+    if (!typingOnTouch()) {
+      (event.currentTarget as HTMLElement).closest<HTMLElement>("[data-mod-site]")?.focus({ preventScroll: true });
+    }
     port.press(item);
   };
 

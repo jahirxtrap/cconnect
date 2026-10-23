@@ -15,6 +15,12 @@ export const returnFocus = (event: FocusEvent) => {
   previous.focus({ preventScroll: true });
 };
 
+export const typingOnTouch = () => isTouch && typing(document.activeElement);
+
+export const keepTyping = (event: Event) => {
+  if (typingOnTouch() && !typing(event.target)) event.preventDefault();
+};
+
 export const holdFocus = hold;
 
 export const restoreFocus = hold;

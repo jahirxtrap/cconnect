@@ -348,6 +348,8 @@ const artLine = (line: string): boolean => {
 export const plainText = (node: ModNode): string | null =>
   node.children.every((kid) => typeof kid === "string") ? (node.children as string[]).join("") : null;
 
+export const LONG_WORD = 24;
+
 const unwrappedText = (child: ModNode): string | null => {
   const wrap = child.props.wrap;
   return child.type !== "Text" || wrap === undefined || wrap === "wrap" ? null : plainText(child);
