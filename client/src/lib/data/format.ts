@@ -66,8 +66,10 @@ export const formatSize = (bytes: number): string => {
 export const usageRatio = (used: number, limit: number): number =>
   limit > 0 ? Math.min(1, Math.max(0, used / limit)) : 0;
 
+export const formatPercent = (ratio: number): string => `${Math.round(ratio * PERCENT)}%`;
+
 export const formatUsage = (used: number, limit: number, unit: (value: number) => string): string =>
-  joined(`${unit(used)} / ${unit(limit)}`, `${Math.round(usageRatio(used, limit) * PERCENT)}%`);
+  joined(`${unit(used)} / ${unit(limit)}`, formatPercent(usageRatio(used, limit)));
 
 const REFERENCE_SUFFIX = ".ccref";
 

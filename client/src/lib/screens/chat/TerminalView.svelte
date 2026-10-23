@@ -211,7 +211,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="relative flex h-full flex-col bg-surface"
+  class="relative flex h-full flex-col bg-background"
   onpointerdowncapture={() => paneFocus.set("terminal")}
 >
   <TabStrip
@@ -230,7 +230,10 @@
     leading={tabIcon}
   />
 
-  <div class="relative min-h-0 flex-1" style="background: {TERMINAL_BACKGROUND}">
+  <div
+    class="relative min-h-0 flex-1"
+    style={terminalTabs.items.length ? `background: ${TERMINAL_BACKGROUND}` : undefined}
+  >
     {#each terminalTabs.items as tab (tab.id)}
       {@const connect = terminalTabs.connectorOf(tab.id)}
       {#if connect}

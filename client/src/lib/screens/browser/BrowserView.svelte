@@ -1,33 +1,39 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ArrowRight from "@lucide/svelte/icons/arrow-right";
+  import House from "@lucide/svelte/icons/house";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import ShieldCheck from "@lucide/svelte/icons/shield-check";
   import ShieldOff from "@lucide/svelte/icons/shield-off";
-  import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
+  import { Portal } from "bits-ui";
   import type { Snippet } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
-  import BrowserDeviceMenu from "./BrowserDeviceMenu.svelte";
+  import BrowserClearDialog from "./BrowserClearDialog.svelte";
+  import BrowserFavoriteDialog from "./BrowserFavoriteDialog.svelte";
+  import BrowserHome from "./BrowserHome.svelte";
+  import BrowserOptionsMenu from "./BrowserOptionsMenu.svelte";
   import BrowserSideSwitch from "./BrowserSideSwitch.svelte";
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
   import { BrowserLayer, coverOf } from "./browserLayer";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
+    androidBrowsing,
+    captureName,
     deviceBrowser,
-    devicePresets,
     nativePick,
     type DeviceBounds,
     type DevicePick,
   } from "./deviceBrowser.svelte";
   import { deviceBrowsing } from "./deviceEngine";
+  import { joined } from "$lib/data/format";
   import type { ElementSource } from "$lib/data/pickedElements";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { isEditing } from "$lib/data/paneFocus.svelte";
-  import { settings } from "$lib/data/settings.svelte";
+  import { settings, type BrowserFavorite } from "$lib/data/settings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
-  import { isDesktop, isTouch } from "$lib/platform";
+  import { isDesktop, isTouch, openExternal } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { store } from "$lib/platform/storage";
   import { inPane, paneRole } from "$lib/screens/chat/paneSurface";
@@ -45,6 +51,8 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import InputField from "$lib/ui/InputField.svelte";
+  import { PullState } from "$lib/ui/pull.svelte";
+  import PullIndicator from "$lib/ui/PullIndicator.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
@@ -110,31 +118,99 @@
 
   const titleOf = (title: string, url: string) => title || (url.startsWith("about:") ? "" : url) || t("NEW_TAB");
 
+  const entryOf = (id: string, title: string, url: string, favicon: string, home: boolean): BrowserEntry =>
+    home ? { id, title: t("NEW_TAB"), url, favicon: "" } : { id, title: titleOf(title, url), url, favicon };
+
+  let serverHome = $state(false);
   const deviceEntries = $derived<BrowserEntry[]>(
-    deviceBrowser.tabs.map((tab) => ({
-      id: tab.id,
-      title: titleOf(tab.title, tab.url),
-      url: tab.url,
-      favicon: tab.favicon,
-    })),
+    deviceBrowser.tabs.map((tab) => entryOf(tab.id, tab.title, tab.url, tab.favicon, tab.home)),
   );
   const serverEntries = $derived<BrowserEntry[]>(
     page.running
-      ? page.tabs.map((tab) => ({
-          id: tab.id,
-          title: titleOf(tab.title, tab.url),
-          url: tab.url,
-          favicon: tab.favicon ?? "",
-        }))
+      ? page.tabs.map((tab) =>
+          entryOf(tab.id, tab.title, tab.url, tab.favicon ?? "", serverHome && tab.id === page.activeTab),
+        )
       : [],
   );
   const entries = $derived(onServer ? serverEntries : deviceEntries);
   const activeId = $derived(onServer ? page.activeTab : deviceBrowser.activeId);
   const active = $derived(entries.find((entry) => entry.id === activeId) ?? null);
-  const canGoBack = $derived(onServer ? page.canGoBack : !!deviceBrowser.active?.canGoBack);
+  const serverAtHome = $derived(serverHome || (!ready && !page.running && !launching && page.available));
+  const atHome = $derived(onServer ? serverAtHome : deviceBrowser.atHome);
+  const canGoBack = $derived(
+    onServer
+      ? page.canGoBack || (serverHome && page.running)
+      : !!deviceBrowser.active?.canGoBack || (atHome && !!deviceBrowser.active?.url),
+  );
   const canGoForward = $derived(onServer ? page.canGoForward : !!deviceBrowser.active?.canGoForward);
-  const shownUrl = $derived(onServer ? page.url : (deviceBrowser.active?.url ?? ""));
+  const pageUrl = $derived(onServer ? page.url : (deviceBrowser.active?.url ?? ""));
+  const shownUrl = $derived(atHome ? "" : pageUrl);
+  const favorites = $derived(settings.browserFavorites);
+  const favorite = $derived(!!shownUrl && favorites.some((item) => item.url === shownUrl));
+
+  const nameOf = (item: BrowserFavorite) => item.title || deviceBrowser.hostOf(item.url) || item.url;
+
+  const toggleFavorite = () => {
+    if (!shownUrl) return;
+    if (favorite) settings.browserFavorites = favorites.filter((item) => item.url !== shownUrl);
+    else favoriting = { url: shownUrl, title: active?.title ?? "" };
+  };
+
+  const iconOf = (url: string) => {
+    if (url === shownUrl && active?.favicon) return active.favicon;
+    return URL.canParse(url) ? `${new URL(url).origin}/favicon.ico` : "";
+  };
+
+  const addFavorite = (url: string, title: string) => {
+    settings.browserFavorites = [...favorites.filter((item) => item.url !== url), { url, title, icon: iconOf(url) }];
+    favoriting = null;
+  };
+
+  const renameFavorite = (target: BrowserFavorite, title: string) => {
+    settings.browserFavorites = favorites.map((item) => (item.url === target.url ? { ...item, title } : item));
+  };
+
+  const removeFavorite = (target: BrowserFavorite) => {
+    settings.browserFavorites = favorites.filter((item) => item.url !== target.url);
+  };
+
+  const goHome = () => {
+    if (onServer) serverHome = true;
+    else deviceBrowser.goHome();
+  };
+
+  const goBack = () => {
+    if (onServer && serverHome) serverHome = false;
+    else if (onServer) link?.back();
+    else deviceBrowser.back();
+  };
   const picking = $derived(onServer ? page.picking : deviceBrowser.picking);
+  const zoomable = $derived(!onServer && deviceBrowser.zoomable);
+  const shielded = $derived(!onServer && !atHome && deviceBrowsing && settings.browserShield.enabled);
+
+  const host = $derived(deviceBrowser.hostOf(shownUrl));
+
+  let clearing = $state<{ site: string | null } | null>(null);
+  let favoriting = $state<{ url: string; title: string } | null>(null);
+  let pullRefreshing = $state(false);
+
+  const pull = new PullState();
+
+  const serverCapture = () =>
+    new Promise<File | null>((done) => {
+      if (!canvas) return done(null);
+      canvas.toBlob(
+        (blob) => done(blob ? new File([blob], captureName(active?.title ?? ""), { type: "image/png" }) : null),
+        "image/png",
+      );
+    });
+
+  const capture = async () => {
+    const target = panes.focusedTab;
+    if (!target) return;
+    const file = onServer ? await serverCapture() : await deviceBrowser.capture();
+    if (file) tabs.stateFor(target).addAttachments([file]);
+  };
 
   const togglePick = () => (onServer ? link?.pick(!page.picking) : deviceBrowser.pick(!deviceBrowser.picking));
 
@@ -203,6 +279,7 @@
   };
 
   const navigate = (input: string) => {
+    serverHome = false;
     if (!onServer) {
       deviceBrowser.navigate(input);
       return;
@@ -290,12 +367,33 @@
     deviceBrowser.onFocus = () => {
       if (role && !layout.mobile) panes.focus(role);
     };
+    deviceBrowser.onPull = (distance, done) => {
+      if (!done) {
+        pull.drag(distance);
+        return;
+      }
+      if (!pull.release(distance)) return;
+      pullRefreshing = true;
+      deviceBrowser.reload();
+    };
     return () => {
       deviceBrowser.onPicked = null;
       deviceBrowser.onKey = null;
       deviceBrowser.onFocus = null;
+      deviceBrowser.onPull = null;
     };
   });
+
+  $effect(() => {
+    if (pullRefreshing && !deviceBrowser.active?.loading) pullRefreshing = false;
+  });
+
+  $effect(() => {
+    if (pull.dragging) return;
+    pull.settle(pullRefreshing ? 1 : 0);
+  });
+
+  $effect(() => () => pull.dispose());
 
   $effect(() => {
     if (onServer || !isDesktop) return;
@@ -493,7 +591,7 @@
   useShortcut("browser.tab.next", () => cycle(1));
   useShortcut("browser.tab.previous", () => cycle(-1));
   useShortcut("browser.reload", () => (onServer ? link?.reload() : deviceBrowser.reload()));
-  useShortcut("browser.back", () => (onServer ? link?.back() : deviceBrowser.back()));
+  useShortcut("browser.back", goBack);
   useShortcut("browser.forward", () => (onServer ? link?.forward() : deviceBrowser.forward()));
   const selectAddress = () => addressBox?.querySelector("input")?.select();
 
@@ -509,6 +607,9 @@
   }
 
   useShortcut("browser.address", focusAddress);
+  useShortcut("browser.zoom.in", () => deviceBrowser.zoomBy(1), () => !onServer && deviceBrowser.zoomable);
+  useShortcut("browser.zoom.out", () => deviceBrowser.zoomBy(-1), () => !onServer && deviceBrowser.zoomable);
+  useShortcut("browser.zoom.reset", () => deviceBrowser.resetZoom(), () => !onServer && deviceBrowser.zoomable);
   useShortcut("browser.pick", togglePick);
   useShortcut(
     "browser.copy",
@@ -550,6 +651,36 @@
 
 {#snippet sideSwitch()}
   <BrowserSideSwitch {side} onSelect={setSide} />
+{/snippet}
+
+{#snippet home()}
+  <BrowserHome
+    {favorites}
+    {nameOf}
+    onSearch={navigate}
+    onAdd={() => (favoriting = { url: "", title: "" })}
+    onRename={renameFavorite}
+    onRemove={removeFavorite}
+  />
+{/snippet}
+
+{#snippet addressTools()}
+  {#if shielded}
+    {@const exempt = !!host && settings.browserShield.allowed.includes(host)}
+    {@const count = deviceBrowser.blocked[deviceBrowser.activeId] ?? 0}
+    <TooltipIconButton
+      label={exempt || !count ? t("BROWSER_SHIELD_HERE") : joined(t("BROWSER_SHIELD_HERE"), plural("BROWSER_SHIELD_COUNT", count))}
+      enabled={!!host}
+      class="size-6 [&_svg]:size-[18px] {exempt ? '' : 'text-accent'}"
+      onclick={() => void deviceBrowser.allowHere(!exempt)}
+    >
+      {#if exempt}
+        <ShieldOff />
+      {:else}
+        <ShieldCheck />
+      {/if}
+    </TooltipIconButton>
+  {/if}
 {/snippet}
 
 <div class="flex min-h-0 flex-1 flex-col">
@@ -596,7 +727,7 @@
       shortcut="browser.back"
       enabled={canGoBack}
       class="size-8"
-      onclick={() => (onServer ? link?.back() : deviceBrowser.back())}
+      onclick={goBack}
     >
       <ArrowLeft size={18} />
     </TooltipIconButton>
@@ -617,46 +748,17 @@
     >
       <RotateCw size={18} />
     </TooltipIconButton>
-    {#if !isTouch}
-      <TooltipIconButton
-        label={t("BROWSER_PICK")}
-        shortcut="browser.pick"
-        class={picking ? "size-8 text-accent" : "size-8"}
-        onclick={togglePick}
-      >
-        <SquareMousePointer size={18} />
-      </TooltipIconButton>
-    {/if}
-    {#if onServer || devicePresets}
-      <BrowserDeviceMenu
-        device={onServer ? page.device : deviceBrowser.device}
-        onSelect={(name) => (onServer ? link?.device(name) : deviceBrowser.setDevice(name))}
-      />
-    {/if}
-    {#if !onServer && deviceBrowsing && settings.browserShield.enabled}
-      {@const host = deviceBrowser.hostOf(deviceBrowser.active?.url ?? "")}
-      {@const exempt = !!host && settings.browserShield.allowed.includes(host)}
-      {@const count = deviceBrowser.blocked[deviceBrowser.activeId] ?? 0}
-      <TooltipIconButton
-        label={exempt || !count ? t("BROWSER_SHIELD_HERE") : plural("BROWSER_SHIELD_COUNT", count)}
-        enabled={!!host}
-        class="size-8 {exempt ? '' : 'text-accent'}"
-        onclick={() => void deviceBrowser.allowHere(!exempt)}
-      >
-        {#if exempt}
-          <ShieldOff size={18} />
-        {:else}
-          <ShieldCheck size={18} />
-        {/if}
-      </TooltipIconButton>
-    {/if}
+    <TooltipIconButton label={t("BROWSER_HOME")} enabled={!atHome} class="size-8" onclick={goHome}>
+      <House size={18} />
+    </TooltipIconButton>
     <div
       bind:this={addressBox}
-      class="min-w-0 flex-1 pl-1"
+      class="min-w-0 flex-1 px-1"
       onfocusin={selectAddress}
       onfocusout={() => {
         typing = false;
         address = shownUrl;
+        addressBox?.querySelector("input")?.setSelectionRange(0, 0);
       }}
     >
       <InputField
@@ -669,19 +771,40 @@
         onClear={() => (address = "")}
         placeholder={t("BROWSER_ADDRESS")}
         singleLine
+        url
+        enterKeyHint="go"
+        trailing={addressTools}
       />
     </div>
+    <BrowserOptionsMenu
+      url={shownUrl}
+      device={onServer ? page.device : deviceBrowser.device}
+      native={!onServer && androidBrowsing}
+      onDevice={(name) => (onServer ? link?.device(name) : deviceBrowser.setDevice(name))}
+      zoom={zoomable ? deviceBrowser.zoom : null}
+      onZoom={(step) => deviceBrowser.zoomBy(step)}
+      onZoomReset={() => deviceBrowser.resetZoom()}
+      {picking}
+      onPick={isTouch ? null : togglePick}
+      onCapture={() => void capture()}
+      onOpen={() => openExternal(shownUrl)}
+      onCopy={() => void copyText(shownUrl)}
+      {favorite}
+      onFavorite={toggleFavorite}
+      onClearSite={onServer || !host ? null : () => (clearing = { site: host })}
+      onClearAll={onServer ? null : () => (clearing = { site: null })}
+    />
   </div>
 
   <div
     bind:this={surface}
-    class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-variant"
+    class="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-background"
   >
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <canvas
       bind:this={canvas}
       tabindex="0"
-      class="max-h-full max-w-full bg-surface outline-none {onServer ? '' : 'hidden'}"
+      class="max-h-full max-w-full bg-background outline-none {onServer ? '' : 'hidden'}"
       style="cursor: {page.picking ? 'crosshair' : cursor}"
       onpointerdown={(event) => {
         canvas?.focus();
@@ -695,8 +818,8 @@
       {onkeyup}
     ></canvas>
     {#if !onServer}
-      {#if !deviceBrowser.active?.url}
-        <EmptyState text={t("BROWSER_ADDRESS")} class="absolute inset-0 bg-surface" />
+      {#if atHome}
+        {@render home()}
       {:else if nativePick && deviceBrowser.picking}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <div
@@ -723,20 +846,45 @@
     {:else if !ready && !connected}
       <EmptyState
         text={pane && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("CONNECTION_ERROR")}
-        class="absolute inset-0 bg-surface"
+        class="absolute inset-0 bg-background"
       />
     {:else if !ready && failed}
       <EmptyState
         text={page.available ? t("BROWSER_FAILED") : t("BROWSER_MISSING")}
-        class="absolute inset-0 bg-surface"
+        class="absolute inset-0 bg-background"
       />
+    {:else if serverAtHome}
+      {@render home()}
     {:else if !ready && !page.running && !launching}
-      <EmptyState
-        text={!page.available ? t("BROWSER_MISSING") : deviceBrowsing ? t("BROWSER_ADDRESS") : t("BROWSER_FAILED")}
-        class="absolute inset-0 bg-surface"
-      />
+      <EmptyState text={t("BROWSER_MISSING")} class="absolute inset-0 bg-background" />
     {:else if !ready}
-      <CenteredProgress class="absolute inset-0 bg-surface" />
+      <CenteredProgress class="absolute inset-0 bg-background" />
     {/if}
   </div>
 </div>
+
+{#if clearing}
+  <BrowserClearDialog site={clearing.site} onDismiss={() => (clearing = null)} />
+{/if}
+
+{#if favoriting}
+  {@const draft = favoriting}
+  <BrowserFavoriteDialog
+    url={draft.url}
+    title={draft.title}
+    onConfirm={addFavorite}
+    onDismiss={() => (favoriting = null)}
+  />
+{/if}
+
+{#if !onServer && deviceBrowser.shown && (pull.fraction > 0 || pullRefreshing)}
+  {@const page = deviceBrowser.shown}
+  <Portal>
+    <div
+      style="left: {page.x}px; top: {page.y}px; width: {page.width}px"
+      class="pointer-events-none fixed z-10"
+    >
+      <PullIndicator fraction={pull.fraction} refreshing={pullRefreshing} />
+    </div>
+  </Portal>
+{/if}

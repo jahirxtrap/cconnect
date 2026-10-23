@@ -24,6 +24,8 @@ const number = (raw: Wire, key: string): number | null =>
 const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
 const texts = (raw: Wire, key: string): string[] | null =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : null;
+const json = (raw: Wire, key: string): object | null =>
+  raw[key] && typeof raw[key] === "object" ? (raw[key] as object) : null;
 
 export interface BackupOptions {
   notes?: boolean;
@@ -110,7 +112,7 @@ const applySettings = (values: Wire) => {
   const language = text(values, "language");
   if (language !== null) i18n.set((language || "system") as Locale);
 
-  const readers = { boolean: flag, number, string: text, strings: texts } as const;
+  const readers = { boolean: flag, number, string: text, strings: texts, json } as const;
   for (const { key, kind } of BACKED_UP) {
     const value = readers[kind](values, key);
     if (value !== null) settings.adopt(key, value);

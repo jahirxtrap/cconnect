@@ -2,11 +2,13 @@
   import Check from "@lucide/svelte/icons/check";
   import { DropdownMenu } from "bits-ui";
   import type { Snippet } from "svelte";
+  import { shortcuts } from "$lib/platform/shortcuts.svelte";
   import { holdFocus, returnFocus } from "./keepFocus";
 
   interface Props {
     text: string;
     description?: string;
+    shortcut?: string;
     onclick?: () => void;
     selected?: boolean;
     enabled?: boolean;
@@ -19,6 +21,7 @@
   const {
     text,
     description = "",
+    shortcut,
     onclick,
     selected = false,
     enabled = true,
@@ -27,10 +30,13 @@
     leading,
     trailing,
   }: Props = $props();
+
+  const hint = $derived(shortcut ? shortcuts.hint(shortcut) : "");
 </script>
 
 <DropdownMenu.Item
   disabled={!enabled}
+  aria-keyshortcuts={shortcut ? shortcuts.aria(shortcut) : undefined}
   {closeOnSelect}
   onSelect={onclick}
   onmousedown={holdFocus}
@@ -48,6 +54,9 @@
   {/if}
   {#if selected}
     <Check size={16} class="shrink-0 text-accent" />
+  {/if}
+  {#if hint}
+    <span class="shrink-0 pl-4 text-body-sm text-on-surface-variant">{hint}</span>
   {/if}
   {@render trailing?.()}
 </DropdownMenu.Item>

@@ -6,11 +6,11 @@
   import { formatDayTime } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { systemName } from "$lib/platform";
+  import BrowserClearDialog from "$lib/screens/browser/BrowserClearDialog.svelte";
   import { deviceBrowser } from "$lib/screens/browser/deviceBrowser.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
-  import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
@@ -85,12 +85,6 @@
       void deviceBrowser.restart();
     }
     onDismiss();
-  };
-
-  const clear = async () => {
-    clearing = false;
-    await deviceBrowser.clearData().catch(() => undefined);
-    await measure();
   };
 
   $effect(() => {
@@ -190,11 +184,5 @@
 </CompactDialog>
 
 {#if clearing}
-  <ConfirmDialog
-    title={t("BROWSER_DATA_CLEAR")}
-    text={t("BROWSER_DATA_CLEAR_CONFIRM")}
-    confirmLabel={t("BROWSER_DATA_CLEAR")}
-    onConfirm={() => void clear()}
-    onDismiss={() => (clearing = false)}
-  />
+  <BrowserClearDialog onDismiss={() => (clearing = false)} onCleared={() => void measure()} />
 {/if}

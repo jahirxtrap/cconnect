@@ -76,6 +76,14 @@ html[data-theme="dark"] {
   animation: menu-exit 90ms linear forwards;
 }
 
+.menu-surface[data-side="left"] {
+  translate: max(0px, 100% - var(--bits-floating-available-width, 100%));
+}
+
+.menu-surface[data-side="right"] {
+  translate: min(0px, var(--bits-floating-available-width, 100%) - 100%);
+}
+
 @media (hover: hover) {
   .menu-surface [data-highlighted] {
     @apply bg-on-surface/10;

@@ -483,7 +483,7 @@
     <p class="mt-3 line-clamp-3 wrap-anywhere text-body-sm text-accent">{current.url}</p>
     <div class="mt-2 flex flex-col gap-1.5">
       <ActionButton
-        text={t("ACCOUNT_COPY_LINK")}
+        text={t("COPY_LINK")}
         onclick={() => void copyText(current.url)}
         class="w-full"
       />

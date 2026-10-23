@@ -4,6 +4,7 @@
   import X from "@lucide/svelte/icons/x";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import type { Snippet } from "svelte";
+  import type { HTMLInputAttributes } from "svelte/elements";
   import { t } from "$lib/i18n/index.svelte";
 
   interface Props {
@@ -18,6 +19,8 @@
     maxLines?: number;
     autofocus?: boolean;
     numeric?: boolean;
+    url?: boolean;
+    enterKeyHint?: HTMLInputAttributes["enterkeyhint"];
     enabled?: boolean;
     error?: string | null;
     onClear?: (() => void) | null;
@@ -39,6 +42,8 @@
     maxLines,
     autofocus = false,
     numeric = false,
+    url = false,
+    enterKeyHint,
     enabled = true,
     error = null,
     onClear = null,
@@ -89,7 +94,11 @@
         <input
           bind:this={field}
           type={masked ? "password" : "text"}
-          inputmode={numeric ? "decimal" : undefined}
+          inputmode={numeric ? "decimal" : url ? "url" : undefined}
+          autocapitalize={url ? "off" : undefined}
+          autocorrect={url ? "off" : undefined}
+          spellcheck={url ? false : undefined}
+          enterkeyhint={enterKeyHint}
           disabled={!enabled}
           {value}
           {placeholder}

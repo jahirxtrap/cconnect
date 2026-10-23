@@ -1,10 +1,11 @@
-export type SettingKind = "boolean" | "number" | "string" | "strings";
+export type SettingKind = "boolean" | "number" | "string" | "strings" | "json";
 
 export interface ClientSetting {
   key: string;
   kind: SettingKind;
-  fallback: string | number | boolean;
+  fallback: string | number | boolean | object;
   backup: boolean;
+  legacy?: string;
 }
 
 export const CLIENT_SETTINGS: ClientSetting[] = [
@@ -27,6 +28,10 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "browser_proxy", kind: "string", fallback: "system", backup: true },
   { key: "browser_proxy_url", kind: "string", fallback: "", backup: true },
   { key: "browser_proxy_bypass", kind: "string", fallback: "", backup: true },
+  { key: "browser_viewport", kind: "string", fallback: "", backup: true, legacy: "browser.preset" },
+  { key: "browser_zoom", kind: "json", fallback: {}, backup: true, legacy: "browser.zoom" },
+  { key: "browser_favorites", kind: "json", fallback: [], backup: true },
+  { key: "mod_band_hidden", kind: "boolean", fallback: false, backup: true, legacy: "mods.bandHidden" },
   { key: "discord_presence", kind: "boolean", fallback: false, backup: true },
   { key: "discord_status", kind: "boolean", fallback: true, backup: true },
   { key: "discord_time", kind: "boolean", fallback: true, backup: true },
@@ -70,4 +75,8 @@ export const BACKED_UP = CLIENT_SETTINGS.filter((setting) => setting.backup);
 
 export const CLIENT_DEFAULTS = Object.fromEntries(
   CLIENT_SETTINGS.map((setting) => [setting.key, setting.fallback]),
+);
+
+export const LEGACY_KEYS = new Map(
+  CLIENT_SETTINGS.flatMap((setting) => (setting.legacy ? [[setting.key, setting.legacy] as const] : [])),
 );

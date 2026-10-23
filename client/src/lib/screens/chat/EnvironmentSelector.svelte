@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { backend, address } from "$lib/services/backend.svelte";
   import AppLogo from "$lib/ui/AppLogo.svelte";
+  import AppTitle from "$lib/ui/AppTitle.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
 
@@ -46,10 +47,7 @@
     <ChevronDown size={24} class="shrink-0 text-on-surface-variant" />
   </Pressable>
 {:else}
-  <div class="flex items-center px-2 {className}">
-    <AppLogo />
-    <p class="ml-2 truncate text-title-lg">{t("APP_NAME")}</p>
-  </div>
+  <AppTitle class="px-2 {className}" />
 {/if}
 
 {#if open}

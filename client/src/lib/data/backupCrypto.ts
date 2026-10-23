@@ -1,3 +1,5 @@
+import { decodeBase64 } from "./base64";
+
 const MARK = "cconnect-encrypted";
 const FORMAT = 1;
 const KDF = "PBKDF2-SHA256";
@@ -23,8 +25,6 @@ const encode = (bytes: Uint8Array): string => {
   return btoa(text);
 };
 
-const decode = (text: string): Uint8Array<ArrayBuffer> =>
-  Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
 
 const keyOf = async (passphrase: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<CryptoKey> => {
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, [
@@ -70,8 +70,12 @@ export const decryptBackup = async (raw: string, passphrase: string): Promise<st
   try {
     const envelope = JSON.parse(raw) as Envelope;
     if (envelope.app !== MARK) return null;
-    const key = await keyOf(passphrase, decode(envelope.salt), envelope.iterations);
-    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: decode(envelope.iv) }, key, decode(envelope.data));
+    const key = await keyOf(passphrase, decodeBase64(envelope.salt), envelope.iterations);
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: decodeBase64(envelope.iv) },
+      key,
+      decodeBase64(envelope.data),
+    );
     return new TextDecoder().decode(plain);
   } catch {
     return null;

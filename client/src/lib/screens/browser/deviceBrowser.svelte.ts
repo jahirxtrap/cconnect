@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { decodeBase64 } from "$lib/data/base64";
 import { settings } from "$lib/data/settings.svelte";
 import { isDesktop, systemName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
@@ -14,6 +15,7 @@ export interface DeviceTab {
   canGoBack: boolean;
   canGoForward: boolean;
   open: boolean;
+  home: boolean;
 }
 
 export interface DeviceBounds {
@@ -24,7 +26,7 @@ export interface DeviceBounds {
 }
 
 interface StoredTabs {
-  tabs: { id: string; url: string; title: string; favicon?: string }[];
+  tabs: { id: string; url: string; title: string; favicon?: string; home?: boolean }[];
   active: string;
 }
 
@@ -60,6 +62,8 @@ interface CdpAnswer {
   object?: { objectId?: string };
   result?: { value?: unknown };
   userAgent?: string;
+  data?: string;
+  cookies?: { name: string; domain: string; path: string }[];
 }
 
 interface Spot {
@@ -73,7 +77,9 @@ export interface ShieldState {
 }
 
 const STORE_KEY = "browser.device";
-const PRESET_KEY = "browser.preset";
+const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
+export const DESKTOP_SITE = "desktop";
+const CAPTURE_NAME = "capture";
 const PRESETS: Record<string, Preset> = {
   mobile: {
     width: 390,
@@ -108,12 +114,14 @@ const SEARCH_URL = "https://www.google.com/search?q=";
 const LOCAL_HOST = /^(localhost|127(\.\d+){3}|\[::1\])(:\d+)?(\/|$)/i;
 const HOST_LIKE = /^[^\s/]+\.[^\s/]+|^[^\s/]+:\d+/;
 export const nativePick = systemName() === "windows";
-export const devicePresets = deviceBrowsing;
 const native = nativePick;
-const android = deviceBrowsing && !isDesktop;
+export const androidBrowsing = deviceBrowsing && !isDesktop;
 const ownMajor = navigator.userAgent.match(/Chrome\/(\d+)/)?.[1] ?? FALLBACK_MAJOR;
+const MODES = new Set(androidBrowsing ? [DESKTOP_SITE] : Object.keys(PRESETS));
+const known = (name: string) => !name || MODES.has(name);
 
-const addressOf = (input: string): string | null => {
+
+export const addressOf = (input: string): string | null => {
   const target = input.trim();
   if (!target) return null;
   if (target.includes("://")) return target;
@@ -124,6 +132,9 @@ const addressOf = (input: string): string | null => {
 
 const agentOf = (preset: Preset, major: string) =>
   `Mozilla/5.0 (Linux; Android ${ANDROID}; ${preset.model}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 ${preset.phone ? "Mobile " : ""}Safari/537.36`;
+
+const desktopAgentOf = (major: string) =>
+  `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${major}.0.0.0 Safari/537.36`;
 
 const hintsOf = (preset: Preset, major: string) => {
   const brands = [
@@ -151,6 +162,7 @@ const blank = (id: string, url = "", title = "", favicon = ""): DeviceTab => ({
   canGoBack: false,
   canGoForward: false,
   open: false,
+  home: false,
 });
 
 const sameBounds = (a: DeviceBounds | null, b: DeviceBounds | null) =>
@@ -160,11 +172,17 @@ const sameBounds = (a: DeviceBounds | null, b: DeviceBounds | null) =>
 const cdp = (id: string, method: string, params: object = {}) =>
   browserCall<CdpAnswer>("browser_cdp", { id, method, params }).catch(() => null);
 
+const related = (domain: string, host: string) => {
+  const bare = domain.replace(/^\./, "").toLowerCase();
+  return bare === host || bare.endsWith(`.${host}`) || host.endsWith(`.${bare}`);
+};
+
+export const captureName = (title: string) => `${title.replace(/[\\/:*?"<>|]+/g, " ").trim() || CAPTURE_NAME}.png`;
+
 class DeviceBrowser {
   tabs = $state<DeviceTab[]>([]);
   activeId = $state("");
   picking = $state(false);
-  device = $state(store.get<string>(PRESET_KEY, ""));
   shown = $state<DeviceBounds | null>(null);
   blocked = $state<Record<string, number>>({});
   shield = $state<ShieldState>({ ready: false, updated: null });
@@ -172,11 +190,12 @@ class DeviceBrowser {
   onPicked: ((url: string, pick: DevicePick) => void) | null = null;
   onKey: ((keys: string) => void) | null = null;
   onFocus: (() => void) | null = null;
+  onPull: ((distance: number, done: boolean) => void) | null = null;
   #hole: DeviceBounds | null = null;
   #hidden = false;
   #placed: DeviceBounds | null = null;
   #shownId: string | null = null;
-  #zooms = new Map<string, number>();
+  #zooms = new Map<string, string>();
   #emulated = new Map<string, string>();
   #fitted = new Map<string, number>();
   #major: Promise<string> | null = null;
@@ -190,7 +209,7 @@ class DeviceBrowser {
     if (this.#started) return;
     this.#started = true;
     const stored = store.get<StoredTabs>(STORE_KEY, { tabs: [], active: "" });
-    this.tabs = stored.tabs.map((tab) => blank(tab.id, tab.url, tab.title, tab.favicon));
+    this.tabs = stored.tabs.map((tab) => ({ ...blank(tab.id, tab.url, tab.title, tab.favicon), home: !!tab.home }));
     this.activeId = this.tabs.some((tab) => tab.id === stored.active) ? stored.active : (this.tabs[0]?.id ?? "");
     browserListen<PageState>("browser-state", (state) => this.#apply(state));
     browserListen<{ id: string; url: string }>("browser-open", (request) => {
@@ -208,6 +227,12 @@ class DeviceBrowser {
     browserListen<{ id: string }>("browser-focused", () => this.onFocus?.());
     browserListen<{ id: string; blocked: number }>("browser-shield", (count) => {
       this.blocked = { ...this.blocked, [count.id]: count.blocked };
+    });
+    browserListen<{ id: string; distance: number; done: boolean }>("browser-pull", (pull) => {
+      if (pull.id === this.activeId) this.onPull?.(pull.distance, pull.done);
+    });
+    browserListen<{ id: string; step: number }>("browser-zoom", (wheel) => {
+      if (wheel.id === this.activeId) this.zoomBy(wheel.step);
     });
     this.#guarded = this.guard();
   }
@@ -256,6 +281,32 @@ class DeviceBrowser {
 
   clearData() {
     return browserCall("browser_clear_data");
+  }
+
+  async clearSite(host: string) {
+    const tab = this.active;
+    if (!tab?.open) return;
+    if (native) await this.#clearSiteByCdp(tab.id, tab.url, host);
+    else await browserCall("browser_clear_site", { id: tab.id, host });
+    this.reload();
+  }
+
+  async #clearSiteByCdp(id: string, url: string, host: string) {
+    const origins = new Set([`https://${host}`, `https://www.${host}`, `http://${host}`, `http://www.${host}`]);
+    if (URL.canParse(url)) origins.add(new URL(url).origin);
+    for (const origin of origins) await cdp(id, "Storage.clearDataForOrigin", { origin, storageTypes: "all" });
+    const cookies = (await cdp(id, "Storage.getCookies"))?.cookies ?? [];
+    for (const cookie of cookies.filter((item) => related(item.domain, host)))
+      await cdp(id, "Network.deleteCookies", { name: cookie.name, domain: cookie.domain, path: cookie.path });
+  }
+
+  async capture(): Promise<File | null> {
+    const tab = this.active;
+    if (!tab?.open) return null;
+    const data = native
+      ? (await cdp(tab.id, "Page.captureScreenshot", { format: "png" }))?.data
+      : await browserCall<string>("browser_capture", { id: tab.id }).catch(() => null);
+    return data ? new File([decodeBase64(data)], captureName(tab.title), { type: "image/png" }) : null;
   }
 
   dataSize() {
@@ -332,10 +383,46 @@ class DeviceBrowser {
     this.#aiming = false;
   }
 
+  get device(): string {
+    const name = settings.browserViewport;
+    return known(name) ? name : "";
+  }
+
   setDevice(name: string) {
-    if (name === this.device || (name && !PRESETS[name])) return;
-    this.device = name;
-    store.set(PRESET_KEY, name);
+    if (name === this.device || !known(name)) return;
+    settings.browserViewport = name;
+    this.#present();
+  }
+
+  get zoom(): number {
+    return this.#zoomOf(this.active?.url ?? "");
+  }
+
+  get zoomable(): boolean {
+    return !androidBrowsing && !PRESETS[this.device] && !!this.active?.open;
+  }
+
+  zoomBy(step: number) {
+    if (!this.zoomable) return;
+    const current = this.zoom;
+    const next =
+      step > 0 ? ZOOM_LEVELS.find((level) => level > current) : ZOOM_LEVELS.findLast((level) => level < current);
+    if (next !== undefined) this.#setZoom(next);
+  }
+
+  resetZoom() {
+    if (this.zoomable) this.#setZoom(1);
+  }
+
+  #zoomOf(url: string): number {
+    return settings.browserZoom[this.hostOf(url)] ?? 1;
+  }
+
+  #setZoom(value: number) {
+    const host = this.hostOf(this.active?.url ?? "");
+    if (!host) return;
+    const { [host]: _kept, ...others } = settings.browserZoom;
+    settings.browserZoom = value === 1 ? others : { ...others, [host]: value };
     this.#present();
   }
 
@@ -385,13 +472,39 @@ class DeviceBrowser {
       this.newTab(url);
       return;
     }
-    this.#update(tab.id, { url });
+    this.#update(tab.id, { url, home: false });
+    this.#persist();
     if (tab.open) void browserCall("browser_navigate", { id: tab.id, url });
-    else this.#present();
+    this.#present();
+  }
+
+  get atHome(): boolean {
+    const tab = this.active;
+    return !tab?.url || tab.home;
+  }
+
+  goHome() {
+    const tab = this.active;
+    if (!tab) {
+      this.newTab();
+      return;
+    }
+    if (this.atHome) return;
+    if (this.picking) this.pick(false);
+    this.#update(tab.id, { home: true });
+    this.#persist();
+    this.#present();
   }
 
   back() {
-    if (this.active?.open) void browserCall("browser_back", { id: this.active.id });
+    const tab = this.active;
+    if (tab?.home && tab.url) {
+      this.#update(tab.id, { home: false });
+      this.#persist();
+      this.#present();
+      return;
+    }
+    if (tab?.open) void browserCall("browser_back", { id: tab.id });
   }
 
   forward() {
@@ -399,7 +512,10 @@ class DeviceBrowser {
   }
 
   reload() {
-    if (this.active?.open) void browserCall("browser_reload", { id: this.active.id });
+    const tab = this.active;
+    if (!tab?.open) return;
+    this.#update(tab.id, { loading: true });
+    void browserCall("browser_reload", { id: tab.id });
   }
 
   focus() {
@@ -437,7 +553,7 @@ class DeviceBrowser {
   #present() {
     const tab = this.active;
     const hole = this.#hole;
-    const showing = tab && tab.url && hole && !this.#hidden ? tab.id : null;
+    const showing = tab && tab.url && !tab.home && hole && !this.#hidden ? tab.id : null;
     if (this.#shownId && this.#shownId !== showing) {
       void browserCall("browser_visible", { id: this.#shownId, visible: false });
       this.#shownId = null;
@@ -492,27 +608,31 @@ class DeviceBrowser {
     this.#adapt(id, zoom);
   }
 
-  #adapt(id: string, zoom: number) {
-    if (native) {
-      void this.#emulate(id, zoom);
-      return;
-    }
-    this.#zoom(id, zoom);
-    this.#agent(id);
+  #adapt(id: string, fit: number) {
+    if (native) void this.#emulate(id, fit);
+    else this.#agent(id);
+    if (androidBrowsing) return;
+    const url = this.tabs.find((tab) => tab.id === id)?.url ?? "";
+    this.#zoom(id, PRESETS[this.device] ? (native ? 1 : fit) : this.#zoomOf(url));
   }
 
   #agent(id: string) {
     const name = this.device;
     if ((this.#emulated.get(id) ?? "") === name) return;
     this.#emulated.set(id, name);
-    const preset = PRESETS[name];
-    const agent = !preset ? null : android ? agentOf(preset, ownMajor) : preset.webkitAgent;
+    const agent = androidBrowsing
+      ? name === DESKTOP_SITE
+        ? desktopAgentOf(ownMajor)
+        : null
+      : (PRESETS[name]?.webkitAgent ?? null);
     void browserCall("browser_agent", { id, agent }).catch(() => this.#emulated.delete(id));
   }
 
   #zoom(id: string, zoom: number) {
-    if (this.#zooms.get(id) === zoom) return;
-    this.#zooms.set(id, zoom);
+    const url = this.tabs.find((tab) => tab.id === id)?.url ?? "";
+    const mark = `${this.hostOf(url)}@${zoom}`;
+    if (this.#zooms.get(id) === mark) return;
+    this.#zooms.set(id, mark);
     void browserCall("browser_zoom", { id, zoom }).catch(() => this.#zooms.delete(id));
   }
 
@@ -579,6 +699,7 @@ class DeviceBrowser {
     if (patch.loading && state.id === this.activeId) this.picking = false;
     this.#update(state.id, patch);
     if (patch.url || patch.title !== undefined || patch.favicon !== undefined) this.#persist();
+    if (patch.url && state.id === this.#shownId && this.#hole) this.#adapt(state.id, this.#fit(this.#hole).zoom);
   }
 
   #update(id: string, patch: Partial<DeviceTab>) {
@@ -587,7 +708,7 @@ class DeviceBrowser {
 
   #persist() {
     store.set<StoredTabs>(STORE_KEY, {
-      tabs: this.tabs.map(({ id, url, title, favicon }) => ({ id, url, title, favicon })),
+      tabs: this.tabs.map(({ id, url, title, favicon, home }) => ({ id, url, title, favicon, home })),
       active: this.activeId,
     });
   }

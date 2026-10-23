@@ -1,5 +1,5 @@
 import { store } from "$lib/platform/storage";
-import { CLIENT_DEFAULTS, CLIENT_SETTINGS } from "./settingsRegistry";
+import { CLIENT_DEFAULTS, CLIENT_SETTINGS, LEGACY_KEYS } from "./settingsRegistry";
 
 export interface VisibilityPrefs {
   simple: boolean | null;
@@ -23,6 +23,23 @@ export interface BrowserProxy {
   url: string;
   bypass: string;
 }
+
+export interface BrowserFavorite {
+  url: string;
+  title: string;
+  icon: string;
+}
+
+const favoriteOf = (value: unknown): BrowserFavorite | null => {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  if (typeof item.url !== "string" || !item.url) return null;
+  return {
+    url: item.url,
+    title: typeof item.title === "string" ? item.title : "",
+    icon: typeof item.icon === "string" ? item.icon : "",
+  };
+};
 
 export interface DiscordPrefs {
   enabled: boolean;
@@ -51,7 +68,10 @@ const KINDS = new Map(CLIENT_SETTINGS.map((setting) => [setting.key, setting.kin
 class Settings {
   #values = $state<Record<string, unknown>>(
     Object.fromEntries(
-      Object.entries(CLIENT_DEFAULTS).map(([key, fallback]) => [key, store.get(key, fallback)]),
+      Object.entries(CLIENT_DEFAULTS).map(([key, fallback]) => {
+        const legacy = LEGACY_KEYS.get(key);
+        return [key, store.get(key, legacy ? store.get(legacy, fallback) : fallback)];
+      }),
     ),
   );
 
@@ -260,6 +280,37 @@ class Settings {
     this.#write("browser_proxy", value.mode);
     this.#write("browser_proxy_url", value.url);
     this.#write("browser_proxy_bypass", value.bypass);
+  }
+
+  get browserViewport() {
+    return this.#read<string>("browser_viewport");
+  }
+  set browserViewport(value: string) {
+    this.#write("browser_viewport", value);
+  }
+
+  get browserZoom(): Record<string, number> {
+    const value = this.#read<unknown>("browser_zoom");
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(Object.entries(value).filter(([, zoom]) => typeof zoom === "number"));
+  }
+  set browserZoom(value: Record<string, number>) {
+    this.#write("browser_zoom", value);
+  }
+
+  get browserFavorites(): BrowserFavorite[] {
+    const value = this.#read<unknown>("browser_favorites");
+    return Array.isArray(value) ? value.map(favoriteOf).filter((item): item is BrowserFavorite => item !== null) : [];
+  }
+  set browserFavorites(value: BrowserFavorite[]) {
+    this.#write("browser_favorites", value);
+  }
+
+  get modBandHidden() {
+    return this.#read<boolean>("mod_band_hidden");
+  }
+  set modBandHidden(value: boolean) {
+    this.#write("mod_band_hidden", value);
   }
 
   get discord(): DiscordPrefs {

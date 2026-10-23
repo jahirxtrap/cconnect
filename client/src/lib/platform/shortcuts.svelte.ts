@@ -1,3 +1,5 @@
+import { untrack } from "svelte";
+import { SvelteMap } from "svelte/reactivity";
 import { isTauri, isTouch, systemName } from "./index";
 import { store } from "./storage";
 
@@ -25,7 +27,13 @@ const NAMED_KEYS: Record<string, string> = {
   Delete: "Del",
   Backspace: APPLE ? "⌫" : "Backspace",
   Space: "Space",
+  Equal: "+",
+  Minus: "-",
 };
+
+const DIGIT_KEYS = Object.fromEntries(Array.from({ length: 10 }, (_, digit) => [String(digit), `Digit${digit}`]));
+
+const SYMBOL_KEYS: Record<string, string> = { ...DIGIT_KEYS, "+": "Equal", "=": "Equal", "-": "Minus" };
 
 export const SHORTCUTS: ShortcutDef[] = [
   { id: "tab.new", label: "SHORTCUT_TAB_NEW", scope: "chat", keys: "Mod+KeyT" },
@@ -61,6 +69,9 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "browser.back", label: "SHORTCUT_BROWSER_BACK", scope: "browser", keys: "Alt+ArrowLeft" },
   { id: "browser.forward", label: "SHORTCUT_BROWSER_FORWARD", scope: "browser", keys: "Alt+ArrowRight" },
   { id: "browser.address", label: "SHORTCUT_BROWSER_ADDRESS", scope: "browser", keys: "Mod+KeyL" },
+  { id: "browser.zoom.in", label: "SHORTCUT_BROWSER_ZOOM_IN", scope: "browser", keys: "Mod+Equal" },
+  { id: "browser.zoom.out", label: "SHORTCUT_BROWSER_ZOOM_OUT", scope: "browser", keys: "Mod+Minus" },
+  { id: "browser.zoom.reset", label: "SHORTCUT_BROWSER_ZOOM_RESET", scope: "browser", keys: "Mod+Digit0" },
   { id: "browser.pick", label: "SHORTCUT_BROWSER_PICK", scope: "browser", keys: "Mod+Shift+KeyE" },
   { id: "browser.copy", label: "SHORTCUT_BROWSER_COPY", scope: "browser", keys: "Mod+KeyC" },
   { id: "browser.cut", label: "SHORTCUT_BROWSER_CUT", scope: "browser", keys: "Mod+KeyX" },
@@ -117,7 +128,7 @@ export const signature = (event: KeyboardEvent): string =>
     ...(event.altKey ? ["Alt"] : []),
     ...(event.shiftKey ? ["Shift"] : []),
     ...(event.metaKey ? ["Meta"] : []),
-    event.code,
+    SYMBOL_KEYS[event.key] ?? event.code,
   ].join("+");
 
 const keyLabel = (code: string): string => {
@@ -159,18 +170,18 @@ type Handler = () => boolean | void;
 
 class Shortcuts {
   #custom = $state<ShortcutKeys>(store.get<ShortcutKeys>(CUSTOM_KEY, {}));
-  #handlers = new Map<string, Handler[]>();
+  #handlers = new SvelteMap<string, Handler[]>();
 
   get custom() {
     return this.#custom;
   }
 
   register(id: string, handler: Handler): () => void {
-    const claimed = this.#handlers.get(id) ?? [];
+    const claimed = untrack(() => this.#handlers.get(id)) ?? [];
     claimed.push(handler);
     this.#handlers.set(id, claimed);
     return () => {
-      const current = this.#handlers.get(id);
+      const current = untrack(() => this.#handlers.get(id));
       if (!current) return;
       const index = current.lastIndexOf(handler);
       if (index >= 0) current.splice(index, 1);

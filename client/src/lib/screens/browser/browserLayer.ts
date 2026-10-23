@@ -14,6 +14,9 @@ const rounded = (box: DOMRect): DeviceBounds => ({
   height: Math.ceil(box.height),
 });
 
+const layered = (hit: Element | null, surface: Element): hit is Element =>
+  !!hit && hit !== surface && !surface.contains(hit) && hit !== document.documentElement && hit !== document.body;
+
 const branchOf = (hit: Element, surface: Element): Element => {
   let node = hit;
   while (node.parentElement && !node.parentElement.contains(surface)) node = node.parentElement;
@@ -25,7 +28,7 @@ export const coverOf = (surface: HTMLElement, hole: DeviceBounds): DeviceBounds[
   for (let y = hole.y + SAMPLE / 2; y < hole.y + hole.height; y += SAMPLE) {
     for (let x = hole.x + SAMPLE / 2; x < hole.x + hole.width; x += SAMPLE) {
       const hit = document.elementFromPoint(x, y);
-      if (hit && hit !== surface && !surface.contains(hit)) layers.add(branchOf(hit, surface));
+      if (layered(hit, surface)) layers.add(branchOf(hit, surface));
     }
   }
   for (const handle of document.querySelectorAll(HANDLES)) {
