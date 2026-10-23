@@ -2,6 +2,8 @@
 
 import os
 import stat
+import subprocess
+import sys
 from pathlib import Path
 
 PACKAGE_DIR = Path(__file__).resolve().parent
@@ -58,6 +60,20 @@ def is_link(path: Path) -> bool:
         return bool(os.stat(path, follow_symlinks=False).st_file_attributes & stat.FILE_ATTRIBUTE_REPARSE_POINT)
     except (OSError, AttributeError):
         return False
+
+
+def unlink_dir(target: Path) -> None:
+    """Detach a link without touching what it points at."""
+    if not target.exists() and not target.is_symlink():
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["cmd", "/c", "rmdir", str(target)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    else:
+        target.unlink()
 
 
 OWNED_DIRS = (

@@ -1,5 +1,6 @@
 <script lang="ts">
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
+  import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Settings from "@lucide/svelte/icons/settings";
   import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
@@ -70,6 +71,8 @@
     };
   });
 
+  const RELOAD_COMMAND = "/reload-plugins";
+
   const pick = (command: ModCommand) => {
     if (!takesArguments(command)) {
       chat.submit(commandText(command));
@@ -128,6 +131,11 @@
         {/each}
       </MenuSub>
     {/if}
+    <MenuItem text={t("RELOAD_PLUGINS")} onclick={() => chat.submit(RELOAD_COMMAND)}>
+      {#snippet trailing()}
+        <RotateCw size={16} class="shrink-0 text-on-surface-variant" />
+      {/snippet}
+    </MenuItem>
     <MenuItem text={t("MODS_OPTIONS")} onclick={() => (listing = true)}>
       {#snippet trailing()}
         <Settings size={16} class="shrink-0 text-on-surface-variant" />

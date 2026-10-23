@@ -177,9 +177,14 @@ def _remove_local(plugin: str) -> dict:
     if root is None or root.parent != claude_assets.SKILLS_DIR:
         return {"ok": False, "message": "plugin not found"}
     try:
-        shutil.rmtree(root)
+        if paths.is_link(root):
+            paths.unlink_dir(root)
+        else:
+            shutil.rmtree(root)
     except OSError as exc:
         return {"ok": False, "message": str(exc)}
+    if root.exists() or paths.is_link(root):
+        return {"ok": False, "message": f"{root} could not be removed"}
     return {"ok": True, "message": ""}
 
 

@@ -249,7 +249,7 @@ def _link_dir(source: Path, target: Path) -> None:
     if paths.is_link(target):
         if target.resolve() == source.resolve():
             return
-        _unlink_dir(target)
+        paths.unlink_dir(target)
     elif target.is_dir():
         adopted, merged = _merge_dir(target, source)
         if not merged or not _remove_tree(target):
@@ -268,20 +268,6 @@ def _link_dir(source: Path, target: Path) -> None:
             logger.warning(f"accounts: {target} could not be linked to {source}: {made.stderr.strip()}")
     else:
         target.symlink_to(source, target_is_directory=True)
-
-
-def _unlink_dir(target: Path) -> None:
-    """Detach a link without touching what it points at."""
-    if not target.exists() and not target.is_symlink():
-        return
-    if _WINDOWS:
-        subprocess.run(
-            ["cmd", "/c", "rmdir", str(target)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-    else:
-        target.unlink()
 
 
 def link_shared_dirs(account_id: str) -> None:
@@ -331,7 +317,7 @@ def delete(account_id: str) -> bool:
     if path is None:
         return False
     for name in _SHARED_DIRS:
-        _unlink_dir(path / name)
+        paths.unlink_dir(path / name)
     shutil.rmtree(path, ignore_errors=True)
     if settings_store.get("account") == account_id:
         settings_store.set("account", None)

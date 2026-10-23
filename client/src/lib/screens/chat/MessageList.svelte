@@ -1,15 +1,20 @@
 <script lang="ts">
+  import FileSearch from "@lucide/svelte/icons/file-search";
   import { tick, untrack } from "svelte";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import type { SuggestionItem } from "$lib/markdown/cconnectBlock";
+  import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import ChatScroller from "./ChatScroller.svelte";
+  import Collapsible from "./blocks/Collapsible.svelte";
   import DateSeparator from "./blocks/DateSeparator.svelte";
+  import { gapAbove, gapBelow, NO_GAP } from "./blocks/gaps";
   import MessageItem from "./blocks/MessageItem.svelte";
   import StatusProgress from "./blocks/StatusProgress.svelte";
   import StickyHeader from "./blocks/StickyHeader.svelte";
+  import { runSummary, toolRuns, type ToolRun } from "./toolRuns";
 
   interface Visibility {
     thinking: string;
@@ -83,6 +88,47 @@
     item.role === "thinking" || item.role === "working" || item.role === "assistant"
       ? index === visible.length - 1 && streaming
       : !!item.toolUseId && pendingToolIds.includes(item.toolUseId);
+
+  let openGroups = $state<Record<string, boolean>>({});
+
+  const runs = $derived(mods?.state.surface ? toolRuns(visible) : []);
+  const runOf = $derived(new Map(runs.flatMap((run) => run.members.map((id) => [id, run] as const))));
+
+  const runActive = (run: ToolRun) => {
+    if (!streaming) return false;
+    const last = visible.findIndex((item) => item.id === run.members.at(-1));
+    return visible.slice(last + 1).every((item) => item.role === "working" || item.role === "thinking");
+  };
+
+  const groupProps = (run: ToolRun) => ({
+    calls: run.calls.map((call) => ({
+      tool_use_id: call.toolUseId ?? String(call.id),
+      tool: call.toolName ?? "",
+      input: call.text,
+      isRunning: !!call.toolUseId && pendingToolIds.includes(call.toolUseId),
+      isErrored: false,
+      isInterrupted: false,
+      ...(call.result === null || call.result === undefined ? {} : { output: call.result }),
+    })),
+    isActive: runActive(run),
+    isExpanded: true,
+    isCallsOnly: true,
+  });
+
+  const groupFolded = (run: ToolRun) => mods?.drawing("ToolGroup", run.id)?.props?.isExpanded === false;
+
+  const groupHides = (run: ToolRun, id: number) =>
+    id !== run.anchor && (!!mods?.tree("ToolGroup", run.id) || (groupFolded(run) && !openGroups[run.id]));
+
+  const groupSpacing = (run: ToolRun, index: number, glued: boolean) => {
+    if (!mods?.tree("ToolGroup", run.id) && !groupFolded(run)) return undefined;
+    const last = visible.findIndex((item) => item.id === run.members.at(-1));
+    const top = glued ? NO_GAP : gapAbove(visible[index - 1]?.role ?? null, visible[index].role);
+    const bottom = gapBelow(visible[last].role, visible[last + 1]?.role ?? null);
+    return `padding-top: ${top}; padding-bottom: ${bottom}`;
+  };
+
+  const toggleGroup = (id: string) => void anchorGrowth(() => (openGroups[id] = !openGroups[id]));
 
   let scroller = $state<ChatScroller | null>(null);
   let lastId: number | null = null;
@@ -180,6 +226,26 @@
   });
 </script>
 
+{#snippet row(item: ChatMessage, index: number, separated: boolean)}
+  <MessageItem
+    message={item}
+    prevRole={visible[index - 1]?.role ?? null}
+    nextRole={visible[index + 1]?.role ?? null}
+    running={runningAt(item, index)}
+    gluedTop={separated}
+    labelMode={modeFor(item.role) === "label"}
+    expanded={expandedIds[item.id] ?? false}
+    onToggle={() => toggleExpanded(item.id)}
+    onGrow={anchorGrowth}
+    {onAnswer}
+    {onSharedLink}
+    {onSharedMenu}
+    onSuggest={index > lastUserAt ? onSuggest : null}
+    {component}
+    {mods}
+  />
+{/snippet}
+
 <ChatScroller
   bind:this={scroller}
   bind:follow
@@ -189,29 +255,45 @@
   onNearTop={onLoadOlder}
 >
     {#each visible as item, index (item.id)}
-      {@const separated = separatorAt(index)}
-      <div data-mid={item.id}>
-        {#if separated}
-          <DateSeparator millis={item.timestamp ?? 0} />
-        {/if}
-        <MessageItem
-          message={item}
-          prevRole={visible[index - 1]?.role ?? null}
-          nextRole={visible[index + 1]?.role ?? null}
-          running={runningAt(item, index)}
-          gluedTop={separated}
-          labelMode={modeFor(item.role) === "label"}
-          expanded={expandedIds[item.id] ?? false}
-          onToggle={() => toggleExpanded(item.id)}
-          onGrow={anchorGrowth}
-          {onAnswer}
-          {onSharedLink}
-          {onSharedMenu}
-          onSuggest={index > lastUserAt ? onSuggest : null}
-          {component}
-          {mods}
-        />
-      </div>
+      {@const run = runOf.get(item.id)}
+      {#if !run || !groupHides(run, item.id)}
+        {@const separated = separatorAt(index)}
+        <div data-mid={item.id}>
+          {#if separated}
+            <DateSeparator millis={item.timestamp ?? 0} />
+          {/if}
+          {#if mods && run?.anchor === item.id}
+            {#snippet group(shown: Record<string, unknown>)}
+              {#if mods?.tree("ToolGroup", run.id)}
+                {#each run.members as id (id)}
+                  {@const at = visible.findIndex((member) => member.id === id)}
+                  {#if at >= 0}
+                    {@render row(visible[at], at, at === index && separated)}
+                  {/if}
+                {/each}
+              {:else if shown.isExpanded === false}
+                <Collapsible
+                  label={runSummary(run)}
+                  icon={FileSearch}
+                  running={runActive(run)}
+                  expanded={!!openGroups[run.id]}
+                  onToggle={() => toggleGroup(run.id)}
+                />
+                {#if openGroups[run.id]}
+                  {@render row(item, index, true)}
+                {/if}
+              {:else}
+                {@render row(item, index, separated)}
+              {/if}
+            {/snippet}
+            <div style={groupSpacing(run, index, separated)}>
+              <ModInline {mods} component="ToolGroup" instanceId={run.id} props={groupProps(run)} engine={group} inset />
+            </div>
+          {:else}
+            {@render row(item, index, separated)}
+          {/if}
+        </div>
+      {/if}
     {/each}
     {#if compacting}
       <StatusProgress kind="compacting" />

@@ -36,6 +36,16 @@
 
   const valueOf = (field: PluginOption) => values[field.key] ?? field.value;
 
+  const blocks = $derived.by(() => {
+    const out: PluginOption[][] = [];
+    for (const field of fields ?? []) {
+      const last = out.at(-1);
+      if (field.type === "boolean" && last?.[0].type === "boolean") last.push(field);
+      else out.push([field]);
+    }
+    return out;
+  });
+
   const changed = $derived(
     Object.fromEntries(
       (fields ?? [])
@@ -80,15 +90,20 @@
       <p class="text-body-sm wrap-anywhere text-error">{error}</p>
     {/if}
     {#if fields}
-      {#each fields as field (field.key)}
+      {#each blocks as block (block[0].key)}
+        {@const field = block[0]}
         {#if field.type === "boolean"}
-          <SwitchRow
-            title={field.title}
-            summary={field.description}
-            required={field.required}
-            checked={valueOf(field) === "true"}
-            onChange={(checked) => (values[field.key] = String(checked))}
-          />
+          <div>
+            {#each block as item (item.key)}
+              <SwitchRow
+                title={item.title}
+                summary={item.description}
+                required={item.required}
+                checked={valueOf(item) === "true"}
+                onChange={(checked) => (values[item.key] = String(checked))}
+              />
+            {/each}
+          </div>
         {:else}
           <div class="flex flex-col gap-1.5">
             {#if field.choices.length}
