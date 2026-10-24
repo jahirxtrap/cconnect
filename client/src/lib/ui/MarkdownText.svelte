@@ -84,12 +84,16 @@
   };
 
   const decorate = (node: HTMLElement) => {
-    const bars: { destroy: () => void }[] = [];
+    const bars = new Map<HTMLElement, { destroy: () => void }>();
     const apply = () => {
+      for (const [scroller, bar] of bars) {
+        if (scroller.isConnected) continue;
+        bar.destroy();
+        bars.delete(scroller);
+      }
       for (const scroller of node.querySelectorAll<HTMLElement>("table, pre")) {
-        if (scroller.dataset.scrollbar) continue;
-        scroller.dataset.scrollbar = "true";
-        bars.push(hscrollbar(scroller, { touchIndicator: true }));
+        if (bars.has(scroller)) continue;
+        bars.set(scroller, hscrollbar(scroller, { touchIndicator: true }));
       }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;
@@ -124,6 +128,7 @@
       destroy: () => {
         observer.disconnect();
         bars.forEach((bar) => bar.destroy());
+        bars.clear();
       },
     };
   };

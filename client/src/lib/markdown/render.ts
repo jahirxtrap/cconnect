@@ -122,11 +122,11 @@ const inlineSegments = (token: Token): Segment[] => {
   return result;
 };
 
-const merged = (list: Segment[]): Segment[] =>
+const merged = (list: Segment[], joinHtml = true): Segment[] =>
   list.reduce<Segment[]>((acc, segment) => {
     const last = acc[acc.length - 1];
     if (segment.kind === "images" && last?.kind === "images") last.items.push(...segment.items);
-    else if (segment.kind === "html" && last?.kind === "html") last.html += segment.html;
+    else if (joinHtml && segment.kind === "html" && last?.kind === "html") last.html += segment.html;
     else acc.push(segment.kind === "images" ? { ...segment, items: [...segment.items] } : { ...segment });
     return acc;
   }, []);
@@ -231,6 +231,6 @@ export const createSegmenter = () => {
       details = cutDetails;
     }
     const pending = segments(markdown.slice(prefix.length));
-    return head.length ? merged([...head, ...pending]) : pending;
+    return head.length ? merged([...head, ...pending], false) : pending;
   };
 };
