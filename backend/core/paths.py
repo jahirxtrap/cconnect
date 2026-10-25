@@ -27,14 +27,18 @@ TRASH_DIR = DATA_DIR / "trash"
 CACHE_DIR = Path(os.environ.get("CCONNECT_CACHE_DIR") or DATA_DIR.parent / "cache")
 
 PROMPTS_DIR = PACKAGE_DIR / "prompts"
+SCRIPTS_DIR = PACKAGE_DIR / "scripts"
+BUILTIN_PACKS_DIR = PACKAGE_DIR / "packs"
 ENV_FILE = (CONFIG_DIR if INSTALLED else BACKEND_DIR) / ".env"
 
 DB_FILE = CONFIG_DIR / "cconnect.db"
 ACCOUNTS_DIR = CONFIG_DIR / "accounts"
 MCP_DISABLED_FILE = CONFIG_DIR / "mcp_disabled.json"
+DELEGATES_FILE = CONFIG_DIR / "delegates.json"
 USER_PROMPT_FILE = CONFIG_DIR / "prompts" / "USER.md"
 COMMIT_PROMPT_FILE = CONFIG_DIR / "prompts" / "COMMIT.md"
 PROJECT_PROMPTS_DIR = CONFIG_DIR / "prompts" / "projects"
+PACKS_DIR = CONFIG_DIR / "packs"
 
 RUNTIME_FILE = STATE_DIR / ".runtime"
 RESTART_FLAG = STATE_DIR / ".restart"
@@ -43,6 +47,7 @@ DETACHED_PID_FILE = STATE_DIR / ".detached.pid"
 DETACHED_PROVIDER_FILE = STATE_DIR / ".detached.provider"
 REWIND_FILE = STATE_DIR / "rewind_pending.json"
 TODOS_FILE = STATE_DIR / "session_todos.json"
+DELEGATE_RUNS_DIR = STATE_DIR / "delegate_runs"
 AI_WORKDIR = Path(os.environ.get("AI_WORKDIR") or STATE_DIR / "internal_task")
 
 NETWORK_STATE_FILE = CACHE_DIR / "network_state.json"
@@ -84,6 +89,7 @@ OWNED_DIRS = (
     SHARED_DIR,
     TRASH_DIR,
     PROJECT_PROMPTS_DIR,
+    PACKS_DIR,
     AI_WORKDIR,
 )
 
