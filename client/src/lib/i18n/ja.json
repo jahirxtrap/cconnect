@@ -359,7 +359,7 @@
   "INFORMATION": "情報",
   "USAGE": "使用量",
   "USAGE_SESSION": "現在のセッション",
-  "USAGE_ALL_MODELS": "すべてのモデル",
+  "USAGE_WEEK": "今週",
   "USAGE_SPEND": "追加使用量",
   "NO_USAGE_DATA": "使用量のデータはありません",
   "RESETS_IN": "{1} 後にリセット",

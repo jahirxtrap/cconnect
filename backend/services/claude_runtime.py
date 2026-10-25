@@ -41,7 +41,7 @@ def _retry_status(data: dict) -> dict:
     return {"type": "status", "kind": "retrying", **{field: data.get(field) for field in _RETRY_FIELDS}}
 
 
-_RATE_WINDOWS = {"five_hour": "session", "seven_day": "weekly_all"}
+_RATE_WINDOWS = {"five_hour": "session", "seven_day": "week"}
 _RATE_SEVERITIES = {"allowed_warning": "warning", "rejected": "critical"}
 
 

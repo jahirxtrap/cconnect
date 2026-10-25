@@ -78,7 +78,7 @@ def _window_id(entry: dict) -> str | None:
     if kind == "session":
         return "session"
     if kind == "weekly_all":
-        return "weekly_all"
+        return "week"
     return ((entry.get("scope") or {}).get("model") or {}).get("display_name")
 
 
@@ -148,8 +148,8 @@ async def usage_data(account: str | None = None, force: bool = False) -> dict:
 def window_label(wid: str) -> str:
     if wid == "session":
         return "Current session"
-    if wid == "weekly_all":
-        return "All models"
+    if wid == "week":
+        return "This week"
     if wid == _SPEND_KEY:
         return "Extra usage"
     return wid

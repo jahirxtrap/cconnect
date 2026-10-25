@@ -359,7 +359,7 @@
   "INFORMATION": "정보",
   "USAGE": "사용량",
   "USAGE_SESSION": "현재 세션",
-  "USAGE_ALL_MODELS": "모든 모델",
+  "USAGE_WEEK": "이번 주",
   "USAGE_SPEND": "추가 사용량",
   "NO_USAGE_DATA": "사용량 데이터 없음",
   "RESETS_IN": "{1} 후 초기화",

@@ -4,7 +4,7 @@ export const ALERT_PERCENT = 90;
 
 const WINDOW_LABELS: Record<string, string> = {
   session: "USAGE_SESSION",
-  weekly_all: "USAGE_ALL_MODELS",
+  week: "USAGE_WEEK",
   spend: "USAGE_SPEND",
 };
 

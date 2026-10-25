@@ -363,7 +363,7 @@
   "INFORMATION": "Informazioni",
   "USAGE": "Utilizzo",
   "USAGE_SESSION": "Sessione attuale",
-  "USAGE_ALL_MODELS": "Tutti i modelli",
+  "USAGE_WEEK": "Questa settimana",
   "USAGE_SPEND": "Utilizzo extra",
   "NO_USAGE_DATA": "Nessun dato di utilizzo",
   "RESETS_IN": "Si azzera tra {1}",
