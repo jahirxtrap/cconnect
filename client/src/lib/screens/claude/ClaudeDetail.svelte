@@ -38,6 +38,7 @@
   import { joined, SEPARATOR } from "$lib/data/format";
   import { holdRefresh } from "$lib/data/inflight";
   import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, openExternal } from "$lib/platform";
@@ -45,6 +46,7 @@
   import {
     claudeApi,
     pluginKey,
+    type ActionResult,
     type CatalogPlugin,
     type ChatMod,
     type Extensions,
@@ -52,6 +54,7 @@
     type McpServer,
     type Memories,
     type Plugin,
+    type PluginChange,
     type PluginReview,
     type ServiceStatus,
     type Skill,
@@ -62,6 +65,7 @@
   import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -83,9 +87,11 @@
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import { rem } from "$lib/ui/rem";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { modAreas, modCommands } from "./modAreas";
   import PluginOptionsDialog from "./PluginOptionsDialog.svelte";
+  import PluginReloadDialog from "./PluginReloadDialog.svelte";
   import { componentLabel, componentTone, incidentLabel, indicatorLabel, indicatorTone } from "./serviceStatus";
 
   interface Props {
@@ -121,6 +127,7 @@
   let busy = $state(false);
   let dialogBusy = $state<string | null>(null);
   let actionError = $state<string | null>(null);
+  let reloadHeld = $state(false);
 
   let memoriesProject = $state<string | null>(null);
   let skillQuery = $state("");
@@ -152,8 +159,6 @@
   let mcpEnv = $state("");
   let areaWidth = $state(0);
   let viewHeight = $state(0);
-
-  const rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 
   const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "marketplaces"];
 
@@ -226,12 +231,13 @@
     marketMenu = marketMenu ? (extensions?.marketplaces.find((item) => item.name === marketMenu?.name) ?? null) : null;
   };
 
-  const runAction = async (action: () => Promise<{ ok: boolean; message: string }>) => {
+  const runAction = async (action: () => Promise<ActionResult | PluginChange>) => {
     const run = ++actionRun;
     busy = true;
     const result = await action();
     if (run !== actionRun) return;
     if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
+    else if ("held" in result && result.held) reloadHeld = true;
     await reload();
     dialogBusy = null;
     busy = false;
@@ -546,7 +552,9 @@
     </div>
   {/if}
 
-  {#if !loaded}
+  {#if serverStatus.unavailable}
+    <ServerUnavailable class="min-h-0 flex-1" />
+  {:else if !loaded}
     <CenteredProgress class="flex-1" />
   {:else if embedded && kind !== "status"}
     <div bind:clientHeight={viewHeight} class="flex min-h-0 flex-1 flex-col">
@@ -758,7 +766,7 @@
                     {#if incident.latest}
                       <p class="mt-0.5 line-clamp-4 text-body-sm text-on-surface-variant">
                         {#if incident.status}
-                          <span class="font-bold {indicatorTone(incident.impact).replace('bg-', 'text-')}">
+                          <span class="text-label-md {indicatorTone(incident.impact).replace('bg-', 'text-')}">
                             {incidentLabel(incident.status)}
                           </span>
                           {SEPARATOR}
@@ -1280,6 +1288,10 @@
       {/if}
     </div>
   </CompactDialog>
+{/if}
+
+{#if reloadHeld}
+  <PluginReloadDialog api={claudeApi} onDismiss={() => (reloadHeld = false)} />
 {/if}
 
 {#if actionError}

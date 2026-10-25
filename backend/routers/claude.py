@@ -1,5 +1,7 @@
 """Claude Code management: user prompt, plugins, marketplaces, skills, MCP and memories."""
 
+import asyncio
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
@@ -41,6 +43,10 @@ class LocalPluginBody(BaseModel):
     path: str
 
 
+class PluginReloadBody(BaseModel):
+    force: bool = False
+
+
 class MarketplaceActionBody(BaseModel):
     action: str  # add | remove | update
     target: str  # source for add, name otherwise
@@ -57,6 +63,11 @@ class McpAddBody(BaseModel):
 class ToggleBody(BaseModel):
     name: str
     enabled: bool
+
+
+@router.get("/claude/prompts")
+def get_prompts():
+    return api_response(data=claude_assets.prompts())
 
 
 @router.get("/claude/prompt")
@@ -109,8 +120,14 @@ async def get_plugins():
 
 
 @router.post("/claude/plugins/action")
-def plugin_action(body: PluginActionBody):
-    return api_response(data=claude_manage.plugin_action(body.action, body.plugin))
+async def plugin_action(body: PluginActionBody):
+    result = await asyncio.to_thread(claude_manage.plugin_action, body.action, body.plugin)
+    return api_response(data=await claude_manage.reload_after(result))
+
+
+@router.post("/claude/plugins/reload")
+async def reload_plugins(body: PluginReloadBody):
+    return api_response(data=await claude_manage.reload_plugins(body.force))
 
 
 @router.get("/claude/plugins/review")
@@ -135,8 +152,9 @@ def set_plugin_options(body: PluginOptionsBody):
 
 
 @router.post("/claude/plugins/local")
-def add_local_plugin(body: LocalPluginBody):
-    return api_response(data=claude_manage.add_local_plugin(body.path))
+async def add_local_plugin(body: LocalPluginBody):
+    result = await asyncio.to_thread(claude_manage.add_local_plugin, body.path)
+    return api_response(data=await claude_manage.reload_after(result))
 
 
 @router.post("/claude/marketplaces/action")

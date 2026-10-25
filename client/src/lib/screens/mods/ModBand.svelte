@@ -158,7 +158,7 @@
         onpointerdown={keepTyping}
         transition:slide={{ duration }}
         class={drawn
-          ? `relative -mb-4 rounded-t-2xl bg-surface-variant pb-6 ${settings.modBandHandle ? "" : "pt-2"}`
+          ? `relative -mb-[var(--radius-lg)] rounded-t-lg bg-surface-variant pb-[calc(var(--radius-lg)+0.5rem)] ${settings.modBandHandle ? "" : "pt-2"}`
           : "h-0 overflow-hidden"}
       >
         {#if settings.modBandHandle}

@@ -63,6 +63,18 @@ def get_project_prompt(project_key: str) -> str:
         return ""
 
 
+def project_prompts() -> dict[str, str]:
+    return {
+        file.stem: text
+        for file in sorted(paths.PROJECT_PROMPTS_DIR.glob("*.md"))
+        if _PROJECT_KEY_RE.match(file.stem) and (text := get_project_prompt(file.stem))
+    }
+
+
+def prompts() -> dict:
+    return {"user": get_user_prompt(), "commit": get_commit_prompt(), "projects": project_prompts()}
+
+
 def set_project_prompt(project_key: str, text: str) -> None:
     if not _PROJECT_KEY_RE.match(project_key or ""):
         raise ValueError("invalid project key")

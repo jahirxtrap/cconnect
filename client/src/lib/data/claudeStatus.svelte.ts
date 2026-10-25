@@ -8,16 +8,17 @@ import {
   claudeApi,
   type Extensions,
   type McpServer,
+  type Prompts,
   type ServiceStatus,
   type Skill,
-  type Usage,
 } from "$lib/services/claudeApi";
+import type { Usage } from "./usageWindows";
 import { cliApi, type CliInfo, type SdkInfo } from "$lib/services/cliApi";
 
 interface ClaudeSnapshot {
   cli: CliInfo | null;
   sdk: SdkInfo | null;
-  userPrompt: string | null;
+  prompts: Prompts | null;
   extensions: Extensions | null;
   skills: Skill[] | null;
   mcpServers: McpServer[] | null;
@@ -29,7 +30,7 @@ interface ClaudeSnapshot {
 const blank: ClaudeSnapshot = {
   cli: null,
   sdk: null,
-  userPrompt: null,
+  prompts: null,
   extensions: null,
   skills: null,
   mcpServers: null,
@@ -41,7 +42,7 @@ const blank: ClaudeSnapshot = {
 class ClaudeStatus {
   cli = $state<CliInfo | null>(null);
   sdk = $state<SdkInfo | null>(null);
-  userPrompt = $state<string | null>(null);
+  prompts = $state<Prompts | null>(null);
   extensions = $state<Extensions | null>(null);
   skills = $state<Skill[] | null>(null);
   mcpServers = $state<McpServer[] | null>(null);
@@ -58,6 +59,10 @@ class ClaudeStatus {
 
   loadCli() {
     return loads.track(this.#loadCli());
+  }
+
+  keepPrompts(change: Partial<Prompts>) {
+    if (this.prompts) this.prompts = { ...this.prompts, ...change };
   }
 
   loadExtensions() {
@@ -77,16 +82,16 @@ class ClaudeStatus {
     if (!backend.configured) {
       this.cli = null;
       this.sdk = null;
-      this.userPrompt = null;
+      this.prompts = null;
       return;
     }
     const cli = await cliApi.status();
     const sdk = await cliApi.sdkStatus();
-    const userPrompt = await claudeApi.userPrompt();
+    const prompts = await claudeApi.prompts();
     if (at !== backend.activeId) return;
     this.cli = cli;
     this.sdk = sdk;
-    this.userPrompt = userPrompt;
+    this.prompts = prompts ?? this.prompts;
   }
 
   async #loadExtensions() {
@@ -173,7 +178,7 @@ class ClaudeStatus {
     return {
       cli: this.cli,
       sdk: this.sdk,
-      userPrompt: this.userPrompt,
+      prompts: this.prompts,
       extensions: this.extensions,
       skills: this.skills,
       mcpServers: this.mcpServers,
@@ -186,7 +191,7 @@ class ClaudeStatus {
   #restore(snapshot: ClaudeSnapshot) {
     this.cli = snapshot.cli;
     this.sdk = snapshot.sdk;
-    this.userPrompt = snapshot.userPrompt;
+    this.prompts = snapshot.prompts;
     this.extensions = snapshot.extensions;
     this.skills = snapshot.skills;
     this.mcpServers = snapshot.mcpServers;

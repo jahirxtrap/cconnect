@@ -81,6 +81,17 @@ def _plugin_place(plugin: str) -> tuple[list[str], str | None]:
     return (["-s", scope] if scope else []), (project_path if project_path and Path(project_path).is_dir() else None)
 
 
+async def reload_plugins(force: bool) -> dict:
+    from services.live_sessions import registry
+
+    reports = await asyncio.gather(*(live.reload("reload-plugins", hold=not force) for live in registry.residents()))
+    return {"held": sum(1 for report in reports if report and report.get("held"))}
+
+
+async def reload_after(result: dict) -> dict:
+    return {**result, **await reload_plugins(force=False)} if result.get("ok") else result
+
+
 def plugin_action(action: str, plugin: str) -> dict:
     if action not in _PLUGIN_ACTIONS:
         return {"ok": False, "message": f"invalid action: {action}"}

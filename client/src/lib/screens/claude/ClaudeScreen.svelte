@@ -18,6 +18,7 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
+  import { rem } from "$lib/ui/rem";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
@@ -51,6 +52,15 @@
   const loggedAccounts = $derived(accountsStore.items.filter((account) => account.loggedIn));
   const tick = $derived(claudeRefresh.tick + (chat.connected ? 1 : 0));
   const refreshing = $derived(claudeRefresh.refreshing);
+  const SECTION_REM = 24;
+  const SECTION_GAP_REM = 1;
+  const MAX_COLUMNS = 4;
+  let sectionsWidth = $state(0);
+  const columns = $derived(
+    tabbed
+      ? Math.max(1, Math.min(MAX_COLUMNS, Math.floor((sectionsWidth / rem() + SECTION_GAP_REM) / (SECTION_REM + SECTION_GAP_REM))))
+      : 1,
+  );
 
   const refresh = () => claudeRefresh.run();
 
@@ -121,14 +131,17 @@
 {/snippet}
 
 {#snippet sections()}
-  <PullToRefresh {refreshing} onRefresh={() => void refresh()}>
-    <div class="px-(--page-inset) pb-(--page-inset) {tabbed ? 'columns-[24rem] gap-4 [&>*]:break-inside-avoid' : ''}">
-      <ClaudeSections
-        {tick}
-        flashCli={highlight.is("cli")}
-        onOpen={open}
-        onAccountsChanged={() => void refresh()}
-      />
+  <PullToRefresh {refreshing} onRefresh={() => void refresh()} class="[scrollbar-gutter:stable]">
+    <div class="px-(--page-inset) pb-(--page-inset)">
+      <div bind:clientWidth={sectionsWidth}>
+        <ClaudeSections
+          {tick}
+          {columns}
+          flashCli={highlight.is("cli")}
+          onOpen={open}
+          onAccountsChanged={() => void refresh()}
+        />
+      </div>
     </div>
   </PullToRefresh>
 {/snippet}

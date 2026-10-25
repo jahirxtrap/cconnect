@@ -13,6 +13,7 @@
   import { commandText, takesArguments } from "$lib/services/capabilitiesApi";
   import { pluginKey, type Plugin } from "$lib/services/claudeApi";
   import PluginOptionsDialog from "$lib/screens/claude/PluginOptionsDialog.svelte";
+  import PluginReloadDialog from "$lib/screens/claude/PluginReloadDialog.svelte";
   import type { ChatState } from "$lib/screens/chat/state.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
@@ -21,6 +22,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -40,6 +42,7 @@
   let installed = $state<Plugin[]>([]);
   let optionsFor = $state<Plugin | null>(null);
   let listing = $state(false);
+  let reloadHeld = $state(false);
 
   const MISSING = {
     off: { text: "MOD_PANES_OFF", setting: "mod_surfaces" },
@@ -47,6 +50,7 @@
   } as const;
 
   const mods = $derived(chat.mods);
+  const offline = $derived(chat.link === "disconnected");
   const loading = $derived(chat.modsState === "loading" || chat.transcriptLoading);
   const missing = $derived(
     chat.modsState === "off" || chat.modsState === "needs_persistent" ? MISSING[chat.modsState] : null,
@@ -71,7 +75,9 @@
     };
   });
 
-  const RELOAD_COMMAND = "/reload-plugins";
+  const reloadPlugins = async () => {
+    if (await chat.claude.reloadPlugins(false)) reloadHeld = true;
+  };
 
   const pick = (command: ModCommand) => {
     if (!takesArguments(command)) {
@@ -131,7 +137,7 @@
         {/each}
       </MenuSub>
     {/if}
-    <MenuItem icon={RotateCw} text={t("RELOAD_PLUGINS")} onclick={() => chat.submit(RELOAD_COMMAND)} />
+    <MenuItem icon={RotateCw} text={t("RELOAD_PLUGINS")} onclick={() => void reloadPlugins()} />
     <MenuItem icon={Settings} text={t("MODS_OPTIONS")} onclick={() => (listing = true)} />
   </PopupMenu>
 {/snippet}
@@ -164,7 +170,9 @@
   <PaneHeader title={t("MODS")} actions={missing ? undefined : moreMenu} />
 {/if}
 
-{#if loading}
+{#if offline}
+  <ServerUnavailable class="min-h-0 flex-1" />
+{:else if loading}
   <CenteredProgress class="min-h-0 flex-1" />
 {:else if missing}
   <EmptyState text={t(missing.text)} class="min-h-0 flex-1">
@@ -211,4 +219,8 @@
 
 {#if listing}
   <ModsOptionsDialog api={chat.claude} onDismiss={() => (listing = false)} />
+{/if}
+
+{#if reloadHeld}
+  <PluginReloadDialog api={chat.claude} onDismiss={() => (reloadHeld = false)} />
 {/if}

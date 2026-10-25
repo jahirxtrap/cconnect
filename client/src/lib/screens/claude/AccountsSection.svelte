@@ -81,7 +81,9 @@
   const defaultId = $derived(accountsStore.defaultId);
 
   const reload = async () => {
-    if (enabled) await accountsStore.load();
+    if (!enabled) return;
+    await accountsStore.load();
+    await accountsStore.loadProviders();
   };
 
   const refresh = async () => {
@@ -143,19 +145,15 @@
   };
 
   const editProvider = (account: Account) => {
+    const stored = accountsStore.providers[account.id];
+    if (!stored) return;
     probe = null;
     editing = account;
-    providerUrl = "";
+    providerUrl = stored.baseUrl;
     newLabel = account.label;
-    auth = emptyAuth();
-    contextScope = "";
+    auth = stored.auth;
+    contextScope = stored.contextScope;
     providerAdding = true;
-    void accountsApi.provider(account.id).then((stored) => {
-      if (!stored || editing !== account) return;
-      providerUrl = stored.baseUrl;
-      auth = stored.auth;
-      contextScope = stored.contextScope;
-    });
   };
 
   const saveProvider = async () => {
@@ -245,6 +243,7 @@
       {#if account.provider}
         <ActionButton
           text={t("ACCOUNT_PROVIDER_EDIT")}
+          enabled={!!accountsStore.providers[account.id]}
           onclick={() => {
             const target = account;
             actions = null;

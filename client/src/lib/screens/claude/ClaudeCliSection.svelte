@@ -37,27 +37,28 @@
 
   let sdkUpdating = $state(false);
   let promptOpen = $state(false);
-  let projectPromptOpen = $state(false);
+  let projectPromptFor = $state<string | null>(null);
   let commitPromptOpen = $state(false);
-  let commitPrompt = $state("");
 
-  $effect(() => {
-    if (!commitPromptOpen || commitPrompt) return;
-    void claudeApi.commitPrompt().then((text) => {
-      if (text !== null) commitPrompt = text;
-    });
-  });
+  const chat = $derived(tabs.state);
+  const projects = $derived(chatListFor(backend.active)?.projects ?? []);
+  const prompts = $derived(claudeStatus.prompts);
+
+  const openProjectPrompt = () => {
+    if (!projects.length) return;
+    projectPromptFor = chat.defaultProjectKey(projects) ?? chat.projectKey ?? chat.withDefaultProject(projects)[0].projectKey;
+  };
 
   useSettingsDialog("claude", (target) => {
     if (target === "user_prompt") promptOpen = true;
-    if (target === "project_prompt") projectPromptOpen = true;
+    if (target === "project_prompt") openProjectPrompt();
     if (target === "commit_prompt") commitPromptOpen = true;
   });
+
   let changelog = $state<{ sdk: boolean; version: string | null } | null>(null);
 
   const cli = $derived(claudeStatus.cli);
   const sdkAutoUpdate = $derived(serverSettings.snapshot?.sdkAutoUpdate ?? true);
-  const userPrompt = $derived(claudeStatus.userPrompt);
 
   const updateSdk = async () => {
     sdkUpdating = true;
@@ -69,9 +70,6 @@
   const setSdkAutoUpdate = (value: boolean) => {
     void serverSettings.update({ sdk_auto_update: value });
   };
-
-  const chat = $derived(tabs.state);
-  const projects = $derived(chatListFor(backend.active)?.projects ?? []);
 
   const rowSummary = (id: string) => {
     const entry = entryFor(id);
@@ -132,14 +130,14 @@
     icon={FilePen}
     title={t("USER_PROMPT")}
     summary={rowSummary("user_prompt")}
-    {enabled}
+    enabled={enabled && !!prompts}
     onclick={() => (promptOpen = true)}
   />
   <PreferenceRow
     icon={FolderGit}
     title={t("COMMIT_PROMPT")}
     summary={t("COMMIT_PROMPT_SUMMARY")}
-    {enabled}
+    enabled={enabled && !!prompts}
     onclick={() => (commitPromptOpen = true)}
   />
   {#if projects.length}
@@ -147,52 +145,54 @@
       icon={FolderPen}
       title={t("PROJECT_PROMPT")}
       summary={rowSummary("project_prompt")}
-      {enabled}
-      onclick={() => (projectPromptOpen = true)}
+      enabled={enabled && !!prompts}
+      onclick={openProjectPrompt}
     />
   {/if}
 </SettingsGroup>
 
-{#if promptOpen}
+{#if prompts && promptOpen}
   <PromptDialog
-    initial={userPrompt ?? ""}
+    initial={prompts.user}
     title={t("USER_PROMPT")}
     summary={t("USER_PROMPT_SUMMARY")}
     onConfirm={(text) => {
       promptOpen = false;
       void claudeApi.setUserPrompt(text).then((ok) => {
-        if (ok) claudeStatus.userPrompt = text;
+        if (ok) claudeStatus.keepPrompts({ user: text });
       });
     }}
     onDismiss={() => (promptOpen = false)}
   />
 {/if}
 
-{#if commitPromptOpen}
+{#if prompts && commitPromptOpen}
   <PromptDialog
-    initial={commitPrompt}
+    initial={prompts.commit}
     title={t("COMMIT_PROMPT")}
     summary={t("COMMIT_PROMPT_SUMMARY")}
     onConfirm={(text) => {
       commitPromptOpen = false;
       void claudeApi.setCommitPrompt(text).then((ok) => {
-        if (ok) commitPrompt = text;
+        if (ok) claudeStatus.keepPrompts({ commit: text });
       });
     }}
     onDismiss={() => (commitPromptOpen = false)}
   />
 {/if}
 
-{#if projectPromptOpen && projects.length}
-  {@const options = chat.withDefaultProject(projects)}
+{#if prompts && projectPromptFor}
   <ProjectPromptDialog
-    projects={options}
-    initialProject={chat.defaultProjectKey(projects) ?? chat.projectKey ?? options[0].projectKey}
+    projects={chat.withDefaultProject(projects)}
+    prompts={prompts.projects}
+    initialProject={projectPromptFor}
     onSave={(project, text) => {
-      projectPromptOpen = false;
-      void claudeApi.setProjectPrompt(project, text);
+      projectPromptFor = null;
+      void claudeApi.setProjectPrompt(project, text).then((ok) => {
+        if (ok) claudeStatus.keepPrompts({ projects: { ...prompts.projects, [project]: text } });
+      });
     }}
-    onDismiss={() => (projectPromptOpen = false)}
+    onDismiss={() => (projectPromptFor = null)}
   />
 {/if}
 
