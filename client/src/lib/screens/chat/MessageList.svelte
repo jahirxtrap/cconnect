@@ -1,6 +1,7 @@
 <script lang="ts">
   import FileSearch from "@lucide/svelte/icons/file-search";
   import { tick, untrack } from "svelte";
+  import type { ApiRetry } from "$lib/data/apiRetry";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
@@ -29,6 +30,7 @@
     streaming: boolean;
     compacting: boolean;
     streamStatus: string | null;
+    apiRetry: ApiRetry | null;
     visibility: Visibility;
     onAnswer: (requestId: string, optionId: string) => void;
     onLoadOlder: () => void;
@@ -51,6 +53,7 @@
     streaming,
     compacting,
     streamStatus,
+    apiRetry,
     visibility,
     onAnswer,
     onLoadOlder,
@@ -81,7 +84,7 @@
   const visible = $derived(messages.filter((item) => modeFor(item.role) !== "off"));
 
   const status = $derived(
-    compacting ? "compacting" : streamStatus === "slow" || streamStatus === "failed" ? streamStatus : null,
+    compacting ? "compacting" : streamStatus === "retrying" ? streamStatus : null,
   );
 
   const roleAfter = (index: number): GapRole | null => visible[index + 1]?.role ?? (status ? "status" : null);
@@ -149,7 +152,7 @@
     const last = visible.findIndex((item) => item.id === run.members.at(-1));
     const gap = gapAbove(visible[index - 1]?.role ?? null, visible[index].role);
     const top = glued ? NO_GAP : rowGap(visible[index - 1]?.role ?? null, visible[index].role, gap, spacedAt(index));
-    const bottom = gapBelow(visible[last].role, roleAfter(last));
+    const bottom = gapBelow(roleAfter(last));
     return `padding-top: ${top}; padding-bottom: ${bottom}`;
   };
 
@@ -175,16 +178,19 @@
     void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
   };
 
-  const separatorAt = (index: number) => {
-    if (!settings.showTimestamps) return false;
-    const current = visible[index].timestamp;
-    if (current === null) return false;
-    for (let i = index - 1; i >= 0; i--) {
-      const previous = visible[i].timestamp;
-      if (previous !== null) return dayIndex(previous) !== dayIndex(current);
+  const newDays = $derived.by(() => {
+    const opened = new Set<number>();
+    if (!settings.showTimestamps) return opened;
+    let latest: number | null = null;
+    for (const item of visible) {
+      if (item.timestamp === null) continue;
+      const day = dayIndex(item.timestamp);
+      if (latest !== null && day <= latest) continue;
+      opened.add(item.id);
+      latest = day;
     }
-    return true;
-  };
+    return opened;
+  });
 
   $effect.pre(() => {
     const head = messages[0]?.id ?? null;
@@ -274,7 +280,7 @@
     {#each visible as item, index (item.id)}
       {@const run = runOf.get(item.id)}
       {#if !run || !groupHides(run, item.id)}
-        {@const separated = separatorAt(index)}
+        {@const separated = newDays.has(item.id)}
         <div data-mid={item.id}>
           {#if separated}
             <DateSeparator millis={item.timestamp ?? 0} />
@@ -315,9 +321,9 @@
     {#if status}
       {@const before = visible.at(-1)?.role ?? null}
       <div
-        style="padding-top: {rowGap(before, 'status', gapAbove(before, 'status'), carded(visible.at(-1)))}; padding-bottom: {gapBelow('status', null)}"
+        style="padding-top: {rowGap(before, 'status', gapAbove(before, 'status'), carded(visible.at(-1)))}; padding-bottom: {gapBelow(null)}"
       >
-        <StatusProgress kind={status} />
+        <StatusProgress kind={status} retry={status === "retrying" ? apiRetry : null} />
       </div>
     {/if}
 </ChatScroller>

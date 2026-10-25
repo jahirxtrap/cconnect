@@ -22,6 +22,7 @@
   label={t("PLAN")}
   icon={Lightbulb}
   {preview}
+  tone="action"
   {expanded}
   {onToggle}
   bodyClass="pt-1.5"

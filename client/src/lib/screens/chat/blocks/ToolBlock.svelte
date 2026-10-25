@@ -1,13 +1,14 @@
 <script lang="ts">
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import type { Snippet } from "svelte";
   import { formatDuration } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
+  import { toolIcon } from "$lib/ui/toolIcons";
   import Collapsible from "./Collapsible.svelte";
 
   interface Props {
     name: string | null;
+    mcp?: boolean;
     input: string;
     result: string | null;
     running: boolean;
@@ -19,6 +20,7 @@
 
   const {
     name,
+    mcp = false,
     input,
     result,
     running,
@@ -39,7 +41,7 @@
 
 <Collapsible
   label={name ?? t("TOOLS")}
-  icon={SquareTerminal}
+  icon={toolIcon(name, mcp)}
   preview={headline}
   stat={running ? null : elapsed}
   labelOnly={empty}

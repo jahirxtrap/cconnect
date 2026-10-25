@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { subpixelText } from "$lib/platform";
   import { gridHeight } from "$lib/ui/gridHeight";
   import type { IconSource } from "$lib/ui/icons";
   import { insideCard, provideCardFrame } from "./cards";
   import CollapsibleHead from "./CollapsibleHead.svelte";
+  import type { HeadTone } from "./headTones";
   import { provideStickyHeads, stickyHeads } from "./stickyHeads";
 
   interface Props {
@@ -15,7 +15,7 @@
     meta?: Snippet;
     labelOnly?: boolean;
     running?: boolean;
-    iconClass?: string;
+    tone?: HeadTone;
     bodyClass?: string;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
@@ -30,7 +30,7 @@
     meta,
     labelOnly = false,
     running = false,
-    iconClass = "text-accent",
+    tone = "process",
     bodyClass = "pt-1",
     expanded = null,
     onToggle = null,
@@ -43,9 +43,7 @@
   const nested = insideCard();
   provideCardFrame();
 
-  const layer = subpixelText ? "" : "will-change-transform";
-
-  const headClass = sticky ? `group/head sticky top-0 z-20 bg-card data-[stuck]:shadow-sm ${layer}` : "";
+  const headClass = sticky ? "group/head sticky top-0 z-20 bg-card data-[stuck]:shadow-sm" : "";
 
   let localExpanded = $state(false);
 
@@ -69,7 +67,7 @@
       {meta}
       {labelOnly}
       {running}
-      {iconClass}
+      {tone}
       expanded={isExpanded}
       onclick={toggle}
     />

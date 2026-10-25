@@ -1,36 +1,56 @@
 <script lang="ts">
   import Archive from "@lucide/svelte/icons/archive";
   import Clock3 from "@lucide/svelte/icons/clock-3";
-  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import { retryReason, type ApiRetry } from "$lib/data/apiRetry";
+  import { formatDuration, joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
+  import NoticeCard from "./NoticeCard.svelte";
+  import type { Tint } from "./tint";
 
   interface Props {
-    kind: "slow" | "failed" | "compacting";
+    kind: "retrying" | "compacting";
+    retry?: ApiRetry | null;
   }
 
-  const { kind }: Props = $props();
+  const { kind, retry = null }: Props = $props();
 
-  const failed = $derived(kind === "failed");
+  const MILLIS_PER_SECOND = 1000;
+
+  let now = $state(Date.now());
+
+  $effect(() => {
+    if (!retry) return;
+    const until = retry.until;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const step = () => {
+      now = Date.now();
+      const left = until - now;
+      if (left > 0) timer = setTimeout(step, ((left - 1) % MILLIS_PER_SECOND) + 1);
+    };
+    step();
+    return () => {
+      if (timer !== null) clearTimeout(timer);
+    };
+  });
+
   const compacting = $derived(kind === "compacting");
-  const tone = $derived(failed ? "red" : compacting ? "blue" : "orange");
-  const label = $derived(failed ? t("STATUS_FAILED") : compacting ? t("COMPACTING") : t("STATUS_SLOW"));
+  const tone = $derived<Tint>(compacting ? "blue" : "orange");
+  const label = $derived(compacting ? t("COMPACTING") : t("STATUS_RETRYING"));
+  const left = $derived(retry ? Math.max(0, retry.until - now) : 0);
+  const reason = $derived(retry ? retryReason(retry) : null);
+  const detail = $derived(
+    retry
+      ? joined(
+          t("STATUS_RETRY_ATTEMPT", retry.attempt, retry.maxRetries),
+          left > 0 && t("STATUS_RETRY_NEXT", formatDuration(Math.ceil(left / MILLIS_PER_SECOND) * MILLIS_PER_SECOND)),
+          reason && t(reason),
+        )
+      : "",
+  );
+  const countdown = $derived(retry && left > 0 && retry.delayMs > 0 ? left / retry.delayMs : null);
 </script>
 
-<div class="w-full px-(--page-inset)">
-  <div class="rounded-panel px-3 py-2.5 {tone === 'red' ? 'bg-red/15' : tone === 'blue' ? 'bg-blue/15' : 'bg-orange/15'}">
-    <div class="flex items-center gap-2.5 {tone === 'red' ? 'text-red' : tone === 'blue' ? 'text-blue' : 'text-orange'}">
-      {#if failed}
-        <TriangleAlert size={16} class="shrink-0" />
-      {:else if compacting}
-        <Archive size={16} class="shrink-0" />
-      {:else}
-        <Clock3 size={16} class="shrink-0" />
-      {/if}
-      <span class="text-body-md">{label}</span>
-    </div>
-    {#if !failed}
-      <LinearProgress tone={compacting ? "blue" : "orange"} class="mt-2" />
-    {/if}
-  </div>
-</div>
+<NoticeCard {tone} icon={compacting ? Archive : Clock3} title={label} {detail}>
+  <LinearProgress value={countdown} {tone} class="mt-2" />
+</NoticeCard>

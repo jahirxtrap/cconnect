@@ -12,6 +12,7 @@
     type ComponentElement,
     type InteractionData,
   } from "$lib/data/chatModels";
+  import { severityTone } from "$lib/data/usageWindows";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
@@ -82,7 +83,7 @@
       .join(", ");
 
   const PICKER_ROW =
-    "flex w-full items-center gap-2 rounded-item px-3 py-1.5 transition-colors hover:bg-hover";
+    "flex w-full items-center gap-2 rounded-item px-3 py-1.5 transition-colors select-none hover:bg-hover";
   const PICKER_MAIN =
     "flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left text-on-surface disabled:cursor-default";
 
@@ -240,7 +241,7 @@
       />
     {:else if element.type === "color"}
       {@const name = valueOf(element)}
-      <div class={PICKER_ROW}>
+      <div data-press class={PICKER_ROW}>
         <button
           type="button"
           disabled={data.submitted}
@@ -261,7 +262,7 @@
       </div>
     {:else if element.type === "path"}
       {@const path = valueOf(element)}
-      <div class={PICKER_ROW}>
+      <div data-press class={PICKER_ROW}>
         <button type="button" disabled={data.submitted} onclick={() => (browsing = element)} class={PICKER_MAIN}>
           <Folder size={16} class="shrink-0 text-accent" />
           <span class="min-w-0 flex-1 truncate text-body-md">
@@ -275,7 +276,7 @@
       </div>
     {:else if element.type === "file"}
       {@const names = fileNames(element)}
-      <div class={PICKER_ROW}>
+      <div data-press class={PICKER_ROW}>
         <label class={PICKER_MAIN}>
           <Paperclip size={16} class="shrink-0 text-accent" />
           <span class="min-w-0 flex-1 truncate text-body-md">
@@ -304,6 +305,7 @@
         {percent}
         alert={(element.alertAbove !== null && percent >= element.alertAbove) ||
           (element.alertBelow !== null && percent <= element.alertBelow)}
+        tone={element.severity ? severityTone(element.severity) : null}
         color={sessionColorOf(element.color)}
       />
     {:else if element.type === "notes"}
@@ -323,7 +325,7 @@
           onclick={() => (openNotes[element.id ?? ""] = true)}
           class="flex w-full cursor-pointer items-center gap-2 rounded-item px-3 py-1.5 text-left text-label-lg text-accent transition-colors select-none hover:bg-hover"
         >
-          <NotepadText size={18} class="shrink-0" />
+          <NotepadText size={16} class="shrink-0" />
           <span class="truncate">{element.label?.trim() || t("ADD_NOTES")}</span>
         </button>
       {/if}

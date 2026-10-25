@@ -33,6 +33,7 @@
 <Collapsible
   label={plural("SHARED_COUNT", listed.length)}
   icon={FolderSymlink}
+  tone="action"
   {expanded}
   {onToggle}
 >

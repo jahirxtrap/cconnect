@@ -2,6 +2,7 @@
   import Bell from "@lucide/svelte/icons/bell";
   import Bot from "@lucide/svelte/icons/bot";
   import Inbox from "@lucide/svelte/icons/inbox";
+  import Info from "@lucide/svelte/icons/info";
   import Lightbulb from "@lucide/svelte/icons/lightbulb";
   import Puzzle from "@lucide/svelte/icons/puzzle";
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
@@ -20,6 +21,8 @@
   import { contextServer } from "$lib/services/serverContext";
   import Chip from "$lib/ui/Chip.svelte";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
+  import UsageWindows from "$lib/screens/claude/UsageWindows.svelte";
+  import CardPanel from "$lib/ui/CardPanel.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import { joinedCorners } from "$lib/ui/joinedCorners";
@@ -31,10 +34,12 @@
   import SharedBlock from "./SharedBlock.svelte";
   import FileChangeBlock from "./FileChangeBlock.svelte";
   import InteractionBlock from "./InteractionBlock.svelte";
+  import NoticeCard from "./NoticeCard.svelte";
   import PlanBlock from "./PlanBlock.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
   import { rowSite } from "./rowSite";
+  import { TINT_CLASS } from "./tint";
 
   interface Props {
     message: ChatMessage;
@@ -86,7 +91,7 @@
   const top = $derived(
     gluedTop || (nested && prevRole === null) ? NO_GAP : rowGap(prevRole, message.role, gap, spaced),
   );
-  const bottom = $derived(nested ? NO_GAP : gapBelow(message.role, nextRole));
+  const bottom = $derived(nested ? NO_GAP : gapBelow(nextRole));
 </script>
 
 {#snippet working(props: Record<string, unknown>)}
@@ -95,6 +100,7 @@
     icon={Bot}
     labelOnly
     {running}
+    tone="quiet"
   />
 {/snippet}
 
@@ -112,7 +118,7 @@
       {#if chips || showTime || message.sendStatus === "error"}
         <div class="flex w-full items-end">
           {#if chips}
-            <div use:hscrollbar class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto">
+            <div use:hscrollbar class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto rounded-full">
               {#each content.elements as element, index (index)}
                 <Chip name={elementLabel(element)} icon={SquareMousePointer} />
               {/each}
@@ -157,6 +163,7 @@
 {#snippet toolRow(props: Record<string, unknown>)}
   <ToolBlock
     name={typeof props.tool === "string" ? props.tool : message.toolName}
+    mcp={message.toolMcp}
     input={typeof props.input === "string" ? props.input : message.text}
     result={typeof props.output === "string" ? props.output : message.result}
     took={message.toolMs}
@@ -248,6 +255,7 @@
     <Collapsible
       label={t("THINKING")}
       icon={Lightbulb}
+      tone="quiet"
       stat={message.thinkingTokens !== null
         ? plural("TOKENS_COUNT", message.thinkingTokens, formatTokens(message.thinkingTokens))
         : null}
@@ -385,8 +393,18 @@
       {expanded}
       {onToggle}
     >
-      <MarkdownText text={message.text} dense />
+      <MarkdownText text={message.text} dense class={fromPlugin ? "text-on-surface-variant" : ""} />
     </Collapsible>
+  {:else if message.role === "usage" && message.usage}
+    <div class="w-full px-(--page-inset)">
+      <CardPanel>
+        {#if message.usage.error !== null || !message.usage.windows.length}
+          <p class="text-body-md text-on-surface-variant">{message.usage.error ?? t("NO_USAGE_DATA")}</p>
+        {:else}
+          <UsageWindows windows={message.usage.windows} />
+        {/if}
+      </CardPanel>
+    </div>
   {:else if message.role === "notification"}
     <Collapsible
       label={t("NOTIFICATION")}
@@ -396,7 +414,7 @@
       {expanded}
       {onToggle}
     >
-      <MarkdownText text={message.text} dense />
+      <MarkdownText text={message.text} dense class="text-on-surface-variant" />
     </Collapsible>
   {:else if message.role === "notice"}
     {@const warning = message.result === "warning"}
@@ -407,20 +425,25 @@
       labelOnly={labelMode || !message.text.trim()}
       {expanded}
       {onToggle}
-      iconClass={warning ? "text-orange" : "text-accent"}
+      tone={warning ? "warning" : "process"}
     >
-      <MarkdownText text={message.text} dense />
+      <MarkdownText text={message.text} dense class="text-on-surface-variant" />
     </Collapsible>
   {:else if message.role === "api_error"}
+    {@const warning = message.result === "warning"}
+    {@const color = warning ? "text-orange" : "text-red"}
     <div class="w-full px-(--page-inset)">
-      <div class="flex items-start gap-2 rounded-panel bg-orange/15 px-2.5 py-1.5">
-        <span class="flex h-5 shrink-0 items-center"><TriangleAlert size={14} class="text-orange" /></span>
-        <p class="min-w-0 flex-1 text-block wrap-anywhere whitespace-pre-wrap text-orange">{message.text}</p>
+      <div class="flex items-start gap-2 rounded-panel px-2.5 py-1.5 {TINT_CLASS[warning ? 'orange' : 'red']}">
+        <span class="flex h-5 shrink-0 items-center"><TriangleAlert size={14} class={color} /></span>
+        <p class="min-w-0 flex-1 text-block wrap-anywhere whitespace-pre-wrap {color}">{message.text}</p>
       </div>
     </div>
+  {:else if message.role === "info"}
+    {@const [title, ...detail] = message.text.split("\n")}
+    <NoticeCard tone="blue" icon={Info} {title} detail={detail.join("\n") || null} />
   {:else if message.role === "interrupted"}
     <div class="w-full px-(--page-inset)">
-      <div class="flex h-7 items-center gap-2 rounded-panel bg-orange/15 px-2.5">
+      <div class="flex h-7 items-center gap-2 rounded-panel px-2.5 {TINT_CLASS.orange}">
         <TriangleAlert size={14} class="shrink-0 text-orange" />
         <p class="min-w-0 flex-1 text-block text-orange">{t("INTERRUPTED")}</p>
       </div>

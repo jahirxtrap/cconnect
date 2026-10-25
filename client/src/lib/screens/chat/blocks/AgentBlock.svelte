@@ -58,7 +58,7 @@
         message={child}
         prevRole={message.children[index - 1]?.role ?? null}
         nextRole={message.children[index + 1]?.role ?? null}
-        running={false}
+        running={running && index === message.children.length - 1 && (child.role === "thinking" || (child.role === "tool" && child.result === null))}
         nested
         {onSharedLink}
       />

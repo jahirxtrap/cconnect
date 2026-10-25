@@ -1,6 +1,7 @@
 <script lang="ts">
   import { theme } from "$lib/design/theme.svelte";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
+  import { DIFF_LINE } from "./diffTones";
 
   interface Props {
     text: string;
@@ -61,13 +62,13 @@
   $effect(() => {
     const body = source;
     const target = language;
-    const dark = theme.dark;
+    const syntax = theme.syntax;
     if (!target) {
       highlighted = null;
       return;
     }
     let active = true;
-    void highlight(body, target, dark).then((result) => {
+    void highlight(body, target, syntax).then((result) => {
       if (active) highlighted = result;
     });
     return () => {
@@ -101,7 +102,7 @@
       {@const here = marking.has(number)}
       {#each removed[number] ?? [] as gone, at (at)}
         <div
-          class="{LINE_CLASS} bg-red-bg text-red {number === anchor
+          class="{LINE_CLASS} {DIFF_LINE.del} {number === anchor
             ? 'border-accent'
             : 'border-transparent'}"
         >{filled(gone)}</div>
@@ -109,12 +110,12 @@
       <div
         data-line={number}
         class="{LINE_CLASS} {here ? 'border-accent' : 'border-transparent'} {marked.has(number)
-          ? 'bg-green-bg'
+          ? DIFF_LINE.add
           : ''}"
       >{#if highlighted === null}{line}{:else}{@html line}{/if}</div>
     {/each}
     {#each trailing as gone, at (at)}
-      <div class="{LINE_CLASS} border-transparent bg-red-bg text-red">{filled(gone)}</div>
+      <div class="{LINE_CLASS} border-transparent {DIFF_LINE.del}">{filled(gone)}</div>
     {/each}
   </div>
 </div>

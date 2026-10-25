@@ -7,7 +7,7 @@ const SMALL = "var(--chat-gap-sm)";
 const TIGHT = "var(--chat-gap-xs)";
 const NONE = "0px";
 
-const NOTICE: GapRole[] = ["api_error", "interrupted", "status"];
+const NOTICE: GapRole[] = ["api_error", "info", "interrupted", "status", "usage"];
 
 const GROUPED: GapRole[] = [
   "thinking",
@@ -33,7 +33,7 @@ const isNotice = (role: GapRole | null): boolean => role !== null && NOTICE.incl
 const group = (role: GapRole | null): number => {
   if (role !== null && GROUPED.includes(role)) return 0;
   if (role === "assistant") return 1;
-  if (role === "user" || role === "api_error" || role === "interrupted") return 2;
+  if (role === "user" || role === "api_error" || role === "info" || role === "interrupted") return 2;
   return 3;
 };
 
@@ -56,11 +56,7 @@ export const gapAbove = (before: GapRole | null, role: GapRole): string => {
   return a === 1 || b === 1 ? NONE : SMALL;
 };
 
-export const gapBelow = (current: GapRole, next: GapRole | null): string => {
-  if (next !== null) return NONE;
-  if (isNotice(current) || current === "user") return NONE;
-  return BIG;
-};
+export const gapBelow = (next: GapRole | null): string => (next === null ? BIG : NONE);
 
 const CARDS: GapRole[] = [...GROUPED, ...NOTICE, "summary", "agent_report"];
 

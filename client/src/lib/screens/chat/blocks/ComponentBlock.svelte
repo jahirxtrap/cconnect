@@ -121,7 +121,9 @@
       return;
     }
     settling = true;
-    void animateScrollLeft(pager, target).then(() => (settling = false));
+    void animateScrollLeft(pager, target).then((last) => {
+      if (last) settling = false;
+    });
   };
 
   const onPagerScroll = () => {
@@ -239,7 +241,7 @@
       {/if}
     {/each}
   {:else if pages.length > 1}
-    <div use:hscrollbar class="no-scrollbar flex gap-2 overflow-x-auto">
+    <div use:hscrollbar class="no-scrollbar flex gap-2 overflow-x-auto rounded-full">
       {#each pages as item, index (index)}
         <SelectChip
           label={item.label?.trim() || String(index + 1)}

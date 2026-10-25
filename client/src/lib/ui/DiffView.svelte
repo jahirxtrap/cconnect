@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { DiffLine } from "$lib/data/chatModels";
+  import { DIFF_LINE, DIFF_SIGN, DIFF_SIGN_COLUMN } from "./diffTones";
   import { hscrollbar } from "./scrollbar";
 
   interface Props {
@@ -12,9 +13,7 @@
   const LINE_CLASS: Record<DiffLine["kind"], string> = {
     header: "text-faint",
     hunk: "text-blue bg-blue-bg",
-    add: "text-on-surface bg-green-bg",
-    del: "text-on-surface-variant bg-red-bg",
-    ctx: "text-on-surface-variant",
+    ...DIFF_LINE,
   };
 
   const PREFIX: Record<DiffLine["kind"], string> = {
@@ -24,6 +23,8 @@
     del: "-",
     ctx: " ",
   };
+
+  const signClass = (kind: DiffLine["kind"]) => (kind === "add" || kind === "del" ? DIFF_SIGN[kind] : "");
 </script>
 
 <div
@@ -32,10 +33,8 @@
 >
   <div class="flex w-max min-w-full flex-col">
     {#each diffLines as line, index (index)}
-      <div class="px-2 py-px whitespace-pre {LINE_CLASS[line.kind]}">{!line.text &&
-        !PREFIX[line.kind]
-          ? " "
-          : `${PREFIX[line.kind]}${line.text}`}</div>
+      <div class="px-2 py-px whitespace-pre {LINE_CLASS[line.kind]}">{#if PREFIX[line.kind]}<span
+            class="{DIFF_SIGN_COLUMN} {signClass(line.kind)}">{PREFIX[line.kind]}</span>{line.text}{:else}{line.text || " "}{/if}</div>
     {/each}
   </div>
 </div>

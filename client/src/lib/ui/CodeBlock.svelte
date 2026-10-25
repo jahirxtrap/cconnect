@@ -23,13 +23,13 @@
 
   $effect(() => {
     const language = resolved;
-    const dark = theme.dark;
+    const syntax = theme.syntax;
     if (!language) {
       html = null;
       return;
     }
     let active = true;
-    void highlight(body, language, dark).then((result) => {
+    void highlight(body, language, syntax).then((result) => {
       if (active) html = result;
     });
     return () => {
