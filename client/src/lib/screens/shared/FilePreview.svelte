@@ -111,13 +111,14 @@
 
   const PDF_RESIZE_STEP = 96;
   const BODY_CLASS = "flex min-h-0 flex-1 flex-col";
-  const FRAME_CLASS = `${BODY_CLASS} mx-(--page-inset) mb-(--page-inset) overflow-hidden rounded-panel`;
-  const TEXT_SCROLL_CLASS = `${TEXT_VIEWPORT_CLASS} selectable min-h-0 flex-1 px-(--page-inset)`;
+  const FRAME_CLASS = `${BODY_CLASS} overflow-hidden rounded-panel`;
+  const PANE_FRAME_CLASS = `${FRAME_CLASS} mx-(--page-inset) mb-(--page-inset)`;
+  const TEXT_SCROLL_CLASS = `${TEXT_VIEWPORT_CLASS} selectable min-h-0 flex-1`;
 
   const pdfStep = $derived(Math.round(pdfWidth / PDF_RESIZE_STEP));
 
   const kind = $derived(forcedKind ?? previewKindOf(filename));
-  const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : FRAME_CLASS);
+  const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : embedded ? PANE_FRAME_CLASS : FRAME_CLASS);
   const binary = $derived(shown !== null && shown.body.includes(NUL));
   const prose = $derived(shown !== null && previewKindOf(shown.name) === "markdown" && formatted);
   const lined = $derived(readsAsText(kind) && !failed && shown !== null && !binary && !prose);
@@ -320,7 +321,7 @@
     <EmptyState text={t("FILE_BINARY")} class="flex-1" />
   {:else if prose}
     {#key shown.base}
-      <div use:viewportScrollbar class="{TEXT_SCROLL_CLASS} overflow-y-auto py-4">
+      <div use:viewportScrollbar class="{TEXT_SCROLL_CLASS} overflow-y-auto px-2.5 py-3">
         <MarkdownText text={shown.body} />
       </div>
     {/key}
