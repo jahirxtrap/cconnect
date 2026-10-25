@@ -1,0 +1,23 @@
+{
+  "name": "Claude Light",
+  "colors": {
+    "background": "#ffffff",
+    "foreground": "#0b0b0b",
+    "black": "#0b0b0b",
+    "red": "#a42528",
+    "green": "#006c10",
+    "yellow": "#794c02",
+    "blue": "#1757ac",
+    "magenta": "#902552",
+    "cyan": "#006458",
+    "white": "#c2c2c2",
+    "bright-black": "#515151",
+    "bright-red": "#dc3c3d",
+    "bright-green": "#10a122",
+    "bright-yellow": "#ae7303",
+    "bright-blue": "#257de0",
+    "bright-magenta": "#ce447d",
+    "bright-cyan": "#019c7f",
+    "bright-white": "#e0e0e0"
+  }
+}

@@ -7,7 +7,8 @@
   import { copyText, pasteText } from "$lib/platform/clipboard";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
   import type { PtyInfo } from "$lib/services/terminalApi";
-  import { FONT_SIZE, LINE_HEIGHT, terminalTheme } from "./theme";
+  import { theme } from "$lib/design/theme.svelte";
+  import { FONT_SIZE, LINE_HEIGHT, terminalContrast, terminalTheme } from "./theme";
   import "@xterm/xterm/css/xterm.css";
 
   interface Props {
@@ -36,6 +37,8 @@
   const GLIDE_FLOOR = 0.04;
   const FRAME_CAP_MS = 32;
   const SPEED_WEIGHT = 0.6;
+  const FOCUS_MODE = 1004;
+  const FOCUS_REPORTS = new Set(["\x1b[I", "\x1b[O"]);
 
   let host = $state<HTMLDivElement | null>(null);
   let terminal: Terminal | null = null;
@@ -81,6 +84,13 @@
   }
 
   $effect(() => {
+    void theme.painted;
+    if (!terminal) return;
+    terminal.options.theme = terminalTheme();
+    terminal.options.minimumContrastRatio = terminalContrast();
+  });
+
+  $effect(() => {
     const container = host;
     if (!container) return;
 
@@ -92,6 +102,7 @@
       scrollback: SCROLLBACK,
       allowProposedApi: true,
       theme: terminalTheme(),
+      minimumContrastRatio: terminalContrast(),
       ...(windowsPty ? { windowsPty } : {}),
     });
     const fit = new FitAddon();
@@ -131,7 +142,18 @@
     );
     link = current;
 
-    const typed = term.onData((data) => current.send(encoder.encode(data)));
+    let enablingFocus = false;
+    const focusMode = term.parser.registerCsiHandler({ prefix: "?", final: "h" }, (params) => {
+      enablingFocus = params.some((param) => (Array.isArray(param) ? param.includes(FOCUS_MODE) : param === FOCUS_MODE));
+      return false;
+    });
+    const typed = term.onData((data) => {
+      if (enablingFocus && FOCUS_REPORTS.has(data)) {
+        enablingFocus = false;
+        return;
+      }
+      current.send(encoder.encode(data));
+    });
     const binary = term.onBinary((data) =>
       current.send(Uint8Array.from(data, (char) => char.charCodeAt(0) & 0xff)),
     );
@@ -243,6 +265,7 @@
       container.removeEventListener("touchend", onTouchEnd);
       container.removeEventListener("touchcancel", onTouchEnd);
       observer.disconnect();
+      focusMode.dispose();
       typed.dispose();
       binary.dispose();
       resized.dispose();

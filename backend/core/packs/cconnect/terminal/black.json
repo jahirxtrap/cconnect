@@ -1,0 +1,23 @@
+{
+  "name": "Black",
+  "colors": {
+    "background": "#000000",
+    "foreground": "#d4d4d4",
+    "black": "#000000",
+    "red": "#ff7b72",
+    "green": "#56d364",
+    "yellow": "#ffd93d",
+    "blue": "#79c0ff",
+    "magenta": "#c084fc",
+    "cyan": "#26c6da",
+    "white": "#d4d4d4",
+    "bright-black": "#8b949e",
+    "bright-red": "#ffa198",
+    "bright-green": "#7ee787",
+    "bright-yellow": "#ffe777",
+    "bright-blue": "#a5d6ff",
+    "bright-magenta": "#d8b4fe",
+    "bright-cyan": "#67e8f9",
+    "bright-white": "#ffffff"
+  }
+}

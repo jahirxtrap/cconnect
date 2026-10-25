@@ -2,22 +2,26 @@
   import Clock from "@lucide/svelte/icons/clock";
   import Expand from "@lucide/svelte/icons/expand";
   import Globe from "@lucide/svelte/icons/globe";
+  import ImageIcon from "@lucide/svelte/icons/image";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Languages from "@lucide/svelte/icons/languages";
   import ListOrdered from "@lucide/svelte/icons/list-ordered";
   import Moon from "@lucide/svelte/icons/moon";
+  import Package from "@lucide/svelte/icons/package";
   import Palette from "@lucide/svelte/icons/palette";
   import Puzzle from "@lucide/svelte/icons/puzzle";
   import Sun from "@lucide/svelte/icons/sun";
   import SunMoon from "@lucide/svelte/icons/sun-moon";
+  import SwatchBook from "@lucide/svelte/icons/swatch-book";
   import Type from "@lucide/svelte/icons/type";
   import { settings } from "$lib/data/settings.svelte";
-  import { DYNAMIC_ACCENT } from "$lib/design/accents";
   import { theme, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { deviceBrowsing } from "$lib/screens/browser/deviceEngine";
+  import PacksDialog from "$lib/screens/packs/PacksDialog.svelte";
+  import { useServerPacks } from "$lib/services/serverPacks.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
@@ -25,18 +29,20 @@
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
   import BrowserDialog from "./BrowserDialog.svelte";
+  import ChatBackgroundDialog from "./ChatBackgroundDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
   import FontDialog from "./FontDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
-  import { localeOptions, themeOptions } from "./settingsValues";
+  import { appearanceOptions, localeOptions } from "./settingsValues";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
+  import ThemeDialog from "./ThemeDialog.svelte";
 
   let dialog = $state<SettingsDialog | null>(null);
 
-  const themes = $derived(themeOptions());
+  const appearances = $derived(appearanceOptions());
   const locales = $derived(localeOptions());
-  const themeIcon = $derived(theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : SunMoon);
+  const appearanceIcon = $derived(theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : SunMoon);
 
   const rowSummary = (id: string) => {
     const entry = entryFor(id);
@@ -44,11 +50,18 @@
   };
 
   useSettingsDialog("client", (target) => (dialog = target));
+  useServerPacks();
 </script>
 
 <SettingsGroup label={t("SETTINGS_CLIENT")}>
   <PreferenceRow
-    icon={themeIcon}
+    icon={appearanceIcon}
+    title={t("APPEARANCE")}
+    summary={rowSummary("appearance")}
+    onclick={() => (dialog = "appearance")}
+  />
+  <PreferenceRow
+    icon={SwatchBook}
     title={t("THEME")}
     summary={rowSummary("theme")}
     onclick={() => (dialog = "theme")}
@@ -70,6 +83,12 @@
     {/snippet}
   </PreferenceRow>
   <PreferenceRow
+    icon={ImageIcon}
+    title={t("CHAT_BACKGROUND")}
+    summary={rowSummary("chat_background")}
+    onclick={() => (dialog = "chat_background")}
+  />
+  <PreferenceRow
     icon={Type}
     title={t("FONT")}
     summary={rowSummary("font")}
@@ -79,6 +98,12 @@
       <span class="flex h-7 w-9 items-center justify-center text-title-lg">😃</span>
     {/snippet}
   </PreferenceRow>
+  <PreferenceRow
+    icon={Package}
+    title={t("PACKS")}
+    summary={rowSummary("packs")}
+    onclick={() => (dialog = "packs")}
+  />
   <PreferenceRow
     icon={Keyboard}
     title={t("SHORTCUTS")}
@@ -157,14 +182,16 @@
   {/if}
 </SettingsGroup>
 
-{#if dialog === "theme"}
+{#if dialog === "appearance"}
   <SelectDialog
-    title={t("THEME")}
-    options={themes}
+    title={t("APPEARANCE")}
+    options={appearances}
     selected={theme.mode}
     onSelect={(value) => theme.setMode(value as ThemeMode)}
     onDismiss={() => (dialog = null)}
   />
+{:else if dialog === "theme"}
+  <ThemeDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "language"}
   <SelectDialog
     title={t("LANGUAGE")}
@@ -175,20 +202,20 @@
   />
 {:else if dialog === "font"}
   <FontDialog onDismiss={() => (dialog = null)} />
+{:else if dialog === "packs"}
+  <PacksDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "accent"}
   <AccentDialog
     title={t("ACCENT")}
-    selected={theme.dynamicColor ? DYNAMIC_ACCENT : theme.accentIndex}
+    selected={theme.accentId}
     closeOnPick
-    onSelect={(index) => {
-      if (index === DYNAMIC_ACCENT) theme.setDynamicColor(true);
-      else if (index !== null) {
-        theme.setDynamicColor(false);
-        theme.setAccent(index);
-      }
+    onSelect={(choice) => {
+      if (choice !== null) theme.setAccent(choice);
     }}
     onDismiss={() => (dialog = null)}
   />
+{:else if dialog === "chat_background"}
+  <ChatBackgroundDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "shortcuts"}
   <ShortcutsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "discord"}

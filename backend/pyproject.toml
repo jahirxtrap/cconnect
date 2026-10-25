@@ -62,7 +62,7 @@ version = { attr = "core.release.VERSION" }
 include = ["core*", "routers*", "schemas*", "middleware*", "services*", "mcps*"]
 
 [tool.setuptools.package-data]
-core = ["prompts/*.md"]
+core = ["prompts/*.md", "scripts/*.js", "packs/**/*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

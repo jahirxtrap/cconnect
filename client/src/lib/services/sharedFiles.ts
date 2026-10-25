@@ -1,3 +1,4 @@
+import { encodeBase64 } from "$lib/data/base64";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { transfers } from "$lib/data/transfers.svelte";
 import { isDesktop, isTauri, openExternal } from "$lib/platform";
@@ -36,6 +37,8 @@ const fetchTracked = async (
     return null;
   }
 };
+
+export const fetchShared = (url: string): Promise<Blob | null> => fetchTracked(url, () => {}, new AbortController().signal);
 
 const TEXT_TYPE = "text/markdown";
 
@@ -126,24 +129,40 @@ export const downloadShared = (url: string, filename: string) => {
   );
 };
 
-export const saveTextToDownloads = async (filename: string, text: string) => {
+const base64Of = async (blob: Blob): Promise<string> => encodeBase64(new Uint8Array(await blob.arrayBuffer()));
+
+const textBlob = (text: string) => new Blob([text], { type: TEXT_TYPE });
+
+export const saveFileToDownloads = async (filename: string, blob: Blob) => {
   const bridge = androidDownloads();
-  if (bridge) return bridge.saveText(filename, text);
+  if (bridge) return bridge.saveData(filename, await base64Of(blob));
   return transfers.download(filename, async (_progress, _signal, keep) => {
-    const saved = await saveBlob(new Blob([text], { type: TEXT_TYPE }), filename);
+    const saved = await saveBlob(blob, filename);
     if (saved) keep(saved);
     return saved !== null;
   });
 };
 
-export const saveTextAs = async (filename: string, text: string) => {
+export const saveTextToDownloads = (filename: string, text: string) => saveFileToDownloads(filename, textBlob(text));
+
+export const saveFileAs = async (filename: string, blob: Blob) => {
   const bridge = androidDownloads();
   if (bridge) {
-    bridge.saveText(filename, text);
+    bridge.saveData(filename, await base64Of(blob));
     return;
   }
-  await saveBlobAs(new Blob([text], { type: TEXT_TYPE }), filename);
+  if (!isTauri) {
+    await saveBlobAs(blob, filename);
+    return;
+  }
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const target = await save({ defaultPath: filename });
+  if (typeof target !== "string") return;
+  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
 };
+
+export const saveTextAs = (filename: string, text: string) => saveFileAs(filename, textBlob(text));
 
 const shareFile = async (file: File): Promise<boolean> => {
   if (!navigator.canShare?.({ files: [file] })) return false;
@@ -158,7 +177,7 @@ const shareFile = async (file: File): Promise<boolean> => {
 export const shareText = async (filename: string, text: string) => {
   const bridge = androidDownloads();
   if (bridge) {
-    bridge.shareText(filename, text);
+    bridge.shareData(filename, await base64Of(textBlob(text)));
     return;
   }
   if (await shareFile(new File([text], filename, { type: TEXT_TYPE }))) return;
@@ -286,7 +305,7 @@ export const openSharedExternally = async (url: string, filename: string) => {
     bridge.open(url, filename, headersJson(url));
     return;
   }
-  const blob = await fetchTracked(url, () => {}, new AbortController().signal);
+  const blob = await fetchShared(url);
   if (!blob) return;
   if (!isTauri) {
     const objectUrl = URL.createObjectURL(blob);

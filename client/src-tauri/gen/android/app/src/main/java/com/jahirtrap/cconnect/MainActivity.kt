@@ -131,6 +131,7 @@ class MainActivity : TauriActivity() {
       Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
       Intent.ACTION_SEND_MULTIPLE ->
         IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+      Intent.ACTION_VIEW -> listOfNotNull(intent.data)
       else -> return
     }
     if (uris.isEmpty()) return
@@ -140,7 +141,7 @@ class MainActivity : TauriActivity() {
     shareAttempts = 0
   }
 
-  /** The web view only takes it once the chat registered its hook, which lags a cold start. */
+  /** The web view only takes it once the app registered its hook, which lags a cold start. */
   private fun deliverShare() {
     val json = pendingShare ?: return
     val view = content ?: return

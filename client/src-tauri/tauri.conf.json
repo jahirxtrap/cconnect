@@ -56,6 +56,15 @@
     "category": "DeveloperTool",
     "shortDescription": "Claude Code desde cualquier dispositivo",
     "longDescription": "Cliente de Claude Code con chat, archivos compartidos, terminal SSH y monitor del servidor.",
+    "fileAssociations": [
+      {
+        "ext": ["ccpack"],
+        "name": "CConnect",
+        "description": "Paquete de CConnect",
+        "mimeType": "application/x-ccpack",
+        "role": "Viewer"
+      }
+    ],
     "windows": {
       "nsis": {
         "installMode": "currentUser",

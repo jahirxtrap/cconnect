@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
@@ -90,14 +91,14 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
     }
 
     @JavascriptInterface
-    fun saveText(filename: String, text: String): Boolean =
-        writeToDownloads(filename) { out -> out.write(text.toByteArray()) } != null
+    fun saveData(filename: String, base64: String): Boolean =
+        writeToDownloads(filename) { out -> out.write(Base64.decode(base64, Base64.NO_WRAP)) } != null
 
     @JavascriptInterface
-    fun shareText(filename: String, text: String) {
+    fun shareData(filename: String, base64: String) {
         workers.execute {
             val file = dedup(File(activity.cacheDir, "shared"), filename)
-            if (runCatching { file.writeText(text) }.isFailure) return@execute
+            if (runCatching { file.writeBytes(Base64.decode(base64, Base64.NO_WRAP)) }.isFailure) return@execute
             sendFile(file, filename)
         }
     }

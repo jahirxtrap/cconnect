@@ -1,21 +1,12 @@
 <script lang="ts">
-  import Download from "@lucide/svelte/icons/download";
-  import ExternalLink from "@lucide/svelte/icons/external-link";
   import Eye from "@lucide/svelte/icons/eye";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
-  import Save from "@lucide/svelte/icons/save";
-  import Share2 from "@lucide/svelte/icons/share-2";
   import { isPreviewable } from "$lib/data/previewKind";
   import { t } from "$lib/i18n/index.svelte";
-  import {
-    downloadShared,
-    openSharedExternally,
-    saveSharedAs,
-    shareShared,
-  } from "$lib/services/sharedFiles";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
   import DialogActionItem from "./DialogActionItem.svelte";
+  import { SHARED_FILE_ACTIONS } from "./sharedFileActions";
 
   interface Props {
     url: string;
@@ -27,8 +18,8 @@
 
   const { url, filename, onView = null, onOpenInShared = null, onDismiss }: Props = $props();
 
-  const run = (action: () => void) => {
-    action();
+  const run = (action: () => unknown) => {
+    void action();
     onDismiss();
   };
 </script>
@@ -43,16 +34,7 @@
   {#if onOpenInShared}
     <DialogActionItem text={t("OPEN_IN_SHARED")} icon={FolderArchive} onclick={() => run(onOpenInShared)} />
   {/if}
-  <DialogActionItem text={t("SAVE")} icon={Download} onclick={() => run(() => void downloadShared(url, filename))} />
-  <DialogActionItem text={t("SAVE_AS")} icon={Save} onclick={() => run(() => void saveSharedAs(url, filename))} />
-  <DialogActionItem
-    text={t("OPEN_EXTERNALLY")}
-    icon={ExternalLink}
-    onclick={() => run(() => void openSharedExternally(url, filename))}
-  />
-  <DialogActionItem
-    text={t("SHARE")}
-    icon={Share2}
-    onclick={() => run(() => void shareShared(url, filename))}
-  />
+  {#each SHARED_FILE_ACTIONS as action (action.label)}
+    <DialogActionItem text={t(action.label)} icon={action.icon} onclick={() => run(() => action.run(url, filename))} />
+  {/each}
 </CompactDialog>

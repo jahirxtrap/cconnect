@@ -3,11 +3,13 @@ import tailwindcss from "@tailwindcss/vite";
 import { readFileSync } from "node:fs";
 import { fileURLToPath, URL } from "node:url";
 import Icons from "unplugin-icons/vite";
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig, loadEnv, searchForWorkspaceRoot } from "vite";
 
 const SUPPORTED_SERVER = ">=1.10.0";
 
 const mobileHost = process.env.TAURI_DEV_HOST;
+
+const builtinPacks = fileURLToPath(new URL("../backend/core/packs", import.meta.url));
 
 const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
@@ -34,6 +36,7 @@ export default defineConfig(({ mode }) => {
       port: 1420,
       strictPort: true,
       hmr: mobileHost ? { protocol: "ws", host: mobileHost, port: 1421 } : undefined,
+      fs: { allow: [searchForWorkspaceRoot(process.cwd()), builtinPacks] },
     },
     build: { target: "es2022" },
   };

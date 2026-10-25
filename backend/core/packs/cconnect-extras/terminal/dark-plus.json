@@ -1,0 +1,23 @@
+{
+  "name": "Dark+",
+  "colors": {
+    "background": "#1e1e1e",
+    "foreground": "#cccccc",
+    "black": "#000000",
+    "red": "#cd3131",
+    "green": "#0dbc79",
+    "yellow": "#e5e510",
+    "blue": "#2472c8",
+    "magenta": "#bc3fbc",
+    "cyan": "#11a8cd",
+    "white": "#e5e5e5",
+    "bright-black": "#666666",
+    "bright-red": "#f14c4c",
+    "bright-green": "#23d18b",
+    "bright-yellow": "#f5f543",
+    "bright-blue": "#3b8eea",
+    "bright-magenta": "#d670d6",
+    "bright-cyan": "#29b8db",
+    "bright-white": "#e5e5e5"
+  }
+}

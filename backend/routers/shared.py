@@ -4,47 +4,28 @@ import asyncio
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Header, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, StreamingResponse
 from starlette.requests import ClientDisconnect
-from loguru import logger
 from pydantic import BaseModel
 
 from core.access import key_matches
 from core.responses import api_response
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import stream_watch
 from services import shared as shared_service
 from services.shared_watch import hub as watch_hub
 
 router = APIRouter(tags=["Shared"])
 
 
+def _watch_message(queue: asyncio.Queue, msg: dict):
+    if msg.get("type") == "watch":
+        watch_hub.set_path(queue, msg.get("path") or "")
+
+
 @router.websocket("/shared/ws")
 async def shared_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
-        return
-    await ws.accept()
-    queue = watch_hub.subscribe()
-
-    async def pump():
-        while True:
-            await send_event(ws, await queue.get())
-
-    pump_task = asyncio.create_task(pump())
-    try:
-        while True:
-            msg = await ws.receive_json()
-            if msg.get("type") == "watch":
-                watch_hub.set_path(queue, msg.get("path") or "")
-    except WebSocketDisconnect:
-        pass
-    except Exception as exc:
-        logger.debug(f"shared_ws ended: {type(exc).__name__}: {exc}")
-    finally:
-        pump_task.cancel()
-        watch_hub.unsubscribe(queue)
+    await stream_watch(ws, watch_hub, _watch_message)
 
 
 class FolderBody(BaseModel):

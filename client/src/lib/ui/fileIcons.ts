@@ -12,6 +12,7 @@ import FolderClosed from "@lucide/svelte/icons/folder-closed";
 import FolderGit from "@lucide/svelte/icons/folder-git";
 import FolderGit2 from "@lucide/svelte/icons/folder-git-2";
 import FolderUp from "@lucide/svelte/icons/folder-up";
+import Package from "@lucide/svelte/icons/package";
 import { fileKindOf, type FileKind } from "$lib/data/previewKind";
 import type { IconSource } from "./icons";
 
@@ -23,6 +24,7 @@ const KIND_ICONS: Record<FileKind, IconSource> = {
   markdown: FileType,
   code: FileCode,
   archive: FileArchive,
+  pack: Package,
   text: File,
 };
 
@@ -34,6 +36,7 @@ const KIND_LABELS: Record<FileKind, string> = {
   markdown: "KIND_MARKDOWN",
   code: "KIND_CODE",
   archive: "KIND_ARCHIVE",
+  pack: "KIND_PACK",
   text: "KIND_TEXT",
 };
 

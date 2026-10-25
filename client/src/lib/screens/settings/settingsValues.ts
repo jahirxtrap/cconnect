@@ -1,24 +1,30 @@
 import { accountsStore } from "$lib/data/accountsStore.svelte";
+import { chatBackground } from "$lib/data/chatBackground.svelte";
+import { NO_BACKGROUND, type BackgroundArt, type BackgroundStyle } from "$lib/design/backgrounds";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { claudeStatus } from "$lib/data/claudeStatus.svelte";
 import { projectNameOf } from "$lib/data/models";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { formatDays, joined } from "$lib/data/format";
-import { ACCENTS } from "$lib/design/accents";
-import { FONT_FAMILIES, FONT_KINDS, type FontKind } from "$lib/design/fonts";
+import { DYNAMIC_ACCENT, THEME_ACCENT } from "$lib/design/accents";
+import type { PackBackground, PackFont, PackTerminal, PackTheme } from "$lib/design/packs/model";
+import { packs } from "$lib/design/packs/registry.svelte";
+import { FONT_KINDS, THEME_KINDS } from "$lib/design/packs/schema";
 import { theme } from "$lib/design/theme.svelte";
-import { i18n, t } from "$lib/i18n/index.svelte";
+import { i18n, plural, t } from "$lib/i18n/index.svelte";
+import { offeredPacks } from "$lib/screens/packs/packText";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
 import type { Account } from "$lib/services/accountsApi";
 import { address, backend } from "$lib/services/backend.svelte";
+import type { DelegateKind } from "$lib/services/delegatesApi";
 import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { RETENTION_FOREVER_DAYS } from "$lib/services/settingsApi";
 import type { SelectOption } from "$lib/ui/SelectDialog.svelte";
 
-export const themeOptions = (): SelectOption[] => [
+export const appearanceOptions = (): SelectOption[] => [
   { value: "system", label: t("THEME_SYSTEM") },
   { value: "light", label: t("THEME_LIGHT") },
   { value: "dark", label: t("THEME_DARK") },
@@ -30,42 +36,83 @@ export const localeOptions = (): SelectOption[] => [
   { value: "es", label: "Español" },
 ];
 
-export const fontOptions: Record<FontKind, () => SelectOption[]> = {
-  text: () => [
-    { value: "geist", label: "Geist Sans", font: FONT_FAMILIES.text.geist },
-    { value: "plex", label: "IBM Plex Sans", font: FONT_FAMILIES.text.plex },
-    { value: "inter", label: "Inter", font: FONT_FAMILIES.text.inter },
-    { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.text.system },
-  ],
-  code: () => [
-    { value: "geist", label: "Geist Mono", font: FONT_FAMILIES.code.geist },
-    { value: "plex", label: "IBM Plex Mono", font: FONT_FAMILIES.code.plex },
-    { value: "jetbrains", label: "JetBrains Mono", font: FONT_FAMILIES.code.jetbrains },
-    { value: "system", label: t("FONT_SYSTEM"), font: FONT_FAMILIES.code.system },
-  ],
-  symbols: () => [
-    { value: "dejavu", label: "DejaVu Sans" },
-    { value: "system", label: t("FONT_SYSTEM") },
-  ],
-  emoji: () => [
-    { value: "system", label: t("FONT_SYSTEM") },
-    { value: "flat", label: "Fluent Emoji Flat" },
-    { value: "color", label: "Fluent Emoji Color" },
-  ],
+export const fontLabel = (font: PackFont): string => font.name ?? t("FONT_SYSTEM");
+
+export const packLabel = (id: string): string | null => {
+  const pack = packs.packOf(id);
+  return pack && !pack.builtin ? joined(pack.info.name, pack.info.author) : null;
 };
+
+const THEME_SWATCHES = ["background", "surface-variant", "on-background"];
+
+const TERMINAL_SWATCHES = ["background", "foreground", "red", "blue"];
+
+export const themeSwatches = (item: PackTheme): string[] => [...THEME_SWATCHES.map((key) => item.colors[key]), item.accent];
+
+export const terminalSwatches = (item: PackTerminal): string[] => TERMINAL_SWATCHES.map((key) => item.colors[key]);
 
 const chosen = (options: SelectOption[], value: string): string =>
   options.find((option) => option.value === value)?.label ?? value;
 
-export const themeValue = (): string => chosen(themeOptions(), theme.mode);
+export const appearanceValue = (): string => chosen(appearanceOptions(), theme.mode);
+
+export const DELEGATE_KIND_LABELS: Record<DelegateKind, string> = {
+  model: "DELEGATE_KIND_MODEL",
+  claude: "DELEGATE_KIND_CLAUDE",
+  command: "DELEGATE_KIND_COMMAND",
+  acp: "DELEGATE_KIND_ACP",
+};
+
+export const BACKGROUND_STYLE_LABELS: Record<BackgroundStyle, string> = {
+  sharp: "BACKGROUND_STYLE_SHARP",
+  soft: "BACKGROUND_STYLE_SOFT",
+  dark: "BACKGROUND_STYLE_DARK",
+};
+
+const BACKGROUND_ART_LABELS: Record<BackgroundArt, string> = {
+  logo: "BACKGROUND_LOGO",
+};
+
+export const packBackgroundLabel = (background: PackBackground): string =>
+  background.name ?? t(BACKGROUND_ART_LABELS[background.id as BackgroundArt]);
+
+export const backgroundLabel = (id: string): string => {
+  if (id === NO_BACKGROUND) return t("CHAT_BACKGROUND_NONE");
+  const background = packs.backgroundOf(id);
+  return background ? packBackgroundLabel(background) : t("BACKGROUND_UPLOAD");
+};
+
+export const chatBackgroundValue = (): string => backgroundLabel(chatBackground.current);
+
+export const themeValue = (): string =>
+  joined(
+    ...THEME_KINDS.map((kind) => packs.themeOf(kind, theme.themeIds[kind]).name),
+    packs.terminalOf(theme.terminalId).name,
+  );
 
 export const localeValue = (): string => chosen(localeOptions(), i18n.locale);
 
 export const fontValue = (): string =>
-  joined(...FONT_KINDS.map((kind) => chosen(fontOptions[kind](), theme.fonts[kind])));
+  joined(...FONT_KINDS.map((kind) => fontLabel(packs.fontOf(kind, theme.fonts[kind]))));
 
-export const accentValue = (): string =>
-  theme.dynamicColor && theme.systemAccent ? t("ACCENT_DYNAMIC") : (ACCENTS[theme.accentIndex]?.name ?? "");
+export const accentLabel = (choice: string | null): string =>
+  choice === null
+    ? t("COLOR_NONE")
+    : choice === DYNAMIC_ACCENT
+      ? t("ACCENT_DYNAMIC")
+      : choice === THEME_ACCENT
+        ? t("ACCENT_THEME")
+        : (packs.accentOf(choice)?.name ?? t("ACCENT_THEME"));
+
+export const accentValue = (): string => accentLabel(theme.accentId);
+
+export const packsValue = (): string => {
+  const offered = offeredPacks().length;
+  return joined(
+    packs.installed.length ? plural("PACKS_INSTALLED_COUNT", packs.installed.length) : t("NO_PACKS_INSTALLED"),
+    offered > 0 && plural("PACKS_SERVER_COUNT", offered),
+  );
+};
 
 export const notificationsValue = (): string =>
   notifier.granted
@@ -143,13 +190,18 @@ export const accountValue = (): string => {
   );
 };
 
-const toolStates = (): boolean[] => {
-  const hidden = new Set(
+const hiddenTools = (): Set<string> =>
+  new Set(
     (serverSettings.snapshot?.mcpDisabled ?? "")
       .split(",")
       .map((name) => name.trim())
       .filter(Boolean),
   );
+
+export const toolHidden = (name: string): boolean => hiddenTools().has(name);
+
+const toolStates = (): boolean[] => {
+  const hidden = hiddenTools();
   const groups = new Map<string, boolean>();
   for (const tool of serverSettings.capabilities?.mcpTools ?? []) {
     const key = tool.group ?? tool.name;
@@ -183,8 +235,8 @@ export const sdkValue = (): string => claudeStatus.sdk?.version ?? "";
 const PROMPT_SUMMARY_LENGTH = 60;
 
 export const userPromptValue = (): string =>
-  claudeStatus.userPrompt
-    ?.split("\n")
+  claudeStatus.prompts?.user
+    .split("\n")
     .find((line) => line.trim())
     ?.slice(0, PROMPT_SUMMARY_LENGTH) ?? "";
 

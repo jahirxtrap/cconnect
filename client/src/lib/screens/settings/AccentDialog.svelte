@@ -2,50 +2,46 @@
   import Check from "@lucide/svelte/icons/check";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
-  import { ACCENTS, DYNAMIC_ACCENT } from "$lib/design/accents";
+  import { DYNAMIC_ACCENT, THEME_ACCENT } from "$lib/design/accents";
+  import { packs } from "$lib/design/packs/registry.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
-  import SwitchRow from "$lib/ui/SwitchRow.svelte";
+  import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
+  import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import { SWATCH_CLASS, SWATCH_GRID_CLASS, swatchBorder } from "$lib/ui/swatch";
 
   interface Props {
     onDismiss: () => void;
     title?: string;
-    selected?: number | null;
+    selected?: string | null;
     showNone?: boolean;
     closeOnPick?: boolean;
-    onSelect?: (index: number | null) => void;
+    onSelect?: (choice: string | null) => void;
   }
 
-  const {
-    onDismiss,
-    title = t("ACCENT"),
-    selected = null,
-    showNone = false,
-    closeOnPick = false,
-    onSelect,
-  }: Props = $props();
+  const { onDismiss, title = t("ACCENT"), selected = null, showNone = false, closeOnPick = false, onSelect }: Props =
+    $props();
 
-  const DEFAULT_INDEX = 4;
+  const SOURCES = [
+    { choice: DYNAMIC_ACCENT, label: "ACCENT_DYNAMIC" },
+    { choice: THEME_ACCENT, label: "ACCENT_THEME" },
+  ];
 
-  let picked = $state<number | null>(untrack(() => selected));
-  let lastIndex = $state(untrack(() => (selected !== null && selected !== DYNAMIC_ACCENT ? selected : DEFAULT_INDEX)));
+  const groups = $derived(
+    packs.all
+      .filter((pack) => pack.accents.length)
+      .map((pack) => ({ id: pack.info.id, name: pack.info.name, accents: pack.accents })),
+  );
 
-  const dynamic = $derived(picked === DYNAMIC_ACCENT);
+  let picked = $state<string | null>(untrack(() => selected));
 
-  const apply = (value: number | null) => {
-    picked = value;
-    onSelect?.(value);
-  };
-
-  const pick = (value: number | null) => {
-    apply(value);
+  const pick = (choice: string | null) => {
+    picked = choice;
+    onSelect?.(choice);
     if (closeOnPick) onDismiss();
   };
-
-  const setDynamic = (on: boolean) => apply(on ? DYNAMIC_ACCENT : showNone ? null : lastIndex);
 </script>
 
 <CompactDialog {title} {onDismiss}>
@@ -53,48 +49,51 @@
     <ActionButton text={t("CANCEL")} onclick={onDismiss} />
   {/snippet}
 
-  <SwitchRow
-    class="mb-4"
-    title={t("ACCENT_DYNAMIC")}
-    checked={dynamic}
-    onChange={setDynamic}
-  >
-    {#snippet leading()}
-      <span class="size-5 rounded-full" style="background: {theme.systemAccent ?? theme.appAccent}"></span>
-    {/snippet}
-  </SwitchRow>
-
-  <div class={SWATCH_GRID_CLASS} class:opacity-40={dynamic}>
-    {#if showNone}
-      <button
-        type="button"
-        onclick={() => pick(null)}
-        aria-label={t("COLOR_NONE")}
-        class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {swatchBorder(picked === null)}"
-      >
-        {#if picked === null}
-          <Check size={20} />
-        {:else}
-          <X size={18} />
-        {/if}
-      </button>
-    {/if}
-    {#each ACCENTS as accent, index (accent.name)}
-      <button
-        type="button"
-        title={accent.name}
-        aria-label={accent.name}
-        onclick={() => {
-          lastIndex = index;
-          pick(index);
-        }}
-        class="{SWATCH_CLASS} text-white {swatchBorder(!dynamic && picked === index)}"
-        style="background: {accent.value}"
-      >
-        {#if !dynamic && picked === index}
-          <Check size={20} />
-        {/if}
-      </button>
+  <div class="mb-4">
+    {#each SOURCES as source (source.choice)}
+      <DialogSelectItem label={t(source.label)} selected={picked === source.choice} onclick={() => pick(source.choice)}>
+        {#snippet trailing()}
+          <span class="flex size-8 shrink-0 items-center justify-center">
+            <span class="size-5 rounded-full" style="background: {theme.resolve(source.choice)}"></span>
+          </span>
+        {/snippet}
+      </DialogSelectItem>
     {/each}
   </div>
+
+  {#each groups as group, index (group.id)}
+    {#if groups.length > 1}
+      <SectionHeader label={group.name} divider={index > 0} />
+    {/if}
+    <div class="{SWATCH_GRID_CLASS} {index < groups.length - 1 ? 'mb-3' : ''}">
+      {#if showNone && index === 0}
+        <button
+          type="button"
+          onclick={() => pick(null)}
+          aria-label={t("COLOR_NONE")}
+          class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {swatchBorder(picked === null)}"
+        >
+          {#if picked === null}
+            <Check size={20} />
+          {:else}
+            <X size={18} />
+          {/if}
+        </button>
+      {/if}
+      {#each group.accents as accent (accent.id)}
+        <button
+          type="button"
+          title={accent.name}
+          aria-label={accent.name}
+          onclick={() => pick(accent.id)}
+          class="{SWATCH_CLASS} text-white {swatchBorder(picked === accent.id)}"
+          style="background: {accent.color}"
+        >
+          {#if picked === accent.id}
+            <Check size={20} />
+          {/if}
+        </button>
+      {/each}
+    </div>
+  {/each}
 </CompactDialog>

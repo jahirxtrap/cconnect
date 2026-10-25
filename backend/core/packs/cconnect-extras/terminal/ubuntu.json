@@ -1,0 +1,23 @@
+{
+  "name": "Ubuntu",
+  "colors": {
+    "background": "#300a24",
+    "foreground": "#ffffff",
+    "black": "#1b1b1b",
+    "red": "#cc1a12",
+    "green": "#4e9a06",
+    "yellow": "#c4a000",
+    "blue": "#3667a6",
+    "magenta": "#7f5985",
+    "cyan": "#06989a",
+    "white": "#d5d5d5",
+    "bright-black": "#838383",
+    "bright-red": "#f93632",
+    "bright-green": "#8ae234",
+    "bright-yellow": "#fce94f",
+    "bright-blue": "#729fcf",
+    "bright-magenta": "#ad7fa8",
+    "bright-cyan": "#34e2e2",
+    "bright-white": "#eeeeec"
+  }
+}

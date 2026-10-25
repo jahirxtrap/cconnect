@@ -4,6 +4,8 @@ mod android;
 mod browser;
 mod local_server;
 mod oauth;
+#[cfg(desktop)]
+mod opened;
 mod presence;
 mod secret;
 mod shield;
@@ -15,7 +17,13 @@ mod webkit;
 use tauri::Manager;
 
 pub(crate) const MAIN_WINDOW: &str = "main";
-pub(crate) const PAGE_SCRIPT: &str = include_str!("page.js");
+pub(crate) const PAGE_SCRIPT: &str = concat!(
+    "(() => {\nconst watchIcon = ",
+    include_str!("../../../backend/core/scripts/page_icon.js"),
+    ";\n",
+    include_str!("page.js"),
+    "})();\n"
+);
 #[cfg(desktop)]
 const TRAY_ID: &str = "cconnect";
 
@@ -100,14 +108,16 @@ pub fn run() {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             use tauri::Manager;
             if let Some(window) = app.webview_windows().values().next() {
                 let _ = window.show();
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
+            opened::hold(app, argv.into_iter().skip(1).map(std::path::PathBuf::from));
         }));
+        builder = builder.manage(opened::Opened::default());
         builder = builder.plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(state_flags())
@@ -134,6 +144,8 @@ pub fn run() {
             hide_helper_windows();
             #[cfg(desktop)]
             present_window(_app);
+            #[cfg(desktop)]
+            opened::hold(_app.handle(), std::env::args().skip(1).map(std::path::PathBuf::from));
             #[cfg(target_os = "android")]
             android::install(_app.handle());
             Ok(())
@@ -169,6 +181,8 @@ pub fn run() {
             oauth::oauth_cancel,
             presence::presence_set,
             presence::presence_clear,
+            #[cfg(desktop)]
+            opened::opened_files,
             #[cfg(desktop)]
             browser::browser_open,
             #[cfg(desktop)]
@@ -237,6 +251,10 @@ pub fn run() {
                 presence::shutdown(&app.state::<presence::Presence>());
                 local_server::shutdown(&app.state::<local_server::LocalServerState>());
                 std::process::exit(0);
+            }
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Opened { urls } => {
+                opened::hold(app, urls.into_iter().filter_map(|url| url.to_file_path().ok()));
             }
             tauri::RunEvent::Exit => {
                 #[cfg(desktop)]

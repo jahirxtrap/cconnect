@@ -19,6 +19,7 @@ from core.config import (
 )
 from core.responses import api_response
 from services import accounts, cli_info
+from services.pack_format import SCHEMA as PACK_SCHEMA
 import mcps
 
 router = APIRouter(tags=["Capabilities"])
@@ -42,6 +43,7 @@ async def get_capabilities(capabilities: str = Query(""), account: str = Query("
         "models": listed,
         "request_limit": REQUEST_LIMIT_BYTES,
         "shared_scheme": SHARED_SCHEME,
+        "pack_schema": PACK_SCHEMA["schema"],
         "output_styles": cli_info.output_styles(info),
         "fast_mode": cli_info.fast_mode(info),
         "colors": COLORS,

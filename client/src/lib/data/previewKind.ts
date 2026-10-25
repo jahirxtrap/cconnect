@@ -1,9 +1,10 @@
+import { isPackFile } from "$lib/design/packs/schema";
 import { resolveLang } from "$lib/markdown/highlighter";
 import { isArchive } from "./format";
 
 export type PreviewKind = "image" | "markdown" | "html" | "text" | "pdf" | "video" | "audio";
 
-export type FileKind = "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "archive" | "text";
+export type FileKind = "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "archive" | "pack" | "text";
 
 export const FILE_KINDS: FileKind[] = [
   "image",
@@ -13,6 +14,7 @@ export const FILE_KINDS: FileKind[] = [
   "markdown",
   "code",
   "archive",
+  "pack",
   "text",
 ];
 
@@ -33,6 +35,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   jpeg: "image/jpeg",
   gif: "image/gif",
   webp: "image/webp",
+  avif: "image/avif",
   bmp: "image/bmp",
   svg: "image/svg+xml",
   ico: "image/x-icon",
@@ -82,6 +85,7 @@ export const isPreviewable = (filename: string): boolean =>
   MARKDOWN_EXTENSIONS.includes(extensionOf(filename)) || guessMimeType(filename) !== null;
 
 export const fileKindOf = (filename: string): FileKind => {
+  if (isPackFile(filename)) return "pack";
   if (isArchive(filename)) return "archive";
   const kind = previewKindOf(filename);
   if (kind === "markdown" || kind === "pdf" || kind === "image" || kind === "video" || kind === "audio") {

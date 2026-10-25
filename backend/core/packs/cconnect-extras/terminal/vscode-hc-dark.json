@@ -1,0 +1,23 @@
+{
+  "name": "VS Code Dark High Contrast",
+  "colors": {
+    "background": "#000000",
+    "foreground": "#ffffff",
+    "black": "#000000",
+    "red": "#cd0000",
+    "green": "#00cd00",
+    "yellow": "#cdcd00",
+    "blue": "#0000ee",
+    "magenta": "#cd00cd",
+    "cyan": "#00cdcd",
+    "white": "#e5e5e5",
+    "bright-black": "#7f7f7f",
+    "bright-red": "#ff0000",
+    "bright-green": "#00ff00",
+    "bright-yellow": "#ffff00",
+    "bright-blue": "#5c5cff",
+    "bright-magenta": "#ff00ff",
+    "bright-cyan": "#00ffff",
+    "bright-white": "#ffffff"
+  }
+}

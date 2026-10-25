@@ -1,0 +1,23 @@
+{
+  "name": "One Half Light",
+  "colors": {
+    "background": "#fafafa",
+    "foreground": "#383a42",
+    "black": "#383a42",
+    "red": "#e45649",
+    "green": "#50a14f",
+    "yellow": "#c18301",
+    "blue": "#0184bc",
+    "magenta": "#a626a4",
+    "cyan": "#0997b3",
+    "white": "#fafafa",
+    "bright-black": "#4f525d",
+    "bright-red": "#df6c75",
+    "bright-green": "#98c379",
+    "bright-yellow": "#e4c07a",
+    "bright-blue": "#61afef",
+    "bright-magenta": "#c577dd",
+    "bright-cyan": "#56b5c1",
+    "bright-white": "#ffffff"
+  }
+}

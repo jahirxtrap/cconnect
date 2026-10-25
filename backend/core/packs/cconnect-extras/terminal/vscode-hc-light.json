@@ -1,0 +1,23 @@
+{
+  "name": "VS Code Light High Contrast",
+  "colors": {
+    "background": "#ffffff",
+    "foreground": "#292929",
+    "black": "#292929",
+    "red": "#cd3131",
+    "green": "#136c13",
+    "yellow": "#949800",
+    "blue": "#0451a5",
+    "magenta": "#bc05bc",
+    "cyan": "#0598bc",
+    "white": "#555555",
+    "bright-black": "#666666",
+    "bright-red": "#cd3131",
+    "bright-green": "#00bc00",
+    "bright-yellow": "#b5ba00",
+    "bright-blue": "#0451a5",
+    "bright-magenta": "#bc05bc",
+    "bright-cyan": "#0598bc",
+    "bright-white": "#a5a5a5"
+  }
+}

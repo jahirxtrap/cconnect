@@ -1,0 +1,23 @@
+{
+  "name": "Light+",
+  "colors": {
+    "background": "#ffffff",
+    "foreground": "#333333",
+    "black": "#000000",
+    "red": "#cd3131",
+    "green": "#107c10",
+    "yellow": "#949800",
+    "blue": "#0451a5",
+    "magenta": "#bc05bc",
+    "cyan": "#0598bc",
+    "white": "#555555",
+    "bright-black": "#666666",
+    "bright-red": "#f14c4c",
+    "bright-green": "#14ce14",
+    "bright-yellow": "#b5ba00",
+    "bright-blue": "#3b8eea",
+    "bright-magenta": "#d670d6",
+    "bright-cyan": "#29b8db",
+    "bright-white": "#a5a5a5"
+  }
+}
