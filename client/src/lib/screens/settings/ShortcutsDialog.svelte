@@ -113,8 +113,8 @@
 
   <div class="flex w-full flex-col">
     <p class="px-2 text-body-sm text-on-surface-variant">{t("SHORTCUTS_HINT")}</p>
-    {#each groups as group (group.scope)}
-      <SectionHeader label={t(SCOPE_LABELS[group.scope])} />
+    {#each groups as group, index (group.scope)}
+      <SectionHeader label={t(SCOPE_LABELS[group.scope])} divider={index > 0} />
       {#each group.items as shortcut (shortcut.id)}
         <div class="flex items-center pr-1">
           <Pressable

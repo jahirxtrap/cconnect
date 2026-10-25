@@ -7,10 +7,11 @@
   import { inPane } from "$lib/screens/chat/paneSurface";
   import { COMPACT_WIDTH } from "$lib/platform/layout.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import Sparkline from "$lib/ui/Sparkline.svelte";
-  import { animateScrollLeft } from "$lib/ui/animateScroll";
+  import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import { formatUptime, monitor } from "./monitor.svelte";
   import MonitorTabs from "./MonitorTabs.svelte";
   import NetworkPage from "./NetworkPage.svelte";
@@ -25,29 +26,11 @@
 
   let width = $state(0);
   let logBox = $state<HTMLDivElement | null>(null);
-  let pager = $state<HTMLDivElement | null>(null);
   let followLogs = true;
-  let shown = 0;
 
   const OsIcon = $derived(osIcon(monitor.info?.osId));
   const narrow = $derived(width < COMPACT_WIDTH);
   const hasNetwork = $derived(monitor.network?.supported === true);
-
-  $effect(() => {
-    const index = monitor.page;
-    if (!pager || index === shown) return;
-    const far = Math.abs(index - shown) > 1;
-    shown = index;
-    const target = index * pager.clientWidth;
-    if (far) pager.scrollLeft = target;
-    else animateScrollLeft(pager, target);
-  });
-
-  const onPagerScroll = () => {
-    if (!pager) return;
-    shown = Math.round(pager.scrollLeft / pager.clientWidth);
-    monitor.page = shown;
-  };
 
   const levelClass = (level: string) =>
     level === "ERROR" || level === "CRITICAL"
@@ -65,12 +48,10 @@
 </script>
 
 <div bind:clientWidth={width} class="flex min-h-0 flex-1 flex-col">
-  {#if !monitor.info}
-    <EmptyState
-      loading={!monitor.offline}
-      text={pane && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("CONNECTION_ERROR")}
-      class="flex-1"
-    />
+  {#if serverStatus.unavailable}
+    <ServerUnavailable class="flex-1" />
+  {:else if !monitor.info}
+    <EmptyState loading={!monitor.offline} text={t("CONNECTION_ERROR")} class="flex-1" />
   {:else}
   {@const current = monitor.info}
   {@const gpu = monitor.gpu}
@@ -80,12 +61,8 @@
     </div>
   {/if}
 
-  <div
-    bind:this={pager}
-    onscroll={onPagerScroll}
-    class="no-scrollbar flex min-h-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain"
-  >
-    <div class="flex w-full shrink-0 snap-center flex-col">
+  <TabPager selected={monitor.page} onSelect={(index) => (monitor.page = index)} class="min-h-0 flex-1">
+    <div class={TAB_PAGE_CLASS}>
       <div class="min-h-0 flex-1 overflow-y-auto {INSET}">
         <div class="grid gap-2.5 {narrow ? '' : 'grid-cols-2'}">
           {@render graph("CPU", plural("CORES_COUNT", current.cpuCores), current.cpuPercent, monitor.cpuHistory)}
@@ -174,7 +151,7 @@
     </div>
 
     {#if hasNetwork && monitor.network}
-      <div class="flex w-full shrink-0 snap-center flex-col">
+      <div class={TAB_PAGE_CLASS}>
         <NetworkPage
           status={monitor.network}
           rxBytes={current.netRx}
@@ -184,7 +161,7 @@
       </div>
     {/if}
 
-    <div class="flex w-full shrink-0 snap-center flex-col">
+    <div class={TAB_PAGE_CLASS}>
       <div class="min-h-0 flex-1 {INSET}">
         <div
           bind:this={logBox}
@@ -206,7 +183,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </TabPager>
   {/if}
 </div>
 

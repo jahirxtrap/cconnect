@@ -8,9 +8,21 @@ export const FLOAT_PANEL_WIDTH = "w-full sm:w-90";
 
 export const TOOLTIP_CLASS = `rounded-md px-2 py-1 text-body-sm ${FLOAT}`;
 
-export const MENU_LIST_CLASS = `menu-surface scrollbar-thin z-70 overflow-x-hidden overflow-y-auto p-1 ${FLOAT_SURFACE_CLASS}`;
+const MENU_SURFACE = `menu-surface z-70 ${FLOAT_SURFACE_CLASS}`;
 
-export const MENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-52 max-w-[var(--bits-floating-available-width,100vw)]`;
+const MENU_SCROLL = "scrollbar-thin overflow-x-hidden overflow-y-auto";
+
+const MENU_BOUNDS = "max-h-96 min-w-52 max-w-[var(--bits-floating-available-width,100vw)]";
+
+export const MENU_LIST_CLASS = `${MENU_SURFACE} p-1 ${MENU_SCROLL}`;
+
+export const MENU_CONTENT_CLASS = `${MENU_LIST_CLASS} ${MENU_BOUNDS}`;
+
+export const MENU_PANEL_CLASS = `${MENU_SURFACE} flex flex-col ${MENU_BOUNDS}`;
+
+export const MENU_PANEL_HEAD_CLASS = "shrink-0 px-1 pt-1";
+
+export const MENU_PANEL_BODY_CLASS = `min-h-0 flex-1 px-1 pb-1 ${MENU_SCROLL}`;
 
 export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w-[calc(100vw-2rem)]`;
 

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
+
   interface Props {
     options: string[];
     selected: number;
@@ -9,6 +11,11 @@
   }
 
   const { options, selected, onSelect, counts = [], fill = false, class: className = "" }: Props = $props();
+
+  const step = (delta: number) => onSelect((selected + delta + options.length) % options.length);
+
+  useShortcut("view.tab.next", () => step(1));
+  useShortcut("view.tab.previous", () => step(-1));
 </script>
 
 <div
@@ -22,7 +29,7 @@
       role="tab"
       aria-selected={index === selected}
       onclick={() => onSelect(index)}
-      class="inline-flex h-7 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-body-sm whitespace-nowrap transition-colors {fill
+      class="inline-flex h-7 min-w-0 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 text-body-sm whitespace-nowrap transition-colors select-none {fill
         ? 'flex-1'
         : ''} {index === selected
         ? 'bg-outline-variant text-on-surface'

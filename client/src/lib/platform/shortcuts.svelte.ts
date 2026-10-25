@@ -84,6 +84,8 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "shared.cut", label: "SHORTCUT_SHARED_CUT", scope: "shared", keys: "Mod+KeyX" },
   { id: "shared.paste", label: "SHORTCUT_SHARED_PASTE", scope: "shared", keys: "Mod+KeyV" },
   { id: "shared.delete", label: "SHORTCUT_SHARED_DELETE", scope: "shared", keys: "Delete", mac: "Meta+Backspace" },
+  { id: "view.tab.next", label: "SHORTCUT_VIEW_TAB_NEXT", scope: "global", keys: "Ctrl+Tab" },
+  { id: "view.tab.previous", label: "SHORTCUT_VIEW_TAB_PREVIOUS", scope: "global", keys: "Ctrl+Shift+Tab" },
   {
     id: "window.fullscreen",
     label: "SHORTCUT_WINDOW_FULLSCREEN",

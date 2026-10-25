@@ -294,7 +294,7 @@
       {#if testing}
         <div class="px-3 py-2.5">
           <div class="flex items-center">
-            <span class="min-w-0 flex-1 text-body-md font-medium">{stageLabel}</span>
+            <span class="min-w-0 flex-1 text-item-title">{stageLabel}</span>
             <span class="text-body-md text-on-surface-variant">
               {formatDecimal(testProgress * PERCENT, 0)}%
             </span>

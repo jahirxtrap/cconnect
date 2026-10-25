@@ -1,7 +1,12 @@
+<script module lang="ts">
+  export const DIALOG_PAGE_CLASS = "scrollbar-thin overflow-y-auto px-5";
+</script>
+
 <script lang="ts">
   import { Dialog } from "bits-ui";
-  import type { Snippet } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
+  import { navigation } from "$lib/app/navigation.svelte";
   import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS } from "./menuSurface";
 
   interface Props {
@@ -12,6 +17,7 @@
     titleTrailing?: Snippet;
     header?: Snippet;
     buttons?: Snippet;
+    paged?: boolean;
     children?: Snippet;
   }
 
@@ -23,8 +29,11 @@
     titleTrailing,
     header,
     buttons,
+    paged = false,
     children,
   }: Props = $props();
+
+  const instant = untrack(() => navigation.returning);
 
   $effect(() => pushDismiss(() => onDismiss()));
 </script>
@@ -33,6 +42,7 @@
   <Dialog.Portal>
     <Dialog.Overlay class={DIALOG_OVERLAY_CLASS} />
     <Dialog.Content
+      data-instant={instant || undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
       class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-[min(40rem,calc(var(--safe-height)_-_2rem))] w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
@@ -55,7 +65,7 @@
       {/if}
       {#if children}
         <div
-          class="scrollbar-thin -mx-5 min-h-0 shrink overflow-x-clip overflow-y-auto px-5 {header
+          class="-mx-5 min-h-0 shrink {paged ? 'flex flex-col' : `overflow-x-clip ${DIALOG_PAGE_CLASS}`} {header
             ? 'mt-1.5'
             : 'mt-4'}"
         >
