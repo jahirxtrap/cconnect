@@ -13,6 +13,7 @@ export type CompatNotice = "app_outdated" | "server_outdated" | "cli_outdated" |
 class ServerStatus {
   reachable = $state(false);
   checking = $state(true);
+  answered = $state(false);
   version = $state<VersionInfo | null>(null);
   release = $state<Release | null>(null);
   updateAvailable = $state(false);
@@ -25,7 +26,7 @@ class ServerStatus {
 
   readonly online = $derived(this.reachable && !this.unauthorized);
 
-  readonly unavailable = $derived(!this.checking && !this.online);
+  readonly unavailable = $derived(this.answered && !this.online);
 
   readonly appOutdated = $derived(!satisfies(APP_VERSION, this.version?.supportedApp));
   readonly serverOutdated = $derived(!satisfies(this.version?.serverVersion, SUPPORTED_SERVER));
@@ -48,6 +49,7 @@ class ServerStatus {
     $effect(() => {
       void backend.baseUrl;
       this.checking = true;
+      this.answered = false;
       void this.refresh();
       const timer = setInterval(() => void this.refresh(), POLL_MS);
       const stopWake = onWake(() => {
@@ -91,6 +93,7 @@ class ServerStatus {
     this.version = version;
     this.reachable = version !== null;
     this.checking = false;
+    this.answered = true;
   }
 }
 

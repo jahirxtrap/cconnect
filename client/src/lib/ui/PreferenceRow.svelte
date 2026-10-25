@@ -34,7 +34,7 @@
 >
   <IconComponent size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
   <div class="min-w-0 flex-1">
-    <p class="truncate text-body-md font-medium">{title}</p>
+    <p class="truncate text-item-title">{title}</p>
     {#if summary}
       <p class="truncate text-body-sm text-on-surface-variant">{summary}</p>
     {/if}

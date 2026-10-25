@@ -18,6 +18,7 @@ export interface SessionMessage {
   role: Role;
   text: string;
   name: string | null;
+  mcp: boolean;
   path: string | null;
   interaction: InteractionData | null;
   diffLines: DiffLine[] | null;
@@ -62,6 +63,8 @@ const ROLES: Record<string, Role> = {
   api_error: "api_error",
   interrupted: "interrupted",
 };
+
+const RESULT_FIELD: Record<string, string> = { notice: "level", api_error: "severity" };
 
 const roleOf = (raw: Wire): Role => {
   const type = text(raw, "type");
@@ -126,6 +129,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     role: roleOf(raw),
     text: body,
     name: text(raw, "name") ?? text(raw, "tool_name") ?? text(raw, "subagent_type"),
+    mcp: raw.mcp === true,
     path: text(raw, "path"),
     interaction: type === "interaction" ? parseInteraction(raw) : null,
     diffLines:
@@ -161,7 +165,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     })(),
     index: int(raw, "index") ?? -1,
     labelOnly: raw.label === true,
-    result: text(raw, type === "notice" ? "level" : "result"),
+    result: text(raw, RESULT_FIELD[type ?? ""] ?? "result"),
     images: images.length ? images : null,
     timestamp: int(raw, "ts"),
     parent: text(raw, "parent"),

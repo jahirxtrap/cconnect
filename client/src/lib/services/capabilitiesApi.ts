@@ -61,6 +61,7 @@ export interface Capabilities {
   models: ModelOption[];
   requestLimit: number | null;
   sharedScheme: string;
+  packSchema: number | null;
   outputStyles: string[];
   fastMode: FastMode;
   colors: string[];
@@ -116,6 +117,7 @@ interface CapabilitiesWire extends VersionWire {
   models?: ModelWire[];
   request_limit?: number;
   shared_scheme?: string;
+  pack_schema?: number;
   output_styles?: string[];
   fast_mode?: { state?: string; disabled_reason?: string | null };
   colors?: string[];
@@ -204,6 +206,7 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
         })),
       requestLimit: data.request_limit ?? null,
       sharedScheme: data.shared_scheme ?? "",
+      packSchema: data.pack_schema ?? null,
       outputStyles: data.output_styles ?? [],
       fastMode: {
         state: data.fast_mode?.state ?? "off",

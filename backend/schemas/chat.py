@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 
 class VisibilityPrefs(BaseModel):
     simple: Optional[bool] = None
+    tokens: Optional[bool] = None
+    timings: Optional[bool] = None
     thinking: Optional[str] = None
     tool_use: Optional[str] = None
     file_change: Optional[str] = None
@@ -40,6 +42,7 @@ class PromptMessage(BaseModel):
     text: str
     attachments: list[str] = []
     id: Optional[str] = None
+    channel: Optional[str] = None
 
 
 class SetGenerationMessage(BaseModel):

@@ -13,6 +13,7 @@
     oninput: (value: string) => void;
     label?: string;
     required?: boolean;
+    optional?: boolean;
     placeholder?: string;
     secret?: boolean;
     singleLine?: boolean;
@@ -36,6 +37,7 @@
     oninput,
     label,
     required = false,
+    optional = false,
     placeholder,
     secret = false,
     singleLine = false,
@@ -79,7 +81,7 @@
 <div class="{enabled ? '' : 'opacity-40'} {className}">
   {#if label}
     <p class={FIELD_LABEL_CLASS}>
-      {label}{#if required}<span class="text-error">&nbsp;*</span>{/if}
+      {optional ? t("OPTIONAL_LABEL", label) : label}{#if required}<span class="text-error">&nbsp;*</span>{/if}
     </p>
   {/if}
   <div

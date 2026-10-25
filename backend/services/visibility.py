@@ -14,6 +14,8 @@ _STAMPS = ("seq", "channel", "parent")
 
 _FILE_CHANGE_KEEP = ("type", "id", "path")
 
+_TIMINGS = {"tool_result": "ms", "agent_result": "duration_ms"}
+
 _CLOSERS = frozenset({
     "assistant_text", "user", "interaction_request", "plan", "command", "notification",
     "summary", "compact", "compact_summary", "api_error", "done", "interrupted",
@@ -76,7 +78,10 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
         if kind == "thinking_tokens":
             return None
         if kind == "agent_result":
-            return {key: value for key, value in event.items() if key != "tokens"}
+            event = {key: value for key, value in event.items() if key != "tokens"}
+
+    if not prefs.get("timings") and kind in _TIMINGS:
+        event = {key: value for key, value in event.items() if key != _TIMINGS[kind]}
 
     if kind == "working":
         if not prefs.get("simple") or carry["working"]:

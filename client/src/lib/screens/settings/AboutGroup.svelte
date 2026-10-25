@@ -111,7 +111,7 @@
         style="width: {PREFERENCE_ICON_SIZE}px; height: {PREFERENCE_ICON_SIZE}px"
       />
       <div class="min-w-0 flex-1">
-        <p class="truncate text-body-md font-medium">{profile.name ?? profile.login}</p>
+        <p class="truncate text-item-title">{profile.name ?? profile.login}</p>
         <p class="truncate text-body-sm text-on-surface-variant">{label}</p>
       </div>
       <ExternalIndicator />
@@ -126,7 +126,7 @@
   >
       <AppLogo size={PREFERENCE_ICON_SIZE} />
       <div class="min-w-0 flex-1">
-      <p class="truncate text-body-md font-medium">{t("APP_NAME")}</p>
+      <p class="truncate text-item-title">{t("APP_NAME")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
         <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>

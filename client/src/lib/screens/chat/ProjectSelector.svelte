@@ -51,7 +51,7 @@
       : ''} {className}"
   >
     <FolderClosed size={16} class="shrink-0" />
-    <span class="min-w-0 flex-1 truncate text-left text-body-md font-medium text-on-surface">{label}</span>
+    <span class="min-w-0 flex-1 truncate text-left text-item-title text-on-surface">{label}</span>
     {#if menu}
       <ChevronDown size={16} class="shrink-0" />
     {/if}

@@ -1,4 +1,5 @@
 import { tick } from "svelte";
+import type { ApiRetry } from "$lib/data/apiRetry";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { serverStatus } from "$lib/data/serverStatus.svelte";
 import {
@@ -16,11 +17,15 @@ import {
   type QueuedMessage,
   type Role,
   type TodoItem,
+  type BackgroundTask,
 } from "$lib/data/chatModels";
 import { emptyModState, type ModState } from "$lib/data/modModels";
-import { projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
+import { isBusyActivity, projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
+import type { PromptCache } from "$lib/data/promptCache";
+import { liveLimits } from "$lib/data/liveLimits.svelte";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { withElements, type PickedElement } from "$lib/data/pickedElements";
+import { reloadText } from "$lib/data/reload";
 import { settings } from "$lib/data/settings.svelte";
 import { terminalTabs } from "$lib/data/terminalTabs.svelte";
 
@@ -49,6 +54,17 @@ interface Effective {
   file_change: string;
   compact: string;
   working: string;
+}
+
+interface HeldView {
+  queue: QueuedMessage[];
+  contextTokens: number | null;
+  promptCache: PromptCache | null;
+  requestBytes: number | null;
+  mediaBytes: number | null;
+  backgroundTasks: BackgroundTask[];
+  todos: TodoItem[];
+  runningToolIds: string[];
 }
 
 interface SideChat {
@@ -94,6 +110,14 @@ const COMPACT_COMMAND = "/compact";
 
 const withoutLiveCompact = (items: ChatMessage[]) =>
   items.filter((item) => !(item.role === "compact" && item.sourceIndex < 0));
+
+const matchKey = (item: ChatMessage): string | null => {
+  if (item.toolUseId) return `${item.role}:${item.toolUseId}`;
+  const text = item.text.trim();
+  return text ? `${item.role}:${text}` : null;
+};
+const AGENT_CHILD_ROLES: Role[] = ["thinking", "assistant", "tool", "file_change"];
+
 const PREVIEW_LENGTH = 120;
 const NOTIFICATION_BODY_LENGTH = 120;
 
@@ -152,15 +176,18 @@ export class ChatState {
   streaming = $state(false);
   compacting = $state(false);
   streamStatus = $state<string | null>(null);
+  apiRetry = $state<ApiRetry | null>(null);
   activity = $state<string | null>(null);
   resident = $state(false);
   todos = $state<TodoItem[]>([]);
   contextTokens = $state<number | null>(null);
+  promptCache = $state<PromptCache | null>(null);
   compactWindow = $state<number | null>(null);
   requestBytes = $state<number | null>(null);
   mediaBytes = $state<number | null>(null);
   pendingToolIds = $state<string[]>([]);
-  backgroundToolIds = $state<string[]>([]);
+  backgroundTasks = $state<BackgroundTask[]>([]);
+  readonly backgroundToolIds = $derived(this.backgroundTasks.map((task) => task.id));
   readonly runningToolIds = $derived([...this.pendingToolIds, ...this.backgroundToolIds]);
 
   environmentId = $state<string | null>(null);
@@ -240,13 +267,7 @@ export class ChatState {
   draft = $state("");
 
   queue = $state<QueuedMessage[]>([]);
-  #frozen = $state<{
-    messages: ChatMessage[];
-    queue: QueuedMessage[];
-    contextTokens: number | null;
-    requestBytes: number | null;
-    mediaBytes: number | null;
-  } | null>(null);
+  #frozen = $state<(HeldView & { messages: ChatMessage[] }) | null>(null);
   attachments = $state<Attachment[]>([]);
   elements = $state<ComposerElement[]>([]);
   uploading = $state(false);
@@ -282,7 +303,12 @@ export class ChatState {
   );
 
   readonly environment = $derived(backend.find(this.environmentId));
+  readonly defaultCwd = $derived(this.environment?.directory ?? "");
   readonly list = $derived(chatListFor(this.environment));
+  readonly liveActivity = $derived(
+    this.activity ?? this.list?.sessions.find((session) => session.sessionId === this.sessionId)?.activity ?? null,
+  );
+  readonly busy = $derived(this.streaming || isBusyActivity(this.liveActivity));
   readonly historyUnavailable = $derived(this.list === null || serverStatus.unavailable);
   readonly historyLoading = $derived(
     this.list !== null && !serverStatus.unavailable && (this.list.loading || !this.list.settingsReady),
@@ -308,10 +334,16 @@ export class ChatState {
     serverStatus.unavailable ? "disconnected" : this.connection,
   );
   readonly connected = $derived(this.connection === "connected");
-  readonly queueView = $derived(this.#frozen?.queue ?? this.queue);
-  readonly contextView = $derived(this.#frozen ? this.#frozen.contextTokens : this.contextTokens);
-  readonly requestView = $derived(this.#frozen ? this.#frozen.requestBytes : this.requestBytes);
-  readonly mediaView = $derived(this.#frozen ? this.#frozen.mediaBytes : this.mediaBytes);
+  #settling = $state<HeldView | null>(null);
+  #snapshot = $derived(this.#frozen ?? this.#settling);
+  readonly queueView = $derived(this.#snapshot?.queue ?? this.queue);
+  readonly backgroundView = $derived(this.#snapshot?.backgroundTasks ?? this.backgroundTasks);
+  readonly todosView = $derived(this.#snapshot?.todos ?? this.todos);
+  readonly runningView = $derived(this.#snapshot?.runningToolIds ?? this.runningToolIds);
+  readonly contextView = $derived(this.#snapshot ? this.#snapshot.contextTokens : this.contextTokens);
+  readonly cacheView = $derived(this.#snapshot ? this.#snapshot.promptCache : this.promptCache);
+  readonly requestView = $derived(this.#snapshot ? this.#snapshot.requestBytes : this.requestBytes);
+  readonly mediaView = $derived(this.#snapshot ? this.#snapshot.mediaBytes : this.mediaBytes);
   readonly visibleQueue = $derived(this.queueView.filter((item) => !this.#silent.has(item.id)));
 
   readonly effectiveModel = $derived(this.modelOverride || this.model);
@@ -339,6 +371,7 @@ export class ChatState {
   modsState = $state<"loading" | "off" | "needs_persistent" | "ready">("loading");
   #nextId = 1;
   #assistantId: number | null = null;
+  #held: ChatMessage[] = [];
   #thinkingId: number | null = null;
   #thinkingTokens: number | null = null;
   #outgoing = 0;
@@ -364,7 +397,7 @@ export class ChatState {
     this.sessionId = context.sessionId;
     this.projectKey = context.projectKey;
     this.sessionColor = context.color ?? null;
-    this.cwd = context.cwd || this.environment?.directory || "";
+    this.cwd = context.cwd || this.defaultCwd;
     this.#initial =
       context.sessionId && context.projectKey
         ? {
@@ -401,8 +434,9 @@ export class ChatState {
     if (id === this.environmentId) return;
     this.environmentId = id;
     backend.select(id);
-    this.cwd = this.environment?.directory ?? "";
+    this.cwd = this.defaultCwd;
     this.onContextChange?.();
+    this.#uploadAbort?.abort();
     this.#socket.close();
     this.connection = "disconnected";
     this.capabilitiesReady = false;
@@ -448,7 +482,7 @@ export class ChatState {
   }
 
   defaultProjectKey(projects: ProjectInfo[] = this.list?.projects ?? []): string | null {
-    const directory = this.environment?.directory ?? "";
+    const directory = this.defaultCwd;
     if (!directory) return null;
     const target = projectKeyOf(directory);
     return projects.find((item) => item.projectKey === target || item.path === directory)?.projectKey ?? target;
@@ -456,11 +490,11 @@ export class ChatState {
 
   #applyDefaultProject() {
     if (settings.lockedProject) this.historyProjectKey = settings.lockedProject;
-    else if (this.environment?.directory) this.historyProjectKey = this.defaultProjectKey();
+    else if (this.defaultCwd) this.historyProjectKey = this.defaultProjectKey();
   }
 
   withDefaultProject(projects: ProjectInfo[]): ProjectInfo[] {
-    const directory = this.environment?.directory ?? "";
+    const directory = this.defaultCwd;
     if (!directory) return projects;
     const target = projectKeyOf(directory);
     if (projects.some((item) => item.projectKey === target || item.path === directory)) return projects;
@@ -551,6 +585,8 @@ export class ChatState {
     }
     if (this.uploading) return;
 
+    const channel = this.#socket.channel;
+    const dir = this.uploadDir;
     const abort = new AbortController();
     this.#uploadAbort = abort;
     this.uploading = true;
@@ -569,7 +605,7 @@ export class ChatState {
           );
         },
         this.environment,
-        `${this.uploadDir}/${item.name}`,
+        `${dir}/${item.name}`,
         abort.signal,
       );
       if (path === null) {
@@ -586,7 +622,16 @@ export class ChatState {
     this.uploading = false;
     this.attachments = [];
     this.elements = [];
+    if (channel !== null && channel !== this.#socket.channel) {
+      this.#rememberPrompt(body);
+      this.#socket.sendPrompt(body, uploaded, this.#nextOutgoingId(), channel);
+      return;
+    }
     this.send(body, uploaded);
+  }
+
+  #nextOutgoingId(): string {
+    return `q${this.#outgoingTag}-${this.#outgoing++}`;
   }
 
   send(text: string, attachments: string[] = []) {
@@ -604,7 +649,7 @@ export class ChatState {
     this.#rememberPrompt(body);
 
     const silent = !this.streaming && !this.queue.length && !this.#sent.size;
-    const id = `q${this.#outgoingTag}-${this.#outgoing++}`;
+    const id = this.#nextOutgoingId();
     if (silent) this.#silent.add(id);
     this.queue = [...this.queue, { id, text: body, attachments, uploading: false }];
 
@@ -646,8 +691,12 @@ export class ChatState {
     }
     if (!this.streaming) return;
     this.#interrupting = true;
-    this.streamStatus = this.streamStatus === "failed" ? "failed" : null;
+    this.streamStatus = null;
     this.#socket.sendInterrupt();
+  }
+
+  stopTask(id: string) {
+    this.#socket.sendStopTask(id);
   }
 
   get #sideKey(): string {
@@ -811,6 +860,15 @@ export class ChatState {
           ],
         });
         break;
+      case "usage":
+        this.#sideAssistantId = null;
+        this.#patchSide(key, {
+          messages: [
+            ...side.messages,
+            newMessage(this.#nextId++, "usage", { timestamp: null, ephemeral: true, usage: event.usage }),
+          ],
+        });
+        break;
       case "interaction_request":
         this.#sideAssistantId = null;
         if (!side.messages.some((item) => item.interaction?.requestId === event.requestId)) {
@@ -882,19 +940,25 @@ export class ChatState {
     return this.#frozen?.messages ?? this.messages;
   }
 
+  #heldView(): HeldView {
+    return {
+      queue: this.queue,
+      contextTokens: this.contextTokens,
+      promptCache: this.promptCache,
+      requestBytes: this.requestBytes,
+      mediaBytes: this.mediaBytes,
+      backgroundTasks: this.backgroundTasks,
+      todos: this.todos,
+      runningToolIds: this.runningToolIds,
+    };
+  }
+
   #freeze() {
-    if (this.#frozen === null && this.messages.length) {
-      this.#frozen = {
-        messages: this.messages,
-        queue: this.queue,
-        contextTokens: this.contextTokens,
-        requestBytes: this.requestBytes,
-        mediaBytes: this.mediaBytes,
-      };
-    }
+    if (this.#frozen === null && this.messages.length) this.#frozen = { messages: this.messages, ...this.#heldView() };
   }
 
   async #openSession(session: SessionInfo) {
+    this.#socket.resetResume();
     this.#freeze();
     this.viewOnly = null;
     this.pendingCategoryId = null;
@@ -916,7 +980,6 @@ export class ChatState {
       this.transcriptLoading = false;
       return;
     }
-    this.#socket.resetResume();
     this.#startSession(session.sessionId);
   }
 
@@ -949,8 +1012,11 @@ export class ChatState {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     if (!sessionId || !project) return;
-    this.transcriptPaging = true;
-    this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE);
+    this.transcriptPaging = this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE);
+  }
+
+  #abandonPage() {
+    if (!this.viewOnly) this.transcriptPaging = false;
   }
 
   async #loadOlderViewOnly(item: TrashedSession, before: number) {
@@ -1083,9 +1149,9 @@ export class ChatState {
 
   selectHistoryProject(projectKey: string | null) {
     this.historyProjectKey = projectKey;
-    if (!projectKey) return;
-    const path = this.#projectPath(projectKey);
-    if (!path || path === this.cwd) return;
+    if (!projectKey && this.sessionId) return;
+    const path = projectKey ? this.#projectPath(projectKey) : this.defaultCwd;
+    if (path === null || path === this.cwd) return;
     this.cwd = path;
     this.onContextChange?.();
     if (!this.sessionId) this.#pushGeneration({ cwd: path });
@@ -1164,9 +1230,10 @@ export class ChatState {
   }
 
   runCommand(command: CommandOption) {
-    if (command.kind === "usage") {
-      this.#append(newMessage(this.#nextId++, "user", { text: `/${command.name}` }));
-      this.#socket.sendUsage();
+    if (command.kind === "usage" || command.kind === "reload") {
+      this.#appendLocal(newMessage(this.#nextId++, "user", { text: `/${command.name}`, ephemeral: true }));
+      if (command.kind === "usage") this.#socket.sendUsage();
+      else this.#socket.sendReload(command.name);
       return;
     }
     if (command.kind === "client" && command.name === "clear") {
@@ -1180,11 +1247,10 @@ export class ChatState {
     if (this.streaming) return;
     const sessionId = this.sessionId;
     const project = this.projectKey;
-    if (sessionId && project) {
-      void this.#sessions.remove(sessionId, project);
-      this.list?.removeSession(sessionId);
-    }
     this.newSession();
+    if (!sessionId || !project) return;
+    void this.#sessions.remove(sessionId, project);
+    this.list?.forgetSession(sessionId);
   }
 
   async autoRename(session: SessionInfo) {
@@ -1226,6 +1292,10 @@ export class ChatState {
   categoriesFor(projectKey: string | null): ChatCategory[] {
     return this.categories.filter((item) => !item.projectKey || item.projectKey === projectKey);
   }
+
+  readonly scopedCategories = $derived(
+    settings.lockedProject ? this.categoriesFor(settings.lockedProject) : this.categories,
+  );
 
   async setChatOrder(order: string) {
     if (order === this.chatOrder) return;
@@ -1362,6 +1432,7 @@ export class ChatState {
     this.oldestLoadedIndex = page && page.items.length ? page.startIndex : null;
     this.transcriptExhausted = !page?.hasMore;
     this.contextTokens = page?.contextTokens ?? null;
+    this.promptCache = page?.cache ?? null;
     this.requestBytes = page?.requestBytes ?? null;
     this.mediaBytes = page?.mediaBytes ?? null;
     this.transcriptLoading = false;
@@ -1426,7 +1497,7 @@ export class ChatState {
 
   async deleteProject(projectKey: string) {
     if (!(await this.#sessions.deleteProject(projectKey))) return;
-    this.list?.removeProject(projectKey);
+    this.list?.forgetProject(projectKey);
     if (this.historyProjectKey === projectKey) this.selectHistoryProject(null);
     if (this.projectKey === projectKey) this.newSession();
   }
@@ -1448,8 +1519,7 @@ export class ChatState {
   async remove(session: SessionInfo) {
     if (!session.projectKey) return;
     if (!(await this.#sessions.remove(session.sessionId, session.projectKey))) return;
-    this.list?.removeSession(session.sessionId);
-    if (this.sessionId === session.sessionId) this.newSession();
+    this.list?.forgetSession(session.sessionId);
   }
 
   #updateHistoryTitle(sessionId: string, title: string) {
@@ -1526,17 +1596,74 @@ export class ChatState {
   }
 
   #append(item: ChatMessage) {
-    this.messages = [...this.messages, item];
+    this.messages = [...this.messages, ...this.#takeHeld(), item];
     this.#capFromTail(MESSAGE_TAIL_CAP);
+  }
+
+  #appendLocal(item: ChatMessage) {
+    if (this.streaming && this.#assistantId !== null) this.#held = [...this.#held, item];
+    else this.#append(item);
+  }
+
+  #takeHeld(): ChatMessage[] {
+    const held = this.#held;
+    this.#held = [];
+    return held;
+  }
+
+  #flushHeld() {
+    if (this.#held.length) this.messages = [...this.messages, ...this.#takeHeld()];
   }
 
   #capFromTail(cap: number) {
     if (!this.followBottom || this.messages.length <= cap) return;
-    const kept = this.messages.slice(this.messages.length - cap);
-    const cursor = kept.find((item) => item.sourceIndex >= 0)?.sourceIndex;
-    this.messages = kept;
-    this.oldestLoadedIndex = cursor ?? this.oldestLoadedIndex;
+    const last = this.messages.length - cap;
+    const cut = this.messages.findLastIndex((item, index) => index <= last && item.sourceIndex >= 0);
+    if (cut <= 0) return;
+    this.messages = this.messages.slice(cut);
+    this.oldestLoadedIndex = this.messages[0].sourceIndex;
     this.transcriptExhausted = false;
+  }
+
+  async #indexLive() {
+    const sessionId = this.sessionId;
+    const project = this.#projectKey();
+    const held = this.messages;
+    const live = held.filter((item) => item.sourceIndex < 0 && !item.ephemeral).length;
+    if (!sessionId || !project || !live) return;
+    const page = await this.#sessions.messages(sessionId, project, Math.min(live, MESSAGE_TAIL_CAP), null, settings.visibility);
+    if (!page || sessionId !== this.sessionId) return;
+    const stored = this.#nest(page.items.filter(isVisible).map((item, index) => this.#fromSession(item, index, sessionId, project)));
+    const positions = new Map<string, number>();
+    const repeated = new Set<string>();
+    const indexed = new Map(stored.map((item, at) => [item.sourceIndex, at]));
+    stored.forEach((item, at) => {
+      const key = matchKey(item);
+      if (key === null) return;
+      if (positions.has(key)) repeated.add(key);
+      positions.set(key, at);
+    });
+    const found = new Map<number, number>();
+    let bound = stored.length;
+    for (let i = held.length - 1; i >= 0; i--) {
+      const item = held[i];
+      if (item.sourceIndex >= 0) {
+        const at = indexed.get(item.sourceIndex);
+        if (at === undefined) break;
+        bound = Math.min(bound, at);
+        continue;
+      }
+      const key = item.ephemeral ? null : matchKey(item);
+      const at = key === null || repeated.has(key) ? undefined : positions.get(key);
+      if (at === undefined || at >= bound) continue;
+      found.set(item.id, stored[at].sourceIndex);
+      bound = at;
+    }
+    if (!found.size) return;
+    this.messages = this.messages.map((item) => {
+      const index = found.get(item.id);
+      return index === undefined ? item : { ...item, sourceIndex: index };
+    });
   }
 
   #projectKey(): string | null {
@@ -1546,15 +1673,17 @@ export class ChatState {
 
   #resetTranscript() {
     this.messages = [];
+    this.#held = [];
     this.#history = [];
     this.expandedIds = {};
     this.todos = [];
     this.queue = [];
     this.contextTokens = null;
+    this.promptCache = null;
     this.requestBytes = null;
     this.mediaBytes = null;
     this.pendingToolIds = [];
-    this.backgroundToolIds = [];
+    this.backgroundTasks = [];
     this.oldestLoadedIndex = null;
     this.transcriptLoading = false;
     this.transcriptPaging = false;
@@ -1605,8 +1734,9 @@ export class ChatState {
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
-    this.backgroundToolIds = [];
+    this.backgroundTasks = [];
     this.contextTokens = page.contextTokens;
+    this.promptCache = page.cache;
     this.requestBytes = page.requestBytes;
     this.mediaBytes = page.mediaBytes;
     if (page.prompts) this.#history = page.prompts;
@@ -1614,6 +1744,7 @@ export class ChatState {
   }
 
   #reloadOnDone = false;
+  #cutChannel: string | null = null;
 
   async #reloadConversation({ keepLive = false } = {}) {
     const sessionId = this.sessionId;
@@ -1647,7 +1778,7 @@ export class ChatState {
     this.transcriptPaging = false;
     this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
-    this.backgroundToolIds = [];
+    this.backgroundTasks = [];
     if (page.prompts) this.#history = page.prompts;
   }
 
@@ -1668,6 +1799,7 @@ export class ChatState {
       message: newMessage(id, item.role, {
         text: item.text,
         toolName: item.name,
+        toolMcp: item.mcp,
         toolUseId: item.toolUseId,
         path: item.path,
         interaction: item.interaction,
@@ -1694,7 +1826,7 @@ export class ChatState {
     for (const { message: item, parent } of flat) {
       if (parent !== null) {
         const index = agentAt.get(parent);
-        if (index !== undefined && (item.role === "tool" || item.role === "file_change")) {
+        if (index !== undefined && AGENT_CHILD_ROLES.includes(item.role)) {
           result[index] = { ...result[index], children: [...result[index].children, item] };
         }
         continue;
@@ -1732,36 +1864,56 @@ export class ChatState {
     );
   }
 
-  #onAgentChild(parent: string, event: ServerEvent) {
-    const child =
-      event.type === "tool_use"
-        ? newMessage(this.#nextId++, "tool", {
+  #childrenAfter(children: ChatMessage[], event: ServerEvent): ChatMessage[] {
+    const last = children.at(-1);
+    switch (event.type) {
+      case "assistant_text":
+      case "thinking": {
+        const role = event.type === "thinking" ? "thinking" : "assistant";
+        if (event.type === "thinking" && event.labelOnly) {
+          return [...children, newMessage(this.#nextId++, "thinking", { labelOnly: true })];
+        }
+        if (!event.text) return children;
+        if (last?.role === role && !last.labelOnly) return [...children.slice(0, -1), { ...last, text: last.text + event.text }];
+        return [...children, newMessage(this.#nextId++, role, { text: event.text })];
+      }
+      case "tool_use":
+        return [
+          ...children,
+          newMessage(this.#nextId++, "tool", {
             text: event.input ?? "",
             toolName: event.name,
+            toolMcp: event.mcp,
             toolUseId: event.id,
             result: event.result,
-          })
-        : event.type === "file_change"
-          ? newMessage(this.#nextId++, "file_change", {
-              toolUseId: event.id,
-              path: event.path,
-              diffLines: event.diffLines,
-              labelOnly: event.labelOnly,
-            })
-          : null;
+          }),
+        ];
+      case "file_change":
+        return [
+          ...children,
+          newMessage(this.#nextId++, "file_change", {
+            toolUseId: event.id,
+            toolName: event.tool,
+            path: event.path,
+            diffLines: event.diffLines,
+            labelOnly: event.labelOnly,
+          }),
+        ];
+      case "tool_result":
+        return event.toolUseId && event.content !== null
+          ? children.map((kid) => (kid.toolUseId === event.toolUseId ? { ...kid, result: event.content } : kid))
+          : children;
+      default:
+        return children;
+    }
+  }
 
-    this.messages = this.messages.map((item) => {
-      if (item.role !== "agent" || item.toolUseId !== parent) return item;
-      if (event.type === "tool_result" && event.toolUseId && event.content !== null) {
-        return {
-          ...item,
-          children: item.children.map((kid) =>
-            kid.toolUseId === event.toolUseId ? { ...kid, result: event.content } : kid,
-          ),
-        };
-      }
-      return child ? { ...item, children: [...item.children, child] } : item;
-    });
+  #onAgentChild(parent: string, event: ServerEvent) {
+    this.messages = this.messages.map((item) =>
+      item.role === "agent" && item.toolUseId === parent
+        ? { ...item, children: this.#childrenAfter(item.children, event) }
+        : item,
+    );
 
     if (event.type === "tool_result" && event.toolUseId) {
       const toolUseId = event.toolUseId;
@@ -1941,7 +2093,7 @@ export class ChatState {
   #resetStreaming() {
     this.streaming = false;
     this.compacting = false;
-    this.streamStatus = this.streamStatus === "failed" ? "failed" : null;
+    this.streamStatus = null;
     this.pendingToolIds = [];
     this.#assistantId = null;
     this.#thinkingId = null;
@@ -1964,6 +2116,7 @@ export class ChatState {
     }
     switch (event.type) {
       case "connecting":
+        this.#abandonPage();
         if (event.resumed || (this.connection !== "connected" && this.connection !== "disconnected")) {
           this.connection = "connecting";
         }
@@ -1972,6 +2125,7 @@ export class ChatState {
         this.#startSession(this.sessionId);
         break;
       case "ready": {
+        if (this.#frozen === null) this.#settling = this.#heldView();
         void this.#consumeInitialSession(event.project);
         this.connection = "connected";
         this.mods.rebind();
@@ -1986,6 +2140,7 @@ export class ChatState {
         this.streaming = event.running;
         this.activity = event.activity;
         this.resident = event.resident;
+        this.backgroundTasks = [];
         const committed = event.committedCount;
         if (!event.resumed || !event.running) {
           this.messages = this.messages.filter((item) => !item.ephemeral);
@@ -2005,6 +2160,11 @@ export class ChatState {
         this.#applyQueueSnapshot(event.queued);
         void this.refreshServerInfo();
         this.#pumpQueue();
+        if (this.#cutChannel !== null && event.channel !== this.#cutChannel && !event.resumed && !event.running) {
+          this.#resetStreaming();
+          void this.#reloadConversation();
+        }
+        this.#cutChannel = null;
         break;
       }
       case "assistant_text":
@@ -2042,27 +2202,53 @@ export class ChatState {
         this.#thinkingId = null;
         this.#append(newMessage(this.#nextId++, "plan", { text: event.markdown }));
         break;
-      case "command":
+      case "command": {
+        const message = newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true });
+        if (event.local) {
+          this.#appendLocal(message);
+          break;
+        }
         this.#assistantId = null;
         this.#thinkingId = null;
-        this.#append(newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true }));
+        this.#append(message);
         break;
-      case "component":
+      }
+      case "component": {
+        const message = newMessage(this.#nextId++, "interaction", {
+          ephemeral: true,
+          interaction: {
+            ...emptyInteraction("shown", "component"),
+            title: event.title,
+            titleKey: event.titleKey,
+            icon: event.icon,
+            blocks: event.blocks,
+          },
+        });
+        if (event.local) {
+          this.#appendLocal(message);
+          break;
+        }
         this.#assistantId = null;
         this.#thinkingId = null;
-        this.#append(
-          newMessage(this.#nextId++, "interaction", {
-            ephemeral: true,
-            interaction: {
-              ...emptyInteraction("shown", "component"),
-              title: event.title,
-              titleKey: event.titleKey,
-              icon: event.icon,
-              blocks: event.blocks,
-            },
-          }),
-        );
+        this.#append(message);
         break;
+      }
+      case "usage": {
+        const message = newMessage(this.#nextId++, "usage", { ephemeral: true, usage: event.usage });
+        if (event.local) {
+          this.#appendLocal(message);
+          break;
+        }
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(message);
+        break;
+      }
+      case "reloaded": {
+        const text = reloadText(event);
+        if (text) this.#appendLocal(newMessage(this.#nextId++, "info", { text, ephemeral: true }));
+        break;
+      }
       case "notification":
         this.#assistantId = null;
         this.#thinkingId = null;
@@ -2127,14 +2313,14 @@ export class ChatState {
         break;
       case "task_running":
         if (event.id && !this.backgroundToolIds.includes(event.id)) {
-          this.backgroundToolIds = [...this.backgroundToolIds, event.id];
+          this.backgroundTasks = [...this.backgroundTasks, { id: event.id, description: event.description }];
         }
         break;
       case "agent_result": {
         const agentId = event.id;
         if (agentId) {
           this.pendingToolIds = this.pendingToolIds.filter((id) => id !== agentId);
-          this.backgroundToolIds = this.backgroundToolIds.filter((id) => id !== agentId);
+          this.backgroundTasks = this.backgroundTasks.filter((task) => task.id !== agentId);
           this.messages = this.messages.map((item) =>
             item.toolUseId === agentId
               ? {
@@ -2166,6 +2352,7 @@ export class ChatState {
         this.#append(
           newMessage(this.#nextId++, "api_error", {
             text: [t("HOOK_FAILED", event.name ?? "hook"), event.text].filter(Boolean).join("\n"),
+            result: "warning",
           }),
         );
         break;
@@ -2176,6 +2363,7 @@ export class ChatState {
           newMessage(this.#nextId++, "tool", {
             text: event.input ?? "",
             toolName: event.name,
+            toolMcp: event.mcp,
             toolUseId: event.id,
             result: event.result,
             toolMs: event.ms,
@@ -2225,8 +2413,9 @@ export class ChatState {
         this.compacting = false;
         break;
       case "status":
-        if (!(this.#interrupting && event.kind === "slow")) {
+        if (!(this.#interrupting && event.kind === "retrying")) {
           this.streamStatus = event.kind === "ok" ? null : event.kind;
+          this.apiRetry = event.retry;
         }
         break;
       case "activity":
@@ -2279,7 +2468,7 @@ export class ChatState {
         this.#upsertTodo(event.id, event.content, event.status);
         break;
       case "queued":
-        if (event.id && !this.#sent.has(event.id) && !this.queue.some((item) => item.id === event.id)) {
+        if (!event.replay && event.id && !this.#sent.has(event.id) && !this.queue.some((item) => item.id === event.id)) {
           this.#sent.add(event.id);
           this.queue = [...this.queue, { id: event.id, text: event.text, attachments: [], uploading: false }];
         }
@@ -2306,6 +2495,12 @@ export class ChatState {
         this.requestBytes = event.requestBytes;
         this.mediaBytes = event.mediaBytes;
         break;
+      case "cache":
+        this.promptCache = event.cache;
+        break;
+      case "rate_limit":
+        liveLimits.set(this.environmentId, this.effectiveAccount, event.windows);
+        break;
       case "session_started":
         this.#bindSession(event.sessionId);
         break;
@@ -2328,12 +2523,15 @@ export class ChatState {
           );
         }
         this.#resetStreaming();
+        this.#flushHeld();
         this.#interrupting = false;
         this.#dropUnborn();
         this.#pumpQueue();
         if (this.#reloadOnDone && !this.streaming) {
           this.#reloadOnDone = false;
           void this.#reloadConversation();
+        } else {
+          void this.#indexLive();
         }
         break;
       case "attached":
@@ -2344,6 +2542,7 @@ export class ChatState {
           .then(() => this.mods.whenDrawn())
           .then(() => {
             this.#frozen = null;
+            this.#settling = null;
             this.transcriptLoading = false;
           });
         break;
@@ -2358,7 +2557,7 @@ export class ChatState {
         this.streaming = false;
         this.compacting = false;
         this.pendingToolIds = [];
-        this.streamStatus = this.streamStatus === "failed" ? "failed" : null;
+        this.streamStatus = null;
         break;
       case "error": {
         this.#resetStreaming();
@@ -2366,13 +2565,14 @@ export class ChatState {
         if (unanswered?.role === "user") {
           this.messages = [...this.messages.slice(0, -1), { ...unanswered, sendStatus: "error" as const }];
         }
+        this.#flushHeld();
         break;
       }
       case "api_error":
         this.#assistantId = null;
         this.#thinkingId = null;
         this.streamStatus = null;
-        this.#append(newMessage(this.#nextId++, "api_error", { text: event.message }));
+        this.#append(newMessage(this.#nextId++, "api_error", { text: event.message, result: event.severity }));
         break;
       case "interaction_request":
         if (!this.messages.some((item) => item.interaction?.requestId === event.requestId)) {
@@ -2447,12 +2647,16 @@ export class ChatState {
         this.#attaching = false;
         this.#arrivingMods = null;
         this.#frozen = null;
+        this.#settling = null;
         this.transcriptLoading = false;
+        this.#abandonPage();
         this.#assistantId = null;
         this.#thinkingId = null;
         this.#sideAssistantId = null;
         this.connection = "disconnected";
+        if (this.streaming || this.pendingToolIds.length) this.#cutChannel ??= this.#socket.channel;
         this.streaming = false;
+        this.#flushHeld();
         this.#sides = Object.fromEntries(
           Object.entries(this.#sides).map(([key, side]) => [key, { ...side, streaming: false }]),
         );

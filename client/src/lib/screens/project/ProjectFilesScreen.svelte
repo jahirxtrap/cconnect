@@ -33,6 +33,7 @@
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
   import { nearEdge } from "$lib/ui/paging";
   import Pressable from "$lib/ui/Pressable.svelte";
@@ -925,12 +926,12 @@
       />
     {/if}
 
-    {#if loading}
+    {#if serverStatus.unavailable}
+      <ServerUnavailable class="min-h-0 flex-1" />
+    {:else if loading || (!projectKey && list?.loading !== false)}
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if !projectKey}
-      {#if serverStatus.unavailable}
-        <EmptyState text={t("SERVER_UNAVAILABLE")} class="min-h-0 flex-1" />
-      {:else if projects.length}
+      {#if projects.length}
         <div class={LIST_CLASS}>
           {#each projects as item (item.projectKey)}
             {@render projectRow(item)}

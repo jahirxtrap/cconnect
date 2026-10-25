@@ -7,6 +7,8 @@
   import EyeOff from "@lucide/svelte/icons/eye-off";
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
+  import type { PromptCache } from "$lib/data/promptCache";
+  import type { LimitWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
   import { contextWindowFor, effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
@@ -25,6 +27,7 @@
     connecting: boolean;
     switching: boolean;
     disconnected: boolean;
+    loading: boolean;
     model: string;
     modelSelected: string;
     effort: string;
@@ -38,9 +41,11 @@
     streamingSelected: string;
     simpleMode: boolean;
     contextTokens: number | null;
+    cache: PromptCache | null;
     compactWindow: number | null;
     requestBytes: number | null;
     mediaBytes: number | null;
+    limits: LimitWindow[];
     quickChatActive: boolean;
     onModel: (value: string) => void;
     onEffort: (value: string) => void;
@@ -56,6 +61,7 @@
     connecting,
     switching,
     disconnected,
+    loading,
     model,
     modelSelected,
     effort,
@@ -69,9 +75,11 @@
     streamingSelected,
     simpleMode,
     contextTokens,
+    cache,
     compactWindow,
     requestBytes,
     mediaBytes,
+    limits,
     quickChatActive,
     onModel,
     onEffort,
@@ -156,7 +164,7 @@
 
 <div
   use:hscrollbar={{ wheel: true }}
-  class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto"
+  class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-full"
 >
   {#if disconnected}
     <span class={STATE_CLASS}>
@@ -292,6 +300,7 @@
           />
         {/each}
         {#if providerAccounts.length}
+          <div class="my-1 border-t border-outline-variant"></div>
           {#each providerAccounts as option (option.value)}
             <MenuItem
               text={option.label}
@@ -343,13 +352,15 @@
   {/if}
 </div>
 
-{#if !disconnected && !connecting && ready && contextWindow !== null}
+{#if !disconnected && !connecting && !loading && ready && contextWindow !== null}
   <ContextRing
     tokens={contextTokens ?? 0}
     limit={contextWindow}
+    {cache}
     bytes={mediaBytes}
     totalBytes={requestBytes}
     byteLimit={capabilities?.requestLimit ?? null}
+    {limits}
   />
 {/if}
 </div>

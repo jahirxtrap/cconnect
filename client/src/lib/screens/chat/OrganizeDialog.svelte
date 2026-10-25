@@ -55,11 +55,11 @@
   const heightOf = (id: string) =>
     listElement?.querySelector<HTMLElement>(`[data-category="${id}"]`)?.offsetHeight ?? 0;
 
-  const dragFrom = $derived(chat.categories.findIndex((item) => item.id === draggingId));
+  const dragFrom = $derived(chat.scopedCategories.findIndex((item) => item.id === draggingId));
   const dropIndex = $derived(
     draggingId === null || step <= 0
       ? -1
-      : Math.max(0, Math.min(dragFrom + Math.round(dragDy / step), chat.categories.length - 1)),
+      : Math.max(0, Math.min(dragFrom + Math.round(dragDy / step), chat.scopedCategories.length - 1)),
   );
 
   const shiftOf = (index: number) => {
@@ -158,7 +158,8 @@
       const target = draggingId === id && dropIndex >= 0 && dropIndex !== dragFrom ? dropIndex : -1;
       if (target >= 0) {
         settling = true;
-        chat.reorderCategory(id, target);
+        const anchor = chat.scopedCategories[target].id;
+        chat.reorderCategory(id, chat.categories.findIndex((item) => item.id === anchor));
         void chat.commitCategoryOrder(id);
         requestAnimationFrame(() => requestAnimationFrame(() => (settling = false)));
       }
@@ -194,13 +195,13 @@
       selected={chat.defaultCategory}
       options={[
         { value: "", label: t("NO_CATEGORY") },
-        ...chat.categories.map((category) => ({ value: category.id, label: category.name })),
+        ...chat.scopedCategories.map((category) => ({ value: category.id, label: category.name })),
       ]}
       onSelect={(value) => void chat.setDefaultCategory(value)}
     />
 
     <p class="mt-1 mb-1.5 px-1 {SECTION_LABEL_CLASS}">{t("CATEGORIES")}</p>
-    {#each chat.categories as category, index (category.id)}
+    {#each chat.scopedCategories as category, index (category.id)}
       {@const dragging = draggingId === category.id}
       {@const hidden = chat.isCategoryHidden(category.id)}
       <div
@@ -281,7 +282,7 @@
     <ActionButton
       class="w-full"
       text={t("ADD_CATEGORY")}
-      onclick={() => void chat.createCategory(`${t("CATEGORY")} ${chat.categories.length + 1}`)}
+      onclick={() => void chat.createCategory(`${t("CATEGORY")} ${chat.scopedCategories.length + 1}`)}
     />
 
     {#if !settings.lockedProject}

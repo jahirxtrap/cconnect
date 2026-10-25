@@ -8,18 +8,19 @@
     title: string;
     text: string;
     confirmLabel: string;
+    dismissLabel?: string;
     onConfirm: () => void;
     onDismiss: () => void;
     danger?: boolean;
     children?: Snippet;
   }
 
-  const { title, text, confirmLabel, onConfirm, onDismiss, danger = false, children }: Props = $props();
+  const { title, text, confirmLabel, dismissLabel, onConfirm, onDismiss, danger = false, children }: Props = $props();
 </script>
 
 <CompactDialog {title} description={text} {onDismiss}>
   {#snippet buttons()}
-    <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
+    <Button onclick={onDismiss} variant="outlined">{dismissLabel ?? t("CANCEL")}</Button>
     <Button onclick={onConfirm} variant={danger ? "destructive" : "filled"}>{confirmLabel}</Button>
   {/snippet}
   {#if children}

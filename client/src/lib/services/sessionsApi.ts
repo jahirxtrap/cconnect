@@ -1,4 +1,5 @@
 import { parseCategory, type ChatCategory } from "$lib/data/models";
+import { promptCacheOf, type PromptCache } from "$lib/data/promptCache";
 import { parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { http, type HttpClient } from "./http";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
@@ -18,6 +19,7 @@ export interface MessagesPage {
   startIndex: number;
   hasMore: boolean;
   contextTokens: number | null;
+  cache: PromptCache | null;
   requestBytes: number | null;
   mediaBytes: number | null;
   prompts: string[] | null;
@@ -68,6 +70,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       start_index?: number;
       has_more?: boolean | string;
       context_tokens?: number;
+      cache?: unknown;
       request_bytes?: number;
       media_bytes?: number;
       prompts?: string[] | null;
@@ -91,6 +94,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       startIndex: data.start_index ?? 0,
       hasMore: data.has_more === true || data.has_more === "true",
       contextTokens: data.context_tokens ?? null,
+      cache: promptCacheOf(data.cache),
       requestBytes: data.request_bytes ?? null,
       mediaBytes: data.media_bytes ?? null,
       prompts: Array.isArray(data.prompts) ? data.prompts : null,

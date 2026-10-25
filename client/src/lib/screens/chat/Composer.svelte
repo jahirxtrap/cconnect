@@ -35,7 +35,8 @@
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar } from "$lib/ui/scrollbar";
-  import StopIcon from "$lib/ui/StopIcon.svelte";
+  import { ROUND_BUTTON_CLASS } from "$lib/ui/roundButton";
+  import StopButton from "$lib/ui/StopButton.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
   import type { Attachment, ComposerElement } from "./state.svelte";
   import { pastedName } from "$lib/data/pastedFile";
@@ -109,9 +110,7 @@
 
   let fieldScroll = $state(0);
 
-  const ROUND_CLASS =
-    "ripple inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors";
-  const ACTION_CLASS = `${ROUND_CLASS} bg-surface-variant text-on-surface-variant hover:text-on-surface`;
+  const ACTION_CLASS = `${ROUND_BUTTON_CLASS} bg-surface-variant text-on-surface-variant hover:text-on-surface`;
   const FIELD_TEXT = isTouch ? "text-body-lg" : "text-body-md leading-(--chat-line-body)";
 
   const accent = $derived(sessionColorOf(sessionColor));
@@ -169,10 +168,14 @@
     leaveHistory();
   };
 
-  const caretLine = (before: boolean) => {
-    if (!field || field.selectionStart !== field.selectionEnd) return false;
-    const at = field.selectionStart;
-    return before ? !draft.slice(0, at).includes("\n") : !draft.slice(at).includes("\n");
+  const recallAtEdge = (older: boolean) => {
+    if (!field || field.selectionStart !== field.selectionEnd) return;
+    const before = field.selectionStart;
+    setTimeout(() => {
+      if (!field || field.selectionStart !== before || field.selectionEnd !== before) return;
+      if (older) recallOlder();
+      else recallNewer();
+    });
   };
 
   const recall = (index: number) => {
@@ -433,12 +436,8 @@
       }
     }
     if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) return;
-    if (event.key === "ArrowUp" && caretLine(true) && recallOlder()) {
-      event.preventDefault();
-      return;
-    }
-    if (event.key === "ArrowDown" && caretLine(false) && recallNewer()) {
-      event.preventDefault();
+    if ((event.key === "ArrowUp" || event.key === "ArrowDown") && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      recallAtEdge(event.key === "ArrowUp");
       return;
     }
     if (event.key !== "Enter" || isTouch) return;
@@ -519,7 +518,7 @@
   {@render band?.()}
   <div
     style={ring}
-    class="relative rounded-2xl bg-surface shadow-composer {ring
+    class="relative rounded-lg bg-surface shadow-composer {ring
       ? ''
       : '[--c-accent-ring:var(--c-outline-variant)]'}"
   >
@@ -651,22 +650,13 @@
             onclick={toggleVoice}
             aria-label={t(listening ? "VOICE_STOP" : "VOICE_START")}
             title={t(listening ? "VOICE_STOP" : "VOICE_START")}
-            class={listening ? `${ROUND_CLASS} bg-accent text-on-accent` : ACTION_CLASS}
+            class={listening ? `${ROUND_BUTTON_CLASS} bg-accent text-on-accent` : ACTION_CLASS}
           >
             <Mic size={18} />
           </button>
         {/if}
         {#if busy}
-          <button
-            type="button"
-            use:keepFocus
-            onclick={onInterrupt}
-            aria-label={t("STOP")}
-            title={t("STOP")}
-            class="{ROUND_CLASS} bg-surface-variant text-on-surface"
-          >
-            <StopIcon size={14} />
-          </button>
+          <StopButton onclick={onInterrupt} />
         {/if}
         <button
           type="button"
@@ -675,7 +665,7 @@
           onclick={submit}
           aria-label={t("SEND")}
           title={t("SEND")}
-          class="{ROUND_CLASS} {canSubmit ? 'bg-accent text-on-accent' : 'bg-surface-variant text-faint'} disabled:cursor-default"
+          class="{ROUND_BUTTON_CLASS} {canSubmit ? 'bg-accent text-on-accent' : 'bg-surface-variant text-faint'} disabled:cursor-default"
         >
           <ArrowUp size={18} />
         </button>

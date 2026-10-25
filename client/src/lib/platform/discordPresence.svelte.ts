@@ -31,7 +31,7 @@ export function presenceLines(): Lines | null {
   const prefs = settings.discord;
   if (!prefs.enabled) return null;
 
-  const running = tabs.list.filter((tab) => tab.running);
+  const running = tabs.list.filter((tab) => tabs.running(tab));
   const tab = panes.focusedTab ?? null;
   const chat = tab ? tabs.stateFor(tab) : null;
   const stage: Stage = running.length ? "working" : chat?.activity === "waiting" ? "waiting" : "idle";
@@ -105,7 +105,7 @@ export function watchPresence() {
 
   $effect(() => {
     if (!settings.discord.enabled) return;
-    const busy = tabs.list.some((tab) => tab.running);
+    const busy = tabs.list.some((tab) => tabs.running(tab));
     if (busy && startedAt === null) startedAt = Date.now();
     if (!busy) startedAt = null;
   });

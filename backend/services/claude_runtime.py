@@ -17,43 +17,52 @@ from core import cli_manager, paths
 from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server
 from mcps.media import block_types
+from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, diffs, mods, persistent_sessions, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, delegates, diffs, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
+from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
 _FILE_EDIT_TOOLS = frozenset({"Edit", "Write", "MultiEdit", "NotebookEdit"})
-_SHARE_RULE = f"mcp__cconnect__{SHARE_TOOL}"
+_MCP_PREFIX = "mcp__"
+_SHARE_RULE = f"{_MCP_PREFIX}cconnect__{SHARE_TOOL}"
+_PACKS_RULE = f"{_MCP_PREFIX}cconnect__{PACKS_TOOL}"
 
-_TRANSIENT_API_STATUS = frozenset({500, 502, 503, 504, 529})
 _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
 _AGENTS_MD_PLUGIN = "cc-plugin-agents-md@builtin"
 _OUTPUT_SHARE = 4
 _MIN_OUTPUT_TOKENS = 1024
-_TRANSIENT_PATTERNS = (
-    "no response from api", "overloaded", "connection error", "connection reset",
-    "econnreset", "etimedout", "timed out", "timeout", "socket hang up",
-    "fetch failed", "network error", "service unavailable", "bad gateway",
-    "gateway timeout", "stream error", "premature close",
-)
-_USAGE_PATTERNS = ("rate limit", "rate_limit", "usage limit", "quota", "too many requests")
 _CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
-_SLOW_SECONDS = 15
 _TURN_CLOCK_SKEW_MS = 5000
-_TASK_ENDED = frozenset({"completed", "failed", "stopped", "killed"})
+_RETRY_FIELDS = ("attempt", "max_retries", "retry_delay_ms", "error_status", "error", "no_response")
 
 
-def _track_task(tasks: set, subtype: Any, data: dict) -> None:
-    task_id = data.get("task_id")
-    if not task_id:
-        return
-    patch = data.get("patch")
-    ended = subtype == "task_notification" or (
-        subtype == "task_updated" and isinstance(patch, dict) and patch.get("status") in _TASK_ENDED
-    )
-    if subtype == "task_started":
-        tasks.add(task_id)
-    elif ended:
-        tasks.discard(task_id)
+def _retry_status(data: dict) -> dict:
+    return {"type": "status", "kind": "retrying", **{field: data.get(field) for field in _RETRY_FIELDS}}
+
+
+_RATE_WINDOWS = {"five_hour": "session", "seven_day": "weekly_all"}
+_RATE_SEVERITIES = {"allowed_warning": "warning", "rejected": "critical"}
+
+
+def _rate_limit_event(info: Any) -> Optional[dict]:
+    raw = getattr(info, "raw", None) or {}
+    unified = raw.get("unifiedWindows") if isinstance(raw.get("unifiedWindows"), dict) else {}
+    limited = _RATE_WINDOWS.get(getattr(info, "rate_limit_type", None) or "")
+    windows = []
+    for key, wid in _RATE_WINDOWS.items():
+        entry = unified.get(key)
+        if not isinstance(entry, dict) or not isinstance(entry.get("utilization"), (int, float)):
+            continue
+        windows.append({
+            "id": wid,
+            "percent": entry["utilization"] * 100,
+            "resets_at": entry.get("resetsAt"),
+            "severity": _RATE_SEVERITIES.get(getattr(info, "status", None), "normal") if wid == limited else "normal",
+        })
+    return {"type": "rate_limit", "windows": windows} if windows else None
+
+
 _MODEL_VARIANT = re.compile(r"\[[^\]]*\]$")
 
 
@@ -75,15 +84,6 @@ def _model_offered(info: dict[str, Any], model: Optional[str], account: Optional
     )
 
 
-def _looks_transient(status: int | None, text: str | None) -> bool:
-    low = (text or "").lower()
-    if any(p in low for p in _USAGE_PATTERNS):
-        return False
-    if status in _TRANSIENT_API_STATUS:
-        return True
-    return any(p in low for p in _TRANSIENT_PATTERNS)
-
-
 def _clean_error_text(text: str | None) -> str:
     return (text or "").strip() or "Unknown error"
 
@@ -92,8 +92,7 @@ def _usage_context(usage: Optional[dict]) -> Optional[int]:
     """Context size of the request that produced a message (input + cache reads)."""
     if not isinstance(usage, dict):
         return None
-    total = (usage.get("input_tokens") or 0) + (usage.get("cache_read_input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
-    return total or None
+    return prompt_cache.input_tokens(usage) or None
 
 
 def _blocks_guide(capabilities: list[str]) -> str:
@@ -224,11 +223,15 @@ def _display_tool_name(name: str) -> str:
     name = (name or "").strip()
     if not name:
         return "Tool"
-    if name.startswith("mcp__"):
-        server, sep, tool = name[len("mcp__"):].partition("__")
+    if name.startswith(_MCP_PREFIX):
+        server, sep, tool = name[len(_MCP_PREFIX):].partition("__")
         if sep and tool:
             return f"{server}: {tool}"
     return name
+
+
+def _tool_naming(name: str) -> dict:
+    return {"name": _display_tool_name(name), "mcp": (name or "").startswith(_MCP_PREFIX)}
 
 
 _FENCE_LINE = re.compile(r"^```", re.MULTILINE)
@@ -265,7 +268,12 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
     if not isinstance(data, dict):
         return []
     if subtype == "task_started" and data.get("is_backgrounded") and data.get("tool_use_id") and vis["tool_use"] != "off":
-        return [{"type": "task_running", "id": data["tool_use_id"]}]
+        return [{
+            "type": "task_running",
+            "id": data["tool_use_id"],
+            "task": data.get("task_id"),
+            "description": data.get("description"),
+        }]
     if subtype == "task_notification" and vis["tool_use"] != "off":
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         return [{
@@ -276,6 +284,8 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
             "tokens": usage.get("total_tokens") if vis.get("tokens") else None,
             "tool_uses": usage.get("tool_uses"),
         }]
+    if subtype == "background_tasks_changed" and isinstance(data.get("tasks"), list):
+        return [{"type": "background_tasks", "ids": [task.get("task_id") for task in data["tasks"] if isinstance(task, dict)]}]
     if subtype == "thinking_tokens" and vis["thinking"] != "off" and vis.get("tokens"):
         tokens = data.get("estimated_tokens")
         return [{"type": "thinking_tokens", "tokens": tokens}] if isinstance(tokens, int) else []
@@ -318,6 +328,13 @@ def _todo_items(todos: Any) -> list[dict]:
         for t in todos
         if isinstance(t, dict)
     ]
+
+
+def _agent_input(name: str, raw_input: dict) -> dict:
+    if name != delegates.TOOL_ID:
+        return raw_input
+    label, task = delegates.label_of(raw_input)
+    return {"subagent_type": label, "description": task}
 
 
 def _agent_event(block_id: Any, raw_input: dict) -> dict:
@@ -432,12 +449,12 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 if bid:
                     hidden.add(bid)
                 continue
-            if name in ("Agent", "Task") and isinstance(raw_input, dict):
+            if name in ("Agent", "Task", delegates.TOOL_ID) and isinstance(raw_input, dict):
                 mode = vis["tool_use"]
                 if mode == "off":
                     _mark_working(events, vis)
                 if mode != "off":
-                    events.append(_agent_event(getattr(block, "id", None), raw_input))
+                    events.append(_agent_event(getattr(block, "id", None), _agent_input(name, raw_input)))
                 continue
             if name == "TodoWrite" and isinstance(raw_input, dict):
                 events.append({"type": "todos", "items": _todo_items(raw_input.get("todos"))})
@@ -468,7 +485,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 events.append({
                     "type": "tool_use",
                     "id": getattr(block, "id", None),
-                    "name": _display_tool_name(name),
+                    **_tool_naming(name),
                     "input": _format_tool_input(raw_input),
                 })
         elif kind == "ToolResultBlock":
@@ -534,7 +551,7 @@ def _build_can_use_tool(
             tool_display = _format_tool_input(tool_input)
         response = await ask_user({
             "kind": "permission",
-            "tool_name": tool_name,
+            "tool_name": _display_tool_name(tool_name),
             "tool_use_id": getattr(ctx, "tool_use_id", None),
             "input": tool_display,
             "options": (
@@ -761,11 +778,13 @@ async def run_prompt(
     seed_id: Optional[str] = None,
     wanted: Optional[Callable[[], dict]] = None,
     request_compact: Optional[Callable[[str], None]] = None,
+    reload: Optional[Callable[[str], Awaitable[Optional[dict]]]] = None,
     capabilities: Optional[list[str]] = None,
     session_info: Optional[Callable[[], dict]] = None,
     on_transport: Optional[Callable[[Any], None]] = None,
     resident: Optional[Any] = None,
     adopt: bool = False,
+    read_from: Optional[int] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
@@ -774,6 +793,7 @@ async def run_prompt(
         AssistantMessage,
         SystemMessage,
         ResultMessage,
+        RateLimitEvent,
         StreamEvent,
         UserMessage,
         PermissionResultAllow,
@@ -826,10 +846,13 @@ async def run_prompt(
         options_kwargs["mcp_servers"] = {"cconnect": build_cconnect_server(
             {
                 "request_compact": turn_compact,
+                "reload": resident.reload_turn if resident is not None else None,
                 "ask_user": turn_ask,
                 "emit": turn_emit,
                 "account": account,
                 "session_info": turn_info,
+                "background": resident.run_background if resident is not None else None,
+                "visibility": resident.wanted if resident is not None else vis,
                 "capabilities": list(capabilities or ()),
             },
             only=None if scope["cconnect"] else [SHARE_TOOL],
@@ -862,28 +885,10 @@ async def run_prompt(
     if style:
         overrides["outputStyle"] = style
     options_kwargs["settings"] = json.dumps(overrides)
-    status_state = {
-        "slow": False,
-        "last": 0.0,
-        "compacting": False,
-        "awaiting_user": False,
-        "tasks": set(),
-        "pending": set(),
-    }
     hooks_map: dict[str, Any] = {
         "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
     }
     loop = asyncio.get_running_loop() if emit is not None else None
-    turn_status = resident.status if resident is not None else (lambda: status_state)
-
-    async def _clear_slow(state):
-        if not state.get("slow"):
-            return
-        state["slow"] = False
-        try:
-            await turn_emit({"type": "status", "kind": "ok"})
-        except Exception:
-            pass
 
     async def _render_site(component: str, instance_id: str, props: dict) -> Optional[dict]:
         if resident is None or not resident.connected or not mods.enabled():
@@ -891,38 +896,8 @@ async def run_prompt(
         return await mods.render_in_chat(resident.client, component, instance_id, props)
 
     if turn_ask is not None:
-        base_can_use_tool = _build_can_use_tool(turn_ask, _render_site)
-        if turn_emit is not None:
-            async def _can_use_tool_status(tool_name, tool_input, ctx):
-                state = turn_status()
-                state["awaiting_user"] = True
-                await _clear_slow(state)
-                try:
-                    return await base_can_use_tool(tool_name, tool_input, ctx)
-                finally:
-                    state["awaiting_user"] = False
-                    state["last"] = asyncio.get_running_loop().time()
-            options_kwargs["can_use_tool"] = _can_use_tool_status
-        else:
-            options_kwargs["can_use_tool"] = base_can_use_tool
+        options_kwargs["can_use_tool"] = _build_can_use_tool(turn_ask, _render_site)
         hooks_map["PreToolUse"].append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))
-    if turn_emit is not None:
-        async def _idle_watchdog():
-            while True:
-                await asyncio.sleep(4)
-                if (
-                    not status_state["slow"]
-                    and not status_state["compacting"]
-                    and not status_state["awaiting_user"]
-                    and not status_state["tasks"]
-                    and not status_state["pending"]
-                    and loop.time() - status_state["last"] > _SLOW_SECONDS
-                ):
-                    status_state["slow"] = True
-                    try:
-                        await emit({"type": "status", "kind": "slow"})
-                    except Exception:
-                        pass
     if hooks_map:
         options_kwargs["hooks"] = hooks_map
     options = ClaudeAgentOptions(**options_kwargs)
@@ -954,6 +929,8 @@ async def run_prompt(
     if drain is not None and resume and cwd and not adopt:
         from services import sessions as _seed
         read_offsets[resume] = _seed.session_size(_seed.project_key_for(cwd), resume)
+    elif adopt and resume and read_from is not None:
+        read_offsets[resume] = read_from
 
     def _withdrawn(chip: dict) -> bool:
         return bool((chip.get("item") or {}).get("withdrawn"))
@@ -1080,21 +1057,19 @@ async def run_prompt(
     tool_started: dict[str, float] = {}
     awaiting_cycle = True  # the next answer that starts belongs to the next message we handed over
     context_tokens: Optional[int] = None
+    request_started = time.time()
+    cache_ttl: Optional[int] = None
+    cache_window: Optional[dict] = None
     first_chunk_pending: set[int] = set()
     streamed_text: dict[int, str] = {}
     streamed_sent: dict[int, int] = {}
     compacting_shown = False
 
-    watchdog_task = None
+    retrying = False
     try:
         current_sid: str | None = None
-        if emit is not None:
-            status_state["last"] = loop.time()
-            watchdog_task = asyncio.create_task(_idle_watchdog())
         if resident is not None:
-            resident.bind(
-                persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, session_info, status_state)
-            )
+            resident.bind(persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, reload, session_info))
             source = _resident_stream(resident, options, prompt_arg, on_transport, adopt)
         else:
             transport = None
@@ -1107,12 +1082,9 @@ async def run_prompt(
                     transport = None
             source = query(prompt=prompt_arg, options=options, transport=transport)
         async for message in source:
-            if emit is not None:
-                status_state["last"] = loop.time()
-                status_state["compacting"] = False
-                if status_state["slow"]:
-                    status_state["slow"] = False
-                    await emit({"type": "status", "kind": "ok"})
+            if retrying and not isinstance(message, SystemMessage) and not getattr(message, "parent_tool_use_id", None):
+                retrying = False
+                yield {"type": "status", "kind": "ok"}
             _msid = getattr(message, "session_id", None)
             if isinstance(_msid, str):
                 if _msid != current_sid:
@@ -1176,7 +1148,7 @@ async def run_prompt(
                         getattr(b, "text", "") for b in (message.content or [])
                         if type(b).__name__ == "TextBlock"
                     ).strip() or f"API Error: {_err}"
-                    yield {"type": "api_error", "text": _text}
+                    yield api_error(_text, _err)
                 else:
                     for _b in message.content or []:
                         if type(_b).__name__ == "ToolUseBlock":
@@ -1184,18 +1156,25 @@ async def run_prompt(
                             tool_calls.remember(_bid, tool=getattr(_b, "name", None), input=getattr(_b, "input", None))
                             if _bid:
                                 tool_started[_bid] = loop.time()
-                                if emit is not None:
-                                    status_state["pending"].add(_bid)
                     for event in _blocks_to_events(message.content, vis(), skip_streamed=partial, hidden_tool_ids=hidden_tool_ids):
                         if parent:
                             event["parent"] = parent
                         yield event
                     if not parent:
-                        total = _usage_context(getattr(message, "usage", None))
+                        usage = getattr(message, "usage", None)
+                        total = _usage_context(usage)
                         if total and total != context_tokens:
                             context_tokens = total
                             yield {"type": "context", "context_tokens": total}
+                        if isinstance(usage, dict):
+                            cache_ttl = prompt_cache.ttl_of(usage, cache_ttl)
+                            current = prompt_cache.window(usage, request_started, cache_ttl)
+                            if current and current != cache_window:
+                                cache_window = current
+                                yield {"type": "cache", "cache": current}
             elif isinstance(message, UserMessage):
+                if not parent:
+                    request_started = time.time()
                 taken = handed.pop(getattr(message, "uuid", None) or "", None)
                 if taken is not None:
                     taken["taken"] = True
@@ -1216,9 +1195,6 @@ async def run_prompt(
                         errored=bool(getattr(_b, "is_error", False)),
                         output=getattr(message, "tool_use_result", None) if len(results) == 1 else None,
                     )
-                if emit is not None:
-                    for _b in results:
-                        status_state["pending"].discard(getattr(_b, "tool_use_id", None))
                 tu_mode = vis()["tool_use"]
                 if tu_mode != "off":
                     for block in getattr(message, "content", None) or []:
@@ -1243,16 +1219,13 @@ async def run_prompt(
             elif isinstance(message, SystemMessage):
                 subtype = getattr(message, "subtype", None)
                 data = getattr(message, "data", None)
-                if emit is not None and isinstance(data, dict):
-                    _track_task(status_state["tasks"], subtype, data)
-                if subtype == "status":
+                if subtype == "api_retry" and isinstance(data, dict):
+                    retrying = True
+                    yield _retry_status(data)
+                elif subtype == "status":
                     busy = isinstance(data, dict) and data.get("status") == "compacting"
-                    if emit is not None:
-                        status_state["compacting"] = busy
                     if busy and not compacting_shown:
                         compacting_shown = True
-                        if emit is not None:
-                            await _clear_slow(status_state)
                         yield {"type": "compacting"}
                     elif not busy and compacting_shown:
                         compacting_shown = False
@@ -1272,6 +1245,10 @@ async def run_prompt(
                 else:
                     for event in _system_events(subtype, data, vis()):
                         yield event
+            elif isinstance(message, RateLimitEvent):
+                limits = _rate_limit_event(message.rate_limit_info)
+                if limits is not None:
+                    yield limits
             elif isinstance(message, ResultMessage):
                 awaiting_cycle = True
                 for ev in _flush_users(getattr(message, "session_id", None) or current_sid):
@@ -1280,17 +1257,13 @@ async def run_prompt(
                 if _cmd:
                     chips[:] = [c for c in chips if not str(c.get("sent") or "").lstrip().startswith("/")]
                     yield {"type": "dequeued", "ids": [c["id"] for c in _cmd if c["id"]], "text": "", "consumed": sum(1 for c in _cmd if c["drained"])}
-                if emit is not None:
-                    status_state["pending"].clear()
                 if getattr(message, "is_error", None):
                     api_status = getattr(message, "api_error_status", None)
                     errs = _reportable_errors(getattr(message, "errors", None))
                     detail = "; ".join(errs) or (getattr(message, "result", None) or "")
                     if not detail and api_status:
                         detail = f"API error {api_status}"
-                    if _looks_transient(api_status, detail):
-                        yield {"type": "status", "kind": "failed"}
-                    elif detail:
+                    if detail:
                         yield {"type": "error", "message": _clean_error_text(detail)}
                 yield {
                     "type": "result",
@@ -1303,13 +1276,8 @@ async def run_prompt(
         reportable = _reportable_errors(raised) if isinstance(raised, list) else []
         logger.error(f"run_prompt failed: {type(exc).__name__}: {exc}")
         detail = "; ".join(reportable) or getattr(exc, "stderr", None) or str(exc)
-        if _looks_transient(None, detail):
-            yield {"type": "status", "kind": "failed"}
-        else:
-            yield {"type": "error", "message": _clean_error_text(detail)}
+        yield {"type": "error", "message": _clean_error_text(detail)}
     finally:
-        if watchdog_task is not None:
-            watchdog_task.cancel()
         if resident is not None:
             resident.unbind()
 

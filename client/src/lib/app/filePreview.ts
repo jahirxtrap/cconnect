@@ -16,8 +16,7 @@ export const openFilePreview = (request: PreviewRequest) => {
 
 export const closeFilePreview = () => {
   if (navigation.previewPane) {
-    navigation.preview = null;
-    navigation.previewPane = false;
+    navigation.endPreview();
     panes.closePreview();
     return;
   }

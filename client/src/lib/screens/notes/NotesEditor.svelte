@@ -199,36 +199,4 @@
     font-size: var(--text-headline);
     line-height: var(--text-headline--line-height);
   }
-
-  .tasks-live :global(.markdown li.task) {
-    margin-inline-start: var(--spacing);
-  }
-
-  .tasks-live :global(.markdown li.task + li.task) {
-    margin-top: calc(var(--spacing) * 2);
-  }
-
-  .tasks-live :global(.markdown li.task > .li-marker) {
-    width: calc(var(--spacing) * 4);
-    min-width: calc(var(--spacing) * 4);
-    height: calc(var(--spacing) * 4);
-    margin-inline: calc(var(--spacing) * -6) calc(var(--spacing) * 2);
-    overflow: hidden;
-    vertical-align: middle;
-    border-radius: var(--radius-xs);
-    color: transparent;
-  }
-
-  .tasks-live :global(.markdown li.task:not(.task-done) > .li-marker) {
-    box-shadow: inset 0 0 0 1.5px var(--color-outline);
-  }
-
-  .tasks-live :global(.markdown li.task-done) {
-    color: var(--color-faint);
-    text-decoration: line-through;
-  }
-
-  .tasks-live :global(.markdown li.task-done > .li-marker) {
-    background: var(--color-accent);
-  }
 </style>

@@ -9,10 +9,17 @@ const MIRRORED = [
   "textTransform", "textIndent", "whiteSpace", "wordSpacing", "overflowWrap", "tabSize",
 ] as const;
 
+const TEXT_METRICS = new Set<string>(["fontSize", "lineHeight", "letterSpacing", "wordSpacing", "textIndent"]);
+
+const inRem = (value: string, root: number): string => (value.endsWith("px") ? `${parseFloat(value) / root}rem` : value);
+
 const caretTop = (node: HTMLTextAreaElement): number => {
   const style = getComputedStyle(node);
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize);
   const mirror = document.createElement("div");
-  for (const property of MIRRORED) mirror.style[property] = style[property];
+  for (const property of MIRRORED) {
+    mirror.style[property] = TEXT_METRICS.has(property) ? inRem(style[property], root) : style[property];
+  }
   mirror.style.cssText += ";position:absolute;visibility:hidden;top:0;left:-9999px;height:auto;white-space:pre-wrap";
   const marker = document.createElement("span");
   mirror.textContent = node.value.slice(0, node.selectionEnd ?? 0);

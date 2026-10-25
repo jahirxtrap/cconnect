@@ -43,7 +43,7 @@
     <Button onclick={save} enabled={!!host.trim() && !!user.trim()}>{t("SAVE")}</Button>
   {/snippet}
   <div class="flex flex-col gap-2">
-    <InputField value={name} oninput={(value) => (name = value)} label={t("SSH_NAME")} singleLine />
+    <InputField value={name} oninput={(value) => (name = value)} label={t("SSH_NAME")} optional singleLine />
     <InputField value={host} oninput={(value) => (host = value)} label={t("HOST")} singleLine />
     <InputField
       value={port}
@@ -56,6 +56,7 @@
       value={password}
       oninput={(value) => (password = value)}
       label={t("SSH_PASSWORD")}
+      optional
       singleLine
       secret
     />

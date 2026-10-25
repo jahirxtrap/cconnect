@@ -33,7 +33,10 @@
     if (anchor === null || !onDismiss) return;
     const close = (event?: Event) => {
       const target = event?.target;
-      if (within && target instanceof Node && within.contains(target)) return;
+      if (within && target instanceof Node) {
+        const unaffected = event?.type === "scroll" ? !target.contains(within) : within.contains(target);
+        if (unaffected) return;
+      }
       onDismiss();
     };
     const view = window.visualViewport;

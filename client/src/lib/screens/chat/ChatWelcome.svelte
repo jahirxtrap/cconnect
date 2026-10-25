@@ -1,19 +1,21 @@
 <script lang="ts">
-  import SquareTerminal from "@lucide/svelte/icons/square-terminal";
+  import { CHAT_VIEW } from "$lib/app/screens";
   import { t } from "$lib/i18n/index.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
 
   interface Props {
-    path: string;
+    project: string | null;
+    unavailable: boolean;
   }
 
-  const { path }: Props = $props();
+  const { project, unavailable }: Props = $props();
 
-  const name = $derived(path.split(/[\\/]/).filter(Boolean).pop() ?? "");
+  const WELCOME_CLASS = "pointer-events-none absolute inset-0";
 </script>
 
-<EmptyState
-  icon={SquareTerminal}
-  text={name ? t("NEW_CHAT_IN", name) : t("NEW_CHAT")}
-  class="pointer-events-none absolute inset-0"
-/>
+{#if unavailable}
+  <ServerUnavailable class={WELCOME_CLASS} />
+{:else}
+  <EmptyState icon={CHAT_VIEW.icon} text={project ? t("NEW_CHAT_IN", project) : t("NEW_CHAT")} class={WELCOME_CLASS} />
+{/if}

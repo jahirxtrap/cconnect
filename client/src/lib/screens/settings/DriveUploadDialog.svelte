@@ -1,5 +1,7 @@
 <script lang="ts">
   import { encryptionAvailable } from "$lib/data/backupCrypto";
+  import { chatBackground } from "$lib/data/chatBackground.svelte";
+  import { packs } from "$lib/design/packs/registry.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import type { UploadOptions } from "$lib/services/drive/driveBackups.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -15,13 +17,18 @@
   const { onUpload, onDismiss }: Props = $props();
 
   let notes = $state(true);
+  let background = $state(false);
+  let withPacks = $state(false);
   let password = $state("");
+
 </script>
 
 <CompactDialog title={t("DRIVE_UPLOAD")} description={t("EXPORT_SETTINGS_WARNING")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button onclick={() => onUpload({ notes, password: password.trim() })}>{t("DRIVE_UPLOAD")}</Button>
+    <Button onclick={() => onUpload({ notes, background, packs: withPacks, password: password.trim() })}
+      >{t("DRIVE_UPLOAD")}</Button
+    >
   {/snippet}
 
   <div class="flex flex-col gap-3.5">
@@ -31,12 +38,29 @@
       checked={notes}
       onChange={(value) => (notes = value)}
     />
+    {#if chatBackground.uploads.length}
+      <SwitchRow
+        title={t("INCLUDE_BACKGROUND")}
+        summary={t("INCLUDE_BACKGROUND_SUMMARY")}
+        checked={background}
+        onChange={(value) => (background = value)}
+      />
+    {/if}
+    {#if packs.installed.length}
+      <SwitchRow
+        title={t("INCLUDE_PACKS")}
+        summary={t("INCLUDE_PACKS_SUMMARY")}
+        checked={withPacks}
+        onChange={(value) => (withPacks = value)}
+      />
+    {/if}
     {#if encryptionAvailable()}
       <div class="flex flex-col gap-1.5">
         <InputField
           value={password}
           oninput={(value) => (password = value)}
           label={t("DRIVE_PASSWORD")}
+          optional
           singleLine
           secret
         />

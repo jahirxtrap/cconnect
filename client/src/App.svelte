@@ -10,7 +10,9 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
+  import { restorePacks } from "$lib/design/packs/library";
   import { publishNotificationTitles } from "$lib/platform/androidNotify";
+  import { listenNativeFiles } from "$lib/platform/pastedContent";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { watchPresence } from "$lib/platform/discordPresence.svelte";
   import { mirrorNativeCopy } from "$lib/platform/clipboard";
@@ -23,12 +25,17 @@
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { monitor } from "$lib/screens/monitor/monitor.svelte";
+  import PackOfferDialog from "$lib/screens/packs/PackOfferDialog.svelte";
+  import { takePacks } from "$lib/screens/packs/packIntake";
+  import { packOffers } from "$lib/screens/packs/packOffers.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
   import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
 
   theme.start();
+  listenNativeFiles(takePacks);
+  void restorePacks();
   layout.start();
   navigation.start();
   tabs.start();
@@ -88,7 +95,7 @@
   };
 
   $effect(() => {
-    theme.environmentAccent = backend.active?.accentIndex ?? null;
+    theme.environmentAccent = backend.active?.accent ?? null;
   });
 
   $effect(() => {
@@ -137,6 +144,12 @@
 <TransfersPanel />
 
 <QrCameraOverlay />
+
+{#if packOffers.current}
+  {#key packOffers.current.id}
+    <PackOfferDialog offer={packOffers.current} onDismiss={() => packOffers.dismiss()} />
+  {/key}
+{/if}
 
 {#if navigation.previewOverlay && navigation.preview}
   {@const request = navigation.preview}

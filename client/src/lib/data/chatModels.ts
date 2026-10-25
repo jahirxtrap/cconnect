@@ -1,4 +1,5 @@
 import type { ModDrawn } from "./modModels";
+import type { Usage } from "./usageWindows";
 
 export type Role =
   | "user"
@@ -14,6 +15,7 @@ export type Role =
   | "compact"
   | "system"
   | "api_error"
+  | "info"
   | "interrupted"
   | "plan"
   | "agent"
@@ -21,7 +23,8 @@ export type Role =
   | "notice"
   | "session_message"
   | "plugin_message"
-  | "agent_report";
+  | "agent_report"
+  | "usage";
 
 export type SendStatus = "sent" | "error";
 
@@ -126,6 +129,7 @@ export interface ComponentElement {
   color: string | null;
   alertAbove: number | null;
   alertBelow: number | null;
+  severity: string | null;
   showIf: ComponentCondition | null;
   format: string | null;
   display: string | null;
@@ -178,6 +182,7 @@ export interface ChatMessage {
   role: Role;
   text: string;
   toolName: string | null;
+  toolMcp: boolean;
   toolUseId: string | null;
   interaction: InteractionData | null;
   path: string | null;
@@ -197,6 +202,7 @@ export interface ChatMessage {
   timestamp: number | null;
   children: ChatMessage[];
   sendStatus: SendStatus;
+  usage: Usage | null;
 }
 
 export interface TodoItem {
@@ -204,6 +210,11 @@ export interface TodoItem {
   content: string;
   status: string;
   activeForm: string;
+}
+
+export interface BackgroundTask {
+  id: string;
+  description: string | null;
 }
 
 export interface QueuedMessage {
@@ -343,6 +354,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   role,
   text: "",
   toolName: null,
+  toolMcp: false,
   toolUseId: null,
   interaction: null,
   path: null,
@@ -362,5 +374,6 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   timestamp: Date.now(),
   children: [],
   sendStatus: "sent",
+  usage: null,
   ...patch,
 });

@@ -76,6 +76,10 @@ html[data-theme="dark"] {
   animation: menu-exit 90ms linear forwards;
 }
 
+.menu-surface[data-instant]:not([data-state="closed"]) {
+  animation: none;
+}
+
 .menu-surface[data-side="left"] {
   translate: max(0px, 100% - var(--bits-floating-available-width, 100%));
 }

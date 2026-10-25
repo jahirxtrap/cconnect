@@ -22,6 +22,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -242,15 +243,17 @@
       {/if}
     {/each}
 
-    {#if !terminalTabs.items.length}
+    {#if !terminalTabs.items.length && serverStatus.unavailable}
+      <ServerUnavailable class="absolute inset-0" />
+    {:else if !terminalTabs.items.length}
       <EmptyState
-        loading={online && unlocked === null}
+        loading={unlocked === null}
         icon={SquareTerminal}
-        text={!online ? t("SERVER_UNAVAILABLE") : unlocked ? t("NO_TERMINALS") : t("TERMINAL_LOCKED")}
+        text={unlocked ? t("NO_TERMINALS") : t("TERMINAL_LOCKED")}
         class="absolute inset-0"
       >
         {#snippet action()}
-          {#if online && unlocked === false}
+          {#if unlocked === false}
             <ActionButton
               text={t("UNLOCK")}
               onclick={() => {

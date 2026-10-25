@@ -15,6 +15,8 @@ import {
   accountSummary,
   accountValue,
   accentValue,
+  appearanceValue,
+  chatBackgroundValue,
   chatLanguageValue,
   chatsValue,
   persistentValue,
@@ -37,6 +39,7 @@ import {
   multipleAccounts,
   notificationsValue,
   outputStyleValue,
+  packsValue,
   permissionValue,
   pluginsValue,
   sdkValue,
@@ -58,10 +61,13 @@ export type SettingsDialog =
   | "import"
   | "drive"
   | "reset"
+  | "appearance"
   | "theme"
   | "language"
   | "font"
+  | "packs"
   | "accent"
+  | "chat_background"
   | "shortcuts"
   | "discord"
   | "browser"
@@ -72,6 +78,7 @@ export type SettingsDialog =
   | "account"
   | "account_actions"
   | "tools"
+  | "delegates"
   | "chats"
   | "privacy";
 
@@ -87,10 +94,13 @@ export interface SettingsEntry {
 }
 
 const SETTINGS_ROWS: SettingsEntry[] = [
+  { id: "appearance", label: "APPEARANCE", value: appearanceValue, section: "client", group: "SETTINGS_CLIENT", dialog: "appearance" },
   { id: "theme", label: "THEME", value: themeValue, section: "client", group: "SETTINGS_CLIENT", dialog: "theme" },
   { id: "language", label: "LANGUAGE", value: localeValue, section: "client", group: "SETTINGS_CLIENT", dialog: "language" },
   { id: "accent", label: "ACCENT", value: accentValue, section: "client", group: "SETTINGS_CLIENT", dialog: "accent" },
+  { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT", dialog: "chat_background" },
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
+  { id: "packs", label: "PACKS", value: packsValue, section: "client", group: "SETTINGS_CLIENT", dialog: "packs" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
@@ -121,6 +131,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
 
   { id: "tools", label: "TOOLS", summary: "MCP_TOOLS_DESC", value: toolsValue, section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
   { id: "browser_view", label: "BROWSER_VIEW", summary: "BROWSER_VIEW_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
+  { id: "delegates", label: "DELEGATES", summary: "DELEGATES_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "delegates" },
 
   { id: "permissions", label: "PERMISSIONS", value: permissionValue, section: "server", group: "SETTINGS_SERVER", dialog: "permissions" },
 

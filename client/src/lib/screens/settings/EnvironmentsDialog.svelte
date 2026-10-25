@@ -58,7 +58,7 @@
     effort: "",
     permissionMode: "",
     streaming: null,
-    accentIndex: null,
+    accent: null,
   });
 
   const DEFAULT_PORT = 8723;

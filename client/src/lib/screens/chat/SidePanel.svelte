@@ -3,6 +3,7 @@
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import { tick } from "svelte";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
+  import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { t } from "$lib/i18n/index.svelte";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -21,6 +22,7 @@
     onClose: () => void;
     onAnswer: (requestId: string, optionId: string) => void;
     component?: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
+    onSuggest?: SuggestionPicker | null;
     bottomInset?: number;
   }
 
@@ -35,8 +37,11 @@
     onClose,
     onAnswer,
     component,
+    onSuggest = null,
     bottomInset = 0,
   }: Props = $props();
+
+  const lastUserAt = $derived(messages.findLastIndex((item) => item.role === "user"));
 
   const PEEK = 58;
   const MIN = 0;
@@ -89,11 +94,7 @@
 
   const toggleFull = () => onHeight(height >= MAX ? PEEK : MAX);
 
-  const TOP_CORNER = 20;
-
-  const corner = $derived(
-    TOP_CORNER * (1 - Math.min(1, Math.max(0, (height - PEEK) / (MAX - PEEK)))),
-  );
+  const corner = $derived(1 - Math.min(1, Math.max(0, (height - PEEK) / (MAX - PEEK))));
 
   let follow = $state(true);
   let scroller = $state<ChatScroller | null>(null);
@@ -154,10 +155,10 @@
   class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background shadow-float {dragging || instant
     ? ''
     : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
-  style="height: {shown}%; transform: translateY({hiddenFraction * PERCENT}%); border-top-left-radius: {corner}px; border-top-right-radius: {corner}px"
+  style="height: {shown}%; transform: translateY({hiddenFraction * PERCENT}%); border-top-left-radius: calc(var(--radius-2xl) * {corner}); border-top-right-radius: calc(var(--radius-2xl) * {corner})"
 >
   {#if shown >= MAX}
-    <span class="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-outline-variant"></span>
+    <span class="pointer-events-none absolute inset-x-0 top-0 z-10 border-t border-outline-variant"></span>
   {/if}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <div
@@ -192,6 +193,7 @@
             onGrow={anchorGrowth}
             {onAnswer}
             {component}
+            onSuggest={index > lastUserAt ? onSuggest : null}
           />
         </div>
       {/each}

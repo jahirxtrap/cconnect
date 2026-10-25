@@ -14,7 +14,11 @@ import {
   type SharedFile,
   type TodoItem,
 } from "$lib/data/chatModels";
+import type { ApiRetry } from "$lib/data/apiRetry";
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
+import type { Reload } from "$lib/data/reload";
+import { promptCacheOf, type PromptCache } from "$lib/data/promptCache";
+import { usageOf, type LimitWindow, type Usage } from "$lib/data/usageWindows";
 import {
   toModComponent,
   toModDrawn,
@@ -64,6 +68,7 @@ export type ServerEvent =
       type: "tool_use";
       id: string | null;
       name: string | null;
+      mcp: boolean;
       input: string | null;
       result: string | null;
       ms: number | null;
@@ -73,7 +78,7 @@ export type ServerEvent =
   | { type: "shared"; id: string | null; files: SharedFile[] }
   | { type: "compacting" }
   | { type: "compacting_ended" }
-  | { type: "status"; kind: string }
+  | { type: "status"; kind: string; retry: ApiRetry | null }
   | { type: "compact"; trigger: string | null; preTokens: number | null; postTokens: number | null; summary: string }
   | {
       type: "compact_summary";
@@ -86,14 +91,17 @@ export type ServerEvent =
   | { type: "ask_working" }
   | { type: "ask_session"; sessionId: string }
   | { type: "ask_done" }
-  | { type: "command"; markdown: string }
+  | { type: "command"; markdown: string; local: boolean }
+  | { type: "usage"; usage: Usage; local: boolean }
   | {
       type: "component";
       title: string | null;
       titleKey: string | null;
       icon: string | null;
       blocks: ComponentElement[];
+      local: boolean;
     }
+  | ({ type: "reloaded" } & Reload)
   | { type: "plan"; markdown: string }
   | {
       type: "agent";
@@ -103,7 +111,7 @@ export type ServerEvent =
       model: string | null;
       effort: string | null;
     }
-  | { type: "task_running"; id: string | null }
+  | { type: "task_running"; id: string | null; description: string | null }
   | {
       type: "agent_result";
       id: string | null;
@@ -133,13 +141,15 @@ export type ServerEvent =
   | { type: "session_started"; sessionId: string | null }
   | { type: "result"; sessionId: string | null }
   | { type: "context"; contextTokens: number | null; requestBytes: number | null; mediaBytes: number | null }
+  | { type: "rate_limit"; windows: LimitWindow[] }
+  | { type: "cache"; cache: PromptCache | null }
   | { type: "done"; replay: boolean }
   | { type: "interrupted" }
   | { type: "attached" }
   | { type: "error"; message: string }
-  | { type: "api_error"; message: string }
+  | { type: "api_error"; message: string; severity: string | null }
   | { type: "closed"; reason: string }
-  | { type: "queued"; id: string | null; text: string }
+  | { type: "queued"; id: string | null; text: string; replay: boolean }
   | { type: "queue"; items: QueuedMessage[] }
   | { type: "dequeued"; ids: string[]; text: string | null; ts: number | null }
   | {
@@ -336,6 +346,7 @@ export const toElement = (raw: Wire): ComponentElement[] => {
       color: text(raw, "color"),
       alertAbove: number(raw, "alert_above"),
       alertBelow: number(raw, "alert_below"),
+      severity: text(raw, "severity"),
       checked: value === true,
       multiline: flag(raw, "multiline"),
       lines: number(raw, "lines"),
@@ -483,12 +494,17 @@ export class ChatSocket {
     });
   }
 
-  sendPrompt(prompt: string, attachments: string[] = [], id: string | null = null) {
+  get channel(): string | null {
+    return this.#channel;
+  }
+
+  sendPrompt(prompt: string, attachments: string[] = [], id: string | null = null, channel: string | null = null) {
     return this.#send({
       type: "prompt",
       text: prompt,
       ...(attachments.length ? { attachments } : {}),
       ...(id ? { id } : {}),
+      ...(channel ? { channel } : {}),
     });
   }
 
@@ -541,6 +557,10 @@ export class ChatSocket {
     this.#send({ type: "interrupt", ...(lane ? { lane } : {}) });
   }
 
+  sendStopTask(id: string) {
+    this.#send({ type: "stop_task", id });
+  }
+
   sendAsk(prompt: string, resume: string | null) {
     if (resume) this.#sideResume = resume;
     this.#send({ type: "ask", text: prompt, ...(resume ? { resume } : {}) });
@@ -550,8 +570,12 @@ export class ChatSocket {
     this.#send({ type: "usage" });
   }
 
-  sendLoadHistory(sessionId: string, project: string, beforeIndex: number, limit = 100) {
-    this.#send({ type: "load_history", session_id: sessionId, project, before_index: beforeIndex, limit });
+  sendReload(command: string) {
+    this.#send({ type: "reload", command });
+  }
+
+  sendLoadHistory(sessionId: string, project: string, beforeIndex: number, limit = 100): boolean {
+    return this.#send({ type: "load_history", session_id: sessionId, project, before_index: beforeIndex, limit });
   }
 
   sendInteractionResponse(requestId: string, optionId: string, freeText: string | null) {
@@ -685,7 +709,8 @@ export class ChatSocket {
     }
 
     const channel = text(wire, "channel");
-    const side = channel !== null && this.#channel !== null && channel !== this.#channel;
+    if (channel !== null && this.#channel === null) return;
+    const side = channel !== null && channel !== this.#channel;
     if (side && channel !== this.#sideChannel) {
       this.#sideChannel = channel;
       this.#sideLastSeq = 0;
@@ -720,6 +745,7 @@ export class ChatSocket {
           type: "tool_use",
           id: text(wire, "id"),
           name: text(wire, "name"),
+          mcp: wire.mcp === true,
           input: text(wire, "input"),
           result: text(wire, "result"),
           ms: int(wire, "ms"),
@@ -750,8 +776,25 @@ export class ChatSocket {
         return { type: "compacting" };
       case "compacting_ended":
         return { type: "compacting_ended" };
-      case "status":
-        return { type: "status", kind: text(wire, "kind") ?? "" };
+      case "status": {
+        const attempt = int(wire, "attempt");
+        const delayMs = int(wire, "retry_delay_ms") ?? 0;
+        return {
+          type: "status",
+          kind: text(wire, "kind") ?? "",
+          retry:
+            attempt === null
+              ? null
+              : {
+                  attempt,
+                  maxRetries: int(wire, "max_retries") ?? attempt,
+                  delayMs,
+                  until: Date.now() + delayMs,
+                  error: text(wire, "error"),
+                  noResponse: typeof wire.no_response === "object" && wire.no_response !== null,
+                },
+        };
+      }
       case "terminal_opened":
         return { type: "terminal_opened", session: wire as unknown as TerminalInfo };
       case "activity": {
@@ -776,7 +819,9 @@ export class ChatSocket {
       case "ask_done":
         return { type: "ask_done" };
       case "command":
-        return { type: "command", markdown: text(wire, "markdown") ?? "" };
+        return { type: "command", markdown: text(wire, "markdown") ?? "", local: wire.local === true };
+      case "usage":
+        return { type: "usage", usage: usageOf(wire), local: wire.local === true };
       case "component":
         return {
           type: "component",
@@ -784,6 +829,19 @@ export class ChatSocket {
           titleKey: text(wire, "title_key"),
           icon: text(wire, "icon"),
           blocks: list(wire, "blocks").flatMap(toElement),
+          local: wire.local === true,
+        };
+      case "reloaded":
+        return {
+          type: "reloaded",
+          command: text(wire, "command") ?? "",
+          resident: wire.resident === true,
+          failed: wire.failed === true,
+          plugins: int(wire, "plugins"),
+          commands: int(wire, "commands"),
+          agents: int(wire, "agents"),
+          mcpServers: int(wire, "mcp_servers"),
+          errors: int(wire, "errors") ?? 0,
         };
       case "plan":
         return { type: "plan", markdown: text(wire, "markdown") ?? "" };
@@ -840,7 +898,7 @@ export class ChatSocket {
       case "agent_report":
         return { type: "agent_report", name: text(wire, "name"), text: text(wire, "text") ?? "" };
       case "queued":
-        return { type: "queued", id: text(wire, "id"), text: text(wire, "text") ?? "" };
+        return { type: "queued", id: text(wire, "id"), text: text(wire, "text") ?? "", replay: wire.replay === true };
       case "queue":
         return { type: "queue", items: queuedItems(wire, "items") };
       case "dequeued":
@@ -855,7 +913,7 @@ export class ChatSocket {
       case "agent":
         return { type: "agent", id: text(wire, "id"), ...agentFieldsOf(wire) };
       case "task_running":
-        return { type: "task_running", id: text(wire, "id") };
+        return { type: "task_running", id: text(wire, "id"), description: text(wire, "description") };
       case "agent_result":
         return {
           type: "agent_result",
@@ -892,6 +950,17 @@ export class ChatSocket {
           requestBytes: int(wire, "request_bytes"),
           mediaBytes: int(wire, "media_bytes"),
         };
+      case "rate_limit":
+        return {
+          type: "rate_limit",
+          windows: list(wire, "windows").map((window) => ({
+            id: text(window, "id") ?? "",
+            percent: number(window, "percent") ?? 0,
+            severity: text(window, "severity"),
+          })),
+        };
+      case "cache":
+        return { type: "cache", cache: promptCacheOf(wire.cache) };
       case "done":
         return { type: "done", replay: wire.replay === true };
       case "interrupted":
@@ -901,7 +970,7 @@ export class ChatSocket {
       case "error":
         return { type: "error", message: text(wire, "message") ?? "error" };
       case "api_error":
-        return { type: "api_error", message: text(wire, "text") ?? "" };
+        return { type: "api_error", message: text(wire, "text") ?? "", severity: text(wire, "severity") };
       case "tail":
         return { type: "tail", items: list(wire, "items") };
       case "history_chunk":

@@ -91,6 +91,10 @@ export const sessionIdPreview = (sessionId: string): string => sessionId.slice(0
 export const sessionLabel = (session: Pick<SessionInfo, "sessionId" | "title" | "preview">): string =>
   session.title ?? session.preview ?? sessionIdPreview(session.sessionId);
 
+const BUSY_ACTIVITIES = ["waiting", "working", "retrying", "compacting"];
+
+export const isBusyActivity = (activity: string | null): boolean => BUSY_ACTIVITIES.includes(activity ?? "");
+
 export const projectFilePath = (base: string | null, relative: string): string => {
   if (!base) return relative;
   const separator = base.includes("\\") ? "\\" : "/";

@@ -1,4 +1,5 @@
 import { authWire, type AuthInput } from "$lib/data/auth";
+import { usageOf, type Usage } from "$lib/data/usageWindows";
 import { backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
 
@@ -99,19 +100,10 @@ export interface ActionResult {
   message: string;
 }
 
-export interface UsageWindow {
-  id: string;
-  percent: number;
-  resetsAt: string | null;
-  unused: boolean;
-  detail: string | null;
+export interface PluginChange extends ActionResult {
+  held: number;
 }
 
-export interface Usage {
-  plan: string | null;
-  windows: UsageWindow[];
-  error: string | null;
-}
 
 export interface ServiceComponent {
   name: string;
@@ -135,6 +127,12 @@ export interface ServiceStatus {
   error: string | null;
 }
 
+export interface Prompts {
+  user: string;
+  commit: string;
+  projects: Record<string, string>;
+}
+
 type Wire = Record<string, any>;
 
 const toAction = (data: Wire | null): ActionResult => ({
@@ -142,24 +140,17 @@ const toAction = (data: Wire | null): ActionResult => ({
   message: data?.message ?? "",
 });
 
+const heldOf = (data: Wire | null): number => (typeof data?.held === "number" ? data.held : 0);
+
+const toPluginChange = (data: Wire | null): PluginChange => ({ ...toAction(data), held: heldOf(data) });
+
 export const createClaudeApi = (client: HttpClient, profile: () => Profile) => ({
   async usage(account: string | null = null, force = false): Promise<Usage | null> {
     const data = await client.get<Wire>("/claude/usage", {
       ...(account ? { account } : {}),
       ...(force ? { force: true } : {}),
     });
-    if (!data) return null;
-    return {
-      plan: data.plan ?? null,
-      windows: (data.windows ?? []).map((window: Wire) => ({
-        id: window.id ?? "",
-        percent: window.percent ?? 0,
-        resetsAt: window.resets_at ?? null,
-        unused: window.unused === true,
-        detail: window.detail ?? null,
-      })),
-      error: data.error ?? null,
-    };
+    return data ? usageOf(data) : null;
   },
 
   async status(force = false): Promise<ServiceStatus | null> {
@@ -185,27 +176,25 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     };
   },
 
-  async userPrompt(): Promise<string | null> {
-    const data = await client.get<Wire>("/claude/prompt");
-    return data?.text ?? null;
+  async prompts(): Promise<Prompts | null> {
+    const data = await client.get<Wire>("/claude/prompts");
+    if (!data) return null;
+    const projects: Wire = data.projects && typeof data.projects === "object" ? data.projects : {};
+    return {
+      user: typeof data.user === "string" ? data.user : "",
+      commit: typeof data.commit === "string" ? data.commit : "",
+      projects: Object.fromEntries(
+        Object.entries(projects).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+      ),
+    };
   },
 
   async setUserPrompt(text: string): Promise<boolean> {
     return (await client.put("/claude/prompt", { text })) !== null;
   },
 
-  async commitPrompt(): Promise<string | null> {
-    const data = await client.get<Wire>("/claude/commit-prompt");
-    return data?.text ?? null;
-  },
-
   async setCommitPrompt(text: string): Promise<boolean> {
     return (await client.put("/claude/commit-prompt", { text })) !== null;
-  },
-
-  async projectPrompt(project: string): Promise<string | null> {
-    const data = await client.get<Wire>("/claude/project-prompt", { project });
-    return data?.text ?? null;
   },
 
   async setProjectPrompt(project: string, text: string): Promise<boolean> {
@@ -278,8 +267,8 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return toAction(await client.put<Wire>("/claude/plugins/options", { plugin, values }));
   },
 
-  async addLocalPlugin(path: string): Promise<ActionResult> {
-    return toAction(await client.post<Wire>("/claude/plugins/local", { path }));
+  async addLocalPlugin(path: string): Promise<PluginChange> {
+    return toPluginChange(await client.post<Wire>("/claude/plugins/local", { path }));
   },
 
   async skills(): Promise<Skill[] | null> {
@@ -336,8 +325,13 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return toAction(await client.delete<Wire>(`/claude/mcp/${encodeURIComponent(name)}`));
   },
 
-  async pluginAction(action: string, plugin: string): Promise<ActionResult> {
-    return toAction(await client.post<Wire>("/claude/plugins/action", { action, plugin }));
+  async pluginAction(action: string, plugin: string): Promise<PluginChange> {
+    return toPluginChange(await client.post<Wire>("/claude/plugins/action", { action, plugin }));
+  },
+
+  async reloadPlugins(force: boolean): Promise<number | null> {
+    const data = await client.post<Wire>("/claude/plugins/reload", { force });
+    return data ? heldOf(data) : null;
   },
 
   async marketplaceAction(action: string, target: string): Promise<ActionResult> {

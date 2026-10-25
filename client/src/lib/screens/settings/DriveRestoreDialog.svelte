@@ -23,7 +23,7 @@
 <CompactDialog title={t("RESTORE")} description={t("DRIVE_RESTORE_CONFIRM", summary)} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button variant="destructive" enabled={ready} onclick={() => onConfirm(password.trim())}>{t("RESTORE")}</Button>
+    <Button enabled={ready} onclick={() => onConfirm(password.trim())}>{t("RESTORE")}</Button>
   {/snippet}
 
   {#if copy.encrypted}

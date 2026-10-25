@@ -14,6 +14,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ConversationRow from "./ConversationRow.svelte";
@@ -202,7 +203,7 @@
         {#if !group.category && groupIndex > 0}
           <div data-spacer={groupIndex} class="my-1 shrink-0">
             <div
-              class="mx-2 h-px bg-outline-variant"
+              class="mx-2 border-t border-outline-variant"
               style="transform: translateY({drag.shiftFor(`spacer:${groupIndex}`)}px); transition: {drag.active
                 ? 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'
                 : 'none'}"
@@ -347,8 +348,10 @@
       {/each}
     {:else if chat.historyLoading}
       <CenteredProgress class="h-full" />
+    {:else if chat.historyUnavailable}
+      <ServerUnavailable class="h-full" />
     {:else}
-      <EmptyState text={chat.historyUnavailable ? t("SERVER_UNAVAILABLE") : t("NO_CHATS")} class="h-full" />
+      <EmptyState text={t("NO_CHATS")} class="h-full" />
     {/if}
   </div>
 

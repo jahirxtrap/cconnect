@@ -17,12 +17,12 @@
   import FolderInput from "@lucide/svelte/icons/folder-input";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
+  import Package from "@lucide/svelte/icons/package";
   import PackageOpen from "@lucide/svelte/icons/package-open";
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Save from "@lucide/svelte/icons/save";
   import SearchX from "@lucide/svelte/icons/search-x";
-  import ServerOff from "@lucide/svelte/icons/server-off";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
   import Upload from "@lucide/svelte/icons/upload";
@@ -65,7 +65,9 @@
   import { UPLOAD_DIR } from "$lib/services/uploadApi";
   import { dragTransfer, type SharedFile } from "$lib/app/dragPayload.svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
+  import { isPackFile } from "$lib/design/packs/schema";
   import EnvironmentAction from "$lib/screens/chat/EnvironmentAction.svelte";
+  import { offerShared } from "$lib/screens/packs/packIntake";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -80,6 +82,7 @@
   import { fileDrop } from "$lib/ui/fileDrop";
   import { entryIcon, kindIcon, kindLabel } from "$lib/ui/fileIcons";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
@@ -327,7 +330,6 @@
   );
   const selectionBar = $derived(selecting && (wide || selected.length > 0));
   const querying = $derived(searching && searchQuery.trim().length > 0);
-  const uploadable = $derived(!querying && archive === null && !transfer && !serverStatus.unavailable);
 
   const selectAll = () => {
     selecting = true;
@@ -424,6 +426,10 @@
         kind: "text",
         onDelete: () => void sharedApi.remove(relative).then(reload),
       });
+      return;
+    }
+    if (isPackFile(entry.name)) {
+      offerShared(downloadUrl(child(entry.file)), entry.name);
       return;
     }
     if (isArchive(entry.name)) {
@@ -1013,13 +1019,6 @@
   {/if}
 {/snippet}
 
-{#snippet emptyAction()}
-  <Button onclick={() => picker?.click()}>
-    <Upload size={16} class="shrink-0" />
-    {t("UPLOAD_FILES")}
-  </Button>
-{/snippet}
-
 {#snippet linkNote(entry: SharedEntry, className: string)}
   {@const LinkIcon = entry.missing ? CircleX : Link2}
   <span class="flex min-w-0 items-center gap-1.5 text-caption {entry.missing ? 'text-red' : 'text-faint'} {className}">
@@ -1087,6 +1086,13 @@
   />
   {#if single && !single.isDir && isArchive(single.name)}
     <MenuItem text={t("EXTRACT")} icon={PackageOpen} onclick={() => single && extractArchive(single)} />
+  {/if}
+  {#if single && !single.isDir && isPackFile(single.name)}
+    <MenuItem
+      text={t("PACK_INSTALL")}
+      icon={Package}
+      onclick={() => single && offerShared(downloadUrl(child(single.file)), single.name)}
+    />
   {/if}
 {/snippet}
 
@@ -1205,7 +1211,9 @@
 
     <div class="flex min-h-0 flex-1 gap-4 px-(--page-inset) pb-(--page-inset)">
       <div class="flex min-w-0 flex-1 flex-col">
-        {#if ordered.length}
+        {#if serverStatus.unavailable}
+          <ServerUnavailable class="flex-1" />
+        {:else if ordered.length}
           <!-- svelte-ignore a11y_no_static_element_interactions -->
           <div
             bind:this={list}
@@ -1222,12 +1230,9 @@
           </div>
         {:else}
           <EmptyState
-            loading={!loaded && !serverStatus.unavailable}
-            icon={compact && serverStatus.unavailable ? ServerOff : querying ? SearchX : FolderOpen}
-            text={compact && serverStatus.unavailable
-              ? t("SERVER_UNAVAILABLE")
-              : t(querying ? "NO_RESULTS" : "NO_FILES")}
-            action={uploadable ? emptyAction : undefined}
+            loading={!loaded}
+            icon={querying ? SearchX : FolderOpen}
+            text={t(querying ? "NO_RESULTS" : "NO_FILES")}
             class="flex-1"
           />
         {/if}

@@ -41,8 +41,9 @@ async def lifespan(app: FastAPI):
     await cli_info.refresh()
     from services import chat_list
     await chat_list.hub.start()
-    from services import project_watch, shared_watch, system_watch
+    from services import packs, project_watch, shared_watch, system_watch
     await shared_watch.hub.start()
+    await packs.watch.start()
     await project_watch.hub.start()
     await system_watch.hub.start()
     from services import network
@@ -50,6 +51,7 @@ async def lifespan(app: FastAPI):
     yield
     chat_list.hub.stop()
     shared_watch.hub.stop()
+    packs.watch.stop()
     project_watch.hub.stop()
     system_watch.hub.stop()
     network.watchdog.stop()

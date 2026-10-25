@@ -1,4 +1,5 @@
 import type { AuthKind } from "$lib/data/auth";
+import { legacyAccent } from "$lib/design/packs/builtin";
 import { secureStore } from "$lib/platform/secureStorage";
 import { store } from "$lib/platform/storage";
 
@@ -20,9 +21,15 @@ export interface EnvironmentProfile {
   effort: string;
   permissionMode: string;
   streaming: boolean | null;
-  // null = follow the app accent; otherwise it overrides it while this environment is active.
-  accentIndex: number | null;
+  accent: string | null;
 }
+
+type StoredProfile = EnvironmentProfile & { accentIndex?: number | null };
+
+const adopted = ({ accentIndex, ...profile }: StoredProfile): EnvironmentProfile => ({
+  ...profile,
+  accent: profile.accent ?? legacyAccent(accentIndex ?? null),
+});
 
 export type Profile = EnvironmentProfile | null;
 
@@ -77,7 +84,7 @@ export const profileKey = (profile: Profile) =>
     : "";
 
 class Backend {
-  environments = $state<EnvironmentProfile[]>(secureStore.get("environments", []));
+  environments = $state<EnvironmentProfile[]>(secureStore.get<StoredProfile[]>("environments", []).map(adopted));
   activeId = $state<string | null>(store.get("environments.active", null));
   schemes = $state<Record<string, string>>({});
 

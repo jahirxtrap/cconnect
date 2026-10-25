@@ -74,7 +74,7 @@ export const screenFor = (kind: RightKind) =>
 
 export type PaneView = Pick<ScreenEntry, "kind" | "label" | "icon">;
 
-const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
+export const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
 
 export const PANE_TOOL_VIEWS: PaneView[] = PANE_TOOLS.map(screenFor);
 

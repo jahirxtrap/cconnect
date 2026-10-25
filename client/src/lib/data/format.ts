@@ -49,6 +49,8 @@ export const formatDays = (days: number): string => {
   return parts.join(" ");
 };
 
+export const formatList = (items: readonly string[]): string => new Intl.ListFormat().format(items);
+
 export const formatDecimal = (value: number, decimals: number, minimum = decimals): string =>
   value.toLocaleString(undefined, { minimumFractionDigits: minimum, maximumFractionDigits: decimals });
 

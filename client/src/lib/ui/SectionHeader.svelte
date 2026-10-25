@@ -3,11 +3,15 @@
 
   interface Props {
     label: string;
+    divider?: boolean;
   }
 
-  const { label }: Props = $props();
+  const { label, divider = false }: Props = $props();
 </script>
 
-<p class="flex h-7 items-center px-2.5 {SECTION_LABEL_CLASS}">
+{#if divider}
+  <div class="mx-1 my-1 border-t border-outline-variant"></div>
+{/if}
+<p class="flex h-7 items-center px-1 {SECTION_LABEL_CLASS}">
   {label}
 </p>

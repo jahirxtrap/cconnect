@@ -1,4 +1,5 @@
 import { mount } from "svelte";
+import { theme } from "$lib/design/theme.svelte";
 import { polyfillFieldSizing } from "$lib/platform/fieldSizing";
 import { trackPressFeedback } from "$lib/platform/pressFeedback";
 import { registerServiceWorker, webApp } from "$lib/platform/pwa.svelte";
@@ -51,6 +52,7 @@ document.addEventListener("selectionchange", () => {
   if (!selectableRoot(selection.anchorNode)) selection.removeAllRanges();
 });
 
+theme.paint();
 polyfillFieldSizing();
 trackPressFeedback();
 registerServiceWorker();

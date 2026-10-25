@@ -52,8 +52,16 @@ class Navigation {
   sharedTarget = $state<string | null>(null);
   preview = $state<PreviewRequest | null>(null);
   previewPane = $state(false);
+  returning = $state(false);
 
   readonly previewOverlay = $derived(this.preview !== null && !this.previewPane);
+
+  endPreview() {
+    this.preview = null;
+    this.previewPane = false;
+    this.returning = true;
+    requestAnimationFrame(() => (this.returning = false));
+  }
 
   readonly chatActive = $derived(this.route === "/");
 
@@ -87,7 +95,7 @@ class Navigation {
         if (consumingDismiss()) return;
         if (dismissTop()) return;
         if (this.previewOverlay) {
-          this.preview = null;
+          this.endPreview();
           return;
         }
         if (this.#dismiss(leaving)) {

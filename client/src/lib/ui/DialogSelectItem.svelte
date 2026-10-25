@@ -38,7 +38,7 @@
     <SelectionDot {selected} />
     <div class="min-w-0 flex-1">
       <p
-        class="truncate text-body-md font-medium {mono ? 'font-mono' : ''} {selected
+        class="truncate text-item-title {mono ? 'font-mono' : ''} {selected
           ? 'text-accent'
           : 'text-on-surface'}"
         style={labelFont ? `font-family: ${labelFont}` : undefined}

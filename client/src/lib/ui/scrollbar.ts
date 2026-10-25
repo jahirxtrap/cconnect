@@ -38,14 +38,24 @@ const ACTIVE = 65;
 const SLEEP_MS = 900;
 const FADE_MS = 180;
 
+const scrolled = new WeakSet<HTMLElement>();
+
 export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
+  if (scrolled.has(node)) return { destroy() {} };
+  scrolled.add(node);
   const { touchIndicator = false, wheel = false, gutter = false } = options;
 
+  const lane = document.createElement("div");
+  lane.style.cssText = "position:absolute;top:0;left:0;height:0;pointer-events:none";
+  const rail = document.createElement("div");
+  rail.style.cssText = "position:sticky;left:0;height:0";
   const thumb = document.createElement("div");
   thumb.style.cssText =
     "position:absolute;top:0;left:0;border-radius:999px;pointer-events:none;opacity:0;" +
     `transition:opacity ${FADE_MS}ms linear`;
-  node.appendChild(thumb);
+  rail.appendChild(thumb);
+  lane.appendChild(rail);
+  node.appendChild(lane);
 
   if (getComputedStyle(node).position === "static") node.style.position = "relative";
   const basePadding = parseFloat(getComputedStyle(node).paddingBottom) || 0;
@@ -62,14 +72,14 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
   const contentWidth = () => {
     let end = 0;
     for (const child of node.children) {
-      if (child === thumb || !(child instanceof HTMLElement)) continue;
+      if (child === lane || !(child instanceof HTMLElement)) continue;
       end = Math.max(end, child.offsetLeft + Math.max(child.offsetWidth, child.scrollWidth));
     }
     if (end) end += parseFloat(getComputedStyle(node).paddingRight) || 0;
     else {
-      thumb.style.display = "none";
+      lane.style.display = "none";
       end = node.scrollWidth;
-      thumb.style.display = "";
+      lane.style.display = "";
     }
     return Math.max(end, node.clientWidth);
   };
@@ -90,15 +100,18 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     }
     if (!isTouch && gutter) node.style.paddingBottom = `${basePadding + thickness + GAP}px`;
     const viewport = node.clientWidth;
-    const size = (viewport / contentWidth()) * viewport;
+    const content = contentWidth();
+    const size = (viewport / content) * viewport;
     const offset = (node.scrollLeft / max) * (viewport - size);
     const alpha = !isTouch && (hovered || dragging) ? ACTIVE : IDLE;
     node.style.cursor = hovered || dragging ? "pointer" : "";
+    lane.style.width = `${content}px`;
+    lane.style.top = `${node.scrollTop + node.clientHeight - thickness}px`;
+    rail.style.width = `${viewport}px`;
     thumb.style.opacity = awake || hovered || dragging ? "1" : "0";
     thumb.style.height = `${thickness}px`;
     thumb.style.width = `${size}px`;
-    thumb.style.transform =
-      `translate(${node.scrollLeft + offset}px, ${node.scrollTop + node.clientHeight - thickness}px)`;
+    thumb.style.transform = `translateX(${offset}px)`;
     thumb.style.background = `rgba(var(--c-on-surface-variant-rgb), ${alpha / 100})`;
   };
 
@@ -205,6 +218,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
 
   return {
     destroy() {
+      scrolled.delete(node);
       if (frame) cancelAnimationFrame(frame);
       if (sleep !== null) clearTimeout(sleep);
       resize.disconnect();
@@ -217,7 +231,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
       node.removeEventListener("wheel", onWheel);
       onDragEnd();
       node.style.cursor = "";
-      thumb.remove();
+      lane.remove();
     },
   };
 }

@@ -1,6 +1,8 @@
+import { untrack } from "svelte";
 import { ROUTES } from "$lib/app/navigation.svelte";
+import { chatListFor, onSessionForgotten } from "$lib/data/chatList.svelte";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
-import { sessionLabel, type SessionInfo } from "$lib/data/models";
+import { isBusyActivity, sessionIdPreview, sessionLabel, type SessionInfo } from "$lib/data/models";
 import { backend } from "$lib/services/backend.svelte";
 import { ChatState } from "./state.svelte";
 
@@ -23,7 +25,6 @@ export interface Tab {
   projectKey: string | null;
   title: string | null;
   color: string | null;
-  running: boolean;
   overrides: TabOverrides;
   panelProject: string | null;
   viewTitle?: string | null;
@@ -171,6 +172,18 @@ class Tabs {
       window.addEventListener("popstate", onPopState);
       return () => window.removeEventListener("popstate", onPopState);
     });
+
+    $effect(() => onSessionForgotten((sessionId) => this.#forget(sessionId)));
+  }
+
+  #forget(sessionId: string) {
+    for (const tab of this.list) {
+      if (tab.sessionId !== sessionId) continue;
+      const chat = this.liveState(tab.id);
+      if (chat && chat.sessionId !== sessionId) continue;
+      chat?.newSession();
+      this.update(tab.id, { sessionId: null, projectKey: null });
+    }
   }
 
   #nextId() {
@@ -191,6 +204,15 @@ class Tabs {
         color: tab.color,
         overrides: tab.overrides,
       });
+      $effect(() => {
+        const view = created.viewOnly;
+        const patch = {
+          sessionId: created.sessionId,
+          projectKey: created.projectKey,
+          viewTitle: view ? (view.title ?? sessionIdPreview(view.sessionId)) : null,
+        };
+        untrack(() => this.update(tab.id, patch));
+      });
     });
     created.tabId = tab.id;
     created.onContextChange = () => this.#syncContext(tab.id, created);
@@ -201,6 +223,13 @@ class Tabs {
 
   liveState(id: string): ChatState | null {
     return this.#states.get(id)?.chat ?? null;
+  }
+
+  running(tab: Tab): boolean {
+    const chat = this.liveState(tab.id);
+    if (chat) return chat.busy;
+    const sessions = tab.sessionId ? chatListFor(backend.find(tab.environmentId))?.sessions : undefined;
+    return isBusyActivity(sessions?.find((session) => session.sessionId === tab.sessionId)?.activity ?? null);
   }
 
   #syncContext(id: string, state: ChatState) {
@@ -235,7 +264,6 @@ class Tabs {
       projectKey: null,
       title: null,
       color: null,
-      running: false,
       overrides: { ...(this.active?.overrides ?? this.#environmentOverrides(environmentId)) },
       panelProject: this.active?.panelProject ?? null,
     };
@@ -288,7 +316,6 @@ class Tabs {
         projectKey: item.proj ?? null,
         title: item.title ?? null,
         color: item.color ?? null,
-        running: false,
         overrides: { ...this.#environmentOverrides(item.env ?? null), ...(item.over ?? {}) },
         panelProject: item.pproj ?? null,
       }));
@@ -332,7 +359,6 @@ class Tabs {
       projectKey: session.projectKey,
       title: sessionLabel(session),
       color: session.color,
-      running: false,
       overrides: { ...(this.active?.overrides ?? this.#environmentOverrides(environmentId)) },
       panelProject: this.active?.panelProject ?? null,
     };

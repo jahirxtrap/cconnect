@@ -13,7 +13,7 @@ import uuid
 
 from loguru import logger
 
-from services import cli_info, mods, persistent_sessions, todos as todos_store, tool_props
+from services import cli_info, mods, persistent_sessions, todos as todos_store, tool_props, visibility
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -23,6 +23,10 @@ OUTBOX_MAX = 5000
 STOP_GRACE = 15.0
 
 TAIL_POLL = 1.0
+
+RELOADS = {"reload-plugins": "reload_plugins", "reload-skills": "reload_skills"}
+
+RELOAD_COUNTS = {"plugins": "plugins", "commands": "commands", "agents": "agents", "mcp_servers": "mcpServers"}
 
 _CLOSE = object()
 
@@ -49,6 +53,9 @@ class LiveSession:
         self._result_seen = False
         self._compacting = False
         self._health = None
+        self._background = {}
+        self._owned = {}
+        self._runs = {}
         self._announced = object()
         self._published_id = None
         self._prompt_id = None
@@ -61,8 +68,9 @@ class LiveSession:
         self._cooldown = None
         self._ending = False
         self._tail = None
-        self._tail_count = None
+        self._tail_counts = {}
         self._tail_stamp = None
+        self.shown_size = None
         self._mods = mods.Surface()
         self._mod_asks = {}
         self._mod_lock = asyncio.Lock()
@@ -73,6 +81,10 @@ class LiveSession:
     @property
     def running(self):
         return self._worker is not None and not self._worker.done() and not self._ending
+
+    @property
+    def working(self):
+        return self.running or bool(self._owned)
 
     @property
     def attached(self):
@@ -89,7 +101,7 @@ class LiveSession:
         if self.running:
             if self._compacting:
                 return "compacting"
-            return "slow" if self._health == "slow" else "working"
+            return "retrying" if self._health == "retrying" else "working"
         if self._health == "failed":
             return "failed"
         return "persistent" if self._resident is not None and self._resident.connected else None
@@ -107,15 +119,24 @@ class LiveSession:
         async with self._lock:
             self._sinks[sink] = prefs
             floor = max(last_seq, self._committed_seq) if since_committed else last_seq
+            replayed = set()
             for stamped in list(self._outbox):
-                if stamped["seq"] > floor:
+                if stamped["seq"] > floor and not (since_committed and self._in_transcript(stamped)):
                     await self._send_one(sink, {**stamped, "replay": True})
+                    replayed.add(stamped["seq"])
             for entry in list(self._pending.values()):
                 event = entry.get("event")
-                if event is not None and event["seq"] <= last_seq:
+                if event is not None and event["seq"] not in replayed:
                     await self._send_one(sink, {**event, "replay": True})
+            if self.running or self.resident_alive:
+                for running in list(self._background.values()):
+                    await self._send_one(sink, {**running, "channel": self.channel, "replay": True})
             await self._send_one(sink, self._mods_snapshot())
         self._watch_transcript()
+
+    def _in_transcript(self, stamped):
+        started = self._runs.get(stamped.get("parent"))
+        return started is not None and started <= self._committed_seq
 
     async def detach(self, sink):
         """Drop one socket. The worker keeps running — it is not cancelled,
@@ -133,8 +154,16 @@ class LiveSession:
         self._tail = asyncio.create_task(self._tail_loop())
 
     def _rebase_tail(self):
-        self._tail_count = None
+        self._tail_counts = {}
         self._tail_stamp = None
+        self.shown_size = None
+
+    def _tail_groups(self):
+        groups = {}
+        for sink, holder in list(self._sinks.items()):
+            prefs = (holder or {}).get("prefs") or visibility.defaults()
+            groups.setdefault(json.dumps(prefs, sort_keys=True), (prefs, []))[1].append(sink)
+        return groups
 
     async def _tail_loop(self):
         from services import sessions as sessions_service
@@ -152,15 +181,19 @@ class LiveSession:
                 if stamp is None or stamp == self._tail_stamp:
                     continue
                 self._tail_stamp = stamp
-                items = await asyncio.to_thread(
-                    sessions_service.get_session_messages, project_key, sid, next(iter(self.wanted()), None)
-                )
-                if self.running:
-                    continue
-                known, self._tail_count = self._tail_count, len(items)
-                if known is None or len(items) <= known:
-                    continue
-                await self._send({"type": "tail", "items": items[known:], "channel": self.channel})
+                groups = self._tail_groups()
+                self._tail_counts = {key: count for key, count in self._tail_counts.items() if key in groups}
+                for key, (prefs, sinks) in groups.items():
+                    items = await asyncio.to_thread(sessions_service.get_session_messages, project_key, sid, prefs)
+                    if self.running:
+                        break
+                    known, self._tail_counts[key] = self._tail_counts.get(key), len(items)
+                    if known is None or len(items) <= known:
+                        continue
+                    self.shown_size = stamp[1]
+                    fresh = [dict(item, index=index) for index, item in enumerate(items[known:], start=known)]
+                    for sink in sinks:
+                        await self._send_one(sink, {"type": "tail", "items": fresh, "channel": self.channel})
         except asyncio.CancelledError:
             return
 
@@ -174,7 +207,8 @@ class LiveSession:
         self._resident = await persistent_sessions.pool.take(self.channel, shape)
         self._resident.listener = self._emit
         self._resident.answerer = self._mod_answer
-        self._resident.changed = lambda: self._publish_activity(self.activity)
+        self._resident.changed = self._resident_changed
+        self._resident.runner = self.run_background
         await persistent_sessions.pool.trim(persistent_sessions.limit(), registry.busy_channels() | {self.channel})
         return self._resident
 
@@ -182,11 +216,90 @@ class LiveSession:
     def resident_alive(self):
         return self._resident is not None and self._resident.connected
 
+    def _resident_changed(self):
+        if not self.resident_alive:
+            self._end_background()
+            self._reassert_meta()
+        self._publish_activity(self.activity)
+
+    async def rename(self, title):
+        if self.resident_alive:
+            await self._resident.request("rename_session", title=title, source="host")
+
+    def _end_background(self):
+        from services import sessions as sessions_service
+
+        for owned in self._owned.values():
+            owned.cancel()
+        ended = list(self._background)
+        self._background.clear()
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        for tool_use_id in ended:
+            loop.create_task(self._emit({"type": "agent_result", "id": tool_use_id, "status": sessions_service.TASK_STOPPED}))
+
+    async def run_background(self, tool_use_id, description, work, summary):
+        if not self.resident_alive or tool_use_id in self._owned:
+            return False
+        stamped = await self._emit({"type": "task_running", "id": tool_use_id, "description": description})
+        self._runs[tool_use_id] = stamped["seq"]
+        self._owned[tool_use_id] = asyncio.create_task(self._run_owned(tool_use_id, work, summary))
+        return True
+
+    async def _run_owned(self, tool_use_id, work, summary):
+        from services import sessions as sessions_service
+
+        started = time.monotonic()
+        try:
+            status, result = sessions_service.TASK_COMPLETED, await work(self._emit, self._ask)
+        except asyncio.CancelledError:
+            status, result = sessions_service.TASK_STOPPED, ""
+        except Exception as exc:
+            logger.debug(f"background task failed: {type(exc).__name__}: {exc}")
+            status, result = sessions_service.TASK_FAILED, str(exc) or type(exc).__name__
+        finally:
+            self._owned.pop(tool_use_id, None)
+        if tool_use_id not in self._background:
+            return
+        duration_ms = int((time.monotonic() - started) * 1000)
+        timings = visibility.ceiling(self.wanted()).get("timings")
+        await self._emit({"type": "agent_result", "id": tool_use_id, "status": status, "duration_ms": duration_ms if timings else None})
+        notification = sessions_service.task_notification(tool_use_id, status, summary(status), result, duration_ms)
+        if self.resident_alive and await self._resident.tell(notification) and not self.running and self.adopter is not None:
+            await self.adopter()
+
+    async def reload(self, command, hold=False):
+        subtype = RELOADS.get(command)
+        if subtype is None:
+            return None
+        if not self.resident_alive:
+            report = {"command": command, "resident": False}
+        else:
+            answer = await self._resident.reload(subtype, hold)
+            if answer is not None and answer.get("held"):
+                return {"held": True}
+            if answer is None:
+                report = {"command": command, "resident": True, "failed": True}
+            else:
+                counts = {name: len(answer[key]) for name, key in RELOAD_COUNTS.items() if isinstance(answer.get(key), list)}
+                report = {"command": command, "resident": True, **counts, "errors": answer.get("error_count") or 0}
+        await self._emit({"type": "reloaded", **report})
+        return report
+
     async def release_resident(self):
         self._cancel_cooldown()
         self._resident = None
+        self._end_background()
         await persistent_sessions.pool.drop(self.channel)
         self._publish_activity(self.activity)
+
+    async def retire(self):
+        from services import sessions as sessions_service
+
+        await self.release_resident()
+        sessions_service.forget_pinned(self.state.session_id)
 
     def _cancel_cooldown(self):
         if self._cooldown is not None:
@@ -205,7 +318,7 @@ class LiveSession:
                 await asyncio.sleep(persistent_sessions.grace())
                 if self._sinks:
                     return
-                if self.running:
+                if self.working:
                     continue
                 await self.release_resident()
                 return
@@ -217,6 +330,18 @@ class LiveSession:
         if kind == "own_turn":
             if self.adopter is not None and not self.running:
                 asyncio.create_task(self.adopter())
+            return None
+        if kind == "loose_system":
+            from services.claude_runtime import _system_events
+
+            for loose in _system_events(event.get("subtype"), event.get("data"), visibility.ceiling(self.wanted())):
+                await self._emit(loose)
+            return None
+        if kind == "background_tasks":
+            alive = set(event.get("ids") or [])
+            gone = [tool_use_id for tool_use_id, running in self._background.items() if running.get("task") and running["task"] not in alive]
+            for tool_use_id in gone:
+                await self._emit({"type": "agent_result", "id": tool_use_id, "status": None})
             return None
         if kind == "commands":
             cli_info.refresh_later(self.state.account)
@@ -242,6 +367,8 @@ class LiveSession:
             if kind in ("done", "interrupted"):
                 self._committed_seq = self._seq
                 self._turn_open = False
+            elif not self.running:
+                self._committed_seq = self._seq
             await self._send(stamped)
         self._track(event)
         return stamped
@@ -253,8 +380,7 @@ class LiveSession:
         """A notice after the turn: a line the transcript keeps travels as a tail item, a log line unstamped."""
         if not event.get("uuid"):
             return {**event, "channel": self.channel}
-        if self._tail_count is not None:
-            self._tail_count += 1
+        self._tail_counts = {key: count + 1 for key, count in self._tail_counts.items()}
         return {"type": "tail", "items": [event], "channel": self.channel}
 
     def _mod_client(self):
@@ -338,6 +464,20 @@ class LiveSession:
         if kind == "queued":
             self._publish_queue()
             return
+        if kind == "task_running":
+            self._background[event.get("id")] = {
+                "type": "task_running",
+                "id": event.get("id"),
+                "task": event.get("task"),
+                "description": event.get("description"),
+            }
+            return
+        if kind == "agent_result":
+            self._background.pop(event.get("id"), None)
+            return
+        if kind in ("done", "interrupted") and not self.resident_alive:
+            self._end_background()
+            return
         if kind in ("session_started", "result"):
             self._publish_activity(self.activity)
             return
@@ -349,8 +489,9 @@ class LiveSession:
             self._compacting = False
             self.turn_start_index = 0
         elif kind == "status":
-            health = event.get("kind")
-            self._health = None if health == "ok" else ("failed" if health == "failed" else "slow")
+            self._health = None if event.get("kind") == "ok" else "retrying"
+        elif kind == "api_error" and event.get("severity") == "error":
+            self._health = "failed"
         else:
             return
         self._publish_activity(self.activity)
@@ -414,9 +555,12 @@ class LiveSession:
             await self._send_one(sink, payload)
 
     def _settle(self):
+        self._compacting = False
+        self._reassert_meta()
+
+    def _reassert_meta(self):
         from services import sessions as sessions_service
 
-        self._compacting = False
         if self.state.session_id and self.state.cwd:
             sessions_service.reassert_meta(
                 sessions_service.project_key_for(self.state.cwd), self.state.session_id
@@ -624,6 +768,20 @@ class LiveSession:
     async def set_permission_mode(self, mode: str) -> bool:
         return await self._send_control("set_permission_mode", mode=mode)
 
+    async def stop_task(self, tool_use_id: str) -> bool:
+        owned = self._owned.get(tool_use_id)
+        if owned is not None:
+            owned.cancel()
+            return True
+        running = self._background.get(tool_use_id)
+        task_id = running.get("task") if running else None
+        if not task_id:
+            return False
+        if await self._send_control("stop_task", task_id=task_id):
+            return True
+        client = self._resident.client if self.resident_alive else None
+        return client is not None and await mods.request(client, "stop_task", task_id=task_id) is not None
+
     async def _ask_cli_to_stop(self):
         worker = self._worker
         if not await self._send_stop():
@@ -777,6 +935,18 @@ class SessionRegistry:
                 return session
         return None
 
+    async def end_session(self, session_id):
+        for channel, session in list(self._sessions.items()):
+            if session.state.session_id != session_id:
+                continue
+            del self._sessions[channel]
+            self._idle_since.pop(channel, None)
+            await session.interrupt()
+            await session.release_resident()
+
+    def residents(self):
+        return [session for session in self._sessions.values() if session.resident_alive]
+
     def live_session_ids(self):
         """Ids of the chats alive in this process, transcript on disk or not yet."""
         return {s.state.session_id for s in self._sessions.values() if s.state.session_id}
@@ -796,22 +966,19 @@ class SessionRegistry:
     def _sweep(self):
         now = self._clock()
         for channel, session in list(self._sessions.items()):
-            if session.running or session.attached:
+            if session.working or session.attached:
                 self._idle_since.pop(channel, None)
                 continue
             since = self._idle_since.setdefault(channel, now)
             if now - since >= self._grace:
-                from services import sessions as sessions_service
-
-                sessions_service.forget_pinned(session.state.session_id)
-                asyncio.create_task(session.release_resident())
+                asyncio.create_task(session.retire())
                 del self._sessions[channel]
                 self._idle_since.pop(channel, None)
 
     def busy_channels(self):
         return {
             channel for channel, session in self._sessions.items()
-            if session.running or session.attached
+            if session.working or session.attached
         }
 
 

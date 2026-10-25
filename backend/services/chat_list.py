@@ -37,6 +37,7 @@ class ChatListHub:
         self._sessions: dict[str, dict] = {}
         self._activity: dict[str, str] = {}
         self._resident: set[str] = set()
+        self._hidden: set[str] = set()
         self._projects: dict[str, dict] = {}
         self._sig_cache: dict[str, tuple] = {}
         self._subscribers: set[asyncio.Queue] = set()
@@ -95,6 +96,18 @@ class ChatListHub:
     def sessions(self) -> list[dict]:
         with self._lock:
             return list(self._sessions.values())
+
+    def hide(self, session_id: str):
+        with self._lock:
+            self._hidden.add(session_id)
+            listed = self._sessions.pop(session_id, None) is not None
+        if listed:
+            self._emit([{"type": "session_removed", "session_id": session_id}])
+
+    async def unhide(self, *session_ids: str):
+        with self._lock:
+            self._hidden.difference_update(session_ids)
+        await self.resync()
 
     def set_activity(self, session_id: Optional[str], activity: Optional[str], resident: Optional[bool] = None):
         if not session_id:
@@ -242,7 +255,7 @@ class ChatListHub:
                 if meta is None:
                     continue
                 count += 1
-                meta = self._with_activity(sid, meta)
+                meta = self._with_activity(sid, sessions_service.with_pinned(sid, meta))
                 sessions[sid] = meta
                 if newest_mtime is None or st.st_mtime > newest_mtime:
                     newest_mtime = st.st_mtime
@@ -289,6 +302,7 @@ class ChatListHub:
             events.append({"type": "placement_removed", "session_id": gone})
         with self._lock:
             old_projects, old_sessions = self._projects, self._sessions
+            new_sessions = {sid: s for sid, s in new_sessions.items() if sid not in self._hidden}
             if broadcast:
                 for key, p in new_projects.items():
                     if key not in old_projects or _project_sig(p) != _project_sig(old_projects[key]):

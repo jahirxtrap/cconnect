@@ -1,5 +1,6 @@
 """Read Claude Code projects and session transcripts from ~/.claude/projects."""
 
+import asyncio
 import json
 import os
 import re
@@ -11,7 +12,8 @@ from typing import Any, Optional
 
 from core import data_migration, paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import mods, settings_store, tool_calls, visibility
+from services import delegate_runs, delegates, mods, prompt_cache, settings_store, tool_calls, visibility
+from services.api_errors import api_error
 from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]+$")
@@ -29,7 +31,7 @@ _CLI_ENTRYPOINT = b'"entrypoint":"cli"'
 
 _TRAVELLING_TYPES = {"user", "assistant"}
 _MEDIA_TYPES = {"image", "document"}
-_request_totals: dict[str, tuple[int, int, int]] = {}
+_request_totals: dict[str, tuple[int, int, int, int]] = {}
 
 
 def _base() -> Path:
@@ -166,13 +168,13 @@ def transcript_stamp(project_key: str, session_id: str) -> Optional[tuple[int, i
     return (stat.st_mtime_ns, stat.st_size)
 
 
-def last_context_tokens(project_key: str, session_id: str, trashed: bool = False) -> Optional[int]:
+def _tail_entries(project_key: str, session_id: str, trashed: bool) -> list[dict]:
     try:
         file = _session_file(project_key, session_id, trashed)
     except ValueError:
-        return None
+        return []
     if not file.is_file():
-        return None
+        return []
     try:
         with file.open("rb") as fh:
             fh.seek(0, 2)
@@ -180,21 +182,29 @@ def last_context_tokens(project_key: str, session_id: str, trashed: bool = False
             fh.seek(max(0, size - 131072))
             chunk = fh.read().decode("utf-8", errors="ignore")
     except OSError:
-        return None
-    for line in reversed(chunk.splitlines()):
-        line = line.strip()
-        if not line:
-            continue
+        return []
+    entries = []
+    for line in chunk.splitlines():
         try:
             entry = json.loads(line)
         except json.JSONDecodeError:
             continue
+        if isinstance(entry, dict):
+            entries.append(entry)
+    return entries
+
+
+def last_context_tokens(project_key: str, session_id: str, trashed: bool = False) -> Optional[int]:
+    for entry in reversed(_tail_entries(project_key, session_id, trashed)):
         msg = entry.get("message")
         usage = msg.get("usage") if isinstance(msg, dict) else None
         if isinstance(usage, dict):
-            total = (usage.get("input_tokens") or 0) + (usage.get("cache_read_input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
-            return total or None
+            return prompt_cache.input_tokens(usage) or None
     return None
+
+
+def last_prompt_cache(project_key: str, session_id: str, trashed: bool = False) -> Optional[dict]:
+    return prompt_cache.from_entries(_tail_entries(project_key, session_id, trashed))
 
 
 def _block_media_bytes(block: Any) -> int:
@@ -229,9 +239,9 @@ def request_weight(project_key: str, session_id: str, trashed: bool = False) -> 
         return None
     start = _last_compact_offset(file)
     key = str(file)
-    offset, total, media = _request_totals.get(key, (0, 0, 0))
+    base, offset, total, media = _request_totals.get(key, (start, start, 0, 0))
     try:
-        if not start <= offset <= file.stat().st_size:
+        if base != start or not start <= offset <= file.stat().st_size:
             offset, total, media = start, 0, 0
         with file.open("rb") as fh:
             fh.seek(offset)
@@ -248,7 +258,7 @@ def request_weight(project_key: str, session_id: str, trashed: bool = False) -> 
                 media += media_weight
     except OSError:
         return None
-    _request_totals[key] = (offset, total, media)
+    _request_totals[key] = (start, offset, total, media)
     return total, media
 
 
@@ -417,15 +427,28 @@ def _project_name(path: str | None) -> str | None:
     return path.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1] or None
 
 
-def rename_session(project_key: str, session_id: str, title: str) -> bool:
-    """Set the session's display title (the `custom-title`/`agent-name` entries the
-    CLI uses), so it shows renamed in the picker and the app history."""
+def _write_title(project_key: str, session_id: str, title: str) -> Optional[str]:
     file = _session_file(project_key, session_id)
     if not file.is_file():
-        return False
+        return None
     safe = title.replace("\n", " ").strip()[:80]
     _pin_meta(session_id, "custom-title", safe)
     _append_entry(file, _meta_entry("custom-title", safe, session_id))
+    _append_entry(file, _meta_entry("agent-name", safe, session_id))
+    return safe
+
+
+async def rename_session(project_key: str, session_id: str, title: str) -> bool:
+    """Set the session's display title (the `custom-title`/`agent-name` entries the
+    CLI uses), so it shows renamed in the picker and the app history."""
+    from services.live_sessions import registry
+
+    safe = await asyncio.to_thread(_write_title, project_key, session_id, title)
+    if safe is None:
+        return False
+    live = registry.get_by_session(session_id)
+    if live is not None:
+        await live.rename(safe)
     return True
 
 
@@ -452,7 +475,8 @@ def set_session_color(project_key: str, session_id: str, color: str) -> bool:
     return True
 
 
-_META_FIELD = {"custom-title": "customTitle", "agent-color": "agentColor"}
+_META_FIELD = {"custom-title": "customTitle", "agent-name": "agentName", "agent-color": "agentColor"}
+_PINNED_FIELD = {"custom-title": "title", "agent-color": "color"}
 _pinned: dict[str, dict[str, str]] = {}
 
 
@@ -477,6 +501,13 @@ def reassert_meta(project_key: str, session_id: str) -> None:
     for etype, value in pinned.items():
         if current.get(etype) != value:
             _append_entry(file, _meta_entry(etype, value, session_id))
+
+
+def with_pinned(session_id: str, meta: dict) -> dict:
+    pinned = _pinned.get(session_id)
+    if not pinned:
+        return meta
+    return {**meta, **{_PINNED_FIELD[etype]: value or None for etype, value in pinned.items()}}
 
 
 def forget_pinned(session_id: str) -> None:
@@ -522,7 +553,7 @@ async def auto_generate_title(project_key: str, session_id: str, account: str = 
         title = raw.replace("\n", " ").strip().strip("\"'").strip().rstrip(".")[:80]
         if not title:
             return None
-        rename_session(project_key, session_id, title)
+        await rename_session(project_key, session_id, title)
         return title
     finally:
         await hub.settle_activity(session_id)
@@ -551,29 +582,40 @@ def delete_session(project_key: str, session_id: str) -> bool:
         extras = file.parent / session_id
         if extras.is_dir():
             shutil.rmtree(extras, ignore_errors=True)
+        delegate_runs.forget(session_id)
     forget_pinned(session_id)
     categories.forget_session(session_id)
     return True
 
 
-def delete_project(project_key: str) -> Optional[list[str]]:
-    """Delete a project directory and every chat in it, returning the ids that were removed."""
-    from services import categories
+async def discard_sessions(project_key: str, session_ids: list[str]) -> list[str]:
+    from services.chat_list import hub
     from services.live_sessions import registry
 
+    for session_id in session_ids:
+        hub.hide(session_id)
+    try:
+        await asyncio.gather(*(registry.end_session(session_id) for session_id in session_ids))
+        return [
+            session_id for session_id in session_ids
+            if await asyncio.to_thread(delete_session, project_key, session_id)
+        ]
+    finally:
+        await hub.unhide(*session_ids)
+
+
+async def discard_session(project_key: str, session_id: str) -> bool:
+    return bool(await discard_sessions(project_key, [session_id]))
+
+
+async def discard_project(project_key: str) -> Optional[list[str]]:
+    """Delete a project directory and every chat in it, returning the ids that were removed."""
     directory = _project_dir(project_key)
     if not directory.is_dir():
         return None
-    session_ids = [file.stem for file in directory.glob("*.jsonl")]
-    for session_id in session_ids:
-        live = registry.get_by_session(session_id)
-        if live is not None and live.running:
-            raise RuntimeError("a turn is running in this project")
-    shutil.rmtree(directory)
-    for session_id in session_ids:
-        forget_pinned(session_id)
-        categories.forget_session(session_id)
-    return session_ids
+    removed = await discard_sessions(project_key, [file.stem for file in directory.glob("*.jsonl")])
+    await asyncio.to_thread(shutil.rmtree, directory, True)
+    return removed
 
 
 def _rewrite_cwd(source: Path, target: Path, cwd: str) -> None:
@@ -923,8 +965,7 @@ def _entry_context_tokens(entry: dict) -> Optional[int]:
     usage = msg.get("usage") if isinstance(msg, dict) else None
     if not isinstance(usage, dict):
         return None
-    total = (usage.get("input_tokens") or 0) + (usage.get("cache_read_input_tokens") or 0) + (usage.get("cache_creation_input_tokens") or 0)
-    return total or None
+    return prompt_cache.input_tokens(usage) or None
 
 
 def _post_compact_context(entries: list[dict], boundary_idx: int) -> Optional[int]:
@@ -1154,6 +1195,20 @@ def _thinking_tokens(message: dict) -> Optional[int]:
     return tokens if isinstance(tokens, int) and tokens > 0 else None
 
 
+def _thinking_item(block: dict, message: dict, vis: dict) -> Optional[dict]:
+    if vis["thinking"] == "label":
+        item: dict = {"type": "thinking", "label": True}
+    else:
+        text = (block.get("thinking") or block.get("text", "")).strip()
+        if not text:
+            return None
+        item = {"type": "thinking", "text": text}
+    tokens = _thinking_tokens(message) if vis.get("tokens") else None
+    if tokens:
+        item["tokens"] = tokens
+    return item
+
+
 def _agent_result(tur: dict, vis: dict) -> dict:
     """The live `agent_result` shape, rebuilt from the transcript's own field names."""
     return {
@@ -1175,7 +1230,7 @@ def _subagent_file(session_dir: Path, agent_id: str) -> Optional[Path]:
 def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> list[dict]:
     from services.claude_runtime import (
         _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
-        _display_tool_name, _flatten_result_content,
+        _tool_naming, _flatten_result_content,
     )
     entries = [entry for entry in _iter_lines(sub_file) if entry.get("type") in _TRAVELLING_TYPES]
     tool_calls.remember_entries(entries)
@@ -1198,7 +1253,19 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
         if not isinstance(content, list):
             continue
         for block in content:
-            if not isinstance(block, dict) or block.get("type") != "tool_use":
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") == "text":
+                text = (block.get("text") or "").strip()
+                if text:
+                    out.append({"type": "text", "role": "assistant", "text": text, "parent": parent_id})
+                continue
+            if block.get("type") == "thinking":
+                item = _thinking_item(block, message, vis) if vis["thinking"] != "off" else None
+                if item:
+                    out.append({**item, "parent": parent_id})
+                continue
+            if block.get("type") != "tool_use":
                 continue
             name = (block.get("name") or "").strip()
             inp = block.get("input")
@@ -1219,7 +1286,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> lis
             if vis["tool_use"] == "off":
                 _working(out, vis)
                 continue
-            ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id}
+            ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id}
             took = sub_ms.get(bid or "") if vis.get("timings") else None
             if took is not None:
                 ev["ms"] = took
@@ -1317,6 +1384,22 @@ def _notified_results(text: str) -> dict[str, dict]:
     return results
 
 
+TASK_COMPLETED = "completed"
+TASK_FAILED = "failed"
+TASK_STOPPED = "stopped"
+
+
+def task_notification(tool_use_id: str, status: str, summary: str, result: str, duration_ms: int) -> str:
+    lines = [
+        f"<tool-use-id>{tool_use_id}</tool-use-id>",
+        f"<status>{status}</status>",
+        f"<summary>{summary}</summary>",
+        *([f"<result>{result}</result>"] if result else []),
+        f"<usage><duration_ms>{duration_ms}</duration_ms></usage>",
+    ]
+    return "\n".join(["<task-notification>", *lines, "</task-notification>"])
+
+
 def _split_notifications(text: str) -> tuple[str, list[dict]]:
     """Notifications, plugin prompts and cross-session messages the CLI carries inside user text."""
     plugin = _plugin_message_item(text)
@@ -1363,6 +1446,32 @@ def user_prompts(messages: list[dict], limit: int = 100) -> list[str]:
             continue
         prompts.append(text)
     return prompts[-limit:]
+
+
+def main_count(messages: list[dict]) -> int:
+    return sum(1 for message in messages if not message.get("parent"))
+
+
+def page_start(messages: list[dict], end: int, limit: int) -> int:
+    seen = 0
+    for index in range(end - 1, -1, -1):
+        if messages[index].get("parent"):
+            continue
+        seen += 1
+        if seen == limit:
+            return index
+    return 0
+
+
+def committed_index(messages: list[dict], main: int) -> int:
+    seen = 0
+    for index, message in enumerate(messages):
+        if message.get("parent"):
+            continue
+        if seen == main:
+            return index
+        seen += 1
+    return len(messages)
 
 
 def get_session_messages(
@@ -1518,7 +1627,7 @@ def get_session_messages(
         if entry.get("isApiErrorMessage"):
             err_text = _text_from_content(message.get("content")).strip()
             if err_text:
-                messages.append({"type": "api_error", "text": err_text})
+                messages.append(api_error(err_text, entry.get("error")))
             continue
         if message.get("stop_reason") == "stop_sequence":
             continue
@@ -1564,22 +1673,12 @@ def get_session_messages(
                 if vis["thinking"] == "off":
                     _working(messages, vis)
                     continue
-                thinking_tokens = _thinking_tokens(message) if vis.get("tokens") else None
-                if vis["thinking"] == "label":
-                    item = {"type": "thinking", "label": True}
-                    if thinking_tokens:
-                        item["tokens"] = thinking_tokens
-                    messages.append(item)
-                    continue
-                text = (block.get("thinking") or block.get("text", "")).strip()
-                if text:
-                    item = {"type": "thinking", "text": text}
-                    if thinking_tokens:
-                        item["tokens"] = thinking_tokens
+                item = _thinking_item(block, message, vis)
+                if item:
                     messages.append(item)
             elif btype == "tool_use":
-                from mcps import shared_files
-                from services.claude_runtime import _FILE_EDIT_TOOLS, _SHARE_RULE, _agent_event, _build_file_diff, _flatten_result_content, _format_tool_input, _display_tool_name
+                from mcps import packs as packs_tool, shared_files
+                from services.claude_runtime import _FILE_EDIT_TOOLS, _PACKS_RULE, _SHARE_RULE, _agent_event, _agent_input, _build_file_diff, _flatten_result_content, _format_tool_input, _tool_naming
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
@@ -1681,6 +1780,22 @@ def get_session_messages(
                             for child in _subagent_blocks(sub_file, bid, vis):
                                 messages.append(child)
                     continue
+                if name == delegates.TOOL_ID and isinstance(inp, dict):
+                    if isinstance(bid, str):
+                        hidden_ids.add(bid)
+                    if vis["tool_use"] != "off":
+                        block_event = _agent_event(bid, _agent_input(name, inp))
+                        done = notified.get(bid or "")
+                        if done is not None:
+                            block_event["agent_result"] = _agent_result(done, vis)
+                        messages.append(block_event)
+                        steps = delegate_runs.children(session_id, bid, vis) if isinstance(bid, str) else None
+                        messages.extend(steps or [])
+                        answer = _flatten_result_content(tool_result_by_id.get(bid or "")).strip()
+                        launched = done is not None or (isinstance(bid, str) and delegate_runs.running(session_id, bid))
+                        if answer and not launched and not any(step["type"] == "text" for step in steps or []):
+                            messages.append({"type": "text", "role": "assistant", "text": answer, "parent": bid})
+                    continue
                 if name == "TodoWrite" or name.startswith("Task"):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
@@ -1711,19 +1826,22 @@ def get_session_messages(
                             "id": bid,
                         })
                         continue
+                pack_id = str(inp.get("id") or "").strip() if isinstance(inp, dict) else ""
+                exported = name == _PACKS_RULE and inp.get("action") == "export" and pack_id
                 if vis["tool_use"] == "off":
                     _working(messages, vis)
-                    continue
-                ev = {"type": "tool_use", "name": _display_tool_name(name), "text": _format_tool_input(inp), "id": bid}
-                took = tool_ms.get(bid or "") if vis.get("timings") else None
-                if took is not None:
-                    ev["ms"] = took
-                if vis["tool_use"] == "full":
-                    from services.claude_runtime import _flatten_result_content
-                    result = _flatten_result_content(tool_result_by_id.get(bid or "")).strip()
-                    if result:
-                        ev["result"] = result
-                messages.append(ev)
+                else:
+                    ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid}
+                    took = tool_ms.get(bid or "") if vis.get("timings") else None
+                    if took is not None:
+                        ev["ms"] = took
+                    if vis["tool_use"] == "full":
+                        result = _flatten_result_content(tool_result_by_id.get(bid or "")).strip()
+                        if result:
+                            ev["result"] = result
+                    messages.append(ev)
+                if exported:
+                    messages.append({"type": "shared", "files": packs_tool.exported(pack_id, project_key)})
         if user_images:
             messages.append({"type": "text", "role": role, "text": "", "images": user_images})
     return messages

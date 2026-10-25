@@ -21,6 +21,8 @@ export type RestoreResult = "ok" | "password" | "failed";
 
 export interface UploadOptions {
   notes: boolean;
+  background: boolean;
+  packs: boolean;
   password: string;
 }
 
@@ -63,7 +65,7 @@ class DriveBackups {
 
   async upload(options: UploadOptions): Promise<boolean> {
     this.busy = true;
-    const payload = exportSettings({ notes: options.notes });
+    const payload = await exportSettings({ notes: options.notes, background: options.background, packs: options.packs });
     const counts = backupCounts(payload);
     const content = options.password ? await encryptBackup(payload, options.password) : payload;
     const copy = await uploadCopy(auth(true), fileName(), content, {

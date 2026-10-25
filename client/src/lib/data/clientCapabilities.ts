@@ -6,6 +6,7 @@ export const CLIENT_CAPABILITIES = [
   "media.pdf",
   "media.html",
   "components",
+  "usage",
   "terminal",
   "browser",
 ];

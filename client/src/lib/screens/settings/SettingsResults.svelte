@@ -31,8 +31,8 @@
   );
 </script>
 
-{#each grouped as block (block.section)}
-  <SectionHeader label={t(sectionLabel(block.section))} />
+{#each grouped as block, index (block.section)}
+  <SectionHeader label={t(sectionLabel(block.section))} divider={index > 0} />
   {#each block.entries as entry (entry.id)}
     {@const hint = entryHint(entry)}
     <Pressable

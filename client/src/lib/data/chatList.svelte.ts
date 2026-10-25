@@ -17,6 +17,13 @@ import { ReconnectingSocket } from "$lib/services/socket";
 const byLastActive = <T extends { lastActive: number | null }>(items: T[]) =>
   [...items].sort((a, b) => (b.lastActive ?? 0) - (a.lastActive ?? 0));
 
+const forgetListeners = new Set<(sessionId: string) => void>();
+
+export const onSessionForgotten = (listener: (sessionId: string) => void) => {
+  forgetListeners.add(listener);
+  return () => forgetListeners.delete(listener);
+};
+
 export class ChatListStore {
   projects = $state<ProjectInfo[]>([]);
 
@@ -50,7 +57,9 @@ export class ChatListStore {
         onMessage: (message) => this.#apply(message),
         onDrop: () => {
           this.connected = false;
-          this.sessions = this.sessions.map((item) => (item.activity ? { ...item, activity: null } : item));
+          this.sessions = this.sessions.map((item) =>
+            item.activity || item.resident ? { ...item, activity: null, resident: false } : item,
+          );
           if (!this.projects.length && !this.sessions.length) this.loading = true;
         },
       },
@@ -98,6 +107,11 @@ export class ChatListStore {
     this.#local.delete(sessionId);
     this.sessions = this.sessions.filter((item) => item.sessionId !== sessionId);
     this.removePlacement(sessionId);
+  }
+
+  forgetSession(sessionId: string) {
+    this.removeSession(sessionId);
+    for (const listener of forgetListeners) listener(sessionId);
   }
 
   upsertCategory(category: ChatCategory) {
@@ -160,9 +174,11 @@ export class ChatListStore {
     ]);
   }
 
-  removeProject(projectKey: string) {
+  forgetProject(projectKey: string) {
+    for (const session of this.sessions.filter((item) => item.projectKey === projectKey)) {
+      this.forgetSession(session.sessionId);
+    }
     this.projects = this.projects.filter((item) => item.projectKey !== projectKey);
-    this.sessions = this.sessions.filter((item) => item.projectKey !== projectKey);
   }
 
   #apply(message: Record<string, unknown>) {
@@ -194,13 +210,13 @@ export class ChatListStore {
         this.upsertSession(parseSession((message.session as Record<string, unknown>) ?? {}));
         break;
       case "session_removed":
-        this.removeSession(message.session_id as string);
+        this.forgetSession(message.session_id as string);
         break;
       case "project_changed":
         this.upsertProject(parseProject((message.project as Record<string, unknown>) ?? {}));
         break;
       case "project_removed":
-        this.removeProject(message.project_key as string);
+        this.forgetProject(message.project_key as string);
         break;
     }
   }

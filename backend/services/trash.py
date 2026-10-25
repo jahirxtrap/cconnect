@@ -9,6 +9,7 @@ from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
 from core.db import Session
 from core.models import TrashedSession
+from services import delegate_runs
 
 
 def trash_root() -> Path:
@@ -104,6 +105,7 @@ def _erase(session_id: str, project_key: str) -> None:
     extras = directory / session_id
     if extras.is_dir():
         shutil.rmtree(extras, ignore_errors=True)
+    delegate_runs.forget(session_id)
 
 
 def purge(session_id: str) -> bool:

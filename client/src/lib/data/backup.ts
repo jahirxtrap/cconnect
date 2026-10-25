@@ -1,6 +1,14 @@
 import { i18n, type Locale } from "$lib/i18n/index.svelte";
 import type { AuthKind } from "./auth";
-import { FONT_KINDS } from "$lib/design/fonts";
+import { decodeBase64, encodeBase64 } from "./base64";
+import { chatBackground } from "./chatBackground.svelte";
+import type { BackgroundEffects } from "$lib/design/backgrounds";
+import { DYNAMIC_ACCENT } from "$lib/design/accents";
+import { legacyAccent } from "$lib/design/packs/builtin";
+import { inspectPack, installPack } from "$lib/design/packs/library";
+import { packs } from "$lib/design/packs/registry.svelte";
+import { archiveBlob } from "$lib/design/packs/storage";
+import { FONT_KINDS, THEME_KINDS, type FontKind } from "$lib/design/packs/schema";
 import { theme, type ThemeMode } from "$lib/design/theme.svelte";
 import { notes, type Note } from "$lib/screens/notes/notes.svelte";
 import { backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
@@ -14,6 +22,7 @@ import { securityKeys } from "./securityKeys.svelte";
 const APP = "cconnect";
 const FORMAT = 1;
 const DEFAULT_SSH_PORT = 22;
+const LEGACY_FONT_FIELDS: Partial<Record<FontKind, string>> = { emoji: "font_style" };
 
 type Wire = Record<string, unknown>;
 
@@ -30,6 +39,8 @@ const json = (raw: Wire, key: string): object | null =>
 
 export interface BackupOptions {
   notes?: boolean;
+  background?: boolean;
+  packs?: boolean;
 }
 
 export interface BackupCounts {
@@ -37,15 +48,53 @@ export interface BackupCounts {
   notes: number;
 }
 
-export const exportSettings = (options: BackupOptions = {}): string =>
-  JSON.stringify(
+const encodedBlob = async (blob: Blob | null) =>
+  blob ? { type: blob.type, data: encodeBase64(new Uint8Array(await blob.arrayBuffer())) } : null;
+
+const decodedBlob = (raw: Wire | null): Blob | null => {
+  const data = raw ? text(raw, "data") : null;
+  return raw && data ? new Blob([decodeBase64(data)], { type: text(raw, "type") ?? "" }) : null;
+};
+
+const encodedPacks = async () =>
+  (await Promise.all(packs.installed.map(async (pack) => encodedBlob(await archiveBlob(pack.info.id))))).filter(
+    (entry) => entry !== null,
+  );
+
+const adoptPacks = async (blobs: Blob[]) => {
+  for (const blob of blobs) {
+    try {
+      await installPack(await inspectPack(blob));
+    } catch {
+      continue;
+    }
+  }
+};
+
+const adoptBackgrounds = async (images: { id: string; blob: Blob }[], chosen: Wire | null) => {
+  for (const { id, blob } of images) await chatBackground.restore(id, blob);
+  if (!chosen) return;
+  const effects = json(chosen, "effects") as Record<string, BackgroundEffects> | null;
+  chatBackground.apply(text(chosen, "selected") ?? chatBackground.selected, effects ?? {});
+};
+
+export const exportSettings = async (options: BackupOptions = {}): Promise<string> => {
+  const images = options.background
+    ? await Promise.all(
+        (await chatBackground.uploadedImages()).map(async ({ id, blob }) => ({ id, ...(await encodedBlob(blob)) })),
+      )
+    : [];
+  const archives = options.packs ? await encodedPacks() : [];
+  return JSON.stringify(
     {
       app: APP,
       version: FORMAT,
       settings: {
         theme_mode: theme.mode,
-        dynamic_color: theme.dynamicColor,
-        accent_index: theme.accentIndex,
+        accent: theme.accentId,
+        terminal: theme.terminalId,
+        chat_background: { selected: chatBackground.selected, effects: chatBackground.saved },
+        ...Object.fromEntries(THEME_KINDS.map((kind) => [`theme_${kind}`, theme.themeIds[kind]])),
         ...Object.fromEntries(FONT_KINDS.map((kind) => [`font_${kind}`, theme.fonts[kind]])),
         // The Compose client stores "" for "follow the system".
         language: i18n.locale === "system" ? "" : i18n.locale,
@@ -72,7 +121,7 @@ export const exportSettings = (options: BackupOptions = {}): string =>
         effort: profile.effort,
         permission_mode: profile.permissionMode,
         ...(profile.streaming === null ? {} : { streaming: profile.streaming }),
-        ...(profile.accentIndex === null ? {} : { accent_index: profile.accentIndex }),
+        ...(profile.accent === null ? {} : { accent: profile.accent }),
         ...(securityKeys.keyFor(profile) ? { security_key: securityKeys.keyFor(profile) } : {}),
       })),
       ssh: sshStore.profiles.map((profile) => ({
@@ -96,20 +145,29 @@ export const exportSettings = (options: BackupOptions = {}): string =>
               })),
           }
         : {}),
+      ...(images.length ? { backgrounds: images } : {}),
+      ...(archives.length ? { packs: archives } : {}),
     },
     null,
     2,
   );
+};
 
 const applySettings = (values: Wire) => {
   const mode = text(values, "theme_mode");
   if (mode === "system" || mode === "light" || mode === "dark") theme.setMode(mode as ThemeMode);
-  const dynamic = flag(values, "dynamic_color");
-  if (dynamic !== null) theme.setDynamicColor(dynamic);
-  const accent = number(values, "accent_index");
+  const accent =
+    text(values, "accent") ?? (flag(values, "dynamic_color") ? DYNAMIC_ACCENT : legacyAccent(number(values, "accent_index")));
   if (accent !== null) theme.setAccent(accent);
+  const terminal = text(values, "terminal");
+  if (terminal !== null) theme.setTerminal(terminal);
+  for (const kind of THEME_KINDS) {
+    const id = text(values, `theme_${kind}`);
+    if (id !== null) theme.setTheme(kind, id);
+  }
   for (const kind of FONT_KINDS) {
-    const font = text(values, `font_${kind}`);
+    const legacy = LEGACY_FONT_FIELDS[kind];
+    const font = text(values, `font_${kind}`) ?? (legacy ? text(values, legacy) : null);
     if (font !== null) theme.setFont(kind, font);
   }
   const language = text(values, "language");
@@ -149,7 +207,7 @@ const toEnvironment = (raw: Wire): EnvironmentProfile | null => {
     effort: text(raw, "effort") ?? "",
     permissionMode: text(raw, "permission_mode") ?? "",
     streaming: flag(raw, "streaming"),
-    accentIndex: number(raw, "accent_index"),
+    accent: text(raw, "accent") ?? legacyAccent(number(raw, "accent_index")),
   };
 };
 
@@ -186,6 +244,9 @@ interface Backup {
   active: string;
   ssh: SshProfile[];
   notes: Note[] | null;
+  background: Wire | null;
+  backgrounds: { id: string; blob: Blob }[];
+  packs: Blob[];
 }
 
 const parsed = (raw: string): Wire | null => {
@@ -203,8 +264,9 @@ const readBackup = (raw: string): Backup | null => {
 
   const environments = list(root, "environments");
   const bindings = root.shortcuts;
+  const values = json(root, "settings") as Wire | null;
   return {
-    values: root.settings && typeof root.settings === "object" ? (root.settings as Wire) : null,
+    values,
     environments: environments.map(toEnvironment).filter((profile): profile is EnvironmentProfile => profile !== null),
     keys: environments.flatMap((entry) => {
       const profile = toEnvironment(entry);
@@ -222,6 +284,15 @@ const readBackup = (raw: string): Backup | null => {
       .map(toSshProfile)
       .filter((profile): profile is SshProfile => profile !== null),
     notes: "notes" in root ? list(root, "notes").map(toNote).filter((note): note is Note => note !== null) : null,
+    background: values ? (json(values, "chat_background") as Wire | null) : null,
+    backgrounds: list(root, "backgrounds").flatMap((entry) => {
+      const id = text(entry, "id");
+      const blob = decodedBlob(entry);
+      return id && blob ? [{ id, blob }] : [];
+    }),
+    packs: list(root, "packs")
+      .map(decodedBlob)
+      .filter((blob): blob is Blob => blob !== null),
   };
 };
 
@@ -241,6 +312,8 @@ export const importSettings = (raw: string): boolean => {
   if (backup.active) backend.select(backup.active);
   if (backup.ssh.length) sshStore.replaceAll(backup.ssh);
   if (backup.notes) notes.replaceAll(backup.notes);
+  if (backup.backgrounds.length || backup.background) void adoptBackgrounds(backup.backgrounds, backup.background);
+  if (backup.packs.length) void adoptPacks(backup.packs);
 
   return true;
 };

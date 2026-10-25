@@ -8,7 +8,7 @@
   import { projectKeyOf } from "$lib/data/models";
   import { parseQrPayload } from "$lib/data/qrPayload";
   import { settings } from "$lib/data/settings.svelte";
-  import { accentAt, ACCENTS } from "$lib/design/accents";
+  import { theme } from "$lib/design/theme.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import type { EnvironmentProfile } from "$lib/services/backend.svelte";
@@ -16,6 +16,7 @@
   import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
   import AccentDialog from "./AccentDialog.svelte";
+  import { accentLabel } from "./settingsValues";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
@@ -100,7 +101,7 @@
     auth = { ...auth, kind: "bearer", token: payload.token };
   };
   let directory = $state(initial.directory);
-  let accentIndex = $state<number | null>(initial.accentIndex);
+  let accent = $state<string | null>(initial.accent);
   let picking = $state(false);
   let browsing = $state(false);
 
@@ -139,7 +140,7 @@
       authHeaderName: auth.headerName.trim(),
       authHeaderValue: auth.headerValue.trim(),
       directory: directory.trim(),
-      accentIndex,
+      accent,
     });
   };
 </script>
@@ -159,7 +160,7 @@
 
   <div class="flex w-full flex-col gap-2">
     <SelectField label={t("ENVIRONMENT_KIND")} selected={kind} options={KIND_OPTIONS} onSelect={onKind} />
-    <InputField value={name} oninput={(value) => (name = value)} label={t("ENVIRONMENT_NAME")} singleLine autofocus />
+    <InputField value={name} oninput={(value) => (name = value)} label={t("ENVIRONMENT_NAME")} optional singleLine autofocus />
     <InputField value={host} oninput={onHost} label={t("HOST")} singleLine />
     {#if kind === "http"}
       <InputField
@@ -174,6 +175,7 @@
       value={directory}
       oninput={(value) => (directory = value)}
       label={t("ENVIRONMENT_DIRECTORY")}
+      optional
       singleLine
     >
       {#snippet trailing()}
@@ -201,13 +203,13 @@
     </InputField>
     <SelectField
       label={t("ENVIRONMENT_ACCENT")}
-      selected={accentIndex === null ? t("COLOR_NONE") : (ACCENTS[accentIndex]?.name ?? "")}
+      selected={accentLabel(accent)}
       onclick={() => (picking = true)}
     >
       {#snippet trailing()}
-        {#if accentIndex !== null}
+        {#if accent !== null}
           <span class="flex size-8 shrink-0 items-center justify-center">
-            <span class="size-4.5 rounded-full" style="background: {accentAt(accentIndex)}"></span>
+            <span class="size-4.5 rounded-full" style="background: {theme.resolve(accent)}"></span>
           </span>
         {/if}
       {/snippet}
@@ -229,10 +231,10 @@
 {#if picking}
   <AccentDialog
     title={t("ENVIRONMENT_ACCENT")}
-    selected={accentIndex}
+    selected={accent}
     showNone
     closeOnPick
-    onSelect={(index) => (accentIndex = index)}
+    onSelect={(choice) => (accent = choice)}
     onDismiss={() => (picking = false)}
   />
 {/if}

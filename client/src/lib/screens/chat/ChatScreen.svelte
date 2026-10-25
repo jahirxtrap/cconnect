@@ -5,7 +5,6 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { accentAt } from "$lib/design/accents";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { accentVars, theme } from "$lib/design/theme.svelte";
   import type { SessionInfo } from "$lib/data/models";
@@ -45,8 +44,8 @@
   const shownTab = $derived(layout.mobile && !paneLayer ? panes.focusedTab : tabs.active);
 
   const accentOf = (environmentId: string | null | undefined) => {
-    const index = backend.environments.find((item) => item.id === environmentId)?.accentIndex ?? null;
-    return accentVars(index === null ? theme.appAccent : accentAt(index));
+    const accent = backend.environments.find((item) => item.id === environmentId)?.accent ?? null;
+    return accentVars(accent === null ? theme.appAccent : theme.resolve(accent));
   };
 
   const centerAccent = $derived(accentOf(shownTab?.environmentId));

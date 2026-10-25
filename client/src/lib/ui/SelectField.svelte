@@ -46,9 +46,9 @@
   {/if}
   {#snippet field()}
     <span
-      class="{FIELD_BOX_CLASS} {enabled ? 'cursor-pointer' : ''} ring-transparent group-data-[state=open]:ring-accent"
+      class="{FIELD_BOX_CLASS} {enabled ? 'cursor-pointer' : ''} ring-transparent select-none group-data-[state=open]:ring-accent"
     >
-      <span style={actionsReserve} class="min-w-0 flex-1 truncate text-left text-body-md">
+      <span style={actionsReserve} class="min-h-[1lh] min-w-0 flex-1 truncate text-left text-body-md">
         {display}
       </span>
       <span

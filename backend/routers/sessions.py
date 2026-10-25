@@ -179,9 +179,7 @@ async def rename_project(project_key: str, body: ProjectNameBody):
 @router.delete("/sessions/projects/{project_key}")
 async def delete_project(project_key: str):
     try:
-        removed = sessions_service.delete_project(project_key)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        removed = await sessions_service.discard_project(project_key)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     registered = projects_service.forget(project_key)
@@ -192,9 +190,9 @@ async def delete_project(project_key: str):
 
 
 @router.delete("/sessions/{session_id}")
-def delete_session(session_id: str, project: str):
+async def delete_session(session_id: str, project: str):
     try:
-        deleted = sessions_service.delete_session(project, session_id)
+        deleted = await sessions_service.discard_session(project, session_id)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not deleted:
@@ -203,9 +201,9 @@ def delete_session(session_id: str, project: str):
 
 
 @router.post("/sessions/{session_id}/rename")
-def rename_session(session_id: str, body: RenameBody):
+async def rename_session(session_id: str, body: RenameBody):
     try:
-        renamed = sessions_service.rename_session(body.project, session_id, body.title)
+        renamed = await sessions_service.rename_session(body.project, session_id, body.title)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not renamed:
@@ -343,10 +341,10 @@ def get_session_messages(
         raise HTTPException(status_code=400, detail=str(exc))
     cut = None if trashed else registry.committed_cut(session_id)
     if cut is not None:
-        items = items[:cut]
+        items = items[:sessions_service.committed_index(items, cut)]
     total = len(items)
     end = total if before_index is None else max(0, min(before_index, total))
-    start = max(0, end - limit)
+    start = sessions_service.page_start(items, end, limit)
     slice_ = [dict(item, index=i) for i, item in enumerate(items[start:end], start=start)]
     weight = sessions_service.request_weight(project, session_id, trashed) or (None, None)
     return api_response(data={
@@ -355,6 +353,7 @@ def get_session_messages(
         "start_index": start,
         "has_more": start > 0,
         "context_tokens": sessions_service.last_context_tokens(project, session_id, trashed),
+        "cache": sessions_service.last_prompt_cache(project, session_id, trashed),
         "request_bytes": weight[0],
         "media_bytes": weight[1],
         "prompts": None if before_index is not None else sessions_service.user_prompts(items),

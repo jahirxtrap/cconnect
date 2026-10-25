@@ -67,7 +67,7 @@
   const SPINNERS: Record<string, string> = {
     renaming: "text-purple",
     compacting: "text-blue",
-    slow: "text-yellow",
+    retrying: "text-yellow",
     working: "text-accent",
   };
 

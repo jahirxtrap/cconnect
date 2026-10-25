@@ -15,13 +15,13 @@ _TURN_MESSAGES = frozenset({"AssistantMessage", "UserMessage", "StreamEvent"})
 
 
 class TurnBinding:
-    def __init__(self, emit, ask_user, wanted, request_compact, session_info, status):
+    def __init__(self, emit, ask_user, wanted, request_compact, reload, session_info):
         self.emit = emit
         self.ask_user = ask_user
         self.wanted = wanted
         self.request_compact = request_compact
+        self.reload = reload
         self.session_info = session_info
-        self.status = status
 
 
 class PersistentSession:
@@ -34,6 +34,7 @@ class PersistentSession:
         self.listener: Optional[Callable[[dict], Awaitable[None]]] = None
         self.answerer: Optional[mods.Answerer] = None
         self.changed: Optional[Callable[[], None]] = None
+        self.runner: Optional[Callable[..., Awaitable[bool]]] = None
         self._reader: Optional[asyncio.Task] = None
         self._owner: Optional[asyncio.Task] = None
         self._stop = asyncio.Event()
@@ -73,15 +74,31 @@ class PersistentSession:
         if turn is not None and turn.request_compact is not None:
             turn.request_compact(reason)
 
+    async def reload_turn(self, kind: str) -> Optional[dict]:
+        turn = self.turn
+        if turn is None or turn.reload is None:
+            return None
+        return await turn.reload(kind)
+
     def session_info(self) -> dict:
         turn = self.turn
         if turn is None or turn.session_info is None:
             return {}
         return turn.session_info()
 
-    def status(self) -> dict:
-        turn = self.turn
-        return turn.status if turn is not None and turn.status is not None else {}
+    async def run_background(self, tool_use_id: str, description: str, work: Callable, summary: Callable[[str], str]) -> bool:
+        runner = self.runner
+        return runner is not None and await runner(tool_use_id, description, work, summary)
+
+    async def tell(self, text: str) -> bool:
+        if self.client is None:
+            return False
+        try:
+            await self.client.query(text)
+        except Exception as exc:
+            logger.warning(f"message to the CLI dropped: {type(exc).__name__}: {exc}")
+            return False
+        return True
 
     async def connect(self, options: Any) -> None:
         ready: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -156,6 +173,8 @@ class PersistentSession:
                 return
 
     async def _pump(self, client: Any, inbox: asyncio.Queue, stop: asyncio.Event) -> None:
+        from claude_agent_sdk import SystemMessage
+
         try:
             async for message in client.receive_messages():
                 if mods.handles(message):
@@ -171,6 +190,8 @@ class PersistentSession:
                     await self._notify({"type": "own_turn"})
                 if self.turn is not None or self._own_turn:
                     await inbox.put(message)
+                elif isinstance(message, SystemMessage):
+                    await self._notify({"type": "loose_system", "subtype": message.subtype, "data": message.data})
                 if kind == "ResultMessage":
                     self._own_turn = False
         except BaseException:
@@ -180,6 +201,14 @@ class PersistentSession:
             stop.set()
             await inbox.put(None)
             await self._notify({"type": "mod_surface", "attached": False})
+
+    async def request(self, subtype: str, **payload) -> Optional[dict]:
+        if self.client is None:
+            return None
+        return await mods.request(self.client, subtype, **payload)
+
+    async def reload(self, subtype: str, hold: bool = False) -> Optional[dict]:
+        return await self.request(subtype, **({"hold_on_cache_impact": True} if hold else {}))
 
     async def close(self) -> None:
         self.turn = None

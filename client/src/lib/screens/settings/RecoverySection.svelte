@@ -3,9 +3,12 @@
   import History from "@lucide/svelte/icons/history";
   import Upload from "@lucide/svelte/icons/upload";
   import { importSettings } from "$lib/data/backup";
-  import { DEFAULT_ACCENT_INDEX } from "$lib/design/accents";
-  import { DEFAULT_FONTS, FONT_KINDS } from "$lib/design/fonts";
+  import { chatBackground } from "$lib/data/chatBackground.svelte";
+  import { DEFAULT_ACCENT } from "$lib/design/accents";
+  import { DEFAULT_FONTS } from "$lib/design/fonts";
+  import { FONT_KINDS, THEME_KINDS } from "$lib/design/packs/schema";
   import { theme } from "$lib/design/theme.svelte";
+  import { DEFAULT_TERMINAL, DEFAULT_THEMES } from "$lib/design/themes";
   import { i18n, t } from "$lib/i18n/index.svelte";
   import { driveAvailable } from "$lib/services/drive/config";
   import { settingsApi } from "$lib/services/settingsApi";
@@ -31,8 +34,10 @@
 
   const reset = () => {
     theme.setMode("system");
-    theme.setDynamicColor(false);
-    theme.setAccent(DEFAULT_ACCENT_INDEX);
+    theme.setTerminal(DEFAULT_TERMINAL);
+    for (const kind of THEME_KINDS) theme.setTheme(kind, DEFAULT_THEMES[kind]);
+    chatBackground.reset();
+    theme.setAccent(DEFAULT_ACCENT);
     for (const kind of FONT_KINDS) theme.setFont(kind, DEFAULT_FONTS[kind]);
     i18n.set("system");
     void settingsApi.reset();

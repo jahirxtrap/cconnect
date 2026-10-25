@@ -73,6 +73,8 @@ COMMANDS = [
     {"name": "compact", "description": "Compact the conversation", "kind": "prompt"},
     {"name": "context", "description": "Show context window usage", "kind": "prompt"},
     {"name": "usage", "description": "Show plan token usage", "kind": "usage"},
+    {"name": "reload-plugins", "description": "Reload plugins", "kind": "reload"},
+    {"name": "reload-skills", "description": "Reload skills", "kind": "reload"},
 ]
 
 

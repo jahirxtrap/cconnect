@@ -77,7 +77,7 @@ class _Session:
         self.partial: bool = False
 
 
-def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False):
+def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False, shown=None):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
@@ -130,9 +130,11 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     seed_id=seed_id,
                     wanted=wanted,
                     request_compact=request_compact,
+                    reload=lambda kind: session.reload(f"reload-{kind}"),
                     capabilities=capabilities,
                     on_transport=on_transport,
                     adopt=adopted,
+                    read_from=shown if adopted else None,
                     session_info=lambda: {
                         "session_id": state.session_id,
                         "cwd": state.cwd,
@@ -214,14 +216,24 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
     return factory
 
 
-def _turn_start(session, prefs=None) -> int:
+def _session_items(session, prefs=None) -> list[dict] | None:
     if not (session.state.session_id and session.state.cwd):
-        return 0
+        return None
     try:
-        return len(sessions_service.get_session_messages(
-            sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs))
+        return sessions_service.get_session_messages(
+            sessions_service.project_key_for(session.state.cwd), session.state.session_id, prefs)
     except Exception:
-        return 0
+        return None
+
+
+def _turn_start(session, prefs=None) -> int:
+    items = _session_items(session, prefs)
+    return sessions_service.main_count(items) if items else 0
+
+
+def _committed_index(session, prefs=None) -> int | None:
+    items = _session_items(session, prefs) if session.running else None
+    return None if items is None else sessions_service.committed_index(items, session.turn_start_index)
 
 
 async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=None):
@@ -243,7 +255,7 @@ async def _adopt_turn(session, prefs=None, capabilities=None):
     """Show a turn the CLI started on its own, such as a prompt a mod submitted, as it runs."""
     turn_start = _turn_start(session, prefs)
     if session.start(
-        _build_turn_runner(session, "", wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport, adopt=True),
+        _build_turn_runner(session, "", wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport, adopt=True, shown=session.shown_size),
     ):
         session.turn_start_index = turn_start
 
@@ -296,13 +308,15 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
 async def _run_usage(send, account: str | None = None, capabilities=None):
     """Send the plan-usage report as a one-off markdown message."""
     from mcps.components import CAPABILITY as COMPONENTS
-    from services.usage import usage_blocks, usage_markdown
+    from services.usage import CAPABILITY as USAGE, usage_blocks, usage_data, usage_markdown
 
     try:
-        if COMPONENTS in (capabilities or ()):
-            await send({"type": "component", "blocks": await usage_blocks(account)})
+        if USAGE in (capabilities or ()):
+            await send({"type": "usage", **await usage_data(account), "local": True})
+        elif COMPONENTS in (capabilities or ()):
+            await send({"type": "component", "blocks": await usage_blocks(account), "local": True})
         else:
-            await send({"type": "command", "markdown": await usage_markdown(account)})
+            await send({"type": "command", "markdown": await usage_markdown(account), "local": True})
     except Exception as exc:
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
 
@@ -409,7 +423,7 @@ async def chat_ws(ws: WebSocket):
                     "activity": session.activity,
                     "resident": session.resident_alive,
                     "resumed": bool(by_session),
-                    "committed_count": session.turn_start_index,
+                    "committed_count": _committed_index(session, seen["prefs"]) if by_session else None,
                     "queued": session.queued_items(),
                 })
                 await session.attach(sink, last_seq=msg.last_seq, since_committed=bool(by_session), prefs=seen)
@@ -444,12 +458,15 @@ async def chat_ws(ws: WebSocket):
                 except ValidationError as exc:
                     await send({"type": "error", "message": exc.errors()})
                     continue
-                if session.running:
-                    await session.enqueue(msg.id, msg.text, msg.attachments)
-                elif msg.id and session.already_consumed(msg.id):
-                    await session.consumed(msg.id)
-                elif not await _start_turn(session, msg.id, msg.text, msg.attachments, seen["prefs"], seen["capabilities"]):
-                    await session.enqueue(msg.id, msg.text, msg.attachments)
+                target = registry.get(msg.channel) if msg.channel and msg.channel != session.channel else session
+                if target is None:
+                    continue
+                if target.running:
+                    await target.enqueue(msg.id, msg.text, msg.attachments)
+                elif msg.id and target.already_consumed(msg.id):
+                    await target.consumed(msg.id)
+                elif not await _start_turn(target, msg.id, msg.text, msg.attachments, seen["prefs"], seen["capabilities"]):
+                    await target.enqueue(msg.id, msg.text, msg.attachments)
 
             elif mtype == "unqueue":
                 mid = raw.get("id")
@@ -463,8 +480,8 @@ async def chat_ws(ws: WebSocket):
                     await send({"type": "error", "message": exc.errors()})
                     continue
                 if session is not None:
-                    if msg.cwd and session.state.session_id is None:
-                        session.state.cwd = msg.cwd
+                    if msg.cwd is not None and session.state.session_id is None:
+                        session.state.cwd = msg.cwd or DEFAULT_CWD
                     if msg.model is not None:
                         session.state.model = msg.model
                         await session.set_model(_resolve_model(msg.model))
@@ -554,6 +571,10 @@ async def chat_ws(ws: WebSocket):
             elif mtype == "usage":
                 spawn(_run_usage(send, accounts.resolve(session.state.account if session else None), seen["capabilities"]))
 
+            elif mtype == "reload":
+                if session is not None:
+                    spawn(session.reload(raw.get("command")))
+
             elif mtype == "interrupt":
                 target = side_session if raw.get("lane") == "side" else session
                 if target is not None:
@@ -562,6 +583,11 @@ async def chat_ws(ws: WebSocket):
                         item = session.peek_queued()
                         if item is not None:
                             await _start_turn(session, item["id"], item["text"], item["attachments"], seen["prefs"], seen["capabilities"])
+
+            elif mtype == "stop_task":
+                tool_use_id = raw.get("id")
+                if session is not None and isinstance(tool_use_id, str):
+                    await session.stop_task(tool_use_id)
 
             elif mtype == "interaction_response":
                 rid = raw.get("id")
@@ -603,7 +629,7 @@ async def chat_ws(ws: WebSocket):
                     items = blocks.degrade_items(items)
                 total = len(items)
                 end = total if before_index is None else max(0, min(before_index, total))
-                start = max(0, end - limit)
+                start = sessions_service.page_start(items, end, limit)
                 slice_ = [dict(item, index=i) for i, item in enumerate(items[start:end], start=start)]
                 await send({
                     "type": "history_chunk",

@@ -137,6 +137,8 @@ TYPES = [
 
 COLORS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
 
+SEVERITIES = ["normal", "warning", "critical"]
+
 LEAF = {
     "type": "object",
     "properties": {
@@ -151,6 +153,11 @@ LEAF = {
         "color": {"type": "string", "enum": COLORS, "description": "bar: its colour. Accent by default."},
         "alert_above": {"type": "number", "description": "bar: alert colour from this value up."},
         "alert_below": {"type": "number", "description": "bar: alert colour from this value down."},
+        "severity": {
+            "type": "string",
+            "enum": SEVERITIES,
+            "description": "bar: how serious its value is, drawn in the theme's colour for it. Normal by default.",
+        },
         "placeholder": {"type": "string"},
         "multiline": {"type": "boolean"},
         "lines": {"type": "integer", "description": "input: fixed height in lines. Implies multiline."},

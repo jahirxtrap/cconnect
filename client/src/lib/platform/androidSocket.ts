@@ -23,8 +23,9 @@ let opened = 0;
 const install = () => {
   if (installed) return;
   installed = true;
-  (window as unknown as { __cconnectLink?: (frame: Frame) => void }).__cconnectLink = (frame) =>
-    live.get(frame.id)?.take(frame);
+  (window as unknown as { __cconnectLink?: (frames: Frame[]) => void }).__cconnectLink = (frames) => {
+    for (const frame of frames) live.get(frame.id)?.take(frame);
+  };
   bridge()?.reset();
 };
 

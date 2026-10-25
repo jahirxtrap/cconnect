@@ -23,7 +23,7 @@
     {#if IconComponent}
       <IconTile icon={IconComponent} class="mb-1" />
     {/if}
-    <p class="text-body-md {IconComponent ? 'font-semibold text-on-surface' : 'text-on-surface-variant'}">{text}</p>
+    <p class={IconComponent ? "text-label-lg text-on-surface" : "text-body-md text-on-surface-variant"}>{text}</p>
     {#if detail}
       <p class="text-body-md text-on-surface-variant">{detail}</p>
     {/if}

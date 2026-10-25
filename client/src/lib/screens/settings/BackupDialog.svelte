@@ -1,5 +1,7 @@
 <script lang="ts">
   import { exportSettings } from "$lib/data/backup";
+  import { chatBackground } from "$lib/data/chatBackground.svelte";
+  import { packs } from "$lib/design/packs/registry.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { copyText } from "$lib/platform/clipboard";
   import Button from "$lib/ui/Button.svelte";
@@ -22,8 +24,20 @@
   let draft = $state("");
   let failed = $state(false);
   let notes = $state(false);
+  let background = $state(false);
+  let withPacks = $state(false);
+  let payload = $state("");
 
-  const payload = $derived(mode === "export" ? exportSettings({ notes }) : "");
+  $effect(() => {
+    if (mode !== "export") return;
+    let current = true;
+    void exportSettings({ notes, background, packs: withPacks }).then((text) => {
+      if (current) payload = text;
+    });
+    return () => {
+      current = false;
+    };
+  });
 </script>
 
 <CompactDialog title={t(TITLES[mode])} {onDismiss}>
@@ -34,7 +48,6 @@
     {:else}
       <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button
-        variant="destructive"
         enabled={!!draft.trim()}
         onclick={() => {
           if (onImport?.(draft.trim())) onDismiss();
@@ -48,6 +61,12 @@
     {#if mode !== "import"}
       <p class="text-body-sm text-on-surface-variant">{t("EXPORT_SETTINGS_WARNING")}</p>
       <SwitchRow title={t("INCLUDE_NOTES")} checked={notes} onChange={(value) => (notes = value)} />
+      {#if chatBackground.uploads.length}
+        <SwitchRow title={t("INCLUDE_BACKGROUND")} checked={background} onChange={(value) => (background = value)} />
+      {/if}
+      {#if packs.installed.length}
+        <SwitchRow title={t("INCLUDE_PACKS")} checked={withPacks} onChange={(value) => (withPacks = value)} />
+      {/if}
       <InputField value={payload} oninput={() => {}} minLines={LINES} maxLines={LINES} />
     {:else}
       <p class="text-body-sm text-on-surface-variant">{t("IMPORT_SETTINGS_HINT")}</p>

@@ -21,6 +21,7 @@ import org.json.JSONObject
 private const val CHANNEL_ID = "cconnect.chat"
 private const val PING_SECONDS = 20L
 private const val QUEUE_LIMIT = 2000
+private const val BATCH_LIMIT = 200
 private val BUSY = setOf("working", "slow", "compacting")
 
 class BackgroundLink(private val context: Context, private val view: () -> WebView?) {
@@ -33,6 +34,8 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   private val queued = ConcurrentHashMap<String, MutableList<String>>()
   private val activity = ConcurrentHashMap<String, String>()
   private val titles = ConcurrentHashMap<String, String>()
+  private val outbox = ArrayDeque<String>()
+  private var draining = false
 
   @Volatile private var awake = true
   @Volatile private var doneTitle = ""
@@ -164,9 +167,34 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   }
 
   private fun deliver(frame: String) {
-    val target = view() ?: return
+    synchronized(outbox) {
+      outbox.addLast(frame)
+      if (draining) return
+      draining = true
+    }
+    drain()
+  }
+
+  private fun drain() {
+    val target = view()
+    if (target == null) {
+      synchronized(outbox) {
+        outbox.clear()
+        draining = false
+      }
+      return
+    }
     target.post {
-      target.evaluateJavascript("window.__cconnectLink && window.__cconnectLink($frame)", null)
+      val batch = synchronized(outbox) {
+        List(minOf(outbox.size, BATCH_LIMIT)) { outbox.removeFirst() }
+      }
+      target.evaluateJavascript("window.__cconnectLink && window.__cconnectLink([${batch.joinToString(",")}])") {
+        val more = synchronized(outbox) {
+          draining = outbox.isNotEmpty()
+          draining
+        }
+        if (more) drain()
+      }
     }
   }
 }
