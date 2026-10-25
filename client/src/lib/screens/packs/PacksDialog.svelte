@@ -7,8 +7,9 @@
   import { inspectPack, installPack } from "$lib/design/packs/library";
   import type { Pack } from "$lib/design/packs/model";
   import { packs } from "$lib/design/packs/registry.svelte";
-  import { PACK_EXTENSION } from "$lib/design/packs/schema";
+  import { PACK_EXTENSION, PACK_MIME } from "$lib/design/packs/schema";
   import { t } from "$lib/i18n/index.svelte";
+  import { systemName } from "$lib/platform";
   import { serverPacks, useServerPacks, type ServerPack } from "$lib/services/serverPacks.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -33,6 +34,10 @@
   const { onDismiss }: Props = $props();
 
   useServerPacks();
+
+  const PICK_TYPES = [PACK_EXTENSION, ".zip", PACK_MIME];
+  const UNTYPED_FILE = "application/octet-stream";
+  const accept = (systemName() === "android" ? [...PICK_TYPES, UNTYPED_FILE] : PICK_TYPES).join(",");
 
   let picker = $state<HTMLInputElement | null>(null);
   let opened = $state<string | null>(null);
@@ -137,7 +142,7 @@
       {@render row(pack)}
     {/each}
   </div>
-  <input bind:this={picker} type="file" accept="{PACK_EXTENSION},.zip,application/zip" multiple hidden onchange={pick} />
+  <input bind:this={picker} type="file" {accept} multiple hidden onchange={pick} />
 </CompactDialog>
 
 {#if openedPack}
