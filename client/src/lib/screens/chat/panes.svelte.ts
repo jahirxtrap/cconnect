@@ -83,6 +83,8 @@ class Panes {
 
   readonly onSecondary = $derived(this.target === "right");
 
+  readonly onTool = $derived(this.open && this.focused === "right" && this.kind !== "chat");
+
   readonly focusedTab = $derived(
     this.target === "right" && this.rightTab ? this.rightTab : tabs.active,
   );
@@ -193,6 +195,7 @@ class Panes {
   }
 
   selectSibling(delta: number) {
+    if (this.onTool) return false;
     const group = this.target === "right" ? tabs.right : tabs.center;
     if (group.length < 2) return;
     const currentId = this.target === "right" ? this.rightTab?.id : tabs.activeId;
@@ -204,6 +207,7 @@ class Panes {
   }
 
   moveFocused(delta: number) {
+    if (this.onTool) return false;
     const target = this.focusedTab;
     if (!target) return;
     const group = this.target === "right" ? tabs.right : tabs.center;
@@ -296,6 +300,7 @@ class Panes {
   }
 
   closeFocused() {
+    if (this.onTool) return false;
     if (this.focusedTab) this.close(this.focusedTab.id);
   }
 

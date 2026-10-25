@@ -408,7 +408,7 @@
     if (!deviceBrowsing) return;
     deviceBrowser.start();
     deviceBrowser.onPicked = (url, pick) => pickToChat("device", url, deviceBrowser.active?.title ?? "", pick);
-    deviceBrowser.onKey = (keys) => shortcuts.run(shortcuts.idFor(keys, SCOPES));
+    deviceBrowser.onKey = (keys) => shortcuts.dispatch(keys, SCOPES);
     deviceBrowser.onFocus = () => {
       if (role && !layout.mobile) panes.focus(role);
     };

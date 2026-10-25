@@ -192,7 +192,14 @@ class Shortcuts {
   }
 
   handle(event: KeyboardEvent, scopes: ShortcutScope[]): boolean {
-    return this.run(this.idFor(signature(event), scopes));
+    return this.dispatch(signature(event), scopes);
+  }
+
+  dispatch(keys: string, scopes: ShortcutScope[]): boolean {
+    return scopes.some((scope) => {
+      const match = SHORTCUTS.find((shortcut) => shortcut.scope === scope && this.keys(shortcut.id) === keys);
+      return match !== undefined && this.run(match.id);
+    });
   }
 
   run(id: string | null): boolean {
