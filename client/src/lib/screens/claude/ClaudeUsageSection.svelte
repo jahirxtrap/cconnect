@@ -1,13 +1,12 @@
 <script lang="ts">
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { joined } from "$lib/data/format";
-  import { formatDayTime, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import UsageWindows from "./UsageWindows.svelte";
 
   interface Props {
     tick?: number;
@@ -16,34 +15,9 @@
 
   const { tick = 0, pending }: Props = $props();
 
-  const MILLIS_PER_HOUR = 3_600_000;
-  const MILLIS_PER_MINUTE = 60_000;
-  const HOURS_PER_DAY = 24;
-
   const usage = $derived(claudeStatus.usage);
   const accounts = $derived(claudeStatus.accounts);
   const loading = $derived(claudeStatus.usageLoading);
-
-  const WINDOW_LABELS: Record<string, string> = {
-    session: "USAGE_SESSION",
-    weekly_all: "USAGE_ALL_MODELS",
-    spend: "USAGE_SPEND",
-  };
-
-  const usageWindowLabel = (id: string) => (id in WINDOW_LABELS ? t(WINDOW_LABELS[id]) : id);
-
-  const resetsLabel = (resetsAt: string | null) => {
-    const millis = resetsAt === null ? null : parseIsoMillis(resetsAt);
-    if (millis === null) return "—";
-    const remaining = millis - Date.now();
-    if (remaining <= 0) return "—";
-    if (remaining < HOURS_PER_DAY * MILLIS_PER_HOUR) {
-      const hours = Math.floor(remaining / MILLIS_PER_HOUR);
-      const minutes = Math.floor((remaining % MILLIS_PER_HOUR) / MILLIS_PER_MINUTE);
-      return t("RESETS_IN", hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`);
-    }
-    return t("RESETS_ON", formatDayTime(millis));
-  };
 
   const label = $derived.by(() => {
     const accountLabel =
@@ -77,14 +51,6 @@
   {:else if !usage || usage.error !== null || !usage.windows.length}
     <EmptyState text={usage?.error || pending} />
   {:else}
-    <div class="flex flex-col gap-3.5 p-4">
-      {#each usage.windows as window (window.id)}
-        <MetricBar
-          title={usageWindowLabel(window.id)}
-          subtitle={window.unused ? t("USAGE_UNUSED") : (window.detail ?? resetsLabel(window.resetsAt))}
-          percent={window.percent}
-        />
-      {/each}
-    </div>
+    <UsageWindows windows={usage.windows} class="p-4" />
   {/if}
 </SettingsGroup>

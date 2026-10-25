@@ -16,6 +16,8 @@ from services import accounts
 
 logger = logging.getLogger(__name__)
 
+CAPABILITY = "usage"
+
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 _CACHE_SECONDS = 60.0
 _cache: dict[str, tuple[float, dict]] = {}
@@ -80,10 +82,6 @@ def _window_id(entry: dict) -> str | None:
     return ((entry.get("scope") or {}).get("model") or {}).get("display_name")
 
 
-def _alerting(entry: dict) -> bool:
-    return entry.get("severity") not in (None, "normal")
-
-
 def _windows(data: dict) -> list[dict]:
     out: list[dict] = []
     for entry in data.get("limits") or []:
@@ -96,7 +94,7 @@ def _windows(data: dict) -> list[dict]:
                 "id": wid,
                 "percent": float(pct),
                 "resets_at": entry.get("resets_at"),
-                "alert": _alerting(entry),
+                "severity": entry.get("severity"),
             }
             win["unused"] = not win["resets_at"] and round(win["percent"]) == 0
             out.append(win)
@@ -128,7 +126,7 @@ def _spend(data: dict) -> dict | None:
         "id": _SPEND_KEY,
         "percent": float(pct),
         "resets_at": None,
-        "alert": _alerting(spend),
+        "severity": spend.get("severity"),
         "unused": False,
         "detail": " / ".join(part for part in (used, limit) if part) or None,
     }
@@ -208,8 +206,8 @@ def _bar_block(win: dict) -> dict:
         "text": win.get("detail") or _resets_hint(win.get("resets_at")),
         "value": round(win["percent"]),
     }
-    if win.get("alert"):
-        block["alert_above"] = 0
+    if win.get("severity"):
+        block["severity"] = win["severity"]
     if win["unused"] and not win.get("detail"):
         block["text_key"] = _UNUSED_KEY
     return block
