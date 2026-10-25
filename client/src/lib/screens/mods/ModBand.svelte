@@ -104,7 +104,8 @@
       thin
       fit
       edge={CARD_INSET}
-      class="pl-3.5"
+      bodyClass="pl-3.5"
+      scrollClass="rounded-viewport [--viewport-radius:var(--radius-md)] [--viewport-radius-end:0px]"
       onFocusChange={(held) => (focused = held)}
       onEscape={() => paneFocus.focusActive()}
     />
@@ -158,7 +159,7 @@
         onpointerdown={keepTyping}
         transition:slide={{ duration }}
         class={drawn
-          ? `relative -mb-[var(--radius-lg)] rounded-t-lg bg-surface-variant pb-[calc(var(--radius-lg)+0.5rem)] ${settings.modBandHandle ? "" : "pt-2"}`
+          ? `relative -mb-[var(--radius-dock)] rounded-t-dock bg-surface-variant pb-[calc(var(--radius-dock)+0.5rem)] ${settings.modBandHandle ? "" : "pt-2"}`
           : "h-0 overflow-hidden"}
       >
         {#if settings.modBandHandle}

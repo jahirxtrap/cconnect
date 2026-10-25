@@ -155,7 +155,7 @@
   class="absolute inset-x-0 bottom-0 z-10 flex min-h-0 flex-col overflow-hidden bg-background shadow-float {dragging || instant
     ? ''
     : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
-  style="height: {shown}%; transform: translateY({hiddenFraction * PERCENT}%); border-top-left-radius: calc(var(--radius-2xl) * {corner}); border-top-right-radius: calc(var(--radius-2xl) * {corner})"
+  style="height: {shown}%; transform: translateY({hiddenFraction * PERCENT}%); border-top-left-radius: calc(var(--radius-dock) * {corner}); border-top-right-radius: calc(var(--radius-dock) * {corner})"
 >
   {#if shown >= MAX}
     <span class="pointer-events-none absolute inset-x-0 top-0 z-10 border-t border-outline-variant"></span>

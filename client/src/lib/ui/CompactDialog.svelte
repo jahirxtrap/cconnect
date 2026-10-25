@@ -1,5 +1,9 @@
 <script module lang="ts">
-  export const DIALOG_PAGE_CLASS = "scrollbar-thin overflow-y-auto px-5";
+  import { ROW_VIEWPORT_CLASS } from "./scrollbar";
+
+  export const DIALOG_PAGE_CLASS = `${ROW_VIEWPORT_CLASS} scrollbar-thin overflow-y-auto [--viewport-inset:calc(var(--spacing)*5)]`;
+
+  export const DIALOG_LIST_CLASS = `${ROW_VIEWPORT_CLASS} scrollbar-thin flex max-h-[420px] flex-col overflow-y-auto [--viewport-inset:0px]`;
 </script>
 
 <script lang="ts">
@@ -8,6 +12,7 @@
   import { pushDismiss } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
   import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS } from "./menuSurface";
+  import { viewportScrollbar } from "./scrollbar";
 
   interface Props {
     title: string;
@@ -65,6 +70,7 @@
       {/if}
       {#if children}
         <div
+          use:viewportScrollbar
           class="-mx-5 min-h-0 shrink {paged ? 'flex flex-col' : `overflow-x-clip ${DIALOG_PAGE_CLASS}`} {header
             ? 'mt-1.5'
             : 'mt-4'}"

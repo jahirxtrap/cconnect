@@ -5,7 +5,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { HSCROLL_CLASS, hscrollbar } from "$lib/ui/scrollbar";
 
   interface Props {
     path: string;
@@ -71,7 +71,7 @@
   <div
     bind:this={scroller}
     use:hscrollbar={{ wheel: true }}
-    class="no-scrollbar flex min-w-0 flex-1 items-center overflow-x-auto"
+    class="{HSCROLL_CLASS} flex min-w-0 flex-1 items-center rounded-sm"
   >
     {#each segments as segment, index (targetAt(index))}
       <ChevronRight size={12} class="mx-0.5 shrink-0 text-faint" />

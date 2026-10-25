@@ -8,13 +8,13 @@
   import { provideMenuDrill } from "./menuDrill.svelte";
   import {
     MENU_CONTENT_CLASS,
+    MENU_HEAD_CLASS,
     MENU_ICON_SIZE,
     MENU_ITEM_CLASS,
-    MENU_PANEL_BODY_CLASS,
-    MENU_PANEL_CLASS,
-    MENU_PANEL_HEAD_CLASS,
+    MENU_SCROLL_CLASS,
     menuIconClass,
   } from "$lib/ui/menuSurface";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
 
   interface Props {
     open: boolean;
@@ -96,14 +96,12 @@
       sideOffset={4}
       collisionPadding={layout.menuPadding}
       style={matchTriggerWidth ? "min-width: var(--bits-dropdown-menu-anchor-width)" : ""}
-      class="{header ? MENU_PANEL_CLASS : MENU_CONTENT_CLASS} {contentClass}"
+      class="{MENU_CONTENT_CLASS} {contentClass}"
     >
       {#if header}
-        <div class={MENU_PANEL_HEAD_CLASS}>{@render header()}</div>
-        <div class={MENU_PANEL_BODY_CLASS}>{@render body()}</div>
-      {:else}
-        {@render body()}
+        <div class={MENU_HEAD_CLASS}>{@render header()}</div>
       {/if}
+      <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>{@render body()}</div>
     </DropdownMenu.Content>
   </DropdownMenu.Portal>
 </DropdownMenu.Root>

@@ -86,7 +86,7 @@
       newShortcut="tab.new"
       onClose={(id) => panes.close(id)}
       onMove={(id, index) => tabs.move(id, index)}
-      onDrop={() => tabs.commit()}
+      onDrop={() => panes.dropTab()}
       {onPaneDrag}
       {onTabDrag}
       group="chat"

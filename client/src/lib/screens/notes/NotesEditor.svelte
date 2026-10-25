@@ -12,6 +12,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
+  import { SCROLL_ROW_CLASS, TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { notes, type Note } from "./notes.svelte";
 
@@ -26,7 +27,7 @@
   const ITEM_RE = /^(\s*)((?:[-*+]\s+\[[ xX]\]\s+)|(?:[-*+]\s+)|(?:\d+[.)]\s+))/;
   const TASK_RE = /^(\s*(?:[-*+]\s+|\d+[.)]\s+)\[)([ xX])(\])/;
   const TOOL_CLASS = "size-7";
-  const BODY_CLASS = "min-h-0 flex-1 px-3.5 pt-2 pb-3.5";
+  const BODY_CLASS = `${TEXT_VIEWPORT_CLASS} min-h-0 flex-1 px-3.5 pt-2 pb-3.5`;
 
   let field = $state<HTMLTextAreaElement | null>(null);
 
@@ -140,7 +141,7 @@
 
 <div class="flex min-h-0 flex-1 flex-col {inset ? 'px-(--page-inset) pb-(--page-inset)' : ''}">
   <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card">
-    <div class="no-scrollbar flex shrink-0 items-center overflow-x-auto px-2 pt-2">
+    <div class="{SCROLL_ROW_CLASS} mx-2 mt-2 flex shrink-0 items-center">
       {#each tools as tool (tool.label)}
         <TooltipIconButton
           label={t(tool.label)}
@@ -177,12 +178,13 @@
       {@render actions?.()}
     </div>
     {#if notes.formatted}
-      <div use:tasks class="tasks-live selectable overflow-y-auto {BODY_CLASS}">
+      <div use:tasks use:viewportScrollbar class="tasks-live selectable overflow-y-auto {BODY_CLASS}">
         <MarkdownText text={note.body} class="markdown-chat" />
       </div>
     {:else}
       <textarea
         bind:this={field}
+        use:viewportScrollbar
         value={note.body}
         oninput={(event) => notes.write(note.id, event.currentTarget.value)}
         onkeydown={onKeydown}

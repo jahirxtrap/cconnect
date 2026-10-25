@@ -9,6 +9,7 @@
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SwatchRow from "$lib/ui/SwatchRow.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import { packLabel, terminalSwatches, themeSwatches } from "./settingsValues";
 
@@ -83,7 +84,7 @@
   {/snippet}
   <TabPager selected={TABS.indexOf(tab)} onSelect={(index) => (tab = TABS[index])} class="min-h-0">
     {#each TABS as value (value)}
-      <div class="{TAB_PAGE_CLASS} {DIALOG_PAGE_CLASS}">
+      <div use:viewportScrollbar class="{TAB_PAGE_CLASS} {DIALOG_PAGE_CLASS}">
         {#each optionsOf(value) as option (option.id)}
           <DialogSelectItem
             label={option.name}

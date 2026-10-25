@@ -14,7 +14,8 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_LIST_CLASS } from "$lib/ui/CompactDialog.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -128,7 +129,7 @@
       <CenteredProgress class="h-[72px]" />
     {/if}
   {:else}
-    <div class="scrollbar-thin flex max-h-[420px] flex-col gap-1 overflow-y-auto">
+    <div use:viewportScrollbar class="{DIALOG_LIST_CLASS} gap-1">
       {#each driveBackups.copies as copy (copy.id)}
         {@const Icon = copy.encrypted ? FileLock2 : File}
         <div

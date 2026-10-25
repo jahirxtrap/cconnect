@@ -8,6 +8,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import NoteMenu from "./NoteMenu.svelte";
   import { notePreview, notes, noteTitle, type Note } from "./notes.svelte";
@@ -91,7 +92,7 @@
 {/snippet}
 
 {#if column}
-  <div class="scrollbar-thin flex min-h-0 flex-col gap-1 overflow-y-auto">
+  <div use:viewportScrollbar class="rounded-viewport scrollbar-thin flex min-h-0 flex-col gap-1 overflow-y-auto [--viewport-inset:0px]">
     {#each listed as note (note.id)}
       {@render row(note)}
     {:else}
@@ -123,7 +124,7 @@
       />
     {/if}
   {:else if notes.cards}
-    <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto {INSET}">
+    <div use:viewportScrollbar class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-y-auto {INSET}">
       <div class="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {#each listed as note (note.id)}
           {@render card(note)}
@@ -131,7 +132,7 @@
       </div>
     </div>
   {:else}
-    <div class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}">
+    <div use:viewportScrollbar class="rounded-viewport scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}">
       {#each listed as note (note.id)}
         {@render row(note)}
       {/each}

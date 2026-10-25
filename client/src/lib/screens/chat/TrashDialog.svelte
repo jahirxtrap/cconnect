@@ -4,7 +4,8 @@
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_LIST_CLASS } from "$lib/ui/CompactDialog.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -48,7 +49,7 @@
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
-  <div class="scrollbar-thin flex max-h-[420px] flex-col gap-0.5 overflow-y-auto">
+  <div use:viewportScrollbar class="{DIALOG_LIST_CLASS} gap-0.5">
     {#if loading}
       <CenteredProgress class="h-[72px]" />
     {:else if items.length === 0}

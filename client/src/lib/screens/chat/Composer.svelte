@@ -34,7 +34,7 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { hscrollbar, SCROLL_ROW_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import { ROUND_BUTTON_CLASS } from "$lib/ui/roundButton";
   import StopButton from "$lib/ui/StopButton.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
@@ -42,7 +42,7 @@
   import { pastedName } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
   import { keepFocus } from "$lib/ui/keepFocus";
-  import { MENU_LIST_CLASS } from "$lib/ui/menuSurface";
+  import { MENU_LIST_CLASS, MENU_SCROLL_CLASS } from "$lib/ui/menuSurface";
 
   interface Props {
     focused: boolean;
@@ -479,37 +479,39 @@
 {#snippet entryList()}
   {#if entries.length}
     <div class="absolute inset-x-0 bottom-full z-40 mb-1.5 max-h-64 {MENU_LIST_CLASS}">
-      {#each entries as entry (entry.command ? `/${entry.command.name}` : `+${entry.row.text}`)}
-        <button
-          type="button"
-          use:keepFocus
-          onclick={() => choose(entry)}
-          onmouseenter={() => {
-            const at = pickable.indexOf(entry);
-            if (at >= 0) highlighted = at;
-          }}
-          class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start rounded-md px-2.5 py-1.5 text-left {entry === current
-            ? 'bg-hover'
-            : ''}"
-        >
-          {#if entry.command}
-            {@const command = entry.command}
-            <span class="w-full truncate text-body-md {command.argumentHint ? 'text-on-surface-variant' : ''}">
-              <span class={command.argumentHint ? "text-on-surface" : ""}
-                >/{command.name}</span
-              >{#if command.argumentHint}&nbsp;{command.argumentHint}{/if}
-            </span>
-            {#if command.description}
-              <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>
+      <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>
+        {#each entries as entry (entry.command ? `/${entry.command.name}` : `+${entry.row.text}`)}
+          <button
+            type="button"
+            use:keepFocus
+            onclick={() => choose(entry)}
+            onmouseenter={() => {
+              const at = pickable.indexOf(entry);
+              if (at >= 0) highlighted = at;
+            }}
+            class="ripple flex w-full min-w-0 cursor-pointer flex-col items-start rounded-md px-2.5 py-1.5 text-left {entry === current
+              ? 'bg-hover'
+              : ''}"
+          >
+            {#if entry.command}
+              {@const command = entry.command}
+              <span class="w-full truncate text-body-md {command.argumentHint ? 'text-on-surface-variant' : ''}">
+                <span class={command.argumentHint ? "text-on-surface" : ""}
+                  >/{command.name}</span
+                >{#if command.argumentHint}&nbsp;{command.argumentHint}{/if}
+              </span>
+              {#if command.description}
+                <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>
+              {/if}
+            {:else}
+              <span class="w-full truncate text-body-md">{entry.row.label}</span>
+              {#if entry.row.description}
+                <span class="w-full truncate text-body-sm text-on-surface-variant">{entry.row.description}</span>
+              {/if}
             {/if}
-          {:else}
-            <span class="w-full truncate text-body-md">{entry.row.label}</span>
-            {#if entry.row.description}
-              <span class="w-full truncate text-body-sm text-on-surface-variant">{entry.row.description}</span>
-            {/if}
-          {/if}
-        </button>
-      {/each}
+          </button>
+        {/each}
+      </div>
     </div>
   {/if}
 {/snippet}
@@ -518,17 +520,17 @@
   {@render band?.()}
   <div
     style={ring}
-    class="relative rounded-lg bg-surface shadow-composer {ring
+    class="relative rounded-dock bg-surface shadow-composer {ring
       ? ''
       : '[--c-accent-ring:var(--c-outline-variant)]'}"
   >
     <!-- svelte-ignore a11y_no_static_element_interactions, a11y_click_events_have_key_events -->
-    <div onclick={focusField} class="relative cursor-text">
+    <div onclick={focusField} class="relative flow-root cursor-text">
       {@render entryList()}
       {#if queue.length}
         <div
           use:hscrollbar={{ wheel: true }}
-          class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 pt-3"
+          class="{SCROLL_ROW_CLASS} mx-3.5 mt-3 flex gap-1.5"
         >
           {#each queue as item (item.id)}
             <Chip name={queueLabel(item)} icon={Hourglass} onclick={() => onOpenQueued(item)} />
@@ -539,7 +541,7 @@
       {#if chipped}
         <div
           use:hscrollbar={{ wheel: true }}
-          class="no-scrollbar flex gap-1.5 overflow-x-auto px-3.5 {queue.length ? 'pt-1.5' : 'pt-3'}"
+          class="{SCROLL_ROW_CLASS} mx-3.5 flex gap-1.5 {queue.length ? 'mt-1.5' : 'mt-3'}"
         >
           {#each elements as item (item.id)}
             <Chip name={elementLabel(item)} icon={SquareMousePointer}>

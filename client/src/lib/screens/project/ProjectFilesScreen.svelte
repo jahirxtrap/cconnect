@@ -37,6 +37,7 @@
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
   import { nearEdge } from "$lib/ui/paging";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
@@ -61,7 +62,7 @@
   const ARCHIVE_MARK = "!";
   const INDENT = 14;
   const ROW_CLASS = "flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left";
-  const LIST_CLASS = "min-h-0 flex-1 overflow-y-auto rounded-panel bg-card p-1";
+  const LIST_FRAME = "flex-1 rounded-panel";
   const SEARCH_DELAY_MS = 200;
   const MILLIS_PER_SECOND = 1000;
   const RAIL_X = 18;
@@ -932,11 +933,11 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if !projectKey}
       {#if projects.length}
-        <div class={LIST_CLASS}>
+        <ScrollCard frame={LIST_FRAME}>
           {#each projects as item (item.projectKey)}
             {@render projectRow(item)}
           {/each}
-        </div>
+        </ScrollCard>
       {:else}
         <EmptyState icon={FolderClosed} text={t("NO_PROJECTS")} class="min-h-0 flex-1" />
       {/if}
@@ -944,11 +945,11 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged && !activeRepo}
       {#if repoRows.length}
-        <div class={LIST_CLASS}>
+        <ScrollCard frame={LIST_FRAME}>
           {#each repoRows as item (item.path)}
             {@render repoRow(item)}
           {/each}
-        </div>
+        </ScrollCard>
       {:else}
         <EmptyState icon={FolderGit2} text={t("NOT_A_REPOSITORY")} class="min-h-0 flex-1" />
       {/if}
@@ -956,11 +957,11 @@
       {#if commits === null}
         <CenteredProgress class="min-h-0 flex-1" />
       {:else if commits.length}
-        <div class={LIST_CLASS} onscroll={onListScroll}>
+        <ScrollCard frame={LIST_FRAME} onscroll={onListScroll}>
           {#each commits as commit, index (commit.hash)}
             {@render commitRow(commit, index, index === commits.length - 1)}
           {/each}
-        </div>
+        </ScrollCard>
       {:else}
         <EmptyState icon={History} text={t("GIT_NO_COMMITS")} class="min-h-0 flex-1" />
       {/if}
@@ -968,32 +969,32 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged}
       {#if files.length}
-        <div class={LIST_CLASS}>
+        <ScrollCard frame={LIST_FRAME}>
           {#each changedRows as row (row.entry.path)}
             {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true)}
           {/each}
-        </div>
+        </ScrollCard>
       {:else}
         <EmptyState icon={GitCompare} text={t("NO_CHANGES")} class="min-h-0 flex-1" />
       {/if}
     {:else if results !== null}
       {#if results.length}
-        <div class={LIST_CLASS}>
+        <ScrollCard frame={LIST_FRAME}>
           {#each results as entry (entry.path)}
             {@render pathRow(entry)}
           {/each}
-        </div>
+        </ScrollCard>
       {:else}
         <EmptyState icon={Search} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
       {/if}
     {:else if rows.length}
-      <div class={LIST_CLASS}>
+      <ScrollCard frame={LIST_FRAME}>
         {#each rows as row (row.entry.path)}
           {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
             activate(row.entry),
           )}
         {/each}
-      </div>
+      </ScrollCard>
     {:else}
       <EmptyState icon={FolderClosed} text={t("NO_FILES")} class="min-h-0 flex-1" />
     {/if}

@@ -8,6 +8,7 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { SCROLL_ROW_CLASS } from "./scrollbar";
   import StatusDot from "./StatusDot.svelte";
 
   interface Props {
@@ -90,7 +91,7 @@
     {#if controls || actions}
       <div class="flex min-w-0 items-center gap-2">
         {#if controls}
-          <div bind:this={strip} class="no-scrollbar flex min-w-0 items-center gap-2 overflow-x-auto">
+          <div bind:this={strip} class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-2">
             {@render controls()}
           </div>
         {/if}

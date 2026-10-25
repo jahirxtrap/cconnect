@@ -79,6 +79,7 @@
   --radius-item: 8px;
   --radius-panel: 10px;
   --radius-group: 12px;
+  --radius-dock: var(--radius-2xl);
 
   --text-body-lg: 16px;
   --text-body-lg--line-height: 24px;
@@ -132,6 +133,7 @@
 :root {
   --font-terminal: var(--family-mono), monospace, var(--family-emoji), var(--family-symbols);
   --page-inset: 16px;
+  --pane-gap: 0.375rem;
   --dot-size: 8px;
 }
 
@@ -147,5 +149,6 @@
     --chat-pager-gap: round(14px, var(--px-grid, 1px));
     --chat-glyph-top: round((var(--chat-head) - var(--chat-glyph)) / 2, var(--px-grid, 1px));
     --dot-size: round(8px, var(--px-grid, 1px));
+    --pane-gap: round(0.375rem, var(--px-grid, 1px));
   }
 }

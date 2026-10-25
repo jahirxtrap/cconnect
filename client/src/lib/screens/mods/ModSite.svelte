@@ -20,6 +20,7 @@
     blank?: Snippet;
     class?: string;
     bodyClass?: string;
+    scrollClass?: string;
     flush?: boolean;
     thin?: boolean;
     edge?: string | null;
@@ -38,6 +39,7 @@
     blank,
     class: className = "",
     bodyClass = "",
+    scrollClass = "",
     flush = false,
     thin = false,
     edge = null,
@@ -296,10 +298,10 @@
     bind:offsetWidth={bodyOuter}
     style={[
       fixedRows ? `max-height: calc(${fixedRows} * var(--mod-line, 1lh))` : "",
-      edge ? "scrollbar-gutter: stable" : "",
+      edge ? `scrollbar-gutter: stable; --viewport-inset: ${edge}` : `--scrollbar-width: ${bodyOuter - bodyInner}px`,
     ]
       .filter(Boolean)
-      .join("; ") || undefined}
+      .join("; ")}
     {onscroll}
     {onscrollend}
     onwheel={release}
@@ -307,7 +309,7 @@
     onpointerdown={(event) => {
       if (event.target === body) release();
     }}
-    class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto {thin ? 'scrollbar-thin' : ''}"
+    class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto {thin ? 'scrollbar-thin' : ''} {scrollClass}"
   >
     <div
       bind:this={padded}

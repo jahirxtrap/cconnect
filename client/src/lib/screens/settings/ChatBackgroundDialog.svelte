@@ -47,7 +47,7 @@
     { field: "x", label: "BACKGROUND_X" },
     { field: "y", label: "BACKGROUND_Y" },
   ] as const;
-  const TILE_CLASS = "relative aspect-[3/4] w-full overflow-hidden rounded-lg border-2 bg-background";
+  const TILE_CLASS = "relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-background";
   const TILE_IDLE_CLASS = "border-outline-variant enabled:hover:border-outline";
   const TILE_GRID_CLASS = "grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2";
 
@@ -91,7 +91,7 @@
       title={backgroundLabel(id)}
       hover={false}
       onclick={() => (selected = id)}
-      class="{TILE_CLASS} {selected === id ? 'border-accent' : TILE_IDLE_CLASS}"
+      class="{TILE_CLASS} {selected === id ? 'border-accent-ring' : TILE_IDLE_CLASS}"
     >
       {#if id === NO_BACKGROUND}
         <X size={20} class="absolute inset-0 m-auto text-on-surface-variant" />

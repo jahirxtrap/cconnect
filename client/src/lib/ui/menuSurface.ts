@@ -1,3 +1,5 @@
+import { CARD_SCROLL_CLASS } from "./scrollbar";
+
 export const MENU_PADDING = 4;
 
 const FLOAT = "bg-float shadow-float";
@@ -10,19 +12,15 @@ export const TOOLTIP_CLASS = `rounded-md px-2 py-1 text-body-sm ${FLOAT}`;
 
 const MENU_SURFACE = `menu-surface z-70 ${FLOAT_SURFACE_CLASS}`;
 
-const MENU_SCROLL = "scrollbar-thin overflow-x-hidden overflow-y-auto";
-
 const MENU_BOUNDS = "max-h-96 min-w-52 max-w-[var(--bits-floating-available-width,100vw)]";
 
-export const MENU_LIST_CLASS = `${MENU_SURFACE} p-1 ${MENU_SCROLL}`;
+export const MENU_LIST_CLASS = `${MENU_SURFACE} flex flex-col`;
+
+export const MENU_SCROLL_CLASS = `${CARD_SCROLL_CLASS} scrollbar-thin`;
 
 export const MENU_CONTENT_CLASS = `${MENU_LIST_CLASS} ${MENU_BOUNDS}`;
 
-export const MENU_PANEL_CLASS = `${MENU_SURFACE} flex flex-col ${MENU_BOUNDS}`;
-
-export const MENU_PANEL_HEAD_CLASS = "shrink-0 px-1 pt-1";
-
-export const MENU_PANEL_BODY_CLASS = `min-h-0 flex-1 px-1 pb-1 ${MENU_SCROLL}`;
+export const MENU_HEAD_CLASS = "shrink-0 px-1 pt-1";
 
 export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w-[calc(100vw-2rem)]`;
 

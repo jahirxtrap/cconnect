@@ -25,7 +25,7 @@
   import { componentIcon } from "$lib/ui/componentIcons";
   import { animateScrollLeft } from "$lib/ui/animateScroll";
   import { gridWidth } from "$lib/ui/gridHeight";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import ComponentElements from "./ComponentElements.svelte";
   import { keyed } from "./componentKeys";
 
@@ -241,7 +241,7 @@
       {/if}
     {/each}
   {:else if pages.length > 1}
-    <div use:hscrollbar class="no-scrollbar flex gap-2 overflow-x-auto rounded-full">
+    <div use:hscrollbar class="{SCROLL_ROW_CLASS} flex gap-2">
       {#each pages as item, index (index)}
         <SelectChip
           label={item.label?.trim() || String(index + 1)}

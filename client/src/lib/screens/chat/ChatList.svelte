@@ -15,6 +15,7 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
+  import { LIST_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ConversationRow from "./ConversationRow.svelte";
@@ -194,7 +195,10 @@
 
   <div
     bind:this={list}
-    class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-px overflow-y-auto px-2 {drag.active ? 'cursor-pointer' : ''}"
+    use:viewportScrollbar
+    class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-px overflow-y-auto {LIST_VIEWPORT_CLASS} {drag.active
+      ? 'cursor-pointer'
+      : ''}"
   >
     {#if searching && !found.length}
       <EmptyState text={t("NO_RESULTS")} class="h-full" />

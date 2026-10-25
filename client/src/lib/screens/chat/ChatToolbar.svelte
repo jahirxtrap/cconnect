@@ -16,7 +16,7 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipWrap from "$lib/ui/TooltipWrap.svelte";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import { keepFocus } from "$lib/ui/keepFocus";
   import ContextRing from "./ContextRing.svelte";
   import { permissionStyle } from "./permissionStyle";
@@ -164,7 +164,7 @@
 
 <div
   use:hscrollbar={{ wheel: true }}
-  class="no-scrollbar flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto rounded-full"
+  class="{SCROLL_ROW_CLASS} flex min-w-0 flex-1 items-center gap-1.5"
 >
   {#if disconnected}
     <span class={STATE_CLASS}>

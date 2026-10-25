@@ -19,6 +19,7 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
 
@@ -158,7 +159,7 @@
   });
 </script>
 
-<div class="min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
+<div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
   <SettingsGroup label={t("NETWORK_STATE")}>
     {#snippet labelTrailing()}
       <StatusDot class={connectivityDot} />

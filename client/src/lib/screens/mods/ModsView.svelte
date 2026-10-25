@@ -195,6 +195,7 @@
       onEscape={pane.closeOnEscape ? () => mods.act("close", { id: pane.id }) : null}
       class="min-h-0 flex-1"
       bodyClass="px-4 py-3"
+      scrollClass="rounded-viewport"
     >
       {#snippet pending()}
         <CenteredProgress class="flex-1" />

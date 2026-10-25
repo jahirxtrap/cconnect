@@ -10,6 +10,7 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import BrowserFavoriteDialog from "./BrowserFavoriteDialog.svelte";
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
@@ -42,7 +43,10 @@
   };
 </script>
 
-<div class="scrollbar-thin absolute inset-0 overflow-y-auto bg-background [--c-card:var(--c-surface)]">
+<div
+  use:viewportScrollbar
+  class="rounded-viewport scrollbar-thin absolute inset-0 overflow-y-auto bg-background [--c-card:var(--c-surface)]"
+>
   <div class="flex min-h-full flex-col items-center justify-center gap-8 p-6">
     <AppTitle scale={TITLE_SCALE} />
     <InputField

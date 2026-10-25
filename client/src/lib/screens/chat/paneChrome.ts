@@ -1,5 +1,7 @@
 export const PANE_BODY_CLASS = "flex h-full flex-col";
 
+export const PANE_CARD_CLASS = "overflow-hidden rounded-panel bg-background";
+
 export const PANE_TOP_CLASS = "flex h-12 shrink-0 items-center gap-1 px-2";
 
 export const PANE_HEADER_CLASS = `${PANE_TOP_CLASS} cursor-pointer transition-opacity`;

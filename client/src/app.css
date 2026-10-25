@@ -277,13 +277,18 @@ html.scanning .qr-overlay {
 }
 
 .rounded-viewport {
-  --viewport-left: var(--page-inset);
-  --viewport-right: calc(var(--page-inset) + var(--scrollbar-width, 0px));
-  --viewport-round: var(--radius-panel);
+  --viewport-left: var(--viewport-inset, var(--page-inset));
+  --viewport-right: calc(var(--viewport-inset, var(--page-inset)) + var(--scrollbar-width, 0px));
+  --viewport-round: var(--viewport-radius, var(--radius-panel));
+  --viewport-round-end: var(--viewport-radius-end, var(--viewport-round));
+  --viewport-reach: max(var(--viewport-round), var(--viewport-round-end));
   --viewport-overlap: 1px;
   --viewport-center: calc(var(--viewport-round) + var(--viewport-overlap));
   --viewport-square: calc(var(--viewport-round) + 2 * var(--viewport-overlap));
   --viewport-corner: #000 calc(var(--viewport-round) - 0.5px), transparent var(--viewport-round);
+  --viewport-center-end: calc(var(--viewport-round-end) + var(--viewport-overlap));
+  --viewport-square-end: calc(var(--viewport-round-end) + 2 * var(--viewport-overlap));
+  --viewport-corner-end: #000 calc(var(--viewport-round-end) - 0.5px), transparent var(--viewport-round-end);
   mask-image:
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0),
@@ -291,22 +296,22 @@ html.scanning .qr-overlay {
     linear-gradient(#000 0 0),
     radial-gradient(circle at var(--viewport-center) var(--viewport-center), var(--viewport-corner)),
     radial-gradient(circle at var(--viewport-overlap) var(--viewport-center), var(--viewport-corner)),
-    radial-gradient(circle at var(--viewport-center) var(--viewport-overlap), var(--viewport-corner)),
-    radial-gradient(circle at var(--viewport-overlap) var(--viewport-overlap), var(--viewport-corner));
+    radial-gradient(circle at var(--viewport-center-end) var(--viewport-overlap), var(--viewport-corner-end)),
+    radial-gradient(circle at var(--viewport-overlap) var(--viewport-overlap), var(--viewport-corner-end));
   mask-size:
-    100% calc(100% - 2 * var(--viewport-round)),
+    100% calc(100% - var(--viewport-round) - var(--viewport-round-end)),
     var(--viewport-left) 100%,
     var(--viewport-right) 100%,
-    calc(100% - var(--viewport-left) - var(--viewport-right) - 2 * var(--viewport-round)) 100%,
+    calc(100% - var(--viewport-left) - var(--viewport-right) - 2 * var(--viewport-reach)) 100%,
     var(--viewport-square) var(--viewport-square),
     var(--viewport-square) var(--viewport-square),
-    var(--viewport-square) var(--viewport-square),
-    var(--viewport-square) var(--viewport-square);
+    var(--viewport-square-end) var(--viewport-square-end),
+    var(--viewport-square-end) var(--viewport-square-end);
   mask-position:
     left 0 top var(--viewport-round),
     left top,
     right top,
-    left calc(var(--viewport-left) + var(--viewport-round)) top 0,
+    left calc(var(--viewport-left) + var(--viewport-reach)) top 0,
     left calc(var(--viewport-left) - var(--viewport-overlap)) top calc(-1 * var(--viewport-overlap)),
     right calc(var(--viewport-right) - var(--viewport-overlap)) top calc(-1 * var(--viewport-overlap)),
     left calc(var(--viewport-left) - var(--viewport-overlap)) bottom calc(-1 * var(--viewport-overlap)),

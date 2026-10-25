@@ -11,6 +11,8 @@
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import Sparkline from "$lib/ui/Sparkline.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
+  import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import { formatUptime, monitor } from "./monitor.svelte";
   import MonitorTabs from "./MonitorTabs.svelte";
@@ -63,7 +65,7 @@
 
   <TabPager selected={monitor.page} onSelect={(index) => (monitor.page = index)} class="min-h-0 flex-1">
     <div class={TAB_PAGE_CLASS}>
-      <div class="min-h-0 flex-1 overflow-y-auto {INSET}">
+      <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}">
         <div class="grid gap-2.5 {narrow ? '' : 'grid-cols-2'}">
           {@render graph("CPU", plural("CORES_COUNT", current.cpuCores), current.cpuPercent, monitor.cpuHistory)}
           {#if gpu}
@@ -163,24 +165,23 @@
 
     <div class={TAB_PAGE_CLASS}>
       <div class="min-h-0 flex-1 {INSET}">
-        <div
-          bind:this={logBox}
-          class="selectable scrollbar-thin h-full overflow-y-auto rounded-lg bg-card px-3.5 py-3"
-        >
-          {#if !monitor.logs.length}
-            <p class="text-body-sm text-on-surface-variant">{t("NO_LOGS")}</p>
-          {/if}
-          {#each monitor.logs as entry, index (index)}
-            <div class="flex gap-3 py-0.5 font-mono text-body-sm">
-              <span class="shrink-0 text-faint">
-                {formatLogTime(entry.ts * MILLIS_PER_SECOND)}
-              </span>
-              <span class="min-w-0 flex-1 wrap-anywhere whitespace-pre-wrap {levelClass(entry.level)}">
-                {entry.message}
-              </span>
-            </div>
-          {/each}
-        </div>
+        <ScrollCard bind:scroller={logBox} frame="h-full rounded-lg" class="selectable scrollbar-thin">
+          <div class="px-2.5 py-2">
+            {#if !monitor.logs.length}
+              <p class="text-body-sm text-on-surface-variant">{t("NO_LOGS")}</p>
+            {/if}
+            {#each monitor.logs as entry, index (index)}
+              <div class="flex gap-3 py-0.5 font-mono text-body-sm">
+                <span class="shrink-0 text-faint">
+                  {formatLogTime(entry.ts * MILLIS_PER_SECOND)}
+                </span>
+                <span class="min-w-0 flex-1 wrap-anywhere whitespace-pre-wrap {levelClass(entry.level)}">
+                  {entry.message}
+                </span>
+              </div>
+            {/each}
+          </div>
+        </ScrollCard>
       </div>
     </div>
   </TabPager>

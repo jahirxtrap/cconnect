@@ -8,7 +8,7 @@
   import Pause from "@lucide/svelte/icons/pause";
   import Square from "@lucide/svelte/icons/square";
   import type { IconSource } from "$lib/ui/icons";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { HSCROLL_CLASS, hscrollbar } from "$lib/ui/scrollbar";
 
   interface Props {
     onKey: (bytes: number[]) => void;
@@ -33,7 +33,7 @@
   ];
 </script>
 
-<div use:hscrollbar={{ wheel: true }} class="no-scrollbar flex flex-1 gap-1 overflow-x-auto">
+<div use:hscrollbar={{ wheel: true }} class="{HSCROLL_CLASS} flex flex-1 gap-1 rounded-md">
   {#each SOFT_KEYS as key (key.title)}
     <button
       type="button"

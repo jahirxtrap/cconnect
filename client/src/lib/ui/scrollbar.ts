@@ -10,6 +10,32 @@ export const scrollbarWidth = (node: HTMLElement, border = borderWidth(node)) =>
   return Math.max(0, node.offsetWidth - node.clientWidth - border);
 };
 
+export const HSCROLL_CLASS = "no-scrollbar overflow-x-auto";
+
+export const SCROLL_ROW_CLASS = `${HSCROLL_CLASS} rounded-full`;
+
+export const ROW_VIEWPORT_CLASS = "rounded-viewport px-(--viewport-inset) [--viewport-radius:var(--radius-md)]";
+
+export const LIST_VIEWPORT_CLASS = `${ROW_VIEWPORT_CLASS} [--viewport-inset:calc(var(--spacing)*2)]`;
+
+export const CARD_SCROLL_CLASS = `${ROW_VIEWPORT_CLASS} [--viewport-inset:calc(var(--spacing)*1)] my-1 min-h-0 flex-1 overflow-x-hidden overflow-y-auto`;
+
+export const TEXT_VIEWPORT_CLASS = "rounded-viewport [--viewport-inset:0px]";
+
+export function viewportScrollbar(node: HTMLElement) {
+  const measure = () => node.style.setProperty("--scrollbar-width", `${scrollbarWidth(node)}px`);
+  const observer = new ResizeObserver(measure);
+  observer.observe(node);
+  for (const child of node.children) observer.observe(child);
+  node.addEventListener("input", measure);
+  return {
+    destroy: () => {
+      observer.disconnect();
+      node.removeEventListener("input", measure);
+    },
+  };
+}
+
 export const scrollableAbove = (from: Element | null) => {
   let node = from as HTMLElement | null;
   while (node) {

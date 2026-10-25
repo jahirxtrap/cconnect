@@ -3,6 +3,7 @@
   import { isTouch } from "$lib/platform";
   import { PullState } from "./pull.svelte";
   import PullIndicator from "./PullIndicator.svelte";
+  import { viewportScrollbar } from "./scrollbar";
 
   interface Props {
     refreshing?: boolean;
@@ -82,7 +83,14 @@
 </script>
 
 <div class="relative min-h-0 flex-1">
-  <div bind:this={scroller} use:touches {onscroll} {onscrollend} class="h-full overflow-y-auto {className}">
+  <div
+    bind:this={scroller}
+    use:touches
+    use:viewportScrollbar
+    {onscroll}
+    {onscrollend}
+    class="rounded-viewport h-full overflow-y-auto {className}"
+  >
     {@render children()}
   </div>
   <PullIndicator fraction={pull.fraction} {refreshing} />

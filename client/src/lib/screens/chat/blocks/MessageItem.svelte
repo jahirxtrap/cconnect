@@ -27,7 +27,7 @@
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import { joinedCorners } from "$lib/ui/joinedCorners";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import AgentBlock from "./AgentBlock.svelte";
   import Collapsible from "./Collapsible.svelte";
   import CompactBlock from "./CompactBlock.svelte";
@@ -118,7 +118,7 @@
       {#if chips || showTime || message.sendStatus === "error"}
         <div class="flex w-full items-end">
           {#if chips}
-            <div use:hscrollbar class="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto rounded-full">
+            <div use:hscrollbar class="{SCROLL_ROW_CLASS} flex min-w-0 flex-1 gap-1.5">
               {#each content.elements as element, index (index)}
                 <Chip name={elementLabel(element)} icon={SquareMousePointer} />
               {/each}

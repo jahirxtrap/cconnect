@@ -63,6 +63,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import AuthFields from "$lib/ui/AuthFields.svelte";
+  import { LIST_VIEWPORT_CLASS, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
@@ -75,6 +76,7 @@
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
+  import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import SelectChip from "$lib/ui/SelectChip.svelte";
   import ClaudeCard, { TAG_CLASS } from "./ClaudeCard.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
@@ -454,7 +456,7 @@
     {#if kind !== "status"}
       <div class="flex shrink-0 items-center gap-1.5 px-(--page-inset) pb-3">
         {#if kind === "plugins" && loaded}
-          <div class="no-scrollbar flex min-w-0 items-center gap-1.5 overflow-x-auto">
+          <div class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-1.5">
             {#each pluginFilters as item (item.label)}
               <SelectChip
                 label={item.label}
@@ -629,30 +631,32 @@
             class="sticky top-0 flex shrink-0"
             style="width: {PANEL_REM}rem; max-height: calc({viewHeight}px - var(--page-inset))"
           >
-            <CardPanel class="scrollbar-thin min-h-0 flex-1 gap-3.5 overflow-y-auto">
-              <div class="flex items-center gap-2.5">
-                <p class="min-w-0 truncate text-title-lg">{panelTitle}</p>
-                {#if kind === "plugins" && pluginMenu}
-                  {#if pluginMenu.mod}
-                    <span class={TAG_CLASS}>{t("MOD")}</span>
+            <ScrollCard frame="flex-1 rounded-panel" class="scrollbar-thin">
+              <div class="flex min-h-full flex-col gap-3.5 px-2.5 py-2">
+                <div class="flex items-center gap-2.5">
+                  <p class="min-w-0 truncate text-title-lg">{panelTitle}</p>
+                  {#if kind === "plugins" && pluginMenu}
+                    {#if pluginMenu.mod}
+                      <span class={TAG_CLASS}>{t("MOD")}</span>
+                    {/if}
+                    <span class="ml-auto flex shrink-0">{@render pluginSwitch(pluginMenu)}</span>
+                  {:else if kind === "mcp" && mcpMenu}
+                    <span class="ml-auto flex shrink-0">{@render mcpSwitch(mcpMenu)}</span>
                   {/if}
-                  <span class="ml-auto flex shrink-0">{@render pluginSwitch(pluginMenu)}</span>
-                {:else if kind === "mcp" && mcpMenu}
-                  <span class="ml-auto flex shrink-0">{@render mcpSwitch(mcpMenu)}</span>
-                {/if}
+                </div>
+                <div class="flex flex-1 flex-col gap-3.5 [--c-card:var(--c-hover)]">
+                  {#if kind === "plugins" && pluginMenu}
+                    {@render pluginBody(pluginMenu)}
+                  {:else if kind === "skills" && skillSheet}
+                    {@render skillBody(skillSheet)}
+                  {:else if kind === "mcp" && mcpMenu}
+                    {@render mcpBody(mcpMenu)}
+                  {:else if kind === "marketplaces" && marketMenu}
+                    {@render marketBody(marketMenu)}
+                  {/if}
+                </div>
               </div>
-              <div class="flex flex-1 flex-col gap-3.5 [--c-card:var(--c-hover)]">
-                {#if kind === "plugins" && pluginMenu}
-                  {@render pluginBody(pluginMenu)}
-                {:else if kind === "skills" && skillSheet}
-                  {@render skillBody(skillSheet)}
-                {:else if kind === "mcp" && mcpMenu}
-                  {@render mcpBody(mcpMenu)}
-                {:else if kind === "marketplaces" && marketMenu}
-                  {@render marketBody(marketMenu)}
-                {/if}
-              </div>
-            </CardPanel>
+            </ScrollCard>
           </div>
         {/if}
       </div>
@@ -660,8 +664,12 @@
     </PullToRefresh>
     </div>
   {:else}
-    <PullToRefresh {refreshing} onRefresh={kind === "status" ? () => void refresh() : null}>
-    <div class="{kind === 'status' ? 'px-(--page-inset)' : 'px-2'} pb-(--page-inset)">
+    <PullToRefresh
+      {refreshing}
+      onRefresh={kind === "status" ? () => void refresh() : null}
+      class={kind === "status" ? "" : LIST_VIEWPORT_CLASS}
+    >
+    <div class="{kind === 'status' ? 'px-(--page-inset)' : ''} pb-(--page-inset)">
       {#if kind === "plugins"}
         {#each filteredPlugins as plugin (pluginKey(plugin))}
           <ListRow

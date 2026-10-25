@@ -37,6 +37,7 @@
   import FloatDock from "$lib/ui/FloatDock.svelte";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
+  import { SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -693,14 +694,14 @@
         </CardPanel>
       {/if}
       {#if queued.elements.length}
-        <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto rounded-full">
+        <div class="{SCROLL_ROW_CLASS} mt-2 flex gap-1.5">
           {#each queued.elements as element, index (index)}
             <Chip name={elementLabel(element)} icon={SquareMousePointer} />
           {/each}
         </div>
       {/if}
       {#if item.attachments.length}
-        <div class="no-scrollbar mt-2 flex gap-1.5 overflow-x-auto rounded-full">
+        <div class="{SCROLL_ROW_CLASS} mt-2 flex gap-1.5">
           {#each item.attachments as attachment (attachment)}
             {@const name = attachment.split("/").pop() ?? attachment}
             <Chip

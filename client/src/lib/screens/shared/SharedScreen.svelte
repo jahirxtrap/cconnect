@@ -90,6 +90,7 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
+  import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import { joinedCorners } from "$lib/ui/joinedCorners";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
@@ -194,7 +195,7 @@
   let touchGesture = false;
   let dragPoint = $state<{ x: number; y: number } | null>(null);
   let marking = $state(false);
-  let list = $state<HTMLElement | null>(null);
+  let list = $state<HTMLDivElement | null>(null);
   let seenUploads = new Set<number>();
   let pressTimer: ReturnType<typeof setTimeout> | null = null;
   let pressOrigin: { x: number; y: number } | null = null;
@@ -1214,20 +1215,20 @@
         {#if serverStatus.unavailable}
           <ServerUnavailable class="flex-1" />
         {:else if ordered.length}
-          <!-- svelte-ignore a11y_no_static_element_interactions -->
-          <div
-            bind:this={list}
+          <ScrollCard
+            bind:scroller={list}
             onpointerdown={onPointerDown}
             onpointermove={onPointerMove}
             onpointerup={onPointerUp}
             onpointercancel={endGesture}
             onclickcapture={onClickCapture}
-            class="min-h-0 overflow-y-auto rounded-lg bg-card p-1 {marking || dragging ? 'touch-none select-none' : ''}"
+            frame="rounded-lg"
+            class={marking || dragging ? "touch-none select-none" : ""}
           >
             {#each ordered as entry, index (entry.file)}
               {@render entryLine(entry, index)}
             {/each}
-          </div>
+          </ScrollCard>
         {:else}
           <EmptyState
             loading={!loaded}

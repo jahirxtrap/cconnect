@@ -8,6 +8,7 @@
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { ReorderDrag } from "$lib/ui/reorderDrag.svelte";
+  import { LIST_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -78,7 +79,7 @@
           </TooltipIconButton>
         {/snippet}
       </AppTopBar>
-      <div class="min-h-0 flex-1 overflow-y-auto px-2 py-1">
+      <div use:viewportScrollbar class="min-h-0 flex-1 overflow-y-auto py-1 {LIST_VIEWPORT_CLASS}">
         {#each groups as group (group.label)}
           {#if groups.length > 1}
             <p class="px-1 pt-1 pb-1.5 {SECTION_LABEL_CLASS}">{group.label}</p>

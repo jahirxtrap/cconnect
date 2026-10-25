@@ -21,11 +21,13 @@
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
+  import { settling } from "$lib/ui/settling.svelte";
   import ProjectDiffView from "$lib/screens/project/ProjectDiffView.svelte";
   import { closeProjectFile, opened } from "$lib/screens/project/openFile.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneActions from "./PaneActions.svelte";
+  import { PANE_CARD_CLASS } from "./paneChrome";
   import PaneContent from "./PaneContent.svelte";
   import PaneSurface from "./PaneSurface.svelte";
   import ChatList from "./ChatList.svelte";
@@ -144,24 +146,12 @@
 
   const notices = $derived(serverStatus.notices.filter((notice) => !dismissed.includes(notice)));
 
-  let layoutTab = $state(tabs.activeId);
-  const instantLayout = $derived(tabs.activeId !== layoutTab);
-
-  $effect(() => {
-    if (!instantLayout) return;
-    const id = tabs.activeId;
-    requestAnimationFrame(() => requestAnimationFrame(() => (layoutTab = id)));
-  });
-
-  let layoutCentered = $state(navigation.centered);
-  const routeShift = $derived(navigation.centered !== layoutCentered);
-  const still = $derived(resizing || routeShift);
-
-  $effect(() => {
-    if (!routeShift) return;
-    const centered = navigation.centered;
-    requestAnimationFrame(() => requestAnimationFrame(() => (layoutCentered = centered)));
-  });
+  const tabShift = settling(() => tabs.activeId);
+  const routeShift = settling(() => navigation.centered);
+  const modeShift = settling(() => layout.mobile);
+  const sizeShift = settling(() => layout.width);
+  const instantLayout = $derived(tabShift.active);
+  const still = $derived(resizing || routeShift.active || modeShift.active || sizeShift.active);
 
   $effect(() => {
     layout.bottomInset = panes.centerBusy ? 0 : composerHeight;
@@ -208,12 +198,7 @@
     panes.commit();
   };
 
-  const dragTab = (id: string, pointerX: number) => {
-    const target = paneAt(pointerX);
-    if (tabs.list.find((tab) => tab.id === id)?.pane === target) return false;
-    panes.moveToPane(id, target);
-    return true;
-  };
+  const dragTab = (id: string, pointerX: number) => panes.dragTab(id, paneAt(pointerX));
 
   const dockLift = $derived(Math.max(0, layout.dockInset - composerHeight - layout.safeBottom));
 
@@ -267,7 +252,7 @@
   </div>
 {/if}
 
-<div class="flex h-full">
+<div class="flex h-full {layout.mobile ? '' : 'bg-surface'}">
   {#if !layout.mobile}
     <LeftPane
       {chat}
@@ -296,7 +281,7 @@
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="relative flex min-w-0 flex-1 flex-col"
+    class="relative flex min-w-0 flex-1 flex-col {layout.mobile ? '' : `my-(--pane-gap) ${PANE_CARD_CLASS}`}"
     style={centerAccent}
     data-unfocused={centerFocused ? undefined : true}
     onpointerdowncapture={(event) => focusFrom(event, "center")}
@@ -316,7 +301,7 @@
           newShortcut="tab.new"
           onClose={(id) => panes.close(id)}
           onMove={(id, index) => tabs.move(id, index)}
-          onDrop={() => tabs.commit()}
+          onDrop={() => panes.dropTab()}
           onPaneDrag={swappable ? (dx, done) => dragPanes(dx, done, "center") : undefined}
           onTabDrag={swappable ? dragTab : undefined}
           group="chat"
@@ -376,15 +361,15 @@
       class="relative h-full shrink-0 overflow-hidden {still
         ? ''
         : 'transition-[width] duration-200'}"
-      style="width: {rightShown ? panelWidth : 0}px; {rightAccent}"
+      style="width: {rightShown ? `calc(${panelWidth}px + 2 * var(--pane-gap))` : 'var(--pane-gap)'}; {rightAccent}"
       data-unfocused={panes.focused === "right" ? undefined : true}
       onpointerdowncapture={(event) => focusFrom(event, "right")}
     >
-      <div class="relative flex h-full flex-col" style="width: {panelWidth}px">
+      <div class="relative flex h-full p-(--pane-gap)" style="width: calc({panelWidth}px + 2 * var(--pane-gap))">
         <div
           role="separator"
           aria-orientation="vertical"
-          class="absolute inset-y-0 left-0 z-30 w-1 cursor-col-resize"
+          class="absolute inset-y-0 left-0 z-30 w-(--pane-gap) cursor-col-resize {rightShown ? '' : 'hidden'}"
           use:resizeHandle={{
             axis: "x",
             invert: true,
@@ -398,16 +383,18 @@
             onDragging: pinWidths,
           }}
         ></div>
-        <PaneContent
-          instant={instantLayout}
-          {centerView}
-          {terminalCwd}
-          onPaneDrag={(dx, done) => dragPanes(dx, done, "right")}
-          onTabDrag={dragTab}
-        />
-        {#if panes.dropTarget === "right"}
-          {@render dropHint()}
-        {/if}
+        <div class="relative flex min-w-0 flex-1 flex-col {PANE_CARD_CLASS}">
+          <PaneContent
+            instant={instantLayout}
+            {centerView}
+            {terminalCwd}
+            onPaneDrag={(dx, done) => dragPanes(dx, done, "right")}
+            onTabDrag={dragTab}
+          />
+          {#if panes.dropTarget === "right"}
+            {@render dropHint()}
+          {/if}
+        </div>
       </div>
     </div>
   {/if}
@@ -432,7 +419,9 @@
 {/snippet}
 
 {#snippet dropHint()}
-  <div class="drop-overlay pointer-events-none absolute inset-0 z-40 border-2 border-accent"></div>
+  <div
+    class="pointer-events-none absolute inset-0 z-40 animate-[drop-overlay-enter_90ms_ease-out] rounded-panel ring-2 ring-[var(--c-accent-ring)] ring-inset"
+  ></div>
 {/snippet}
 
 {#snippet centerActions()}

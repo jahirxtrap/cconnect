@@ -10,7 +10,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { DRAG_PRESS_MS } from "$lib/ui/press";
-  import { hscrollbar } from "$lib/ui/scrollbar";
+  import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import { PANE_HEADER_CLASS, PANE_SUB_CLASS, paneDim, paneTabClass } from "./paneChrome";
   import { panes } from "./panes.svelte";
@@ -307,7 +307,7 @@
     use:hscrollbar={{ wheel: true }}
     role="tablist"
     data-strip={group}
-    class="no-scrollbar flex min-w-0 flex-1 items-center gap-1 overflow-x-auto"
+    class="{SCROLL_ROW_CLASS} flex min-w-0 flex-1 items-center gap-1"
   >
     {#each items as tab (tab.id)}
       {@const active = tab.id === activeId}

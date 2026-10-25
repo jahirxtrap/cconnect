@@ -15,6 +15,7 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import SshEditDialog from "./SshEditDialog.svelte";
 
@@ -64,7 +65,7 @@
       {/snippet}
     </EmptyState>
   {:else}
-    <div class="min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
+    <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
       <div class="flex flex-col rounded-lg bg-card p-1">
         {#each sshStore.profiles as profile (profile.id)}
           {@const OsIcon = osIcon(profile.os)}

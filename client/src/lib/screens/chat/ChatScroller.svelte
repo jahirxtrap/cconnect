@@ -4,7 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { keepFocus } from "$lib/ui/keepFocus";
   import { LOAD_MORE_PX } from "$lib/ui/paging";
-  import { scrollbarWidth } from "$lib/ui/scrollbar";
+  import { scrollbarWidth, viewportScrollbar } from "$lib/ui/scrollbar";
   import { provideStickyHeads } from "./blocks/stickyHeads";
 
   interface Props {
@@ -195,7 +195,7 @@
   <div
     bind:this={container}
     {onscroll}
-    style="--scrollbar-width: {verticalScrollbar}px"
+    use:viewportScrollbar
     class="selectable rounded-viewport isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
   >
     <div bind:this={content} class="shrink-0">

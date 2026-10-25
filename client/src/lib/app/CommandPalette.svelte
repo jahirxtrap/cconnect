@@ -6,6 +6,7 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS, MENU_ITEM_CLASS } from "$lib/ui/menuSurface";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import { LIST_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
 
@@ -81,7 +82,7 @@
           onkeydown={onKeydown}
         />
       </div>
-      <div class="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div use:viewportScrollbar class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pb-2 {LIST_VIEWPORT_CLASS}">
         {#each groups as section, index (section.group)}
           <SectionHeader label={t(GROUP_LABELS[section.group])} divider={index > 0} />
           {#each section.items as command (command.id)}

@@ -6,8 +6,16 @@
   import { layout } from "$lib/platform/layout.svelte";
   import type { IconSource } from "./icons";
   import { menuDrill } from "./menuDrill.svelte";
-  import { MENU_ICON_SIZE, MENU_ITEM_CLASS, MENU_PADDING, SUBMENU_CONTENT_CLASS, menuIconClass } from "./menuSurface";
+  import {
+    MENU_ICON_SIZE,
+    MENU_ITEM_CLASS,
+    MENU_PADDING,
+    MENU_SCROLL_CLASS,
+    SUBMENU_CONTENT_CLASS,
+    menuIconClass,
+  } from "./menuSurface";
   import { returnFocus } from "./keepFocus";
+  import { viewportScrollbar } from "./scrollbar";
 
   interface Props {
     text: string;
@@ -44,15 +52,17 @@
     <DropdownMenu.SubTrigger onfocusin={returnFocus} class={MENU_ITEM_CLASS}>
       {@render face()}
     </DropdownMenu.SubTrigger>
-    <DropdownMenu.SubContent
-      align="start"
-      sideOffset={4}
-      alignOffset={-MENU_PADDING}
-      collisionPadding={layout.menuPadding}
-      avoidCollisions={true}
-      class={SUBMENU_CONTENT_CLASS}
-    >
-      {@render children()}
-    </DropdownMenu.SubContent>
+    <DropdownMenu.Portal>
+      <DropdownMenu.SubContent
+        align="start"
+        sideOffset={4}
+        alignOffset={-MENU_PADDING}
+        collisionPadding={layout.menuPadding}
+        avoidCollisions={true}
+        class={SUBMENU_CONTENT_CLASS}
+      >
+        <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>{@render children()}</div>
+      </DropdownMenu.SubContent>
+    </DropdownMenu.Portal>
   </DropdownMenu.Sub>
 {/if}

@@ -11,8 +11,9 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { dragSaved, openTransfer } from "$lib/services/sharedFiles";
   import FloatDock from "./FloatDock.svelte";
-  import { FLOAT_PANEL_WIDTH, FLOAT_SURFACE_CLASS } from "./menuSurface";
+  import { FLOAT_PANEL_WIDTH, FLOAT_SURFACE_CLASS, MENU_SCROLL_CLASS } from "./menuSurface";
   import ProgressRing from "./ProgressRing.svelte";
+  import { viewportScrollbar } from "./scrollbar";
   import TooltipIconButton from "./TooltipIconButton.svelte";
 
   const items = $derived(transfers.items);
@@ -55,7 +56,7 @@
       </div>
 
       {#if !transfers.collapsed}
-        <div role="list" class="scrollbar-thin max-h-64 overflow-y-auto p-1 pt-0">
+        <div role="list" class="max-h-64 {MENU_SCROLL_CLASS}" use:viewportScrollbar>
           {#each items as item (item.id)}
             {@const openable = item.status === "done" && item.url.length > 0}
             {@const dragging = isDesktop && item.status === "done" && item.saved.length > 0}

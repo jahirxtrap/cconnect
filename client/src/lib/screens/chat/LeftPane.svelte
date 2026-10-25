@@ -59,7 +59,7 @@
 </script>
 
 <div
-  class="relative h-full shrink-0 overflow-hidden border-r border-outline-variant bg-surface {resizing
+  class="relative h-full shrink-0 overflow-hidden bg-surface {resizing
     ? ''
     : 'transition-[width] duration-200'}"
   style="width: {expanded ? width : RAIL_WIDTH}px; {accent}"

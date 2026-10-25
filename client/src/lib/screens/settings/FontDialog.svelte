@@ -9,6 +9,7 @@
   import CompactDialog, { DIALOG_PAGE_CLASS } from "$lib/ui/CompactDialog.svelte";
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import { fontLabel, packLabel } from "./settingsValues";
 
@@ -54,7 +55,7 @@
   {/snippet}
   <TabPager selected={FONT_KINDS.indexOf(kind)} onSelect={(index) => (kind = FONT_KINDS[index])} class="min-h-0">
     {#each FONT_KINDS as value (value)}
-      <div class="{TAB_PAGE_CLASS} {DIALOG_PAGE_CLASS}">
+      <div use:viewportScrollbar class="{TAB_PAGE_CLASS} {DIALOG_PAGE_CLASS}">
         {#each packs.fontsOf(value) as font (font.id)}
           <DialogSelectItem
             label={fontLabel(font)}

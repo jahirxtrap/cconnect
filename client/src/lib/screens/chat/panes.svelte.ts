@@ -58,6 +58,7 @@ class Panes {
 
   #wideOpen = false;
   #mobile = layout.mobile;
+  #tabDragFrom: PaneRole | null = null;
   #tool = $state<RightKind>("terminal");
 
   readonly tool = $derived(this.kind === "chat" ? this.#tool : this.kind);
@@ -233,6 +234,21 @@ class Panes {
     }
     this.focus(role);
     this.commit();
+  }
+
+  dragTab(id: string, role: PaneRole): boolean {
+    const pane = tabs.list.find((item) => item.id === id)?.pane ?? null;
+    this.#tabDragFrom ??= pane;
+    this.dropTarget = role !== this.#tabDragFrom ? role : null;
+    if (pane === role) return false;
+    this.moveToPane(id, role);
+    return true;
+  }
+
+  dropTab() {
+    this.#tabDragFrom = null;
+    this.dropTarget = null;
+    tabs.commit();
   }
 
   reveal(id: string) {
