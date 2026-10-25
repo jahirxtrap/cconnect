@@ -86,7 +86,7 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
     fun open(url: String, filename: String, headersJson: String) {
         workers.execute {
             val file = fetchToCache(url, filename, headersJson) ?: return@execute
-            if (!viewFile(file, filename)) sendFile(file, filename)
+            openFile(file, filename)
         }
     }
 
@@ -97,10 +97,25 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
     @JavascriptInterface
     fun shareData(filename: String, base64: String) {
         workers.execute {
-            val file = dedup(File(activity.cacheDir, "shared"), filename)
-            if (runCatching { file.writeBytes(Base64.decode(base64, Base64.NO_WRAP)) }.isFailure) return@execute
+            val file = cacheData(filename, base64) ?: return@execute
             sendFile(file, filename)
         }
+    }
+
+    @JavascriptInterface
+    fun openData(filename: String, base64: String) {
+        workers.execute {
+            val file = cacheData(filename, base64) ?: return@execute
+            openFile(file, filename)
+        }
+    }
+
+    private fun cacheData(filename: String, base64: String): File? = runCatching {
+        dedup(File(activity.cacheDir, "shared"), filename).apply { writeBytes(Base64.decode(base64, Base64.NO_WRAP)) }
+    }.getOrNull()
+
+    private fun openFile(file: File, filename: String) {
+        if (!viewFile(file, filename)) sendFile(file, filename)
     }
 
     fun writeUri(url: String, target: Uri, headersJson: String) {

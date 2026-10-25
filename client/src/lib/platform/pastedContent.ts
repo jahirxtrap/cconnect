@@ -7,7 +7,7 @@ interface NativeFile {
   data: string;
 }
 
-type Host = { __cconnectPaste?: (payload: string) => void };
+type Host = { __cconnectPaste?: (payload: string, opened?: boolean) => void };
 
 type Route = (files: File[]) => Promise<File[]>;
 
@@ -33,14 +33,15 @@ const openedOnDesktop = async (route: Route) => {
 };
 
 export const listenNativeFiles = (route: Route) => {
-  (window as unknown as Host).__cconnectPaste = (payload) => {
+  (window as unknown as Host).__cconnectPaste = (payload, opened = false) => {
     let items: NativeFile[];
     try {
       items = JSON.parse(payload) as NativeFile[];
     } catch {
       return;
     }
-    void route(decoded(items)).then(deliver);
+    if (opened) void route(decoded(items)).then(deliver);
+    else deliver(decoded(items));
   };
   if (isDesktop) void openedOnDesktop(route);
 };

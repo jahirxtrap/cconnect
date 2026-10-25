@@ -42,6 +42,7 @@ class MainActivity : TauriActivity() {
   private var pendingSave: Triple<String, String, String>? = null
   private var content: WebView? = null
   private var pendingShare: String? = null
+  private var pendingOpened = false
   private var shareAttempts = 0
   @Volatile private var safeArea: Insets = Insets.NONE
   @Volatile private var keyboard = 0
@@ -106,7 +107,8 @@ class MainActivity : TauriActivity() {
     onBackPressedDispatcher.addCallback(this, backCallback)
     askNotifications()
     trackWindowInsets()
-    takeShare(intent)
+    val relaunched = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+    if (savedInstanceState == null && !relaunched) takeShare(intent)
   }
 
   override fun onNewIntent(intent: Intent) {
@@ -138,6 +140,7 @@ class MainActivity : TauriActivity() {
     val json = PastedContent.encode(this, uris)
     if (json == "[]") return
     pendingShare = json
+    pendingOpened = intent.action == Intent.ACTION_VIEW
     shareAttempts = 0
   }
 
@@ -148,7 +151,7 @@ class MainActivity : TauriActivity() {
     if (shareAttempts++ > SHARE_ATTEMPTS) return
     view.postDelayed({
       view.evaluateJavascript(
-        "window.__cconnectPaste ? (window.__cconnectPaste(${JSONObject.quote(json)}), true) : false",
+        "window.__cconnectPaste ? (window.__cconnectPaste(${JSONObject.quote(json)}, $pendingOpened), true) : false",
       ) { accepted ->
         if (accepted == "true") pendingShare = null else deliverShare()
       }

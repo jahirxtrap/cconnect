@@ -3,7 +3,7 @@
   import { canUsePack, exportPack, packFileName, removePack, usePack } from "$lib/design/packs/library";
   import type { Pack } from "$lib/design/packs/model";
   import { t } from "$lib/i18n/index.svelte";
-  import { saveFileAs } from "$lib/services/sharedFiles";
+  import { saveFileToDownloads } from "$lib/services/sharedFiles";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -25,7 +25,7 @@
     failure = null;
     try {
       const blob = await exportPack(pack);
-      if (blob) await saveFileAs(packFileName(pack), blob);
+      if (blob) await saveFileToDownloads(packFileName(pack), blob);
     } catch (error) {
       failure = packErrorText(error);
     }

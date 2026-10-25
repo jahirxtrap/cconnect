@@ -9,6 +9,8 @@
     usePack,
     type InspectedPack,
   } from "$lib/design/packs/library";
+  import type { Pack } from "$lib/design/packs/model";
+  import { PackError } from "$lib/design/packs/reader";
   import { packs } from "$lib/design/packs/registry.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -21,9 +23,16 @@
     name: string;
     load: () => Promise<Blob | null>;
     onInspected?: (inspected: InspectedPack) => void;
+    onExisting: (pack: Pack) => void;
   }
 
-  const { name, load, onInspected }: Props = $props();
+  const { name, load, onInspected, onExisting }: Props = $props();
+
+  const showExisting = (pack: Pack | undefined) => {
+    if (!pack) return false;
+    onExisting(pack);
+    return true;
+  };
 
   type Action = { use: boolean };
 
@@ -42,11 +51,14 @@
       })
       .then((result) => {
         if (!alive) return;
+        if (standingOf(result.pack) === "same" && showExisting(packs.installedOf(result.pack.info.id))) return;
         inspected = result;
         onInspected?.(result);
       })
       .catch((error: unknown) => {
-        if (alive) failure = packErrorText(error);
+        if (!alive) return;
+        if (error instanceof PackError && error.code === "reserved" && showExisting(packs.packOf(error.args[0]))) return;
+        failure = packErrorText(error);
       })
       .finally(() => {
         if (alive) loading = false;
@@ -60,13 +72,11 @@
   const usable = $derived(inspected ? canUsePack(inspected.pack) : false);
   const installedVersion = $derived(inspected ? packs.installedOf(inspected.pack.info.id)?.info.version : undefined);
   const note = $derived(
-    standing === "same"
-      ? t("PACK_INSTALLED")
-      : standing === "older"
-        ? t("PACK_OLDER", installedVersion ?? "")
-        : standing === "newer"
-          ? t("PACK_NEWER", installedVersion ?? "")
-          : null,
+    standing === "older"
+      ? t("PACK_OLDER", installedVersion ?? "")
+      : standing === "newer"
+        ? t("PACK_NEWER", installedVersion ?? "")
+        : null,
   );
   const installLabel = $derived(t(standing === "newer" ? "PACK_UPDATE" : standing === "older" ? "PACK_REPLACE" : "PACK_INSTALL"));
 
@@ -75,8 +85,9 @@
     busy = true;
     failure = null;
     try {
-      if (standingOf(inspected.pack) !== "same") await installPack(inspected);
+      await installPack(inspected);
       if (use) usePack(inspected.pack);
+      showExisting(packs.installedOf(inspected.pack.info.id));
     } catch (error) {
       failure = packErrorText(error);
     } finally {
@@ -109,25 +120,21 @@
     {#if failure}
       <p class="text-body-sm text-red">{failure}</p>
     {/if}
-    {#if standing !== "same" || usable}
-      <div class="flex flex-wrap gap-2">
-        {#if standing !== "same"}
-          <Button
-            small
-            variant={usable ? "outlined" : "filled"}
-            enabled={!busy}
-            onclick={() => request({ use: false })}
-          >
-            {installLabel}
-          </Button>
-        {/if}
-        {#if usable}
-          <Button small enabled={!busy} onclick={() => request({ use: true })}>
-            {t(standing === "same" ? "PACK_USE" : "PACK_INSTALL_USE")}
-          </Button>
-        {/if}
-      </div>
-    {/if}
+    <div class="flex flex-wrap gap-2">
+      <Button
+        small
+        variant={usable ? "outlined" : "filled"}
+        enabled={!busy}
+        onclick={() => request({ use: false })}
+      >
+        {installLabel}
+      </Button>
+      {#if usable}
+        <Button small enabled={!busy} onclick={() => request({ use: true })}>
+          {t("PACK_INSTALL_USE")}
+        </Button>
+      {/if}
+    </div>
   </div>
 {:else}
   <p class="text-body-sm text-red">{failure}</p>

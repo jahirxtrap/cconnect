@@ -8,6 +8,7 @@ interface AndroidDownloadsBridge {
   openSaved: (id: string) => boolean;
   saveData: (filename: string, base64: string) => boolean;
   shareData: (filename: string, base64: string) => void;
+  openData: (filename: string, base64: string) => void;
 }
 
 interface DownloadState {

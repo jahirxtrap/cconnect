@@ -61,6 +61,3 @@ export const BUILTIN_PACKS: readonly Pack[] = BUILTIN_PACK_IDS.map((id) => {
     ? { ...pack, syntax: Object.keys(BUILTIN_SYNTAX).map((syntax) => ({ id: syntax, pack: id, name: syntax, file: null })) }
     : pack;
 });
-
-export const legacyAccent = (index: number | null): string | null =>
-  index === null ? null : (BUILTIN_PACKS[0].accents[index]?.id ?? null);

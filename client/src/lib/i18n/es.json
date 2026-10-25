@@ -736,7 +736,6 @@
   "PACK_USE": "Usar",
   "PACK_UPDATE": "Actualizar",
   "PACK_REPLACE": "Reemplazar",
-  "PACK_INSTALLED": "Instalado",
   "PACK_NEWER": "Tienes la versión {1}",
   "PACK_OLDER": "Tienes la versión {1}, que es más nueva",
   "PACK_REPLACE_CONFIRM": "¿Reemplazar la versión {2} de «{1}» por la {3}?",

@@ -1,7 +1,6 @@
 import { untrack } from "svelte";
 import { DEFAULT_ACCENT, DYNAMIC_ACCENT, THEME_ACCENT, withAlpha } from "./accents";
 import { DEFAULT_FONTS } from "./fonts";
-import { legacyAccent } from "./packs/builtin";
 import { loadFace } from "./packs/faces";
 import { packs } from "./packs/registry.svelte";
 import { FONT_KINDS, THEME_KINDS, type FontKind, type ThemeKind } from "./packs/schema";
@@ -27,10 +26,7 @@ const TERMINAL_KEY = "theme.terminal";
 
 const LEGACY_FONT_KEYS: Partial<Record<FontKind, string>> = { emoji: "theme.font" };
 
-const storedAccent = (): string =>
-  store.get<string | null>(ACCENT_KEY, null) ??
-  (store.get("theme.dynamic", false) ? DYNAMIC_ACCENT : legacyAccent(store.get<number | null>("theme.accent", null))) ??
-  DEFAULT_ACCENT;
+const storedAccent = (): string => store.get<string | null>(ACCENT_KEY, null) ?? DEFAULT_ACCENT;
 
 const storedFont = (kind: FontKind): string => {
   const legacy = LEGACY_FONT_KEYS[kind];

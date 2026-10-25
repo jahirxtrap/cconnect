@@ -3,8 +3,6 @@ import type { AuthKind } from "./auth";
 import { decodeBase64, encodeBase64 } from "./base64";
 import { chatBackground } from "./chatBackground.svelte";
 import type { BackgroundEffects } from "$lib/design/backgrounds";
-import { DYNAMIC_ACCENT } from "$lib/design/accents";
-import { legacyAccent } from "$lib/design/packs/builtin";
 import { inspectPack, installPack } from "$lib/design/packs/library";
 import { packs } from "$lib/design/packs/registry.svelte";
 import { archiveBlob } from "$lib/design/packs/storage";
@@ -156,8 +154,7 @@ export const exportSettings = async (options: BackupOptions = {}): Promise<strin
 const applySettings = (values: Wire) => {
   const mode = text(values, "theme_mode");
   if (mode === "system" || mode === "light" || mode === "dark") theme.setMode(mode as ThemeMode);
-  const accent =
-    text(values, "accent") ?? (flag(values, "dynamic_color") ? DYNAMIC_ACCENT : legacyAccent(number(values, "accent_index")));
+  const accent = text(values, "accent");
   if (accent !== null) theme.setAccent(accent);
   const terminal = text(values, "terminal");
   if (terminal !== null) theme.setTerminal(terminal);
@@ -207,7 +204,7 @@ const toEnvironment = (raw: Wire): EnvironmentProfile | null => {
     effort: text(raw, "effort") ?? "",
     permissionMode: text(raw, "permission_mode") ?? "",
     streaming: flag(raw, "streaming"),
-    accent: text(raw, "accent") ?? legacyAccent(number(raw, "accent_index")),
+    accent: text(raw, "accent"),
   };
 };
 

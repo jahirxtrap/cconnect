@@ -6,7 +6,7 @@
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
   import DialogActionItem from "./DialogActionItem.svelte";
-  import { SHARED_FILE_ACTIONS } from "./sharedFileActions";
+  import { FILE_ACTIONS } from "./sharedFileActions";
 
   interface Props {
     url: string;
@@ -34,7 +34,7 @@
   {#if onOpenInShared}
     <DialogActionItem text={t("OPEN_IN_SHARED")} icon={FolderArchive} onclick={() => run(onOpenInShared)} />
   {/if}
-  {#each SHARED_FILE_ACTIONS as action (action.label)}
-    <DialogActionItem text={t(action.label)} icon={action.icon} onclick={() => run(() => action.run(url, filename))} />
+  {#each FILE_ACTIONS as action (action.label)}
+    <DialogActionItem text={t(action.label)} icon={action.icon} onclick={() => run(() => action.run({ url }, filename))} />
   {/each}
 </CompactDialog>

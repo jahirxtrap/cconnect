@@ -135,8 +135,8 @@ const textBlob = (text: string) => new Blob([text], { type: TEXT_TYPE });
 
 export const saveFileToDownloads = async (filename: string, blob: Blob) => {
   const bridge = androidDownloads();
-  if (bridge) return bridge.saveData(filename, await base64Of(blob));
   return transfers.download(filename, async (_progress, _signal, keep) => {
+    if (bridge) return bridge.saveData(filename, await base64Of(blob));
     const saved = await saveBlob(blob, filename);
     if (saved) keep(saved);
     return saved !== null;
@@ -164,7 +164,7 @@ export const saveFileAs = async (filename: string, blob: Blob) => {
 
 export const saveTextAs = (filename: string, text: string) => saveFileAs(filename, textBlob(text));
 
-const shareFile = async (file: File): Promise<boolean> => {
+const nativeShare = async (file: File): Promise<boolean> => {
   if (!navigator.canShare?.({ files: [file] })) return false;
   try {
     await navigator.share({ files: [file] });
@@ -174,13 +174,19 @@ const shareFile = async (file: File): Promise<boolean> => {
   return true;
 };
 
-export const shareText = async (filename: string, text: string) => {
+const shareData = async (filename: string, blob: Blob): Promise<boolean> => {
   const bridge = androidDownloads();
-  if (bridge) {
-    bridge.shareData(filename, await base64Of(textBlob(text)));
-    return;
-  }
-  if (await shareFile(new File([text], filename, { type: TEXT_TYPE }))) return;
+  if (!bridge) return nativeShare(new File([blob], filename, { type: blob.type }));
+  bridge.shareData(filename, await base64Of(blob));
+  return true;
+};
+
+export const shareFile = async (filename: string, blob: Blob) => {
+  if (!(await shareData(filename, blob))) await saveFileToDownloads(filename, blob);
+};
+
+export const shareText = async (filename: string, text: string) => {
+  if (await shareData(filename, textBlob(text))) return;
   if (navigator.share) {
     try {
       await navigator.share({ title: filename, text });
@@ -286,7 +292,7 @@ export const shareShared = async (url: string, filename: string) => {
     return blob !== null;
   });
   const found = blob as Blob | null;
-  if (found && (await shareFile(new File([found], filename, { type: found.type })))) return;
+  if (found && (await nativeShare(new File([found], filename, { type: found.type })))) return;
   openExternal(url);
 };
 
@@ -299,6 +305,25 @@ export const openTransfer = async (saved: string, url: string, filename: string)
   await openSharedExternally(url, filename);
 };
 
+const openData = async (filename: string, blob: Blob): Promise<boolean> => {
+  if (!isTauri) {
+    window.open(URL.createObjectURL(blob), "_blank", "noopener");
+    return true;
+  }
+  try {
+    const { writeFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+    const target = `cconnect/${filename}`;
+    await mkdir("cconnect", { baseDir: BaseDirectory.Temp, recursive: true });
+    await writeFile(target, new Uint8Array(await blob.arrayBuffer()), { baseDir: BaseDirectory.Temp });
+    const { tempDir, join } = await import("@tauri-apps/api/path");
+    const { openPath } = await import("@tauri-apps/plugin-opener");
+    await openPath(await join(await tempDir(), target));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const openSharedExternally = async (url: string, filename: string) => {
   const bridge = androidDownloads();
   if (bridge) {
@@ -306,21 +331,11 @@ export const openSharedExternally = async (url: string, filename: string) => {
     return;
   }
   const blob = await fetchShared(url);
-  if (!blob) return;
-  if (!isTauri) {
-    const objectUrl = URL.createObjectURL(blob);
-    window.open(objectUrl, "_blank", "noopener");
-    return;
-  }
-  try {
-    const { writeFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
-    const target = `cconnect/${filename}`;
-    await mkdir("cconnect", { baseDir: BaseDirectory.Temp, recursive: true });
-    await writeFile(target, new Uint8Array(await (blob as Blob).arrayBuffer()), { baseDir: BaseDirectory.Temp });
-    const { tempDir, join } = await import("@tauri-apps/api/path");
-    const { openPath } = await import("@tauri-apps/plugin-opener");
-    await openPath(await join(await tempDir(), target));
-  } catch {
-    openExternal(url);
-  }
+  if (blob && !(await openData(filename, blob))) openExternal(url);
+};
+
+export const openFileExternally = async (filename: string, blob: Blob) => {
+  const bridge = androidDownloads();
+  if (bridge) bridge.openData(filename, await base64Of(blob));
+  else await openData(filename, blob);
 };
