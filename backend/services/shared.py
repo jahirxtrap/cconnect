@@ -66,11 +66,6 @@ def _entry_for(path: Path) -> dict:
     }
 
 
-def outside(path: Path) -> bool:
-    root = _base().resolve()
-    return path.resolve() != root and root not in path.resolve().parents
-
-
 def content_path(path: Path) -> Path:
     """What a path holds: the file a reference points at, or the reference itself when it is broken."""
     if not shared_links.is_link(path.name):

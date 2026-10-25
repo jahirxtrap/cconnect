@@ -87,7 +87,7 @@ export const createSharedApi = (client: HttpClient) => ({
   },
 
   async materialize(path: string): Promise<string | null> {
-    const data = await machine.post<{ path?: string }>("/shared/materialize", { path });
+    const data = await client.post<{ path?: string }>("/shared/materialize", { path });
     return data?.path ?? null;
   },
 

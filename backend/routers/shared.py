@@ -84,9 +84,7 @@ def link_shared(body: LinkBody, x_security_key: str = Header("")):
 
 
 @router.post("/shared/materialize")
-def materialize_shared(body: FolderBody, x_security_key: str = Header("")):
-    if not key_matches(x_security_key):
-        return api_response(status=403)
+def materialize_shared(body: FolderBody):
     try:
         created = shared_service.materialize(body.path)
     except ValueError as exc:
@@ -214,15 +212,13 @@ async def upload_shared(path: str, request: Request, policy: Literal["keep", "re
 
 
 @router.get("/shared/{path:path}")
-def download_shared(path: str, x_security_key: str = Header("")):
+def download_shared(path: str):
     try:
         resolved = shared_service.resolve_file(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    if shared_service.outside(resolved) and not key_matches(x_security_key):
-        raise HTTPException(status_code=403, detail="the security key unlocks referenced files")
     return FileResponse(
         resolved,
         filename=shared_service.visible_of(path),
