@@ -84,7 +84,7 @@ class LiveSession:
 
     @property
     def working(self):
-        return self.running or bool(self._owned)
+        return self.running or bool(self._owned) or bool(self._background)
 
     @property
     def attached(self):
