@@ -12,7 +12,7 @@ import type { PackBackground, PackFont, PackTerminal, PackTheme } from "$lib/des
 import { packs } from "$lib/design/packs/registry.svelte";
 import { FONT_KINDS, THEME_KINDS } from "$lib/design/packs/schema";
 import { theme } from "$lib/design/theme.svelte";
-import { i18n, plural, t } from "$lib/i18n/index.svelte";
+import { i18n, LOCALES, localeName, plural, t } from "$lib/i18n/index.svelte";
 import { offeredPacks } from "$lib/screens/packs/packText";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
@@ -32,8 +32,7 @@ export const appearanceOptions = (): SelectOption[] => [
 
 export const localeOptions = (): SelectOption[] => [
   { value: "system", label: t("LANGUAGE_SYSTEM") },
-  { value: "en", label: "English" },
-  { value: "es", label: "Español" },
+  ...LOCALES.map((code) => ({ value: code, label: localeName(code) })),
 ];
 
 export const fontLabel = (font: PackFont): string => font.name ?? t("FONT_SYSTEM");

@@ -46,8 +46,6 @@ export interface Dictation {
   onEnd: (error: string | null) => void;
 }
 
-const REGIONS: Record<string, string> = { es: "es-ES", en: "en-US" };
-
 const scope = () =>
   window as unknown as {
     SpeechRecognition?: RecognitionClass;
@@ -66,8 +64,13 @@ const engine = (): RecognitionClass | null =>
 
 export const voiceAvailable = (): boolean => android() !== null || engine() !== null;
 
+const withRegion = (code: string): string => {
+  const { language, region } = new Intl.Locale(code).maximize();
+  return region ? `${language}-${region}` : language;
+};
+
 export const dictationLanguage = (): string =>
-  navigator.language.includes("-") ? navigator.language : (REGIONS[i18n.resolved] ?? "en-US");
+  navigator.language.includes("-") ? navigator.language : withRegion(i18n.resolved);
 
 let active: (() => void) | null = null;
 
