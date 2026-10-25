@@ -4,16 +4,18 @@ import { backend } from "./backend.svelte";
 interface MediaOptions {
   url: string;
   fallback?: string | null;
+  transform?: (file: Blob) => Promise<Blob>;
   onerror?: () => void;
   onload?: () => void;
 }
 
 type Sourced = HTMLImageElement | HTMLMediaElement | HTMLIFrameElement | HTMLEmbedElement;
 
-const fetchObjectUrl = async (url: string) => {
+const fetchObjectUrl = async (url: string, transform?: (file: Blob) => Promise<Blob>) => {
   const response = await fetch(url, { headers: securityKeys.fileHeadersFor(backend.active) });
   if (!response.ok) throw new Error(String(response.status));
-  return URL.createObjectURL(await response.blob());
+  const file = await response.blob();
+  return URL.createObjectURL(transform ? await transform(file) : file);
 };
 
 export function mediaSrc(node: Sourced, options: MediaOptions) {
@@ -31,7 +33,7 @@ export function mediaSrc(node: Sourced, options: MediaOptions) {
     const sources = [options.url, options.fallback].filter(Boolean) as string[];
     for (const source of sources) {
       try {
-        const resolved = await fetchObjectUrl(source);
+        const resolved = await fetchObjectUrl(source, options.transform);
         if (attempt !== token) {
           URL.revokeObjectURL(resolved);
           return;

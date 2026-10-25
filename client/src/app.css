@@ -1,4 +1,5 @@
 @import "./lib/design/tokens.css";
+@import "./lib/design/scrollbars.css";
 
 html,
 body,
@@ -36,34 +37,6 @@ html[data-theme="dark"] {
 @media (pointer: coarse) {
   body {
     text-rendering: geometricPrecision;
-  }
-}
-
-@media (pointer: fine) {
-  * {
-    scrollbar-color: var(--c-scrollbar) transparent;
-  }
-
-  ::-webkit-scrollbar {
-    width: 14px;
-    height: 14px;
-  }
-
-  ::-webkit-scrollbar-track,
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    background: var(--c-scrollbar);
-    background-clip: content-box !important;
-    border: 4px solid transparent;
-    border-radius: 999px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--c-scrollbar-hover);
-    background-clip: content-box !important;
   }
 }
 

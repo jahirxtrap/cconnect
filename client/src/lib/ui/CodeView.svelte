@@ -2,6 +2,7 @@
   import { theme } from "$lib/design/theme.svelte";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
   import { DIFF_LINE } from "./diffTones";
+  import { viewportScrollbar } from "./scrollbar";
 
   interface Props {
     text: string;
@@ -93,6 +94,7 @@
 
 <div
   bind:this={scroller}
+  use:viewportScrollbar
   style="--gutter-raw: {gutter}"
   class="code-gutter overflow-y-auto font-mono text-body-sm leading-[18px] {className}"
 >

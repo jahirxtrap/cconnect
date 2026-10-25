@@ -36,11 +36,13 @@
   import CodeView from "$lib/ui/CodeView.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import { frameScrollbars, themedPage } from "$lib/ui/frameScrollbars.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import PdfView from "./PdfView.svelte";
 
@@ -108,10 +110,14 @@
   let pdfWidth = $state(0);
 
   const PDF_RESIZE_STEP = 96;
+  const BODY_CLASS = "flex min-h-0 flex-1 flex-col";
+  const FRAME_CLASS = `${BODY_CLASS} mx-(--page-inset) mb-(--page-inset) overflow-hidden rounded-panel`;
+  const TEXT_SCROLL_CLASS = `${TEXT_VIEWPORT_CLASS} selectable min-h-0 flex-1 px-(--page-inset)`;
 
   const pdfStep = $derived(Math.round(pdfWidth / PDF_RESIZE_STEP));
 
   const kind = $derived(forcedKind ?? previewKindOf(filename));
+  const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : FRAME_CLASS);
   const binary = $derived(shown !== null && shown.body.includes(NUL));
   const prose = $derived(shown !== null && previewKindOf(shown.name) === "markdown" && formatted);
   const lined = $derived(readsAsText(kind) && !failed && shown !== null && !binary && !prose);
@@ -293,17 +299,18 @@
           <iframe
             use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
             title={filename}
-            class="min-h-0 w-full flex-1 border-0 bg-white"
+            class="min-h-0 w-full flex-1 border-0"
           ></iframe>
         {/key}
       </div>
     {/if}
   {:else if kind === "html"}
     <iframe
-      use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+      use:mediaSrc={{ url: source, transform: themedPage, onerror: () => (failed = true) }}
+      use:frameScrollbars
       title={filename}
       sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-      class="min-h-0 w-full flex-1 border-0 bg-white"
+      class="min-h-0 w-full flex-1 border-0"
     ></iframe>
   {:else if failed}
     <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
@@ -313,7 +320,7 @@
     <EmptyState text={t("FILE_BINARY")} class="flex-1" />
   {:else if prose}
     {#key shown.base}
-      <div class="selectable min-h-0 flex-1 overflow-y-auto p-4">
+      <div use:viewportScrollbar class="{TEXT_SCROLL_CLASS} overflow-y-auto py-4">
         <MarkdownText text={shown.body} />
       </div>
     {/key}
@@ -327,7 +334,7 @@
         current={shown.current}
         anchor={shown.anchor}
         numbers={settings.codeLineNumbers}
-        class="selectable min-h-0 flex-1"
+        class={TEXT_SCROLL_CLASS}
       />
     {/key}
   {/if}
@@ -336,7 +343,7 @@
 {#if embedded}
   <div class="flex h-full min-h-0 flex-col bg-background text-on-surface">
     <PaneHeader title={filename} onBack={onClose} actions={toolbar} />
-    <div class="mx-2 mb-2 flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-card">
+    <div class={bodyClass}>
       {@render body()}
     </div>
   </div>
@@ -349,7 +356,7 @@
         </TooltipIconButton>
       {/snippet}
     </AppTopBar>
-    <div class="flex min-h-0 flex-1 flex-col">
+    <div class={bodyClass}>
       {@render body()}
     </div>
   </div>
