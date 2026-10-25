@@ -168,6 +168,12 @@
     leaveHistory();
   };
 
+  const parked = () =>
+    !!field &&
+    recalledAt >= 0 &&
+    field.selectionStart === field.value.length &&
+    field.selectionEnd === field.value.length;
+
   const recallAtEdge = (older: boolean) => {
     if (!field || field.selectionStart !== field.selectionEnd) return;
     const before = field.selectionStart;
@@ -437,7 +443,14 @@
     }
     if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) return;
     if ((event.key === "ArrowUp" || event.key === "ArrowDown") && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
-      recallAtEdge(event.key === "ArrowUp");
+      const older = event.key === "ArrowUp";
+      if (!parked()) {
+        recallAtEdge(older);
+        return;
+      }
+      event.preventDefault();
+      if (older) recallOlder();
+      else recallNewer();
       return;
     }
     if (event.key !== "Enter" || isTouch) return;
