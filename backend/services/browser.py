@@ -46,11 +46,8 @@ _HOME = "about:blank"
 _PAGE_EVENTS = ("Page.frameNavigated", "Page.navigatedWithinDocument", "Page.loadEventFired")
 _ICON_BYTES = 64 * 1024
 _ICON_TIMEOUT = 5.0
-_ICON_SCRIPT = """(() => {
-  const link = document.querySelector('link[rel~="icon" i]');
-  if (link && link.href) return link.href;
-  return /^https?:$/.test(location.protocol) ? location.origin + '/favicon.ico' : '';
-})()"""
+_ICON_BINDING = "cconnectIcon"
+_ICON_WATCH = f"({(paths.SCRIPTS_DIR / 'page_icon.js').read_text(encoding='utf-8')})((icon) => window.{_ICON_BINDING}(icon))"
 
 _ANDROID = "14"
 _FALLBACK_MAJOR = "141"
@@ -576,18 +573,14 @@ class BrowserSession:
         self._tabs[tab.id] = tab
         await self._cdp.call("Page.enable", {}, tab.session)
         await self._cdp.call("Runtime.enable", {}, tab.session)
-        await self._cdp.call("Runtime.addBinding", {"name": _CURSOR_BINDING}, tab.session)
-        await self._cdp.call(
-            "Page.addScriptToEvaluateOnNewDocument", {"source": _CURSOR_SCRIPT}, tab.session
-        )
-        await self._cdp.call(
-            "Runtime.evaluate", {"expression": _CURSOR_SCRIPT}, tab.session
-        )
+        for binding, script in ((_CURSOR_BINDING, _CURSOR_SCRIPT), (_ICON_BINDING, _ICON_WATCH)):
+            await self._cdp.call("Runtime.addBinding", {"name": binding}, tab.session)
+            await self._cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": script}, tab.session)
+            await self._cdp.call("Runtime.evaluate", {"expression": script}, tab.session)
         if self._device:
             await self._emulate(tab.session)
             if url and not url.startswith("about:"):
                 await self._cdp.call("Page.reload", {}, tab.session)
-        self._spawn(self._favicon(tab))
         return tab
 
     def _spawn(self, work):
@@ -595,14 +588,7 @@ class BrowserSession:
         self._icons.add(task)
         task.add_done_callback(self._icons.discard)
 
-    async def _favicon(self, tab: _Tab):
-        try:
-            found = await self._cdp.call(
-                "Runtime.evaluate", {"expression": _ICON_SCRIPT, "returnByValue": True}, tab.session
-            )
-        except (RuntimeError, ConnectionClosed, OSError, AttributeError):
-            return
-        url = (found.get("result") or {}).get("value") or ""
+    async def _favicon(self, tab: _Tab, url: str):
         if url == tab.icon:
             return
         tab.icon = url
@@ -815,6 +801,10 @@ class BrowserSession:
         if method == "Runtime.bindingCalled":
             if params.get("name") == _CURSOR_BINDING and session == self._page:
                 self._publish(("cursor", {"shape": params.get("payload") or "auto"}))
+            elif params.get("name") == _ICON_BINDING:
+                tab = next((item for item in self._tabs.values() if item.session == session), None)
+                if tab is not None:
+                    self._spawn(self._favicon(tab, params.get("payload") or ""))
             return
         if method == "Overlay.inspectNodeRequested" and session == self._page:
             await self._picked(int(params.get("backendNodeId") or 0), session)
@@ -838,10 +828,6 @@ class BrowserSession:
                 tab.title = info.get("title") or ""
                 self._publish(("state", self.status()))
             return
-        if method == "Page.loadEventFired":
-            loaded = next((item for item in self._tabs.values() if item.session == session), None)
-            if loaded is not None:
-                self._spawn(self._favicon(loaded))
         if method in _PAGE_EVENTS and session == self._page:
             if method == "Page.loadEventFired":
                 self._loaded.set()

@@ -24,7 +24,7 @@ const KEY_EVENT: &str = "browser-key";
 const SHIELD_EVENT: &str = "browser-shield";
 const SIGNAL_MARK: &str = "\u{2063}cconnect:";
 #[cfg(not(windows))]
-const HISTORY_PROBE: &str = "[location.href, window.navigation ? window.navigation.canGoBack : null, window.navigation ? window.navigation.canGoForward : null, (document.querySelector('link[rel~=\"icon\" i]') || {}).href || (/^https?:$/.test(location.protocol) ? location.origin + '/favicon.ico' : '')]";
+const HISTORY_PROBE: &str = "[location.href, window.navigation ? window.navigation.canGoBack : null, window.navigation ? window.navigation.canGoForward : null]";
 #[derive(Default)]
 pub struct BrowserKeys(Mutex<HashSet<String>>);
 
@@ -205,6 +205,11 @@ fn signal<R: Runtime>(webview: &Webview<R>, id: &str, json: &str) {
                 serde_json::json!({ "id": id, "step": data.as_i64().unwrap_or(0) }),
             );
         }
+        Some("favicon") => {
+            let mut state = PageState::of(id);
+            state.favicon = data.as_str().map(str::to_string);
+            report(webview, state);
+        }
         _ => {}
     }
 }
@@ -212,13 +217,10 @@ fn signal<R: Runtime>(webview: &Webview<R>, id: &str, json: &str) {
 #[cfg(windows)]
 fn watch_native<R: Runtime>(webview: &Webview<R>) {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
-        ICoreWebView2_15, COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN,
+        COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN,
         COREWEBVIEW2_KEY_EVENT_KIND_SYSTEM_KEY_DOWN,
     };
-    use webview2_com::{
-        AcceleratorKeyPressedEventHandler, FaviconChangedEventHandler, HistoryChangedEventHandler,
-    };
-    use windows_core::{Interface, PWSTR};
+    use webview2_com::{AcceleratorKeyPressedEventHandler, HistoryChangedEventHandler};
 
     let id = tab_of(webview.label());
     let target = webview.clone();
@@ -270,25 +272,10 @@ fn watch_native<R: Runtime>(webview: &Webview<R>) {
             }
             Ok(())
         }));
-        let (icon_id, icon_target) = (id.clone(), target.clone());
-        let icons = FaviconChangedEventHandler::create(Box::new(move |sender, _| {
-            let Some(core) = sender.and_then(|core| core.cast::<ICoreWebView2_15>().ok()) else {
-                return Ok(());
-            };
-            let mut uri = PWSTR::null();
-            unsafe { core.FaviconUri(&mut uri)? };
-            let mut state = PageState::of(&icon_id);
-            state.favicon = Some(webview2_com::take_pwstr(uri));
-            report(&icon_target, state);
-            Ok(())
-        }));
         let mut token = 0i64;
         unsafe {
             let _ = core.add_HistoryChanged(&history, &mut token);
             let _ = controller.add_AcceleratorKeyPressed(&keys, &mut token);
-            if let Ok(favicons) = core.cast::<ICoreWebView2_15>() {
-                let _ = favicons.add_FaviconChanged(&icons, &mut token);
-            }
         }
         guard(&target, &core);
     });
@@ -540,16 +527,13 @@ fn probe_history<R: Runtime>(webview: &Webview<R>) {
     let id = tab_of(webview.label());
     let target = webview.clone();
     let _ = webview.eval_with_callback(HISTORY_PROBE, move |result| {
-        let Ok((url, back, forward, favicon)) =
-            serde_json::from_str::<(String, Option<bool>, Option<bool>, String)>(&result)
-        else {
+        let Ok((url, back, forward)) = serde_json::from_str::<(String, Option<bool>, Option<bool>)>(&result) else {
             return;
         };
         let mut state = PageState::of(&id);
         state.url = Some(url);
         state.can_go_back = back;
         state.can_go_forward = forward;
-        state.favicon = Some(favicon);
         report(&target, state);
     });
 }

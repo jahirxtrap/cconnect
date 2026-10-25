@@ -10,8 +10,8 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
-  import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import BrowserFavoriteDialog from "./BrowserFavoriteDialog.svelte";
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
 
   interface Props {
@@ -19,11 +19,11 @@
     nameOf: (favorite: BrowserFavorite) => string;
     onSearch: (input: string) => void;
     onAdd: () => void;
-    onRename: (favorite: BrowserFavorite, title: string) => void;
+    onEdit: (favorite: BrowserFavorite, url: string, title: string) => void;
     onRemove: (favorite: BrowserFavorite) => void;
   }
 
-  const { favorites, nameOf, onSearch, onAdd, onRename, onRemove }: Props = $props();
+  const { favorites, nameOf, onSearch, onAdd, onEdit, onRemove }: Props = $props();
 
   const TITLE_SCALE = 1.25;
   const ADD_ICON_SIZE = 20;
@@ -33,7 +33,7 @@
 
   let query = $state("");
   let menuUrl = $state<string | null>(null);
-  let renaming = $state<BrowserFavorite | null>(null);
+  let editing = $state<BrowserFavorite | null>(null);
 
   const submit = (event: KeyboardEvent) => {
     if (event.key !== "Enter" || !query.trim()) return;
@@ -81,7 +81,7 @@
                   <EllipsisVertical />
                 </TooltipIconButton>
               {/snippet}
-              <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => (renaming = favorite)} />
+              <MenuItem icon={Pencil} text={t("EDIT")} onclick={() => (editing = favorite)} />
               <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => onRemove(favorite)} />
             </PopupMenu>
           </div>
@@ -97,14 +97,16 @@
   </div>
 </div>
 
-{#if renaming}
-  {@const target = renaming}
-  <RenameDialog
-    initial={nameOf(target)}
-    onConfirm={(title) => {
-      onRename(target, title);
-      renaming = null;
+{#if editing}
+  {@const target = editing}
+  <BrowserFavoriteDialog
+    url={target.url}
+    title={target.title}
+    editing
+    onConfirm={(url, title) => {
+      onEdit(target, url, title);
+      editing = null;
     }}
-    onDismiss={() => (renaming = null)}
+    onDismiss={() => (editing = null)}
   />
 {/if}

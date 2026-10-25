@@ -103,6 +103,7 @@ class Browser(
 ) {
   private class Tab(val id: String, val view: WebView) {
     @Volatile var source = ""
+    var title = ""
     val blocked = AtomicInteger()
     var agent: String? = null
     var desktop: ScriptHandler? = null
@@ -474,7 +475,7 @@ class Browser(
 
   private fun current(tab: Tab) = JSONObject()
     .put("url", tab.view.url.orEmpty())
-    .put("title", tab.view.title.orEmpty())
+    .put("title", tab.title)
     .put("canGoBack", tab.view.canGoBack())
     .put("canGoForward", tab.view.canGoForward())
 
@@ -491,6 +492,7 @@ class Browser(
       "picked" -> message.optJSONObject("data")?.let { emit(PICKED_EVENT, it.put("id", tab.id)) }
       "picking" -> emit(PICKING_EVENT, JSONObject().put("id", tab.id).put("picking", message.optBoolean("data")))
       "focused" -> emit(FOCUSED_EVENT, JSONObject().put("id", tab.id))
+      "favicon" -> report(tab, JSONObject().put("favicon", message.optString("data")))
     }
   }
 
@@ -512,6 +514,7 @@ class Browser(
   private inner class PageClient(private val tab: Tab) : WebViewClient() {
     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
       tab.source = url
+      tab.title = ""
       tab.blocked.set(0)
       emit(SHIELD_EVENT, JSONObject().put("id", tab.id).put("blocked", 0))
       report(tab, JSONObject().put("url", url).put("loading", true))
@@ -551,12 +554,8 @@ class Browser(
         signal(tab, title.removePrefix(SIGNAL))
         return
       }
+      tab.title = title
       report(tab, JSONObject().put("title", title))
-    }
-
-    override fun onReceivedIcon(view: WebView, icon: Bitmap) {
-      val bytes = ByteArrayOutputStream().also { icon.compress(Bitmap.CompressFormat.PNG, PNG_QUALITY, it) }.toByteArray()
-      report(tab, JSONObject().put("favicon", "data:image/png;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)))
     }
 
     override fun onCreateWindow(view: WebView, dialog: Boolean, user: Boolean, message: Message): Boolean {

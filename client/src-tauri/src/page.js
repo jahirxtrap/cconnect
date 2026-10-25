@@ -1,9 +1,14 @@
 (() => {
   if (window.__cconnect) return;
+  let kept = null;
   const post = (kind, data) => {
-    const kept = document.title;
+    if (kept === null) kept = document.title;
     document.title = '⁣cconnect:' + JSON.stringify({ kind, data });
-    setTimeout(() => { document.title = kept; });
+    setTimeout(() => {
+      if (kept === null) return;
+      document.title = kept;
+      kept = null;
+    });
   };
   const describe = (target) => {
     const parts = [];
@@ -83,5 +88,6 @@
       wheeled = 0;
     }, { passive: false });
   }
+  watchIcon((icon) => post('favicon', icon));
   Object.defineProperty(window, '__cconnect', { value: { pick: (on) => (on ? start() : stop()), describe } });
 })();

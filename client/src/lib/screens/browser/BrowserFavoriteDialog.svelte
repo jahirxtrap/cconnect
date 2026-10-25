@@ -9,18 +9,19 @@
   interface Props {
     url?: string;
     title?: string;
+    editing?: boolean;
     onConfirm: (url: string, title: string) => void;
     onDismiss: () => void;
   }
 
-  const { url: initialUrl = "", title: initialTitle = "", onConfirm, onDismiss }: Props = $props();
+  const { url: initialUrl = "", title: initialTitle = "", editing = false, onConfirm, onDismiss }: Props = $props();
 
   let title = $state(untrack(() => initialTitle));
   let address = $state(untrack(() => initialUrl));
   const url = $derived(addressOf(address));
 </script>
 
-<CompactDialog title={t("BROWSER_FAVORITE_ADD")} {onDismiss}>
+<CompactDialog title={t(editing ? "EDIT_FAVORITE" : "BROWSER_FAVORITE_ADD")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={() => url && onConfirm(url, title.trim())} enabled={!!url}>{t("SAVE")}</Button>

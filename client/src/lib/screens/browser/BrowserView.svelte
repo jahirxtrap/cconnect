@@ -41,7 +41,7 @@
   import { isDesktop, isTouch, openExternal } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { store } from "$lib/platform/storage";
-  import { inPane, paneRole } from "$lib/screens/chat/paneSurface";
+  import { paneRole } from "$lib/screens/chat/paneSurface";
   import TabStrip from "$lib/screens/chat/TabStrip.svelte";
   import {
     browserLink,
@@ -55,6 +55,7 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { keepFocus } from "$lib/ui/keepFocus";
   import { PullState } from "$lib/ui/pull.svelte";
   import PullIndicator from "$lib/ui/PullIndicator.svelte";
@@ -85,7 +86,6 @@
   const OVERLAYS =
     "[role=dialog], [role=alertdialog], [role=menu], [role=listbox], [role=tooltip], [data-dialog-overlay], [data-alert-dialog-overlay]";
 
-  const pane = inPane();
   const role = paneRole();
   const layer = new BrowserLayer();
 
@@ -190,9 +190,22 @@
     favoriting = null;
   };
 
-  const renameFavorite = (target: BrowserFavorite, title: string) => {
-    settings.browserFavorites = favorites.map((item) => (item.url === target.url ? { ...item, title } : item));
+  const editFavorite = (target: BrowserFavorite, url: string, title: string) => {
+    settings.browserFavorites = favorites.flatMap((item) =>
+      item.url === target.url
+        ? [{ url, title, icon: url === target.url ? item.icon : iconOf(url) }]
+        : item.url === url
+          ? []
+          : [item],
+    );
   };
+
+  $effect(() => {
+    const icon = active?.favicon;
+    const url = shownUrl;
+    if (!icon || !url || !favorites.some((item) => item.url === url && item.icon !== icon)) return;
+    settings.browserFavorites = favorites.map((item) => (item.url === url ? { ...item, icon } : item));
+  });
 
   const removeFavorite = (target: BrowserFavorite) => {
     settings.browserFavorites = favorites.filter((item) => item.url !== target.url);
@@ -633,10 +646,18 @@
   });
   useShortcut("browser.tab.next", () => cycle(1));
   useShortcut("browser.tab.previous", () => cycle(-1));
-  useShortcut("browser.reload", () => (onServer ? link?.reload() : deviceBrowser.reload()));
+  const reload = () => {
+    if (atHome) return;
+    if (onServer) link?.reload();
+    else deviceBrowser.reload();
+  };
+
+  useShortcut("browser.reload", reload);
   useShortcut("browser.back", goBack);
   useShortcut("browser.forward", () => (onServer ? link?.forward() : deviceBrowser.forward()));
-  const selectAddress = () => addressBox?.querySelector("input")?.select();
+  const selectAddress = (event: FocusEvent) => {
+    if (event.target instanceof HTMLInputElement) event.target.select();
+  };
 
   function focusAddress() {
     const input = addressBox?.querySelector("input");
@@ -702,7 +723,7 @@
     {nameOf}
     onSearch={navigate}
     onAdd={() => (favoriting = { url: "", title: "" })}
-    onRename={renameFavorite}
+    onEdit={editFavorite}
     onRemove={removeFavorite}
   />
 {/snippet}
@@ -718,19 +739,21 @@
   {#if shielded}
     {@const exempt = !!host && settings.browserShield.allowed.includes(host)}
     {@const count = deviceBrowser.blocked[deviceBrowser.activeId] ?? 0}
-    <TooltipIconButton
-      label={exempt || !count ? t("BROWSER_SHIELD_HERE") : joined(t("BROWSER_SHIELD_HERE"), plural("BROWSER_SHIELD_COUNT", count))}
-      enabled={!!host}
-      active={!exempt}
-      class="size-6"
-      onclick={() => void deviceBrowser.allowHere(!exempt)}
-    >
-      {#if exempt}
-        <ShieldOff />
-      {:else}
-        <ShieldCheck />
-      {/if}
-    </TooltipIconButton>
+    <span use:keepFocus class="flex">
+      <TooltipIconButton
+        label={exempt || !count ? t("BROWSER_SHIELD_HERE") : joined(t("BROWSER_SHIELD_HERE"), plural("BROWSER_SHIELD_COUNT", count))}
+        enabled={!!host}
+        active={!exempt}
+        class="size-6"
+        onclick={() => void deviceBrowser.allowHere(!exempt)}
+      >
+        {#if exempt}
+          <ShieldOff />
+        {:else}
+          <ShieldCheck />
+        {/if}
+      </TooltipIconButton>
+    </span>
   {/if}
 {/snippet}
 
@@ -794,8 +817,9 @@
     <TooltipIconButton
       label={t("REFRESH")}
       shortcut="browser.reload"
+      enabled={!atHome}
       class="size-7"
-      onclick={() => (onServer ? link?.reload() : deviceBrowser.reload())}
+      onclick={reload}
     >
       <RotateCw />
     </TooltipIconButton>
@@ -903,12 +927,10 @@
           }}
         ></div>
       {/if}
+    {:else if serverStatus.unavailable}
+      <ServerUnavailable class="absolute inset-0 bg-background" />
     {:else if !ready && !connected}
-      <EmptyState
-        icon={BROWSER_ICON}
-        text={pane && serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : t("CONNECTION_ERROR")}
-        class="absolute inset-0 bg-background"
-      />
+      <EmptyState icon={BROWSER_ICON} text={t("CONNECTION_ERROR")} class="absolute inset-0 bg-background" />
     {:else if !ready && failed}
       <EmptyState
         icon={BROWSER_ICON}
