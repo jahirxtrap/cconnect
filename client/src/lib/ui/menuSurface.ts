@@ -6,7 +6,9 @@ const FLOAT = "bg-float shadow-float";
 
 export const FLOAT_SURFACE_CLASS = `rounded-lg ${FLOAT}`;
 
-export const FLOAT_PANEL_WIDTH = "w-full sm:w-90";
+export const FLOAT_PANEL_WIDTH = "w-(--float-panel-width) max-w-full";
+
+export const FLOAT_HEAD_CLASS = "flex items-center gap-1 py-1 pr-2 pl-3.5";
 
 export const TOOLTIP_CLASS = `rounded-md px-2 py-1 text-body-sm ${FLOAT}`;
 

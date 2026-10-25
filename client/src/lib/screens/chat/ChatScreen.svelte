@@ -126,6 +126,12 @@
   let organizeOpen = $state(false);
   let dismissed = $state<CompatNotice[]>([]);
   let composerHeight = $state(0);
+  let paneFrame = $state<HTMLElement | null>(null);
+
+  const paneGap = $derived.by(() => {
+    void layout.width;
+    return paneFrame ? parseFloat(getComputedStyle(paneFrame).paddingLeft) : 0;
+  });
 
   $effect(() => {
     if (paneLayer) paneOpened = true;
@@ -154,14 +160,19 @@
   const still = $derived(resizing || routeShift.active || modeShift.active || sizeShift.active);
 
   $effect(() => {
-    layout.bottomInset = panes.centerBusy ? 0 : composerHeight;
+    layout.bottomInset = (panes.centerBusy ? 0 : composerHeight) + paneGap;
     return () => (layout.bottomInset = 0);
   });
 
   $effect(() => {
-    layout.rightInset = navigation.chatActive && !layout.mobile && panes.open ? panelWidth : 0;
-    layout.rightInsetAnimated = !still;
-    return () => (layout.rightInset = 0);
+    const desktop = !layout.mobile && (navigation.chatActive || navigation.centered);
+    layout.leftInset = desktop ? (expanded ? leftShown : RAIL_WIDTH) : 0;
+    layout.rightInset = desktop ? (rightShown ? panelWidth + 2 * paneGap : paneGap) : 0;
+    layout.insetsAnimated = !still;
+    return () => {
+      layout.leftInset = 0;
+      layout.rightInset = 0;
+    };
   });
 
   const focusFrom = (event: PointerEvent, role: PaneRole) => {
@@ -200,7 +211,7 @@
 
   const dragTab = (id: string, pointerX: number) => panes.dragTab(id, paneAt(pointerX));
 
-  const dockLift = $derived(Math.max(0, layout.dockInset - composerHeight - layout.safeBottom));
+  const dockLift = $derived(Math.max(0, layout.dockInset - composerHeight - layout.safeBottom - paneGap));
 
   $effect(() => {
     const environmentIds = [...new Set(tabs.list.map((tab) => tab.environmentId))];
@@ -365,7 +376,11 @@
       data-unfocused={panes.focused === "right" ? undefined : true}
       onpointerdowncapture={(event) => focusFrom(event, "right")}
     >
-      <div class="relative flex h-full p-(--pane-gap)" style="width: calc({panelWidth}px + 2 * var(--pane-gap))">
+      <div
+        bind:this={paneFrame}
+        class="relative flex h-full p-(--pane-gap)"
+        style="width: calc({panelWidth}px + 2 * var(--pane-gap))"
+      >
         <div
           role="separator"
           aria-orientation="vertical"

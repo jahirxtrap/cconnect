@@ -32,28 +32,30 @@
   {/snippet}
 
   <div class="flex flex-col gap-3.5">
-    <SwitchRow
-      title={t("INCLUDE_NOTES")}
-      summary={t("INCLUDE_NOTES_SUMMARY")}
-      checked={notes}
-      onChange={(value) => (notes = value)}
-    />
-    {#if chatBackground.uploads.length}
+    <div>
       <SwitchRow
-        title={t("INCLUDE_BACKGROUND")}
-        summary={t("INCLUDE_BACKGROUND_SUMMARY")}
-        checked={background}
-        onChange={(value) => (background = value)}
+        title={t("INCLUDE_NOTES")}
+        summary={t("INCLUDE_NOTES_SUMMARY")}
+        checked={notes}
+        onChange={(value) => (notes = value)}
       />
-    {/if}
-    {#if packs.installed.length}
-      <SwitchRow
-        title={t("INCLUDE_PACKS")}
-        summary={t("INCLUDE_PACKS_SUMMARY")}
-        checked={withPacks}
-        onChange={(value) => (withPacks = value)}
-      />
-    {/if}
+      {#if chatBackground.uploads.length}
+        <SwitchRow
+          title={t("INCLUDE_BACKGROUND")}
+          summary={t("INCLUDE_BACKGROUND_SUMMARY")}
+          checked={background}
+          onChange={(value) => (background = value)}
+        />
+      {/if}
+      {#if packs.installed.length}
+        <SwitchRow
+          title={t("INCLUDE_PACKS")}
+          summary={t("INCLUDE_PACKS_SUMMARY")}
+          checked={withPacks}
+          onChange={(value) => (withPacks = value)}
+        />
+      {/if}
+    </div>
     {#if encryptionAvailable()}
       <div class="flex flex-col gap-1.5">
         <InputField

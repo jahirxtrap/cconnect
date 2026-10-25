@@ -52,9 +52,11 @@
   <div
     style="padding: {snapToDevicePixel(layout.menuPadding.top)}px {snapToDevicePixel(
       layout.menuPadding.right + scrollbar + layout.rightInset,
-    )}px {snapToDevicePixel(bottom)}px {layout.menuPadding.left}px"
-    class="pointer-events-none fixed inset-x-0 bottom-0 z-30 {layout.rightInsetAnimated
-      ? 'transition-[padding-right] duration-200'
+    )}px {snapToDevicePixel(bottom)}px {snapToDevicePixel(layout.menuPadding.left + layout.leftInset)}px; --float-panel-width: {layout.mobile
+      ? '100%'
+      : 'calc(var(--spacing) * 90)'}"
+    class="pointer-events-none fixed inset-x-0 bottom-0 z-30 {layout.insetsAnimated
+      ? 'transition-[padding] duration-200'
       : ''}"
   >
     <div bind:clientHeight={contentHeight} class="flex flex-col items-end gap-1.5">

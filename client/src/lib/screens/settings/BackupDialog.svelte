@@ -60,13 +60,15 @@
   <div class="flex w-full flex-col gap-2">
     {#if mode !== "import"}
       <p class="text-body-sm text-on-surface-variant">{t("EXPORT_SETTINGS_WARNING")}</p>
-      <SwitchRow title={t("INCLUDE_NOTES")} checked={notes} onChange={(value) => (notes = value)} />
-      {#if chatBackground.uploads.length}
-        <SwitchRow title={t("INCLUDE_BACKGROUND")} checked={background} onChange={(value) => (background = value)} />
-      {/if}
-      {#if packs.installed.length}
-        <SwitchRow title={t("INCLUDE_PACKS")} checked={withPacks} onChange={(value) => (withPacks = value)} />
-      {/if}
+      <div>
+        <SwitchRow title={t("INCLUDE_NOTES")} checked={notes} onChange={(value) => (notes = value)} />
+        {#if chatBackground.uploads.length}
+          <SwitchRow title={t("INCLUDE_BACKGROUND")} checked={background} onChange={(value) => (background = value)} />
+        {/if}
+        {#if packs.installed.length}
+          <SwitchRow title={t("INCLUDE_PACKS")} checked={withPacks} onChange={(value) => (withPacks = value)} />
+        {/if}
+      </div>
       <InputField value={payload} oninput={() => {}} minLines={LINES} maxLines={LINES} />
     {:else}
       <p class="text-body-sm text-on-surface-variant">{t("IMPORT_SETTINGS_HINT")}</p>

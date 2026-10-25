@@ -11,7 +11,7 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { dragSaved, openTransfer } from "$lib/services/sharedFiles";
   import FloatDock from "./FloatDock.svelte";
-  import { FLOAT_PANEL_WIDTH, FLOAT_SURFACE_CLASS, MENU_SCROLL_CLASS } from "./menuSurface";
+  import { FLOAT_HEAD_CLASS, FLOAT_PANEL_WIDTH, FLOAT_SURFACE_CLASS, MENU_SCROLL_CLASS } from "./menuSurface";
   import ProgressRing from "./ProgressRing.svelte";
   import { viewportScrollbar } from "./scrollbar";
   import TooltipIconButton from "./TooltipIconButton.svelte";
@@ -34,7 +34,7 @@
       bind:clientHeight={panelHeight}
       class="menu-surface pointer-events-auto overflow-hidden {FLOAT_PANEL_WIDTH} {FLOAT_SURFACE_CLASS}"
     >
-      <div class="flex items-center gap-1 py-1 pr-1 pl-3.5">
+      <div class={FLOAT_HEAD_CLASS}>
         <p class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
           {running ? t("TRANSFERS_ACTIVE", `${done + 1}`, `${items.length}`) : t("TRANSFERS_DONE")}
         </p>

@@ -16,8 +16,9 @@ class Layout {
   width = $state(window.innerWidth);
   height = $state(window.innerHeight);
   bottomInset = $state(0);
+  leftInset = $state(0);
   rightInset = $state(0);
-  rightInsetAnimated = $state(true);
+  insetsAnimated = $state(true);
   transfersInset = $state(0);
   docks = $state<Record<string, number>>({});
   keyboard = $state(0);
