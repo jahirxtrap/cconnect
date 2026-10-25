@@ -48,7 +48,7 @@ SETTINGS: dict[str, SettingDef] = {
     "suggestions": SettingDef(True, bool, "The model ends a turn with buttons for the next step, either sent as they are or left written for you to finish"),
     "sdk_auto_update": SettingDef(True, bool, "Install the latest Claude Agent SDK every time the server starts"),
     "persistent_sessions": SettingDef(False, bool, "Keep a chat's Claude process alive while it stays open: instant answers and commands that keep running in the background, at about 400 MB of memory per open chat"),
-    "persistent_grace": SettingDef(120, int, "Seconds a persistent chat stays alive after the last device closes it, so a reconnection does not restart it"),
+    "persistent_grace": SettingDef(300, int, "Seconds a persistent chat stays alive after the last device closes it, so a reconnection does not restart it"),
     "persistent_limit": SettingDef(10, int, "How many chats may hold a live process at once; the oldest idle one is closed past that"),
     "mod_surfaces": SettingDef(True, bool, "Show what mods report in every chat, and the panes and band they draw in a persistent one through the CLI's internal UI protocol, which can change between versions; off, only the lines the transcript keeps"),
     "default_category": SettingDef("", str, "Category a new chat is filed into; empty leaves it out of every category"),

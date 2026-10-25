@@ -125,7 +125,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   suggestions: effectiveBool(wire, "suggestions", true),
   sdkAutoUpdate: effectiveBool(wire, "sdk_auto_update", true),
   persistentSessions: effectiveBool(wire, "persistent_sessions", false),
-  persistentGrace: effectiveNum(wire, "persistent_grace", 120),
+  persistentGrace: effectiveNum(wire, "persistent_grace", 300),
   persistentLimit: effectiveNum(wire, "persistent_limit", 10),
   modSurfaces: wire.mod_surfaces ? effectiveBool(wire, "mod_surfaces", false) : null,
   outputStyle: effectiveStr(wire, "output_style", "default"),
