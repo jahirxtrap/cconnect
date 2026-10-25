@@ -39,6 +39,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import { SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
+  import { LINK_LOOKS } from "$lib/ui/linkStatus";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ModBand from "$lib/screens/mods/ModBand.svelte";
@@ -207,8 +208,10 @@
 
   const status = $derived.by(() => {
     if (chat.viewOnly) return { dot: "bg-gray", spinner: false, text: t("TRASH") };
-    if (chat.link === "disconnected") return { dot: "bg-red", spinner: false, text: t("SERVER_UNAVAILABLE") };
-    if (chat.link === "connecting") return { dot: "bg-gray", spinner: true, text: t("CONNECTING") };
+    if (chat.link !== "connected") {
+      const look = LINK_LOOKS[chat.link];
+      return { dot: look.dot, spinner: look.spinner, text: t(look.text) };
+    }
     if (activity === "waiting") return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
     if (activity === "compacting") return { dot: "bg-gray", spinner: true, tone: "text-blue", text: t("COMPACTING") };
     if (activity === "retrying") return { dot: "bg-gray", spinner: true, tone: "text-yellow", text: t("WORKING") };

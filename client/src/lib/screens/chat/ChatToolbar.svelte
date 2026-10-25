@@ -14,6 +14,7 @@
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import { LINK_LOOKS } from "$lib/ui/linkStatus";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipWrap from "$lib/ui/TooltipWrap.svelte";
   import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
@@ -168,13 +169,13 @@
 >
   {#if disconnected}
     <span class={STATE_CLASS}>
-      <StatusDot class="bg-red" box={16} />
-      <span class="whitespace-nowrap">{t("DISCONNECTED")}</span>
+      <StatusDot class={LINK_LOOKS.disconnected.dot} box={16} />
+      <span class="whitespace-nowrap">{t(LINK_LOOKS.disconnected.text)}</span>
     </span>
   {:else if connecting || !ready}
     <span class={STATE_CLASS}>
       <LoadingIndicator size={16} />
-      <span class="whitespace-nowrap">{connecting ? t("CONNECTING") : t("LOADING")}</span>
+      <span class="whitespace-nowrap">{connecting ? t(LINK_LOOKS.connecting.text) : t("LOADING")}</span>
     </span>
   {:else}
     {#if switching}

@@ -331,7 +331,7 @@ export class ChatState {
 
   readonly allProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
   readonly link = $derived<ConnectionState>(
-    serverStatus.unavailable ? "disconnected" : this.connection,
+    serverStatus.link === "connected" ? this.connection : serverStatus.link,
   );
   readonly connected = $derived(this.connection === "connected");
   #settling = $state<HeldView | null>(null);

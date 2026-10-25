@@ -1,4 +1,5 @@
 import { APP_VERSION, SUPPORTED_SERVER } from "./build";
+import type { ConnectionState } from "./chatModels";
 import { chatListFor } from "./chatList.svelte";
 import { compareVersions, satisfies } from "./compat";
 import { onWake } from "$lib/platform/wake";
@@ -26,7 +27,11 @@ class ServerStatus {
 
   readonly online = $derived(this.reachable && !this.unauthorized);
 
-  readonly unavailable = $derived(this.answered && !this.online);
+  readonly link = $derived<ConnectionState>(
+    this.online ? "connected" : this.checking || !this.answered ? "connecting" : "disconnected",
+  );
+
+  readonly unavailable = $derived(this.link === "disconnected");
 
   readonly appOutdated = $derived(!satisfies(APP_VERSION, this.version?.supportedApp));
   readonly serverOutdated = $derived(!satisfies(this.version?.serverVersion, SUPPORTED_SERVER));

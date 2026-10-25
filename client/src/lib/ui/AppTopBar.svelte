@@ -8,6 +8,7 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { LINK_LOOKS } from "./linkStatus";
   import { SCROLL_ROW_CLASS } from "./scrollbar";
   import StatusDot from "./StatusDot.svelte";
 
@@ -40,9 +41,9 @@
   let heading = $state<HTMLElement | null>(null);
   let strip = $state<HTMLElement | null>(null);
 
-  const line = $derived(
-    server ? (serverStatus.unavailable ? t("SERVER_UNAVAILABLE") : (backend.active?.name ?? null)) : subtitle,
-  );
+  const look = $derived(serverStatus.link === "connected" ? null : LINK_LOOKS[serverStatus.link]);
+
+  const line = $derived(server ? (look ? t(look.text) : (backend.active?.name ?? null)) : subtitle);
 
   const overflow = (node: HTMLElement) => Math.max(0, node.scrollWidth - node.clientWidth);
 
@@ -69,10 +70,7 @@
 </script>
 
 {#snippet serverDot()}
-  <StatusDot
-    class={serverStatus.unavailable ? "bg-red" : "bg-green"}
-    loading={serverStatus.checking && !serverStatus.online}
-  />
+  <StatusDot class={look?.dot ?? "bg-green"} loading={look?.spinner ?? false} />
 {/snippet}
 
 <header class="flex h-12 shrink-0 items-center pr-2 {navigationIcon ? 'pl-2' : 'pl-(--page-inset)'} {className}">
