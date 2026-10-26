@@ -122,7 +122,7 @@ async def get_plugins():
 @router.post("/claude/plugins/action")
 async def plugin_action(body: PluginActionBody):
     result = await asyncio.to_thread(claude_manage.plugin_action, body.action, body.plugin)
-    return api_response(data=await claude_manage.reload_after(result))
+    return api_response(data=await claude_manage.after_plugin_action(body.action, body.plugin, result))
 
 
 @router.post("/claude/plugins/reload")

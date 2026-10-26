@@ -11,6 +11,7 @@ from core import cli_manager, paths
 from services import accounts, claude_assets, cli_settings, files
 
 _PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "update"})
+_PLUGIN_REMOVALS = frozenset({"uninstall", "disable"})
 _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
 
 OFFICIAL_MARKETPLACE = "anthropics/claude-plugins-official"
@@ -90,6 +91,16 @@ async def reload_plugins(force: bool) -> dict:
 
 async def reload_after(result: dict) -> dict:
     return {**result, **await reload_plugins(force=False)} if result.get("ok") else result
+
+
+async def after_plugin_action(action: str, plugin: str, result: dict) -> dict:
+    from services.live_sessions import registry
+
+    if result.get("ok") and action in _PLUGIN_REMOVALS:
+        name = plugin.partition("@")[0]
+        for live in registry.live():
+            await live.forget_plugin(name)
+    return await reload_after(result)
 
 
 def plugin_action(action: str, plugin: str) -> dict:

@@ -224,6 +224,21 @@ class Surface:
             else:
                 self.status.pop(plugin, None)
 
+    def drop(self, plugins: set[str]) -> bool:
+        """Forget what the given plugins left on screen; whether anything went."""
+        panes = [pane for pane in self.panes if pane.get("plugin") not in plugins]
+        commands = [command for command in self.commands if command.get("plugin") not in plugins]
+        status = {plugin: text for plugin, text in self.status.items() if plugin not in plugins}
+        if (panes, commands, status) == (self.panes, self.commands, self.status):
+            return False
+        kept = {pane.get("id") for pane in panes}
+        self.panes, self.commands, self.status = panes, commands, status
+        self.shown_id, self.focused_id, self.focus_requested_id = (
+            pane_id if pane_id in kept else None
+            for pane_id in (self.shown_id, self.focused_id, self.focus_requested_id)
+        )
+        return True
+
     def snapshot(self) -> dict:
         shown = self if enabled() else Surface()
         return {

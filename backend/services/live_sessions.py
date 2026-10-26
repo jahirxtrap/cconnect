@@ -55,6 +55,7 @@ class LiveSession:
         self._health = None
         self._background = {}
         self._owned = {}
+        self._unplugged = set()
         self._runs = {}
         self._announced = object()
         self._published_id = None
@@ -378,6 +379,19 @@ class LiveSession:
     def _mods_snapshot(self):
         return {**self._mods.snapshot(), "channel": self.channel}
 
+    async def forget_plugin(self, name):
+        """Take a removed plugin off this chat, once the turn that still loads it is over."""
+        if self.resident_alive:
+            return
+        if self.running:
+            self._unplugged.add(name)
+            return
+        await self._drop_mods({name})
+
+    async def _drop_mods(self, plugins):
+        if self._mods.drop(plugins):
+            await self._send(self._mods_snapshot())
+
     def _loose_notice(self, event):
         """A notice after the turn: a line the transcript keeps travels as a tail item, a log line unstamped."""
         if not event.get("uuid"):
@@ -479,6 +493,9 @@ class LiveSession:
             return
         if kind in ("done", "interrupted") and not self.resident_alive:
             self._end_background()
+            if self._unplugged:
+                unplugged, self._unplugged = self._unplugged, set()
+                asyncio.get_running_loop().create_task(self._drop_mods(unplugged))
             return
         if kind in ("session_started", "result"):
             self._publish_activity(self.activity)
@@ -948,6 +965,9 @@ class SessionRegistry:
 
     def residents(self):
         return [session for session in self._sessions.values() if session.resident_alive]
+
+    def live(self):
+        return list(self._sessions.values())
 
     def live_session_ids(self):
         """Ids of the chats alive in this process, transcript on disk or not yet."""
