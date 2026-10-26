@@ -1,9 +1,10 @@
 import mimetypes
 
-from fastapi import APIRouter, HTTPException, WebSocket
+from fastapi import APIRouter, Header, HTTPException, WebSocket
 from fastapi.responses import FileResponse, Response
 
-from core.responses import FILE_HEADERS
+from core.access import key_matches
+from core.responses import FILE_HEADERS, api_response
 from core.ws import stream_watch
 from services import packs
 from services.pack_format import MIME
@@ -22,6 +23,15 @@ async def download_pack(name: str):
     if target is None:
         raise HTTPException(status_code=404, detail="not found")
     return FileResponse(target, media_type=MIME, filename=name, headers=FILE_HEADERS)
+
+
+@router.delete("/packs/{name}")
+async def delete_pack(name: str, x_security_key: str = Header("")):
+    if not key_matches(x_security_key):
+        return api_response(status=403)
+    if not packs.remove(name):
+        raise HTTPException(status_code=404, detail="not found")
+    return api_response()
 
 
 @router.get("/packs/{name}/preview")

@@ -305,6 +305,10 @@ any app on Android shows what it brings, to install, save, share or open
 elsewhere. When its author picked what to apply, **Use** puts all of it on at
 once. From Samsung's My Files, use **Import pack** instead.
 
+Every pack on the server stays in that list, the ones you already have too:
+it offers to install a new one, to update yours when the server holds a newer
+version, and to delete one from the server, which takes the security key.
+
 ## Mods
 
 Claude Code mods are plugins that change what Claude shows and how it behaves:
@@ -650,8 +654,9 @@ Getting in takes the key the server prints on every start (`SECURITY_KEY`,
 replaced with `python run.py --security-key --rotate`). It is the only gate, so
 treat it as a password to the machine. The same key decides whether Claude may
 open a shell and run a command in it, which you can also turn off from
-Settings → Tools, and whether the project explorer shows the files git ignores
-and lets you commit them.
+Settings → Tools, whether the project explorer shows the files git ignores
+and lets you commit them, and whether **Packs** can delete a pack from the
+server.
 
 ## SSH client
 

@@ -2,8 +2,11 @@
   import Download from "@lucide/svelte/icons/download";
   import Package from "@lucide/svelte/icons/package";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
+  import Trash from "@lucide/svelte/icons/trash";
   import Upload from "@lucide/svelte/icons/upload";
   import { joined } from "$lib/data/format";
+  import { securityKeys } from "$lib/data/securityKeys.svelte";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { inspectPack, installPack } from "$lib/design/packs/library";
   import type { Pack } from "$lib/design/packs/model";
   import { packs } from "$lib/design/packs/registry.svelte";
@@ -15,17 +18,19 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileDrop } from "$lib/ui/fileDrop";
   import IconTile from "$lib/ui/IconTile.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
+  import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import PackDialog from "./PackDialog.svelte";
   import { offerFiles } from "./packIntake";
   import { packOffers } from "./packOffers.svelte";
-  import { contentsSummary, offeredPacks, packByline, packSummary } from "./packText";
+  import { isOffer, packByline, packSummary, serverByline, serverStandings } from "./packText";
   import PackThumb from "./PackThumb.svelte";
 
   interface Props {
@@ -43,10 +48,13 @@
   let picker = $state<HTMLInputElement | null>(null);
   let opened = $state<string | null>(null);
   let installing = $state<string | null>(null);
+  let deleting = $state<ServerPack | null>(null);
+  let unlocking = $state<ServerPack | null>(null);
+  let rejected = $state(false);
 
   const installed = $derived(packs.all.filter((pack) => !pack.builtin));
   const builtin = $derived(packs.all.filter((pack) => pack.builtin));
-  const offered = $derived(offeredPacks());
+  const onServer = $derived(serverStandings());
   const openedPack = $derived(opened ? packs.packOf(opened) : undefined);
 
   const pick = (event: Event) => {
@@ -68,6 +76,19 @@
     } finally {
       installing = null;
     }
+  };
+
+  const removeServer = async (entry: ServerPack, key = securityKeys.current) => {
+    deleting = null;
+    if (await serverPacks.remove(entry, key)) {
+      if (key !== securityKeys.current) securityKeys.set(key);
+      unlocking = null;
+      rejected = false;
+      return;
+    }
+    if (!serverStatus.version?.gated) return;
+    rejected = key !== "";
+    unlocking = entry;
   };
 </script>
 
@@ -99,21 +120,19 @@
     <div class="mt-1 mb-2">
       <ActionButton text={t("IMPORT_PACK")} icon={Upload} onclick={() => picker?.click()} class="w-full" />
     </div>
-    {#if offered.length}
+    {#if onServer.length}
       <SectionHeader label={t("PACKS_SERVER")} divider />
-      {#each offered as offer (offer.entry.file)}
+      {#each onServer as listed (listed.entry.file)}
         <ListRow
-          title={offer.entry.name}
-          subtitle={offer.standing === "newer"
-            ? joined(offer.entry.version, t("PACK_NEWER", packs.installedOf(offer.entry.id)?.info.version ?? ""))
-            : joined(offer.entry.author, offer.entry.version, contentsSummary(offer.entry.contents))}
+          title={listed.entry.name}
+          subtitle={serverByline(listed)}
           subtitleLines={2}
-          onclick={() => offerServer(offer.entry)}
+          onclick={() => offerServer(listed.entry)}
         >
           {#snippet leading()}
-            {#if offer.entry.preview}
+            {#if listed.entry.preview}
               <img
-                use:mediaSrc={{ url: serverPacks.urlOf(offer.entry, "/preview") }}
+                use:mediaSrc={{ url: serverPacks.urlOf(listed.entry, "/preview") }}
                 alt=""
                 draggable="false"
                 class="size-11 shrink-0 rounded-lg object-cover"
@@ -123,16 +142,21 @@
             {/if}
           {/snippet}
           {#snippet trailing()}
-            <TooltipIconButton
-              label={t(offer.standing === "newer" ? "PACK_UPDATE" : "PACK_INSTALL")}
-              enabled={installing === null}
-              onclick={() => void installServer(offer.entry)}
-            >
-              {#if offer.standing === "newer"}
-                <RefreshCw />
-              {:else}
-                <Download />
-              {/if}
+            {#if isOffer(listed.standing)}
+              <TooltipIconButton
+                label={t(listed.standing === "newer" ? "PACK_UPDATE" : "PACK_INSTALL")}
+                enabled={installing === null}
+                onclick={() => void installServer(listed.entry)}
+              >
+                {#if listed.standing === "newer"}
+                  <RefreshCw />
+                {:else}
+                  <Download />
+                {/if}
+              </TooltipIconButton>
+            {/if}
+            <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = listed.entry)}>
+              <Trash />
             </TooltipIconButton>
           {/snippet}
         </ListRow>
@@ -148,4 +172,28 @@
 
 {#if openedPack}
   <PackDialog pack={openedPack} onDismiss={() => (opened = null)} />
+{/if}
+
+{#if deleting}
+  {@const entry = deleting}
+  <ConfirmDialog
+    title={t("DELETE")}
+    text={t("PACK_SERVER_DELETE_CONFIRM", entry.name)}
+    confirmLabel={t("DELETE")}
+    danger
+    onConfirm={() => void removeServer(entry)}
+    onDismiss={() => (deleting = null)}
+  />
+{/if}
+
+{#if unlocking}
+  {@const entry = unlocking}
+  <SecurityKeyDialog
+    {rejected}
+    onConfirm={(key) => void removeServer(entry, key)}
+    onDismiss={() => {
+      unlocking = null;
+      rejected = false;
+    }}
+  />
 {/if}

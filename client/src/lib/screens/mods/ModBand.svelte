@@ -6,7 +6,7 @@
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
-  import { keepTyping, typingOnTouch } from "$lib/ui/keepFocus";
+  import { holdFocus, keepTyping, typingOnTouch } from "$lib/ui/keepFocus";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import ModInline from "./ModInline.svelte";
   import ModSite from "./ModSite.svelte";
@@ -33,8 +33,15 @@
     return true;
   };
 
+  const ownTarget = (event: MouseEvent) =>
+    (event.target as HTMLElement).closest("button, a, input, textarea, [data-mod-site]");
+
+  const holdFromCard = (event: MouseEvent) => {
+    if (!ownTarget(event)) holdFocus(event);
+  };
+
   const focusFromCard = (event: MouseEvent) => {
-    if (typingOnTouch() || (event.target as HTMLElement).closest("button, a, input, textarea, [data-mod-site]")) return;
+    if (typingOnTouch() || ownTarget(event)) return;
     focusBand();
   };
 
@@ -156,6 +163,7 @@
       <div
         bind:this={card}
         onclick={focusFromCard}
+        onmousedown={holdFromCard}
         onpointerdown={keepTyping}
         transition:slide={{ duration }}
         class={drawn

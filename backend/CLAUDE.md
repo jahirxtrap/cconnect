@@ -61,10 +61,10 @@ except `/api/health`; the WS handshake checks the same header via `ws_bearer_ok`
 
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
-Claude — the shells, the files git ignores and every git write. It only gates while the
-Bearer gate is on (`gated()`), so a plain local run is open. Each route checks it for
-itself; there is no middleware for it, and a read that the panel needs before it can ask
-for anything (`repos`) is deliberately outside it.
+Claude — the shells, the files git ignores, every git write and deleting a pack from the
+server's library. It only gates while the Bearer gate is on (`gated()`), so a plain local
+run is open. Each route checks it for itself; there is no middleware for it, and a read that
+the panel needs before it can ask for anything (`repos`) is deliberately outside it.
 
 `--expose tailnet` is the one exposure that skips both the token and `CCONNECT_AUTH_ACTIVE`:
 `tailscale serve` answers only inside the tailnet, so it is the local mode with HTTPS on top.
@@ -83,10 +83,11 @@ reload, marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`,
 `/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/delegates` (the destinations;
 writing them takes the security key), `/api/packs/*` (the server's pack library and its
-previews). Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list),
-`WS /api/system/ws`, `WS /api/shared/ws`, `WS /api/packs/ws`, `WS /api/network/speedtest/ws`,
-`WS /api/browser/ws` (frames and state of the server's Chromium; `watch` decides whether it
-runs, and an opening without it watches, which is what an app older than 1.10.3 sends).
+previews; deleting from it takes the security key). Live streams: `WS /api/chat/ws`,
+`WS /api/list/ws` (chat/project list), `WS /api/system/ws`, `WS /api/shared/ws`,
+`WS /api/packs/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws` (frames and state
+of the server's Chromium; `watch` decides whether it runs, and an opening without it
+watches, which is what an app older than 1.10.3 sends).
 
 A route that answers with a file uses `FILE_HEADERS` (`core/responses.py`): without
 `Cache-Control: no-cache`, the `last-modified` of a `FileResponse` lets a browser keep a copy

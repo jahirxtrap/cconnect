@@ -16,7 +16,7 @@
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
-  import { packByline, packErrorText, packSummary } from "./packText";
+  import { packByline, packErrorText, packSummary, standingNote } from "./packText";
   import PackThumb from "./PackThumb.svelte";
 
   interface Props {
@@ -71,13 +71,7 @@
   const standing = $derived(inspected ? standingOf(inspected.pack) : "new");
   const usable = $derived(inspected ? canUsePack(inspected.pack) : false);
   const installedVersion = $derived(inspected ? packs.installedOf(inspected.pack.info.id)?.info.version : undefined);
-  const note = $derived(
-    standing === "older"
-      ? t("PACK_OLDER", installedVersion ?? "")
-      : standing === "newer"
-        ? t("PACK_NEWER", installedVersion ?? "")
-        : null,
-  );
+  const note = $derived(standingNote(standing, installedVersion));
   const installLabel = $derived(t(standing === "newer" ? "PACK_UPDATE" : standing === "older" ? "PACK_REPLACE" : "PACK_INSTALL"));
 
   const perform = async ({ use }: Action) => {

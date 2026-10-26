@@ -26,7 +26,11 @@ Themes, terminal colours, fonts, accents and chat backgrounds come from packs
 (`design/packs/`). The built-in ones and the pack format are the backend's: the build globs
 `backend/core/packs/**` and imports its `schema.json` and `builtin.json`, `opened.rs` compiles
 the schema in, and the client reader (`design/packs/reader.ts`) has to validate exactly as
-`backend/services/pack_format.py` does.
+`backend/services/pack_format.py` does. The Packs dialog lists the server's whole library,
+each entry with its standing against the installed copy (`standingFor`); only `new` and
+`newer` offer an action, and `offeredPacks` counts those for the settings row. Deleting from
+the server asks for the security key through `SecurityKeyDialog` and stores it only once a
+request with it went through, as the terminal does.
 
 ## Rules
 

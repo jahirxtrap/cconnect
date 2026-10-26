@@ -1,5 +1,7 @@
+import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { backend, withToken } from "./backend.svelte";
+import { createHttp } from "./http";
 import { fetchFile } from "./mediaSource";
 import { ReconnectingSocket } from "./socket";
 
@@ -67,6 +69,14 @@ class ServerPacks {
     } catch {
       return null;
     }
+  }
+
+  async remove(pack: ServerPack, key: string): Promise<boolean> {
+    const client = createHttp(
+      () => backend.active,
+      () => securityKeys.headers(key),
+    );
+    return (await client.delete(`/packs/${encodeURIComponent(pack.file)}`)) !== null;
   }
 }
 
