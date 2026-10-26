@@ -16,7 +16,7 @@
 
   const { names, onChoose, onDismiss }: Props = $props();
 
-  const subtitle = $derived(names.length > 1 ? plural("CLASH_COUNT", names.length) : names[0]);
+  const subtitle = $derived(names.length > 1 ? plural("FILE_COUNT", names.length) : names[0]);
 </script>
 
 <CompactDialog title={t("CLASH_TITLE")} {subtitle} description={t("CLASH_HINT")} {onDismiss}>

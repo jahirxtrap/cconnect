@@ -432,7 +432,7 @@
     {#if opening}
       <CenteredProgress class="absolute inset-0 z-10" />
     {:else if !chat.view.length && !chat.sessionId && !chat.streaming}
-      <ChatWelcome project={welcomeProject} unavailable={chat.link === "disconnected"} />
+      <ChatWelcome project={welcomeProject} link={chat.link} />
     {/if}
     <div
       class="overflow-hidden {opening ? 'opacity-0' : ''} {sideDragging || instant

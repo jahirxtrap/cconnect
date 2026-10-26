@@ -31,7 +31,8 @@
 </script>
 
 <Collapsible
-  label={plural("SHARED_COUNT", listed.length)}
+  label={t("SHARED_WITH_YOU")}
+  stat={plural("FILE_COUNT", listed.length)}
   icon={FolderSymlink}
   tone="action"
   {expanded}

@@ -7,14 +7,15 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CenterViewToggle from "./CenterViewToggle.svelte";
   import { panes } from "./panes.svelte";
+
+  const tool = $derived(screenFor(panes.tool));
 </script>
 
 <div class="flex shrink-0 items-center">
   {#if layout.mobile}
     {#if !panes.onSecondary}
-      {@const Tool = screenFor(panes.tool).icon}
       <TooltipIconButton label={t("PANEL_RIGHT")} shortcut="panel.right" onclick={() => panes.setKind(panes.tool)}>
-        <Tool />
+        <tool.icon />
       </TooltipIconButton>
     {/if}
   {:else}

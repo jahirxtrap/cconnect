@@ -147,13 +147,10 @@
       </div>
   </Pressable>
 
-  {#if updater.progress !== null}
-    <div class="px-4 py-3">
+  <div class="flex flex-col gap-2.5 px-4 py-3">
+    {#if updater.progress !== null}
       <LinearProgress value={updater.progress} />
-    </div>
-  {/if}
-
-  <div class="px-4 py-3">
+    {/if}
     <ActionButton
       class="w-full"
       text={updateLabel}
