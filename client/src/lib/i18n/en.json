@@ -233,6 +233,8 @@
   "DRIVE_ENVIRONMENTS_OTHER": "{1} environments",
   "DRIVE_NOTES_ONE": "{1} note",
   "DRIVE_NOTES_OTHER": "{1} notes",
+  "DRIVE_BACKGROUNDS_ONE": "{1} background",
+  "DRIVE_BACKGROUNDS_OTHER": "{1} backgrounds",
   "DRIVE_PASSWORD": "Password",
   "DRIVE_PASSWORD_FIELD": "Password",
   "DRIVE_PASSWORD_HINT": "It encrypts the copy. If you forget it, that copy cannot be restored.",

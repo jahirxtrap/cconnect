@@ -230,6 +230,7 @@
   "DRIVE_NO_COPIES": "コピーはありません",
   "DRIVE_ENVIRONMENTS_OTHER": "環境 {1} 件",
   "DRIVE_NOTES_OTHER": "ノート {1} 件",
+  "DRIVE_BACKGROUNDS_OTHER": "背景 {1} 個",
   "DRIVE_PASSWORD": "パスワード",
   "DRIVE_PASSWORD_FIELD": "パスワード",
   "DRIVE_PASSWORD_HINT": "このパスワードでコピーを暗号化します。忘れると、そのコピーは復元できません。",

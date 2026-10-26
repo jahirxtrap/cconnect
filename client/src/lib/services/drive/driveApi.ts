@@ -22,9 +22,11 @@ export interface CopyContents {
   encrypted: boolean;
   environments: number;
   notes: number;
+  backgrounds: number;
 }
 
-export interface DriveCopy extends CopyContents {
+export interface DriveCopy extends Omit<CopyContents, "backgrounds"> {
+  backgrounds: number | null;
   id: string;
   name: string;
   createdAt: number;
@@ -79,6 +81,7 @@ const toCopy = (file: DriveFile): DriveCopy => {
     encrypted: marks.encrypted === "1",
     environments: Number(marks.environments ?? 0),
     notes: Number(marks.notes ?? 0),
+    backgrounds: marks.backgrounds === undefined ? null : Number(marks.backgrounds),
   };
 };
 
@@ -147,6 +150,7 @@ export const uploadCopy = async (
       encrypted: contents.encrypted ? "1" : "0",
       environments: String(contents.environments),
       notes: String(contents.notes),
+      backgrounds: String(contents.backgrounds),
     },
   };
   const body = [

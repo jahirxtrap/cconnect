@@ -233,6 +233,8 @@
   "DRIVE_ENVIRONMENTS_OTHER": "{1} Umgebungen",
   "DRIVE_NOTES_ONE": "{1} Notiz",
   "DRIVE_NOTES_OTHER": "{1} Notizen",
+  "DRIVE_BACKGROUNDS_ONE": "{1} Hintergrund",
+  "DRIVE_BACKGROUNDS_OTHER": "{1} Hintergründe",
   "DRIVE_PASSWORD": "Passwort",
   "DRIVE_PASSWORD_FIELD": "Passwort",
   "DRIVE_PASSWORD_HINT": "Es verschlüsselt die Sicherung. Vergisst du es, lässt sich diese Sicherung nicht wiederherstellen.",

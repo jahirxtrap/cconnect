@@ -233,6 +233,8 @@
   "DRIVE_ENVIRONMENTS_OTHER": "{1} environnements",
   "DRIVE_NOTES_ONE": "{1} note",
   "DRIVE_NOTES_OTHER": "{1} notes",
+  "DRIVE_BACKGROUNDS_ONE": "{1} fond",
+  "DRIVE_BACKGROUNDS_OTHER": "{1} fonds",
   "DRIVE_PASSWORD": "Mot de passe",
   "DRIVE_PASSWORD_FIELD": "Mot de passe",
   "DRIVE_PASSWORD_HINT": "Il chiffre la copie. Si vous l’oubliez, cette copie ne pourra pas être restaurée.",

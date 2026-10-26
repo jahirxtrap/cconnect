@@ -233,6 +233,8 @@
   "DRIVE_ENVIRONMENTS_OTHER": "{1} ambientes",
   "DRIVE_NOTES_ONE": "{1} nota",
   "DRIVE_NOTES_OTHER": "{1} notas",
+  "DRIVE_BACKGROUNDS_ONE": "{1} plano de fundo",
+  "DRIVE_BACKGROUNDS_OTHER": "{1} planos de fundo",
   "DRIVE_PASSWORD": "Senha",
   "DRIVE_PASSWORD_FIELD": "Senha",
   "DRIVE_PASSWORD_HINT": "Ela criptografa a cópia. Se você esquecê-la, essa cópia não poderá ser restaurada.",

@@ -73,6 +73,7 @@ class DriveBackups {
       encrypted: options.password !== "",
       environments: counts.environments,
       notes: counts.notes,
+      backgrounds: counts.backgrounds,
     });
     if (copy) {
       this.copies = [copy, ...this.copies];

@@ -230,6 +230,7 @@
   "DRIVE_NO_COPIES": "暂无备份",
   "DRIVE_ENVIRONMENTS_OTHER": "{1} 个环境",
   "DRIVE_NOTES_OTHER": "{1} 条笔记",
+  "DRIVE_BACKGROUNDS_OTHER": "{1} 个背景",
   "DRIVE_PASSWORD": "密码",
   "DRIVE_PASSWORD_FIELD": "密码",
   "DRIVE_PASSWORD_HINT": "密码用于加密备份。如果忘记密码，将无法恢复该备份。",

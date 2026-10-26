@@ -230,6 +230,7 @@
   "DRIVE_NO_COPIES": "백업 없음",
   "DRIVE_ENVIRONMENTS_OTHER": "환경 {1}개",
   "DRIVE_NOTES_OTHER": "메모 {1}개",
+  "DRIVE_BACKGROUNDS_OTHER": "배경 {1}개",
   "DRIVE_PASSWORD": "비밀번호",
   "DRIVE_PASSWORD_FIELD": "비밀번호",
   "DRIVE_PASSWORD_HINT": "백업을 암호화합니다. 비밀번호를 잊으면 해당 백업을 복원할 수 없습니다.",

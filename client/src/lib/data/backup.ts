@@ -44,6 +44,7 @@ export interface BackupOptions {
 export interface BackupCounts {
   environments: number;
   notes: number;
+  backgrounds: number;
 }
 
 const encodedBlob = async (blob: Blob | null) =>
@@ -295,7 +296,11 @@ const readBackup = (raw: string): Backup | null => {
 
 export const backupCounts = (raw: string): BackupCounts => {
   const backup = readBackup(raw);
-  return { environments: backup?.environments.length ?? 0, notes: backup?.notes?.length ?? 0 };
+  return {
+    environments: backup?.environments.length ?? 0,
+    notes: backup?.notes?.length ?? 0,
+    backgrounds: backup?.backgrounds.length ?? 0,
+  };
 };
 
 export const importSettings = (raw: string): boolean => {

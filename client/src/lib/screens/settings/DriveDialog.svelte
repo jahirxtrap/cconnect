@@ -46,6 +46,7 @@
       formatDateShort(copy.createdAt),
       plural("DRIVE_ENVIRONMENTS", copy.environments),
       plural("DRIVE_NOTES", copy.notes),
+      copy.backgrounds !== null && plural("DRIVE_BACKGROUNDS", copy.backgrounds),
     );
 
   const dismiss = () => {
