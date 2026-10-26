@@ -41,8 +41,10 @@ const connectors = new Map<string, TerminalConnector>();
 class TerminalTabs {
   #items = $state<TerminalTab[]>([]);
   #activeId = $state<string | null>(null);
+  #unlocked = $state<Record<string, boolean>>({});
 
   readonly environment = $derived(backend.active?.id ?? "");
+  readonly unlocked = $derived<boolean | null>(this.#unlocked[this.environment] ?? null);
   readonly items = $derived(this.#items.filter((tab) => this.#reachable(tab)));
   readonly activeId = $derived(
     this.items.some((tab) => tab.id === this.#activeId) ? this.#activeId : (this.items[0]?.id ?? null),
@@ -67,6 +69,10 @@ class TerminalTabs {
       { id: session.id, title: session.title, local: true, pty: session.pty, shell: session.shell },
       (hooks, cols, rows) => localLink(session.id, key, hooks, cols, rows),
     );
+  }
+
+  markUnlocked(environment: string, value: boolean) {
+    this.#unlocked = { ...this.#unlocked, [environment]: value };
   }
 
   titleOf(tab: TerminalTab) {

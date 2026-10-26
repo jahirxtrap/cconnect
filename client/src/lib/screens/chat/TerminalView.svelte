@@ -63,12 +63,13 @@
     focusActive();
   };
 
-  let unlocked = $state<boolean | null>(null);
+  const unlocked = $derived(terminalTabs.unlocked);
 
   const refresh = async () => {
     if (!online) return;
+    const environment = terminalTabs.environment;
     const listed = await listTerminals();
-    unlocked = listed !== null;
+    terminalTabs.markUnlocked(environment, listed !== null);
     if (!listed) return;
     sessions = listed;
     terminalTabs.sync(listed);

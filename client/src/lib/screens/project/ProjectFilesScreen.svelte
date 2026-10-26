@@ -476,22 +476,27 @@
 
   const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
 
+  const remember = () => {
+    if (!compact || !placed) return;
+    rememberProject(placed, {
+      children,
+      expanded,
+      path: opened.path,
+      changed,
+      repos,
+      repoRoot,
+      tracked,
+      locked,
+    });
+  };
+
+  $effect(() => () => untrack(remember));
+
   $effect(() => {
     const target = slot;
     if (!projectKey || target === placed) return;
     untrack(() => {
-      if (compact && placed) {
-        rememberProject(placed, {
-          children,
-          expanded,
-          path: opened.path,
-          changed,
-          repos,
-          repoRoot,
-          tracked,
-          locked,
-        });
-      }
+      remember();
       placed = target;
       results = null;
       picked = {};

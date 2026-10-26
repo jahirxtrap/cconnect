@@ -5,5 +5,5 @@ const listings = new Map<string, SharedEntry[]>();
 export const recallShared = (slot: string): SharedEntry[] | undefined => listings.get(slot);
 
 export const rememberShared = (slot: string, entries: SharedEntry[]) => {
-  if (entries.length) listings.set(slot, entries);
+  listings.set(slot, entries);
 };

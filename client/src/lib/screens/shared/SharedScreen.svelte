@@ -875,12 +875,18 @@
 
   let listed = "";
 
+  const remember = () => {
+    if (compact && listed && loaded) rememberShared(listed, entries);
+  };
+
+  $effect(() => () => untrack(remember));
+
   $effect(() => {
     const environment = backend.activeId;
     const current = archive;
     const slot = `${environment ?? ""}|${current ?? ""}|${archiveDir}|${path}`;
     untrack(() => {
-      if (compact && listed) rememberShared(listed, entries);
+      remember();
       listed = slot;
       exitSelection();
       endGesture();

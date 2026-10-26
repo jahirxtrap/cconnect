@@ -10,6 +10,7 @@
   import ShieldOff from "@lucide/svelte/icons/shield-off";
   import X from "@lucide/svelte/icons/x";
   import { Portal } from "bits-ui";
+  import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { screenFor } from "$lib/app/screens";
   import { panes } from "$lib/screens/chat/panes.svelte";
@@ -21,6 +22,7 @@
   import BrowserSideSwitch from "./BrowserSideSwitch.svelte";
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
   import { BrowserLayer, coverOf } from "./browserLayer";
+  import { rememberBrowser, takeBrowser } from "./browserMemory";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
     androidBrowsing,
@@ -38,6 +40,7 @@
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { settings, type BrowserFavorite } from "$lib/data/settings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import { isDesktop, isTouch, openExternal } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { store } from "$lib/platform/storage";
@@ -92,13 +95,7 @@
   let surface = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
   let addressBox = $state<HTMLElement | null>(null);
-  let connected = $state(false);
-  let ready = $state(false);
-  let cursor = $state("auto");
-  let side = $state<BrowserSide>(deviceBrowsing ? store.get<BrowserSide>(SIDE_KEY, "device") : "server");
-  let launching = $state(false);
-  let failed = $state(false);
-  let page = $state<BrowserState>({
+  const IDLE_PAGE: BrowserState = {
     available: true,
     running: false,
     url: "",
@@ -111,13 +108,23 @@
     pageHeight: 0,
     device: "",
     picking: false,
-  });
+  };
+
+  let connected = $state(false);
+  let dropped = $state(false);
+  let ready = $state(false);
+  let cursor = $state("auto");
+  let side = $state<BrowserSide>(deviceBrowsing ? store.get<BrowserSide>(SIDE_KEY, "device") : "server");
+  let launching = $state(false);
+  let failed = $state(false);
+  let page = $state<BrowserState>({ ...IDLE_PAGE });
   let address = $state("");
   let typing = $state(false);
   let dragging = $state(false);
   let link = $state.raw<BrowserLink | null>(null);
 
   let context: CanvasRenderingContext2D | null = null;
+  let lastFrame: ImageBitmap | null = null;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
 
   const onServer = $derived(side === "server");
@@ -160,6 +167,7 @@
     serverHome || (page.running ? blank(page.url) : !ready && !launching && page.available),
   );
   const atHome = $derived(onServer ? serverAtHome : deviceBrowser.atHome);
+  const framed = $derived(ready && !serverAtHome && !serverStatus.unavailable);
   const canGoBack = $derived(
     onServer
       ? page.canGoBack || (serverHome && page.running)
@@ -352,7 +360,8 @@
     }
     context ??= node.getContext("2d");
     context?.drawImage(bitmap, 0, 0);
-    bitmap.close();
+    if (lastFrame !== bitmap) lastFrame?.close();
+    lastFrame = bitmap;
   };
 
   const receive = (next: BrowserState) => {
@@ -363,13 +372,22 @@
   };
 
   $effect(() => {
+    const environment = backend.activeId ?? "";
     if (!surface) return;
+    untrack(() => {
+      const saved = takeBrowser(environment);
+      if (!saved) return;
+      page = saved.page;
+      serverHome = saved.home;
+      if (saved.frame) paint(saved.frame);
+    });
     const created = browserLink(
       {
         onFrame: paint,
         onState: receive,
         onConnected: (value) => {
           connected = value;
+          dropped = !value;
           if (!value) ready = false;
         },
         onCursor: (shape) => (cursor = shape),
@@ -388,9 +406,14 @@
     link = created;
     return () => {
       created.close();
+      rememberBrowser(environment, { page, home: serverHome, frame: lastFrame });
+      lastFrame = null;
       link = null;
       ready = false;
       connected = false;
+      dropped = false;
+      serverHome = false;
+      page = { ...IDLE_PAGE };
     };
   });
 
@@ -527,6 +550,8 @@
     if (page.activeTab || !canvas) return;
     context ??= canvas.getContext("2d");
     context?.clearRect(0, 0, canvas.width, canvas.height);
+    lastFrame?.close();
+    lastFrame = null;
   });
 
   $effect(() => {
@@ -888,7 +913,7 @@
     <canvas
       bind:this={canvas}
       tabindex="0"
-      class="max-h-full max-w-full bg-background outline-none {onServer ? '' : 'hidden'}"
+      class="max-h-full max-w-full bg-background outline-none {onServer ? (framed ? '' : 'invisible') : 'hidden'}"
       style="cursor: {page.picking ? 'crosshair' : cursor}"
       onpointerdown={(event) => {
         canvas?.focus();
@@ -930,7 +955,12 @@
     {:else if serverStatus.unavailable}
       <ServerUnavailable class="absolute inset-0 bg-background" />
     {:else if !ready && !connected}
-      <EmptyState icon={BROWSER_ICON} text={t("CONNECTION_ERROR")} class="absolute inset-0 bg-background" />
+      <EmptyState
+        loading={!dropped}
+        icon={BROWSER_ICON}
+        text={t("CONNECTION_ERROR")}
+        class="absolute inset-0 bg-background"
+      />
     {:else if !ready && failed}
       <EmptyState
         icon={BROWSER_ICON}
