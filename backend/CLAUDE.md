@@ -189,7 +189,9 @@ Mods ride on the CLI's internal UI protocol (`services/mods.py`): `ui_attach` as
 `desktop` surface, `ui_render` per site, and the CLI's notifications, which fold into one
 `Surface` per live session and reach the app as the `mods` snapshot. `mod_surfaces`, on by
 default, gates all of it. What a mod writes to the transcript shows in any chat, while panes and the band
-need the resident CLI. The protocol is not public and moves between CLI versions, so every
+need the resident CLI. A chat without one keeps its last surface between turns and no CLI is left
+to redraw it, so uninstalling or disabling a plugin drops what it left there (`forget_plugin`)
+once the turn that still loads it ends. The protocol is not public and moves between CLI versions, so every
 request goes through `mods.request`, which turns a failure into `None` instead of raising.
 
 ## Settings and visibility
