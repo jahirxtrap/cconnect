@@ -88,6 +88,11 @@ previews). Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list
 `WS /api/browser/ws` (frames and state of the server's Chromium; `watch` decides whether it
 runs, and an opening without it watches, which is what an app older than 1.10.3 sends).
 
+A route that answers with a file uses `FILE_HEADERS` (`core/responses.py`): without
+`Cache-Control: no-cache`, the `last-modified` of a `FileResponse` lets a browser keep a copy
+for a tenth of the file's age without asking, and a file rewritten under the same name shows
+its old version.
+
 Transcript slices are cursor-based (`before_index`), and while a live session still has
 events to replay the tail is cut at its `turn_start_index` so the same turn never arrives
 twice — once from disk and once from the replay.

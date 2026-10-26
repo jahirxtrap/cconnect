@@ -142,7 +142,10 @@ Two sides share one panel and one tab strip, switched by `BrowserSideSwitch`:
   app's, placed every frame over the panel's surface; a surface that is not visible (the
   phone keeps its side panel mounted under `invisible`) gets no page. On Windows the app's
   region is carved around it (`browserLayer.ts`), so menus and dialogs float over the live
-  page; elsewhere the page hides while something covers it.
+  page; elsewhere the page hides while something covers it. On Linux Tauri packs a child
+  webview into the window's `GtkBox`, under the app, and ignores its bounds, so
+  `webkit::place` moves it into a `GtkFixed` laid over the main webview and places it there
+  on every `browser_bounds`.
 - **Server** (`services/browserSocket.ts`): the backend's Chromium, streamed as frames. It
   only runs while the socket `watch`es, so opening the panel does not start it.
 
@@ -160,6 +163,36 @@ Linux (`webkit.rs`); local and tailnet hosts are never blocked. A proxy change n
 `browser_restart`, since WebView2 only takes it as a launch argument. A picked element
 travels in the prompt as `<browser-element>` (`data/pickedElements.ts`) and shows as a chip;
 picking is left out on touch screens.
+
+## Server files (`services/mediaSource.ts`, `services/pageSource.ts`)
+
+`fetchFile` is the one way to read a file the server serves: the profile comes from
+`sharedProfileOf`, the headers from `fileHeaders` (the security key only on the project file
+routes), and `cache: "no-cache"`, or a file rewritten under the same name comes back from
+Chromium's heuristic cache. `mediaSrc` and `posterSrc` hand it to an element as an object
+URL; nothing loads a server URL straight into `src`. HTML goes through `ui/PageFrame.svelte`
+(`pageSrc`, the themed scrollbar and the sandbox, the same in the chat and the preview): a
+`blob:` document inherits the app's CSP and loses its scripts, styles and fonts, so in the apps
+`preview_open` registers the page and the iframe loads it from the `preview` protocol
+(`src-tauri/src/preview.rs`) — an origin of its own, without CSP and out of reach of the
+app, with the files of its folder proxied from the server. The web has no CSP and keeps
+`blob:`, without `allow-same-origin`. `tauri dev` applies no CSP at all, so anything about
+it is checked in a build.
+
+Chat media blocks share `.media-frame` (`ui/mediaFrame.ts`): a transparent border pulls the
+content's clip a pixel in and an inset `outline` draws the line over the content, or light
+content bleeds into the border along the curve.
+
+## PDF (`screens/shared/PdfView.svelte`)
+
+pdf.js's own `PDFViewer` renders every PDF except the full preview on a wide desktop window,
+which keeps the system's viewer and reloads it once a resize settles, since Chromium does not
+refit a PDF to its iframe. pdf.js floors a page to a multiple of `--scale-round-x`, taken from
+the device pixel ratio, so the canvas stays one to one with the screen: never override it, a
+stretched page goes soft. The fit takes the next multiple up and centres the page, and the
+frame clips the extra pixel or two. The user's zoom is its own state, never derived from the
+rounded scale, and while a resize runs the page repaints every 150 ms if it is on screen and
+once 250 ms after it stops.
 
 ## Image preview (`lib/ui/ZoomPane.svelte`)
 
