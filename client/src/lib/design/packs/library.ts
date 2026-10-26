@@ -1,3 +1,4 @@
+import { chatBackground } from "$lib/data/chatBackground.svelte";
 import { forgetSyntax } from "$lib/markdown/highlighter";
 import { theme } from "../theme.svelte";
 import { openArchive, writeArchive } from "./archive";
@@ -5,7 +6,7 @@ import { dropFaces } from "./faces";
 import type { Pack } from "./model";
 import { readPack, type PackSource } from "./reader";
 import { packs } from "./registry.svelte";
-import { PACK_EXTENSION, PACK_MIME, THEME_KINDS } from "./schema";
+import { FONT_KINDS, PACK_EXTENSION, PACK_MIME, THEME_KINDS } from "./schema";
 import { archiveBlob, dropArchive, sourceOf, staleCatalog, storeArchive, writeCatalog } from "./storage";
 
 export type PackStanding = "new" | "same" | "newer" | "older";
@@ -90,13 +91,26 @@ export const exportPack = async (pack: Pack): Promise<Blob | null> => {
 export const packSource = (pack: Pack): Promise<PackSource | null> =>
   pack.builtin ? Promise.resolve(null) : sourceOf(pack.info.id);
 
-export const canUsePack = (pack: Pack): boolean =>
-  pack.themes.length > 0 &&
-  THEME_KINDS.every((kind) => pack.themes.filter((item) => item.kind === kind).length <= 1);
+export const canUsePack = (pack: Pack): boolean => pack.info.use.length > 0;
+
+const firstUsed = <T extends { id: string }>(use: string[], items: readonly T[]): T | undefined =>
+  use.map((id) => items.find((item) => item.id === id)).find((item) => item !== undefined);
 
 export const usePack = (pack: Pack) => {
-  for (const item of pack.themes) theme.setTheme(item.kind, item.id);
-  if (!pack.themes.some((item) => item.kind === theme.modeKind)) theme.setMode(pack.themes[0].kind);
+  const use = pack.info.use;
+  const themes = THEME_KINDS.flatMap((kind) => firstUsed(use, pack.themes.filter((item) => item.kind === kind)) ?? []);
+  for (const item of themes) theme.setTheme(item.kind, item.id);
+  if (themes.length && !themes.some((item) => item.kind === theme.modeKind)) theme.setMode(themes[0].kind);
+  const terminal = firstUsed(use, pack.terminals);
+  if (terminal) theme.setTerminal(terminal.id);
+  const accent = firstUsed(use, pack.accents);
+  if (accent) theme.setAccent(accent.id);
+  for (const kind of FONT_KINDS) {
+    const font = firstUsed(use, pack.fonts.filter((item) => item.kind === kind));
+    if (font) theme.setFont(kind, font.id);
+  }
+  const background = firstUsed(use, pack.backgrounds);
+  if (background) chatBackground.apply(background.id, {});
 };
 
 export const restorePacks = async () => {

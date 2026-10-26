@@ -17,7 +17,7 @@ MIME: str = SCHEMA["mime"]
 _COLOR = re.compile(r"^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
 _LOCAL_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _FONT_STYLE = re.compile(r"^[a-z ]*$", re.IGNORECASE)
-_MANIFEST_FIELDS = {"schema", "id", "name", "version", "author", "contributors", "description", "preview"}
+_MANIFEST_FIELDS = {"schema", "id", "name", "version", "author", "contributors", "description", "preview", "use"}
 _THEME_FIELDS = {"name", "kind", "extends", "accent", "syntax", "colors"}
 _TERMINAL_FIELDS = {"name", "colors"}
 _ACCENT_FIELDS = {"id", "name", "color"}
@@ -192,6 +192,9 @@ def _manifest(archive: _Archive) -> dict:
         raise PackFormatError("reference", MANIFEST, "preview", preview)
     if preview is not None and _extension(preview) not in SCHEMA["imageFormats"]:
         raise PackFormatError("format", preview)
+    use = fields.get("use", [])
+    if not isinstance(use, list) or any(not isinstance(item, str) or not item.strip() for item in use):
+        raise PackFormatError("field", MANIFEST, "use")
     return {
         "id": pack_id,
         "name": name,
@@ -200,10 +203,11 @@ def _manifest(archive: _Archive) -> dict:
         "contributors": [item.strip() for item in contributors],
         "description": _text(fields, "description", MANIFEST),
         "preview": preview,
+        "use": [item.strip() for item in use],
     }
 
 
-def _themes(archive: _Archive) -> int:
+def _themes(archive: _Archive) -> set[str]:
     entries = _entries(archive, "themes")
     own_themes = {local for _, local in entries}
     own_syntax = {local for _, local in _entries(archive, "syntax")}
@@ -232,17 +236,17 @@ def _themes(archive: _Archive) -> int:
                 raise PackFormatError("cycle", path)
             trail.add(current)
             current = parents.get(current)
-    return len(entries)
+    return own_themes
 
 
-def _terminals(archive: _Archive) -> int:
+def _terminals(archive: _Archive) -> set[str]:
     entries = _entries(archive, "terminal")
     for path, _local in entries:
         fields = _fields(archive, path)
         _only(fields, _TERMINAL_FIELDS, path)
         _text(fields, "name", path, required=True)
         _colors(fields, SCHEMA["terminal"], path)
-    return len(entries)
+    return {local for _, local in entries}
 
 
 def _syntax_colors(value, path: str, key: str):
@@ -270,9 +274,9 @@ def _syntax(archive: _Archive) -> int:
     return len(entries)
 
 
-def _accents(archive: _Archive) -> int:
+def _accents(archive: _Archive) -> set[str]:
     if _ACCENTS_FILE not in archive.paths:
-        return 0
+        return set()
     entries = archive.json(_ACCENTS_FILE)
     if not isinstance(entries, list):
         raise PackFormatError("json", _ACCENTS_FILE)
@@ -290,10 +294,10 @@ def _accents(archive: _Archive) -> int:
             raise PackFormatError("duplicate", path)
         seen.add(local)
         _color(entry.get("color"), path, "color")
-    return len(entries)
+    return seen
 
 
-def _fonts(archive: _Archive) -> int:
+def _fonts(archive: _Archive) -> dict[str, str]:
     families: dict[str, str] = {}
     for path in archive.paths:
         if not path.startswith("fonts/"):
@@ -307,10 +311,10 @@ def _fonts(archive: _Archive) -> int:
         if families.get(key, parts[2]) != parts[2]:
             raise PackFormatError("duplicate", path)
         families[key] = parts[2]
-    return len(families)
+    return families
 
 
-def _backgrounds(archive: _Archive) -> int:
+def _backgrounds(archive: _Archive) -> set[str]:
     images, settings = {}, {}
     for path in archive.paths:
         if not path.startswith("backgrounds/"):
@@ -339,22 +343,32 @@ def _backgrounds(archive: _Archive) -> int:
                 raise PackFormatError("field", path, key)
         if "fit" in fields and fields["fit"] not in SCHEMA["backgroundFits"]:
             raise PackFormatError("field", path, "fit")
-    return len(images)
+    return set(images)
 
 
 def read_pack(data: bytes) -> dict:
     archive = _Archive(data)
     info = _manifest(archive)
+    themes = _themes(archive)
+    terminals = _terminals(archive)
+    syntax = _syntax(archive)
+    accents = _accents(archive)
+    fonts = _fonts(archive)
+    backgrounds = _backgrounds(archive)
     contents = {
-        "themes": _themes(archive),
-        "terminals": _terminals(archive),
-        "syntax": _syntax(archive),
-        "accents": _accents(archive),
-        "fonts": _fonts(archive),
-        "backgrounds": _backgrounds(archive),
+        "themes": len(themes),
+        "terminals": len(terminals),
+        "syntax": syntax,
+        "accents": len(accents),
+        "fonts": len(fonts),
+        "backgrounds": len(backgrounds),
     }
     if not any(contents.values()):
         raise PackFormatError("empty")
+    usable = themes | terminals | accents | {key.partition("/")[2] for key in fonts} | backgrounds
+    for local in info["use"]:
+        if local not in usable:
+            raise PackFormatError("reference", MANIFEST, "use", local)
     return {**info, "contents": contents}
 
 

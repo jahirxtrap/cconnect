@@ -1,7 +1,7 @@
 import { strFromU8 } from "fflate";
 import { rgbOf, withAlpha } from "../accents";
 import { BUILTIN_BACKGROUNDS } from "../backgrounds";
-import { BUILTIN_FONTS } from "../fonts";
+import { BUILTIN_FONTS, DEFAULT_FONTS, SYSTEM_FAMILIES, SYSTEM_FONT } from "../fonts";
 import { DEFAULT_TERMINAL, DEFAULT_THEMES } from "../themes";
 import { BUILTIN_PACKS, BUILTIN_SYNTAX, EXTRAS_PACK } from "./builtin";
 import type { Pack, PackAccent, PackBackground, PackFont, PackTerminal, PackTheme, ThemeFile } from "./model";
@@ -130,9 +130,14 @@ class Packs {
     return this.fonts.filter((font) => font.kind === kind);
   }
 
+  systemFont(kind: FontKind): PackFont {
+    return { id: SYSTEM_FONT, pack: "", kind, name: null, family: SYSTEM_FAMILIES[kind], face: null, files: [] };
+  }
+
   fontOf(kind: FontKind, id: string): PackFont {
     const fonts = this.fontsOf(kind);
-    return fonts.find((font) => font.id === id) ?? fonts[0];
+    const find = (wanted: string) => (wanted === SYSTEM_FONT ? this.systemFont(kind) : fonts.find((font) => font.id === wanted));
+    return find(id) ?? find(DEFAULT_FONTS[kind]) ?? fonts[0] ?? this.systemFont(kind);
   }
 
   async loadSyntax(id: string): Promise<unknown> {

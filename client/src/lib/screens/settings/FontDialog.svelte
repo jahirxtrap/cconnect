@@ -56,7 +56,7 @@
   <TabPager selected={FONT_KINDS.indexOf(kind)} onSelect={(index) => (kind = FONT_KINDS[index])} class="min-h-0">
     {#each FONT_KINDS as value (value)}
       <div use:viewportScrollbar class="{TAB_PAGE_CLASS} {DIALOG_PAGE_CLASS}">
-        {#each packs.fontsOf(value) as font (font.id)}
+        {#each [packs.systemFont(value), ...packs.fontsOf(value)] as font (font.id)}
           <DialogSelectItem
             label={fontLabel(font)}
             subtitle={packLabel(font.pack)}

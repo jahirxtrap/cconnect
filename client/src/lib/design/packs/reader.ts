@@ -74,7 +74,7 @@ type Entry = [path: string, local: string];
 const COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const LOCAL_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FONT_STYLE = /^[a-z ]*$/i;
-const MANIFEST_FIELDS = ["schema", "id", "name", "version", "author", "contributors", "description", "preview"];
+const MANIFEST_FIELDS = ["schema", "id", "name", "version", "author", "contributors", "description", "preview", "use"];
 const THEME_FIELDS = ["name", "kind", "extends", "accent", "syntax", "colors"];
 const TERMINAL_FIELDS = ["name", "colors"];
 const ACCENT_FIELDS = ["id", "name", "color"];
@@ -157,6 +157,10 @@ const readInfo = (source: PackSource): PackInfo => {
   const preview = textOf(fields, "preview", MANIFEST);
   if (preview !== null && !source.paths.includes(preview)) throw new PackError("reference", MANIFEST, "preview", preview);
   if (preview !== null && !IMAGE_FORMATS.includes(extensionOf(preview))) throw new PackError("format", preview);
+  const use = fields.use ?? [];
+  if (!Array.isArray(use) || use.some((entry) => typeof entry !== "string" || !entry.trim())) {
+    throw new PackError("field", MANIFEST, "use");
+  }
   return {
     id,
     name,
@@ -165,6 +169,7 @@ const readInfo = (source: PackSource): PackInfo => {
     contributors: (contributors as string[]).map((entry) => entry.trim()),
     description: textOf(fields, "description", MANIFEST),
     preview,
+    use: (use as string[]).map((entry) => entry.trim()),
   };
 };
 
@@ -355,5 +360,11 @@ export const readPack = (source: PackSource, builtin: boolean, known: KnownIds):
   if (!builtin && contents.every((items) => !items.length)) {
     throw new PackError("empty");
   }
-  return result;
+  const usable = new Set(
+    [result.themes, result.terminals, result.accents, result.fonts, result.backgrounds].flat().map((item) => item.id),
+  );
+  for (const local of info.use) {
+    if (!usable.has(qualify(local))) throw new PackError("reference", MANIFEST, "use", local);
+  }
+  return { ...result, info: { ...info, use: info.use.map(qualify) } };
 };

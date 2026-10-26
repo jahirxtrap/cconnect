@@ -20,23 +20,24 @@ export const BUILTIN_FONTS: Record<FontKind, readonly BuiltinFont[]> = {
     { id: "geist", name: "Geist Sans", family: '"Geist Variable"' },
     { id: "plex", name: "IBM Plex Sans", family: '"IBM Plex Sans Variable"' },
     { id: "inter", name: "Inter", family: '"Inter Variable"' },
-    { id: SYSTEM_FONT, name: null, family: "system-ui" },
   ],
   mono: [
     { id: "geist", name: "Geist Mono", family: '"Geist Mono Variable"' },
     { id: "plex", name: "IBM Plex Mono", family: '"IBM Plex Mono"' },
     { id: "jetbrains", name: "JetBrains Mono", family: '"JetBrains Mono Variable"' },
-    { id: SYSTEM_FONT, name: null, family: "ui-monospace, monospace" },
   ],
-  symbols: [
-    { id: "dejavu", name: "DejaVu Sans", family: '"DejaVu Sans"' },
-    { id: SYSTEM_FONT, name: null, family: '"Segoe UI Symbol", "Apple Symbols"' },
-  ],
+  symbols: [{ id: "dejavu", name: "DejaVu Sans", family: '"DejaVu Sans"' }],
   emoji: [
-    { id: SYSTEM_FONT, name: null, family: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"' },
     { id: "flat", name: "Fluent Emoji Flat", family: '"Fluent Emoji Flat"' },
     { id: "color", name: "Fluent Emoji Color", family: '"Fluent Emoji Color"' },
   ],
+};
+
+export const SYSTEM_FAMILIES: Record<FontKind, string> = {
+  text: "system-ui",
+  mono: "ui-monospace, monospace",
+  symbols: '"Segoe UI Symbol", "Apple Symbols"',
+  emoji: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"',
 };
 
 export const DEFAULT_FONTS: Record<FontKind, string> = { text: "geist", mono: "geist", symbols: "dejavu", emoji: SYSTEM_FONT };

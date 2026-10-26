@@ -302,7 +302,8 @@ All of that travels as a `.ccpack` pack. **Packs** installs one from a file or
 from those available on the server — Claude can write one for you and leave it
 there — and opening a `.ccpack` in the chat, in Shared, from the desktop or from
 any app on Android shows what it brings, to install, save, share or open
-elsewhere. From Samsung's My Files, use **Import pack** instead.
+elsewhere. When its author picked what to apply, **Use** puts all of it on at
+once. From Samsung's My Files, use **Import pack** instead.
 
 ## Mods
 

@@ -9,6 +9,7 @@ export interface PackInfo {
   contributors: string[];
   description: string | null;
   preview: string | null;
+  use: string[];
 }
 
 export interface ThemeFile {

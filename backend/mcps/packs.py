@@ -23,7 +23,7 @@ DESCRIPTION = (
 )
 
 _EXAMPLE = {
-    MANIFEST: {"schema": SCHEMA["schema"], "name": "Rose", "version": "1.0.0", "author": "Jane"},
+    MANIFEST: {"schema": SCHEMA["schema"], "name": "Rose", "version": "1.0.0", "author": "Jane", "use": ["rose-dark", "rose"]},
     "themes/rose-dark.json": {
         "name": "Rose Dark",
         "kind": "dark",
@@ -39,8 +39,11 @@ GUIDE = "\n".join(
         f"A pack is a folder with {MANIFEST} at its root, written anywhere, then stored with save and its "
         "absolute path; the app offers it from there, and export hands the user the .ccpack.",
         f"{MANIFEST}: " + '{"schema": ' + str(SCHEMA["schema"]) + ', "name", "version", "author"?, '
-        '"contributors"?: [names], "description"?, "id"?, "preview"?: path of an image in the pack}.',
+        '"contributors"?: [names], "description"?, "id"?, "preview"?: path of an image in the pack, '
+        '"use"?: [ids of this pack]}.',
         "Every other file is optional and takes its id from its name.",
+        "use is what the app's Use button applies, and without it the button is not offered: the first light "
+        "theme, dark theme, terminal, accent and background listed, and the first font of each kind.",
         f"themes/<id>.json: {{name, kind: {' or '.join(SCHEMA['themeKinds'])}, extends?: theme id, accent?, "
         "syntax?: syntax id, colors: {token: color}}. A token left out comes from extends, or from the default "
         "theme of its kind, and the -bg, hover and scrollbar tokens derive from their base color.",
@@ -55,7 +58,7 @@ GUIDE = "\n".join(
         "Colors are #rgb, #rgba, #rrggbb or #rrggbbaa.",
         f"Built-in themes to extend: {', '.join(sorted(KNOWN_THEMES))}.",
         f"Built-in syntax: {', '.join(sorted(KNOWN_SYNTAX))}.",
-        "Example, one dark theme with its accent:",
+        "Example, one dark theme with its accent, both applied by Use:",
         *(f"{path}: {json.dumps(content)}" for path, content in _EXAMPLE.items()),
     ]
 )
