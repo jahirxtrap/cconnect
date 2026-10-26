@@ -616,7 +616,10 @@ pub async fn browser_open<R: Runtime>(
         see_through(&app);
     }
     #[cfg(target_os = "linux")]
-    crate::webkit::route(&webview, &proxy);
+    {
+        crate::webkit::route(&webview, &proxy);
+        crate::webkit::place(&webview, x, y, width, height).map_err(|error| error.to_string())?;
+    }
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     crate::webkit::guard(&webview);
     Ok(())
@@ -791,14 +794,21 @@ pub async fn browser_bounds<R: Runtime>(
     width: f64,
     height: f64,
 ) -> Result<(), String> {
-    use tauri::{LogicalPosition, LogicalSize, Rect};
+    #[cfg(target_os = "linux")]
+    {
+        crate::webkit::place(&page(&app, &id)?, x, y, width, height).map_err(|error| error.to_string())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        use tauri::{LogicalPosition, LogicalSize, Rect};
 
-    page(&app, &id)?
-        .set_bounds(Rect {
-            position: LogicalPosition::new(x, y).into(),
-            size: LogicalSize::new(width, height).into(),
-        })
-        .map_err(|error| error.to_string())
+        page(&app, &id)?
+            .set_bounds(Rect {
+                position: LogicalPosition::new(x, y).into(),
+                size: LogicalSize::new(width, height).into(),
+            })
+            .map_err(|error| error.to_string())
+    }
 }
 
 #[tauri::command]

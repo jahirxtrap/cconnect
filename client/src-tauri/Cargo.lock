@@ -622,6 +622,7 @@ dependencies = [
  "block2",
  "cairo-rs",
  "discord-rich-presence",
+ "gtk",
  "jni",
  "objc2",
  "objc2-app-kit",

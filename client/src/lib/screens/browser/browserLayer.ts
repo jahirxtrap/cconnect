@@ -65,8 +65,8 @@ export class BrowserLayer {
     if (sent !== this.#sent) {
       this.#sent = sent;
       void browserCall<boolean>("browser_layer", { hole, radius, cover })
-        .then((supported) => (this.#supported = supported))
-        .catch(() => (this.#supported = false));
+        .then((supported) => this.#answer(supported))
+        .catch(() => this.#answer(false));
     }
     if (this.#supported === false) return;
     document.documentElement.classList.toggle(SEE_THROUGH, !!hole);
@@ -91,10 +91,19 @@ export class BrowserLayer {
   }
 
   clear() {
-    document.documentElement.classList.remove(SEE_THROUGH);
-    for (const node of [...this.#kept.keys()]) this.#restore(node);
+    this.#uncover();
     this.#sent = JSON.stringify([null, 0, []]);
     void browserCall("browser_layer", { hole: null, radius: 0, cover: [] }).catch(() => undefined);
+  }
+
+  #answer(supported: boolean) {
+    this.#supported = supported;
+    if (!supported) this.#uncover();
+  }
+
+  #uncover() {
+    document.documentElement.classList.remove(SEE_THROUGH);
+    for (const node of [...this.#kept.keys()]) this.#restore(node);
   }
 
   #restore(node: HTMLElement) {

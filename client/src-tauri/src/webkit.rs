@@ -65,6 +65,11 @@ pub fn route<R: Runtime>(webview: &Webview<R>, proxy: &crate::browser::Proxy) {
     let _ = webview.with_webview(move |platform| platform::route(platform, &mode, &url, &bypass));
 }
 
+#[cfg(target_os = "linux")]
+pub fn place<R: Runtime>(webview: &Webview<R>, x: f64, y: f64, width: f64, height: f64) -> tauri::Result<()> {
+    webview.with_webview(move |platform| platform::place(platform, x, y, width, height))
+}
+
 #[cfg(target_os = "macos")]
 mod platform {
     use std::cell::Cell;
@@ -332,7 +337,7 @@ mod platform {
     use webkit2gtk::gio::Cancellable;
     use webkit2gtk::{
         NetworkProxyMode, NetworkProxySettings, SettingsExt, SnapshotOptions, SnapshotRegion, UserContentManager,
-        UserContentManagerExt, WebContextExt, WebViewExt, WebsiteData, WebsiteDataManagerExt,
+        UserContentManagerExt, WebContextExt, WebView, WebViewExt, WebsiteData, WebsiteDataManagerExt,
         WebsiteDataManagerExtManual, WebsiteDataTypes,
     };
     use webkit2gtk_sys as sys;
@@ -528,6 +533,48 @@ mod platform {
                 manager.set_network_proxy_settings(NetworkProxyMode::Custom, Some(&mut settings));
             }
             _ => manager.set_network_proxy_settings(NetworkProxyMode::Default, None),
+        }
+    }
+
+    fn layer_of(view: &WebView) -> Option<gtk::Fixed> {
+        use gtk::prelude::*;
+
+        let parent = view.parent()?;
+        if let Ok(layer) = parent.clone().downcast::<gtk::Fixed>() {
+            return Some(layer);
+        }
+        let column = parent.downcast::<gtk::Box>().ok()?;
+        column.remove(view);
+        let children = column.children();
+        if let Some(overlay) = children.iter().find_map(|child| child.clone().downcast::<gtk::Overlay>().ok()) {
+            return overlay.children().into_iter().find_map(|child| child.downcast::<gtk::Fixed>().ok());
+        }
+        let main = children.into_iter().find(|child| child.is::<WebView>())?;
+        let overlay = gtk::Overlay::new();
+        let layer = gtk::Fixed::new();
+        column.remove(&main);
+        overlay.add(&main);
+        overlay.add_overlay(&layer);
+        overlay.set_overlay_pass_through(&layer, true);
+        column.pack_start(&overlay, true, true, 0);
+        layer.show();
+        overlay.show();
+        Some(layer)
+    }
+
+    pub fn place(platform: PlatformWebview, x: f64, y: f64, width: f64, height: f64) {
+        use gtk::prelude::*;
+
+        let view = platform.inner();
+        let Some(layer) = layer_of(&view) else {
+            return;
+        };
+        let (x, y) = (x.round() as i32, y.round() as i32);
+        view.set_size_request(width.round().max(1.0) as i32, height.round().max(1.0) as i32);
+        if view.parent().is_some() {
+            layer.move_(&view, x, y);
+        } else {
+            layer.put(&view, x, y);
         }
     }
 }

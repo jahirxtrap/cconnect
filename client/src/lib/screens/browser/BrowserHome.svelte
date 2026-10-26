@@ -43,60 +43,59 @@
   };
 </script>
 
-<div
-  use:viewportScrollbar
-  class="rounded-viewport scrollbar-thin absolute inset-0 overflow-y-auto bg-background [--c-card:var(--c-surface)]"
->
-  <div class="flex min-h-full flex-col items-center justify-center gap-8 p-6">
-    <AppTitle scale={TITLE_SCALE} />
-    <InputField
-      value={query}
-      oninput={(next) => (query = next)}
-      onkeydown={submit}
-      onClear={() => (query = "")}
-      placeholder={t("BROWSER_ADDRESS")}
-      singleLine
-      url
-      enterKeyHint="go"
-      class="w-full max-w-xl"
-    />
-    <div class="grid w-full max-w-xl grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
-      {#each favorites as favorite (favorite.url)}
-        <div class="relative">
-          <CardPanel
-            onclick={() => onSearch(favorite.url)}
-            onlongclick={() => (menuUrl = favorite.url)}
-            oncontextmenu={() => (menuUrl = favorite.url)}
-            class={TILE}
-          >
-            <span class={BADGE}>
-              <BrowserTabIcon src={favorite.icon} large />
-            </span>
-            <span class={LABEL}>{nameOf(favorite)}</span>
-          </CardPanel>
-          <div class="absolute top-1 right-1">
-            <PopupMenu
-              open={menuUrl === favorite.url}
-              label={t("MORE_OPTIONS")}
-              onOpenChange={(open) => (menuUrl = open ? favorite.url : null)}
+<div class="absolute inset-0 bg-background [--c-card:var(--c-surface)]">
+  <div use:viewportScrollbar class="rounded-viewport scrollbar-thin h-full overflow-y-auto">
+    <div class="flex min-h-full flex-col items-center justify-center gap-8 p-6">
+      <AppTitle scale={TITLE_SCALE} />
+      <InputField
+        value={query}
+        oninput={(next) => (query = next)}
+        onkeydown={submit}
+        onClear={() => (query = "")}
+        placeholder={t("BROWSER_ADDRESS")}
+        singleLine
+        url
+        enterKeyHint="go"
+        class="w-full max-w-xl"
+      />
+      <div class="grid w-full max-w-xl grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2">
+        {#each favorites as favorite (favorite.url)}
+          <div class="relative">
+            <CardPanel
+              onclick={() => onSearch(favorite.url)}
+              onlongclick={() => (menuUrl = favorite.url)}
+              oncontextmenu={() => (menuUrl = favorite.url)}
+              class={TILE}
             >
-              {#snippet triggerChild(props)}
-                <TooltipIconButton label={t("MORE_OPTIONS")} class="size-6" {...props}>
-                  <EllipsisVertical />
-                </TooltipIconButton>
-              {/snippet}
-              <MenuItem icon={Pencil} text={t("EDIT")} onclick={() => (editing = favorite)} />
-              <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => onRemove(favorite)} />
-            </PopupMenu>
+              <span class={BADGE}>
+                <BrowserTabIcon src={favorite.icon} large />
+              </span>
+              <span class={LABEL}>{nameOf(favorite)}</span>
+            </CardPanel>
+            <div class="absolute top-1 right-1">
+              <PopupMenu
+                open={menuUrl === favorite.url}
+                label={t("MORE_OPTIONS")}
+                onOpenChange={(open) => (menuUrl = open ? favorite.url : null)}
+              >
+                {#snippet triggerChild(props)}
+                  <TooltipIconButton label={t("MORE_OPTIONS")} class="size-6" {...props}>
+                    <EllipsisVertical />
+                  </TooltipIconButton>
+                {/snippet}
+                <MenuItem icon={Pencil} text={t("EDIT")} onclick={() => (editing = favorite)} />
+                <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => onRemove(favorite)} />
+              </PopupMenu>
+            </div>
           </div>
-        </div>
-      {/each}
-      <CardPanel onclick={onAdd} class={TILE}>
-        <span class={BADGE}>
-          <Plus size={ADD_ICON_SIZE} class="shrink-0" />
-        </span>
-        <span class={LABEL}>{t("ADD")}</span>
-      </CardPanel>
+        {/each}
+        <CardPanel onclick={onAdd} class={TILE}>
+          <span class={BADGE}>
+            <Plus size={ADD_ICON_SIZE} class="shrink-0" />
+          </span>
+          <span class={LABEL}>{t("ADD")}</span>
+        </CardPanel>
+      </div>
     </div>
   </div>
 </div>
