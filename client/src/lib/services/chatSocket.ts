@@ -51,6 +51,7 @@ export type ServerEvent =
       sessionId: string | null;
       project: string | null;
       cwd: string | null;
+      account: string | null;
       channel: string | null;
       running: boolean;
       resumed: boolean;
@@ -697,6 +698,7 @@ export class ChatSocket {
         sessionId: text(wire, "session_id"),
         project: text(wire, "project"),
         cwd: text(wire, "cwd"),
+        account: text(wire, "account"),
         channel,
         running: flag(wire, "running"),
         resumed: flag(wire, "resumed"),

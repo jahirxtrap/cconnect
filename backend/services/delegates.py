@@ -19,9 +19,9 @@ PRESETS = (
         "binary": "codex",
         "kind": "command",
         "name": "Codex",
-        "args": ["exec", "--sandbox", "read-only", "-"],
-        "edit_args": ["exec", "--sandbox", "workspace-write", "-"],
-        "bypass_args": ["exec", "--dangerously-bypass-approvals-and-sandbox", "-"],
+        "args": ["exec", "--skip-git-repo-check", "--sandbox", "read-only", "-"],
+        "edit_args": ["exec", "--skip-git-repo-check", "--sandbox", "workspace-write", "-"],
+        "bypass_args": ["exec", "--skip-git-repo-check", "--dangerously-bypass-approvals-and-sandbox", "-"],
     },
     {"binary": "codex-acp", "kind": "acp", "name": "Codex", "args": []},
     {
@@ -33,9 +33,14 @@ PRESETS = (
         "bypass_args": ["-p", TASK_TOKEN, "--dangerously-skip-permissions"],
     },
     {"binary": "copilot", "kind": "acp", "name": "Copilot", "args": ["--acp"]},
-    {"binary": "gemini", "kind": "acp", "name": "Gemini", "args": ["--acp"]},
     {"binary": "opencode", "kind": "acp", "name": "opencode", "args": ["acp"]},
-    {"binary": "cursor-agent", "kind": "command", "name": "Cursor", "args": ["-p", TASK_TOKEN]},
+    {
+        "binary": "cursor-agent",
+        "kind": "command",
+        "name": "Cursor",
+        "args": ["-p", "--trust", "--mode", "ask", TASK_TOKEN],
+        "bypass_args": ["-p", "--trust", "--force", TASK_TOKEN],
+    },
 )
 
 

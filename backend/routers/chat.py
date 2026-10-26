@@ -108,7 +108,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                 if state.cwd and resumed_sid else 0
             )
             resume_at = rewind_service.get_pending(resumed_sid)
-            resident = await session.resident()
+            resident = await session.resident(keep=adopted)
             try:
                 async for event in run_prompt(
                     resident=resident,
@@ -393,11 +393,9 @@ async def chat_ws(ws: WebSocket):
                 if existing is None and msg.resume:
                     by_session = registry.get_by_session(msg.resume)
                 existing = existing or by_session
-                reattaching = existing is not None
                 previous = session
-                if reattaching:
+                if existing is not None:
                     session = existing
-                    session.state.account = msg.account
                 else:
                     state = _Session()
                     resumed_cwd = sessions_service.find_session_cwd(msg.resume) if msg.resume else None
@@ -418,6 +416,7 @@ async def chat_ws(ws: WebSocket):
                     "session_id": session.state.session_id,
                     "project": sessions_service.project_key_for(session.state.cwd or ""),
                     "cwd": session.state.cwd,
+                    "account": accounts.resolve(session.state.account),
                     "channel": session.channel,
                     "running": session.running,
                     "activity": session.activity,

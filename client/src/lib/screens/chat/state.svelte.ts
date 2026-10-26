@@ -1215,11 +1215,15 @@ export class ChatState {
   setAccount(account: string) {
     const previous = this.effectiveAccount;
     const next = account || this.account;
-    this.onOverrides?.({ account });
-    this.accountOverride = account;
+    this.#storeAccount(account);
     this.#pushGeneration({ account: next });
     this.switchingAccount = this.#usesProvider(previous) || this.#usesProvider(next);
     void this.refreshServerInfo();
+  }
+
+  #storeAccount(account: string) {
+    this.onOverrides?.({ account });
+    this.accountOverride = account;
   }
 
   setStreamTokens(value: string) {
@@ -2158,6 +2162,7 @@ export class ChatState {
           };
         }
         this.#applyQueueSnapshot(event.queued);
+        if (event.account && event.account !== this.effectiveAccount) this.#storeAccount(event.account);
         void this.refreshServerInfo();
         this.#pumpQueue();
         if (this.#cutChannel !== null && event.channel !== this.#cutChannel && !event.resumed && !event.running) {

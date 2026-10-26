@@ -13,7 +13,7 @@ import uuid
 
 from loguru import logger
 
-from services import cli_info, mods, persistent_sessions, todos as todos_store, tool_props, visibility
+from services import accounts, cli_info, mods, persistent_sessions, todos as todos_store, tool_props, visibility
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -197,13 +197,15 @@ class LiveSession:
         except asyncio.CancelledError:
             return
 
-    async def resident(self):
-        """The standing client this chat writes to, created on demand while the mode is on."""
+    async def resident(self, keep=False):
+        """The standing client this chat writes to, created on demand while the mode is on, or the running one with ``keep``."""
         if not persistent_sessions.enabled():
             await self.release_resident()
             return None
         self._cancel_cooldown()
-        shape = persistent_sessions.shape_of(self.state.cwd, self.state.account, self.channel)
+        if keep and self.resident_alive:
+            return self._resident
+        shape = persistent_sessions.shape_of(self.state.cwd, accounts.resolve(self.state.account), self.channel)
         self._resident = await persistent_sessions.pool.take(self.channel, shape)
         self._resident.listener = self._emit
         self._resident.answerer = self._mod_answer

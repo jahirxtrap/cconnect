@@ -978,6 +978,12 @@ async def run_prompt(
                 if key not in carried_seen:
                     carried_seen.add(key)
                     events.append(carried)
+                    shown = vis()
+                    if carried["type"] == "notification" and shown["tool_use"] != "off":
+                        events.extend(
+                            {"type": "agent_result", "id": tool_use_id, **_q._agent_result(result, shown)}
+                            for tool_use_id, result in _q._notified_results(text).items()
+                        )
                 continue
             if not chips:
                 if adopt:
