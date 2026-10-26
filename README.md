@@ -182,7 +182,7 @@ aside.
 
 ## Connecting
 
-Open Settings → Connections and add the server: on mobile, scan the QR
+Open Settings → Environments and add the server: on mobile, scan the QR
 (top-right of the dialog) to autofill it from `--expose`'s output; on desktop,
 paste the address and token by hand. The connection becomes active immediately
 and the chat reconnects.
@@ -213,7 +213,7 @@ native apps keep plain HTTP for local backends.) Updating is just a reload. It
 is hosted at https://app.cconnect.dev/.
 
 It can also be installed, and then it opens in its own window without the
-browser bar. **Install app** in Settings → Information opens the browser's own
+browser bar. **Install app** in Settings → About opens the browser's own
 install dialog on Chrome and Edge; on the iPhone there is no such dialog, and no
 way to open one, so it shows the two steps instead: the share button in Safari's
 own bar, then *Add to Home Screen*. The entry disappears once it is installed.
@@ -221,7 +221,9 @@ own bar, then *Add to Home Screen*. The entry disappears once it is installed.
 ## In the chat
 
 Claude Code's own slash commands show up in the composer, plus a `/usage` view
-of your plan's token limits. A **quick chat** button opens a side panel for a
+of your plan's token limits. The context ring in the composer bar shows how full
+the context is, your session and weekly limits as they move, and how long the cache
+has left. A **quick chat** button opens a pane under the chat for a
 throwaway question — handy to ask something while a long task keeps running,
 without derailing it.
 
@@ -263,7 +265,9 @@ open: a message is answered without starting the CLI first, and commands can
 keep working in the background between turns. Each one holds its own process
 (around 400 MB of memory, not counting its MCP servers), so you choose how many
 chats may keep one at once and how long it waits after the last device closes the
-chat, and you can close it yourself from the chat's header.
+chat, and you can close it yourself from the chat's header. Whatever runs in the
+background is listed under **Running** in that header, each task with a button to
+stop it, and the session stays open while any of it is still working.
 
 Model, effort, permission mode, how much of each turn you see, when the context
 gets compacted, which of CLAUDE.md and AGENTS.md Claude reads as the project's
@@ -284,6 +288,22 @@ cycle). With both panels open a tab drags from one to the other as if the two
 bars were one. The tabs you had open come back when you reopen the app, each
 loading only once you switch to it.
 
+## Themes and packs
+
+**Theme** in the Client settings picks a light theme, a dark theme and the
+terminal colours apart — CConnect's own and two dozen more, from Claude and
+GitHub to Dracula and Nord — and **Appearance** chooses between them or follows
+the system. The accent colour can come from the theme, **Font** sets the
+typefaces for text, code, symbols and emoji, and **Chat background** puts the
+CConnect logo, a background from a pack or a picture of your own behind the
+conversation.
+
+All of that travels as a `.ccpack` pack. **Packs** installs one from a file or
+from those available on the server — Claude can write one for you and leave it
+there — and opening a `.ccpack` in the chat, in Shared, from the desktop or from
+any app on Android shows what it brings, to install, save, share or open
+elsewhere. From Samsung's My Files, use **Import pack** instead.
+
 ## Mods
 
 Claude Code mods are plugins that change what Claude shows and how it behaves:
@@ -294,11 +314,16 @@ in its own style instead of as terminal text, on desktop, web and Android alike.
 Panes open in the side panel's **Mods** view, one tab each, and take the same
 shortcuts as the chat's tabs. The band sits on top of the composer with the mods'
 status line under it, and its bar hides and shows it; with **Collapsible mods
-band** off in Settings that is left to a shortcut of your own. Turning **Mods**
-on in the server settings shows what mods report in any chat, while panes and
-the band also need persistent sessions, since the Claude process that stays
+band** off in Settings that is left to a shortcut of your own. **Mods**, on by
+default in the server settings, shows what mods report in any chat, while panes
+and the band also need persistent sessions, since the Claude process that stays
 running is the one drawing them. It rides on an internal Claude Code protocol
 that can change between versions, so it is marked experimental.
+
+**Reload plugins** under ⋮ in the Mods view, or `/reload-plugins` and
+`/reload-skills` in the composer, bring in what you changed without leaving the
+chat. Installing a plugin or switching one on or off reloads the open persistent
+chats on its own, and asks first when they would lose their cache.
 
 They install like any plugin, from a marketplace or from a folder. When Claude
 writes one for you in a chat, CConnect asks before turning it on for that
@@ -314,9 +339,9 @@ The shared folder grew into a full file manager. Browse `backend/data/shared/` f
 the app: upload files (with per-file progress you can cancel), create folders,
 rename, sort by name/date/type/size, and long-press (or right-click on desktop)
 to multi-select — then move, copy, share, delete, save to Downloads, or copy a
-file's PC path. Open a file to preview it in place — images with zoom, SVG,
-Markdown, and source code, and HTML in a web view on mobile or your browser on
-desktop — and delete it right from the preview if it's no longer needed.
+file's PC path. Open a file to preview it in place — images with zoom, video,
+audio, PDF, SVG, Markdown, source code and HTML — and delete it right from the
+preview if it's no longer needed.
 
 With the side panel open the preview lands there instead of covering the chat,
 so you can watch a file while Claude rewrites it — it reloads on its own when it
@@ -327,7 +352,7 @@ tap opens it, and the rest of the actions stay in the viewer's menu.
 Each project keeps its own folder inside it: what you upload from a chat and what
 Claude writes for you land there, so with a project pinned you see that project's
 files and nothing else. The three-dot menu filters what to show — images, video,
-audio, PDF, Markdown, code, archives.
+audio, PDF, Markdown, code, archives, packs.
 
 It works in both directions: drop a file into `backend/data/shared/` on the PC — or
 just ask Claude to write one there — and you get a tap-to-download link in the
@@ -388,7 +413,7 @@ PC:
   app — it rides along every conversation, on top of the system conventions in
   `backend/core/prompts/CCONNECT.md`.
 - See your **plan usage** at a glance — your subscription tier (Pro, Max 5x,
-  Max 20x) and a bar per limit window: current session, all models, and the
+  Max 20x) and a bar per limit window: current session, this week, and the
   per-model weekly caps, each with its reset time.
 - Keep several **Claude accounts** on one backend and switch between them.
 
@@ -474,6 +499,11 @@ agent so they're available out of the box from the phone:
   every chat — that's where the file-sharing and progress-check conventions
   live. Your personal additions go in `USER.md`, edited straight from the
   Claude screen.
+- **Delegation.** Claude can hand a task to another AI and get its answer
+  back — a model, Claude Code on another of your accounts, or an agent such as
+  Codex, Antigravity or Copilot. Add them in Settings → Delegation, or ask
+  Claude to add one; in a persistent chat the task can run in the background
+  while the conversation goes on.
 
 ## Discord
 
@@ -508,6 +538,9 @@ and each one degrades on its own.
   Every other format the file manager offers works out of the box.
 - **Ookla speedtest** — the speed test in Monitor → Network, which otherwise
   reports the CLI as unavailable.
+- **Codex, Antigravity, Copilot** or another agent — destinations for delegation.
+  Without any, Claude can still delegate to a model or to another of your Claude
+  accounts.
 
 ## Configuration
 
@@ -544,7 +577,12 @@ A search box finds any option by name or by its value, wherever it lives, and
 takes you to it. A **Privacy** section decides what leaves the machine: remote
 control from claude.ai, commit co-authorship, and session upload. The backend
 also updates itself from here, and on desktop the local server is started,
-restarted or stopped from the same place.
+restarted or stopped from the same place. On the desktop Settings opens in the
+centre beside your chats, the same as Claude, Monitor, Shared and Notes.
+
+The app comes in ten languages — English, Spanish, Brazilian Portuguese, French,
+German, Italian, Japanese, Simplified Chinese, Korean and Russian — and follows
+the system's unless you pick one under **Language**.
 
 ## Staying current
 
@@ -555,7 +593,8 @@ changelog), the server requirement, or the CLI update button. Release notes
 for both CConnect and Claude Code are readable in the app. Settings → Recovery
 exports your settings to copy them into another install, or keeps copies of them
 in your Google Drive (encrypted with a password if you give one, and with this
-device's notes if you want them along); the chats themselves stay on the server.
+device's notes, packs and backgrounds if you want them along); the chats
+themselves stay on the server.
 
 ## Browser
 
@@ -574,7 +613,7 @@ tabs switches between them:
 Both carry tabs with the site's icon, back and forward, a reload and a home
 button. Home is a start page of CConnect's with a search box and your
 favorites, which you add from ⋮ or from the **+** on that page with the name and
-address you choose, and rename or delete from the tile itself.
+address you choose, and edit or delete from the tile itself.
 
 ⋮ beside the address holds the rest: **Viewport** loads the page as a phone or a
 tablet (shrunk to fit the panel), or on Android as the mobile or the desktop

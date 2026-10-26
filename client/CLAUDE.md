@@ -8,18 +8,25 @@ contract. Assets and the web build are named `cconnect-tauri`.
 ```
 src/
 ├── App.svelte              # routes, window-level keydown / drag guards
-├── app.css                 # global rules + keyframes (menus, ripple, markdown, scrollbars)
-├── lib/
-│   ├── app/                # navigation (URL routing per screen)
-│   ├── data/               # models, settings, format helpers, time, previewKind
-│   ├── design/             # tokens.css, theme, session colors
-│   ├── i18n/               # en.json / es.json — every user-facing string
-│   ├── platform/           # isTouch, layout, desktop, fieldSizing polyfill
-│   ├── screens/            # chat/, shared/, project/, claude/, mods/, browser/, monitor/, settings/, terminal/, notes/
-│   ├── services/           # backend clients: chatSocket, sessionsApi, sharedApi, claudeApi…
-│   └── ui/                 # the shared toolkit
-└── src-tauri/              # Rust side + gen/android (committed)
+├── app.css                 # global rules + keyframes (menus, ripple, markdown)
+└── lib/
+    ├── app/                # navigation (URL routing per screen)
+    ├── data/               # models, settings, format helpers, time, previewKind
+    ├── design/             # tokens.css, theme, themes, fonts, backgrounds, scrollbars.css, packs/
+    ├── i18n/               # one JSON per locale — every user-facing string
+    ├── markdown/           # the Markdown renderer and its cconnect blocks
+    ├── platform/           # isTouch, layout, desktop, fieldSizing polyfill
+    ├── screens/            # chat/, shared/, project/, claude/, mods/, packs/, browser/, monitor/, settings/, terminal/, notes/
+    ├── services/           # backend clients: chatSocket, sessionsApi, sharedApi, claudeApi…
+    └── ui/                 # the shared toolkit
+src-tauri/                  # Rust side + gen/android (committed)
 ```
+
+Themes, terminal colours, fonts, accents and chat backgrounds come from packs
+(`design/packs/`). The built-in ones and the pack format are the backend's: the build globs
+`backend/core/packs/**` and imports its `schema.json` and `builtin.json`, `opened.rs` compiles
+the schema in, and the client reader (`design/packs/reader.ts`) has to validate exactly as
+`backend/services/pack_format.py` does.
 
 ## Rules
 
@@ -27,16 +34,25 @@ src/
   no `update` hook: reactivity inside one needs its own observers, or an `$effect` in the
   component that calls back into it.
 - **Reuse the toolkit.** `PopupMenu`, `MenuSub`, `MenuItem`, `InputField`, `ListRow`,
-  `CompactDialog`, `ConfirmDialog`, `ZoomPane`, `DropOverlay`, `MarkdownText`, `CodeBlock`,
-  `SelectionDot`, `scrollbar`, `gridHeight`, `fileDrop`, `keepFocus`. New screens compose
-  these; forking a variant is how the two apps drift.
+  `CompactDialog`, `ConfirmDialog`, `CardPanel`, `ScrollCard`, `FloatDock`, `TabPager`,
+  `ZoomPane`, `DropOverlay`, `MarkdownText`, `CodeBlock`, `SelectionDot`, `scrollbar`,
+  `gridHeight`, `fileDrop`, `keepFocus`, `menuSurface`, `sharedFileActions`. New screens
+  compose these; forking a variant is how the two apps drift.
 - **Tailwind is concatenated by hand — there is no twMerge.** Two conflicting utilities both
   end up in `class`, and the winner is whatever CSS order decides. Resolve conflicts with a
   prop or a conditional, never by appending another class.
 - Menus, tooltips, dialogs and popovers come from **bits-ui**. Menus open to the right
   (`align="start"`), collision padding comes from `layout.menuPadding`, and the exit
-  animation is `.menu-surface[data-state="closed"]` in `app.css`.
-- Every string goes through `t()` and lives in `lib/i18n/en.json` + `es.json`.
+  animation is `.menu-surface[data-state="closed"]` in `app.css`. On touch a `MenuSub`
+  drills down in place with a row to go back (`ui/menuDrill.svelte.ts`) instead of
+  floating a second menu; on the desktop it opens on hover, through a `Portal`, because the
+  rounded viewport's mask clips anything positioned inside it.
+- Every string goes through `t()` and lives in the `lib/i18n/*.json` catalogs, one per
+  locale and picked up on their own. `en.json` is the base: a key missing from another
+  catalog falls back to it, so a new string goes there first. Plurals are CLDR forms in
+  uppercase (`_ONE`, `_FEW`, `_MANY`, `_OTHER`) and a catalog only has the forms its language
+  uses. Outside English every form carries `{1}`, since `_ONE` there also covers numbers
+  like 21.
 - **`platformName()` answers `"web"` for anything outside Tauri**, so it says which build
   is running, not which system. Anything that depends on the OS — ⌘ versus Ctrl, the
   iPhone's install path — asks `systemName()`, which reads the agent either way. Mixing
@@ -58,9 +74,9 @@ fraction of a pixel on every open/close. It takes two halves and neither is enou
 
 ## Chat scroller (`screens/chat/ChatScroller.svelte`)
 
-One component owns the viewport and the chat list, the quick chat and the side panel all
-mount it; the API is exported (`atBottom`, `scrollToEnd`, `holdAt`, `scrollFromEnd`,
-`bringToTop`, `refreshHeader`).
+One component owns the viewport; the chat list (`MessageList`) and the quick chat
+(`SidePanel`) mount it, and the API is exported (`atBottom`, `scrollToEnd`, `holdAt`,
+`scrollFromEnd`, `scrollTo`, `bringToTop`, `refreshHeader`, `collapsePinned`…).
 
 - `follow` is the stick-to-the-end state. The `ResizeObserver` re-pins to the end while it
   is on, or to `pendingTop` when a hold is in place, which is what stops a block growing
@@ -70,11 +86,10 @@ mount it; the API is exported (`atBottom`, `scrollToEnd`, `holdAt`, `scrollFromE
 - `atBottom()` must also be true when there is no scroll at all
   (`scrollHeight <= clientHeight`), or expanding a block in a short chat grows downward
   instead of following the end.
-- The pinned header is recomputed on scroll and on resize, walking forward from
-  `firstVisible()` (a binary search over `offsetTop`); its push is snapped to the device
-  pixel. The 40px fallback height, used until the header measures itself, is load-bearing —
-  replacing it with "invisible until measured" produces a blank frame, which reads as a
-  flicker.
+- A long block's head sticks with native `position: sticky` (on where `stickyHeads()` is
+  provided). On scroll and on resize `updatePinned()` walks forward from `firstVisible()` (a
+  binary search over `offsetTop`) and marks the head that is stuck with `data-stuck`, which
+  is all the styling hooks onto; there is no copy of the header to measure or push.
 
 ## Mods (`screens/mods/`)
 
@@ -174,14 +189,27 @@ with the server's `SUPPORTED_SERVER` floor — there is no offline mode to win, 
 does nothing without its backend.
 
 `beforeinstallprompt` is captured with `preventDefault()`, which silences Chrome's own
-banner and hands the promotion to **Install app** in Settings → Information. iOS fires no
+banner and hands the promotion to **Install app** in Settings → About. iOS fires no
 such event and exposes no install API, so there the same entry only spells out the two
 steps.
 
 ## Android
 
 `src-tauri/gen/android/` **is committed** — it holds `MainActivity.kt`, `PastedContent.kt`,
-`Browser.kt` and the manifest, so edits there are real source, not generated scratch.
+`Browser.kt`, `Downloads.kt` and the rest of the Kotlin side, and the manifest, so edits there
+are real source, not generated scratch. `src-tauri/.taurignore` keeps `tauri dev` from
+rebuilding the desktop app every time one of them changes.
+
+The manifest offers CConnect to open only `.ccpack` files: a VIEW whose path ends in
+`.ccpack`, with or without a type, and a `content:` VIEW typed `application/octet-stream`,
+which is how Files by Google hands one over (its address carries a number, not the name).
+Share always attaches, a pack included; an opened file goes through `takePacks`, so a pack
+offers its dialog and anything else becomes an attachment (`platform/pastedContent.ts`). Samsung's My Files sends an
+extension it does not know with an empty type and a nameless `content://media/external/file/`
+address, which only a `*/*` filter accepts, and that filter would offer CConnect for every
+file there, so a pack from it goes through Packs → Import pack. Android's file picker cannot
+filter by an extension it does not know either, so that dialog adds `application/octet-stream`
+on Android.
 
 `MainActivity` deletes `app_webview/variations_seed*` before the WebView starts. That file is
 the experiment config the WebView downloads on the first launch and applies from the next
@@ -221,4 +249,5 @@ npm run tauri dev | build
 1. **Backend is the source of truth**; mirror its event shapes verbatim.
 2. **No comments.** Self-explanatory names; rationale goes in the answer or the commit.
    `<!-- svelte-ignore … -->` is a directive, not a comment, and stays.
-3. **Neutral Spanish** for user-facing text, from the i18n files — no regionalisms.
+3. User-facing text comes from the i18n files and reads as written for each language, with
+   the terms its catalog already uses; Spanish is neutral, with no regionalisms.

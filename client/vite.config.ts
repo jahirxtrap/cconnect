@@ -5,7 +5,7 @@ import { fileURLToPath, URL } from "node:url";
 import Icons from "unplugin-icons/vite";
 import { defineConfig, loadEnv, searchForWorkspaceRoot } from "vite";
 
-const SUPPORTED_SERVER = ">=1.10.0";
+const SUPPORTED_SERVER = ">=2.0.0";
 
 const mobileHost = process.env.TAURI_DEV_HOST;
 

@@ -3,12 +3,14 @@
 Mobile, desktop and web interface for Claude Code. The apps drive Claude Code running
 on the user's PC — chats in tabs, projects and sessions, file edits, permission prompts
 and forms, rich blocks, plan proposals, subagents, attachments, a message queue and
-rewind, persistent sessions that keep a chat's CLI running, and the panes and band
-Claude Code mods draw — over HTTP/WS, reachable on the tailnet or publicly through a
-Tailscale Funnel. They also manage the Claude install itself (CLI, plugins,
-marketplaces, MCP servers, skills, memories), a file manager over the shared folder, an
-explorer of the project that shows its git diff and commits it, a browser that opens pages
-on the device or on the PC, a PC monitor, an SSH client and notes.
+rewind, persistent sessions that keep a chat's CLI running along with its background
+tasks, delegating a task to another AI, and the panes and band Claude Code mods draw — over
+HTTP/WS, reachable on the tailnet or publicly through a Tailscale Funnel. They also manage
+the Claude install itself (CLI, plugins, marketplaces, MCP servers, skills, memories), a
+file manager over the shared folder, an explorer of the project that shows its git diff
+and commits it, a browser that opens pages on the device or on the PC, a PC monitor, an
+SSH client and notes, with themes, fonts and chat backgrounds installed from `.ccpack`
+packs, in ten languages.
 
 **Monorepo with two modules that must stay in sync:**
 
@@ -17,6 +19,9 @@ on the device or on the PC, a PC monitor, an SSH client and notes.
 - **`client/`** — Svelte + Tauri: one codebase → desktop, web and Android.
   See `client/CLAUDE.md`.
 
+The client also builds from backend files: the pack format and the built-in packs
+(`backend/core/packs/`) and the page icon script (`backend/core/scripts/page_icon.js`).
+
 ## Architecture
 
 ```
@@ -24,7 +29,7 @@ on the device or on the PC, a PC monitor, an SSH client and notes.
                                     │
                                     ├──> ~/.claude/projects   (sessions on disk)
                                     ├──> ~/.claude            (plugins, MCP, skills, memories)
-                                    └──> the data folder      (settings, accounts, shared, trash)
+                                    └──> the data folder      (settings, accounts, shared, packs, trash)
 ```
 
 The data folder is `backend/data` in a checkout and `~/.cconnect/data` once the package is

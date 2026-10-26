@@ -26,6 +26,9 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   (env), `display` (separator and joining, shared with the app), `settings_defs` + `db` +
   `settings_store` (SQLite KV), `cli_manager`, `sdk`, `responses` (**the** envelope:
   `{success, status, message, data}`).
+- `core/packs/` — the built-in packs and `schema.json` / `builtin.json`, the pack format. The
+  client build and the Tauri compile read them too, and so does `core/scripts/page_icon.js`
+  (the page icon both browsers report), so all of them ship in the wheel.
 - `middleware/` — `public_auth` (Bearer, no-op without a token), `security`, `error_handler`.
 - `routers/` — thin: validate, call a service, return `api_response()`.
 - `services/` — all the logic. `live_sessions` (turn decoupled from the socket), `claude_runtime`
@@ -35,7 +38,10 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
   `usage`, `accounts`, `shared`, `git_ops` (the commit panel, on top of the single runner in
   `services/git`, one lock per repository), `browser` (the server's Chromium, started only
-  while a socket watches one of its tabs).
+  while a socket watches one of its tabs), `delegates` / `delegate_runner` / `delegate_runs`
+  (handing a task to another AI), `packs` / `pack_format` (the server's pack library and the
+  validation the client's reader mirrors), `prompt_cache`, `tool_calls` / `tool_props`,
+  `api_errors`, `directory_watch` (the base of the shared and pack watchers).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
 - `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
   substituted per request), `BLOCKS.md`, `BROWSER.md`, `MODS.md` (only what this app adds
@@ -72,13 +78,15 @@ exists, or the QR would point nowhere.
 Everything returns `api_response()`. Route groups: `/api/health`, `/api/capabilities`,
 `/api/settings`, `/api/cli`, `/api/sessions/*` (transcript slices, checkpoints + rewind,
 rename/color/move/delete, trash, categories, transcript images), `/api/shared/*` (file
-manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompt, plugins,
-marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`, `/api/system/*`,
-`/api/network/*`, `/api/git/*` (repositories under a project, identities, the written
-message, commit, revert, pull, push). Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list),
-`WS /api/system/ws`, `WS /api/shared/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws`
-(frames and state of the server's Chromium; `watch` decides whether it runs, and an opening
-without it watches, which is what an app older than 1.10.3 sends).
+manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins and their
+reload, marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`,
+`/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
+the written message, commit, revert, pull, push), `/api/delegates` (the destinations;
+writing them takes the security key), `/api/packs/*` (the server's pack library and its
+previews). Live streams: `WS /api/chat/ws`, `WS /api/list/ws` (chat/project list),
+`WS /api/system/ws`, `WS /api/shared/ws`, `WS /api/packs/ws`, `WS /api/network/speedtest/ws`,
+`WS /api/browser/ws` (frames and state of the server's Chromium; `watch` decides whether it
+runs, and an opening without it watches, which is what an app older than 1.10.3 sends).
 
 Transcript slices are cursor-based (`before_index`), and while a live session still has
 events to replay the tail is cut at its `turn_start_index` so the same turn never arrives
@@ -86,9 +94,14 @@ twice — once from disk and once from the replay.
 
 ## WebSocket protocol (`/api/chat/ws`)
 
-Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`,
-`set_permission_mode`, `interrupt`, `interaction_response`, `load_history`, `ask`, `usage`,
-`close_resident`, and for mods `mod_render`, `mod_act`, `mod_answer`, `mod_client_module`.
+Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`, `unqueue`,
+`set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history`,
+`ask`, `usage`, `stop_task`, `reload`, `close_resident`, and for mods `mod_render`, `mod_act`,
+`mod_answer`, `mod_client_module`.
+
+Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
+the app adopts it, and only `set_generation` changes it. A tab that had not loaded its
+account yet used to send the default on reconnect and restart the CLI on it.
 
 Server → client, all seq'd per session except the control ones (`ready`, `permission_mode`,
 `history_chunk`, `usage`, `ask_*`, `activity`) and the mods ones:
@@ -100,8 +113,10 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 | `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
 | `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase |
 | `context` | context size; see below |
-| `status` (`retrying`/`slow`/`ok`/`failed`) | transient API trouble, suppressed while compacting, while a tool is in flight, while a task the CLI reported (`task_started` until its `task_notification` or terminal `task_updated`) is alive and while awaiting the user |
-| `task_running` / `agent_result` | a backgrounded agent or task started, and its end; the app shows the block as running in between |
+| `status` (`retrying`/`ok`) | `retrying` follows the CLI's `api_retry` with the attempt, the delay and the cause; a turn that fails arrives as an `api_error` whose `severity` tells a warning from an error |
+| `rate_limit` / `cache` | the plan's session and weekly windows as the CLI reports them (ids `session` and `week`), and the prompt cache's expiry for the context ring |
+| `task_running` / `agent_result` | a backgrounded agent or task started, and its end; the app shows the block as running in between, lists it under Running and stops it with `stop_task` |
+| `reloaded` | what `/reload-plugins` or `/reload-skills` brought in |
 | `commands` | the session's slash commands, sent again when `/reload-plugins` changes them |
 | `activity` | per-chat state, rides the channel so a brand-new chat reports before it has an id |
 | `queued` / `dequeued` | message queue |
@@ -159,17 +174,21 @@ final `result` lands.
 
 With `persistent_sessions` on, a chat keeps its CLI between turns. `persistent_sessions.pool`
 holds one `PersistentSession` per channel, a `ClaudeSDKClient` owned by its own task and
-keyed by cwd, account and scope; `persistent_limit` trims the oldest idle ones, and the
-live session releases its own `persistent_grace` seconds after the last socket detaches.
-A turn whose options differ from the ones the CLI started with (`mark`: model, effort,
-permission mode, mods) closes it and starts a fresh one. When the CLI starts a turn on its
-own, a mod sending a prompt for instance, `own_turn` makes the live session adopt it so it
-streams like any other.
+keyed by cwd, the resolved account and scope; `persistent_limit` trims the oldest idle
+ones, and the live session releases its own `persistent_grace` seconds (300 by default)
+after the last socket detaches, once nothing runs in the background (`working` counts the
+tasks the CLI reported). A turn whose options differ from the ones the CLI started with
+(`mark`: model, effort, permission mode, mods) closes it and starts a fresh one, and so does
+another account, since the account is the CLI's config folder and credentials. When the CLI
+starts a turn on its own, a mod sending a prompt or a background task finishing,
+`own_turn` makes the live session adopt it so it streams like any other; an adopted turn
+keeps the running CLI (`resident(keep=True)`) and never reshapes it, or it would kill the
+process that started the turn.
 
 Mods ride on the CLI's internal UI protocol (`services/mods.py`): `ui_attach` as the
 `desktop` surface, `ui_render` per site, and the CLI's notifications, which fold into one
-`Surface` per live session and reach the app as the `mods` snapshot. `mod_surfaces` gates
-all of it. What a mod writes to the transcript shows in any chat, while panes and the band
+`Surface` per live session and reach the app as the `mods` snapshot. `mod_surfaces`, on by
+default, gates all of it. What a mod writes to the transcript shows in any chat, while panes and the band
 need the resident CLI. The protocol is not public and moves between CLI versions, so every
 request goes through `mods.request`, which turns a failure into `None` instead of raising.
 
@@ -187,7 +206,9 @@ Tools auto-register: each module exposes `tools = [...]`, or `make_tools(context
 tool needs the running turn (returning `[]` removes it from that turn — the safest gate).
 Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own messages, numbered,
 before a compaction too, without the tool calls), `session_info`, `show_component`,
-`ask_component`, and the browser and terminal tools behind their settings.
+`ask_component`, `share_files`, `packs` (writes a pack into the server's library),
+`delegate` (runs a task on a destination, or registers one), `reload` (persistent chats
+only), and the browser and terminal tools behind their settings.
 
 `ask_component` and `show_component` share one element list (`mcps/components.py`). The
 contract is flat: every value travels as a string, an `id` means the element carries a
@@ -203,7 +224,8 @@ the single table of what the app renders inline.
 4. **The summary** (`componentSummary` / the derived `summary`) — the one everybody forgets;
    skipping it is what printed `secret` values into the chat.
 5. The validation (`componentMissing` / `missing`) if it can be required.
-6. The two translation files if it brings text of its own.
+6. `en.json` if it brings text of its own, and the other catalogs with it (a key they lack
+   falls back to English).
 
 ## Configuration
 
