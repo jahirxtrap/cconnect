@@ -10,6 +10,7 @@
   import { PACK_EXTENSION, PACK_MIME } from "$lib/design/packs/schema";
   import { t } from "$lib/i18n/index.svelte";
   import { systemName } from "$lib/platform";
+  import { mediaSrc } from "$lib/services/mediaSource";
   import { serverPacks, useServerPacks, type ServerPack } from "$lib/services/serverPacks.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -112,7 +113,7 @@
           {#snippet leading()}
             {#if offer.entry.preview}
               <img
-                src={serverPacks.urlOf(offer.entry, "/preview")}
+                use:mediaSrc={{ url: serverPacks.urlOf(offer.entry, "/preview") }}
                 alt=""
                 draggable="false"
                 class="size-11 shrink-0 rounded-lg object-cover"

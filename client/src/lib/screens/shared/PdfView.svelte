@@ -1,13 +1,20 @@
 <script lang="ts">
-  import type { PDFPageProxy, RenderTask } from "pdfjs-dist";
-  import { tick, untrack } from "svelte";
-  import { securityKeys } from "$lib/data/securityKeys.svelte";
-  import { backend } from "$lib/services/backend.svelte";
+  import type { PDFDocumentLoadingTask } from "pdfjs-dist";
+  import type { PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
+  import "pdfjs-dist/web/pdf_viewer.css";
+  import { openExternal } from "$lib/platform";
+  import { fetchFile } from "$lib/services/mediaSource";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
 
   interface Props {
     url: string;
     onerror: () => void;
+  }
+
+  interface Engine {
+    pdfjs: typeof import("pdfjs-dist");
+    view: PDFViewer;
+    links: PDFLinkService;
   }
 
   const { url, onerror }: Props = $props();
@@ -16,127 +23,99 @@
   const MAX_ZOOM = 5;
   const DOUBLE_TAP_ZOOM = 2.5;
   const WHEEL_STEP = 0.0015;
+  const DRAWING_DELAY = 250;
+  const SHARPEN_INTERVAL = 150;
+  const SCALE_STEPS = 100;
+  const MAX_ROUND_UNIT = 8;
+  const ALIGN_SLACK = 0.01;
   const HALF = 2;
-  const PAGE_PIXELS = 12e6;
-  const SHARPEN_MS = 200;
-  const SHARPEN_MARGIN = 600;
+  const EXTERNAL_LINK = /^(https?|mailto):/i;
 
-  let viewport = $state<HTMLDivElement | null>(null);
-  let host = $state<HTMLDivElement | null>(null);
-  let width = $state(0);
-  let baseHeight = $state(0);
-  let zoom = $state(1);
+  let container = $state<HTMLDivElement | null>(null);
+  let pages = $state<HTMLDivElement | null>(null);
   let loading = $state(true);
+  let zoom = $state(MIN_ZOOM);
+  let engine = $state.raw<Engine | null>(null);
+
+  const zoomed = $derived(zoom > MIN_ZOOM);
+
+  let pageWidth = 0;
+  let onscreen = false;
+  let sharpened = 0;
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const points = new Map<number, { x: number; y: number }>();
   let pinchDistance = 0;
   let pinchZoom = 1;
-  let dragX = 0;
-  let dragY = 0;
-
-  let pages: PDFPageProxy[] = [];
-  let canvases: HTMLCanvasElement[] = [];
-  let factors: number[] = [];
-  let task: RenderTask | null = null;
-  let generation = 0;
-  let sharpenTimer: ReturnType<typeof setTimeout> | null = null;
 
   const clamp = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
-  const density = () => window.devicePixelRatio || 1;
-
-  const sheet = (page: PDFPageProxy, available: number, factor: number) => {
-    const base = page.getViewport({ scale: 1 });
-    const cap = Math.sqrt(PAGE_PIXELS / (base.width * base.height));
-    const viewport = page.getViewport({ scale: Math.min((available / base.width) * factor, cap) });
-    const canvas = document.createElement("canvas");
-    canvas.style.display = "block";
-    canvas.style.width = "100%";
-    canvas.style.height = "auto";
-    canvas.width = Math.floor(viewport.width);
-    canvas.height = Math.floor(viewport.height);
-    return { canvas, viewport };
+  const roundUnit = () => {
+    const drawn = parseFloat(pages?.querySelector<HTMLElement>(".page")?.style.getPropertyValue("--scale-round-x") ?? "");
+    if (drawn > 0) return drawn;
+    const ratio = window.devicePixelRatio || 1;
+    for (let unit = 1; unit <= MAX_ROUND_UNIT; unit++) {
+      if (Math.abs(ratio * unit - Math.round(ratio * unit)) < 1 / SCALE_STEPS) return unit;
+    }
+    return 1;
   };
 
-  const paint = async (index: number, available: number, factor: number) => {
-    const page = pages[index];
-    const { canvas, viewport } = sheet(page, available, factor);
-    const context = canvas.getContext("2d");
-    if (!context) return;
-    factors[index] = 0;
-    task = page.render({ canvas, canvasContext: context, viewport });
-    await task.promise;
-    task = null;
-    canvases[index].replaceWith(canvas);
-    canvases[index] = canvas;
-    factors[index] = factor;
+  const target = () => {
+    if (!container || !pageWidth) return null;
+    const unit = roundUnit();
+    return ((Math.ceil(container.clientWidth / unit) * unit + ALIGN_SLACK) / pageWidth) * zoom;
   };
 
-  const onscreen = () => {
-    const box = viewport;
-    if (!box) return canvases.map((_, index) => index);
+  const center = () => {
+    const box = container;
+    if (box && !zoomed) box.scrollLeft = (box.scrollWidth - box.clientWidth) / HALF;
+  };
+
+  const scaleTo = (scale: number, origin?: [number, number]) => {
+    const view = engine?.view;
+    if (!view || Math.abs(scale - view.currentScale) < 1 / SCALE_STEPS) return;
+    view.updateScale({ scaleFactor: scale / view.currentScale, drawingDelay: DRAWING_DELAY, origin });
+    center();
+  };
+
+  const apply = (view: PDFViewer, scale: number) => {
+    view.currentScale = scale;
+    center();
+  };
+
+  const settle = () => {
+    if (settleTimer !== null) clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => {
+      settleTimer = null;
+      const view = engine?.view;
+      const scale = target();
+      if (view && scale !== null) apply(view, scale);
+    }, DRAWING_DELAY);
+  };
+
+  const refit = () => {
+    const view = engine?.view;
+    const scale = target();
+    if (!view || loading || scale === null) return;
+    const now = performance.now();
+    if (onscreen && now - sharpened >= SHARPEN_INTERVAL) {
+      sharpened = now;
+      apply(view, scale);
+    } else {
+      scaleTo(scale);
+    }
+    settle();
+  };
+
+  const zoomAt = (next: number, clientX: number, clientY: number) => {
+    const box = container;
+    if (!box) return;
+    zoom = clamp(next);
+    const scale = target();
+    if (scale === null) return;
     const rect = box.getBoundingClientRect();
-    const indexes: number[] = [];
-    canvases.forEach((canvas, index) => {
-      const area = canvas.getBoundingClientRect();
-      if (area.bottom > rect.top - SHARPEN_MARGIN && area.top < rect.bottom + SHARPEN_MARGIN) {
-        indexes.push(index);
-      }
-    });
-    return indexes;
-  };
-
-  const sharpen = async () => {
-    const mine = ++generation;
-    const factor = density() * zoom;
-    const targets = zoom > MIN_ZOOM ? onscreen() : canvases.map((_, index) => index);
-    for (const index of targets) {
-      if (mine !== generation) return;
-      if (factors[index] === factor) continue;
-      try {
-        await paint(index, width, factor);
-      } catch {
-        return;
-      }
-    }
-  };
-
-  const scheduleSharpen = () => {
-    if (sharpenTimer !== null) clearTimeout(sharpenTimer);
-    sharpenTimer = setTimeout(() => {
-      sharpenTimer = null;
-      if (loading) {
-        scheduleSharpen();
-        return;
-      }
-      task?.cancel();
-      void sharpen();
-    }, SHARPEN_MS);
-  };
-
-  const render = async (container: HTMLDivElement, available: number) => {
-    const pdfjs = await import("pdfjs-dist");
-    pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href;
-
-    const response = await fetch(url, { headers: securityKeys.fileHeadersFor(backend.active) });
-    if (!response.ok) throw new Error(String(response.status));
-    const document_ = await pdfjs.getDocument({ data: await response.arrayBuffer() }).promise;
-
-    container.replaceChildren();
-    pages = [];
-    canvases = [];
-    factors = [];
-    const factor = density();
-    for (let number = 1; number <= document_.numPages; number++) {
-      const page = await document_.getPage(number);
-      const { canvas } = sheet(page, available, factor);
-      container.appendChild(canvas);
-      pages.push(page);
-      canvases.push(canvas);
-      factors.push(0);
-      await paint(pages.length - 1, available, factor);
-    }
-    baseHeight = container.offsetHeight;
+    scaleTo(scale, [clientX - rect.left, clientY - rect.top]);
+    settle();
   };
 
   const spread = () => {
@@ -150,68 +129,23 @@
   };
 
   const regrip = () => {
-    if (points.size >= 2) {
-      pinchDistance = spread();
-      pinchZoom = zoom;
-      return;
-    }
-    pinchDistance = 0;
-    const [last] = [...points.values()];
-    if (!last) return;
-    dragX = last.x;
-    dragY = last.y;
-  };
-
-  const zoomAt = async (target: number, clientX: number, clientY: number) => {
-    const box = viewport;
-    if (!box) return;
-    const next = clamp(target);
-    if (next === zoom) return;
-    const rect = box.getBoundingClientRect();
-    const focusX = clientX - rect.left;
-    const focusY = clientY - rect.top;
-    const ratio = next / zoom;
-    const left = (box.scrollLeft + focusX) * ratio - focusX;
-    const top = (box.scrollTop + focusY) * ratio - focusY;
-    zoom = next;
-    await tick();
-    box.scrollLeft = left;
-    box.scrollTop = top;
-    scheduleSharpen();
+    pinchDistance = points.size >= 2 ? spread() : 0;
+    pinchZoom = zoom;
   };
 
   const onPointerDown = (event: PointerEvent) => {
     if (event.isPrimary) points.clear();
     points.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    dragX = event.clientX;
-    dragY = event.clientY;
-    if (points.size >= 2) {
-      regrip();
-      return;
-    }
-    if (event.pointerType !== "touch" || zoom <= MIN_ZOOM) return;
-    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    regrip();
   };
 
   const onPointerMove = (event: PointerEvent) => {
     if (!points.has(event.pointerId)) return;
     points.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (points.size >= 2) {
-      if (pinchDistance <= 0) return;
-      event.preventDefault();
-      const focus = centre();
-      void zoomAt((pinchZoom * spread()) / pinchDistance, focus.x, focus.y);
-      return;
-    }
-    if (event.pointerType !== "touch" || zoom <= MIN_ZOOM) return;
+    if (points.size < 2 || pinchDistance <= 0) return;
     event.preventDefault();
-    const box = viewport;
-    if (box) {
-      box.scrollLeft -= event.clientX - dragX;
-      box.scrollTop -= event.clientY - dragY;
-    }
-    dragX = event.clientX;
-    dragY = event.clientY;
+    const focus = centre();
+    zoomAt((pinchZoom * spread()) / pinchDistance, focus.x, focus.y);
   };
 
   const onPointerUp = (event: PointerEvent) => {
@@ -222,63 +156,126 @@
   const onWheel = (event: WheelEvent) => {
     if (!event.ctrlKey) return;
     event.preventDefault();
-    void zoomAt(zoom - event.deltaY * WHEEL_STEP * zoom, event.clientX, event.clientY);
+    zoomAt(zoom - event.deltaY * WHEEL_STEP * zoom, event.clientX, event.clientY);
   };
 
   const onDoubleClick = (event: MouseEvent) => {
-    void zoomAt(zoom > MIN_ZOOM ? MIN_ZOOM : DOUBLE_TAP_ZOOM, event.clientX, event.clientY);
+    zoomAt(zoomed ? MIN_ZOOM : DOUBLE_TAP_ZOOM, event.clientX, event.clientY);
   };
 
-  const onScroll = () => {
-    if (zoom > MIN_ZOOM) scheduleSharpen();
+  const onClick = (event: MouseEvent) => {
+    const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(".annotationLayer a[href]");
+    if (!link || !EXTERNAL_LINK.test(link.href)) return;
+    event.preventDefault();
+    openExternal(link.href);
   };
 
   $effect(() => {
-    const container = host;
-    const available = width;
-    if (!container || available <= 0 || untrack(() => zoom) > MIN_ZOOM) return;
+    const box = container;
+    const host = pages;
+    if (!box || !host) return;
     let cancelled = false;
-    loading = true;
-    render(container, available)
-      .then(() => {
-        if (!cancelled) loading = false;
-      })
-      .catch(() => {
-        if (!cancelled) onerror();
+
+    const start = async () => {
+      const pdfjs = await import("pdfjs-dist");
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).href;
+      const { EventBus, LinkTarget, PDFLinkService, PDFViewer } = await import("pdfjs-dist/web/pdf_viewer.mjs");
+      if (cancelled) return;
+      const eventBus = new EventBus();
+      const links = new PDFLinkService({ eventBus, externalLinkTarget: LinkTarget.BLANK });
+      const view = new PDFViewer({
+        container: box,
+        viewer: host,
+        eventBus,
+        linkService: links,
+        removePageBorders: true,
+        annotationMode: pdfjs.AnnotationMode.ENABLE,
       });
+      links.setViewer(view);
+      eventBus.on("pagesinit", () => {
+        const first = view.getPageView(0);
+        pageWidth = first ? first.width / view.currentScale : 0;
+        zoom = MIN_ZOOM;
+        const scale = target();
+        if (scale !== null) apply(view, scale);
+        loading = false;
+      });
+      eventBus.on("pagerendered", () => {
+        const scale = target();
+        if (scale !== null && Math.abs(scale - view.currentScale) > 1 / SCALE_STEPS / SCALE_STEPS) apply(view, scale);
+        else center();
+      });
+      engine = { pdfjs, view, links };
+    };
+
+    start().catch(() => {
+      if (!cancelled) onerror();
+    });
+    const observer = new ResizeObserver(refit);
+    observer.observe(box);
+    const visibility = new IntersectionObserver(([entry]) => {
+      onscreen = entry.isIntersecting;
+    });
+    visibility.observe(box);
+
     return () => {
       cancelled = true;
-      generation++;
-      if (sharpenTimer !== null) clearTimeout(sharpenTimer);
-      task?.cancel();
+      observer.disconnect();
+      visibility.disconnect();
+      if (settleTimer !== null) clearTimeout(settleTimer);
+      engine = null;
+    };
+  });
+
+  $effect(() => {
+    const current = engine;
+    const source = url;
+    if (!current) return;
+    let cancelled = false;
+    let task: PDFDocumentLoadingTask | null = null;
+    loading = true;
+
+    const open = async () => {
+      const response = await fetchFile(source);
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.arrayBuffer();
+      if (cancelled) return;
+      task = current.pdfjs.getDocument({ data });
+      const document_ = await task.promise;
+      if (cancelled) return;
+      current.view.setDocument(document_);
+      current.links.setDocument(document_);
+    };
+
+    open().catch(() => {
+      if (!cancelled) onerror();
+    });
+
+    return () => {
+      cancelled = true;
+      void task?.destroy();
     };
   });
 </script>
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div
-  bind:this={viewport}
-  bind:clientWidth={width}
-  class="scrollbar-thin relative min-h-0 flex-1 overflow-auto overscroll-contain bg-neutral-800 {zoom >
-  MIN_ZOOM
-    ? 'touch-none'
-    : 'touch-pan-y'}"
-  onpointerdown={onPointerDown}
-  onpointermove={onPointerMove}
-  onpointerup={onPointerUp}
-  onpointercancel={onPointerUp}
-  onwheel={onWheel}
-  ondblclick={onDoubleClick}
-  onscroll={onScroll}
->
-  <div class="relative" style="width: {width * zoom}px; height: {baseHeight * zoom}px">
-    <div
-      bind:this={host}
-      class="absolute left-0 top-0 flex flex-col gap-2"
-      style="width: {width}px; transform: scale({zoom}); transform-origin: 0 0"
-    ></div>
+<div class="relative min-h-0 flex-1">
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div
+    bind:this={container}
+    class="scrollbar-thin absolute inset-0 touch-pan-x touch-pan-y overscroll-contain {zoomed
+      ? 'overflow-auto'
+      : 'overflow-x-hidden overflow-y-auto'}"
+    onpointerdown={onPointerDown}
+    onpointermove={onPointerMove}
+    onpointerup={onPointerUp}
+    onpointercancel={onPointerUp}
+    onwheel={onWheel}
+    ondblclick={onDoubleClick}
+    onclick={onClick}
+  >
+    <div bind:this={pages} class="pdfViewer"></div>
   </div>
   {#if loading}
-    <CenteredProgress class="sticky inset-0 h-full" />
+    <CenteredProgress class="absolute inset-0" />
   {/if}
 </div>

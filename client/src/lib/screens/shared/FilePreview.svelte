@@ -12,15 +12,14 @@
   import Type from "@lucide/svelte/icons/type";
   import type { Snippet } from "svelte";
   import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
-  import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { platformName } from "$lib/platform";
-  import { backend } from "$lib/services/backend.svelte";
-  import { mediaSrc } from "$lib/services/mediaSource";
+  import { fetchFile, mediaSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
+  import { isMobile } from "$lib/platform";
+  import { layout } from "$lib/platform/layout.svelte";
   import { paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -36,13 +35,13 @@
   import CodeView from "$lib/ui/CodeView.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import { frameScrollbars, themedPage } from "$lib/ui/frameScrollbars.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
+  import PageFrame from "$lib/ui/PageFrame.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import PdfView from "./PdfView.svelte";
 
@@ -95,9 +94,35 @@
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
+  const PDF_RESIZE_SETTLE_MS = 300;
 
   const centered = paneRole() === "center";
+  const nativePdf = $derived((!embedded || centered) && !isMobile && !layout.mobile);
 
+  const refitOnResize = (node: HTMLIFrameElement) => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let width = 0;
+    const observer = new ResizeObserver(([entry]) => {
+      const next = Math.round(entry.contentRect.width);
+      if (!width || next === width) {
+        width = next;
+        return;
+      }
+      width = next;
+      if (timer !== null) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timer = null;
+        if (node.src) node.src = node.src;
+      }, PDF_RESIZE_SETTLE_MS);
+    });
+    observer.observe(node);
+    return {
+      destroy() {
+        observer.disconnect();
+        if (timer !== null) clearTimeout(timer);
+      },
+    };
+  };
 
   let arrived = $state<{ base: string; name: string; body: string } | null>(null);
   let shown = $state<Shown | null>(null);
@@ -107,15 +132,11 @@
   let formatted = $state(settings.markdownPreviewFormatted);
   let menu = $state(false);
   let confirmingDelete = $state(false);
-  let pdfWidth = $state(0);
 
-  const PDF_RESIZE_STEP = 96;
   const BODY_CLASS = "flex min-h-0 flex-1 flex-col";
   const FRAME_CLASS = `${BODY_CLASS} overflow-hidden rounded-panel`;
   const PANE_FRAME_CLASS = `${FRAME_CLASS} mx-(--page-inset) mb-(--page-inset)`;
   const TEXT_SCROLL_CLASS = `${TEXT_VIEWPORT_CLASS} selectable min-h-0 flex-1`;
-
-  const pdfStep = $derived(Math.round(pdfWidth / PDF_RESIZE_STEP));
 
   const kind = $derived(forcedKind ?? previewKindOf(filename));
   const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : embedded ? PANE_FRAME_CLASS : FRAME_CLASS);
@@ -157,7 +178,7 @@
       return;
     }
     failed = false;
-    void fetch(target, { headers: securityKeys.fileHeadersFor(backend.sharedProfileOf(target)) })
+    void fetchFile(target)
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
         arrived = { base: requested, name, body: await response.text() };
@@ -292,27 +313,24 @@
   {:else if kind === "pdf"}
     {#if failed}
       <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
-    {:else if platformName() === "android"}
-      <PdfView url={source} onerror={() => (failed = true)} />
+    {:else if nativePdf}
+      <iframe
+        use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+        use:refitOnResize
+        title={filename}
+        class="min-h-0 w-full flex-1 border-0"
+      ></iframe>
     {:else}
-      <div bind:clientWidth={pdfWidth} class="flex min-h-0 w-full flex-1">
-        {#key pdfStep}
-          <iframe
-            use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
-            title={filename}
-            class="min-h-0 w-full flex-1 border-0"
-          ></iframe>
-        {/key}
-      </div>
+      <PdfView url={source} onerror={() => (failed = true)} />
     {/if}
   {:else if kind === "html"}
-    <iframe
-      use:mediaSrc={{ url: source, transform: themedPage, onerror: () => (failed = true) }}
-      use:frameScrollbars
+    <PageFrame
+      url={source}
+      name={filename}
       title={filename}
-      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+      onerror={() => (failed = true)}
       class="min-h-0 w-full flex-1 border-0"
-    ></iframe>
+    />
   {:else if failed}
     <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
   {:else if shown === null}

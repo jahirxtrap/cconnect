@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 
 from core.access import key_matches
-from core.responses import api_response
+from core.responses import FILE_HEADERS, api_response
 from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services import project_files, project_watch
@@ -118,5 +118,5 @@ def project_file(project_key: str, path: str, x_security_key: str = Header("")):
         resolved,
         filename=resolved.name,
         content_disposition_type="inline",
-        headers={"Content-Encoding": "identity", "Cache-Control": "no-cache"},
+        headers=FILE_HEADERS,
     )

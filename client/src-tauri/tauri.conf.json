@@ -34,7 +34,7 @@
         "img-src": "'self' data: blob: http: https:",
         "media-src": "'self' data: blob: http: https:",
         "object-src": "'self' data: blob:",
-        "frame-src": "'self' data: blob: http: https:",
+        "frame-src": "'self' data: blob: http: https: preview:",
         "style-src": "'self' 'unsafe-inline'",
         "font-src": "'self' data:",
         "connect-src": "'self' ipc: http://ipc.localhost ws: wss: http: https:"

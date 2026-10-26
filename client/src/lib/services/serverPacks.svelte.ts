@@ -1,6 +1,6 @@
-import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { backend, withToken } from "./backend.svelte";
+import { fetchFile } from "./mediaSource";
 import { ReconnectingSocket } from "./socket";
 
 export interface ServerPack {
@@ -62,7 +62,7 @@ class ServerPacks {
 
   async download(pack: ServerPack): Promise<Blob | null> {
     try {
-      const response = await fetch(this.urlOf(pack), { headers: securityKeys.fileHeadersFor(backend.active) });
+      const response = await fetchFile(this.urlOf(pack));
       return response.ok ? await response.blob() : null;
     } catch {
       return null;

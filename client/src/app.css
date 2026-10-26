@@ -228,25 +228,41 @@ html.scanning .qr-overlay {
   visibility: visible;
 }
 
-.ripple {
-  position: relative;
-}
-
-.ripple::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-color: currentColor;
-  opacity: 0;
-  transition: opacity 150ms linear;
-  pointer-events: none;
-}
-
-@media (hover: hover) {
-  .ripple:hover:not(:disabled):not([data-disabled])::after {
-    opacity: 0.08;
+@layer components {
+  .ripple {
+    position: relative;
   }
+
+  .ripple::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background-color: currentColor;
+    opacity: 0;
+    transition: opacity 150ms linear;
+    pointer-events: none;
+  }
+
+  @media (hover: hover) {
+    .ripple:hover:not(:disabled):not([data-disabled])::after {
+      opacity: 0.08;
+    }
+  }
+
+  .media-frame {
+    border: 1px solid transparent;
+    outline: 1px solid var(--c-outline-variant);
+    outline-offset: -1px;
+  }
+}
+
+.pdfViewer .page {
+  --page-bg-color: transparent !important;
+}
+
+.pdfViewer.removePageBorders .page:last-child {
+  margin-bottom: 0;
 }
 
 .rounded-viewport {

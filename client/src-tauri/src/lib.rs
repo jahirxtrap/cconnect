@@ -7,6 +7,7 @@ mod oauth;
 #[cfg(desktop)]
 mod opened;
 mod presence;
+mod preview;
 mod secret;
 mod shield;
 mod ssh;
@@ -161,6 +162,8 @@ pub fn run() {
         .manage(oauth::OauthState::default())
         .manage(presence::Presence::default())
         .manage(shield::Shield::default())
+        .manage(preview::Previews::default())
+        .register_asynchronous_uri_scheme_protocol(preview::SCHEME, preview::serve)
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_connect,
             ssh::ssh_send,
@@ -181,6 +184,8 @@ pub fn run() {
             oauth::oauth_cancel,
             presence::presence_set,
             presence::presence_clear,
+            preview::preview_open,
+            preview::preview_close,
             #[cfg(desktop)]
             opened::opened_files,
             #[cfg(desktop)]

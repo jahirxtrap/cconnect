@@ -54,6 +54,11 @@ export const relativeFromUrl = (url: string, profile: Profile = backend.sharedPr
   return url.slice(prefix.length).split("?")[0].split("/").map(decodeSegment).join("/");
 };
 
+export const sharedFolderUrl = (url: string, profile: Profile = backend.sharedProfileOf(url)): string | null => {
+  const route = url.split("?")[0];
+  return route.startsWith(sharedPrefix(profile)) ? route.slice(0, route.lastIndexOf("/") + 1) : null;
+};
+
 export const archiveFileUrl = (path: string, inner: string, profile: Profile = backend.active) =>
   `${baseUrlOf(profile)}/shared-archive-file?path=${encodeURIComponent(path)}&inner=${encodeURIComponent(inner)}`;
 

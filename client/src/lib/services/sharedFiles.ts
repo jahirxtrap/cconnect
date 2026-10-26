@@ -1,10 +1,11 @@
 import { encodeBase64 } from "$lib/data/base64";
-import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { transfers } from "$lib/data/transfers.svelte";
 import { isDesktop, isTauri, openExternal } from "$lib/platform";
 import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDownloads";
 import { copyText } from "$lib/platform/clipboard";
-import { backend, type Profile } from "./backend.svelte";
+import { backend } from "./backend.svelte";
+import { fetchFile } from "./mediaSource";
+import { fileHeaders } from "./projectFilesApi";
 
 export interface SharedItem {
   url: string;
@@ -15,10 +16,9 @@ const fetchTracked = async (
   url: string,
   onProgress: (value: number) => void,
   signal: AbortSignal,
-  profile: Profile = backend.sharedProfileOf(url),
 ): Promise<Blob | null> => {
   try {
-    const response = await fetch(url, { headers: securityKeys.fileHeadersFor(profile), signal });
+    const response = await fetchFile(url, { signal });
     if (!response.ok) return null;
     const total = Number(response.headers.get("content-length")) || 0;
     if (!response.body || !total) return await response.blob();
@@ -42,7 +42,7 @@ export const fetchShared = (url: string): Promise<Blob | null> => fetchTracked(u
 
 const TEXT_TYPE = "text/markdown";
 
-const headersJson = (url: string) => JSON.stringify(securityKeys.fileHeadersFor(backend.sharedProfileOf(url)));
+const headersJson = (url: string) => JSON.stringify(fileHeaders(url, backend.sharedProfileOf(url)));
 
 const saveBlob = async (blob: Blob, filename: string): Promise<string | null> => {
   if (!isTauri) {

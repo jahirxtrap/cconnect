@@ -8,6 +8,8 @@ import orjson
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 
+FILE_HEADERS = {"Content-Encoding": "identity", "Cache-Control": "no-cache"}
+
 
 class ORJSONResponse(JSONResponse):
     """orjson serializes plain payloads; jsonable_encoder covers the types it rejects."""

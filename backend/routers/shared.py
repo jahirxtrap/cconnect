@@ -10,7 +10,7 @@ from starlette.requests import ClientDisconnect
 from pydantic import BaseModel
 
 from core.access import key_matches
-from core.responses import api_response
+from core.responses import FILE_HEADERS, api_response
 from core.ws import stream_watch
 from services import shared as shared_service
 from services.shared_watch import hub as watch_hub
@@ -223,7 +223,7 @@ def download_shared(path: str):
         resolved,
         filename=shared_service.visible_of(path),
         content_disposition_type="inline",
-        headers={"Content-Encoding": "identity"},
+        headers=FILE_HEADERS,
     )
 
 

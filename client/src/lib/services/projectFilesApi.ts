@@ -1,5 +1,5 @@
 import { securityKeys } from "$lib/data/securityKeys.svelte";
-import { backend, baseUrlOf, type Profile } from "./backend.svelte";
+import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { createHttp, type HttpClient } from "./http";
 
 export interface ProjectEntry {
@@ -44,13 +44,19 @@ const parseEntry = (raw: Wire): ProjectEntry => ({
   repoPath: raw.repo_path ?? "",
 });
 
-const projectBase = (projectKey: string) => `/projects/${encodeURIComponent(projectKey)}`;
+const PROJECTS = "/projects";
+const FILE_ROUTE = "file";
+const ARCHIVE_FILE_ROUTE = "archive-file";
+const KEYED_ROUTES = [FILE_ROUTE, ARCHIVE_FILE_ROUTE];
+const PATH_PARAM = "path";
+
+const projectBase = (projectKey: string) => `${PROJECTS}/${encodeURIComponent(projectKey)}`;
 
 export const projectFileUrl = (
   projectKey: string,
   path: string,
   profile: Profile = backend.active,
-) => `${baseUrlOf(profile)}${projectBase(projectKey)}/file?path=${encodeURIComponent(path)}`;
+) => `${baseUrlOf(profile)}${projectBase(projectKey)}/${FILE_ROUTE}?${PATH_PARAM}=${encodeURIComponent(path)}`;
 
 export const projectArchiveFileUrl = (
   projectKey: string,
@@ -58,7 +64,24 @@ export const projectArchiveFileUrl = (
   inner: string,
   profile: Profile = backend.active,
 ) =>
-  `${baseUrlOf(profile)}${projectBase(projectKey)}/archive-file?path=${encodeURIComponent(path)}&inner=${encodeURIComponent(inner)}`;
+  `${baseUrlOf(profile)}${projectBase(projectKey)}/${ARCHIVE_FILE_ROUTE}?${PATH_PARAM}=${encodeURIComponent(path)}&inner=${encodeURIComponent(inner)}`;
+
+const projectRouteOf = (url: string, profile: Profile): string | null => {
+  const route = url.split("?")[0];
+  return route.startsWith(`${baseUrlOf(profile)}${PROJECTS}/`) ? route.slice(route.lastIndexOf("/") + 1) : null;
+};
+
+export const fileHeaders = (url: string, profile: Profile): Record<string, string> => ({
+  ...authHeadersOf(profile),
+  ...(KEYED_ROUTES.includes(projectRouteOf(url, profile) ?? "") ? securityKeys.headersFor(profile) : {}),
+});
+
+export const projectFolderUrl = (url: string, profile: Profile = backend.active): string | null => {
+  if (projectRouteOf(url, profile) !== FILE_ROUTE) return null;
+  const [route, query] = url.split("?");
+  const path = new URLSearchParams(query).get(PATH_PARAM) ?? "";
+  return `${route}?${PATH_PARAM}=${encodeURIComponent(path.slice(0, path.lastIndexOf("/") + 1))}`;
+};
 
 export const createProjectFilesApi = (client: HttpClient) => ({
   async tree(projectKey: string, path = ""): Promise<ProjectListing | null> {

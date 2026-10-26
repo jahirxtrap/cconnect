@@ -4,6 +4,7 @@
   import { isVideo } from "$lib/data/previewKind";
   import { mediaSrc } from "$lib/services/mediaSource";
   import CenteredProgress from "./CenteredProgress.svelte";
+  import { MEDIA_FRAME_CLASS } from "./mediaFrame";
 
   interface Props {
     url: string;
@@ -31,9 +32,9 @@
 </script>
 
 <div
-  class="flex aspect-4/3 max-w-full shrink items-center justify-center overflow-hidden rounded-panel border border-outline-variant select-none {compact
+  class="flex aspect-4/3 max-w-full shrink items-center justify-center overflow-hidden {MEDIA_FRAME_CLASS} select-none {compact
     ? 'h-40'
-    : 'h-70'} {video ? 'bg-black' : ''}"
+    : 'h-70'} {video ? 'bg-black' : 'bg-card'}"
 >
   {#if video}
     <!-- svelte-ignore a11y_media_has_caption -->

@@ -4,6 +4,7 @@ import { theme } from "$lib/design/theme.svelte";
 const MARK = "data-cconnect-scrollbars";
 const ANCHORS = [/<head\b[^>]*>/i, /<!doctype[^>]*>/i];
 const OWN_STYLE = /::-webkit-scrollbar|scrollbar-(color|width)/;
+const LISTENER = `addEventListener("message",(event)=>{const text=event.source===parent&&event.data&&event.data[${JSON.stringify(MARK)}];const style=document.querySelector("style[${MARK}]");if(typeof text==="string"&&style)style.textContent=text})`;
 
 const sheet = () => {
   const { scrollbar, "scrollbar-hover": hover } = theme.current.colors;
@@ -20,14 +21,12 @@ export const themedPage = async (file: Blob): Promise<Blob> => {
   if (stylesScrollbars(new DOMParser().parseFromString(html, "text/html"))) return file;
   const anchor = ANCHORS.map((pattern) => html.match(pattern)).find((match) => match !== null);
   const at = anchor ? anchor.index! + anchor[0].length : 0;
-  const style = `<style ${MARK}>${sheet()}</style>`;
+  const style = `<style ${MARK}>${sheet()}</style><script ${MARK}>${LISTENER}</script>`;
   return new Blob([html.slice(0, at), style, html.slice(at)], { type: "text/html;charset=utf-8" });
 };
 
 export function frameScrollbars(node: HTMLIFrameElement) {
   $effect(() => {
-    const text = sheet();
-    const style = node.contentDocument?.querySelector(`style[${MARK}]`);
-    if (style) style.textContent = text;
+    node.contentWindow?.postMessage({ [MARK]: sheet() }, "*");
   });
 }

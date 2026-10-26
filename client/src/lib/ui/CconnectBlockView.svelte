@@ -4,10 +4,13 @@
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import { isVideo } from "$lib/data/previewKind";
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
-  import { mediaSrc } from "$lib/services/mediaSource";
+  import { mediaSrc, posterSrc } from "$lib/services/mediaSource";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
+  import PageFrame from "./PageFrame.svelte";
   import CardPanel from "./CardPanel.svelte";
+  import { MEDIA_FRAME_CLASS } from "./mediaFrame";
+  import { ROUND_BUTTON_CLASS } from "./roundButton";
   import SuggestionChips from "./SuggestionChips.svelte";
 
   interface Props {
@@ -21,8 +24,7 @@
 
   const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
   const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
-  const ARROW_CLASS =
-    "ripple pointer-events-auto inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full bg-surface-variant text-on-surface transition-opacity disabled:cursor-default disabled:opacity-50";
+  const ARROW_CLASS = `${ROUND_BUTTON_CLASS} pointer-events-auto bg-surface-variant text-on-surface disabled:cursor-default disabled:opacity-50`;
   const IMAGE_WIDTH = $derived(compact ? "13.333rem" : "23.333rem");
   const PEEK = "2.5rem";
   const RAIL_WIDTH = $derived(`min(100%, calc(${IMAGE_WIDTH} + ${PEEK} * 2))`);
@@ -72,12 +74,12 @@
 {#snippet media(item: { url: string; alt?: string; poster?: string })}
   {#if isVideo(item.url)}
     <div
-      class="flex aspect-4/3 max-w-full {compact ? 'h-40' : 'h-70'} items-center justify-center overflow-hidden rounded-panel border border-outline-variant bg-black"
+      class="flex aspect-4/3 max-w-full {compact ? 'h-40' : 'h-70'} items-center justify-center overflow-hidden {MEDIA_FRAME_CLASS} bg-black"
     >
       <!-- svelte-ignore a11y_media_has_caption -->
       <video
         use:mediaSrc={{ url: item.url }}
-        poster={item.poster}
+        use:posterSrc={item.poster}
         controls
         class="max-h-full max-w-full object-contain"
       ></video>
@@ -108,24 +110,26 @@
             </div>
           {/each}
         </div>
-        <button
-          type="button"
-          class="{ARROW_CLASS} absolute left-0"
-          disabled={page === 0}
-          aria-label="previous"
-          onclick={() => goto(page - 1)}
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <button
-          type="button"
-          class="{ARROW_CLASS} absolute right-0"
-          disabled={page >= data.items.length - 1}
-          aria-label="next"
-          onclick={() => goto(page + 1)}
-        >
-          <ChevronRight size={18} />
-        </button>
+        <div class="pointer-events-none absolute inset-0 flex items-center justify-between">
+          <button
+            type="button"
+            class={ARROW_CLASS}
+            disabled={page === 0}
+            aria-label="previous"
+            onclick={() => goto(page - 1)}
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            type="button"
+            class={ARROW_CLASS}
+            disabled={page >= data.items.length - 1}
+            aria-label="next"
+            onclick={() => goto(page + 1)}
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
       </div>
       <div class="flex h-2 items-center gap-1.5">
         {#each data.items as _item, index (index)}
@@ -142,7 +146,7 @@
     </div>
   {/if}
 {:else if data.type === "playlist"}
-  <CardPanel class="w-full gap-2">
+  <CardPanel class="w-full gap-2 {MEDIA_FRAME_CLASS}">
     {#each data.items as item (item.url)}
       <div class="flex w-full min-w-0 flex-col gap-1">
         <span class="truncate text-body-sm text-on-surface-variant">{item.title ?? fileName(item.url)}</span>
@@ -165,7 +169,7 @@
   {:else}
     <div class="relative w-full select-none">
       <div
-        class="flex w-full overflow-hidden rounded-panel bg-card"
+        class="flex w-full overflow-hidden {MEDIA_FRAME_CLASS} bg-card"
         style="height: {DOC_HEIGHT}"
       >
         <PdfView url={data.url} onerror={() => (pdfFailed = true)} />
@@ -175,13 +179,14 @@
   {/if}
 {:else}
   <div class="relative w-full select-none">
-    <iframe
-      use:mediaSrc={{ url: data.url }}
-      title={data.title ?? fileName(data.url)}
-      sandbox="allow-scripts allow-popups"
-      referrerpolicy="no-referrer"
-      class="w-full rounded-panel bg-card {MEDIA_HEIGHT}"
-    ></iframe>
+    <div class="flex w-full overflow-hidden {MEDIA_FRAME_CLASS} bg-card {MEDIA_HEIGHT}">
+      <PageFrame
+        url={data.url}
+        name={fileName(data.url)}
+        title={data.title ?? fileName(data.url)}
+        class="size-full"
+      />
+    </div>
     {@render expand(data.url)}
   </div>
 {/if}

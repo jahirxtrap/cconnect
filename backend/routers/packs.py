@@ -3,6 +3,7 @@ import mimetypes
 from fastapi import APIRouter, HTTPException, WebSocket
 from fastapi.responses import FileResponse, Response
 
+from core.responses import FILE_HEADERS
 from core.ws import stream_watch
 from services import packs
 from services.pack_format import MIME
@@ -20,7 +21,7 @@ async def download_pack(name: str):
     target = packs.file_of(name)
     if target is None:
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(target, media_type=MIME, filename=name)
+    return FileResponse(target, media_type=MIME, filename=name, headers=FILE_HEADERS)
 
 
 @router.get("/packs/{name}/preview")
