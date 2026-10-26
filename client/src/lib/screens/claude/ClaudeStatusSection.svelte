@@ -4,7 +4,7 @@
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { entryFor, entryHint } from "$lib/screens/settings/settingsIndex";
+  import { entryFor, entryText } from "$lib/screens/settings/settingsIndex";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
@@ -26,7 +26,7 @@
   const summary = $derived(
     (() => {
       const entry = entryFor("service_status");
-      return (entry ? entryHint(entry) : "") || pending;
+      return (entry ? entryText(entry) : "") || pending;
     })(),
   );
 

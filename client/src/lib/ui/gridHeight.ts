@@ -12,7 +12,10 @@ const floorToDevicePixel = (value: number) => {
   return Math.floor((value + LAYOUT_UNIT / scale) * scale) / scale;
 };
 
-const floorToLayoutUnit = (value: number) => Math.max(0, Math.floor(value / LAYOUT_UNIT) * LAYOUT_UNIT);
+const roundToLayoutUnit = (value: number) => {
+  const unit = LAYOUT_UNIT / density();
+  return Math.max(0, Math.round(value / unit) * unit);
+};
 
 export const snapToDevicePixel = (value: number) => {
   const scale = density();
@@ -23,7 +26,7 @@ export const gridHeight = (node: HTMLElement) => {
   let pad = 0;
   const read = () => {
     const natural = node.getBoundingClientRect().height - pad;
-    const next = floorToLayoutUnit(ceilToDevicePixel(natural) - natural);
+    const next = roundToLayoutUnit(ceilToDevicePixel(natural) - natural);
     if (next === pad) return;
     pad = next;
     node.style.paddingBottom = pad ? `${pad}px` : "";

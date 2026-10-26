@@ -12,7 +12,7 @@
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { claudeApi } from "$lib/services/claudeApi";
   import { cliApi } from "$lib/services/cliApi";
-  import { entryFor, entryHint } from "$lib/screens/settings/settingsIndex";
+  import { entryFor, entryText } from "$lib/screens/settings/settingsIndex";
   import { useSettingsDialog } from "$lib/screens/settings/useSettingsDialog.svelte";
   import { claudeChangelog, sdkChangelog } from "$lib/services/githubApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -73,8 +73,7 @@
 
   const rowSummary = (id: string) => {
     const entry = entryFor(id);
-    const hint = entry ? entryHint(entry) : "";
-    return hint || pending;
+    return (entry ? entryText(entry) : "") || pending;
   };
 
   $effect(() => {

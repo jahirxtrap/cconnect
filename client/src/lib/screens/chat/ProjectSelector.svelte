@@ -15,6 +15,7 @@
     selected: string | null;
     onSelect: (projectKey: string | null) => void;
     allowAll?: boolean;
+    loading?: boolean;
     shown?: string;
     following?: boolean;
     onFollow?: (() => void) | null;
@@ -26,6 +27,7 @@
     selected,
     onSelect,
     allowAll = true,
+    loading = false,
     shown,
     following = false,
     onFollow = null,
@@ -37,6 +39,7 @@
 
   const nameOf = (projectKey: string | null) => {
     if (!projectKey) return t("ALL_PROJECTS");
+    if (loading) return t("LOADING");
     const project = projects.find((item) => item.projectKey === projectKey);
     return project ? projectLabel(project) : projectKey;
   };

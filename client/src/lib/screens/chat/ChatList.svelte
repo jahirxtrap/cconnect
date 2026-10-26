@@ -185,6 +185,7 @@
       <ProjectSelector
         projects={visibleProjects}
         selected={chat.historyProject}
+        loading={chat.historyLoading}
         onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
       />
     </div>

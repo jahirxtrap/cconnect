@@ -81,8 +81,11 @@ const PROJECT_KEY_SEPARATOR = /[^A-Za-z0-9]/g;
 
 export const projectKeyOf = (path: string): string => path.replace(PROJECT_KEY_SEPARATOR, "-");
 
+export const pathName = (path: string | null | undefined): string | null =>
+  path?.replace(/\\/g, "/").replace(/\/+$/, "").split("/").pop() || null;
+
 export const projectLabel = (project: ProjectInfo): string =>
-  project.name ?? project.path ?? project.projectKey;
+  project.name ?? pathName(project.path) ?? project.projectKey;
 
 const SESSION_ID_PREVIEW = 8;
 
@@ -105,8 +108,7 @@ export const projectFilePath = (base: string | null, relative: string): string =
 export const projectNameOf = (projects: ProjectInfo[], key: string, fallbackPath?: string | null): string => {
   const found = projects.find((item) => item.projectKey === key);
   if (found) return projectLabel(found);
-  const source = fallbackPath?.trim() || key;
-  return source.split(/[\\/]/).filter(Boolean).pop() ?? key;
+  return pathName(fallbackPath?.trim()) ?? key;
 };
 
 export const parsePlacement = (raw: Wire): ChatPlacement => ({

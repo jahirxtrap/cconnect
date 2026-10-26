@@ -9,7 +9,7 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { entryFor, entryHint } from "$lib/screens/settings/settingsIndex";
+  import { entryFor, entryText } from "$lib/screens/settings/settingsIndex";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TrailingIcon from "$lib/ui/TrailingIcon.svelte";
@@ -28,7 +28,7 @@
 
   const rowSummary = (id: string) => {
     const entry = entryFor(id);
-    return (entry ? entryHint(entry) : "") || pending;
+    return (entry ? entryText(entry) : "") || pending;
   };
 
   const memoriesSummary = $derived(

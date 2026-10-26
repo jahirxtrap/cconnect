@@ -69,8 +69,11 @@ fraction of a pixel on every open/close. It takes two halves and neither is enou
   is what clipped the rounded edge of the bars inside a pager. A hardcoded list of snapped
   values is the wrong shape for this; let CSS do the rounding.
 - `gridHeight` pads a node up to the next device pixel from a `ResizeObserver`, which is
-  what a collapsible body needs. It floors the padding to Blink's layout unit (1/64 px) and
-  ignores anything below it — an arbitrary epsilon there is wrong and unstable.
+  what a collapsible body needs. It rounds the padding to Blink's layout unit, and that unit
+  is 1/64 of a **device** pixel where Chromium lays out in device pixels (WebView2, Android):
+  rounding to 1/64 of a CSS px instead left the body 0.016 device px short at dPR 1.25, and
+  the text below it jumped a pixel on every open. An arbitrary epsilon there is wrong and
+  unstable.
 
 ## Chat scroller (`screens/chat/ChatScroller.svelte`)
 

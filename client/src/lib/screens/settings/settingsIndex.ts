@@ -287,10 +287,12 @@ export const entryFor = (id: string | null): SettingsEntry | undefined =>
 export const sectionLabel = (id: SettingsSection): string =>
   SETTINGS_SECTIONS.find((section) => section.id === id)?.label ?? id;
 
+export const entryText = (entry: SettingsEntry): string =>
+  entry.value?.() || (entry.summary ? t(entry.summary) : "");
+
 export const entryHint = (entry: SettingsEntry): string => {
-  const current = entry.value?.();
-  if (current) return current;
-  if (entry.summary) return t(entry.summary);
+  const text = entryText(entry);
+  if (text) return text;
   const holder = entry.dialog ? entryFor(entry.dialog) : undefined;
   const place = t(holder?.label ?? entry.group);
   return place === t(entry.label) || place === t(sectionLabel(entry.section)) ? "" : place;
