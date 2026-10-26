@@ -1,0 +1,1 @@
+export const SIGNING_PUBLIC_KEY = "ul_HStfAYEW6ORusB6WucNXDFZEjSW3lNyG4to_kA_k";
