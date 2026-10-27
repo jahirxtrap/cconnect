@@ -63,7 +63,7 @@
     input.value = "";
   };
 
-  const offerServer = (entry: ServerPack) => packOffers.offer(entry.file, () => serverPacks.download(entry));
+  const offerServer = (entry: ServerPack) => packOffers.offerRemote(entry.file, () => serverPacks.download(entry));
 
   const installServer = async (entry: ServerPack) => {
     installing = entry.id;
@@ -72,7 +72,7 @@
       if (!blob) throw new Error();
       await installPack(await inspectPack(blob));
     } catch {
-      packOffers.offer(entry.file, () => Promise.resolve(blob));
+      packOffers.offerRemote(entry.file, () => Promise.resolve(blob));
     } finally {
       installing = null;
     }

@@ -44,16 +44,14 @@
       <Button onclick={() => (deleting = true)} variant="danger">{t("DELETE")}</Button>
     {/if}
     <Button onclick={() => void save()} variant="outlined">{t("EXPORT")}</Button>
+    <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
     {#if canUsePack(pack)}
-      <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
       <Button
         onclick={() => {
           usePack(pack);
           onDismiss();
         }}>{t("PACK_USE")}</Button
       >
-    {:else}
-      <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
     {/if}
   {/snippet}
   <div class="flex w-full flex-col gap-3">

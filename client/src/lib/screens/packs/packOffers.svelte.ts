@@ -2,6 +2,7 @@ export interface PackOffer {
   id: number;
   name: string;
   load: () => Promise<Blob | null>;
+  remote: boolean;
   url: string | null;
 }
 
@@ -11,8 +12,16 @@ class PackOffers {
 
   readonly current = $derived(this.queue[0] ?? null);
 
-  offer(name: string, load: () => Promise<Blob | null>, url: string | null = null) {
-    this.queue = [...this.queue, { id: this.#next++, name, load, url }];
+  offer(name: string, load: () => Promise<Blob | null>) {
+    this.#add({ name, load, remote: false, url: null });
+  }
+
+  offerRemote(name: string, load: () => Promise<Blob | null>, url: string | null = null) {
+    this.#add({ name, load, remote: true, url });
+  }
+
+  #add(offer: Omit<PackOffer, "id">) {
+    this.queue = [...this.queue, { ...offer, id: this.#next++ }];
   }
 
   dismiss() {

@@ -10,14 +10,13 @@
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import { isArchive, visibleName } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
-  import { openExternal } from "$lib/platform";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { createSegmenter, type Segment } from "$lib/markdown/render";
   import { backend, sharedRootOf } from "$lib/services/backend.svelte";
   import { contextServer } from "$lib/services/serverContext";
   import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
-  import ConfirmDialog from "./ConfirmDialog.svelte";
+  import ExternalLinkDialog from "./ExternalLinkDialog.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import { hscrollbar } from "./scrollbar";
 
@@ -186,15 +185,5 @@
 {/snippet}
 
 {#if externalLink}
-  {@const link = externalLink}
-  <ConfirmDialog
-    title={t("OPEN_EXTERNAL_LINK")}
-    text={t("OPEN_EXTERNAL_LINK_MESSAGE", link)}
-    confirmLabel={t("OPEN")}
-    onConfirm={() => {
-      openExternal(link);
-      externalLink = null;
-    }}
-    onDismiss={() => (externalLink = null)}
-  />
+  <ExternalLinkDialog url={externalLink} onDismiss={() => (externalLink = null)} />
 {/if}

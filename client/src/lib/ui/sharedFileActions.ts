@@ -27,9 +27,15 @@ const either =
   (source: FileSource, filename: string) =>
     "url" in source ? fromUrl(source.url, filename) : fromBlob(filename, source.blob);
 
+export const OPEN_EXTERNALLY_ACTION: FileAction = {
+  label: "OPEN_EXTERNALLY",
+  icon: ExternalLink,
+  run: either(openSharedExternally, openFileExternally),
+};
+
 export const FILE_ACTIONS: readonly FileAction[] = [
   { label: "SAVE", icon: Download, run: either(downloadShared, saveFileToDownloads) },
   { label: "SAVE_AS", icon: Save, run: either(saveSharedAs, saveFileAs) },
-  { label: "OPEN_EXTERNALLY", icon: ExternalLink, run: either(openSharedExternally, openFileExternally) },
+  OPEN_EXTERNALLY_ACTION,
   { label: "SHARE", icon: Share2, run: either(shareShared, shareFile) },
 ];

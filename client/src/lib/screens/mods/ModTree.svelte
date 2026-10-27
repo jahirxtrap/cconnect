@@ -5,7 +5,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import type { ModChild, ModComponent, ModNode } from "$lib/data/modModels";
   import { t } from "$lib/i18n/index.svelte";
-  import { openExternal } from "$lib/platform";
+  import ExternalLinkDialog from "$lib/ui/ExternalLinkDialog.svelte";
   import { typingOnTouch } from "$lib/ui/keepFocus";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -87,7 +87,7 @@
     secondary: "bg-surface-variant",
   };
   const PLAIN_CLASS =
-    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap select-none enabled:hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap transition-colors select-none enabled:hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
   const KEYCAP_CLASS =
     "inline-flex h-[1.125rem] min-w-[1.125rem] shrink-0 items-center justify-center rounded-sm bg-surface-variant px-1 font-mono text-label-sm leading-none text-on-surface-variant uppercase";
 
@@ -99,6 +99,7 @@
   const hotBoxes = new SvelteSet<string>();
   let drafts = $state<Record<string, string>>({});
   let openMenu = $state<string | null>(null);
+  let externalLink = $state<string | null>(null);
 
   const prop = (item: ModNode, key: string): string | null =>
     typeof item.props[key] === "string" ? (item.props[key] as string) : null;
@@ -360,10 +361,10 @@
     {@const href = prop(child, "href") ?? ""}
     <a
       {href}
-      class="cursor-pointer wrap-anywhere text-accent underline-offset-2 hover:underline"
+      class="cursor-pointer wrap-anywhere text-accent underline"
       onclick={(event) => {
         event.preventDefault();
-        if (href) openExternal(href);
+        if (href) externalLink = href;
       }}
       >{#if child.children.length}{@render children(child, { ...ctx, inText: true })}{:else}{prop(child, "label") ??
           href}{/if}</a
@@ -478,3 +479,7 @@
 <div class="relative flex min-w-0 flex-col">
   {@render render(node, { ...ROOT, edge: flush })}
 </div>
+
+{#if externalLink}
+  <ExternalLinkDialog url={externalLink} onDismiss={() => (externalLink = null)} />
+{/if}

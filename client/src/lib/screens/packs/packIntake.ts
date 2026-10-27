@@ -15,7 +15,7 @@ export const offerFiles = (files: File[]) => {
   for (const file of files) packOffers.offer(file.name, () => Promise.resolve(file));
 };
 
-export const offerShared = (url: string, name: string) => packOffers.offer(name, () => fetchShared(url), url);
+export const offerShared = (url: string, name: string) => packOffers.offerRemote(name, () => fetchShared(url), url);
 
 export const takePacks = async (files: File[]): Promise<File[]> => {
   const rest: File[] = [];

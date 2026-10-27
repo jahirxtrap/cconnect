@@ -11,6 +11,7 @@
   import { untrack, type Snippet } from "svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { provideDialogSettled } from "./dialogSettled";
   import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS } from "./menuSurface";
   import { viewportScrollbar } from "./scrollbar";
 
@@ -40,6 +41,10 @@
 
   const instant = untrack(() => navigation.returning);
 
+  let settled = $state(instant);
+
+  provideDialogSettled(() => settled);
+
   $effect(() => pushDismiss(() => onDismiss()));
 </script>
 
@@ -49,6 +54,9 @@
     <Dialog.Content
       data-instant={instant || undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
+      onanimationend={(event) => {
+        if (event.target === event.currentTarget) settled = true;
+      }}
       class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-[min(40rem,calc(var(--safe-height)_-_2rem))] w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
       <div class="flex items-center">
