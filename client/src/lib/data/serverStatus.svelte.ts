@@ -3,13 +3,13 @@ import type { ConnectionState } from "./chatModels";
 import { chatListFor } from "./chatList.svelte";
 import { compareVersions, satisfies } from "./compat";
 import { onWake } from "$lib/platform/wake";
-import { backend } from "$lib/services/backend.svelte";
+import { backend, tokenOf } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
 import { latestRelease, type Release } from "$lib/services/githubApi";
 
 const POLL_MS = 30_000;
 
-export type CompatNotice = "app_outdated" | "server_outdated" | "cli_outdated" | "unauthorized";
+export type CompatNotice = "app_outdated" | "server_outdated" | "cli_outdated" | "unauthorized" | "token_rejected";
 
 class ServerStatus {
   reachable = $state(false);
@@ -19,6 +19,8 @@ class ServerStatus {
   release = $state<Release | null>(null);
   updateAvailable = $state(false);
   releaseChecked = $state(false);
+  releaseChecking = $state(false);
+  releaseFailed = $state(false);
 
   #releaseRequested = false;
   #request = 0;
@@ -41,7 +43,7 @@ class ServerStatus {
 
   readonly notices = $derived.by<CompatNotice[]>(() => {
     if (!this.reachable) return [];
-    if (this.unauthorized) return ["unauthorized"];
+    if (this.unauthorized) return [tokenOf(backend.active) ? "token_rejected" : "unauthorized"];
     const notices: CompatNotice[] = [];
     if (this.appOutdated) notices.push("app_outdated");
     if (this.serverOutdated) notices.push("server_outdated");
@@ -85,10 +87,14 @@ class ServerStatus {
   async checkRelease(force = false) {
     if (this.#releaseRequested && !force) return;
     this.#releaseRequested = true;
-    const found = (await latestRelease()) ?? this.release;
+    this.releaseChecking = true;
+    const latest = await latestRelease();
+    const found = latest ?? this.release;
     this.release = found;
     this.updateAvailable = !!found && compareVersions(found.tag.replace(/^v/, ""), APP_VERSION) > 0;
+    this.releaseFailed = latest === null;
     this.releaseChecked = true;
+    this.releaseChecking = false;
   }
 
   async refresh() {

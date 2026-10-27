@@ -4,6 +4,7 @@
   import FolderPen from "@lucide/svelte/icons/folder-pen";
   import FolderGit from "@lucide/svelte/icons/folder-git";
   import Package from "@lucide/svelte/icons/package";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import { t } from "$lib/i18n/index.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { backend } from "$lib/services/backend.svelte";
@@ -18,9 +19,9 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
+  import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
-  import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CliControls from "./CliControls.svelte";
   import ProjectPromptDialog from "./ProjectPromptDialog.svelte";
@@ -110,14 +111,18 @@
       </TooltipIconButton>
     {/snippet}
   </PreferenceRow>
-  <div class="flex flex-col gap-2.5 px-4 py-3">
-    <SwitchRow
-      title={t("SDK_AUTO_UPDATE")}
-      summary={t("SDK_AUTO_UPDATE_SUMMARY")}
-      checked={sdkAutoUpdate}
-      {enabled}
-      onChange={setSdkAutoUpdate}
-    />
+  <PreferenceRow
+    icon={RefreshCw}
+    title={t("SDK_AUTO_UPDATE")}
+    summary={t("SDK_AUTO_UPDATE_SUMMARY")}
+    {enabled}
+    onclick={() => setSdkAutoUpdate(!sdkAutoUpdate)}
+  >
+    {#snippet trailing()}
+      <CompactSwitch checked={sdkAutoUpdate} onCheckedChange={setSdkAutoUpdate} {enabled} />
+    {/snippet}
+  </PreferenceRow>
+  <div class="px-4 py-3">
     <ActionButton
       text={sdkUpdating ? t("SDK_UPDATING") : t("SDK_UPDATE")}
       enabled={enabled && !sdkUpdating}

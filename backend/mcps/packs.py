@@ -47,7 +47,9 @@ GUIDE = "\n".join(
         f"themes/<id>.json: {{name, kind: {' or '.join(SCHEMA['themeKinds'])}, extends?: theme id, accent?, "
         "syntax?: syntax id, colors: {token: color}}. A token left out comes from extends, or from the default "
         "theme of its kind, and the -bg, hover and scrollbar tokens derive from their base color.",
-        f"Theme tokens: {', '.join(SCHEMA['colors'])}.",
+        "Theme tokens and what each paints:",
+        *(f"- {key}: {SCHEMA['colorRoles'][key]}" for key in SCHEMA["colors"]),
+        "The named colors a mod draws take red, green, yellow, blue, cyan and gray, and magenta takes purple.",
         "syntax/<id>.json: a VS Code color theme with tokenColors.",
         f"terminal/<id>.json: {{name, colors: {{key: color}}}} with keys {', '.join(SCHEMA['terminal'])}.",
         "accents.json: [{name, color, id?}].",

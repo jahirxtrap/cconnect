@@ -31,6 +31,9 @@
     "orange": "#d17a1b",
     "cyan": "#0e7490",
     "purple": "#8250df",
-    "gray": "#656d76"
+    "gray": "#656d76",
+    "logo": "#1a1a1a",
+    "logo-ring": "#3f3f46",
+    "logo-mark": "#ededed"
   }
 }

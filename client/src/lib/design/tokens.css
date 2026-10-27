@@ -57,6 +57,9 @@
   --color-cyan: var(--c-cyan);
   --color-purple: var(--c-purple);
   --color-gray: var(--c-gray);
+  --color-logo: var(--c-logo);
+  --color-logo-ring: var(--c-logo-ring);
+  --color-logo-mark: var(--c-logo-mark);
 
   --chat-gap-lg: 16px;
   --chat-gap-sm: 6px;

@@ -151,11 +151,6 @@ export const createSystemApi = (client: HttpClient, profile: () => Profile) => (
     return (await client.post("/system/restart")) !== null;
   },
 
-  async updateStatus(): Promise<ServerUpdate | null> {
-    const data = await client.get<Wire>("/system/update");
-    return data && parseUpdate(data);
-  },
-
   async checkUpdate(): Promise<ServerUpdate | null> {
     const data = await client.post<Wire>("/system/update/check");
     return data && parseUpdate(data);

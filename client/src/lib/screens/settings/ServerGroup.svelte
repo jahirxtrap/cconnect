@@ -25,6 +25,7 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import OutputPanel from "$lib/ui/OutputPanel.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
+  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
@@ -91,9 +92,8 @@
   const checkUpdate = async () => {
     checkingUpdate = true;
     failure = null;
-    const result = await systemApi.checkUpdate();
+    repo = await systemApi.checkUpdate();
     checkingUpdate = false;
-    if (result) repo = result;
   };
 
   const runUpdate = async () => {
@@ -121,7 +121,7 @@
     loads.track(
       (async () => {
         await serverSettings.load();
-        if (backend.configured) repo = await systemApi.updateStatus();
+        if (backend.configured) await checkUpdate();
       })(),
     );
 
@@ -241,14 +241,10 @@
     />
   {/if}
 
-  <div
-    class="flex w-full items-center gap-3 px-4 py-3 {ready ? '' : 'opacity-40'} {flash
-      ? 'flash-highlight'
-      : ''}"
-  >
-    <Server size={18} class="shrink-0 text-on-surface-variant" />
+  <div class="{PREFERENCE_ROW_CLASS} {ready ? '' : 'opacity-40'} {flash ? 'flash-highlight' : ''}">
+    <Server size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
     <div class="min-w-0 flex-1">
-      <p class="truncate text-body-md">{t("SERVER_VERSION")}</p>
+      <p class="truncate text-item-title">{t("SERVER_VERSION")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">
         {ready ? versionSummary : loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE")}
       </p>
@@ -257,8 +253,10 @@
       {/if}
       {#if updateAvailable}
         <p class="text-body-sm text-accent">
-          {packaged ? t("SERVER_NEW_VERSION", repo?.latest ?? "") : plural("SERVER_BEHIND", repo?.behind ?? 0)}
+          {packaged ? t("UPDATE_AVAILABLE", repo?.latest ?? "") : plural("SERVER_BEHIND", repo?.behind ?? 0)}
         </p>
+      {:else if repo && !repo.ok}
+        <p class="text-body-sm text-on-surface-variant">{t("UPDATE_CHECK_FAILED")}</p>
       {:else if (repo?.tracked || packaged) && repo?.ok}
         <p class="text-body-sm text-on-surface-variant">
           {serverModified ? t("SERVER_MODIFIED") : t("UP_TO_DATE")}

@@ -34,7 +34,7 @@
 <div aria-hidden="true" class="pointer-events-none absolute inset-0 overflow-hidden {className}">
   {#if art === "logo"}
     <div class="absolute flex items-center justify-center" style={frame}>
-      <svg viewBox="0 0 108 108" class="size-[min(60%,24rem)]"><LogoGlyph /></svg>
+      <svg viewBox="0 0 108 108" class="size-[min(60%,24rem)]"><LogoGlyph ring="stroke-outline" mark="stroke-on-background" /></svg>
     </div>
   {:else if url}
     <img

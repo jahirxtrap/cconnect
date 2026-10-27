@@ -17,7 +17,7 @@
 >
   <path
     d="M24,0 L84,0 A24,24 0 0 1 108,24 L108,84 A24,24 0 0 1 84,108 L24,108 A24,24 0 0 1 0,84 L0,24 A24,24 0 0 1 24,0 Z"
-    class="fill-surface-variant"
+    class="fill-logo"
   />
-  <LogoGlyph />
+  <LogoGlyph ring="stroke-logo-ring" mark="stroke-logo-mark" />
 </svg>

@@ -3,6 +3,7 @@
 import subprocess
 import sys
 from importlib.metadata import PackageNotFoundError, version as installed_version
+from typing import Optional
 
 import httpx
 
@@ -21,13 +22,14 @@ def _parts(version: str) -> tuple[int, ...]:
     return tuple(int(piece) for piece in version.split(".") if piece.isdigit())
 
 
-def _released() -> str:
-    """The version on PyPI, empty unless it is newer than the one running."""
+def _released() -> Optional[str]:
+    """The version on PyPI when it is newer than the one running, empty when it is not, None when PyPI did not answer."""
     try:
         answer = httpx.get(_RELEASE_URL, timeout=_RELEASE_TIMEOUT)
-        latest = str(answer.json()["info"]["version"]) if answer.status_code == 200 else ""
+        answer.raise_for_status()
+        latest = str(answer.json()["info"]["version"])
     except (httpx.HTTPError, ValueError, KeyError):
-        return ""
+        return None
     return latest if _parts(latest) > _parts(release.VERSION) else ""
 
 
@@ -119,7 +121,8 @@ def status() -> dict:
 
 def check() -> dict:
     if paths.INSTALLED:
-        return {**_package_status(), "latest": _released(), "ok": True, "message": ""}
+        latest = _released()
+        return {**_package_status(), "latest": latest or "", "ok": latest is not None, "message": ""}
     if not revision():
         return status()
     try:

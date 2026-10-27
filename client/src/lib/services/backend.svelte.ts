@@ -48,8 +48,10 @@ export const baseUrlOf = (profile: Profile) => (isConfigured(profile) ? `${origi
 
 export const sharedRootOf = (profile: Profile) => `${baseUrlOf(profile) || "/api"}/shared`;
 
+export const tokenOf = (profile: Profile) => (profile?.authKind === "bearer" ? profile.authToken : "");
+
 export const withToken = (url: string, profile: Profile) => {
-  const token = profile?.authKind === "bearer" ? profile.authToken : "";
+  const token = tokenOf(profile);
   return token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
 };
 
@@ -58,9 +60,8 @@ export const socketUrlOf = (profile: Profile, path: string) =>
 
 export const authHeadersOf = (profile: Profile): Record<string, string> => {
   if (!profile) return {};
-  if (profile.authKind === "bearer" && profile.authToken) {
-    return { Authorization: `Bearer ${profile.authToken}` };
-  }
+  const token = tokenOf(profile);
+  if (token) return { Authorization: `Bearer ${token}` };
   if (profile.authKind === "basic" && (profile.authUser || profile.authPassword)) {
     return { Authorization: `Basic ${btoa(`${profile.authUser}:${profile.authPassword}`)}` };
   }

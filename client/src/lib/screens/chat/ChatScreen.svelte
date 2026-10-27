@@ -63,6 +63,7 @@
     server_outdated: "COMPAT_SERVER_OUTDATED",
     cli_outdated: "COMPAT_CLI_OUTDATED",
     unauthorized: "COMPAT_UNAUTHORIZED",
+    token_rejected: "COMPAT_TOKEN_REJECTED",
   };
 
   let expanded = $state(settings.leftExpanded);
@@ -422,7 +423,7 @@
       actionLabel={t("SETTINGS")}
       onAction={() => {
         dismissed = [...dismissed, notice];
-        if (notice === "unauthorized") navigation.openSettings("environments");
+        if (notice === "unauthorized" || notice === "token_rejected") navigation.openSettings("environments");
         else if (notice === "server_outdated") navigation.openSettings("server");
         else if (notice !== "cli_outdated") navigation.openSettings("about");
         else if (layout.mobile) navigation.openClaude("cli");

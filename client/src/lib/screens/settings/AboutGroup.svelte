@@ -50,18 +50,13 @@
   let homeScreenOpen = $state(false);
   let owner = $state<Profile | null>(null);
   let contributor = $state<Profile | null>(null);
-  let checking = $state(false);
-
   const release = $derived(serverStatus.release);
   const updateAvailable = $derived(serverStatus.updateAvailable && !!release);
+  const checking = $derived(serverStatus.releaseChecking);
 
   const open = (url: string) => openExternal(url);
 
-  const check = async () => {
-    checking = true;
-    await serverStatus.checkRelease(true);
-    checking = false;
-  };
+  const check = () => serverStatus.checkRelease(true);
 
   const downloadingUpdate = $derived(updater.progress !== null);
 
@@ -136,7 +131,9 @@
       {/if}
         {#if updateAvailable && release}
           <p class="text-body-sm text-accent">{t("UPDATE_AVAILABLE", release.tag)}</p>
-        {:else if serverStatus.releaseChecked && !serverStatus.appOutdated && !serverStatus.serverOutdated}
+        {:else if serverStatus.releaseFailed}
+          <p class="text-body-sm text-on-surface-variant">{t("UPDATE_CHECK_FAILED")}</p>
+        {:else if serverStatus.releaseChecked}
           <p class="text-body-sm text-on-surface-variant">{t("UP_TO_DATE")}</p>
         {/if}
       </div>
