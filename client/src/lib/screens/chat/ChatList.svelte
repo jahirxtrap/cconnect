@@ -17,10 +17,10 @@
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { LIST_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import SearchBar from "$lib/ui/SearchBar.svelte";
+  import { RowDrag } from "$lib/ui/rowDrag.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ConversationRow from "./ConversationRow.svelte";
   import { CategoryDrag } from "./dragCategories.svelte";
-  import { ChatDrag } from "./dragChats.svelte";
   import EnvironmentSelector from "./EnvironmentSelector.svelte";
   import ProjectSelector from "./ProjectSelector.svelte";
   import type { ChatState } from "./state.svelte";
@@ -105,7 +105,7 @@
   const visibleProjects = $derived(chat.historyProjects);
 
   let list = $state<HTMLDivElement | null>(null);
-  const drag = new ChatDrag();
+  const drag = new RowDrag();
   const categoryDrag = new CategoryDrag();
   let settling = $state(false);
 
@@ -284,11 +284,11 @@
         {#if !group.category || !chat.isCategoryCollapsed(group.category.id)}
           {@const groupId = group.category?.id ?? null}
           {#each group.sessions as session, index (session.sessionId)}
-            {@const dragged = drag.sessionId === session.sessionId}
+            {@const dragged = drag.id === session.sessionId}
             {@const carried = categoryDrag.dragging(groupId)}
             <!-- svelte-ignore a11y_no_static_element_interactions -->
             <div
-              data-session={session.sessionId}
+              data-row={session.sessionId}
               data-group={groupId ?? ""}
               data-index={index}
               class="relative {dragged || carried ? 'z-10' : ''} {drag.active || categoryDrag.active

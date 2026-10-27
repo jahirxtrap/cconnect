@@ -17,6 +17,7 @@
   import ColorDialog from "$lib/ui/ColorDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import Drawer from "$lib/ui/Drawer.svelte";
+  import { DROP_BORDER_CLASS } from "$lib/ui/fileDrop";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -442,7 +443,7 @@
 
 {#snippet dropHint()}
   <div
-    class="pointer-events-none absolute inset-0 z-40 animate-[drop-overlay-enter_90ms_ease-out] rounded-panel ring-2 ring-[var(--c-accent-ring)] ring-inset"
+    class="pointer-events-none absolute inset-0 z-40 animate-[drop-overlay-enter_90ms_ease-out] rounded-panel {DROP_BORDER_CLASS}"
   ></div>
 {/snippet}
 

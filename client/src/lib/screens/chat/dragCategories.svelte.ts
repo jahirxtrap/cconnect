@@ -103,7 +103,7 @@ export class CategoryDrag {
   #measure() {
     const list = this.#list;
     if (!list) return;
-    const nodes = Array.from(list.querySelectorAll<HTMLElement>("[data-header], [data-session]"));
+    const nodes = Array.from(list.querySelectorAll<HTMLElement>("[data-header], [data-row]"));
     const blocks: Block[] = [];
     let current: Block | null = null;
     for (const node of nodes) {

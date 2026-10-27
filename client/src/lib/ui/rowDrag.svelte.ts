@@ -1,8 +1,17 @@
-import { DRAG_PRESS_MS, MOUSE_SLOP, TOUCH_SLOP } from "$lib/ui/press";
+import { DRAG_PRESS_MS, MOUSE_SLOP, TOUCH_SLOP } from "./press";
 
 export interface DropTarget {
   categoryId: string | null;
   index: number | null;
+}
+
+export interface RowOptions {
+  list: HTMLElement | null;
+  manual: boolean;
+  origin: DropTarget;
+  onExpand?: (categoryId: string) => void;
+  onCommit: (id: string, target: DropTarget) => void;
+  onOutside?: (id: string, event: PointerEvent) => boolean;
 }
 
 interface Slot {
@@ -23,9 +32,10 @@ interface Drop {
   y: number;
 }
 
-const SPRING_MS = 800;
+export const SPRING_MS = 800;
 const EDGE = 48;
 const EDGE_STEP = 12;
+const HALF = 2;
 
 const swallow = (event: MouseEvent) => {
   event.preventDefault();
@@ -36,8 +46,8 @@ const blockScroll = (event: TouchEvent) => event.preventDefault();
 
 const blockContext = (event: Event) => event.preventDefault();
 
-export class ChatDrag {
-  sessionId = $state<string | null>(null);
+export class RowDrag {
+  id = $state<string | null>(null);
   target = $state<DropTarget | null>(null);
   offset = $state(0);
 
@@ -62,10 +72,11 @@ export class ChatDrag {
   #scroller: number | null = null;
   #frame: number | null = null;
   #expand: ((categoryId: string) => void) | null = null;
-  #commit: ((sessionId: string, target: DropTarget) => void) | null = null;
+  #commit: ((id: string, target: DropTarget) => void) | null = null;
+  #outside: ((id: string, event: PointerEvent) => boolean) | null = null;
 
   get active(): boolean {
-    return this.sessionId !== null;
+    return this.id !== null;
   }
 
   shiftFor(key: string): number {
@@ -82,47 +93,47 @@ export class ChatDrag {
     return this.active && this.target?.categoryId === categoryId;
   }
 
-  begin(
-    event: PointerEvent,
-    sessionId: string,
-    options: {
-      list: HTMLElement | null;
-      manual: boolean;
-      origin: DropTarget;
-      onExpand: (categoryId: string) => void;
-      onCommit: (sessionId: string, target: DropTarget) => void;
-    },
-  ) {
+  begin(event: PointerEvent, id: string, options: RowOptions) {
     if (event.button !== undefined && event.button !== 0) return;
-    this.#list = options.list;
-    this.#manual = options.manual;
-    this.#expand = options.onExpand;
-    this.#commit = options.onCommit;
-    this.#origin = options.origin;
-    this.#startX = event.clientX;
-    this.#startY = event.clientY;
-    this.#pointer = event.clientY;
-    this.#touch = event.pointerType === "touch";
-    const start = () => this.#start(sessionId);
+    this.#configure(options, event.clientX, event.clientY, event.pointerType === "touch");
+    const start = () => this.#start(id, false);
     if (this.#touch) this.#press = setTimeout(start, DRAG_PRESS_MS);
     else this.#pending = start;
+  }
+
+  adopt(id: string, x: number, y: number, touch: boolean, options: RowOptions) {
+    this.#configure(options, x, y, touch);
+    this.#start(id, true);
+  }
+
+  #configure(options: RowOptions, x: number, y: number, touch: boolean) {
+    this.#list = options.list;
+    this.#manual = options.manual;
+    this.#expand = options.onExpand ?? null;
+    this.#commit = options.onCommit;
+    this.#outside = options.onOutside ?? null;
+    this.#origin = options.origin;
+    this.#startX = x;
+    this.#startY = y;
+    this.#pointer = y;
+    this.#touch = touch;
     window.addEventListener("pointermove", this.#onMove);
     window.addEventListener("pointerup", this.#onUp);
     window.addEventListener("pointercancel", this.#onUp);
   }
 
-  #start(sessionId: string) {
+  #start(id: string, centered: boolean) {
     this.#press = null;
     this.#pending = null;
     if (this.#touch) {
       window.addEventListener("touchmove", blockScroll, { passive: false });
       window.addEventListener("contextmenu", blockContext);
     }
-    this.sessionId = sessionId;
+    this.id = id;
     this.#measure();
     const row = this.#slots[this.#from];
     this.#height = row ? row.bottom - row.top : 0;
-    this.#grab = row ? this.#pointer - row.top : 0;
+    this.#grab = row ? (centered ? this.#height / HALF : this.#pointer - row.top) : 0;
     this.#to = this.#from;
     this.target = this.#origin;
     this.#watch();
@@ -131,18 +142,12 @@ export class ChatDrag {
   #measure() {
     const list = this.#list;
     if (!list) return;
-    const nodes = Array.from(
-      list.querySelectorAll<HTMLElement>("[data-session], [data-header], [data-spacer]"),
-    );
+    const nodes = Array.from(list.querySelectorAll<HTMLElement>("[data-row], [data-header], [data-spacer]"));
     this.#slots = nodes.map((node) => {
       const box = node.getBoundingClientRect();
       const header = node.dataset.header !== undefined;
       const spacer = node.dataset.spacer !== undefined;
-      const key = spacer
-        ? `spacer:${node.dataset.spacer}`
-        : header
-          ? `cat:${node.dataset.header}`
-          : (node.dataset.session ?? "");
+      const key = spacer ? `spacer:${node.dataset.spacer}` : header ? `cat:${node.dataset.header}` : (node.dataset.row ?? "");
       return {
         key,
         categoryId: header ? (node.dataset.header ?? null) : node.dataset.group || null,
@@ -154,7 +159,7 @@ export class ChatDrag {
         bottom: box.bottom,
       };
     });
-    this.#from = this.#slots.findIndex((slot) => slot.key === this.sessionId);
+    this.#from = this.#slots.findIndex((slot) => slot.key === this.id);
     this.#tick++;
   }
 
@@ -190,6 +195,10 @@ export class ChatDrag {
     }
     if (!this.active) return;
     event.preventDefault();
+    if (this.id !== null && this.#outside?.(this.id, event)) {
+      this.#detach();
+      return;
+    }
     this.#follow();
     this.#aim();
     this.#autoScroll();
@@ -222,7 +231,7 @@ export class ChatDrag {
         continue;
       }
       drops.push({ categoryId: slot.categoryId, index: siblings, slotIndex: at, y: slot.top });
-      if (slot.key !== this.sessionId) siblings++;
+      if (slot.key !== this.id) siblings++;
       if (ends) drops.push({ categoryId: slot.categoryId, index: siblings, slotIndex: at + 1, y: slot.bottom });
     }
     return drops;
@@ -287,15 +296,15 @@ export class ChatDrag {
   }
 
   #onUp = () => {
-    const sessionId = this.sessionId;
+    const id = this.id;
     const target = this.target;
     const origin = this.#origin;
     const dragged = this.active;
     this.#detach();
     if (dragged) window.addEventListener("click", swallow, { capture: true, once: true });
-    if (!sessionId || !target) return;
+    if (!id || !target) return;
     const moved = target.categoryId !== origin?.categoryId || (target.index !== null && target.index !== origin?.index);
-    if (moved) this.#commit?.(sessionId, target);
+    if (moved) this.#commit?.(id, target);
   };
 
   #detach() {
@@ -306,7 +315,7 @@ export class ChatDrag {
     this.#stopScroll();
     if (this.#frame !== null) cancelAnimationFrame(this.#frame);
     this.#frame = null;
-    this.sessionId = null;
+    this.id = null;
     this.target = null;
     this.#origin = null;
     this.offset = 0;

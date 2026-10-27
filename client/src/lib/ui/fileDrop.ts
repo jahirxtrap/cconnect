@@ -1,6 +1,8 @@
 import { guessMimeType } from "$lib/data/previewKind";
 import { isTauri } from "$lib/platform";
 
+export const DROP_BORDER_CLASS = "border-2 border-accent/85";
+
 export interface FileDropZone {
   accepts: () => boolean;
   drop: (files: File[]) => void;

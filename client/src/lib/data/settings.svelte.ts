@@ -242,6 +242,20 @@ class Settings {
     this.#write("right_width", value);
   }
 
+  get paneBar(): string[] {
+    return this.#list("pane_bar");
+  }
+  set paneBar(value: string[]) {
+    this.#write("pane_bar", value.join(","));
+  }
+
+  get paneMenu(): string[] {
+    return this.#list("pane_menu");
+  }
+  set paneMenu(value: string[]) {
+    this.#write("pane_menu", value.join(","));
+  }
+
   get minimizeToTray() {
     return this.#read<boolean>("minimize_to_tray");
   }

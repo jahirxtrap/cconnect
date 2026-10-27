@@ -21,6 +21,8 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "chat_view_full", kind: "boolean", fallback: false, backup: true },
   { key: "show_timestamps", kind: "boolean", fallback: false, backup: true },
   { key: "mod_band_handle", kind: "boolean", fallback: true, backup: true },
+  { key: "pane_bar", kind: "strings", fallback: "", backup: true },
+  { key: "pane_menu", kind: "strings", fallback: "", backup: true },
   { key: "minimize_to_tray", kind: "boolean", fallback: false, backup: true },
   { key: "browser_adblock", kind: "boolean", fallback: true, backup: true },
   { key: "browser_adblock_lists", kind: "strings", fallback: "easylist,easyprivacy,ublock", backup: true },

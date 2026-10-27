@@ -63,7 +63,7 @@ export const SCREENS: ScreenEntry[] = [
   },
 ];
 
-const PANE_TOOLS: RightKind[] = ["terminal", "browser", "project", "mods"];
+export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods"];
 
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),
@@ -76,12 +76,4 @@ export type PaneView = Pick<ScreenEntry, "kind" | "label" | "icon">;
 
 export const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
 
-export const PANE_TOOL_VIEWS: PaneView[] = PANE_TOOLS.map(screenFor);
-
-const MORE_VIEWS: PaneView[] = SCREENS.filter((screen) => !PANE_TOOLS.includes(screen.kind));
-
-export const paneMenuViews = (mobile: boolean, all: boolean): PaneView[] => [
-  ...(mobile ? [] : [CHAT_VIEW]),
-  ...(all ? PANE_TOOL_VIEWS : []),
-  ...MORE_VIEWS,
-];
+export const PANE_VIEWS: PaneView[] = [CHAT_VIEW, ...SCREENS];
