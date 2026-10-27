@@ -24,7 +24,6 @@
     align?: "start" | "center" | "end";
     matchTriggerWidth?: boolean;
     triggerClass?: string;
-    contentClass?: string;
     trigger?: Snippet;
     triggerChild?: Snippet<[Record<string, unknown>]>;
     header?: Snippet;
@@ -39,7 +38,6 @@
     align = "start",
     matchTriggerWidth = false,
     triggerClass = "",
-    contentClass = "",
     trigger,
     triggerChild,
     header,
@@ -96,7 +94,7 @@
       sideOffset={4}
       collisionPadding={layout.menuPadding}
       style={matchTriggerWidth ? "min-width: var(--bits-dropdown-menu-anchor-width)" : ""}
-      class="{MENU_CONTENT_CLASS} {contentClass}"
+      class={MENU_CONTENT_CLASS}
     >
       {#if header}
         <div class={MENU_HEAD_CLASS}>{@render header()}</div>

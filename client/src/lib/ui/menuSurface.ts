@@ -14,7 +14,7 @@ export const TOOLTIP_CLASS = `rounded-md px-2 py-1 text-body-sm ${FLOAT}`;
 
 const MENU_SURFACE = `menu-surface z-70 ${FLOAT_SURFACE_CLASS}`;
 
-const MENU_BOUNDS = "max-h-96 min-w-52 max-w-[var(--bits-floating-available-width,100vw)]";
+const MENU_BOUNDS = "max-h-96 min-w-52 max-w-[min(20rem,var(--bits-floating-available-width,100vw))]";
 
 export const MENU_LIST_CLASS = `${MENU_SURFACE} flex flex-col`;
 
@@ -24,7 +24,7 @@ export const MENU_CONTENT_CLASS = `${MENU_LIST_CLASS} ${MENU_BOUNDS}`;
 
 export const MENU_HEAD_CLASS = "shrink-0 px-1 pt-1";
 
-export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w-[calc(100vw-2rem)]`;
+export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w-[min(20rem,calc(100vw-2rem))]`;
 
 export const MENU_ITEM_CLASS =
   "flex min-h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors outline-none select-none";
