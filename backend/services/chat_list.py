@@ -17,6 +17,7 @@ from loguru import logger
 
 from core.config import CLAUDE_PROJECTS_DIR
 from services import projects as projects_service
+from services import rewind
 from services import sessions as sessions_service
 
 _DEBOUNCE_SECONDS = 0.5
@@ -25,7 +26,7 @@ _POLL_SECONDS = 2.0
 
 def _session_sig(s: dict) -> tuple:
     return (s.get("title"), s.get("color"), s.get("preview"), s.get("last_active"),
-            s.get("size"), s.get("path"), s.get("project_key"), s.get("activity"))
+            s.get("size"), s.get("path"), s.get("project_key"), s.get("activity"), s.get("rewind"))
 
 
 def _project_sig(p: dict) -> tuple:
@@ -121,6 +122,10 @@ class ChatListHub:
                 self._resident.add(session_id)
             elif resident is False:
                 self._resident.discard(session_id)
+        self.refresh_session(session_id)
+
+    def refresh_session(self, session_id: str):
+        with self._lock:
             entry = self._sessions.get(session_id)
             if entry is None:
                 return
@@ -131,12 +136,15 @@ class ChatListHub:
         self._emit([{"type": "session_changed", "session": updated}])
 
     def _with_activity(self, session_id: str, entry: dict) -> dict:
-        updated = {key: value for key, value in entry.items() if key not in ("activity", "resident")}
+        updated = {key: value for key, value in entry.items() if key not in ("activity", "resident", "rewind")}
         activity = self._activity.get(session_id)
         if activity:
             updated["activity"] = activity
         if session_id in self._resident:
             updated["resident"] = True
+        anchor = rewind.get_pending(session_id)
+        if anchor:
+            updated["rewind"] = anchor
         return updated
 
     def restore_activity(self, session_id: Optional[str]):

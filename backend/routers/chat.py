@@ -33,6 +33,7 @@ from schemas.chat import (
 )
 from services import accounts
 from services import blocks
+from services import chat_list
 from services import cli_info
 from services import rewind as rewind_service
 from services import sessions as sessions_service
@@ -154,6 +155,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                         state.fork = False
                         if resume_at and not event.get("is_error"):
                             rewind_service.clear_pending(resumed_sid)
+                            chat_list.hub.refresh_session(resumed_sid)
                         if state.cwd and not adopted:
                             sessions_service.record_prompt_history(state.cwd, state.session_id, prompt_text)
                     yield event

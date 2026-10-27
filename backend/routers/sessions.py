@@ -293,6 +293,7 @@ async def rewind_session(session_id: str, body: RewindBody):
         if not result.get("can_rewind"):
             raise HTTPException(status_code=409, detail=result.get("error") or "cannot rewind files")
     rewind_service.set_pending(session_id, body.rewind_id)
+    chat_list.hub.refresh_session(session_id)
     return api_response(data=result)
 
 

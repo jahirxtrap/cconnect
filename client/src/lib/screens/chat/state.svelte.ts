@@ -305,9 +305,9 @@ export class ChatState {
   readonly environment = $derived(backend.find(this.environmentId));
   readonly defaultCwd = $derived(this.environment?.directory ?? "");
   readonly list = $derived(chatListFor(this.environment));
-  readonly liveActivity = $derived(
-    this.activity ?? this.list?.sessions.find((session) => session.sessionId === this.sessionId)?.activity ?? null,
-  );
+  readonly listed = $derived(this.list?.sessions.find((session) => session.sessionId === this.sessionId) ?? null);
+  readonly liveActivity = $derived(this.activity ?? this.listed?.activity ?? null);
+  readonly listedRewind = $derived(this.list?.loading === false ? (this.listed?.rewind ?? null) : undefined);
   readonly busy = $derived(this.streaming || isBusyActivity(this.liveActivity));
   readonly historyUnavailable = $derived(this.list === null || serverStatus.unavailable);
   readonly historyLoading = $derived(
@@ -411,6 +411,7 @@ export class ChatState {
             color: context.color ?? null,
             activity: null,
             resident: false,
+            rewind: null,
           }
         : null;
     this.transcriptLoading = this.#initial !== null;
@@ -752,6 +753,7 @@ export class ChatState {
           color: this.sessionColor,
           activity: null,
           resident: false,
+          rewind: null,
         },
         true,
       );
@@ -998,6 +1000,7 @@ export class ChatState {
         color: null,
         activity: null,
         resident: false,
+        rewind: null,
       },
     );
   }
@@ -1124,8 +1127,11 @@ export class ChatState {
     const point = this.rewindTarget;
     if (!sessionId || !project || !point || this.rewindBusy) return false;
     this.rewindBusy = true;
+    const seen = this.#rewindSeen;
+    this.#rewindSeen = { sessionId, anchor: point.rewindId };
     const result = await this.#sessions.rewind(sessionId, project, point, mode);
     if (!result) {
+      this.#rewindSeen = seen;
       this.rewindBusy = false;
       return false;
     }
@@ -1465,6 +1471,7 @@ export class ChatState {
       color: null,
       activity: null,
       resident: false,
+      rewind: null,
     });
   }
 
@@ -1749,6 +1756,15 @@ export class ChatState {
 
   #reloadOnDone = false;
   #cutChannel: string | null = null;
+  #rewindSeen: { sessionId: string | null; anchor: string | null } | null = null;
+
+  followRewind(sessionId: string | null, anchor: string | null | undefined) {
+    if (anchor === undefined) return;
+    const seen = this.#rewindSeen;
+    this.#rewindSeen = { sessionId, anchor };
+    if (!anchor || seen?.sessionId !== sessionId || seen.anchor === anchor) return;
+    void this.#reloadConversation({ keepLive: this.streaming });
+  }
 
   async #reloadConversation({ keepLive = false } = {}) {
     const sessionId = this.sessionId;

@@ -213,6 +213,11 @@ class Tabs {
         };
         untrack(() => this.update(tab.id, patch));
       });
+      $effect(() => {
+        const sessionId = created.sessionId;
+        const anchor = created.listedRewind;
+        untrack(() => created.followRewind(sessionId, anchor));
+      });
     });
     created.tabId = tab.id;
     created.onContextChange = () => this.#syncContext(tab.id, created);
