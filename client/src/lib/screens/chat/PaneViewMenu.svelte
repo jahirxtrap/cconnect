@@ -39,7 +39,7 @@
           data-group=""
           data-index={index}
           class="relative {dragged ? 'z-10' : ''} {drag.active ? 'pointer-events-none' : ''}"
-          onpointerdown={(event) => !all && paneViews.beginMenuDrag(event, view.kind, index)}
+          onpointerdown={(event) => paneViews.beginMenuDrag(event, view.kind, index, all)}
         >
           <div
             class={dragged ? "rounded-md bg-hover" : ""}

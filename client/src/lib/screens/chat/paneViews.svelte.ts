@@ -97,8 +97,8 @@ class PaneViews {
     };
   };
 
-  beginMenuDrag(event: PointerEvent, kind: RightKind, index: number) {
-    this.menuDrag.begin(event, kind, this.#rowOptions(index));
+  beginMenuDrag(event: PointerEvent, kind: RightKind, index: number, all: boolean) {
+    this.menuDrag.begin(event, kind, this.#rowOptions(index, all));
   }
 
   #save(bar: RightKind[], menu: RightKind[]) {
@@ -106,13 +106,24 @@ class PaneViews {
     settings.paneMenu = menu;
   }
 
-  #rowOptions(index: number): RowOptions {
+  #saveAll(kind: RightKind, index: number) {
+    const shown = this.menuOf(true).map((view) => view.kind);
+    const moved = placed(shown, kind, index);
+    const order = [...this.#order.bar, ...this.#order.menu].map((item) =>
+      shown.includes(item) ? (moved.shift() ?? item) : item,
+    );
+    this.#save(order.slice(0, this.#order.bar.length), order.slice(this.#order.bar.length));
+  }
+
+  #rowOptions(index: number, all = false): RowOptions {
     return {
       list: this.#list,
       manual: true,
       origin: { categoryId: null, index },
       onCommit: (id, target) => {
-        if (target.index !== null) this.#save(this.#order.bar, placed(this.#order.menu, kindOf(id), target.index));
+        if (target.index === null) return;
+        if (all) this.#saveAll(kindOf(id), target.index);
+        else this.#save(this.#order.bar, placed(this.#order.menu, kindOf(id), target.index));
       },
       onOutside: (id, event) => this.#leaveMenu(kindOf(id), event),
     };
