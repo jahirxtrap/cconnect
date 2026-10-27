@@ -3,5 +3,6 @@
   "id": "cconnect",
   "name": "CConnect",
   "version": "1.0.0",
-  "author": "CConnect"
+  "author": "CConnect",
+  "use": ["cconnect-light", "cconnect-dark", "black"]
 }
