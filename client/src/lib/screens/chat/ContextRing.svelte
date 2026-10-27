@@ -1,6 +1,15 @@
 <script lang="ts">
   import { Tooltip } from "bits-ui";
-  import { formatDuration, formatPercent, formatSize, formatTokens, formatUsage, usageRatio } from "$lib/data/format";
+  import type { AgentCost } from "$lib/data/agentModels";
+  import {
+    formatCurrency,
+    formatDuration,
+    formatPercent,
+    formatSize,
+    formatTokens,
+    formatUsage,
+    usageRatio,
+  } from "$lib/data/format";
   import type { PromptCache } from "$lib/data/promptCache";
   import { ALERT_PERCENT, limitTone, usageWindowLabel, type LimitTone, type LimitWindow } from "$lib/data/usageWindows";
   import { isTouch } from "$lib/platform";
@@ -19,9 +28,10 @@
     byteLimit: number | null;
     cache: PromptCache | null;
     limits: LimitWindow[];
+    cost?: AgentCost | null;
   }
 
-  const { tokens, limit, bytes, totalBytes, byteLimit, cache, limits }: Props = $props();
+  const { tokens, limit, bytes, totalBytes, byteLimit, cache, limits, cost = null }: Props = $props();
 
   const SIZE = 20;
   const STROKE = 2.5;
@@ -85,11 +95,15 @@
   );
 </script>
 
-{#snippet meter(label: string, value: string, ratio: number, tone: LimitTone)}
+{#snippet figure(label: string, value: string)}
   <div class="flex items-baseline justify-between gap-4">
     <span>{label}</span>
     <span class="text-on-surface-variant">{value}</span>
   </div>
+{/snippet}
+
+{#snippet meter(label: string, value: string, ratio: number, tone: LimitTone)}
+  {@render figure(label, value)}
   <LinearProgress value={ratio} {tone} class="mt-1" />
 {/snippet}
 
@@ -104,6 +118,11 @@
     {#if bytes !== null && byteLimit !== null}
       <div class="mt-2">
         {@render gauge(t("MEDIA_LABEL"), bytes, byteLimit, formatSize)}
+      </div>
+    {/if}
+    {#if cost}
+      <div class="mt-2">
+        {@render figure(t("COST_LABEL"), formatCurrency(cost.amount, cost.currency))}
       </div>
     {/if}
     {#if cache}

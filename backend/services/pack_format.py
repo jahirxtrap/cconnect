@@ -1,11 +1,11 @@
 import io
 import json
 import re
-import unicodedata
 import zipfile
 from pathlib import PurePosixPath
 
 from core import paths
+from core.slugs import slug
 
 SCHEMA = json.loads((paths.BUILTIN_PACKS_DIR / "schema.json").read_text(encoding="utf-8"))
 BUILTIN_IDS: list[str] = json.loads((paths.BUILTIN_PACKS_DIR / "builtin.json").read_text(encoding="utf-8"))
@@ -49,11 +49,6 @@ class PackFormatError(ValueError):
         super().__init__(_MESSAGES[code].format(*details))
 
 
-def slug_of(name: str) -> str:
-    plain = "".join(char for char in unicodedata.normalize("NFKD", name) if not unicodedata.combining(char))
-    return re.sub(r"^-+|-+$", "", re.sub(r"[^a-z0-9]+", "-", plain.lower()))
-
-
 def _extension(path: str) -> str:
     return path.rsplit(".", 1)[-1].lower() if "." in path else ""
 
@@ -68,7 +63,7 @@ def _builtin_known() -> tuple[set[str], set[str]]:
     themes, syntax = set(), set()
     for pack in BUILTIN_IDS:
         for file in (paths.BUILTIN_PACKS_DIR / pack / "themes").glob("*.json"):
-            themes.add(slug_of(file.stem))
+            themes.add(slug(file.stem))
             syntax.add(json.loads(file.read_text(encoding="utf-8"))["syntax"])
     return themes, syntax
 
@@ -158,7 +153,7 @@ def _entries(archive: _Archive, folder: str) -> list[tuple[str, str]]:
     for path in archive.paths:
         if not path.startswith(f"{folder}/"):
             continue
-        local = slug_of(_base(path))
+        local = slug(_base(path))
         if len(path.split("/")) != 2 or _extension(path) != "json" or not local:
             raise PackFormatError("format", path)
         if local in seen:
@@ -179,7 +174,7 @@ def _manifest(archive: _Archive) -> dict:
     if schema > SCHEMA["schema"]:
         raise PackFormatError("schema", str(schema))
     name = _text(fields, "name", MANIFEST, required=True)
-    pack_id = _text(fields, "id", MANIFEST) or slug_of(name)
+    pack_id = _text(fields, "id", MANIFEST) or slug(name)
     if not _LOCAL_ID.match(pack_id):
         raise PackFormatError("field", MANIFEST, "id")
     if pack_id in BUILTIN_IDS:
@@ -287,7 +282,7 @@ def _accents(archive: _Archive) -> set[str]:
             raise PackFormatError("json", path)
         _only(entry, _ACCENT_FIELDS, path)
         name = _text(entry, "name", path, required=True)
-        local = _text(entry, "id", path) or slug_of(name)
+        local = _text(entry, "id", path) or slug(name)
         if not _LOCAL_ID.match(local):
             raise PackFormatError("field", path, "id")
         if local in seen:
@@ -303,7 +298,7 @@ def _fonts(archive: _Archive) -> dict[str, str]:
         if not path.startswith("fonts/"):
             continue
         parts = path.split("/")
-        local = slug_of(parts[2]) if len(parts) > 2 else ""
+        local = slug(parts[2]) if len(parts) > 2 else ""
         valid = len(parts) == _FONT_DEPTH and parts[1] in SCHEMA["fontKinds"] and local and parts[3]
         if not valid or _extension(path) not in SCHEMA["fontFormats"]:
             raise PackFormatError("format", path)
@@ -319,7 +314,7 @@ def _backgrounds(archive: _Archive) -> set[str]:
     for path in archive.paths:
         if not path.startswith("backgrounds/"):
             continue
-        local = slug_of(_base(path))
+        local = slug(_base(path))
         extension = _extension(path)
         known = extension == "json" or extension in SCHEMA["imageFormats"]
         if len(path.split("/")) != 2 or not local or not known:

@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 
 def uv_tool() -> str:
     parts = Path(sys.prefix).parts
@@ -27,7 +29,15 @@ def upgrade_command(distribution: str) -> list[str]:
     return [sys.executable, "-m", "pip", "install", "--upgrade", distribution]
 
 
-def run(command: list[str], timeout: int) -> subprocess.CompletedProcess:
+def run(command: list[str], timeout: int, cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(
-        command, capture_output=True, text=True, timeout=timeout, encoding="utf-8", errors="replace"
+        command,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+        encoding="utf-8",
+        errors="replace",
+        cwd=cwd,
+        env=env,
+        creationflags=NO_WINDOW,
     )

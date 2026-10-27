@@ -1,0 +1,92 @@
+import { untrack } from "svelte";
+import { settings } from "$lib/data/settings.svelte";
+import { panelProject } from "$lib/screens/chat/panelProject.svelte";
+import { ChatState } from "$lib/screens/chat/state.svelte";
+import { tabs } from "$lib/screens/chat/tabs.svelte";
+
+interface Kept {
+  session: string;
+  cwd: string;
+}
+
+interface Stored {
+  agent?: string;
+  kept?: Record<string, Kept>;
+}
+
+const stored = (): Stored => {
+  try {
+    return JSON.parse(settings.agentPane || "{}") as Stored;
+  } catch {
+    return {};
+  }
+};
+
+const keyOf = (environmentId: string | null, agent: string) => `${environmentId ?? ""}/${agent}`;
+
+const followedFolder = (): string | null => (panelProject.settled ? (panelProject.path ?? tabs.state.cwd) : null);
+
+class AgentPane {
+  agent = $state<string | null>(stored().agent ?? null);
+
+  #kept: Record<string, Kept> = stored().kept ?? {};
+  #states = new Map<string, ChatState>();
+
+  select(agent: string) {
+    this.agent = agent;
+    this.#save();
+  }
+
+  restart(chat: ChatState) {
+    chat.startAgentSession(followedFolder() ?? chat.cwd);
+  }
+
+  syncVisibility() {
+    for (const chat of this.#states.values()) chat.syncVisibility();
+  }
+
+  stateFor(environmentId: string | null, agent: string): ChatState {
+    const key = keyOf(environmentId, agent);
+    const existing = this.#states.get(key);
+    if (existing) return existing;
+    const kept = this.#kept[key];
+    let created!: ChatState;
+    $effect.root(() => {
+      created = new ChatState({
+        environmentId,
+        sessionId: kept?.session ?? null,
+        projectKey: null,
+        cwd: kept?.cwd ?? followedFolder() ?? tabs.state.cwd,
+        agent,
+      });
+      $effect(() => {
+        const session = created.sessionId;
+        const cwd = created.cwd;
+        const talked = created.messages.length > 0;
+        if (session && talked) untrack(() => this.#keep(key, session, cwd));
+      });
+      $effect(() => {
+        const folder = followedFolder();
+        untrack(() => {
+          const blank = !created.messages.length && !created.streaming && !created.transcriptLoading;
+          if (blank && folder && folder !== created.cwd) created.startAgentSession(folder);
+        });
+      });
+    });
+    this.#states.set(key, created);
+    return created;
+  }
+
+  #keep(key: string, session: string, cwd: string) {
+    const kept = this.#kept[key];
+    if (kept?.session === session && kept.cwd === cwd) return;
+    this.#kept = { ...this.#kept, [key]: { session, cwd } };
+    this.#save();
+  }
+
+  #save() {
+    settings.agentPane = JSON.stringify({ agent: this.agent, kept: this.#kept });
+  }
+}
+
+export const agentPane = new AgentPane();

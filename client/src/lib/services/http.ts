@@ -9,7 +9,14 @@ interface Envelope<T> {
   data?: T;
 }
 
+export interface HttpResult<T> {
+  ok: boolean;
+  status: number;
+  data: T | null;
+}
+
 export interface HttpClient {
+  call: <T>(method: string, path: string, query?: Query, body?: unknown) => Promise<HttpResult<T>>;
   get: <T>(path: string, query?: Query) => Promise<T | null>;
   post: <T>(path: string, body?: unknown) => Promise<T | null>;
   put: <T>(path: string, body?: unknown) => Promise<T | null>;
@@ -29,9 +36,9 @@ const withQuery = (base: string, path: string, query?: Query) => {
 };
 
 export const createHttp = (profile: () => Profile, extraHeaders?: () => Record<string, string>): HttpClient => {
-  const execute = async <T>(method: string, path: string, query?: Query, body?: unknown): Promise<T | null> => {
+  const call = async <T>(method: string, path: string, query?: Query, body?: unknown): Promise<HttpResult<T>> => {
     const target = profile();
-    if (!isConfigured(target)) return null;
+    if (!isConfigured(target)) return { ok: false, status: 0, data: null };
     try {
       const response = await fetch(withQuery(baseUrlOf(target), path, query), {
         method,
@@ -43,13 +50,19 @@ export const createHttp = (profile: () => Profile, extraHeaders?: () => Record<s
         body: body === undefined ? undefined : JSON.stringify(body ?? {}),
       });
       const envelope = (await response.json()) as Envelope<T>;
-      return envelope.success ? (envelope.data ?? ({} as T)) : null;
+      return { ok: envelope.success, status: envelope.status ?? response.status, data: envelope.data ?? null };
     } catch {
-      return null;
+      return { ok: false, status: 0, data: null };
     }
   };
 
+  const execute = async <T>(method: string, path: string, query?: Query, body?: unknown): Promise<T | null> => {
+    const result = await call<T>(method, path, query, body);
+    return result.ok ? (result.data ?? ({} as T)) : null;
+  };
+
   return {
+    call,
     get: <T>(path: string, query?: Query) => execute<T>("GET", path, query),
     post: <T>(path: string, body?: unknown) => execute<T>("POST", path, undefined, body ?? {}),
     put: <T>(path: string, body?: unknown) => execute<T>("PUT", path, undefined, body ?? {}),

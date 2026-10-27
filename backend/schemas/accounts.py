@@ -11,6 +11,11 @@ class AccountRenameRequest(BaseModel):
     label: str
 
 
+class AccountDelegationRequest(BaseModel):
+    delegate: bool
+    purpose: str = Field("", max_length=400)
+
+
 class LoginCodeRequest(BaseModel):
     code: str
 

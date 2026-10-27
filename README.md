@@ -504,11 +504,14 @@ agent so they're available out of the box from the phone:
   every chat — that's where the file-sharing and progress-check conventions
   live. Your personal additions go in `USER.md`, edited straight from the
   Claude screen.
+- **ACP agents.** A right-panel view runs agents that speak the Agent Client
+  Protocol, such as Copilot, Codex or Gemini, installed from the official
+  catalog or added by hand, each with its own sessions.
 - **Delegation.** Claude can hand a task to another AI and get its answer
-  back — a model, Claude Code on another of your accounts, or an agent such as
-  Codex, Antigravity or Copilot. Add them in Settings → Delegation, or ask
-  Claude to add one; in a persistent chat the task can run in the background
-  while the conversation goes on.
+  back: an ACP agent, an agent CLI added under ACP agents as a command, or
+  another of your Claude accounts once its sheet says Claude can use it. Claude
+  can also install an agent from the catalog when you ask; in a persistent chat
+  the task can run in the background while the conversation goes on.
 
 ## Discord
 
@@ -543,9 +546,9 @@ and each one degrades on its own.
   Every other format the file manager offers works out of the box.
 - **Ookla speedtest** — the speed test in Monitor → Network, which otherwise
   reports the CLI as unavailable.
-- **Codex, Antigravity, Copilot** or another agent — destinations for delegation.
-  Without any, Claude can still delegate to a model or to another of your Claude
-  accounts.
+- **Node.js** — the ACP agents the catalog ships as npm packages. Python ones
+  install with **uv** when it is on the `PATH`, which also fetches the Python
+  version they ask for, and with pip otherwise; binaries need neither.
 
 ## Configuration
 

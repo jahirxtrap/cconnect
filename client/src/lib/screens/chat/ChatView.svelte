@@ -1,7 +1,6 @@
 <script lang="ts">
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
-  import History from "@lucide/svelte/icons/history";
   import Power from "@lucide/svelte/icons/power";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
@@ -10,6 +9,7 @@
   import { untrack, type Snippet } from "svelte";
   import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { screenFor } from "$lib/app/screens";
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
@@ -51,6 +51,8 @@
   import { chatBackground } from "$lib/data/chatBackground.svelte";
   import { NO_BACKGROUND } from "$lib/design/backgrounds";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
+  import AgentStatusCard from "./AgentStatusCard.svelte";
+  import AgentToolbar from "./AgentToolbar.svelte";
   import ChatBackdrop from "./ChatBackdrop.svelte";
   import ChatToolbar from "./ChatToolbar.svelte";
   import ChatWelcome from "./ChatWelcome.svelte";
@@ -63,13 +65,17 @@
   import BackgroundTasks from "./BackgroundTasks.svelte";
   import TaskIndicator from "./TaskIndicator.svelte";
   import { panes } from "./panes.svelte";
-  import { tabs, type Tab } from "./tabs.svelte";
+  import { agentPane } from "$lib/screens/agents/agentPane.svelte";
+  import AgentSessions from "$lib/screens/agents/AgentSessions.svelte";
+  import type { ChatState } from "./state.svelte";
+  import { tabs } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
   import { pastedName } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
 
   interface Props {
-    tab: Tab;
+    chat: ChatState;
+    viewKey: string;
     primary?: boolean;
     focused?: boolean;
     dockLift?: number;
@@ -80,7 +86,8 @@
   }
 
   const {
-    tab,
+    chat,
+    viewKey,
     primary = false,
     focused = true,
     dockLift = 0,
@@ -92,8 +99,6 @@
 
   const SIDE_PEEK = 58;
   const OUTSIDE_TURN = ["usage", "reload"];
-
-  const chat = $derived(tabs.stateFor(tab));
 
   provideServer(() => chat.environment);
 
@@ -126,10 +131,17 @@
     onComposerHeight?.(composerHeight);
   });
 
-  const canAttach = $derived(!chat.sideOpen);
   const limits = $derived(liveLimits.of(chat.environmentId, chat.effectiveAccount) ?? []);
   const welcomeProject = $derived(
     chat.historyProject ? projectNameOf(chat.historyProjects, chat.historyProject, chat.cwd) : null,
+  );
+  const welcomeLink = $derived(
+    chat.agent &&
+      !chat.agentStarted &&
+      chat.link === "connected" &&
+      (chat.agentState?.status ?? "connecting") === "connecting"
+      ? "connecting"
+      : chat.link,
   );
 
   const dialogOpen = $derived(
@@ -191,12 +203,16 @@
   const blocked = $derived(
     chat.link === "disconnected" ||
       chat.link === "connecting" ||
-      !chat.capabilitiesReady ||
-      chat.switchingAccount ||
-      !chat.capabilities?.models.length,
+      (chat.agent
+        ? chat.agentState?.status !== "ready"
+        : !chat.capabilitiesReady || chat.switchingAccount || !chat.capabilities?.models.length),
   );
+  const actionsEnabled = $derived(!chat.agent || !blocked);
+  const resumable = $derived(!!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume));
+  const canAttach = $derived(!chat.sideOpen && actionsEnabled);
 
   const availableCommands = $derived.by(() => {
+    if (chat.agent) return chat.connected ? (chat.agentState?.commands ?? []) : [];
     const all = chat.capabilities?.commands ?? [];
     if (chat.sideOpen || !chat.connected) return [];
     const outsideTurn = (command: CommandOption) => OUTSIDE_TURN.includes(command.kind);
@@ -212,6 +228,13 @@
       const look = LINK_LOOKS[chat.link];
       return { dot: look.dot, spinner: look.spinner, text: t(look.text) };
     }
+    const agentStatus = chat.agent ? (chat.agentState?.status ?? "connecting") : "ready";
+    if (agentStatus === "connecting") {
+      const look = LINK_LOOKS.connecting;
+      return { dot: look.dot, spinner: look.spinner, text: t(look.text) };
+    }
+    if (agentStatus === "auth") return { dot: "bg-orange", spinner: false, text: t("AGENT_SIGN_IN_NEEDED") };
+    if (agentStatus !== "ready") return { dot: "bg-red", spinner: false, text: t("AGENT_UNAVAILABLE") };
     if (activity === "waiting") return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
     if (activity === "compacting") return { dot: "bg-gray", spinner: true, tone: "text-blue", text: t("COMPACTING") };
     if (activity === "retrying") return { dot: "bg-gray", spinner: true, tone: "text-yellow", text: t("WORKING") };
@@ -359,7 +382,7 @@
 <svelte:window onpaste={onPaste} />
 <svelte:document {onselectionchange} />
 
-<AppTopBar title={t("APP_NAME")} subtitle={status.text} {navigationIcon}>
+<AppTopBar title={chat.agent ? chat.agentName : t("APP_NAME")} subtitle={status.text} {navigationIcon}>
   {#snippet subtitleLeading()}
     <StatusDot
       class={status.dot}
@@ -377,7 +400,7 @@
         <Trash />
       </TooltipIconButton>
     {:else}
-      {#if chat.sessionId !== null && idle && !running}
+      {#if !chat.agent && chat.sessionId !== null && idle && !running}
         <TooltipIconButton
           label={t("REWIND")}
           onclick={() => {
@@ -385,7 +408,7 @@
             void chat.loadRewindPoints();
           }}
         >
-          <History />
+          <RotateCcw />
         </TooltipIconButton>
       {/if}
       {#if activity === "persistent"}
@@ -398,6 +421,9 @@
       {/if}
       <BackgroundTasks tasks={chat.backgroundView} onStop={(id) => chat.stopTask(id)} />
       <TaskIndicator todos={chat.todosView} />
+      {#if resumable}
+        <AgentSessions {chat} />
+      {/if}
     {/if}
     {#if layout.mobile && primary}
       <TabSwitcher />
@@ -405,7 +431,8 @@
     {/if}
     <TooltipIconButton
       label={t("NEW_SESSION")}
-      onclick={() => (chat.viewOnly ? chat.closeViewOnly() : chat.newSession())}
+      onclick={() =>
+        chat.agent ? agentPane.restart(chat) : chat.viewOnly ? chat.closeViewOnly() : chat.newSession()}
     >
       <SquarePen />
     </TooltipIconButton>
@@ -431,8 +458,12 @@
   <div class="relative min-h-0 flex-1 overflow-hidden">
     {#if opening}
       <CenteredProgress class="absolute inset-0 z-10" />
-    {:else if !chat.view.length && !chat.sessionId && !chat.streaming}
-      <ChatWelcome project={welcomeProject} link={chat.link} />
+    {:else if !chat.view.length && (chat.agent || !chat.sessionId) && !chat.streaming}
+      <ChatWelcome
+        project={welcomeProject}
+        link={welcomeLink}
+        icon={chat.agent ? screenFor("agents").icon : undefined}
+      />
     {/if}
     <div
       class="overflow-hidden {opening ? 'opacity-0' : ''} {sideDragging || instant
@@ -440,7 +471,7 @@
         : 'transition-[height] duration-[350ms] ease-[cubic-bezier(0.33,1,0.68,1)]'}"
       style="height: {chat.sideOpen ? Math.max(0, 100 - sideHeight) : 100}%"
     >
-      {#key tab.id}
+      {#key viewKey}
         <MessageList
           messages={chat.view}
           pendingToolIds={chat.runningView}
@@ -499,14 +530,18 @@
   {#if !chat.viewOnly}
     <div class="shrink-0 {chat.sideOpen ? 'bg-background' : ''}" bind:clientHeight={composerHeight}>
       {#snippet band()}
-        <ModBand
-          mods={chat.mods}
-          draft={!!chat.draft}
-          working={busy}
-          hidden={chat.sideOpen}
-          {instant}
-          active={focused}
-        />
+        {#if chat.agent}
+          <AgentStatusCard {chat} />
+        {:else}
+          <ModBand
+            mods={chat.mods}
+            draft={!!chat.draft}
+            working={busy}
+            hidden={chat.sideOpen}
+            {instant}
+            active={focused}
+          />
+        {/if}
       {/snippet}
       <Composer
         {band}
@@ -518,6 +553,7 @@
         decorations={chat.sideOpen ? [] : decorations}
         {focused}
         {blocked}
+        {actionsEnabled}
         streaming={chat.sideOpen ? chat.sideStreaming : busy}
         draft={chat.sideOpen ? chat.sideDraft : chat.draft}
         onDraft={(value) => (chat.sideOpen ? (chat.sideDraft = value) : (chat.draft = value))}
@@ -546,39 +582,52 @@
 </div>
 
 {#snippet controls()}
-  <ChatToolbar
-    capabilities={chat.capabilities}
-    ready={chat.capabilitiesReady}
-    connecting={chat.link === "connecting"}
-    disconnected={chat.link === "disconnected"}
-    loading={chat.transcriptLoading}
-    model={chat.effectiveModel}
-    modelSelected={chat.modelOverride}
-    effort={chat.effectiveEffort}
-    effortSelected={chat.effortOverride}
-    permissionMode={chat.effectivePermissionMode}
-    permissionSelected={chat.permissionOverride}
-    account={chat.effectiveAccount}
-    switching={chat.switchingAccount}
-    accountSelected={chat.accountOverride}
-    onAccount={(value) => chat.setAccount(value)}
-    streamTokens={chat.effectiveStreamTokens}
-    contextTokens={chat.contextView}
-    cache={resident ? chat.cacheView : null}
-    compactWindow={chat.compactWindow}
-    requestBytes={chat.requestView}
-    mediaBytes={chat.mediaView}
-    {limits}
-    onModel={(value) => chat.setModel(value)}
-    onEffort={(value) => chat.setEffort(value)}
-    onPermissionMode={(value) => chat.setPermissionMode(value)}
-    onStreamTokens={(value) => chat.setStreamTokens(value)}
-    streamingSelected={chat.streamingOverride === null ? "" : chat.streamingOverride ? "on" : "off"}
-    simpleMode={chat.effectiveVisibility.simple}
-    onVisibility={() => (visibilityOpen = true)}
-    onQuickChat={() => (chat.sideOpen ? closeSide() : chat.openSideChat())}
-    quickChatActive={chat.sideMessages.length > 0}
-  />
+  {#if chat.agent}
+    <AgentToolbar
+      agent={chat.agentState}
+      link={chat.link}
+      loading={chat.transcriptLoading}
+      contextTokens={chat.contextView}
+      contextWindow={chat.contextWindow}
+      simpleMode={chat.effectiveVisibility.simple}
+      onOption={(id, value) => chat.setAgentOption(id, value)}
+      onVisibility={() => (visibilityOpen = true)}
+    />
+  {:else}
+    <ChatToolbar
+      capabilities={chat.capabilities}
+      ready={chat.capabilitiesReady}
+      connecting={chat.link === "connecting"}
+      disconnected={chat.link === "disconnected"}
+      loading={chat.transcriptLoading}
+      model={chat.effectiveModel}
+      modelSelected={chat.modelOverride}
+      effort={chat.effectiveEffort}
+      effortSelected={chat.effortOverride}
+      permissionMode={chat.effectivePermissionMode}
+      permissionSelected={chat.permissionOverride}
+      account={chat.effectiveAccount}
+      switching={chat.switchingAccount}
+      accountSelected={chat.accountOverride}
+      onAccount={(value) => chat.setAccount(value)}
+      streamTokens={chat.effectiveStreamTokens}
+      contextTokens={chat.contextView}
+      cache={resident ? chat.cacheView : null}
+      compactWindow={chat.compactWindow}
+      requestBytes={chat.requestView}
+      mediaBytes={chat.mediaView}
+      {limits}
+      onModel={(value) => chat.setModel(value)}
+      onEffort={(value) => chat.setEffort(value)}
+      onPermissionMode={(value) => chat.setPermissionMode(value)}
+      onStreamTokens={(value) => chat.setStreamTokens(value)}
+      streamingSelected={chat.streamingOverride === null ? "" : chat.streamingOverride ? "on" : "off"}
+      simpleMode={chat.effectiveVisibility.simple}
+      onVisibility={() => (visibilityOpen = true)}
+      onQuickChat={() => (chat.sideOpen ? closeSide() : chat.openSideChat())}
+      quickChatActive={chat.sideMessages.length > 0}
+    />
+  {/if}
 {/snippet}
 
 {#snippet component(data: InteractionData, onGrow: (grow: () => void, anchor: HTMLElement | null) => void)}
@@ -649,6 +698,7 @@
         tokens: values.tokens === "" ? null : values.tokens === "on",
         timings: values.timings === "" ? null : values.timings === "on",
       });
+      agentPane.syncVisibility();
       visibilityOpen = false;
     }}
     onDismiss={() => (visibilityOpen = false)}

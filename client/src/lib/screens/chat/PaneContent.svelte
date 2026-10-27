@@ -8,6 +8,7 @@
   import ClaudeDetail, { type ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import BrowserView from "$lib/screens/browser/BrowserView.svelte";
+  import AgentsView from "$lib/screens/agents/AgentsView.svelte";
   import ModsView from "$lib/screens/mods/ModsView.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
@@ -76,7 +77,7 @@
   );
 </script>
 
-<PaneSurface plain={chatShown}>
+<PaneSurface plain={chatShown || panes.kind === "agents"}>
   {#if chatShown && panes.rightTab}
     <TabStrip
       items={tabs.right}
@@ -98,7 +99,7 @@
   {/if}
   <div class="relative flex min-h-0 flex-1 flex-col">
     {#if chatShown && panes.rightTab}
-      <ChatView tab={panes.rightTab} {focused} />
+      <ChatView chat={tabs.stateFor(panes.rightTab)} viewKey={panes.rightTab.id} {focused} />
     {:else if panes.kind === "notes"}
       <PaneHeader
         title={openNote ? noteTitle(openNote) || t("NOTE_UNTITLED") : t("NOTES")}
@@ -121,6 +122,8 @@
       <BrowserView {focused} />
     {:else if panes.kind === "mods"}
       <ModsView chat={panes.focusedChat} />
+    {:else if panes.kind === "agents"}
+      <AgentsView {focused} />
     {:else if panes.kind === "claude"}
       {#if claudeDetail}
         <ClaudeDetail kind={claudeDetail} onClose={() => (claudeDetail = null)} />
@@ -160,7 +163,6 @@
 {#snippet chatActions()}
   <PaneTools tools={false} />
 {/snippet}
-
 {#snippet paneTail()}
   <span class="mx-1 h-5 w-px shrink-0 bg-outline-variant"></span>
   <PaneTools tools={false} />

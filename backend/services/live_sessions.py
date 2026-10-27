@@ -28,6 +28,8 @@ RELOADS = {"reload-plugins": "reload_plugins", "reload-skills": "reload_skills"}
 
 RELOAD_COUNTS = {"plugins": "plugins", "commands": "commands", "agents": "agents", "mcp_servers": "mcpServers"}
 
+AGENT_EVENTS = ("agent_state", "history")
+
 _CLOSE = object()
 
 
@@ -78,6 +80,11 @@ class LiveSession:
         self._roster_lock = asyncio.Lock()
         self._turn_open = False
         self.turn_start_index = 0
+        self.agent = None
+
+    def bind_agent(self, agent):
+        self.agent = agent
+        agent.bind(self._emit, self._ask)
 
     @property
     def running(self):
@@ -302,6 +309,9 @@ class LiveSession:
         from services import sessions as sessions_service
 
         await self.release_resident()
+        if self.agent is not None:
+            await self.agent.release()
+            return
         sessions_service.forget_pinned(self.state.session_id)
 
     def _cancel_cooldown(self):
@@ -348,6 +358,11 @@ class LiveSession:
             return None
         if kind == "commands":
             cli_info.refresh_later(self.state.account)
+            await self._send({**event, "channel": self.channel})
+            return None
+        if kind in AGENT_EVENTS:
+            if event.get("session_id"):
+                self.state.session_id = event["session_id"]
             await self._send({**event, "channel": self.channel})
             return None
         if kind in mods.STATE_EVENTS:
@@ -580,7 +595,7 @@ class LiveSession:
     def _reassert_meta(self):
         from services import sessions as sessions_service
 
-        if self.state.session_id and self.state.cwd:
+        if self.state.session_id and self.state.cwd and self.agent is None:
             sessions_service.reassert_meta(
                 sessions_service.project_key_for(self.state.cwd), self.state.session_id
             )
@@ -765,17 +780,11 @@ class LiveSession:
         worker = self._worker
         if transport is None or worker is None or worker.done():
             return False
-        request = {
-            "type": "control_request",
-            "request_id": f"req_{subtype}_{uuid.uuid4().hex[:8]}",
-            "request": {"subtype": subtype, **payload},
-        }
         try:
-            await transport.write(json.dumps(request) + "\n")
+            return await transport.control(subtype, payload)
         except Exception as exc:
             logger.warning(f"{subtype} request rejected: {type(exc).__name__}: {exc}")
             return False
-        return True
 
     async def _send_stop(self):
         return await self._send_control("interrupt")

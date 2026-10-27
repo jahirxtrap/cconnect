@@ -67,6 +67,7 @@
     onCloseSide?: (() => void) | null;
     sessionColor?: string | null;
     blocked?: boolean;
+    actionsEnabled?: boolean;
     ghost?: string | null;
     onKey?: (event: KeyboardEvent, empty: boolean) => boolean;
     onEdit?: (text: string, cursor: number, stroke: ModStroke | null) => void;
@@ -99,6 +100,7 @@
     onCloseSide = null,
     sessionColor = null,
     blocked = false,
+    actionsEnabled = true,
     ghost = null,
     onKey,
     onEdit,
@@ -625,6 +627,16 @@
             class={ACTION_CLASS}
           >
             <X size={18} />
+          </button>
+        {:else if !actionsEnabled}
+          <button
+            type="button"
+            disabled
+            aria-label={t("ACTIONS")}
+            title={t("ACTIONS")}
+            class="{ROUND_BUTTON_CLASS} bg-surface-variant text-faint disabled:cursor-default"
+          >
+            <Plus size={18} />
           </button>
         {:else}
           <PopupMenu

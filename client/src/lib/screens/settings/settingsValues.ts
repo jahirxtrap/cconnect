@@ -17,8 +17,8 @@ import { offeredPacks } from "$lib/screens/packs/packText";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
 import type { Account } from "$lib/services/accountsApi";
+import { agents } from "$lib/services/agents.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
-import type { DelegateKind } from "$lib/services/delegatesApi";
 import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { RETENTION_FOREVER_DAYS } from "$lib/services/settingsApi";
@@ -54,13 +54,6 @@ const chosen = (options: SelectOption[], value: string): string =>
   options.find((option) => option.value === value)?.label ?? value;
 
 export const appearanceValue = (): string => chosen(appearanceOptions(), theme.mode);
-
-export const DELEGATE_KIND_LABELS: Record<DelegateKind, string> = {
-  model: "DELEGATE_KIND_MODEL",
-  claude: "DELEGATE_KIND_CLAUDE",
-  command: "DELEGATE_KIND_COMMAND",
-  acp: "DELEGATE_KIND_ACP",
-};
 
 export const BACKGROUND_STYLE_LABELS: Record<BackgroundStyle, string> = {
   sharp: "BACKGROUND_STYLE_SHARP",
@@ -111,6 +104,11 @@ export const packsValue = (): string => {
     packs.installed.length ? plural("PACKS_INSTALLED_COUNT", packs.installed.length) : t("NO_PACKS_INSTALLED"),
     offered > 0 && plural("PACKS_SERVER_COUNT", offered),
   );
+};
+
+export const agentsValue = (): string => {
+  const installed = agents.listOf(backend.active)?.agents.length ?? 0;
+  return installed ? plural("AGENTS_INSTALLED_COUNT", installed) : t("AGENTS_NONE");
 };
 
 export const notificationsValue = (): string =>
@@ -196,8 +194,6 @@ const hiddenTools = (): Set<string> =>
       .map((name) => name.trim())
       .filter(Boolean),
   );
-
-export const toolHidden = (name: string): boolean => hiddenTools().has(name);
 
 const toolStates = (): boolean[] => {
   const hidden = hiddenTools();

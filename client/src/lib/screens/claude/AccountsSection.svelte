@@ -27,6 +27,7 @@
   import SelectField from "$lib/ui/SelectField.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
@@ -53,6 +54,20 @@
   let editing = $state<Account | null>(null);
   let providerUrl = $state("");
   let auth = $state<AuthInput>(emptyAuth());
+  let offered = $state(false);
+  let purpose = $state("");
+
+  const openActions = (account: Account) => {
+    offered = account.delegate;
+    purpose = account.purpose;
+    actions = account;
+  };
+
+  const saveDelegation = async (account: Account) => {
+    actions = null;
+    await accountsApi.setDelegation(account.id, offered, purpose.trim());
+    await refresh();
+  };
 
   const pasteCode = async () => {
     const text = (await pasteText()).trim();
@@ -191,7 +206,7 @@
   useSettingsDialog("claude", (dialog, entry) => {
     if (dialog !== "account_actions") return;
     const found = accountsStore.find(accountIdOf(entry.id));
-    if (found) actions = found;
+    if (found) openActions(found);
   });
 
   $effect(() => {
@@ -208,7 +223,7 @@
       summary={accountSummary(account)}
       alert={loginError === account.id ? t("ACCOUNT_LOGIN_FAILED") : null}
       {enabled}
-      onclick={enabled ? () => (actions = account) : undefined}
+      onclick={enabled ? () => openActions(account) : undefined}
     >
       {#snippet trailing()}
         {#if busy === account.id}
@@ -238,8 +253,23 @@
   <CompactDialog title={account.label} onDismiss={() => (actions = null)}>
     {#snippet buttons()}
       <Button onclick={() => (actions = null)} variant="outlined">{t("CANCEL")}</Button>
+      <Button
+        enabled={offered !== account.delegate || purpose.trim() !== account.purpose}
+        onclick={() => void saveDelegation(account)}>{t("SAVE")}</Button
+      >
     {/snippet}
-    <div class="flex flex-col gap-1.5">
+    <div class="flex flex-col gap-2">
+      <SwitchRow
+        title={t("ACCOUNT_DELEGATE")}
+        summary={t("ACCOUNT_DELEGATE_SUMMARY")}
+        checked={offered}
+        onChange={(value) => (offered = value)}
+      />
+      {#if offered}
+        <InputField value={purpose} oninput={(value) => (purpose = value)} label={t("PURPOSE")} optional minLines={2} />
+      {/if}
+    </div>
+    <div class="mt-3 flex flex-col gap-1.5">
       {#if account.provider}
         <ActionButton
           text={t("ACCOUNT_PROVIDER_EDIT")}

@@ -63,6 +63,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "left_expanded", kind: "boolean", fallback: true, backup: false },
   { key: "tabs_state", kind: "string", fallback: "", backup: false },
   { key: "right_pane", kind: "string", fallback: "", backup: false },
+  { key: "agent_pane", kind: "string", fallback: "", backup: false },
   { key: "visibility_simple", kind: "string", fallback: "", backup: false },
   { key: "visibility_tokens", kind: "string", fallback: "", backup: false },
   { key: "visibility_timings", kind: "string", fallback: "", backup: false },

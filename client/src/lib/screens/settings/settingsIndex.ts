@@ -15,6 +15,7 @@ import {
   accountSummary,
   accountValue,
   accentValue,
+  agentsValue,
   appearanceValue,
   chatBackgroundValue,
   chatLanguageValue,
@@ -78,7 +79,7 @@ export type SettingsDialog =
   | "account"
   | "account_actions"
   | "tools"
-  | "delegates"
+  | "agents"
   | "chats"
   | "privacy";
 
@@ -131,7 +132,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
 
   { id: "tools", label: "TOOLS", summary: "MCP_TOOLS_DESC", value: toolsValue, section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
   { id: "browser_view", label: "BROWSER_VIEW", summary: "BROWSER_VIEW_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
-  { id: "delegates", label: "DELEGATES", summary: "DELEGATES_SUMMARY", section: "server", group: "SETTINGS_SERVER", dialog: "delegates" },
+  { id: "agents", label: "AGENTS", value: agentsValue, section: "server", group: "SETTINGS_SERVER", dialog: "agents" },
 
   { id: "permissions", label: "PERMISSIONS", value: permissionValue, section: "server", group: "SETTINGS_SERVER", dialog: "permissions" },
 

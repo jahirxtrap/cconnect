@@ -16,7 +16,7 @@ def is_image(name: str) -> bool:
     return Path(name).suffix.lower() in _IMAGE_EXTENSIONS
 
 
-def _encode_image(path: Path) -> tuple[str, str] | None:
+def encode_image(path: Path) -> tuple[str, str] | None:
     try:
         from PIL import Image
         with Image.open(path) as img:
@@ -45,7 +45,7 @@ def compose_prompt(text: str, relpaths: list[str]) -> tuple[str, list[dict]]:
         if path is None:
             continue
         if is_image(path.name):
-            encoded = _encode_image(path)
+            encoded = encode_image(path)
             if encoded:
                 media, data = encoded
                 images.append({

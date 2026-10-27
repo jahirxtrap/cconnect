@@ -717,6 +717,23 @@ async def _block_secrets(input_data, tool_use_id, context):
     return {}
 
 
+class CliControls:
+    """Control requests written to a running Claude Code CLI."""
+
+    def __init__(self, transport: Any):
+        self._transport = transport
+
+    async def control(self, subtype: str, payload: dict) -> bool:
+        if self._transport is None:
+            return False
+        await self._transport.write(json.dumps({
+            "type": "control_request",
+            "request_id": f"req_{subtype}_{uuid.uuid4().hex[:8]}",
+            "request": {"subtype": subtype, **payload},
+        }) + "\n")
+        return True
+
+
 async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=False) -> AsyncIterator[Any]:
     """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
     fresh = not resident.connected
@@ -726,7 +743,7 @@ async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=Fa
 
     client = resident.client
     if on_transport is not None:
-        on_transport(getattr(client, "_transport", None))
+        on_transport(CliControls(getattr(client, "_transport", None)))
     inbox = resident.listen()
     if fresh:
         await resident.attach_surface()
@@ -1082,7 +1099,7 @@ async def run_prompt(
             if on_transport is not None:
                 try:
                     transport = SubprocessCLITransport(prompt=prompt_arg, options=options)
-                    on_transport(transport)
+                    on_transport(CliControls(transport))
                 except Exception as exc:
                     logger.warning(f"no interruptible transport: {type(exc).__name__}: {exc}")
                     transport = None

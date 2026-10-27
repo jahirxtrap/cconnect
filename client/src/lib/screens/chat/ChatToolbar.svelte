@@ -3,24 +3,23 @@
   import Component from "@lucide/svelte/icons/component";
   import Gauge from "@lucide/svelte/icons/gauge";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
-  import Eye from "@lucide/svelte/icons/eye";
-  import EyeOff from "@lucide/svelte/icons/eye-off";
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import type { PromptCache } from "$lib/data/promptCache";
   import type { LimitWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
   import { contextWindowFor, effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import { MENU_ICON_SIZE } from "$lib/ui/menuSurface";
   import { LINK_LOOKS } from "$lib/ui/linkStatus";
-  import StatusDot from "$lib/ui/StatusDot.svelte";
-  import TooltipWrap from "$lib/ui/TooltipWrap.svelte";
   import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
-  import { keepFocus } from "$lib/ui/keepFocus";
   import ContextRing from "./ContextRing.svelte";
   import { permissionStyle } from "./permissionStyle";
+  import { CHIP_ICON_SIZE, CHIP_SLOT } from "./toolbarChips";
+  import ToolbarSelect from "./ToolbarSelect.svelte";
+  import ToolbarState from "./ToolbarState.svelte";
+  import ToolbarToggle from "./ToolbarToggle.svelte";
+  import VisibilityToggle from "./VisibilityToggle.svelte";
 
   interface Props {
     capabilities: Capabilities | null;
@@ -90,17 +89,6 @@
     onQuickChat,
   }: Props = $props();
 
-  const CHIP_SHAPE = "flex h-7 shrink-0 items-center rounded-full text-body-sm text-on-surface-variant";
-  const CHIP = `${CHIP_SHAPE} bg-surface-variant`;
-  const ITEM_CLASS = `${CHIP} ripple cursor-pointer gap-1.5 px-2.5 transition-colors hover:text-on-surface`;
-  const STATE_CLASS = `${CHIP} cursor-default gap-1.5 px-2.5`;
-  const toggleClass = (on: boolean) =>
-    `${CHIP_SHAPE} ${on ? "bg-accent-soft" : "bg-surface-variant"} ripple w-7 cursor-pointer justify-center transition-colors hover:text-on-surface`;
-  const TOGGLE_CLASS = toggleClass(false);
-  const SLOT = "flex shrink-0 items-center";
-
-  let openMenu = $state<"model" | "effort" | "permission" | "account" | "streaming" | null>(null);
-
   const serverOption = { value: "", label: t("SERVER_DEFAULT") };
 
   const modelOptions = $derived([
@@ -149,207 +137,76 @@
   const serverPermission = $derived(capabilities?.defaults.permissionMode ?? "");
 </script>
 
+{#snippet choices(options: { value: string; label: string }[], selected: string, onPick: (value: string) => void)}
+  {#each options as option (option.value)}
+    <MenuItem text={option.label} selected={option.value === selected} onclick={() => onPick(option.value)} />
+  {/each}
+{/snippet}
+
 <div class="flex h-full min-w-0 flex-1 items-stretch">
-<TooltipWrap label={t("QUICK_CHAT")} class="{SLOT} pr-1.5 pl-0.5">
-  <button
-    type="button"
-    use:keepFocus
-    onclick={onQuickChat}
-    aria-label={t("QUICK_CHAT")}
-    aria-pressed={quickChatActive}
-    class={toggleClass(quickChatActive)}
-  >
-    <MessagesSquare size={16} class="text-accent" />
-  </button>
-</TooltipWrap>
+<ToolbarToggle label={t("QUICK_CHAT")} pressed={quickChatActive} class="{CHIP_SLOT} pr-1.5 pl-0.5" onclick={onQuickChat}>
+  <MessagesSquare size={CHIP_ICON_SIZE} class="text-accent" />
+</ToolbarToggle>
 
 <div
   use:hscrollbar={{ wheel: true }}
   class="{SCROLL_ROW_CLASS} flex min-w-0 flex-1 items-center gap-1.5"
 >
   {#if disconnected}
-    <span class={STATE_CLASS}>
-      <StatusDot class={LINK_LOOKS.disconnected.dot} box={16} />
-      <span class="whitespace-nowrap">{t(LINK_LOOKS.disconnected.text)}</span>
-    </span>
+    <ToolbarState text={t(LINK_LOOKS.disconnected.text)} dot={LINK_LOOKS.disconnected.dot} />
   {:else if connecting || !ready}
-    <span class={STATE_CLASS}>
-      <LoadingIndicator size={16} />
-      <span class="whitespace-nowrap">{connecting ? t(LINK_LOOKS.connecting.text) : t("LOADING")}</span>
-    </span>
+    <ToolbarState text={connecting ? t(LINK_LOOKS.connecting.text) : t("LOADING")} loading />
   {:else}
     {#if switching}
-      <span class={STATE_CLASS}>
-        <LoadingIndicator size={16} />
-        <span class="whitespace-nowrap">{t("LOADING")}</span>
-      </span>
+      <ToolbarState text={t("LOADING")} loading />
     {:else if !modelsAvailable}
-      <span class={STATE_CLASS}>
-        <Sparkles size={16} class="shrink-0 text-on-surface-variant" />
-        <span class="whitespace-nowrap">{t("MODEL_UNAVAILABLE")}</span>
-      </span>
+      <ToolbarState text={t("MODEL_UNAVAILABLE")} icon={Sparkles} />
     {:else}
-      <PopupMenu
-        open={openMenu === "model"}
-        side="top"
-        triggerClass={SLOT}
-        onOpenChange={(open) => (openMenu = open ? "model" : null)}
-      >
-        {#snippet trigger()}
-          <TooltipWrap label={t("MODEL")} class={SLOT}>
-            <span class={ITEM_CLASS}>
-              <Sparkles size={16} class="shrink-0 text-accent" />
-              <span class="whitespace-nowrap">{modelLabel}</span>
-            </span>
-          </TooltipWrap>
-        {/snippet}
-        {#each modelOptions as option (option.value)}
-          <MenuItem
-            text={option.label}
-            selected={option.value === modelSelected}
-            onclick={() => {
-              onModel(option.value);
-              openMenu = null;
-            }}
-          />
-        {/each}
-      </PopupMenu>
+      <ToolbarSelect label={t("MODEL")} icon={Sparkles} text={modelLabel}>
+        {@render choices(modelOptions, modelSelected, onModel)}
+      </ToolbarSelect>
     {/if}
 
     {#if effortLevels.length && !switching}
-      <PopupMenu
-        open={openMenu === "effort"}
-        side="top"
-        triggerClass={SLOT}
-        onOpenChange={(open) => (openMenu = open ? "effort" : null)}
-      >
-        {#snippet trigger()}
-          <TooltipWrap label={t("EFFORT")} class={SLOT}>
-            <span class={ITEM_CLASS}>
-              <Gauge size={16} class="shrink-0 text-accent" />
-              <span class="whitespace-nowrap">{effort}</span>
-            </span>
-          </TooltipWrap>
-        {/snippet}
-        {#each effortOptions as option (option.value)}
-          <MenuItem
-            text={option.label}
-            selected={option.value === effortSelected}
-            onclick={() => {
-              onEffort(option.value);
-              openMenu = null;
-            }}
-          />
-        {/each}
-      </PopupMenu>
+      <ToolbarSelect label={t("EFFORT")} icon={Gauge} text={effort}>
+        {@render choices(effortOptions, effortSelected, onEffort)}
+      </ToolbarSelect>
     {/if}
 
-    <PopupMenu
-      open={openMenu === "permission"}
-      side="top"
-      triggerClass={SLOT}
-      onOpenChange={(open) => (openMenu = open ? "permission" : null)}
-    >
-      {#snippet trigger()}
-        <TooltipWrap label={t("PERMISSIONS")} class={SLOT}>
-          <span class={ITEM_CLASS}>
-            <permission.icon size={16} class="shrink-0 {permission.tone}" />
-            <span class="whitespace-nowrap">{permissionLabel}</span>
-          </span>
-        </TooltipWrap>
-      {/snippet}
+    <ToolbarSelect label={t("PERMISSIONS")} icon={permission.icon} iconClass={permission.tone} text={permissionLabel}>
       {#each permissionOptions as option (option.value)}
         {@const style = permissionStyle(option.value || serverPermission)}
         <MenuItem
           text={option.label}
           selected={option.value === permissionSelected}
-          onclick={() => {
-            onPermissionMode(option.value);
-            openMenu = null;
-          }}
+          onclick={() => onPermissionMode(option.value)}
         >
           {#snippet leading()}
-            <style.icon size={16} class="shrink-0 {style.tone}" />
+            <style.icon size={MENU_ICON_SIZE} class="shrink-0 {style.tone}" />
           {/snippet}
         </MenuItem>
       {/each}
-    </PopupMenu>
+    </ToolbarSelect>
 
     {#if (capabilities?.accounts ?? []).length > 1}
-      <PopupMenu
-        open={openMenu === "account"}
-        side="top"
-        triggerClass={SLOT}
-        onOpenChange={(open) => (openMenu = open ? "account" : null)}
-      >
-        {#snippet trigger()}
-          <TooltipWrap label={t("ACCOUNT")} class={SLOT}>
-            <span class={ITEM_CLASS}>
-              <AccountIcon size={16} class="shrink-0 text-accent" />
-              <span class="whitespace-nowrap">{accountLabel}</span>
-            </span>
-          </TooltipWrap>
-        {/snippet}
-        {#each accountOptions as option (option.value)}
-          <MenuItem
-            text={option.label}
-            selected={option.value === accountSelected}
-            onclick={() => {
-              onAccount(option.value);
-              openMenu = null;
-            }}
-          />
-        {/each}
+      <ToolbarSelect label={t("ACCOUNT")} icon={AccountIcon} text={accountLabel}>
+        {@render choices(accountOptions, accountSelected, onAccount)}
         {#if providerAccounts.length}
           <div class="my-1 border-t border-outline-variant"></div>
-          {#each providerAccounts as option (option.value)}
-            <MenuItem
-              text={option.label}
-              selected={option.value === accountSelected}
-              onclick={() => {
-                onAccount(option.value);
-                openMenu = null;
-              }}
-            />
-          {/each}
+          {@render choices(providerAccounts, accountSelected, onAccount)}
         {/if}
-      </PopupMenu>
+      </ToolbarSelect>
     {/if}
 
-    <PopupMenu
-      open={openMenu === "streaming"}
-      side="top"
-      triggerClass={SLOT}
-      onOpenChange={(open) => (openMenu = open ? "streaming" : null)}
+    <ToolbarSelect
+      label={t("STREAMING")}
+      icon={Radio}
+      iconClass={streamTokens ? "text-green" : "text-on-surface-variant"}
     >
-      {#snippet trigger()}
-        <TooltipWrap label={t("STREAMING")} class={SLOT}>
-          <span class={TOGGLE_CLASS}>
-            <Radio size={16} class={streamTokens ? "text-green" : "text-on-surface-variant"} />
-          </span>
-        </TooltipWrap>
-      {/snippet}
-      {#each streamingOptions as option (option.value)}
-        <MenuItem
-          text={option.label}
-          selected={option.value === streamingSelected}
-          onclick={() => {
-            onStreamTokens(option.value);
-            openMenu = null;
-          }}
-        />
-      {/each}
-    </PopupMenu>
+      {@render choices(streamingOptions, streamingSelected, onStreamTokens)}
+    </ToolbarSelect>
 
-    <TooltipWrap label={t("VISIBILITY")} class={SLOT}>
-      <button type="button" use:keepFocus onclick={onVisibility} aria-label={t("VISIBILITY")} class={TOGGLE_CLASS}>
-        {#if simpleMode}
-          <EyeOff size={16} class="text-accent" />
-        {:else}
-          <Eye size={16} class="text-accent" />
-        {/if}
-      </button>
-    </TooltipWrap>
+    <VisibilityToggle {simpleMode} {onVisibility} />
   {/if}
 </div>
 

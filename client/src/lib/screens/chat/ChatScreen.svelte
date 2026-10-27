@@ -13,6 +13,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
+  import { useAgents } from "$lib/services/agents.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import ColorDialog from "$lib/ui/ColorDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -39,6 +40,8 @@
   import TabStrip from "./TabStrip.svelte";
   import { tabs, type PaneRole } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
+
+  useAgents();
 
   const chat = $derived(panes.focusedChat);
   const paneLayer = $derived(layout.mobile && panes.showingTool);
@@ -358,7 +361,8 @@
         </PaneSurface>
       {:else if shownTab}
         <ChatView
-          tab={shownTab}
+          chat={tabs.stateFor(shownTab)}
+          viewKey={shownTab.id}
           primary
           focused={chatFocused}
           {dockLift}
@@ -450,7 +454,6 @@
 {#snippet centerActions()}
   <PaneActions />
 {/snippet}
-
 {#snippet menuButton()}
   <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => (drawer.open = true)}>
     <Menu />

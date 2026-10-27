@@ -20,6 +20,8 @@ export interface Account {
   loggedIn: boolean;
   primary: boolean;
   provider: AccountProvider | null;
+  delegate: boolean;
+  purpose: string;
 }
 
 export interface ProviderProbe {
@@ -58,6 +60,8 @@ const parse = (data: Wire): Account => ({
         contextScope: data.provider.context_scope ?? "",
       }
     : null,
+  delegate: data.delegate === true,
+  purpose: data.purpose ?? "",
 });
 
 export const exportUrl = (id: string, profile: Profile = backend.active) =>
@@ -151,6 +155,10 @@ export const createAccountsApi = (client: HttpClient) => ({
     const done = (await client.put(`/accounts/${id}`, { label })) !== null;
     if (done) serverDefaults.bump();
     return done;
+  },
+
+  async setDelegation(id: string, delegate: boolean, purpose: string): Promise<boolean> {
+    return (await client.put(`/accounts/${id}/delegation`, { delegate, purpose })) !== null;
   },
 
   async remove(id: string): Promise<boolean> {

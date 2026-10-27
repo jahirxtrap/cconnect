@@ -21,17 +21,20 @@ from core.ws import send_event
 from mcps import terminal as terminal_mcp
 from middleware.public_auth import ws_bearer_ok
 from schemas.chat import (
+    AgentLoginMessage,
     ModActionMessage,
     ModAnswerMessage,
     ModClientModuleMessage,
     ModRenderMessage,
     PromptMessage,
     SetGenerationMessage,
+    SetOptionMessage,
     SetPermissionMessage,
     SetVisibilityMessage,
     StartMessage,
 )
 from services import accounts
+from services import agent_sessions
 from services import blocks
 from services import chat_list
 from services import cli_info
@@ -76,6 +79,7 @@ class _Session:
         self.model: str | None = None
         self.effort: str = "max"
         self.partial: bool = False
+        self.agent: str | None = None
 
 
 def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False, shown=None):
@@ -234,11 +238,17 @@ def _turn_start(session, prefs=None) -> int:
 
 
 def _committed_index(session, prefs=None) -> int | None:
-    items = _session_items(session, prefs) if session.running else None
+    items = _session_items(session, prefs) if session.running and session.agent is None else None
     return None if items is None else sessions_service.committed_index(items, session.turn_start_index)
 
 
 async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=None):
+    if session.agent is not None:
+        if not session.start(agent_sessions.runner(session, session.agent, text, attachments or [], mid), seed_id=mid):
+            return False
+        if mid:
+            await session.commit_user(mid, text)
+        return True
     turn_start = _turn_start(session, prefs)
     if not session.start(
         _build_turn_runner(session, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport),
@@ -398,6 +408,15 @@ async def chat_ws(ws: WebSocket):
                 previous = session
                 if existing is not None:
                     session = existing
+                elif msg.agent:
+                    state = _Session()
+                    state.agent = msg.agent
+                    state.cwd = msg.cwd or DEFAULT_CWD
+                    state.session_id = msg.resume
+                    session = registry.create(state)
+                    agent = agent_sessions.AgentSession(msg.agent, state.cwd, sessions_service.project_key_for(state.cwd))
+                    session.bind_agent(agent)
+                    spawn(agent.open(msg.resume))
                 else:
                     state = _Session()
                     resumed_cwd = sessions_service.find_session_cwd(msg.resume) if msg.resume else None
@@ -426,9 +445,17 @@ async def chat_ws(ws: WebSocket):
                     "resumed": bool(by_session),
                     "committed_count": _committed_index(session, seen["prefs"]) if by_session else None,
                     "queued": session.queued_items(),
+                    "agent": session.state.agent,
                 })
+                if session.agent is not None:
+                    await sink({**session.agent.snapshot(), "channel": session.channel})
+                    if not msg.last_seq:
+                        await sink({**session.agent.history(), "channel": session.channel})
                 await session.attach(sink, last_seq=msg.last_seq, since_committed=bool(by_session), prefs=seen)
-                if not session.running and session.state.session_id:
+                if session.agent is not None:
+                    if not session.running and session.agent.todos:
+                        await send({"type": "todos", "items": session.agent.todos})
+                elif not session.running and session.state.session_id:
                     tasks = sessions_service.session_tasks(
                         session.state.session_id,
                         sessions_service.project_key_for(session.state.cwd or ""),
@@ -506,6 +533,36 @@ async def chat_ws(ws: WebSocket):
                     session.state.permission_mode = msg.mode
                     await session.set_permission_mode(msg.mode)
                 await send({"type": "permission_mode", "mode": msg.mode})
+
+            elif mtype == "set_option":
+                try:
+                    msg = SetOptionMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None and session.agent is not None:
+                    spawn(session.agent.set_option(msg.id, msg.value))
+
+            elif mtype == "agent_login":
+                try:
+                    msg = AgentLoginMessage(**raw)
+                except ValidationError as exc:
+                    await send({"type": "error", "message": exc.errors()})
+                    continue
+                if session is not None and session.agent is not None:
+                    spawn(session.agent.login(msg.method))
+
+            elif mtype == "agent_logout":
+                if session is not None and session.agent is not None:
+                    spawn(session.agent.logout())
+
+            elif mtype == "agent_retry":
+                if session is not None and session.agent is not None:
+                    session.agent.reopen(signing_in=session.agent.status == agent_sessions.SIGN_IN)
+
+            elif mtype == "history":
+                if session is not None and session.agent is not None:
+                    await sink({**session.agent.history(), "channel": session.channel})
 
             elif mtype == "close_resident":
                 if session is not None:

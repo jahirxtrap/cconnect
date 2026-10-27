@@ -51,6 +51,12 @@ export const formatDays = (days: number): string => {
 
 export const formatList = (items: readonly string[]): string => new Intl.ListFormat().format(items);
 
+export const linesOf = (text: string): string[] =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
 export const formatDecimal = (value: number, decimals: number, minimum = decimals): string =>
   value.toLocaleString(undefined, { minimumFractionDigits: minimum, maximumFractionDigits: decimals });
 
@@ -69,6 +75,9 @@ export const usageRatio = (used: number, limit: number): number =>
   limit > 0 ? Math.min(1, Math.max(0, used / limit)) : 0;
 
 export const formatPercent = (ratio: number): string => `${Math.round(ratio * PERCENT)}%`;
+
+export const formatCurrency = (amount: number, currency: string): string =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
 
 export const formatUsage = (used: number, limit: number, unit: (value: number) => string): string =>
   joined(`${unit(used)} / ${unit(limit)}`, formatPercent(usageRatio(used, limit)));

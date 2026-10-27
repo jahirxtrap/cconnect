@@ -1,10 +1,10 @@
 <script lang="ts">
-  import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import FolderClosed from "@lucide/svelte/icons/folder-closed";
   import Plus from "@lucide/svelte/icons/plus";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import DropdownRow from "$lib/ui/DropdownRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ProjectPathDialog from "./ProjectPathDialog.svelte";
@@ -47,26 +47,12 @@
   const label = $derived(shown ?? nameOf(selected));
 </script>
 
-{#snippet row(menu: boolean)}
-  <span
-    class="flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-on-surface-variant {menu
-      ? 'cursor-pointer transition-colors hover:bg-hover'
-      : ''} {className}"
-  >
-    <FolderClosed size={16} class="shrink-0" />
-    <span class="min-w-0 flex-1 truncate text-left text-item-title text-on-surface">{label}</span>
-    {#if menu}
-      <ChevronDown size={16} class="shrink-0" />
-    {/if}
-  </span>
-{/snippet}
-
 {#if settings.lockedProject}
-  {@render row(false)}
+  <DropdownRow {label} icon={FolderClosed} menu={false} class={className} />
 {:else}
 <PopupMenu {open} matchTriggerWidth triggerClass="w-full" onOpenChange={(value) => (open = value)}>
   {#snippet trigger()}
-    {@render row(true)}
+    <DropdownRow {label} icon={FolderClosed} class={className} />
   {/snippet}
   {#if onFollow}
     <MenuItem

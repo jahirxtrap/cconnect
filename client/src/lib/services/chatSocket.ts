@@ -14,6 +14,7 @@ import {
   type SharedFile,
   type TodoItem,
 } from "$lib/data/chatModels";
+import { toAgentState, type AgentState } from "$lib/data/agentModels";
 import type { ApiRetry } from "$lib/data/apiRetry";
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
 import type { Reload } from "$lib/data/reload";
@@ -59,8 +60,12 @@ export type ServerEvent =
       queued: QueuedMessage[];
       activity: string | null;
       resident: boolean;
+      agent: string | null;
     }
   | { type: "activity"; state: string | null; resident: boolean }
+  | { type: "agent_state"; state: AgentState }
+  | { type: "history"; items: Record<string, unknown>[] }
+  | { type: "stop"; reason: string | null; severity: string | null }
   | { type: "terminal_opened"; session: TerminalInfo }
   | { type: "assistant_text"; text: string }
   | { type: "thinking"; text: string; labelOnly: boolean }
@@ -141,7 +146,13 @@ export type ServerEvent =
   | { type: "task"; id: string; content: string | null; status: string | null }
   | { type: "session_started"; sessionId: string | null }
   | { type: "result"; sessionId: string | null }
-  | { type: "context"; contextTokens: number | null; requestBytes: number | null; mediaBytes: number | null }
+  | {
+      type: "context";
+      contextTokens: number | null;
+      contextWindow: number | null;
+      requestBytes: number | null;
+      mediaBytes: number | null;
+    }
   | { type: "rate_limit"; windows: LimitWindow[] }
   | { type: "cache"; cache: PromptCache | null }
   | { type: "done"; replay: boolean }
@@ -198,6 +209,7 @@ export interface StartOptions {
   partial: boolean;
   account: string;
   visibility: VisibilityPrefs;
+  agent: string | null;
 }
 
 export interface GenerationPatch {
@@ -486,6 +498,7 @@ export class ChatSocket {
       effort: options.effort,
       partial: options.partial,
       visibility: options.visibility,
+      ...(options.agent ? { agent: options.agent } : {}),
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,
       capabilities: CLIENT_CAPABILITIES,
@@ -519,6 +532,26 @@ export class ChatSocket {
 
   sendCloseResident() {
     this.#send({ type: "close_resident" });
+  }
+
+  sendSetOption(id: string, value: string | boolean) {
+    this.#send({ type: "set_option", id, value });
+  }
+
+  sendAgentLogin(method: string) {
+    this.#send({ type: "agent_login", method });
+  }
+
+  sendAgentLogout() {
+    this.#send({ type: "agent_logout" });
+  }
+
+  sendAgentRetry() {
+    this.#send({ type: "agent_retry" });
+  }
+
+  sendHistory() {
+    return this.#send({ type: "history" });
   }
 
   sendModRender(site: ModRenderSite, rid: number) {
@@ -706,6 +739,7 @@ export class ChatSocket {
         queued: queuedItems(wire),
         activity: text(wire, "activity"),
         resident: flag(wire, "resident"),
+        agent: text(wire, "agent"),
       });
       return;
     }
@@ -803,6 +837,12 @@ export class ChatSocket {
         const state = text(wire, "state");
         return { type: "activity", state: state === "idle" ? null : state, resident: flag(wire, "resident") };
       }
+      case "agent_state":
+        return { type: "agent_state", state: toAgentState(wire) };
+      case "history":
+        return { type: "history", items: list(wire, "items") };
+      case "stop":
+        return { type: "stop", reason: text(wire, "reason"), severity: text(wire, "severity") };
       case "compact":
       case "compact_summary":
         return {
@@ -949,6 +989,7 @@ export class ChatSocket {
         return {
           type: "context",
           contextTokens: int(wire, "context_tokens"),
+          contextWindow: int(wire, "context_window"),
           requestBytes: int(wire, "request_bytes"),
           mediaBytes: int(wire, "media_bytes"),
         };

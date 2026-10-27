@@ -81,7 +81,16 @@ def _shell() -> list[str]:
 
 
 class Terminal:
-    def __init__(self, session_id: str, title: str, cwd: str, argv: list[str], cols: int, rows: int) -> None:
+    def __init__(
+        self,
+        session_id: str,
+        title: str,
+        cwd: str,
+        argv: list[str],
+        cols: int,
+        rows: int,
+        env: Optional[dict[str, str]] = None,
+    ) -> None:
         self.id = session_id
         self.title = title
         self.cwd = cwd
@@ -90,13 +99,15 @@ class Terminal:
         self.rows = rows
         self.alive = True
         self.exit_status: Optional[int] = None
+        self.exited = asyncio.Event()
         self.created_at = time.time()
-        env = dict(os.environ)
-        env["TERM"] = _TERM
-        self._proc = PtyProcess.spawn(argv, cwd=cwd, env=env, dimensions=(rows, cols))
+        spawned = dict(env or os.environ)
+        spawned["TERM"] = _TERM
+        self._proc = PtyProcess.spawn(argv, cwd=cwd, env=spawned, dimensions=(rows, cols))
         self.pid = self._proc.pid
         self._loop = asyncio.get_running_loop()
         self._scrollback = bytearray()
+        self._dropped = 0
         self._listeners: set[asyncio.Queue] = set()
         self._sizes: dict[int, tuple[int, int]] = {}
         threading.Thread(target=self._pump, daemon=True).start()
@@ -117,6 +128,7 @@ class Terminal:
     def _publish(self, data: bytes) -> None:
         self._scrollback += data
         if len(self._scrollback) > _SCROLLBACK_BYTES:
+            self._dropped += len(self._scrollback) - _SCROLLBACK_BYTES
             del self._scrollback[:-_SCROLLBACK_BYTES]
         for queue in self._listeners:
             queue.put_nowait(data)
@@ -124,6 +136,7 @@ class Terminal:
     def _finish(self, status: Optional[int]) -> None:
         self.alive = False
         self.exit_status = status
+        self.exited.set()
         for queue in self._listeners:
             queue.put_nowait(None)
 
@@ -163,6 +176,10 @@ class Terminal:
         """What the terminal shows, with the escape sequences stripped."""
         text = visible_text(bytes(self._scrollback).decode("utf-8", errors="replace"))
         return text[-limit:] if limit > 0 else text
+
+    @property
+    def overflowed(self) -> bool:
+        return self._dropped > 0
 
     def write(self, data: bytes) -> None:
         if self.alive:
@@ -220,19 +237,34 @@ def _root(candidates: Optional[list[str]]) -> str:
     return str(Path.home())
 
 
-def create(cwd: Optional[list[str]] = None, title: Optional[str] = None, cols: int = 0, rows: int = 0) -> dict:
+def spawn(
+    cwd: Optional[list[str]] = None,
+    title: Optional[str] = None,
+    cols: int = 0,
+    rows: int = 0,
+    argv: Optional[list[str]] = None,
+    env: Optional[dict[str, str]] = None,
+) -> Terminal:
+    """A terminal running the shell, or the program given, that no panel lists yet."""
     root = _root(cwd)
-    session_id = uuid.uuid4().hex[:12]
-    term = Terminal(
-        session_id,
+    return Terminal(
+        uuid.uuid4().hex[:12],
         (title or "").strip() or Path(root).name or root,
         root,
-        _shell(),
+        argv or _shell(),
         cols or _DEFAULT_COLS,
         rows or _DEFAULT_ROWS,
+        env,
     )
-    _terminals[session_id] = term
+
+
+def listed(term: Terminal) -> dict:
+    _terminals[term.id] = term
     return meta(term)
+
+
+def create(cwd: Optional[list[str]] = None, title: Optional[str] = None, cols: int = 0, rows: int = 0) -> dict:
+    return listed(spawn(cwd, title, cols, rows))
 
 
 def get(session_id: str) -> Optional[Terminal]:

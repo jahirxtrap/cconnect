@@ -174,7 +174,10 @@
       return raw
         .split(VALUE_SEPARATOR)
         .filter(Boolean)
-        .map((item) => element.options.find((option) => option.value === item)?.label ?? item)
+        .map((item) => {
+          const option = element.options.find((candidate) => candidate.value === item);
+          return option?.label || keyed(option?.labelKey ?? null) || item;
+        })
         .join(", ");
     }
     if (element.type === "toggle") return raw === "true" ? t("YES") : t("NO");

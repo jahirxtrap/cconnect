@@ -50,6 +50,7 @@
   import ProjectSelector from "$lib/screens/chat/ProjectSelector.svelte";
   import { PANE_TOP_CLASS } from "$lib/screens/chat/paneChrome";
   import { inPane, usePaneTail } from "$lib/screens/chat/paneSurface";
+  import { panelProject } from "$lib/screens/chat/panelProject.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
 
   interface Props {
@@ -81,11 +82,8 @@
   const expandable = $derived(compact && !layout.mobile);
   const fullFile = $derived(opened.full && expandable);
 
-  const chat = $derived(tabs.state);
   const list = $derived(chatListFor(backend.active));
   const projects = $derived(list?.visibleProjects ?? []);
-  const known = (key: string | null) =>
-    key !== null && (list?.projects ?? []).some((item) => item.projectKey === key);
 
   let children = $state<Record<string, ProjectEntry[]>>({});
   let expanded = $state<Record<string, boolean>>({});
@@ -303,14 +301,11 @@
   let rejected = $state(false);
   let loading = $state(false);
 
-  const followed = $derived(chat.historyProject);
-  const pinned = $derived(tabs.active?.panelProject ?? null);
-  const wanted = $derived(settings.lockedProject || (pinned === null ? followed : pinned || null));
-  const settled = $derived(list !== null && !list.loading);
-  const projectKey = $derived(!settled || known(wanted) ? wanted : known(followed) ? followed : null);
+  const pinned = $derived(panelProject.pinned);
+  const projectKey = $derived(panelProject.key);
 
   $effect(() => {
-    if (settled && pinned && !known(pinned)) tabs.setPanelProject(null);
+    if (panelProject.settled && pinned && !panelProject.known(pinned)) tabs.setPanelProject(null);
   });
 
   const project = $derived(projects.find((item) => item.projectKey === projectKey) ?? null);

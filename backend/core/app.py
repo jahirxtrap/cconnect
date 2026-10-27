@@ -31,6 +31,8 @@ async def lifespan(app: FastAPI):
     init_db()
     settings_store.load()
     cli_settings.migrate()
+    from services import delegates
+    delegates.migrate()
     from services import accounts
     await asyncio.to_thread(accounts.link_all_shared_dirs)
     paths.RUNTIME_FILE.write_text(f"PORT={PORT}\nPID={os.getpid()}\n", encoding="utf-8")
@@ -55,8 +57,9 @@ async def lifespan(app: FastAPI):
     project_watch.hub.stop()
     system_watch.hub.stop()
     network.watchdog.stop()
-    from services import persistent_sessions
+    from services import agent_connections, persistent_sessions
     await persistent_sessions.pool.close_all()
+    await agent_connections.pool.close_all()
     paths.RUNTIME_FILE.unlink(missing_ok=True)
 
 

@@ -16,6 +16,10 @@ export const keyed = (key: string | null, many = false): string | null => {
       return t("ADD_NOTES");
     case "unused":
       return t("USAGE_UNUSED");
+    case "link_done":
+      return t("AGENT_LINK_CONTINUE");
+    case "cancel":
+      return t("CANCEL");
     default:
       return null;
   }

@@ -1,10 +1,11 @@
-"""Claude accounts: list, create, rename, delete and remote OAuth login."""
+"""Claude accounts: list, create, rename, delegation, delete and remote OAuth login."""
 
 from fastapi import APIRouter, Request, Response
 
 from core.responses import api_response
 from schemas.accounts import (
     AccountCreateRequest,
+    AccountDelegationRequest,
     AccountRenameRequest,
     LoginCodeRequest,
     ProviderAccountRequest,
@@ -86,6 +87,13 @@ async def update_provider_account(account_id: str, payload: ProviderUpdateReques
 @router.put("/accounts/{account_id}")
 def rename_account(account_id: str, payload: AccountRenameRequest):
     if not accounts.rename(account_id, payload.label):
+        return api_response(status=404)
+    return api_response()
+
+
+@router.put("/accounts/{account_id}/delegation")
+def set_account_delegation(account_id: str, payload: AccountDelegationRequest):
+    if not accounts.set_delegation(account_id, payload.delegate, payload.purpose):
         return api_response(status=404)
     return api_response()
 

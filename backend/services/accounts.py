@@ -169,6 +169,11 @@ def _label(path: Path, fallback: str) -> str:
     return _meta(path).get("label") or fallback
 
 
+def _delegation(path: Path) -> dict:
+    meta = _meta(path)
+    return {"delegate": meta.get("delegate") is True, "purpose": str(meta.get("purpose") or "")}
+
+
 def list_accounts() -> list[dict]:
     items = [{
         "id": PRIMARY_ID,
@@ -176,6 +181,7 @@ def list_accounts() -> list[dict]:
         "logged_in": is_logged_in(None),
         "primary": True,
         "provider": None,
+        **_delegation(primary_dir()),
     }]
     if paths.ACCOUNTS_DIR.is_dir():
         for entry in sorted(paths.ACCOUNTS_DIR.iterdir()):
@@ -191,6 +197,7 @@ def list_accounts() -> list[dict]:
                         "model": provider["model"],
                         "context_scope": providers.scope_for(provider.get("context_scope"))["id"],
                     } if provider else None,
+                    **_delegation(entry),
                 })
     return items
 
@@ -324,13 +331,21 @@ def delete(account_id: str) -> bool:
     return True
 
 
-def rename(account_id: str, label: str) -> bool:
+def _write_meta(account_id: str, changes: dict) -> bool:
     path = config_dir(account_id) if account_id != PRIMARY_ID else primary_dir()
     if path is None:
         return False
-    meta = {**_meta(path), "label": label.strip() or account_id}
-    (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
+    (path / _META_FILE).write_text(json.dumps({**_meta(path), **changes}), encoding="utf-8")
     return True
+
+
+def rename(account_id: str, label: str) -> bool:
+    return _write_meta(account_id, {"label": label.strip() or account_id})
+
+
+def set_delegation(account_id: str, delegate: bool, purpose: str) -> bool:
+    """Whether Claude may hand this account a task, and what it is good for."""
+    return _write_meta(account_id, {"delegate": delegate, "purpose": purpose.strip()})
 
 
 def _provider(base_url: str, model: str, auth: Optional[dict], scope: str) -> dict:

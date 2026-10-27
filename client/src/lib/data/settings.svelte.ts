@@ -358,6 +358,13 @@ class Settings {
     this.#write("right_pane", value);
   }
 
+  get agentPane() {
+    return this.#read<string>("agent_pane");
+  }
+  set agentPane(value: string) {
+    this.#write("agent_pane", value);
+  }
+
   get sharedSortField() {
     return this.#read<string>("shared_sort_field");
   }

@@ -1,4 +1,5 @@
 import Activity from "@lucide/svelte/icons/activity";
+import Bot from "@lucide/svelte/icons/bot";
 import Compass from "@lucide/svelte/icons/compass";
 import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
 import FolderTree from "@lucide/svelte/icons/folder-tree";
@@ -61,9 +62,16 @@ export const SCREENS: ScreenEntry[] = [
     open: () => panes.setKind("mods"),
     paneOnly: true,
   },
+  {
+    kind: "agents",
+    label: "AGENTS",
+    icon: Bot,
+    open: () => panes.setKind("agents"),
+    paneOnly: true,
+  },
 ];
 
-export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods"];
+export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods", "agents"];
 
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),

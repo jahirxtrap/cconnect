@@ -3,6 +3,7 @@
 from typing import Any, Callable, Iterable
 
 from services import settings_store
+from services.event_rows import visible_rows
 
 TYPES = ("thinking", "tool_use", "file_change", "compact")
 
@@ -73,6 +74,9 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
     """Cut one event down to what this socket wants, or drop it entirely.
     In simple mode a dropped event becomes a single ``working`` marker per batch."""
     kind = event.get("type")
+
+    if kind == "history":
+        return {**event, "items": visible_rows(event.get("items") or [], prefs)}
 
     if not prefs.get("tokens"):
         if kind == "thinking_tokens":

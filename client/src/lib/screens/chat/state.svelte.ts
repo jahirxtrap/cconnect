@@ -19,6 +19,7 @@ import {
   type TodoItem,
   type BackgroundTask,
 } from "$lib/data/chatModels";
+import { agentStopText, type AgentState } from "$lib/data/agentModels";
 import { emptyModState, type ModState } from "$lib/data/modModels";
 import { isBusyActivity, projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
 import type { PromptCache } from "$lib/data/promptCache";
@@ -74,6 +75,7 @@ interface SideChat {
 }
 import { t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
+import { agents } from "$lib/services/agents.svelte";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
 import {
   commandFor,
@@ -164,14 +166,19 @@ export interface ChatContext {
   cwd: string;
   color?: string | null;
   overrides?: ChatOverrides;
+  agent?: string | null;
 }
 
 export class ChatState {
   onContextChange: (() => void) | null = null;
   onOverrides: ((patch: Partial<ChatOverrides>) => void) | null = null;
   tabId: string | null = null;
+  readonly agent: string | null;
 
   connection = $state<ConnectionState>("connecting");
+  agentState = $state<AgentState | null>(null);
+  agentStarted = $state(false);
+  contextWindow = $state<number | null>(null);
   messages = $state<ChatMessage[]>([]);
   streaming = $state(false);
   compacting = $state(false);
@@ -303,6 +310,15 @@ export class ChatState {
   );
 
   readonly environment = $derived(backend.find(this.environmentId));
+
+  get agentName(): string {
+    return agents.find(this.environment, this.agent)?.name ?? this.agentState?.info?.title ?? this.agent ?? "";
+  }
+
+  get agentTitle(): string | null {
+    const opening = this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH);
+    return this.agentState?.title || opening || null;
+  }
   readonly defaultCwd = $derived(this.environment?.directory ?? "");
   readonly list = $derived(chatListFor(this.environment));
   readonly listed = $derived(this.list?.sessions.find((session) => session.sessionId === this.sessionId) ?? null);
@@ -393,13 +409,14 @@ export class ChatState {
   #arrivingMods: ModState | null = null;
 
   constructor(context: ChatContext) {
+    this.agent = context.agent ?? null;
     this.environmentId = context.environmentId;
     this.sessionId = context.sessionId;
     this.projectKey = context.projectKey;
     this.sessionColor = context.color ?? null;
     this.cwd = context.cwd || this.defaultCwd;
     this.#initial =
-      context.sessionId && context.projectKey
+      context.sessionId && context.projectKey && !this.agent
         ? {
             sessionId: context.sessionId,
             projectKey: context.projectKey,
@@ -414,7 +431,7 @@ export class ChatState {
             rewind: null,
           }
         : null;
-    this.transcriptLoading = this.#initial !== null;
+    this.transcriptLoading = this.#initial !== null || (this.agent !== null && context.sessionId !== null);
     this.#loadOverrides(context.overrides);
     this.#applyDefaultProject();
     this.#connect();
@@ -491,6 +508,7 @@ export class ChatState {
 
   #applyDefaultProject() {
     if (settings.lockedProject) this.historyProjectKey = settings.lockedProject;
+    else if (this.agent) this.historyProjectKey = projectKeyOf(this.cwd);
     else if (this.defaultCwd) this.historyProjectKey = this.defaultProjectKey();
   }
 
@@ -569,6 +587,10 @@ export class ChatState {
   }
 
   submit(text: string) {
+    if (this.agent) {
+      void this.sendPrompt(text);
+      return;
+    }
     const command = commandFor(this.capabilities, text);
     if (command && command.kind !== "prompt") this.runCommand(command);
     else void this.sendPrompt(text);
@@ -738,6 +760,10 @@ export class ChatState {
 
   #bindSession(sessionId: string | null) {
     if (!sessionId) return;
+    if (this.agent) {
+      this.sessionId = sessionId;
+      return;
+    }
     const born = this.sessionId === null;
     const list = this.list;
     if (list && !list.sessions.some((item) => item.sessionId === sessionId)) {
@@ -936,6 +962,41 @@ export class ChatState {
 
   openSession(session: SessionInfo) {
     void this.#openSession(session);
+  }
+
+  startAgentSession(cwd: string) {
+    this.cwd = cwd;
+    this.#applyDefaultProject();
+    this.newSession();
+  }
+
+  openAgentSession(sessionId: string) {
+    if (sessionId === this.sessionId) return;
+    this.#socket.resetResume();
+    this.#resetTranscript();
+    this.sessionId = sessionId;
+    this.streaming = false;
+    this.compacting = false;
+    this.activity = null;
+    this.streamStatus = null;
+    this.transcriptLoading = true;
+    this.#startSession(sessionId);
+  }
+
+  setAgentOption(id: string, value: string | boolean) {
+    this.#socket.sendSetOption(id, value);
+  }
+
+  agentLogin(method: string) {
+    this.#socket.sendAgentLogin(method);
+  }
+
+  agentLogout() {
+    this.#socket.sendAgentLogout();
+  }
+
+  agentRetry() {
+    this.#socket.sendAgentRetry();
   }
 
   get view(): ChatMessage[] {
@@ -1597,12 +1658,14 @@ export class ChatState {
       partial: this.effectiveStreamTokens,
       account: this.effectiveAccount,
       visibility: settings.visibility,
+      agent: this.agent,
     });
   }
 
   syncVisibility() {
     this.#socket.sendVisibility(settings.visibility);
     this.#reloadOnDone = this.streaming;
+    if (this.agent && this.streaming) return;
     void this.#reloadConversation({ keepLive: this.streaming });
   }
 
@@ -1641,7 +1704,7 @@ export class ChatState {
     const project = this.#projectKey();
     const held = this.messages;
     const live = held.filter((item) => item.sourceIndex < 0 && !item.ephemeral).length;
-    if (!sessionId || !project || !live) return;
+    if (!sessionId || !project || !live || this.agent) return;
     const page = await this.#sessions.messages(sessionId, project, Math.min(live, MESSAGE_TAIL_CAP), null, settings.visibility);
     if (!page || sessionId !== this.sessionId) return;
     const stored = this.#nest(page.items.filter(isVisible).map((item, index) => this.#fromSession(item, index, sessionId, project)));
@@ -1690,6 +1753,7 @@ export class ChatState {
     this.todos = [];
     this.queue = [];
     this.contextTokens = null;
+    this.contextWindow = null;
     this.promptCache = null;
     this.requestBytes = null;
     this.mediaBytes = null;
@@ -1767,6 +1831,10 @@ export class ChatState {
   }
 
   async #reloadConversation({ keepLive = false } = {}) {
+    if (this.agent) {
+      this.#socket.sendHistory();
+      return;
+    }
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     if (!sessionId || !project) return;
@@ -2110,6 +2178,10 @@ export class ChatState {
     return heading || t("PLAN");
   }
 
+  #awaitingHistory(): boolean {
+    return this.agent !== null && this.sessionId !== null && this.agentState?.status === "connecting";
+  }
+
   #resetStreaming() {
     this.streaming = false;
     this.compacting = false;
@@ -2178,7 +2250,7 @@ export class ChatState {
           };
         }
         this.#applyQueueSnapshot(event.queued);
-        if (event.account && event.account !== this.effectiveAccount) this.#storeAccount(event.account);
+        if (!this.agent && event.account && event.account !== this.effectiveAccount) this.#storeAccount(event.account);
         void this.refreshServerInfo();
         this.#pumpQueue();
         if (this.#cutChannel !== null && event.channel !== this.#cutChannel && !event.resumed && !event.running) {
@@ -2443,6 +2515,32 @@ export class ChatState {
         this.activity = event.state;
         this.resident = event.resident;
         break;
+      case "agent_state":
+        this.agentState = event.state;
+        if (event.state.status === "ready") this.agentStarted = true;
+        if (event.state.sessionId) this.sessionId = event.state.sessionId;
+        if (event.state.status === "auth" || event.state.status === "error") this.transcriptLoading = false;
+        break;
+      case "history": {
+        const sessionId = this.sessionId ?? "";
+        const visible = event.items.map(parseSessionMessage).filter(isVisible);
+        this.messages = this.#nest(
+          visible.map((item, index) => this.#fromSession(item, index, sessionId, this.projectKey)),
+        );
+        this.#nextId = visible.length;
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.expandedIds = {};
+        this.oldestLoadedIndex = null;
+        this.transcriptExhausted = true;
+        this.transcriptLoading = this.#awaitingHistory();
+        break;
+      }
+      case "stop":
+        this.#assistantId = null;
+        this.#thinkingId = null;
+        this.#append(newMessage(this.#nextId++, "api_error", { text: agentStopText(event.reason), result: event.severity }));
+        break;
       case "terminal_opened":
         void listTerminals().then((listed) => {
           if (listed) terminalTabs.openLocal(event.session);
@@ -2513,6 +2611,7 @@ export class ChatState {
         break;
       case "context":
         this.contextTokens = event.contextTokens;
+        this.contextWindow = event.contextWindow;
         this.requestBytes = event.requestBytes;
         this.mediaBytes = event.mediaBytes;
         break;
@@ -2564,7 +2663,7 @@ export class ChatState {
           .then(() => {
             this.#frozen = null;
             this.#settling = null;
-            this.transcriptLoading = false;
+            this.transcriptLoading = this.#awaitingHistory();
           });
         break;
       case "interrupted":

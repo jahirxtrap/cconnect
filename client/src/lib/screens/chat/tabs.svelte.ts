@@ -332,9 +332,12 @@ class Tabs {
   }
 
   openTab(environmentId: string | null, cwd: string, pane: PaneRole = "center"): Tab {
-    const tab = this.#blank(environmentId, cwd, pane);
+    return this.#add(this.#blank(environmentId, cwd, pane));
+  }
+
+  #add(tab: Tab): Tab {
     this.list = [...this.list, tab];
-    if (pane === "center") {
+    if (tab.pane === "center") {
       this.activeId = tab.id;
       this.#syncEnvironment();
     }
@@ -355,25 +358,13 @@ class Tabs {
   }
 
   openSessionTab(session: SessionInfo, environmentId: string | null, pane: PaneRole = "center"): Tab {
-    const tab: Tab = {
-      id: this.#nextId(),
-      pane,
-      environmentId,
-      cwd: session.path ?? "",
+    return this.#add({
+      ...this.#blank(environmentId, session.path ?? "", pane),
       sessionId: session.sessionId,
       projectKey: session.projectKey,
       title: sessionLabel(session),
       color: session.color,
-      overrides: { ...(this.active?.overrides ?? this.#environmentOverrides(environmentId)) },
-      panelProject: this.active?.panelProject ?? null,
-    };
-    this.list = [...this.list, tab];
-    if (pane === "center") {
-      this.activeId = tab.id;
-      this.#syncEnvironment();
-    }
-    this.#persist();
-    return tab;
+    });
   }
 
   updateActive(patch: Partial<Omit<Tab, "id">>) {

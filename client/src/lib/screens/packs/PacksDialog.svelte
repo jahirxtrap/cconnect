@@ -3,10 +3,8 @@
   import Package from "@lucide/svelte/icons/package";
   import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import Trash from "@lucide/svelte/icons/trash";
-  import Upload from "@lucide/svelte/icons/upload";
   import { joined } from "$lib/data/format";
-  import { securityKeys } from "$lib/data/securityKeys.svelte";
-  import { serverStatus } from "$lib/data/serverStatus.svelte";
+  import { KeyGate } from "$lib/data/keyGate.svelte";
   import { inspectPack, installPack } from "$lib/design/packs/library";
   import type { Pack } from "$lib/design/packs/model";
   import { packs } from "$lib/design/packs/registry.svelte";
@@ -49,8 +47,8 @@
   let opened = $state<string | null>(null);
   let installing = $state<string | null>(null);
   let deleting = $state<ServerPack | null>(null);
-  let unlocking = $state<ServerPack | null>(null);
-  let rejected = $state(false);
+
+  const gate = new KeyGate();
 
   const installed = $derived(packs.all.filter((pack) => !pack.builtin));
   const builtin = $derived(packs.all.filter((pack) => pack.builtin));
@@ -78,17 +76,9 @@
     }
   };
 
-  const removeServer = async (entry: ServerPack, key = securityKeys.current) => {
+  const removeServer = async (entry: ServerPack) => {
     deleting = null;
-    if (await serverPacks.remove(entry, key)) {
-      if (key !== securityKeys.current) securityKeys.set(key);
-      unlocking = null;
-      rejected = false;
-      return;
-    }
-    if (!serverStatus.version?.gated) return;
-    rejected = key !== "";
-    unlocking = entry;
+    await gate.run((key) => serverPacks.remove(entry, key));
   };
 </script>
 
@@ -118,7 +108,7 @@
       <EmptyState text={t("NO_PACKS_INSTALLED")} class="py-3" />
     {/each}
     <div class="mt-1 mb-2">
-      <ActionButton text={t("IMPORT_PACK")} icon={Upload} onclick={() => picker?.click()} class="w-full" />
+      <ActionButton text={t("IMPORT_PACK")} onclick={() => picker?.click()} class="w-full" />
     </div>
     {#if onServer.length}
       <SectionHeader label={t("PACKS_SERVER")} divider />
@@ -186,14 +176,6 @@
   />
 {/if}
 
-{#if unlocking}
-  {@const entry = unlocking}
-  <SecurityKeyDialog
-    {rejected}
-    onConfirm={(key) => void removeServer(entry, key)}
-    onDismiss={() => {
-      unlocking = null;
-      rejected = false;
-    }}
-  />
+{#if gate.asking}
+  <SecurityKeyDialog rejected={gate.rejected} onConfirm={(key) => gate.confirm(key)} onDismiss={() => gate.dismiss()} />
 {/if}

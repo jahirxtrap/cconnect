@@ -35,6 +35,7 @@ class StartMessage(BaseModel):
     last_seq: int = 0
     capabilities: list[str] = []
     security_key: Optional[str] = None
+    agent: Optional[str] = None
 
 
 class PromptMessage(BaseModel):
@@ -61,6 +62,17 @@ class SetPermissionMessage(BaseModel):
 
 class InterruptMessage(BaseModel):
     type: Literal["interrupt"]
+
+
+class SetOptionMessage(BaseModel):
+    type: Literal["set_option"]
+    id: str = Field(max_length=256)
+    value: Union[bool, str]
+
+
+class AgentLoginMessage(BaseModel):
+    type: Literal["agent_login"]
+    method: str = Field(max_length=256)
 
 
 ModComponent = Literal[

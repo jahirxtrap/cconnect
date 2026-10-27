@@ -1,4 +1,5 @@
 import { toDismiss, toElement } from "$lib/services/chatSocket";
+import { agentStopText } from "./agentModels";
 import {
   diffKindOf,
   emptyInteraction,
@@ -61,10 +62,11 @@ const ROLES: Record<string, Role> = {
   agent: "agent",
   plan: "plan",
   api_error: "api_error",
+  stop: "api_error",
   interrupted: "interrupted",
 };
 
-const RESULT_FIELD: Record<string, string> = { notice: "level", api_error: "severity" };
+const RESULT_FIELD: Record<string, string> = { notice: "level", api_error: "severity", stop: "severity" };
 
 const roleOf = (raw: Wire): Role => {
   const type = text(raw, "type");
@@ -114,7 +116,9 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
         ? (text(raw, "input") ?? "")
         : type === "agent"
           ? (text(raw, "description") ?? "")
-          : (text(raw, "text") ?? "");
+          : type === "stop"
+            ? agentStopText(text(raw, "reason"))
+            : (text(raw, "text") ?? "");
 
   const images = list(raw, "images")
     .map((image) => {

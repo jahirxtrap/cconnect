@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Bot from "@lucide/svelte/icons/bot";
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import Eye from "@lucide/svelte/icons/eye";
   import Lock from "@lucide/svelte/icons/lock";
@@ -6,7 +7,6 @@
   import Flame from "@lucide/svelte/icons/flame";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Unplug from "@lucide/svelte/icons/unplug";
-  import Workflow from "@lucide/svelte/icons/workflow";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Puzzle from "@lucide/svelte/icons/puzzle";
   import Server from "@lucide/svelte/icons/server";
@@ -15,8 +15,8 @@
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { useAgents } from "$lib/services/agents.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { DELEGATE_TOOL } from "$lib/services/delegatesApi";
   import { localServer } from "$lib/services/localServer.svelte";
   import { type SettingsPatch } from "$lib/services/settingsApi";
   import { systemApi, type ServerUpdate } from "$lib/services/systemApi";
@@ -29,13 +29,12 @@
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import AgentsDialog from "$lib/screens/agents/AgentsDialog.svelte";
   import ChatsDialog from "./ChatsDialog.svelte";
-  import DelegatesDialog from "./DelegatesDialog.svelte";
   import PersistentDialog from "./PersistentDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
   import PrivacyDialog from "./PrivacyDialog.svelte";
   import { entryFor, entryHint, type SettingsDialog } from "./settingsIndex";
-  import { toolHidden } from "./settingsValues";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
   import ToolsDialog from "./ToolsDialog.svelte";
   import VisibilityDialog from "./VisibilityDialog.svelte";
@@ -46,6 +45,8 @@
   }
 
   const { tick = 0, flash = false }: Props = $props();
+
+  useAgents();
 
   let dialog = $state<SettingsDialog | null>(null);
   let repo = $state<ServerUpdate | null>(null);
@@ -168,11 +169,11 @@
   />
 
   <PreferenceRow
-    icon={Workflow}
-    title={t("DELEGATES")}
-    summary={rowSummary("delegates")}
-    enabled={ready && !toolHidden(DELEGATE_TOOL)}
-    onclick={() => (dialog = "delegates")}
+    icon={Bot}
+    title={t("AGENTS")}
+    summary={rowSummary("agents")}
+    enabled={ready}
+    onclick={() => (dialog = "agents")}
   />
 
   <PreferenceRow
@@ -322,8 +323,8 @@
       void apply({ mcp_disabled, browser_view, suggestions })}
     onDismiss={() => (dialog = null)}
   />
-{:else if dialog === "delegates"}
-  <DelegatesDialog accounts={capabilities?.accounts ?? []} onDismiss={() => (dialog = null)} />
+{:else if dialog === "agents"}
+  <AgentsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "permissions" && snapshot}
   <SelectDialog
     title={t("PERMISSION_MODE")}

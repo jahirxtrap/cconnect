@@ -87,6 +87,17 @@ export function mediaSrc(node: Sourced, options: SourceOptions) {
   );
 }
 
+export function maskSrc(node: HTMLElement, options: SourceOptions) {
+  return sourceAction(
+    options,
+    (url, current) => fetchObjectUrl(url, current.transform),
+    (url) => {
+      node.style.maskImage = `url("${url}")`;
+    },
+    revoke,
+  );
+}
+
 export function posterSrc(node: HTMLVideoElement, url: string | undefined) {
   const source = sourceAction(
     { url: url ?? "" },
