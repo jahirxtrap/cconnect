@@ -436,6 +436,11 @@ textarea,
   -webkit-touch-callout: default;
 }
 
+[data-unfocused] .selectable {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 @layer base {
   input,
   textarea,
@@ -465,6 +470,11 @@ textarea,
 input::selection,
 textarea::selection {
   background: var(--c-accent-selection);
+}
+
+input:placeholder-shown::selection,
+textarea:placeholder-shown::selection {
+  background: transparent;
 }
 
 .markdown {
