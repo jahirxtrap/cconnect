@@ -434,6 +434,13 @@ class Settings {
   set lockedProject(value: string) {
     this.#write("locked_project", value);
   }
+
+  get skippedRelease() {
+    return this.#read<string>("skipped_release");
+  }
+  set skippedRelease(value: string) {
+    this.#write("skipped_release", value);
+  }
 }
 
 export const settings = new Settings();

@@ -64,6 +64,7 @@
     cli_outdated: "COMPAT_CLI_OUTDATED",
     unauthorized: "COMPAT_UNAUTHORIZED",
     token_rejected: "COMPAT_TOKEN_REJECTED",
+    update_available: "UPDATE_AVAILABLE",
   };
 
   let expanded = $state(settings.leftExpanded);
@@ -152,6 +153,11 @@
   });
 
   const notices = $derived(serverStatus.notices.filter((notice) => !dismissed.includes(notice)));
+
+  const dismissNotice = (notice: CompatNotice) => {
+    if (notice === "update_available") serverStatus.skipRelease();
+    else dismissed = [...dismissed, notice];
+  };
 
   const tabShift = settling(() => tabs.activeId);
   const routeShift = settling(() => navigation.centered);
@@ -419,17 +425,17 @@
 {#snippet compatNotices()}
   {#each notices as notice (notice)}
     <NoticeCard
-      text={t(NOTICE_KEYS[notice])}
+      text={t(NOTICE_KEYS[notice], serverStatus.release?.tag ?? "")}
       actionLabel={t("SETTINGS")}
       onAction={() => {
-        dismissed = [...dismissed, notice];
+        dismissNotice(notice);
         if (notice === "unauthorized" || notice === "token_rejected") navigation.openSettings("environments");
         else if (notice === "server_outdated") navigation.openSettings("server");
         else if (notice !== "cli_outdated") navigation.openSettings("about");
         else if (layout.mobile) navigation.openClaude("cli");
         else navigation.openSettings("cli");
       }}
-      onDismiss={() => (dismissed = [...dismissed, notice])}
+      onDismiss={() => dismissNotice(notice)}
     />
   {/each}
 {/snippet}

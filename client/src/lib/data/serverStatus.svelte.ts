@@ -2,6 +2,8 @@ import { APP_VERSION, SUPPORTED_SERVER } from "./build";
 import type { ConnectionState } from "./chatModels";
 import { chatListFor } from "./chatList.svelte";
 import { compareVersions, satisfies } from "./compat";
+import { settings } from "./settings.svelte";
+import { isTauri } from "$lib/platform";
 import { onWake } from "$lib/platform/wake";
 import { backend, tokenOf } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
@@ -9,7 +11,13 @@ import { latestRelease, type Release } from "$lib/services/githubApi";
 
 const POLL_MS = 30_000;
 
-export type CompatNotice = "app_outdated" | "server_outdated" | "cli_outdated" | "unauthorized" | "token_rejected";
+export type CompatNotice =
+  | "app_outdated"
+  | "server_outdated"
+  | "cli_outdated"
+  | "unauthorized"
+  | "token_rejected"
+  | "update_available";
 
 class ServerStatus {
   reachable = $state(false);
@@ -40,6 +48,9 @@ class ServerStatus {
   readonly cliOutdated = $derived(
     !!this.version?.cliVersion && !satisfies(this.version.cliVersion, this.version.supportedCli),
   );
+  readonly releaseNotice = $derived(
+    isTauri && this.updateAvailable && !!this.release && this.release.tag !== settings.skippedRelease,
+  );
 
   readonly notices = $derived.by<CompatNotice[]>(() => {
     if (!this.reachable) return [];
@@ -48,8 +59,13 @@ class ServerStatus {
     if (this.appOutdated) notices.push("app_outdated");
     if (this.serverOutdated) notices.push("server_outdated");
     if (this.cliOutdated) notices.push("cli_outdated");
+    if (this.releaseNotice) notices.push("update_available");
     return notices;
   });
+
+  skipRelease() {
+    if (this.release) settings.skippedRelease = this.release.tag;
+  }
 
   start() {
     void this.checkRelease();

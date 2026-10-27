@@ -69,6 +69,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "visibility_file_change", kind: "string", fallback: "", backup: false },
   { key: "visibility_compact", kind: "string", fallback: "", backup: false },
   { key: "visibility_working", kind: "string", fallback: "", backup: false },
+  { key: "skipped_release", kind: "string", fallback: "", backup: false },
 ];
 
 export const BACKED_UP = CLIENT_SETTINGS.filter((setting) => setting.backup);

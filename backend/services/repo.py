@@ -47,12 +47,11 @@ def _on_disk() -> str:
 
 def upgrade() -> dict:
     """Replaces the installed package with the newest release."""
-    before = _on_disk()
     try:
         result = packages.run(upgrade_command(), _TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:
         return {**_package_status(), "ok": False, "message": str(exc), "changed": False}
-    changed = _on_disk() != before
+    changed = _on_disk() != release.VERSION
     return {
         **_package_status(),
         "ok": result.returncode == 0 or changed,
