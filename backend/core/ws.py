@@ -1,7 +1,7 @@
 """WebSocket frames: orjson instead of the stdlib encoder Starlette's send_json uses."""
 
 import asyncio
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Protocol
 
 import orjson
 from fastapi import WebSocket, WebSocketDisconnect
@@ -9,7 +9,12 @@ from fastapi.encoders import jsonable_encoder
 from loguru import logger
 
 from middleware.public_auth import ws_bearer_ok
-from services.directory_watch import DirectoryWatchHub
+
+
+class WatchHub(Protocol):
+    def subscribe(self) -> asyncio.Queue: ...
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None: ...
 
 
 async def send_event(ws: WebSocket, payload: Any) -> None:
@@ -18,7 +23,7 @@ async def send_event(ws: WebSocket, payload: Any) -> None:
 
 async def stream_watch(
     ws: WebSocket,
-    hub: DirectoryWatchHub,
+    hub: WatchHub,
     on_message: Optional[Callable[[asyncio.Queue, dict], None]] = None,
 ) -> None:
     if not ws_bearer_ok(ws):

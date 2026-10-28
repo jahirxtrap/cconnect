@@ -19,6 +19,7 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChatView from "$lib/screens/chat/ChatView.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
+  import AgentChats from "./AgentChats.svelte";
   import AgentIcon from "./AgentIcon.svelte";
   import AgentsDialog from "./AgentsDialog.svelte";
   import { agentPane } from "./agentPane.svelte";
@@ -105,6 +106,9 @@
 
 {#if chat && selected}
   <ChatView {chat} viewKey="{backend.activeId}/{selected.id}" {focused} navigationIcon={switcher} />
+  {#if agentPane.history}
+    <AgentChats {chat} {focused} />
+  {/if}
 {:else}
   <PaneHeader title={t("AGENTS")} />
   {#if serverStatus.unavailable}

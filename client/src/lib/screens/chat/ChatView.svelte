@@ -1,6 +1,7 @@
 <script lang="ts">
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
+  import History from "@lucide/svelte/icons/history";
   import Power from "@lucide/svelte/icons/power";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
@@ -66,7 +67,6 @@
   import TaskIndicator from "./TaskIndicator.svelte";
   import { panes } from "./panes.svelte";
   import { agentPane } from "$lib/screens/agents/agentPane.svelte";
-  import AgentSessions from "$lib/screens/agents/AgentSessions.svelte";
   import type { ChatState } from "./state.svelte";
   import { tabs } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
@@ -422,7 +422,9 @@
       <BackgroundTasks tasks={chat.backgroundView} onStop={(id) => chat.stopTask(id)} />
       <TaskIndicator todos={chat.todosView} />
       {#if resumable}
-        <AgentSessions {chat} />
+        <TooltipIconButton label={t("CHATS")} onclick={() => (agentPane.history = true)}>
+          <History />
+        </TooltipIconButton>
       {/if}
     {/if}
     {#if layout.mobile && primary}

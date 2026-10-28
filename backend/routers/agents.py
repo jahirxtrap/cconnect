@@ -5,12 +5,13 @@ import os
 from typing import Literal, Optional
 from urllib.parse import urlparse
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, HTTPException, WebSocket
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from core.access import key_matches
 from core.responses import FILE_HEADERS, api_response
+from core.ws import stream_watch
 from services import agent_registry, agent_sessions, agents, terminal
 from services.acp_peer import AcpError
 from services.agent_connections import pool
@@ -176,13 +177,23 @@ def agent_log(agent_id: str):
     return api_response(data={"lines": pool.log(agent_id)})
 
 
-@router.get("/agents/{agent_id}/sessions")
-async def agent_sessions_list(agent_id: str, cwd: str, cursor: Optional[str] = None):
+def _watch_message(queue: asyncio.Queue, message: dict):
+    if message.get("type") == "watch":
+        agent_sessions.watch.watch(queue, message.get("agent") or "", message.get("cwd") or "")
+
+
+@router.websocket("/agents/ws")
+async def agents_ws(ws: WebSocket):
+    await stream_watch(ws, agent_sessions.watch, _watch_message)
+
+
+@router.post("/agents/{agent_id}/sessions/fork")
+async def agent_session_fork(agent_id: str, cwd: str, session: str):
     try:
-        listed = await agent_sessions.sessions(agent_id, cwd, cursor)
+        forked = await agent_sessions.fork(agent_id, cwd, session)
     except (AcpError, agents.AgentError, OSError) as exc:
         return _failed(exc)
-    return api_response(data=listed)
+    return api_response(data={"session_id": forked})
 
 
 @router.delete("/agents/{agent_id}/sessions")

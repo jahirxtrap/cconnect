@@ -33,6 +33,7 @@ const followedFolder = (): string | null => (panelProject.settled ? (panelProjec
 
 class AgentPane {
   agent = $state<string | null>(stored().agent ?? null);
+  history = $state(false);
 
   #kept: Record<string, Kept> = stored().kept ?? {};
   #held = new Map<string, Held>();

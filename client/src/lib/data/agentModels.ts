@@ -48,6 +48,7 @@ export interface AgentSessionSupport {
   resume: boolean;
   close: boolean;
   delete: boolean;
+  fork: boolean;
 }
 
 export interface AgentPromptSupport {
@@ -218,6 +219,7 @@ export const toAgentState = (raw: Wire): AgentState => {
       resume: flag(sessions, "resume"),
       close: flag(sessions, "close"),
       delete: flag(sessions, "delete"),
+      fork: flag(sessions, "fork"),
     },
     logout: flag(raw, "logout"),
     info: toInfo(raw.info),

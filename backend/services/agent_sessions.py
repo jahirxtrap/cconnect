@@ -6,9 +6,8 @@ import json
 import mimetypes
 import os
 import shutil
-import time
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Optional
+from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 from urllib.parse import urlparse
 
 from core import paths
@@ -29,7 +28,6 @@ MODE_OPTION = "mode"
 SELECT = "select"
 BOOLEAN = "boolean"
 OUTPUT_LIMIT = 30000
-TITLE_LENGTH = 80
 STOP_REASONS = ("max_tokens", "max_turn_requests", "refusal")
 STOP_SEVERITY = "warning"
 CANCELLED_REASON = "cancelled"
@@ -44,23 +42,47 @@ def _present(capabilities: dict, key: str) -> bool:
     return capabilities.get(key) is not None
 
 
-def _history_file(agent_id: str, session_id: str) -> Path:
-    return paths.AGENT_HISTORY_DIR / agent_id / f"{hashlib.sha256(session_id.encode('utf-8')).hexdigest()[:32]}.json"
-
-
-def _defaults() -> dict[str, dict]:
+def _read(file: Path) -> dict:
     try:
-        stored = json.loads(paths.AGENT_DEFAULTS_FILE.read_text(encoding="utf-8"))
+        stored = json.loads(file.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return {}
     return stored if isinstance(stored, dict) else {}
 
 
+def _write(file: Path, stored: dict) -> None:
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text(json.dumps(stored, ensure_ascii=False), encoding="utf-8")
+
+
+def _defaults() -> dict[str, dict]:
+    return _read(paths.AGENT_DEFAULTS_FILE)
+
+
 def _remember(agent_id: str, **fields: list[dict]) -> None:
     stored = _defaults()
     stored[agent_id] = {**stored.get(agent_id, {}), **fields}
-    paths.AGENT_DEFAULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    paths.AGENT_DEFAULTS_FILE.write_text(json.dumps(stored, ensure_ascii=False), encoding="utf-8")
+    _write(paths.AGENT_DEFAULTS_FILE, stored)
+
+
+def _known(agent_id: str) -> dict[str, str]:
+    known = _read(paths.AGENT_SESSIONS_FILE).get(agent_id)
+    return {str(session_id): str(cwd) for session_id, cwd in known.items()} if isinstance(known, dict) else {}
+
+
+def _set_known(agent_id: str, known: dict[str, str]) -> None:
+    stored = _read(paths.AGENT_SESSIONS_FILE)
+    stored[agent_id] = known
+    _write(paths.AGENT_SESSIONS_FILE, stored)
+
+
+def _without(agent_id: str, session_id: str) -> dict[str, str]:
+    return {known: cwd for known, cwd in _known(agent_id).items() if known != session_id}
+
+
+def _keep_id(connection: AgentConnection, agent_id: str, session_id: str, cwd: str) -> None:
+    if session_id and not _present(connection.session_capabilities, "list"):
+        _set_known(agent_id, {session_id: cwd, **_without(agent_id, session_id)})
 
 
 def _choices(options: list) -> list[dict]:
@@ -183,6 +205,7 @@ class AgentSession:
                 "resume": _present(sessions, "resume"),
                 "close": _present(sessions, "close"),
                 "delete": _present(sessions, "delete"),
+                "fork": _present(sessions, "fork"),
             },
             "logout": _present(capabilities.get("auth") or {}, "logout"),
             "info": (connection.info.get("agentInfo") if connection is not None else None) or None,
@@ -249,6 +272,7 @@ class AgentSession:
         result = await connection.call("session/new", {"cwd": self.cwd, "mcpServers": []}) or {}
         self.session_id = str(result.get("sessionId") or "")
         connection.bind(self.session_id, self)
+        _keep_id(connection, self.agent_id, self.session_id, self.cwd)
         self._setup(result)
         _remember(self.agent_id, options=self.options)
         chosen, self._chosen = self._chosen, {}
@@ -280,8 +304,6 @@ class AgentSession:
             self.todos = next((event.get("items") or [] for event in reversed(self._replayed) if event.get("type") == "todos"), [])
         elif _present(connection.session_capabilities, "resume"):
             result = await connection.call("session/resume", params)
-            if replay:
-                self.rows = self._stored()
         elif connection.capabilities.get("loadSession"):
             self._replaying = True
             try:
@@ -323,6 +345,7 @@ class AgentSession:
         elif kind == "session_info_update":
             if "title" in update:
                 self.title = update.get("title")
+                watch.changed(self.agent_id, self.cwd)
         elif kind == "usage_update":
             self.usage = {"used": update.get("used"), "size": update.get("size"), "cost": update.get("cost")}
             if not self._replaying:
@@ -398,29 +421,7 @@ class AgentSession:
         turn, self._turn = self._turn or [], None
         self.rows.extend(event_rows.rows_of(turn))
         if self.session_id:
-            self._store()
-
-    def _store(self) -> None:
-        """Keep the session listed for its folder, and its rows too when the agent cannot replay them."""
-        connection = self.connection
-        replays = connection is not None and connection.capabilities.get("loadSession")
-        target = _history_file(self.agent_id, self.session_id or "")
-        target.parent.mkdir(parents=True, exist_ok=True)
-        first = next((row["text"] for row in self.rows if row.get("type") == "text" and row.get("role") == "user"), "")
-        target.write_text(json.dumps({
-            "session_id": self.session_id,
-            "cwd": self.cwd,
-            "title": self.title or first[:TITLE_LENGTH],
-            "updated_at": time.time(),
-            **({} if replays else {"rows": self.rows}),
-        }, ensure_ascii=False), encoding="utf-8")
-
-    def _stored(self) -> list[dict]:
-        try:
-            stored = json.loads(_history_file(self.agent_id, self.session_id or "").read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            return []
-        return stored.get("rows") if isinstance(stored.get("rows"), list) else []
+            watch.changed(self.agent_id, self.cwd)
 
     async def control(self, subtype: str, _payload: dict) -> bool:
         connection = self.connection
@@ -668,56 +669,48 @@ def runner(live: Any, session: AgentSession, text: str, files: list[str], seed_i
     return factory
 
 
-async def _list_page(connection: AgentConnection, cwd: str, cursor: Optional[str]) -> dict:
-    return await connection.call("session/list", {"cwd": cwd, **({"cursor": cursor} if cursor else {})}) or {}
+async def _listed(connection: AgentConnection, cwd: str) -> AsyncIterator[dict]:
+    cursor: Optional[str] = None
+    while True:
+        result = await connection.call("session/list", {"cwd": cwd, **({"cursor": cursor} if cursor else {})}) or {}
+        for item in result.get("sessions") or []:
+            if isinstance(item, dict) and item.get("sessionId"):
+                yield item
+        following = result.get("nextCursor")
+        if not following or following == cursor:
+            return
+        cursor = following
 
 
 async def _gone(connection: AgentConnection, cwd: str, session_id: str) -> bool:
     if not _present(connection.session_capabilities, "list"):
         return False
-    cursor: Optional[str] = None
     try:
-        while True:
-            result = await _list_page(connection, cwd, cursor)
-            if any(isinstance(item, dict) and item.get("sessionId") == session_id for item in result.get("sessions") or []):
+        async for item in _listed(connection, cwd):
+            if item["sessionId"] == session_id:
                 return False
-            following = result.get("nextCursor")
-            if not following or following == cursor:
-                return True
-            cursor = following
     except AcpError:
         return False
+    return True
 
 
-async def sessions(agent_id: str, cwd: str, cursor: Optional[str] = None) -> dict:
-    """The sessions an agent keeps for a folder, newest first."""
+async def all_sessions(agent_id: str, cwd: str) -> list[dict]:
     connection = await pool.take(agent_id, cwd)
     try:
         if _present(connection.session_capabilities, "list"):
-            result = await _list_page(connection, cwd, cursor)
-            listed = [
-                {"session_id": str(item.get("sessionId")), "title": item.get("title"), "updated_at": item.get("updatedAt"), "cwd": item.get("cwd")}
-                for item in result.get("sessions") or []
-                if isinstance(item, dict) and item.get("sessionId")
+            return [
+                {"session_id": str(item["sessionId"]), "title": item.get("title"), "updated_at": item.get("updatedAt"), "cwd": item.get("cwd")}
+                async for item in _listed(connection, cwd)
             ]
-            return {"sessions": listed, "next": result.get("nextCursor")}
         if not (connection.capabilities.get("loadSession") or _present(connection.session_capabilities, "resume")):
-            return {"sessions": [], "next": None}
-        return {"sessions": _stored_sessions(agent_id, cwd), "next": None}
+            return []
+        return [
+            {"session_id": session_id, "title": None, "updated_at": None, "cwd": cwd}
+            for session_id, folder in _known(agent_id).items()
+            if folder == cwd
+        ]
     finally:
         pool.give(connection)
-
-
-def _stored_sessions(agent_id: str, cwd: str) -> list[dict]:
-    found: list[dict] = []
-    for file in (paths.AGENT_HISTORY_DIR / agent_id).glob("*.json"):
-        try:
-            stored = json.loads(file.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if stored.get("cwd") == cwd and stored.get("session_id"):
-            found.append({"session_id": stored["session_id"], "title": stored.get("title"), "updated_at": stored.get("updated_at"), "cwd": cwd})
-    return sorted(found, key=lambda item: item.get("updated_at") or 0, reverse=True)
 
 
 async def forget(agent_id: str, cwd: str, session_id: str) -> None:
@@ -728,4 +721,58 @@ async def forget(agent_id: str, cwd: str, session_id: str) -> None:
             await connection.call("session/delete", {"sessionId": session_id})
     finally:
         pool.give(connection)
-    _history_file(agent_id, session_id).unlink(missing_ok=True)
+    if session_id in _known(agent_id):
+        _set_known(agent_id, _without(agent_id, session_id))
+    watch.changed(agent_id, cwd)
+
+
+async def fork(agent_id: str, cwd: str, session_id: str) -> str:
+    connection = await pool.take(agent_id, cwd)
+    try:
+        result = await connection.call("session/fork", {"sessionId": session_id, "cwd": cwd, "mcpServers": []}) or {}
+        forked = str(result.get("sessionId") or "")
+        _keep_id(connection, agent_id, forked, cwd)
+    finally:
+        pool.give(connection)
+    watch.changed(agent_id, cwd)
+    return forked
+
+
+async def _snapshot(agent_id: str, cwd: str) -> dict:
+    try:
+        listed = await all_sessions(agent_id, cwd)
+    except (AcpError, agents.AgentError, OSError):
+        listed = None
+    return {"type": "sessions", "agent": agent_id, "cwd": cwd, "sessions": listed}
+
+
+class SessionsWatch:
+    def __init__(self):
+        self._watching: dict[asyncio.Queue, tuple[str, str]] = {}
+
+    def subscribe(self) -> asyncio.Queue:
+        queue: asyncio.Queue = asyncio.Queue()
+        self._watching[queue] = ("", "")
+        return queue
+
+    def unsubscribe(self, queue: asyncio.Queue) -> None:
+        self._watching.pop(queue, None)
+
+    def watch(self, queue: asyncio.Queue, agent_id: str, cwd: str) -> None:
+        if queue in self._watching and agent_id and cwd:
+            self._watching[queue] = (agent_id, cwd)
+            asyncio.get_running_loop().create_task(self._push(agent_id, cwd, [queue]))
+
+    def changed(self, agent_id: str, cwd: str) -> None:
+        watching = [queue for queue, key in self._watching.items() if key == (agent_id, cwd)]
+        if watching:
+            asyncio.get_running_loop().create_task(self._push(agent_id, cwd, watching))
+
+    async def _push(self, agent_id: str, cwd: str, queues: list[asyncio.Queue]) -> None:
+        snapshot = await _snapshot(agent_id, cwd)
+        for queue in queues:
+            if self._watching.get(queue) == (agent_id, cwd):
+                queue.put_nowait(snapshot)
+
+
+watch = SessionsWatch()

@@ -1,12 +1,10 @@
 import {
   toAgentFailure,
-  toAgentSession,
   toCatalogAgent,
   toInstalledAgent,
   type AgentFailure,
   type AgentLogin,
   type AgentProtocol,
-  type AgentSession,
   type CatalogAgent,
   type InstalledAgent,
 } from "$lib/data/agentModels";
@@ -23,11 +21,6 @@ export const MODEL_TOKEN = "{model}";
 export interface AgentList {
   agents: InstalledAgent[];
   node: boolean;
-}
-
-export interface AgentSessionPage {
-  sessions: AgentSession[];
-  next: string | null;
 }
 
 export interface CustomAgentFields {
@@ -112,13 +105,10 @@ export const createAgentsApi = (profile: () => Profile) => {
       );
     },
 
-    async sessions(id: string, cwd: string, cursor: string | null = null) {
+    async fork(id: string, cwd: string, session: string) {
       return outcome(
-        await client.call<Wire>("GET", `/agents/${segment(id)}/sessions`, { cwd, cursor: cursor ?? undefined }),
-        (data): AgentSessionPage => ({
-          sessions: ((data.sessions as Wire[] | undefined) ?? []).flatMap((item) => toAgentSession(item) ?? []),
-          next: typeof data.next === "string" ? data.next : null,
-        }),
+        await client.call<Wire>("POST", `/agents/${segment(id)}/sessions/fork`, { cwd, session }, {}),
+        (data) => (typeof data.session_id === "string" ? data.session_id : ""),
       );
     },
 
