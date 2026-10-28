@@ -4,7 +4,8 @@ Mobile, desktop and web interface for Claude Code. The apps drive Claude Code ru
 on the user's PC — chats in tabs, projects and sessions, file edits, permission prompts
 and forms, rich blocks, plan proposals, subagents, attachments, a message queue and
 rewind, persistent sessions that keep a chat's CLI running along with its background
-tasks, delegating a task to another AI, and the panes and band Claude Code mods draw — over
+tasks, chats with ACP agents in the side panel, delegating a task to another AI or agent,
+and the panes and band Claude Code mods draw — over
 HTTP/WS, reachable on the tailnet or publicly through a Tailscale Funnel. They also manage
 the Claude install itself (CLI, plugins, marketplaces, MCP servers, skills, memories), a
 file manager over the shared folder, an explorer of the project that shows its git diff

@@ -38,8 +38,12 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
   `usage`, `accounts`, `shared`, `git_ops` (the commit panel, on top of the single runner in
   `services/git`, one lock per repository), `browser` (the server's Chromium, started only
-  while a socket watches one of its tabs), `delegates` / `delegate_runner` / `delegate_runs`
-  (handing a task to another AI), `packs` / `pack_format` (the server's pack library and the
+  while a socket watches one of its tabs), `agents` / `agent_registry` (the ACP agents installed
+  from the official catalog or added by hand), `agent_connections` / `agent_sessions` /
+  `acp_peer` / `acp_events` (one process per agent and folder, a chat's session on it, and its
+  updates turned into the chat's events), `event_rows` (those events as history rows),
+  `delegates` / `delegate_runner` / `delegate_runs` (handing a task to an agent or another
+  account, with the model it asks for), `packs` / `pack_format` (the server's pack library and the
   validation the client's reader mirrors), `prompt_cache`, `tool_calls` / `tool_props`,
   `api_errors`, `directory_watch` (the base of the shared and pack watchers).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
@@ -103,8 +107,11 @@ twice — once from disk and once from the replay.
 
 Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`, `unqueue`,
 `set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history`,
-`ask`, `usage`, `stop_task`, `reload`, `close_resident`, and for mods `mod_render`, `mod_act`,
-`mod_answer`, `mod_client_module`.
+`ask`, `usage`, `stop_task`, `reload`, `close_resident`, for mods `mod_render`, `mod_act`,
+`mod_answer`, `mod_client_module`, and for an ACP agent (a `start` that names one) `set_option`,
+`agent_login`, `agent_logout`, `agent_retry` and `history`. An agent's chat gets `agent_state`
+(status, options, commands, sign-in methods) and `history` (its rows, paged like a transcript)
+outside the seq'd stream.
 
 Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
 the app adopts it, and only `set_generation` changes it. A tab that had not loaded its

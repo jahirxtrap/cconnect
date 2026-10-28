@@ -16,7 +16,7 @@ src/
     ├── i18n/               # one JSON per locale — every user-facing string
     ├── markdown/           # the Markdown renderer and its cconnect blocks
     ├── platform/           # isTouch, layout, desktop, fieldSizing polyfill
-    ├── screens/            # chat/, shared/, project/, claude/, mods/, packs/, browser/, monitor/, settings/, terminal/, notes/
+    ├── screens/            # chat/, agents/, shared/, project/, claude/, mods/, packs/, browser/, monitor/, settings/, terminal/, notes/
     ├── services/           # backend clients: chatSocket, sessionsApi, sharedApi, claudeApi…
     └── ui/                 # the shared toolkit
 src-tauri/                  # Rust side + gen/android (committed)

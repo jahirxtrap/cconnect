@@ -263,9 +263,10 @@ the **+** menu beside it, so the bar keeps two buttons.
 **Persistent sessions** keep a chat's Claude process running while you have it
 open: a message is answered without starting the CLI first, and commands can
 keep working in the background between turns. Each one holds its own process
-(around 400 MB of memory, not counting its MCP servers), so you choose how many
-chats may keep one at once and how long it waits after the last device closes the
-chat, and you can close it yourself from the chat's header. Whatever runs in the
+(around 400 MB of memory, not counting its MCP servers), so **Sessions** in the
+Server settings chooses how many chats and ACP agents may keep one at once and how
+long each waits after the last device closes it, and you can close it yourself
+from the chat's header. Whatever runs in the
 background is listed under **Running** in that header, each task with a button to
 stop it, and the session stays open while any of it is still working.
 
@@ -286,7 +287,9 @@ switcher does the same. Open any chat or session in a new tab, reorder them, and
 on desktop reach for the keyboard (Ctrl+T to open, Ctrl+W to close, Ctrl+Tab to
 cycle). With both panels open a tab drags from one to the other as if the two
 bars were one. The tabs you had open come back when you reopen the app, each
-loading only once you switch to it.
+loading only once you switch to it. The side panel's views — terminal, browser,
+project files, mods and ACP agents — sit in a bar you reorder by dragging, moving
+any of them into or out of its menu.
 
 ## Themes and packs
 
@@ -509,9 +512,10 @@ agent so they're available out of the box from the phone:
   catalog or added by hand, each with its own sessions.
 - **Delegation.** Claude can hand a task to another AI and get its answer
   back: an ACP agent, an agent CLI added under ACP agents as a command, or
-  another of your Claude accounts once its sheet says Claude can use it. Claude
-  can also install an agent from the catalog when you ask; in a persistent chat
-  the task can run in the background while the conversation goes on.
+  another of your Claude accounts once its sheet says Claude can use it, with
+  the model you ask for when the destination offers a choice. Claude can also
+  install an agent from the catalog when you ask; in a persistent chat the task
+  can run in the background while the conversation goes on.
 
 ## Discord
 
@@ -571,7 +575,7 @@ required for a plain local run.
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `--expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
 | `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `run.py` when it exposes the server, so you rarely write it yourself |
-| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores and committing from the project panel. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
+| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server and an ACP agent's environment variables. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
 | `WEB_CONCURRENCY` | `2` | Uvicorn workers with `run.py --production`. Ignored on Windows, which always runs one |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
@@ -597,7 +601,8 @@ the system's unless you pick one under **Language**.
 The app and the backend declare which versions of each other — and of the
 Claude CLI — they support. When something falls behind, a notice in the chat
 takes you straight to the right place: the app's own update (with its
-changelog), the server requirement, or the CLI update button. Release notes
+changelog), the server requirement, or the CLI update button. On the desktop and
+Android the app also tells you once when a new version of it is out. Release notes
 for both CConnect and Claude Code are readable in the app. Settings → Recovery
 exports your settings to copy them into another install, or keeps copies of them
 in your Google Drive (encrypted with a password if you give one, and with this
