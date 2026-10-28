@@ -5,7 +5,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { sessionColorOf } from "$lib/design/sessionColors";
+  import { sessionColorOptions } from "$lib/design/sessionColors";
   import { accentVars, theme } from "$lib/design/theme.svelte";
   import type { SessionInfo } from "$lib/data/models";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
@@ -532,9 +532,7 @@
   {@const target = colorTarget}
   <ColorDialog
     title={t("CONVERSATION_COLOR")}
-    options={(chat.capabilities?.colors ?? [])
-      .map((name) => ({ value: name, color: sessionColorOf(name) ?? "", label: name }))
-      .filter((option) => option.color)}
+    options={sessionColorOptions(chat.capabilities?.colors ?? [])}
     selected={target.color}
     onSelect={(color) => void chat.setColor(target, color)}
     onDismiss={() => (colorTarget = null)}

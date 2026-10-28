@@ -78,9 +78,10 @@ export const createAgentsApi = (profile: () => Profile) => {
       return withToken(`${baseUrlOf(target)}/agents/catalog/icon?url=${encodeURIComponent(url)}`, target);
     },
 
-    iconUrl(id: string): string {
+    iconUrl(id: string, version: string | null): string {
       const target = profile();
-      return withToken(`${baseUrlOf(target)}/agents/${segment(id)}/icon`, target);
+      const query = version ? `?v=${encodeURIComponent(version)}` : "";
+      return withToken(`${baseUrlOf(target)}/agents/${segment(id)}/icon${query}`, target);
     },
 
     async install(id: string) {

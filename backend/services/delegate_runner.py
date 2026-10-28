@@ -280,7 +280,7 @@ async def _acp(destination: dict, task: str, turn: Turn) -> str:
     session = agent_sessions.AgentSession(destination["id"], turn.cwd, sessions.project_key_for(turn.cwd))
     session.bind(delegation.report, delegation.ask)
     try:
-        await session.open()
+        await session.open(create_now=True)
         if session.status != agent_sessions.READY:
             raise DelegateError(session.detail or session.reason or session.status)
         if turn.model:

@@ -430,7 +430,7 @@
       <PaneActions />
     {/if}
     <TooltipIconButton
-      label={t("NEW_SESSION")}
+      label={t("NEW_CHAT")}
       onclick={() =>
         chat.agent ? agentPane.restart(chat) : chat.viewOnly ? chat.closeViewOnly() : chat.newSession()}
     >

@@ -30,7 +30,7 @@
   const removable = $derived(!!support && (support.delete || !support.list));
   const opened = $derived(chat.messages.some((item) => item.role === "user"));
   const label = $derived(
-    chat.agentTitle || page?.sessions.find((item) => item.sessionId === chat.sessionId)?.title || t("NEW_SESSION"),
+    chat.agentTitle || page?.sessions.find((item) => item.sessionId === chat.sessionId)?.title || t("NEW_CHAT"),
   );
 
   const load = async (cursor: string | null = null) => {
@@ -64,7 +64,7 @@
 
 <PopupMenu
   {open}
-  label={t("SESSIONS")}
+  label={t("CHATS")}
   align="end"
   onOpenChange={(value) => {
     open = value;
@@ -72,7 +72,7 @@
   }}
 >
   {#snippet triggerChild(props)}
-    <TooltipIconButton label={t("SESSIONS")} {...props}>
+    <TooltipIconButton label={t("CHATS")} {...props}>
       <History />
     </TooltipIconButton>
   {/snippet}
@@ -89,7 +89,7 @@
         onclick={() => pick(session)}
       />
     {:else}
-      <MenuItem text={t("AGENT_SESSIONS_NONE")} enabled={false} />
+      <MenuItem text={t("NO_CHATS")} enabled={false} />
     {/each}
     {#if page.next}
       {@const cursor = page.next}
@@ -98,7 +98,7 @@
   {/if}
   {#if removable && opened && chat.sessionId}
     {@const current = chat.sessionId}
-    <MenuItem text={t("AGENT_SESSION_DELETE")} icon={Trash} danger onclick={() => (deleting = current)} />
+    <MenuItem text={t("AGENT_CHAT_DELETE")} icon={Trash} danger onclick={() => (deleting = current)} />
   {/if}
 </PopupMenu>
 
@@ -106,7 +106,7 @@
   {@const target = deleting}
   <ConfirmDialog
     title={t("DELETE")}
-    text={t("AGENT_SESSION_DELETE_CONFIRM", label)}
+    text={t("DELETE_CONVERSATION_CONFIRM", label)}
     confirmLabel={t("DELETE")}
     danger
     onConfirm={() => void remove(target)}

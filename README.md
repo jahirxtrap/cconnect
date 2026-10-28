@@ -62,7 +62,12 @@ it into an installed one without touching the original.
 | `cconnect expose tailscale` | Publish over the internet through a Tailscale Funnel |
 | `cconnect expose caddy --public-host cc.example.com` | Publish behind a proxy you already run |
 | `cconnect run --detach`, `cconnect stop` | Leave it serving after the terminal closes |
+| `cconnect run --port 9000` | Serve on another port than 8723, also with `expose` |
+| `cconnect restart` | Restart the backend that is running |
 | `cconnect status` | Version, where the data lives, what is running |
+| `cconnect logs`, `cconnect logs -f` | Print the server log, `-f` to keep following it |
+| `cconnect doctor` | Check the Claude CLI, the SDK, Node.js, Tailscale and the port |
+| `cconnect -v` | Print the version |
 | `cconnect update` | Upgrade to the latest release |
 | `cconnect migrate <folder>` | Copy a previous data folder into this one |
 | `cconnect key` | Print the security key, `--rotate` to replace it |

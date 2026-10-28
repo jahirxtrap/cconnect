@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Bot from "@lucide/svelte/icons/bot";
+  import BotMessageSquare from "@lucide/svelte/icons/bot-message-square";
   import CircleUser from "@lucide/svelte/icons/circle-user";
   import Eye from "@lucide/svelte/icons/eye";
   import Lock from "@lucide/svelte/icons/lock";
@@ -169,7 +169,7 @@
   />
 
   <PreferenceRow
-    icon={Bot}
+    icon={BotMessageSquare}
     title={t("AGENTS")}
     summary={rowSummary("agents")}
     enabled={ready}

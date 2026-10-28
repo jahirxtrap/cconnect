@@ -1,5 +1,6 @@
 <script lang="ts">
-  import Bot from "@lucide/svelte/icons/bot";
+  import { untrack } from "svelte";
+  import BotMessageSquare from "@lucide/svelte/icons/bot-message-square";
   import LogOut from "@lucide/svelte/icons/log-out";
   import Settings2 from "@lucide/svelte/icons/settings-2";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -9,6 +10,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import { MENU_ICON_SIZE, menuIconClass } from "$lib/ui/menuSurface";
@@ -42,9 +44,11 @@
 
   $effect(() => {
     const shown = chat;
-    return () => {
-      if (shown) agentPane.letGo(shown);
-    };
+    if (shown) untrack(() => agentPane.keepOnly(shown));
+  });
+
+  $effect(() => {
+    if (!listed && !serverStatus.unavailable) void agents.refresh(profile);
   });
 </script>
 
@@ -105,10 +109,12 @@
   <PaneHeader title={t("AGENTS")} />
   {#if serverStatus.unavailable}
     <ServerUnavailable class="min-h-0 flex-1" />
-  {:else if !listed}
+  {:else if !listed && !agents.failed(profile)}
     <CenteredProgress class="min-h-0 flex-1" />
+  {:else if !listed}
+    <ConnectionError class="min-h-0 flex-1" />
   {:else}
-    <EmptyState icon={Bot} text={t("AGENTS_NONE")} class="min-h-0 flex-1">
+    <EmptyState icon={BotMessageSquare} text={t("AGENTS_NONE")} class="min-h-0 flex-1">
       {#snippet action()}
         <ActionButton text={t("AGENTS_MANAGE")} onclick={() => (managing = true)} />
       {/snippet}

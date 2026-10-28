@@ -43,6 +43,11 @@ class AgentPane {
   }
 
   restart(chat: ChatState) {
+    const key = [...this.#held].find(([, held]) => held.chat === chat)?.[0];
+    if (key && this.#kept[key]) {
+      this.#kept = Object.fromEntries(Object.entries(this.#kept).filter(([name]) => name !== key));
+      this.#save();
+    }
     chat.startAgentSession(followedFolder() ?? chat.cwd);
   }
 
@@ -82,12 +87,12 @@ class AgentPane {
     return created;
   }
 
-  letGo(chat: ChatState) {
+  keepOnly(chat: ChatState) {
     for (const [key, held] of this.#held) {
-      if (held.chat !== chat) continue;
+      if (held.chat === chat) continue;
       this.#held.delete(key);
       held.stop();
-      chat.dispose();
+      held.chat.dispose();
     }
   }
 

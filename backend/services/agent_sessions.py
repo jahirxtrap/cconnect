@@ -48,6 +48,21 @@ def _history_file(agent_id: str, session_id: str) -> Path:
     return paths.AGENT_HISTORY_DIR / agent_id / f"{hashlib.sha256(session_id.encode('utf-8')).hexdigest()[:32]}.json"
 
 
+def _defaults() -> dict[str, dict]:
+    try:
+        stored = json.loads(paths.AGENT_DEFAULTS_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return stored if isinstance(stored, dict) else {}
+
+
+def _remember(agent_id: str, **fields: list[dict]) -> None:
+    stored = _defaults()
+    stored[agent_id] = {**stored.get(agent_id, {}), **fields}
+    paths.AGENT_DEFAULTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    paths.AGENT_DEFAULTS_FILE.write_text(json.dumps(stored, ensure_ascii=False), encoding="utf-8")
+
+
 def _choices(options: list) -> list[dict]:
     choices: list[dict] = []
     for option in options or []:
@@ -111,11 +126,11 @@ def _commands(listed: Any) -> list[dict]:
 
 
 class AgentSession:
-    def __init__(self, agent_id: str, cwd: str, project_key: str):
+    def __init__(self, agent_id: str, cwd: str, project_key: str, resume: Optional[str] = None):
         self.agent_id = agent_id
         self.cwd = cwd
         self.project_key = project_key
-        self.session_id: Optional[str] = None
+        self.session_id: Optional[str] = resume
         self.connection: Optional[AgentConnection] = None
         self.status = CONNECTING
         self.reason: Optional[str] = None
@@ -138,6 +153,7 @@ class AgentSession:
         self._terminals: dict[str, terminal.Terminal] = {}
         self._limits: dict[str, int] = {}
         self._opening: Optional[asyncio.Task] = None
+        self._chosen: dict[str, Any] = {}
 
     def bind(self, emit: Emit, ask: Ask) -> None:
         self._emit = emit
@@ -181,7 +197,7 @@ class AgentSession:
         self.reason = reason
         self.detail = detail
 
-    async def open(self, resume: Optional[str] = None, signing_in: bool = False) -> None:
+    async def open(self, resume: Optional[str] = None, signing_in: bool = False, create_now: bool = False) -> None:
         self.released = False
         self.status, self.reason, self.detail = CONNECTING, None, ""
         await self._announce()
@@ -189,7 +205,7 @@ class AgentSession:
             connection = await self._connect()
             if resume:
                 await self._resume(connection, resume)
-            else:
+            elif create_now or not self._start_blank():
                 await self._create(connection)
             self.status = READY
         except AcpError as exc:
@@ -221,18 +237,30 @@ class AgentSession:
         self.connection = await pool.take(self.agent_id, self.cwd)
         return self.connection
 
+    def _start_blank(self) -> bool:
+        remembered = _defaults().get(self.agent_id) or {}
+        if not isinstance(remembered.get("options"), list):
+            return False
+        self.options = [{**option, "current": self._chosen.get(option["id"], option.get("current"))} for option in remembered["options"]]
+        self.commands = remembered.get("commands") or []
+        return True
+
     async def _create(self, connection: AgentConnection) -> None:
         result = await connection.call("session/new", {"cwd": self.cwd, "mcpServers": []}) or {}
         self.session_id = str(result.get("sessionId") or "")
         connection.bind(self.session_id, self)
         self._setup(result)
+        _remember(self.agent_id, options=self.options)
+        chosen, self._chosen = self._chosen, {}
+        for option_id, value in chosen.items():
+            await self.set_option(option_id, value)
 
     async def _resume(self, connection: AgentConnection, session_id: str) -> None:
         """Reopen a session, or start a new one when the agent no longer has it."""
         try:
             await self._attach(connection, session_id, replay=True)
         except AcpError as exc:
-            if exc.code not in MISSING_SESSION:
+            if exc.code not in MISSING_SESSION and not await _gone(connection, self.cwd, session_id):
                 raise
             connection.unbind(session_id)
             self.rows, self.todos = [], []
@@ -291,6 +319,7 @@ class AgentSession:
             self.options = [{**option, "current": update.get("currentModeId")} if option.get("legacy") else option for option in self.options]
         elif kind == "available_commands_update":
             self.commands = _commands(update.get("availableCommands"))
+            _remember(self.agent_id, commands=self.commands)
         elif kind == "session_info_update":
             if "title" in update:
                 self.title = update.get("title")
@@ -404,7 +433,12 @@ class AgentSession:
     async def set_option(self, option_id: str, value: Any) -> None:
         option = next((item for item in self.options if item["id"] == option_id), None)
         connection = self.connection
-        if option is None or connection is None or not self.session_id:
+        if option is None or connection is None:
+            return
+        if not self.session_id:
+            self._chosen[option_id] = value
+            self.options = [{**item, "current": value} if item is option else item for item in self.options]
+            await self._announce()
             return
         try:
             if option.get("legacy"):
@@ -635,12 +669,33 @@ def runner(live: Any, session: AgentSession, text: str, files: list[str], seed_i
     return factory
 
 
+async def _list_page(connection: AgentConnection, cwd: str, cursor: Optional[str]) -> dict:
+    return await connection.call("session/list", {"cwd": cwd, **({"cursor": cursor} if cursor else {})}) or {}
+
+
+async def _gone(connection: AgentConnection, cwd: str, session_id: str) -> bool:
+    if not _present(connection.session_capabilities, "list"):
+        return False
+    cursor: Optional[str] = None
+    try:
+        while True:
+            result = await _list_page(connection, cwd, cursor)
+            if any(isinstance(item, dict) and item.get("sessionId") == session_id for item in result.get("sessions") or []):
+                return False
+            following = result.get("nextCursor")
+            if not following or following == cursor:
+                return True
+            cursor = following
+    except AcpError:
+        return False
+
+
 async def sessions(agent_id: str, cwd: str, cursor: Optional[str] = None) -> dict:
     """The sessions an agent keeps for a folder, newest first."""
     connection = await pool.take(agent_id, cwd)
     try:
         if _present(connection.session_capabilities, "list"):
-            result = await connection.call("session/list", {"cwd": cwd, **({"cursor": cursor} if cursor else {})}) or {}
+            result = await _list_page(connection, cwd, cursor)
             listed = [
                 {"session_id": str(item.get("sessionId")), "title": item.get("title"), "updated_at": item.get("updatedAt"), "cwd": item.get("cwd")}
                 for item in result.get("sessions") or []

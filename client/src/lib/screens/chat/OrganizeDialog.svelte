@@ -3,13 +3,16 @@
   import EyeOff from "@lucide/svelte/icons/eye-off";
   import Folder from "@lucide/svelte/icons/folder";
   import GripHorizontal from "@lucide/svelte/icons/grip-horizontal";
+  import Palette from "@lucide/svelte/icons/palette";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Trash from "@lucide/svelte/icons/trash";
   import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
+  import { sessionColorOf, sessionColorOptions } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
+  import ColorDialog from "$lib/ui/ColorDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EditableText from "$lib/ui/EditableText.svelte";
@@ -37,6 +40,7 @@
   let ownerMenu = $state<string | null>(null);
   let draft = $state("");
   let deletingCategory = $state<ChatCategory | null>(null);
+  let colouringCategory = $state<ChatCategory | null>(null);
   let deletingProject = $state<ProjectInfo | null>(null);
   let addingProject = $state(false);
   let trashOpen = $state(false);
@@ -263,6 +267,9 @@
           {/each}
         </PopupMenu>
         {/if}
+        <TooltipIconButton label={t("CATEGORY_COLOR")} onclick={() => (colouringCategory = category)}>
+          <Palette color={sessionColorOf(category.color) ?? undefined} />
+        </TooltipIconButton>
         <TooltipIconButton
           label={hidden ? t("SHOW") : t("HIDE")}
                    onclick={() => chat.toggleCategoryHidden(category.id)}
@@ -369,6 +376,17 @@
       deletingCategory = null;
     }}
     onDismiss={() => (deletingCategory = null)}
+  />
+{/if}
+
+{#if colouringCategory}
+  {@const target = colouringCategory}
+  <ColorDialog
+    title={t("CATEGORY_COLOR")}
+    options={sessionColorOptions(chat.capabilities?.colors ?? [])}
+    selected={target.color}
+    onSelect={(color) => void chat.setCategoryColor(target, color)}
+    onDismiss={() => (colouringCategory = null)}
   />
 {/if}
 

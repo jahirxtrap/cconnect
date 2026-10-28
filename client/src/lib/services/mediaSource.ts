@@ -14,7 +14,7 @@ type Sourced = HTMLImageElement | HTMLMediaElement | HTMLIFrameElement | HTMLEmb
 export const fetchFile = (url: string, init: RequestInit = {}) =>
   fetch(url, { ...init, cache: "no-cache", headers: fileHeaders(url, backend.sharedProfileOf(url)) });
 
-const fetchObjectUrl = async (url: string, transform?: (file: Blob) => Promise<Blob>) => {
+export const fetchObjectUrl = async (url: string, transform?: (file: Blob) => Promise<Blob>) => {
   const response = await fetchFile(url);
   if (!response.ok) throw new Error(String(response.status));
   const file = await response.blob();
@@ -82,17 +82,6 @@ export function mediaSrc(node: Sourced, options: SourceOptions) {
     async (url) => {
       node.src = url;
       if (node instanceof HTMLImageElement) await node.decode().catch(() => undefined);
-    },
-    revoke,
-  );
-}
-
-export function maskSrc(node: HTMLElement, options: SourceOptions) {
-  return sourceAction(
-    options,
-    (url, current) => fetchObjectUrl(url, current.transform),
-    (url) => {
-      node.style.maskImage = `url("${url}")`;
     },
     revoke,
   );

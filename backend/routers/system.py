@@ -10,7 +10,7 @@ from core.config import RESTART_EXIT_CODE
 from core.responses import api_response
 from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
-from services import directories, repo, system_monitor, system_watch
+from services import directories, live_sessions, repo, system_monitor, system_watch
 
 router = APIRouter(tags=["system"])
 
@@ -30,6 +30,7 @@ def get_system_logs(after: int = Query(0, ge=0), limit: int = Query(200, ge=1, l
 def _exit_after(code: int) -> None:
     async def _later():
         await asyncio.sleep(_EXIT_DELAY)
+        await live_sessions.close_processes()
         flag = paths.RESTART_FLAG if code == RESTART_EXIT_CODE else paths.STOP_FLAG
         flag.touch()
         os._exit(code)

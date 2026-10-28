@@ -99,7 +99,7 @@
         <PanelLeftOpen />
       </TooltipIconButton>
       <TooltipIconButton
-        label={t("NEW_SESSION")}
+        label={t("NEW_CHAT")}
         onclick={() => {
           chat.newSession();
           navigation.showChat();

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Bot from "@lucide/svelte/icons/bot";
-  import { maskSrc } from "$lib/services/mediaSource";
+  import BotMessageSquare from "@lucide/svelte/icons/bot-message-square";
+  import { agents } from "$lib/services/agents.svelte";
 
   interface Props {
     url: string | null;
@@ -10,22 +10,21 @@
 
   const { url, size, class: className = "" }: Props = $props();
 
-  let failed = $state<string | null>(null);
-  let loaded = $state<string | null>(null);
+  const src = $derived(url ? agents.iconSrc(url) : null);
 
-  const drawn = $derived(!!url && loaded === url && failed !== url);
+  $effect(() => {
+    if (url) agents.loadIcon(url);
+  });
 </script>
 
-{#if url && failed !== url}
+{#if src}
   <span
-    use:maskSrc={{ url, onload: () => (loaded = url), onerror: () => (failed = url) }}
-    style={size ? `width: ${size}px; height: ${size}px` : undefined}
-    class="{drawn
-      ? 'inline-block bg-current'
-      : 'hidden'} shrink-0 [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] {className}"
+    style:mask-image={`url("${src}")`}
+    style:width={size ? `${size}px` : undefined}
+    style:height={size ? `${size}px` : undefined}
+    class="inline-block shrink-0 bg-current [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain] {className}"
     aria-hidden="true"
   ></span>
-{/if}
-{#if !drawn}
-  <Bot {size} class="shrink-0 {className}" />
+{:else}
+  <BotMessageSquare {size} class="shrink-0 {className}" />
 {/if}

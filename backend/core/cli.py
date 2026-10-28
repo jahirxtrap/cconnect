@@ -13,16 +13,18 @@ import shutil
 import socket
 import subprocess
 import sys
+import time
 from contextlib import suppress
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
 import psutil
 import qrcode
 
-from core import data_migration, paths, release
+from core import cli_manager, data_migration, paths, release, sdk
 from core.config import PORT, RESTART_EXIT_CODE
-from services import repo, system_monitor
+from services import agent_registry, repo, system_monitor
 
 _ENV_PATH = paths.ENV_FILE
 _TOKEN_VAR = "PUBLIC_ACCESS_TOKEN"
@@ -34,7 +36,8 @@ _STOP_TIMEOUT = 10
 _POLL_SECONDS = 0.5
 _MODULE = "core.cli"
 _APP = "core.app:app"
-_COMMANDS = ("run", "expose", "stop", "status", "update", "migrate", "key")
+_COMMANDS = ("run", "expose", "stop", "restart", "status", "logs", "doctor", "update", "migrate", "key")
+_TOP_FLAGS = ("-h", "--help", "-v", "--version")
 
 
 def _abort(msg: str) -> None:
@@ -408,21 +411,23 @@ def _flag_parser() -> argparse.ArgumentParser:
                              f"{_HOSTNAME_VAR}, then to <user>-<ip>.sslip.io.")
     parser.add_argument("--detach", action="store_true",
                         help="Run in the background and return; the server outlives the terminal.")
+    parser.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
     parser.add_argument("--stop", action="store_true",
                         help="Stop a backend previously started with --detach.")
     parser.add_argument("--security-key", action="store_true",
                         help="Print the key that unlocks the terminal and ignored files, generating it the first time.")
     parser.add_argument("--rotate", action="store_true",
                         help="With --security-key, replace the existing key instead of printing it.")
-    parser.set_defaults(command="", source="", force=False, json=False)
+    parser.set_defaults(command="", source="", force=False, json=False, follow=False)
     return parser
 
 
 def _command_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cconnect", description="CConnect backend.")
+    parser.add_argument("-v", "--version", action="version", version=f"cconnect {release.VERSION}")
     parser.set_defaults(
-        production=False, expose="", public_host="", detach=False,
-        security_key=False, rotate=False, source="", force=False, json=False,
+        production=False, expose="", public_host="", detach=False, port=None,
+        security_key=False, rotate=False, source="", force=False, json=False, follow=False,
     )
     commands = parser.add_subparsers(dest="command")
 
@@ -431,6 +436,7 @@ def _command_parser() -> argparse.ArgumentParser:
                      help="No reload, multi-worker (Linux/macOS only).")
     run.add_argument("--detach", action="store_true",
                      help="Run in the background; the server outlives the terminal.")
+    run.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
 
     expose = commands.add_parser("expose", help="Serve over the internet, token-gated.")
     expose.add_argument("provider", choices=list(_PROVIDERS))
@@ -441,11 +447,19 @@ def _command_parser() -> argparse.ArgumentParser:
                         help="Run in the background; the server outlives the terminal.")
     expose.add_argument("--production", action="store_true",
                         help="No reload, multi-worker (Linux/macOS only).")
+    expose.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
 
     commands.add_parser("stop", help="Stop a backend started with --detach.")
 
+    commands.add_parser("restart", help="Restart the backend that is running.")
+
     status = commands.add_parser("status", help="Version, where the data lives and what is running.")
     status.add_argument("--json", action="store_true", help="Print it as JSON, for other programs.")
+
+    logs = commands.add_parser("logs", help="Print the server log.")
+    logs.add_argument("-f", "--follow", action="store_true", help="Keep printing new entries as they arrive.")
+
+    commands.add_parser("doctor", help="Check what the backend needs on this machine.")
 
     commands.add_parser("update", help="Upgrade this install to the latest release.")
 
@@ -462,7 +476,7 @@ def _command_parser() -> argparse.ArgumentParser:
 
 
 def _parse(argv: list[str]) -> argparse.Namespace:
-    legacy = bool(argv) and argv[0].startswith("-") and argv[0] not in ("-h", "--help")
+    legacy = bool(argv) and argv[0].startswith("-") and argv[0] not in _TOP_FLAGS
     if legacy:
         args = _flag_parser().parse_args(argv)
         args.command = "key" if args.security_key else "stop" if args.stop else "run"
@@ -511,6 +525,56 @@ def _print_status(as_json: bool) -> None:
     _print_rows(rows)
 
 
+def _print_entries(page: dict) -> int:
+    for entry in page["items"]:
+        stamp = datetime.fromtimestamp(entry["ts"]).strftime("%H:%M:%S")
+        print(f"{stamp}  {entry['level']:<8} {entry['message']}", flush=True)
+    return page["offset"]
+
+
+def _print_logs(follow: bool) -> None:
+    offset = _print_entries(system_monitor.logs())
+    with suppress(KeyboardInterrupt):
+        while follow:
+            time.sleep(_POLL_SECONDS)
+            offset = _print_entries(system_monitor.logs(offset))
+
+
+def _restart() -> None:
+    live = _runtime()
+    if not live:
+        _abort("No backend is running.")
+    paths.RESTART_FLAG.touch()
+    print(f"Restarting the backend (pid {live['PID']}).")
+
+
+def _port_state(port: int) -> str:
+    live = _runtime()
+    if live and int(live.get("PORT") or 0) == port:
+        return f"{port}, this backend (pid {live['PID']})"
+    with socket.socket() as probe:
+        probe.settimeout(1)
+        taken = probe.connect_ex(("127.0.0.1", port)) == 0
+    return f"{port}, taken by another program" if taken else f"{port}, free"
+
+
+def _doctor(port: int) -> None:
+    system = cli_manager.system_cli()
+    tools = agent_registry.node_tools()
+    tailscale = (_tailscale_status().get("BackendState") or "installed, not running") if shutil.which("tailscale") else None
+    _print_rows([
+        ("Version", release.VERSION),
+        ("Data", str(paths.DATA_DIR)),
+        ("Claude CLI", f"{system} ({cli_manager.cli_version(system) or 'version unknown'})" if system else "not on PATH"),
+        ("Bundled CLI", cli_manager.bundled_version() or "missing"),
+        ("Agent SDK", sdk.installed_version() or "missing"),
+        ("Node.js", " and ".join(tools) if tools else "node or npm missing, agents from npm cannot install"),
+        ("Tailscale", tailscale or "not installed"),
+        ("Port", _port_state(port)),
+        ("Security key", "set" if os.environ.get(_SECURITY_KEY_VAR) else f"not set, run {_invocation()} key"),
+    ])
+
+
 def _update() -> None:
     if not paths.INSTALLED:
         _abort("this is a git checkout, not an installed release: update it with git pull.")
@@ -553,6 +617,8 @@ def _migrate(source: str, force: bool) -> None:
 
 def main():
     args = _parse(sys.argv[1:])
+    port = args.port or PORT
+    os.environ["PORT"] = str(port)
 
     try:
         moved = data_migration.migrate()
@@ -569,6 +635,18 @@ def main():
 
     if args.command == "status":
         _print_status(args.json)
+        return
+
+    if args.command == "logs":
+        _print_logs(args.follow)
+        return
+
+    if args.command == "doctor":
+        _doctor(port)
+        return
+
+    if args.command == "restart":
+        _restart()
         return
 
     if args.command == "update":
@@ -592,7 +670,7 @@ def main():
         system_monitor.reset_log_file()
         key_generated = _ensure_security_key()
         if args.expose:
-            _expose(args.expose, PORT, args.public_host, keep_running=True, key_generated=key_generated)
+            _expose(args.expose, port, args.public_host, keep_running=True, key_generated=key_generated)
             paths.DETACHED_PROVIDER_FILE.write_text(args.expose, encoding="utf-8")
         else:
             _print_security_key(key_generated)
@@ -608,14 +686,14 @@ def main():
     system_monitor.reset_log_file()
     key_generated = _ensure_security_key()
     if args.expose:
-        _expose(args.expose, PORT, args.public_host, key_generated=key_generated)
+        _expose(args.expose, port, args.public_host, key_generated=key_generated)
     else:
         _print_security_key(key_generated)
 
     reload = not args.production and not is_windows
     workers = int(os.environ.get("WEB_CONCURRENCY", "2")) if (args.production and not is_windows) else 1
 
-    cmd = [sys.executable, "-m", "uvicorn", _APP, "--host", "0.0.0.0", "--port", str(PORT)]
+    cmd = [sys.executable, "-m", "uvicorn", _APP, "--host", "0.0.0.0", "--port", str(port)]
     if reload:
         cmd += ["--reload", "--reload-exclude", str(paths.DATA_DIR)]
     elif workers > 1:

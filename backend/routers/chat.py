@@ -415,7 +415,7 @@ async def chat_ws(ws: WebSocket):
                     state.cwd = msg.cwd or DEFAULT_CWD
                     state.session_id = msg.resume
                     session = registry.create(state)
-                    session.bind_agent(agent_sessions.AgentSession(msg.agent, state.cwd, sessions_service.project_key_for(state.cwd)))
+                    session.bind_agent(agent_sessions.AgentSession(msg.agent, state.cwd, sessions_service.project_key_for(state.cwd), msg.resume))
                     spawn(session.open_agent(msg.resume))
                 else:
                     state = _Session()

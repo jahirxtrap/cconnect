@@ -11,3 +11,9 @@ const SESSION_COLORS: Record<string, string> = {
 
 export const sessionColorOf = (name: string | null | undefined): string | null =>
   (name && SESSION_COLORS[name]) ?? null;
+
+export const sessionColorOptions = (names: string[]) =>
+  names.flatMap((name) => {
+    const color = sessionColorOf(name);
+    return color ? [{ value: name, color, label: name }] : [];
+  });

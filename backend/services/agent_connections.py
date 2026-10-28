@@ -9,7 +9,7 @@ from typing import Any, Awaitable, Callable, Optional, Protocol
 
 import psutil
 
-from core import packages, release
+from core import packages, process_job, release
 from services import acp_events, agents, persistent_sessions
 from services.acp_peer import AUTH_REQUIRED, INTERNAL_ERROR, RESOURCE_NOT_FOUND, STREAM_LIMIT, AcpError, AcpPeer
 
@@ -111,6 +111,7 @@ class AgentConnection:
             limit=STREAM_LIMIT,
             creationflags=packages.NO_WINDOW,
         )
+        process_job.tie(self._process.pid)
         self._peer = AcpPeer(self._process.stdout, self._process.stdin, self._requested, self._notified)
         self._tasks = [asyncio.create_task(self._serve()), asyncio.create_task(self._read_log())]
         try:

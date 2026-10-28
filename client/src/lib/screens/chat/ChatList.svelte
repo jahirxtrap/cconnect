@@ -159,7 +159,7 @@
       onSelect={(id) => chat.selectEnvironment(id)}
     />
     <TooltipIconButton
-      label={t("NEW_SESSION")}
+      label={t("NEW_CHAT")}
       onclick={() => {
         chat.newSession();
         onAfterSelect();

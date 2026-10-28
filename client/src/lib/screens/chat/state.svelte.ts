@@ -1416,6 +1416,11 @@ export class ChatState {
     if (updated) this.list?.upsertCategory(updated);
   }
 
+  async setCategoryColor(category: ChatCategory, color: string | null) {
+    const updated = await this.#sessions.updateCategory(category.id, { color: color ?? "" });
+    if (updated) this.list?.upsertCategory(updated);
+  }
+
   isCategoryCollapsed(categoryId: string): boolean {
     return settings.collapsedCategories.includes(categoryId);
   }
@@ -2179,7 +2184,12 @@ export class ChatState {
   }
 
   #awaitingHistory(): boolean {
-    return this.agent !== null && this.sessionId !== null && this.agentState?.status === "connecting";
+    return (
+      this.agent !== null &&
+      this.sessionId !== null &&
+      this.agentState?.status === "connecting" &&
+      this.messages.length === 0
+    );
   }
 
   #resetStreaming() {

@@ -13,7 +13,16 @@ import uuid
 
 from loguru import logger
 
-from services import accounts, cli_info, mods, persistent_sessions, todos as todos_store, tool_props, visibility
+from services import (
+    accounts,
+    agent_connections,
+    cli_info,
+    mods,
+    persistent_sessions,
+    todos as todos_store,
+    tool_props,
+    visibility,
+)
 
 # How many recent stamped events to retain per session for replay on reconnect.
 # A very long disconnect can outrun this; the client then falls back to the
@@ -1050,3 +1059,8 @@ class SessionRegistry:
 
 
 registry = SessionRegistry()
+
+
+async def close_processes() -> None:
+    await persistent_sessions.pool.close_all()
+    await agent_connections.pool.close_all()

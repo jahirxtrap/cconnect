@@ -57,9 +57,8 @@ async def lifespan(app: FastAPI):
     project_watch.hub.stop()
     system_watch.hub.stop()
     network.watchdog.stop()
-    from services import agent_connections, persistent_sessions
-    await persistent_sessions.pool.close_all()
-    await agent_connections.pool.close_all()
+    from services import live_sessions
+    await live_sessions.close_processes()
     paths.RUNTIME_FILE.unlink(missing_ok=True)
 
 

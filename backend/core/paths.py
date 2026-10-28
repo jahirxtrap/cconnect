@@ -51,6 +51,7 @@ REWIND_FILE = STATE_DIR / "rewind_pending.json"
 TODOS_FILE = STATE_DIR / "session_todos.json"
 DELEGATE_RUNS_DIR = STATE_DIR / "delegate_runs"
 AGENT_HISTORY_DIR = STATE_DIR / "agent_history"
+AGENT_DEFAULTS_FILE = STATE_DIR / "agent_defaults.json"
 AI_WORKDIR = Path(os.environ.get("AI_WORKDIR") or STATE_DIR / "internal_task")
 
 NETWORK_STATE_FILE = CACHE_DIR / "network_state.json"

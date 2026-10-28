@@ -1,5 +1,5 @@
 import Activity from "@lucide/svelte/icons/activity";
-import Bot from "@lucide/svelte/icons/bot";
+import BotMessageSquare from "@lucide/svelte/icons/bot-message-square";
 import Compass from "@lucide/svelte/icons/compass";
 import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
 import FolderTree from "@lucide/svelte/icons/folder-tree";
@@ -65,7 +65,7 @@ export const SCREENS: ScreenEntry[] = [
   {
     kind: "agents",
     label: "AGENTS",
-    icon: Bot,
+    icon: BotMessageSquare,
     open: () => panes.setKind("agents"),
     paneOnly: true,
   },

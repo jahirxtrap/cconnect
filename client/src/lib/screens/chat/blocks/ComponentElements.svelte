@@ -13,7 +13,7 @@
     type InteractionData,
   } from "$lib/data/chatModels";
   import { severityTone } from "$lib/data/usageWindows";
-  import { sessionColorOf } from "$lib/design/sessionColors";
+  import { sessionColorOf, sessionColorOptions } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
   import CconnectBlockView from "$lib/ui/CconnectBlockView.svelte";
@@ -71,11 +71,7 @@
   let colouring = $state<ComponentElement | null>(null);
   let uploading = $state<string | null>(null);
 
-  const colorOptions = $derived(
-    colors
-      .map((name) => ({ value: name, color: sessionColorOf(name) ?? "", label: name }))
-      .filter((option) => option.color !== ""),
-  );
+  const colorOptions = $derived(sessionColorOptions(colors));
 
   const fileNames = (element: ComponentElement) =>
     picked(element.id)
