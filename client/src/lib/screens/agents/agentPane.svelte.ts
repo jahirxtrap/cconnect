@@ -44,12 +44,14 @@ class AgentPane {
   }
 
   restart(chat: ChatState) {
+    const folder = followedFolder() ?? chat.cwd;
+    if (chat.untouched && chat.cwd === folder) return;
     const key = [...this.#held].find(([, held]) => held.chat === chat)?.[0];
     if (key && this.#kept[key]) {
       this.#kept = Object.fromEntries(Object.entries(this.#kept).filter(([name]) => name !== key));
       this.#save();
     }
-    chat.startAgentSession(followedFolder() ?? chat.cwd);
+    chat.startAgentSession(folder);
   }
 
   syncVisibility() {

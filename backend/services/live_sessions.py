@@ -89,6 +89,7 @@ class LiveSession:
         self._roster_lock = asyncio.Lock()
         self._turn_open = False
         self.turn_start_index = 0
+        self.turn_split = False
         self.agent = None
         self.used_at = time.monotonic()
 
@@ -420,6 +421,7 @@ class LiveSession:
             if kind in ("done", "interrupted"):
                 self._committed_seq = self._seq
                 self._turn_open = False
+                self.turn_split = kind == "interrupted" and self.running
             elif not self.running:
                 self._committed_seq = self._seq
             await self._send(stamped)
@@ -801,6 +803,7 @@ class LiveSession:
         self._stopping = False
         self._drained.clear()
         self._turn_open = True
+        self.turn_split = False
         self._worker = asyncio.create_task(self._run(runner_factory))
         self._publish_activity(self.activity)
         for item in carried:
@@ -1022,7 +1025,7 @@ class SessionRegistry:
         session = self.get_by_session(session_id)
         if session is None or not session.has_replay:
             return None
-        return session.turn_start_index
+        return session.turn_start_index, session.turn_split
 
     def resolve_interaction(self, rid, response):
         for session in self._sessions.values():

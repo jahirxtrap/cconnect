@@ -1452,7 +1452,15 @@ def main_count(messages: list[dict]) -> int:
     return sum(1 for message in messages if not message.get("parent"))
 
 
-def committed_index(messages: list[dict], main: int) -> int:
+def committed_index(messages: list[dict], main: int, split: bool = False) -> int:
+    start = _main_index(messages, main)
+    if not split:
+        return start
+    stops = [index for index in range(start, len(messages)) if _interrupt_mark(messages[index])]
+    return stops[-1] + 1 if stops else start
+
+
+def _main_index(messages: list[dict], main: int) -> int:
     seen = 0
     for index, message in enumerate(messages):
         if message.get("parent"):
@@ -1461,6 +1469,10 @@ def committed_index(messages: list[dict], main: int) -> int:
             return index
         seen += 1
     return len(messages)
+
+
+def _interrupt_mark(message: dict) -> bool:
+    return message.get("type") == "interrupted" and not message.get("parent")
 
 
 def get_session_messages(

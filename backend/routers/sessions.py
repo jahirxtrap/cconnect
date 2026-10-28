@@ -343,7 +343,7 @@ def get_session_messages(
         raise HTTPException(status_code=400, detail=str(exc))
     cut = None if trashed else registry.committed_cut(session_id)
     if cut is not None:
-        items = items[:sessions_service.committed_index(items, cut)]
+        items = items[:sessions_service.committed_index(items, *cut)]
     total = len(items)
     end = total if before_index is None else max(0, min(before_index, total))
     start = page_start(items, end, limit)

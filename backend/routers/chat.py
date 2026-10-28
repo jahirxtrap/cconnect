@@ -240,7 +240,7 @@ def _turn_start(session, prefs=None) -> int:
 
 def _committed_index(session, prefs=None) -> int | None:
     items = _session_items(session, prefs) if session.running and session.agent is None else None
-    return None if items is None else sessions_service.committed_index(items, session.turn_start_index)
+    return None if items is None else sessions_service.committed_index(items, session.turn_start_index, session.turn_split)
 
 
 async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=None):
