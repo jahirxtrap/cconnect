@@ -61,8 +61,8 @@ except `/api/health`; the WS handshake checks the same header via `ws_bearer_ok`
 
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
-Claude — the shells, the files git ignores, every git write and deleting a pack from the
-server's library. It only gates while the Bearer gate is on (`gated()`), so a plain local
+Claude — the shells, the files git ignores, every git write, deleting a pack from the
+server's library and an agent's environment variables. It only gates while the Bearer gate is on (`gated()`), so a plain local
 run is open. Each route checks it for itself; there is no middleware for it, and a read that
 the panel needs before it can ask for anything (`repos`) is deliberately outside it.
 
@@ -81,8 +81,9 @@ rename/color/move/delete, trash, categories, transcript images), `/api/shared/*`
 manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins and their
 reload, marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`,
 `/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
-the written message, commit, revert, pull, push), `/api/delegates` (the destinations;
-writing them takes the security key), `/api/packs/*` (the server's pack library and its
+the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
+Protocol agents: catalog, install, sign-in and sessions; reading or changing their
+environment variables takes the security key), `/api/packs/*` (the server's pack library and its
 previews; deleting from it takes the security key). Live streams: `WS /api/chat/ws`,
 `WS /api/list/ws` (chat/project list), `WS /api/system/ws`, `WS /api/shared/ws`,
 `WS /api/packs/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws` (frames and state
@@ -180,9 +181,10 @@ final `result` lands.
 
 With `persistent_sessions` on, a chat keeps its CLI between turns. `persistent_sessions.pool`
 holds one `PersistentSession` per channel, a `ClaudeSDKClient` owned by its own task and
-keyed by cwd, the resolved account and scope; `persistent_limit` trims the oldest idle
-ones, and the live session releases its own `persistent_grace` seconds (300 by default)
-after the last socket detaches, once nothing runs in the background (`working` counts the
+keyed by cwd, the resolved account and scope. `session_limit` (10 by default) caps the
+chats holding a process, persistent CLIs and ACP agents together, and `registry.trim`
+releases the least recently used idle ones past it; the live session releases its own
+`session_grace` seconds (300 by default) after the last socket detaches, once nothing runs in the background (`working` counts the
 tasks the CLI reported). A turn whose options differ from the ones the CLI started with
 (`mark`: model, effort, permission mode, mods) closes it and starts a fresh one, and so does
 another account, since the account is the CLI's config folder and credentials. When the CLI
