@@ -7,9 +7,10 @@
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
+  import PackBanner from "./PackBanner.svelte";
   import PackContent from "./PackContent.svelte";
   import { packByline, packErrorText } from "./packText";
-  import PackThumb from "./PackThumb.svelte";
 
   interface Props {
     pack: Pack;
@@ -55,7 +56,7 @@
     {/if}
   {/snippet}
   <div class="flex w-full flex-col gap-3">
-    <PackThumb {pack} large />
+    <PackBanner {pack} />
     {#if pack.info.description || pack.info.contributors.length}
       <div class="flex flex-col gap-1">
         {#if pack.info.description}
@@ -69,7 +70,7 @@
       </div>
     {/if}
     {#if failure}
-      <p class="text-body-sm text-red">{failure}</p>
+      <ErrorText text={failure} />
     {/if}
     <PackContent {pack} />
   </div>

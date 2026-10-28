@@ -41,6 +41,9 @@ GUIDE = "\n".join(
         f"{MANIFEST}: " + '{"schema": ' + str(SCHEMA["schema"]) + ', "name", "version", "author"?, '
         '"contributors"?: [names], "description"?, "id"?, "preview"?: path of an image in the pack, '
         '"use"?: [ids of this pack]}.',
+        "preview is the pack's icon, drawn 44 px wide in the app's lists, while the app draws the pack's banner "
+        "itself from its theme colors. Make it square, as an SVG or a raster no bigger than 256x256, with a creative "
+        "motif of the pack's own and no text: a screenshot or fine detail turns to noise at that size.",
         "Every other file is optional and takes its id from its name.",
         "use is what the app's Use button applies, and without it the button is not offered: the first light "
         "theme, dark theme, terminal, accent and background listed, and the first font of each kind.",

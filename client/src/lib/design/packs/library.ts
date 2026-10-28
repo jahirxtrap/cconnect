@@ -96,21 +96,25 @@ export const canUsePack = (pack: Pack): boolean => pack.info.use.length > 0;
 const firstUsed = <T extends { id: string }>(use: string[], items: readonly T[]): T | undefined =>
   use.map((id) => items.find((item) => item.id === id)).find((item) => item !== undefined);
 
-export const usePack = (pack: Pack) => {
+export const usedBy = (pack: Pack) => {
   const use = pack.info.use;
-  const themes = THEME_KINDS.flatMap((kind) => firstUsed(use, pack.themes.filter((item) => item.kind === kind)) ?? []);
-  for (const item of themes) theme.setTheme(item.kind, item.id);
-  if (themes.length && !themes.some((item) => item.kind === theme.modeKind)) theme.setMode(themes[0].kind);
-  const terminal = firstUsed(use, pack.terminals);
-  if (terminal) theme.setTerminal(terminal.id);
-  const accent = firstUsed(use, pack.accents);
-  if (accent) theme.setAccent(accent.id);
-  for (const kind of FONT_KINDS) {
-    const font = firstUsed(use, pack.fonts.filter((item) => item.kind === kind));
-    if (font) theme.setFont(kind, font.id);
-  }
-  const background = firstUsed(use, pack.backgrounds);
-  if (background) chatBackground.apply(background.id, {});
+  return {
+    themes: THEME_KINDS.flatMap((kind) => firstUsed(use, pack.themes.filter((item) => item.kind === kind)) ?? []),
+    terminal: firstUsed(use, pack.terminals),
+    accent: firstUsed(use, pack.accents),
+    fonts: FONT_KINDS.flatMap((kind) => firstUsed(use, pack.fonts.filter((item) => item.kind === kind)) ?? []),
+    background: firstUsed(use, pack.backgrounds),
+  };
+};
+
+export const usePack = (pack: Pack) => {
+  const used = usedBy(pack);
+  for (const item of used.themes) theme.setTheme(item.kind, item.id);
+  if (used.themes.length && !used.themes.some((item) => item.kind === theme.modeKind)) theme.setMode(used.themes[0].kind);
+  if (used.terminal) theme.setTerminal(used.terminal.id);
+  if (used.accent) theme.setAccent(used.accent.id);
+  for (const font of used.fonts) theme.setFont(font.kind, font.id);
+  if (used.background) chatBackground.apply(used.background.id, {});
 };
 
 export const restorePacks = async () => {

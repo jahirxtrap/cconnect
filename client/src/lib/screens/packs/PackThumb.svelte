@@ -9,10 +9,9 @@
   interface Props {
     pack: Pack;
     source?: PackSource | null;
-    large?: boolean;
   }
 
-  const { pack, source = null, large = false }: Props = $props();
+  const { pack, source = null }: Props = $props();
 
   let url = $state<string | null>(null);
 
@@ -40,8 +39,8 @@
     src={url}
     alt=""
     draggable="false"
-    class="shrink-0 object-cover {large ? 'aspect-[3/1] w-full rounded-panel' : 'size-11 rounded-lg'}"
+    class="size-11 shrink-0 rounded-lg object-cover"
   />
-{:else if !large}
+{:else}
   <IconTile icon={Package} />
 {/if}
