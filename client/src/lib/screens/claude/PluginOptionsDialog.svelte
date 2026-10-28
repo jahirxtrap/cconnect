@@ -4,6 +4,7 @@
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
@@ -87,7 +88,7 @@
   {/snippet}
   <div class="flex flex-col gap-3.5">
     {#if error}
-      <p class="text-body-sm wrap-anywhere text-error">{error}</p>
+      <ErrorText text={error} />
     {/if}
     {#if fields}
       {#each blocks as block (block[0].key)}

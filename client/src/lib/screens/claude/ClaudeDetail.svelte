@@ -73,6 +73,7 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
@@ -874,7 +875,7 @@
     {@render facts(rows)}
     {#if plugin.mod && pluginReview}
       {#each pluginReview.errors as error (error)}
-        <p class="text-body-sm wrap-anywhere text-error">{error}</p>
+        <ErrorText text={error} />
       {/each}
       {#if !rows.some((fact) => fact.label === t("COMMANDS") || fact.label === t("MOD_CALLS")) && !pluginReview.errors.length}
         <p class="text-body-sm text-on-surface-variant">{t("MOD_REVIEW_EMPTY")}</p>

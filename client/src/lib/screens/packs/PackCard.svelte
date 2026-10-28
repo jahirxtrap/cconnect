@@ -6,6 +6,7 @@
   import { PackError } from "$lib/design/packs/reader";
   import { packs } from "$lib/design/packs/registry.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import { packByline, packErrorText, packSummary } from "./packText";
   import PackThumb from "./PackThumb.svelte";
 
@@ -67,6 +68,6 @@
       <p class="truncate text-body-sm text-on-surface-variant">{packSummary(pack)}</p>
     </div>
   </div>
-{:else}
-  <p class="text-body-sm text-red">{failure}</p>
+{:else if failure}
+  <ErrorText text={failure} />
 {/if}

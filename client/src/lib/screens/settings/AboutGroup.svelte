@@ -28,6 +28,7 @@
   import Button from "$lib/ui/Button.svelte";
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import ExternalIndicator from "$lib/ui/ExternalIndicator.svelte";
   import GithubIcon from "$lib/ui/GithubIcon.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
@@ -124,10 +125,10 @@
       <p class="truncate text-item-title">{t("APP_NAME")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">{t("VERSION_LABEL", APP_VERSION)}</p>
       {#if serverStatus.appOutdated}
-        <p class="text-body-sm text-red">{t("COMPAT_APP_OUTDATED")}</p>
+        <ErrorText text={t("COMPAT_APP_OUTDATED")} />
       {/if}
       {#if serverStatus.serverOutdated}
-        <p class="text-body-sm text-red">{t("COMPAT_SERVER_OUTDATED")}</p>
+        <ErrorText text={t("COMPAT_SERVER_OUTDATED")} />
       {/if}
         {#if updateAvailable && release}
           <p class="text-body-sm text-accent">{t("UPDATE_AVAILABLE", release.tag)}</p>

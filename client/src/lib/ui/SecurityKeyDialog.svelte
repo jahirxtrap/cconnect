@@ -2,6 +2,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
+  import ErrorText from "./ErrorText.svelte";
   import InputField from "./InputField.svelte";
 
   interface Props {
@@ -24,7 +25,7 @@
   <div class="flex flex-col gap-2">
     <InputField value={key} oninput={(value) => (key = value)} label={t("SECURITY_KEY")} singleLine secret />
     {#if rejected}
-      <p class="text-body-sm text-error">{t("SECURITY_KEY_REJECTED")}</p>
+      <ErrorText text={t("SECURITY_KEY_REJECTED")} />
     {/if}
   </div>
 </CompactDialog>

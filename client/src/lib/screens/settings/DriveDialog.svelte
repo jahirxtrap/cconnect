@@ -17,6 +17,7 @@
   import CompactDialog, { DIALOG_LIST_CLASS } from "$lib/ui/CompactDialog.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import DriveRestoreDialog from "./DriveRestoreDialog.svelte";
@@ -180,7 +181,7 @@
       />
     </div>
     {#if driveBackups.failed}
-      <p class="mt-2 text-body-sm text-red">{t("DRIVE_FAILED")}</p>
+      <ErrorText text={t("DRIVE_FAILED")} class="mt-2" />
     {/if}
   {/if}
 </CompactDialog>

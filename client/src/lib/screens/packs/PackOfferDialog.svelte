@@ -6,6 +6,7 @@
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import { FILE_ACTIONS, OPEN_EXTERNALLY_ACTION, type FileSource } from "$lib/ui/sharedFileActions";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import PackCard from "./PackCard.svelte";
@@ -100,7 +101,7 @@
         <p class="text-body-sm text-on-surface-variant">{note}</p>
       {/if}
       {#if failure}
-        <p class="text-body-sm text-red">{failure}</p>
+        <ErrorText text={failure} />
       {/if}
       {#if inspected}
         <PackContent pack={inspected.pack} source={inspected.source} />

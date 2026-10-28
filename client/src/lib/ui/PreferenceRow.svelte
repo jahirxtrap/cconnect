@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import ErrorText from "./ErrorText.svelte";
   import type { IconSource } from "./icons";
   import Pressable from "./Pressable.svelte";
   import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "./preferenceRow";
@@ -39,7 +40,7 @@
       <p class="truncate text-body-sm text-on-surface-variant">{summary}</p>
     {/if}
     {#if alert}
-      <p class="text-body-sm text-red">{alert}</p>
+      <ErrorText text={alert} />
     {/if}
   </div>
   {#if trailing}

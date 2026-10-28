@@ -14,6 +14,7 @@
   } from "$lib/platform/shortcuts.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -143,9 +144,7 @@
       {/each}
     {/each}
     {#if clash.length}
-      <p class="px-2 text-body-sm text-red">
-        {t("SHORTCUTS_CONFLICT", clash.map((shortcut) => t(shortcut.label)).join(", "))}
-      </p>
+      <ErrorText text={t("SHORTCUTS_CONFLICT", clash.map((shortcut) => t(shortcut.label)).join(", "))} class="px-2" />
     {/if}
   </div>
 </CompactDialog>

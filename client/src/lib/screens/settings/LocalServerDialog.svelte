@@ -7,6 +7,7 @@
   import { localServer } from "$lib/services/localServer.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import OutputPanel from "$lib/ui/OutputPanel.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
@@ -74,7 +75,6 @@
   });
 
   const panel = $derived.by(() => {
-    if (failure) return failure;
     const lines = [`${t("LOCAL_URL")}: http://localhost:${info.port}`];
     if (info.publicUrl) lines.push(`${t("PUBLIC_URL")}: ${info.publicUrl}`);
     if (info.token) lines.push(`${t("TOKEN")}: ${info.token}`);
@@ -164,8 +164,10 @@
       />
     {/if}
 
-    {#if panel}
-      <OutputPanel text={panel} failure={failure !== null} class="mt-1" />
+    {#if failure}
+      <ErrorText text={failure} class="mt-1" />
+    {:else}
+      <OutputPanel text={panel} class="mt-1" />
     {/if}
   </div>
 </CompactDialog>

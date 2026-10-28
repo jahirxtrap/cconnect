@@ -3,6 +3,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import Button from "./Button.svelte";
   import CompactDialog from "./CompactDialog.svelte";
+  import ErrorText from "./ErrorText.svelte";
   import InputField from "./InputField.svelte";
 
   interface Props {
@@ -52,6 +53,6 @@
     {/snippet}
   </InputField>
   {#if error}
-    <p class="mt-1.5 text-body-sm text-error">{error}</p>
+    <ErrorText text={error} class="mt-1.5" />
   {/if}
 </CompactDialog>

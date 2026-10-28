@@ -3,7 +3,6 @@
   import { pluginKey, type ClaudeApi, type Plugin } from "$lib/services/claudeApi";
   import PluginOptionsDialog from "$lib/screens/claude/PluginOptionsDialog.svelte";
   import Button from "$lib/ui/Button.svelte";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
@@ -48,13 +47,7 @@
   {#snippet header()}
     <SearchBar value={query} oninput={(value) => (query = value)} placeholder={t("SEARCH")} />
   {/snippet}
-  {#if error}
-    <p class="text-body-sm wrap-anywhere text-error">{error}</p>
-  {:else if !mods}
-    <CenteredProgress class="py-6" />
-  {:else if !shown.length}
-    <EmptyState text={t(mods.length ? "NO_RESULTS" : "NO_MODS_OPTIONS")} class="py-8" />
-  {:else}
+  {#if shown.length}
     {#each shown as plugin (pluginKey(plugin))}
       <ListRow
         subtitleLines={2}
@@ -63,6 +56,12 @@
         onclick={() => (optionsFor = plugin)}
       />
     {/each}
+  {:else}
+    <EmptyState
+      loading={!mods && !error}
+      text={error ?? t(mods?.length ? "NO_RESULTS" : "NO_MODS_OPTIONS")}
+      class="h-[72px]"
+    />
   {/if}
 </CompactDialog>
 

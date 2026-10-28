@@ -6,6 +6,7 @@
   import { copyText } from "$lib/platform/clipboard";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
 
@@ -83,7 +84,7 @@
         autofocus
       />
       {#if failed}
-        <p class="-mt-0.5 text-body-sm text-red">{t("IMPORT_SETTINGS_FAILED")}</p>
+        <ErrorText text={t("IMPORT_SETTINGS_FAILED")} class="-mt-0.5" />
       {/if}
     {/if}
   </div>

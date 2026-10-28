@@ -12,6 +12,7 @@
   import { gitApi, type GitIdentity, type GitRepo } from "$lib/services/gitApi";
   import Button from "$lib/ui/Button.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
@@ -260,7 +261,7 @@
       </div>
 
       {#if failure}
-        <p class="text-body-sm wrap-anywhere text-error">{failure}</p>
+        <ErrorText text={failure} />
       {/if}
 
       <div class="flex gap-2">

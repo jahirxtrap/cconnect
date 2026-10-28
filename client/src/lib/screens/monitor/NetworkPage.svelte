@@ -14,6 +14,7 @@
     type WifiNetwork,
   } from "$lib/services/networkApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
@@ -177,7 +178,7 @@
   </SettingsGroup>
 
   {#if notice}
-    <p class="px-1 pt-2 text-body-sm text-error">{notice}</p>
+    <ErrorText text={notice} class="px-1 pt-2" />
   {/if}
 
   <SettingsGroup label={t("NETWORK_INTERFACES")}>
