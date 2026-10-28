@@ -32,7 +32,7 @@
   import { recallProject, rememberProject } from "./projectMemory";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
   import { nearEdge } from "$lib/ui/paging";
@@ -985,7 +985,7 @@
           {/each}
         </ScrollCard>
       {:else}
-        <EmptyState icon={Search} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
+        <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
       {/if}
     {:else if rows.length}
       <ScrollCard frame={LIST_FRAME}>

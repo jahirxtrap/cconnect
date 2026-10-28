@@ -1,5 +1,5 @@
 <script module lang="ts">
-  export const OUTLINE_CLASS = "ring-1 ring-outline ring-inset";
+  export const OUTLINE_CLASS = "ring-(length:--hairline) ring-outline ring-inset";
 </script>
 
 <script lang="ts">

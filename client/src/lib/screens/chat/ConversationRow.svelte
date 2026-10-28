@@ -119,14 +119,15 @@
   >
     {title}
   </Pressable>
-  <div class={revealed ? "" : "opacity-0 group-hover:opacity-100"}>
-    <PopupMenu open={menu} label={t("MORE_OPTIONS")} onOpenChange={(value) => (menu = value)}>
+  <div class="flex {revealed ? '' : 'opacity-0 group-hover:opacity-100'}">
+    <PopupMenu
+      open={menu}
+      label={t("MORE_OPTIONS")}
+      triggerClass="inline-flex size-6 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
+      onOpenChange={(value) => (menu = value)}
+    >
       {#snippet trigger()}
-        <span
-          class="inline-flex size-6 cursor-pointer items-center justify-center rounded-full text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
-        >
-          <EllipsisVertical size={16} />
-        </span>
+        <EllipsisVertical size={16} />
       {/snippet}
       <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => run(onRename)} />
       <MenuItem icon={Sparkles} text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />

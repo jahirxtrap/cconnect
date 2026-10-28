@@ -1,3 +1,9 @@
+<script lang="ts" module>
+  import SearchX from "@lucide/svelte/icons/search-x";
+
+  export const NO_RESULTS_ICON = SearchX;
+</script>
+
 <script lang="ts">
   import type { Snippet } from "svelte";
   import CenteredProgress from "./CenteredProgress.svelte";

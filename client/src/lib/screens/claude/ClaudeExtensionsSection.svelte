@@ -1,10 +1,5 @@
 <script lang="ts">
-  import Blocks from "@lucide/svelte/icons/blocks";
-  import Brain from "@lucide/svelte/icons/brain";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
-  import Store from "@lucide/svelte/icons/store";
-  import Unplug from "@lucide/svelte/icons/unplug";
-  import Wand from "@lucide/svelte/icons/wand";
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -13,7 +8,7 @@
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TrailingIcon from "$lib/ui/TrailingIcon.svelte";
-  import type { ClaudeKind } from "./ClaudeDetail.svelte";
+  import { CLAUDE_ICONS, type ClaudeKind } from "./ClaudeDetail.svelte";
 
   interface Props {
     enabled: boolean;
@@ -45,15 +40,15 @@
 </script>
 
 <SettingsGroup label={t("EXTENSIONS")}>
-  {@render link(Blocks, t("PLUGINS"), rowSummary("plugins"), "plugins")}
-  {@render link(Wand, t("SKILLS"), rowSummary("skills"), "skills")}
-  {@render link(Unplug, t("MCP_SERVERS"), rowSummary("mcp"), "mcp")}
-  {@render link(Store, t("MARKETPLACES"), rowSummary("marketplaces"), "marketplaces")}
-  {@render link(Brain, t("MEMORIES"), memoriesSummary, "memories")}
+  {@render link(t("PLUGINS"), rowSummary("plugins"), "plugins")}
+  {@render link(t("SKILLS"), rowSummary("skills"), "skills")}
+  {@render link(t("MCP_SERVERS"), rowSummary("mcp"), "mcp")}
+  {@render link(t("MARKETPLACES"), rowSummary("marketplaces"), "marketplaces")}
+  {@render link(t("MEMORIES"), memoriesSummary, "memories")}
 </SettingsGroup>
 
-{#snippet link(icon: typeof Blocks, title: string, summary: string, kind: ClaudeKind)}
-  <PreferenceRow {icon} {title} {summary} {enabled} onclick={() => onOpen(kind)}>
+{#snippet link(title: string, summary: string, kind: ClaudeKind)}
+  <PreferenceRow icon={CLAUDE_ICONS[kind]} {title} {summary} {enabled} onclick={() => onOpen(kind)}>
     {#snippet trailing()}
       <TrailingIcon icon={ChevronRight} />
     {/snippet}

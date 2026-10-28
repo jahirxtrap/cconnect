@@ -853,7 +853,7 @@
     </TooltipIconButton>
     <div
       bind:this={addressBox}
-      class="group/address mx-1 flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface-variant pl-2.5 ring-1 ring-transparent transition-shadow ring-inset focus-within:ring-accent {shielded
+      class="group/address mx-1 flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface-variant pl-2.5 ring-(length:--hairline) ring-transparent transition-shadow ring-inset focus-within:ring-accent {shielded
         ? 'pr-1'
         : address
           ? 'pr-2.5 focus-within:pr-1'

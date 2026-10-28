@@ -1,4 +1,12 @@
 <script lang="ts" module>
+  import Activity from "@lucide/svelte/icons/activity";
+  import Blocks from "@lucide/svelte/icons/blocks";
+  import Brain from "@lucide/svelte/icons/brain";
+  import Store from "@lucide/svelte/icons/store";
+  import Unplug from "@lucide/svelte/icons/unplug";
+  import Wand from "@lucide/svelte/icons/wand";
+  import type { IconSource } from "$lib/ui/icons";
+
   export const CLAUDE_KINDS = [
     "plugins",
     "skills",
@@ -19,6 +27,23 @@
     status: "SERVICE_STATUS",
   };
 
+  export const CLAUDE_ICONS: Record<ClaudeKind, IconSource> = {
+    plugins: Blocks,
+    skills: Wand,
+    mcp: Unplug,
+    marketplaces: Store,
+    memories: Brain,
+    status: Activity,
+  };
+
+  const CLAUDE_EMPTY: Record<Exclude<ClaudeKind, "status">, string> = {
+    plugins: "NO_PLUGINS",
+    skills: "NO_SKILLS",
+    mcp: "NO_MCP_SERVERS",
+    marketplaces: "NO_MARKETPLACES",
+    memories: "NO_MEMORIES",
+  };
+
   export const STATUS_PAGE = "https://status.claude.com";
 </script>
 
@@ -29,7 +54,6 @@
   import Plus from "@lucide/svelte/icons/plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
-  import Store from "@lucide/svelte/icons/store";
   import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
@@ -72,7 +96,7 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
@@ -358,6 +382,8 @@
     ),
   );
 
+  const filtering = $derived(!!needle || (kind === "plugins" && pluginFilter.kind !== "all"));
+
   const shownCount = $derived(
     kind === "plugins"
       ? filteredPlugins.length
@@ -559,6 +585,12 @@
     <ServerUnavailable class="min-h-0 flex-1" />
   {:else if !loaded}
     <CenteredProgress class="flex-1" />
+  {:else if kind !== "status" && !shownCount}
+    <EmptyState
+      icon={filtering ? NO_RESULTS_ICON : CLAUDE_ICONS[kind]}
+      text={t(filtering ? "NO_RESULTS" : CLAUDE_EMPTY[kind])}
+      class="min-h-0 flex-1"
+    />
   {:else if embedded && kind !== "status"}
     <div bind:clientHeight={viewHeight} class="flex min-h-0 flex-1 flex-col">
     <PullToRefresh {refreshing} onRefresh={null}>
@@ -623,9 +655,6 @@
               {/each}
             {/if}
           </div>
-          {#if !shownCount}
-            <EmptyState text={t(!needle && kind === "memories" ? "NO_FILES" : "NO_RESULTS")} class="py-10" />
-          {/if}
         </div>
         {#if sidePanel && panelTitle}
           <div
@@ -670,7 +699,7 @@
       onRefresh={kind === "status" ? () => void refresh() : null}
       class={kind === "status" ? "" : LIST_VIEWPORT_CLASS}
     >
-    <div class="{kind === 'status' ? 'px-(--page-inset)' : ''} pb-(--page-inset)">
+    <div class="{kind === 'status' ? 'flex min-h-full flex-col px-(--page-inset)' : ''} pb-(--page-inset)">
       {#if kind === "plugins"}
         {#each filteredPlugins as plugin (pluginKey(plugin))}
           <ListRow
@@ -699,10 +728,6 @@
               {@render stateDot(skill.enabled)}
             {/snippet}
           </ListRow>
-        {:else}
-          {#if needle}
-            <EmptyState text={t("NO_RESULTS")} class="h-full" />
-          {/if}
         {/each}
       {:else if kind === "mcp"}
         {#each filteredMcp as server (server.name)}
@@ -725,9 +750,6 @@
           </ListRow>
         {/each}
       {:else if kind === "memories"}
-        {#if !memoryList.length}
-          <EmptyState text={t("NO_FILES")} class="h-full" />
-        {/if}
         {#each memoryList as memory (`${memory.scope}/${memory.name}`)}
           <ListRow
             title={memory.name}
@@ -740,7 +762,7 @@
           </ListRow>
         {/each}
       {:else if !service || service.error !== null}
-        <EmptyState text={t("STATUS_UNKNOWN")} class="h-full" />
+        <EmptyState icon={CLAUDE_ICONS.status} text={t("STATUS_UNKNOWN")} class="flex-1" />
       {:else}
         {@const indicator = service.indicator}
         <div class={embedded ? "grid grid-cols-[repeat(auto-fit,minmax(min(24rem,100%),1fr))] items-start gap-4" : ""}>

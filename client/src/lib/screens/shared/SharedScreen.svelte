@@ -22,7 +22,6 @@
   import Paperclip from "@lucide/svelte/icons/paperclip";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Save from "@lucide/svelte/icons/save";
-  import SearchX from "@lucide/svelte/icons/search-x";
   import Share2 from "@lucide/svelte/icons/share-2";
   import Trash from "@lucide/svelte/icons/trash";
   import Upload from "@lucide/svelte/icons/upload";
@@ -81,7 +80,7 @@
   import DropOverlay from "$lib/ui/DropOverlay.svelte";
   import { fileDrop } from "$lib/ui/fileDrop";
   import { entryIcon, kindIcon, kindLabel } from "$lib/ui/fileIcons";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -1238,7 +1237,7 @@
         {:else}
           <EmptyState
             loading={!loaded}
-            icon={querying ? SearchX : FolderOpen}
+            icon={querying ? NO_RESULTS_ICON : FolderOpen}
             text={t(querying ? "NO_RESULTS" : "NO_FILES")}
             class="flex-1"
           />

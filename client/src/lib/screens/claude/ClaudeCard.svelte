@@ -28,7 +28,7 @@
   }: Props = $props();
 </script>
 
-<CardPanel {onclick} class="min-w-0 gap-1.5 {selected ? 'ring-1 ring-accent-ring ring-inset' : ''}">
+<CardPanel {onclick} class="min-w-0 gap-1.5 {selected ? 'ring-(length:--hairline) ring-accent-ring ring-inset' : ''}">
   <span class="flex min-w-0 items-center gap-2">
     <span class="min-w-0 truncate text-label-lg">{title}</span>
     {#if tag}

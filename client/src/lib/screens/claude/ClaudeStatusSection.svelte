@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Activity from "@lucide/svelte/icons/activity";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -9,6 +8,7 @@
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TrailingIcon from "$lib/ui/TrailingIcon.svelte";
+  import { CLAUDE_ICONS } from "./ClaudeDetail.svelte";
   import { indicatorTone } from "./serviceStatus";
 
   interface Props {
@@ -48,7 +48,7 @@
       class={!service || service.error !== null ? "bg-gray" : indicatorTone(service.indicator)}
     />
   {/snippet}
-  <PreferenceRow icon={Activity} title={t("SERVICE_STATUS")} {summary} {enabled} onclick={onOpen}>
+  <PreferenceRow icon={CLAUDE_ICONS.status} title={t("SERVICE_STATUS")} {summary} {enabled} onclick={onOpen}>
     {#snippet trailing()}
       <TrailingIcon icon={ChevronRight} />
     {/snippet}
