@@ -275,11 +275,10 @@ export const localServerValue = (): string => {
   return "";
 };
 
-export const persistentValue = (): string => {
+export const sessionsValue = (): string => {
   const snapshot = serverSettings.snapshot;
   if (!snapshot) return "";
-  if (!snapshot.persistentSessions) return t("PERSISTENT_OFF");
-  return joined(t("PERSISTENT_ON"), t("PERSISTENT_LIMIT_VALUE", snapshot.persistentLimit));
+  return joined(snapshot.persistentSessions && t("PERSISTENT_SESSIONS"), t("SESSION_LIMIT_VALUE", snapshot.sessionLimit));
 };
 
 export const chatsValue = (): string => {

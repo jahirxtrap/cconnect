@@ -81,10 +81,26 @@ class LiveSession:
         self._turn_open = False
         self.turn_start_index = 0
         self.agent = None
+        self.used_at = time.monotonic()
 
     def bind_agent(self, agent):
         self.agent = agent
         agent.bind(self._emit, self._ask)
+
+    async def open_agent(self, resume=None):
+        await self.agent.open(resume)
+        await registry.trim(self.channel)
+
+    def wake_agent(self):
+        """Reopen an agent the idle timer released, now that a device is back."""
+        if self.agent is None or not self.agent.released:
+            return
+        self.agent.bind(self._emit, self._ask)
+        asyncio.get_running_loop().create_task(self.open_agent(self.agent.session_id))
+
+    @property
+    def holds_process(self):
+        return self.resident_alive or (self.agent is not None and self.agent.holding)
 
     @property
     def running(self):
@@ -126,6 +142,7 @@ class LiveSession:
         transcript, so it only needs the in-progress turn (events after the last done)."""
         async with self._lock:
             self._sinks[sink] = prefs
+            self.used_at = time.monotonic()
             floor = max(last_seq, self._committed_seq) if since_committed else last_seq
             replayed = set()
             for stamped in list(self._outbox):
@@ -152,6 +169,7 @@ class LiveSession:
         receiving."""
         async with self._lock:
             self._sinks.pop(sink, None)
+            self.used_at = time.monotonic()
         if not self._sinks:
             self._schedule_cooldown()
 
@@ -219,7 +237,7 @@ class LiveSession:
         self._resident.answerer = self._mod_answer
         self._resident.changed = self._resident_changed
         self._resident.runner = self.run_background
-        await persistent_sessions.pool.trim(persistent_sessions.limit(), registry.busy_channels() | {self.channel})
+        await registry.trim(self.channel)
         return self._resident
 
     @property
@@ -320,7 +338,7 @@ class LiveSession:
             self._cooldown = None
 
     def _schedule_cooldown(self):
-        if self._resident is None:
+        if not self.holds_process:
             return
         self._cancel_cooldown()
         self._cooldown = asyncio.create_task(self._cooldown_loop())
@@ -333,10 +351,18 @@ class LiveSession:
                     return
                 if self.working:
                     continue
-                await self.release_resident()
+                await self.release_process()
                 return
         except asyncio.CancelledError:
             return
+
+    async def release_process(self):
+        """Let go of the process this chat holds: its persistent CLI, or its agent."""
+        if self.agent is not None:
+            self._cancel_cooldown()
+            await self.agent.release(linger=False)
+            return
+        await self.release_resident()
 
     async def _emit(self, event):
         kind = event.get("type")
@@ -739,6 +765,7 @@ class LiveSession:
     def start(self, runner_factory, seed_id=None, compacting=False):
         if self.running:
             return False
+        self.used_at = time.monotonic()
         carried = []
         while not self._inbox.empty():
             try:
@@ -1011,6 +1038,15 @@ class SessionRegistry:
             channel for channel, session in self._sessions.items()
             if session.working or session.attached
         }
+
+    async def trim(self, keep):
+        """Release the least recently used idle chats holding a process, past the configured limit."""
+        busy = self.busy_channels() | {keep}
+        holding = [session for session in self._sessions.values() if session.holds_process]
+        idle = sorted((session for session in holding if session.channel not in busy), key=lambda session: session.used_at)
+        excess = len(holding) - max(persistent_sessions.limit(), len(holding) - len(idle))
+        for session in idle[:max(excess, 0)]:
+            await session.release_process()
 
 
 registry = SessionRegistry()

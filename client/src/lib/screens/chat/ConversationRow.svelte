@@ -9,7 +9,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Tag from "@lucide/svelte/icons/tag";
   import Trash2 from "@lucide/svelte/icons/trash-2";
-  import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
+  import { isPersistentSession, projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -109,7 +109,7 @@
       spinnerClass={activity ? SPINNERS[activity] : undefined}
       class={activity && DOTS[activity] ? DOTS[activity] : "bg-faint"}
       color={activity && DOTS[activity] ? null : color}
-      ring={resident || activity === "persistent"}
+      ring={isPersistentSession(activity, resident)}
     />
   </span>
   <Pressable

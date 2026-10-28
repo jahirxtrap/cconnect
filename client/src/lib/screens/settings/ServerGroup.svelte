@@ -23,7 +23,7 @@
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
-  import OutputPanel from "$lib/ui/OutputPanel.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
@@ -31,9 +31,9 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import AgentsDialog from "$lib/screens/agents/AgentsDialog.svelte";
   import ChatsDialog from "./ChatsDialog.svelte";
-  import PersistentDialog from "./PersistentDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
   import PrivacyDialog from "./PrivacyDialog.svelte";
+  import SessionsDialog from "./SessionsDialog.svelte";
   import { entryFor, entryHint, type SettingsDialog } from "./settingsIndex";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
   import ToolsDialog from "./ToolsDialog.svelte";
@@ -210,10 +210,10 @@
 
   <PreferenceRow
     icon={Flame}
-    title={t("PERSISTENT_SESSIONS")}
-    summary={rowSummary("persistent_sessions")}
+    title={t("SESSIONS")}
+    summary={rowSummary("sessions")}
     enabled={ready}
-    onclick={() => (dialog = "persistent")}
+    onclick={() => (dialog = "sessions")}
   />
 
   {#if snapshot && snapshot.modSurfaces !== null}
@@ -250,7 +250,7 @@
         {ready ? versionSummary : loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE")}
       </p>
       {#if ready && serverStatus.serverOutdated}
-        <p class="text-body-sm text-red">{t("COMPAT_SERVER_OUTDATED")}</p>
+        <ErrorText text={t("COMPAT_SERVER_OUTDATED")} />
       {/if}
       {#if updateAvailable}
         <p class="text-body-sm text-accent">
@@ -275,9 +275,9 @@
         onclick={() => void (updateAvailable ? runUpdate() : checkUpdate())}
       />
       {#if failure}
-        <OutputPanel text={failure} failure class="mt-2.5" />
+        <ErrorText text={failure} class="mt-2.5" />
       {:else if repo?.message && !repo.ok}
-        <OutputPanel text={repo.message} failure class="mt-2.5" />
+        <ErrorText text={repo.message} class="mt-2.5" />
       {/if}
     </div>
   {/if}
@@ -365,13 +365,13 @@
     onConfirm={(trash_enabled, retention_days) => void apply({ trash_enabled, retention_days })}
     onDismiss={() => (dialog = null)}
   />
-{:else if dialog === "persistent" && snapshot}
-  <PersistentDialog
-    sessions={snapshot.persistentSessions}
-    grace={snapshot.persistentGrace}
-    limit={snapshot.persistentLimit}
-    onConfirm={(persistent_sessions, persistent_grace, persistent_limit) =>
-      void apply({ persistent_sessions, persistent_grace, persistent_limit })}
+{:else if dialog === "sessions" && snapshot}
+  <SessionsDialog
+    persistent={snapshot.persistentSessions}
+    grace={snapshot.sessionGrace}
+    limit={snapshot.sessionLimit}
+    onConfirm={(persistent_sessions, session_grace, session_limit) =>
+      void apply({ persistent_sessions, session_grace, session_limit })}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "privacy" && snapshot}

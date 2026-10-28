@@ -3,7 +3,7 @@
 from typing import Any, Callable, Iterable
 
 from services import settings_store
-from services.event_rows import visible_rows
+from services.event_rows import HISTORY_PAGE, page_start, visible_rows
 
 TYPES = ("thinking", "tool_use", "file_change", "compact")
 
@@ -76,7 +76,9 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
     kind = event.get("type")
 
     if kind == "history":
-        return {**event, "items": visible_rows(event.get("items") or [], prefs)}
+        rows = visible_rows(event.get("items") or [], prefs)
+        start = page_start(rows, len(rows), HISTORY_PAGE)
+        return {**event, "items": rows[start:], "start_index": start, "has_more": start > 0}
 
     if not prefs.get("tokens"):
         if kind == "thinking_tokens":

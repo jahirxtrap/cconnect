@@ -100,6 +100,9 @@ const BUSY_ACTIVITIES = ["waiting", "working", "retrying", "compacting"];
 
 export const isBusyActivity = (activity: string | null): boolean => BUSY_ACTIVITIES.includes(activity ?? "");
 
+export const isPersistentSession = (activity: string | null, resident: boolean): boolean =>
+  resident || activity === "persistent";
+
 export const projectFilePath = (base: string | null, relative: string): string => {
   if (!base) return relative;
   const separator = base.includes("\\") ? "\\" : "/";

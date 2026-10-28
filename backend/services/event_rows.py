@@ -3,6 +3,7 @@
 STAMPS = ("seq", "channel", "replay", "parent")
 VERBATIM = ("file_change", "shared", "compact", "notice", "api_error", "interrupted", "stop")
 FILTERED = ("tool_use", "thinking", "file_change")
+HISTORY_PAGE = 100
 
 
 def _bare(event: dict) -> dict:
@@ -57,6 +58,18 @@ def rows_of(events: list[dict]) -> list[dict]:
         if (row["type"] not in ("text", "thinking") or row.get("label") or row["text"])
         and (row["type"] != "interaction" or row["resolved"])
     ]
+
+
+def page_start(messages: list[dict], end: int, limit: int) -> int:
+    """Where a page of ``limit`` top-level messages ending at ``end`` starts."""
+    seen = 0
+    for index in range(end - 1, -1, -1):
+        if messages[index].get("parent"):
+            continue
+        seen += 1
+        if seen == limit:
+            return index
+    return 0
 
 
 def visible_rows(rows: list[dict], vis: dict, parent: str | None = None) -> list[dict]:

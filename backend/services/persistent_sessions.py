@@ -229,11 +229,11 @@ def enabled() -> bool:
 
 
 def grace() -> float:
-    return max(float(settings_store.get("persistent_grace") or 0), 0.0)
+    return max(float(settings_store.get("session_grace") or 0), 0.0)
 
 
 def limit() -> int:
-    return max(int(settings_store.get("persistent_limit") or 1), 1)
+    return max(int(settings_store.get("session_limit") or 1), 1)
 
 
 def shape_of(cwd: str, account: Optional[str], scope_id: str) -> dict:
@@ -270,11 +270,6 @@ class SessionPool:
     async def close_all(self) -> None:
         for key in list(self._sessions):
             await self.drop(key)
-
-    async def trim(self, limit: int, keep: set[str]) -> None:
-        extra = [key for key in self._sessions if key not in keep]
-        while len(self._sessions) > max(limit, len(keep)) and extra:
-            await self.drop(extra.pop(0))
 
 
 pool = SessionPool()

@@ -1452,17 +1452,6 @@ def main_count(messages: list[dict]) -> int:
     return sum(1 for message in messages if not message.get("parent"))
 
 
-def page_start(messages: list[dict], end: int, limit: int) -> int:
-    seen = 0
-    for index in range(end - 1, -1, -1):
-        if messages[index].get("parent"):
-            continue
-        seen += 1
-        if seen == limit:
-            return index
-    return 0
-
-
 def committed_index(messages: list[dict], main: int) -> int:
     seen = 0
     for index, message in enumerate(messages):

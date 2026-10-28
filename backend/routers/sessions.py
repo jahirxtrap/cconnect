@@ -14,6 +14,7 @@ from services import projects as projects_service
 from services import trash as trash_service
 from services import rewind as rewind_service
 from services import sessions as sessions_service
+from services.event_rows import page_start
 from services.live_sessions import registry
 
 router = APIRouter(tags=["Sessions"])
@@ -345,7 +346,7 @@ def get_session_messages(
         items = items[:sessions_service.committed_index(items, cut)]
     total = len(items)
     end = total if before_index is None else max(0, min(before_index, total))
-    start = sessions_service.page_start(items, end, limit)
+    start = page_start(items, end, limit)
     slice_ = [dict(item, index=i) for i, item in enumerate(items[start:end], start=start)]
     weight = sessions_service.request_weight(project, session_id, trashed) or (None, None)
     return api_response(data={
