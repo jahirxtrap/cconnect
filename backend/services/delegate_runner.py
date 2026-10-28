@@ -16,7 +16,7 @@ from services.claude_runtime import (
     _cli_env,
     _flatten_result_content,
 )
-from services.delegates import TASK_TOKEN
+from services.delegates import MODEL_TOKEN, TASK_TOKEN
 
 Report = Callable[[dict], Awaitable[None]]
 Ask = Callable[[dict], Awaitable[dict]]
@@ -35,6 +35,7 @@ CHECKED_ARGS = (("args", DEFAULT_MODE), ("edit_args", EDIT_MODES[0]), ("bypass_a
 REPORTED = ("assistant_text", "thinking", "tool_use", "tool_result", "file_change")
 ALLOWING = ("allow_once", "allow_always")
 REFUSING = ("reject_once", "reject_always")
+MODEL_CATEGORY = "model"
 CHECK_TASK = "Reply with only the word: ok"
 CHECK_SECONDS = 120.0
 MODEL_PROMPT = (
@@ -54,6 +55,7 @@ class Turn(NamedTuple):
     mode: str = DEFAULT_MODE
     ask: Optional[Ask] = None
     tools: bool = True
+    model: Optional[str] = None
 
 
 def _named(name: str, tool: str) -> str:
@@ -106,8 +108,8 @@ async def _stream(options: Any, task: str, vis: dict, report: Report) -> str:
     return final
 
 
-def _model_of(account: str) -> str:
-    return accounts.model_for(account, settings_store.get("model"))
+def _model_of(account: str, wanted: Optional[str]) -> str:
+    return wanted or accounts.model_for(account, settings_store.get("model"))
 
 
 async def _model(destination: dict, task: str, turn: Turn) -> str:
@@ -116,7 +118,7 @@ async def _model(destination: dict, task: str, turn: Turn) -> str:
     account = accounts.resolve(destination["account"])
     options = ClaudeAgentOptions(
         cwd=turn.cwd,
-        model=_model_of(account),
+        model=_model_of(account, turn.model),
         cli_path=cli_manager.resolve_cli_path(),
         env=_cli_env(account),
         system_prompt=MODEL_PROMPT,
@@ -132,7 +134,7 @@ async def _claude(destination: dict, task: str, turn: Turn) -> str:
     account = accounts.resolve(destination["account"])
     options = ClaudeAgentOptions(
         cwd=turn.cwd,
-        model=_model_of(account),
+        model=_model_of(account, turn.model),
         cli_path=cli_manager.resolve_cli_path(),
         env=_cli_env(account),
         system_prompt={"type": "preset", "preset": "claude_code"},
@@ -167,12 +169,15 @@ async def _lines(stream: asyncio.StreamReader):
 
 
 async def _command(destination: dict, task: str, turn: Turn) -> str:
+    if turn.model and not destination["model_args"]:
+        raise DelegateError(f"{destination['name']} offers no choice of model")
     executable = _executable(destination)
     args = _args_for(destination, turn.mode)
     inline = any(TASK_TOKEN in arg for arg in args)
     if inline and Path(executable).suffix.lower() in BATCH_SUFFIXES:
         raise DelegateError(f"{Path(executable).name} is a batch file: send the task on stdin instead of {TASK_TOKEN}")
-    argv = [arg.replace(TASK_TOKEN, task) for arg in args]
+    chosen = [arg.replace(MODEL_TOKEN, turn.model) for arg in destination["model_args"]] if turn.model else []
+    argv = [*(arg.replace(TASK_TOKEN, task) for arg in args), *chosen]
     report = turn.report
     process = await asyncio.create_subprocess_exec(
         executable,
@@ -258,6 +263,18 @@ class _Delegation:
         return f"{answer}\n\n{note}" if answer else note
 
 
+async def _choose_model(session: agent_sessions.AgentSession, name: str, wanted: str) -> None:
+    option = next((item for item in session.options if item["category"] == MODEL_CATEGORY), None)
+    if option is None:
+        raise DelegateError(f"{name} offers no choice of model")
+    choice = next((item for item in option["choices"] if wanted.lower() in (item["value"].lower(), item["name"].lower())), None)
+    if choice is None:
+        raise DelegateError(f"{name} has no model {wanted}; it offers {', '.join(item['value'] for item in option['choices'])}")
+    await session.set_option(option["id"], choice["value"])
+    if next((item["current"] for item in session.options if item["id"] == option["id"]), None) != choice["value"]:
+        raise DelegateError(f"{name} did not switch to {choice['value']}")
+
+
 async def _acp(destination: dict, task: str, turn: Turn) -> str:
     delegation = _Delegation(destination["name"], turn)
     session = agent_sessions.AgentSession(destination["id"], turn.cwd, sessions.project_key_for(turn.cwd))
@@ -266,6 +283,8 @@ async def _acp(destination: dict, task: str, turn: Turn) -> str:
         await session.open()
         if session.status != agent_sessions.READY:
             raise DelegateError(session.detail or session.reason or session.status)
+        if turn.model:
+            await _choose_model(session, destination["name"], turn.model)
         closing = await session.prompt(task, [])
     finally:
         await session.release()

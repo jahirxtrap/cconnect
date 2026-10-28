@@ -59,6 +59,8 @@ export interface AgentResult {
 export interface AgentRun {
   model: string | null;
   effort: string | null;
+  agent: string | null;
+  account: { provider: boolean } | null;
 }
 
 export interface InteractionOption {

@@ -14,6 +14,7 @@
     type ComponentElement,
     type InteractionData,
   } from "$lib/data/chatModels";
+  import { masked } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -169,7 +170,7 @@
     });
 
   const shownValue = (element: ComponentElement, raw: string) => {
-    if (element.secret) return "•".repeat(Math.min(raw.length, 12));
+    if (element.secret) return masked(raw.length);
     if (element.type === "select" || element.type === "buttons") {
       return raw
         .split(VALUE_SEPARATOR)

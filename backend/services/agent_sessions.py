@@ -127,6 +127,7 @@ class AgentSession:
         self.todos: list[dict] = []
         self.rows: list[dict] = []
         self.attached: set[Path] = set()
+        self.released = False
         self.reader = acp_events.UpdateReader(self._share, self._watch)
         self._replaying = False
         self._replayed: list[dict] = []
@@ -181,6 +182,7 @@ class AgentSession:
         self.detail = detail
 
     async def open(self, resume: Optional[str] = None, signing_in: bool = False) -> None:
+        self.released = False
         self.status, self.reason, self.detail = CONNECTING, None, ""
         await self._announce()
         try:
@@ -588,7 +590,11 @@ class AgentSession:
         found = listing({"paths": [name]}, self.project_key)
         return found[0] if found else None
 
-    async def release(self) -> None:
+    @property
+    def holding(self) -> bool:
+        return self.connection is not None
+
+    async def release(self, linger: bool = True) -> None:
         for held in self._terminals.values():
             held.close()
         self._terminals.clear()
@@ -596,10 +602,11 @@ class AgentSession:
         connection, self.connection = self.connection, None
         self._emit = None
         self._ask = None
+        self.released = True
         if connection is not None:
             if self.session_id:
                 connection.unbind(self.session_id)
-            pool.give(connection)
+            pool.give(connection, linger)
 
 
 def runner(live: Any, session: AgentSession, text: str, files: list[str], seed_id: Optional[str]):

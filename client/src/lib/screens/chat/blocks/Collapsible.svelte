@@ -10,6 +10,7 @@
   interface Props {
     label: string;
     icon?: IconSource;
+    leading?: Snippet<[string]>;
     preview?: string | null;
     stat?: string | null;
     meta?: Snippet;
@@ -25,6 +26,7 @@
   const {
     label,
     icon: IconComponent,
+    leading,
     preview = null,
     stat = null,
     meta,
@@ -62,6 +64,7 @@
     <CollapsibleHead
       {label}
       icon={IconComponent}
+      {leading}
       {summary}
       {stat}
       {meta}

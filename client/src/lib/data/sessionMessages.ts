@@ -1,4 +1,4 @@
-import { toDismiss, toElement } from "$lib/services/chatSocket";
+import { agentRunOf, toDismiss, toElement } from "$lib/services/chatSocket";
 import { agentStopText } from "./agentModels";
 import {
   diffKindOf,
@@ -155,7 +155,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
         : null,
     thinkingTokens: type === "thinking" ? int(raw, "tokens") : null,
     toolMs: int(raw, "ms"),
-    agentRun: type === "agent" ? { model: text(raw, "model"), effort: text(raw, "effort") } : null,
+    agentRun: type === "agent" ? agentRunOf(raw) : null,
     agentResult: (() => {
       const done = raw.agent_result;
       if (type !== "agent" || typeof done !== "object" || done === null) return null;

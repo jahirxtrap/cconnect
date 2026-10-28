@@ -92,6 +92,15 @@ SCHEMA = {
             "type": "boolean",
             "description": "run, Claude accounts only: false to only get an answer, without reading anything. true when left out.",
         },
+        "model": {
+            "type": "string",
+            "description": (
+                "run: the model it works with, its own default when left out. A Claude account takes an alias such as "
+                "haiku, sonnet or opus, or a full model id. An agent over the Agent Client Protocol takes one of the "
+                "models it offers, and a name it does not offer comes back with the list. An agent CLI takes one only when "
+                "it was registered with model_args."
+            ),
+        },
         "name": {"type": "string", "description": "register and update: the name the user calls it by."},
         "kind": {
             "type": "string",
@@ -116,6 +125,14 @@ SCHEMA = {
             "type": "array",
             "items": {"type": "string"},
             "description": "register and update, command only: its arguments while it may act without asking, for a chat that bypasses permissions.",
+        },
+        "model_args": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                f"register and update, command only: the arguments that pick its model, added at the end only when a "
+                f"run asks for a model, with {delegates.MODEL_TOKEN} where the model goes. Take them from its own help."
+            ),
         },
         "description": {"type": "string", "description": "register and update: what it is good at, in one line."},
     },
@@ -286,6 +303,7 @@ def make_tools(context: dict) -> list:
         where, seen = cwd(), vis()
         mode = info().get("permission_mode") or delegate_runner.DEFAULT_MODE
         tools = args.get("tools") is not False
+        model = (args.get("model") or "").strip() or None
         steps = delegate_runs.follow(session_id, parent) if parent else []
 
         async def run(emit_to, ask_with) -> str:
@@ -296,7 +314,7 @@ def make_tools(context: dict) -> list:
 
             try:
                 return await delegate_runner.run(
-                    destination, task, delegate_runner.Turn(where, seen, report, mode, ask_with, tools)
+                    destination, task, delegate_runner.Turn(where, seen, report, mode, ask_with, tools, model)
                 )
             finally:
                 if parent:

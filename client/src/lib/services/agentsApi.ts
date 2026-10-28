@@ -18,6 +18,7 @@ import type { TerminalInfo } from "./terminalApi";
 type Wire = Record<string, unknown>;
 
 export const TASK_TOKEN = "{task}";
+export const MODEL_TOKEN = "{model}";
 
 export interface AgentList {
   agents: InstalledAgent[];
@@ -37,6 +38,7 @@ export interface CustomAgentFields {
   args: string[];
   edit_args: string[];
   bypass_args: string[];
+  model_args: string[];
   env?: Record<string, string>;
 }
 
@@ -81,8 +83,8 @@ export const createAgentsApi = (profile: () => Profile) => {
       return withToken(`${baseUrlOf(target)}/agents/${segment(id)}/icon`, target);
     },
 
-    async install(id: string, key: string) {
-      return outcome(await keyed(key).call<Wire>("POST", `/agents/${segment(id)}/install`, undefined, {}), toInstalledAgent);
+    async install(id: string) {
+      return outcome(await client.call<Wire>("POST", `/agents/${segment(id)}/install`, undefined, {}), toInstalledAgent);
     },
 
     async add(fields: CustomAgentFields, key: string) {
@@ -93,8 +95,8 @@ export const createAgentsApi = (profile: () => Profile) => {
       return outcome(await keyed(key).call<Wire>("PATCH", `/agents/${segment(id)}`, undefined, changes), toInstalledAgent);
     },
 
-    async remove(id: string, key: string) {
-      return outcome(await keyed(key).call<Wire>("DELETE", `/agents/${segment(id)}`), () => true);
+    async remove(id: string) {
+      return outcome(await client.call<Wire>("DELETE", `/agents/${segment(id)}`), () => true);
     },
 
     async env(id: string, key: string) {
@@ -103,8 +105,8 @@ export const createAgentsApi = (profile: () => Profile) => {
       );
     },
 
-    async log(id: string, key: string) {
-      return outcome(await keyed(key).call<Wire>("GET", `/agents/${segment(id)}/log`), (data) =>
+    async log(id: string) {
+      return outcome(await client.call<Wire>("GET", `/agents/${segment(id)}/log`), (data) =>
         Array.isArray(data.lines) ? data.lines.map(String) : [],
       );
     },

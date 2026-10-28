@@ -2,6 +2,7 @@ import {
   diffKindOf,
   sharedFilesFrom,
   VALUE_SEPARATOR,
+  type AgentRun,
   type ComponentCondition,
   type ComponentConfirm,
   type ComponentElement,
@@ -64,7 +65,7 @@ export type ServerEvent =
     }
   | { type: "activity"; state: string | null; resident: boolean }
   | { type: "agent_state"; state: AgentState }
-  | { type: "history"; items: Record<string, unknown>[] }
+  | { type: "history"; items: Record<string, unknown>[]; startIndex: number; hasMore: boolean }
   | { type: "stop"; reason: string | null; severity: string | null }
   | { type: "terminal_opened"; session: TerminalInfo }
   | { type: "assistant_text"; text: string }
@@ -109,14 +110,12 @@ export type ServerEvent =
     }
   | ({ type: "reloaded" } & Reload)
   | { type: "plan"; markdown: string }
-  | {
+  | ({
       type: "agent";
       id: string | null;
       subagentType: string | null;
       description: string | null;
-      model: string | null;
-      effort: string | null;
-    }
+    } & AgentRun)
   | { type: "task_running"; id: string | null; description: string | null }
   | {
       type: "agent_result";
@@ -235,11 +234,20 @@ const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw
 export const diffLinesOf = (raw: Wire): DiffLine[] =>
   list(raw, "diff_lines").map((line) => ({ kind: diffKindOf(text(line, "kind")), text: text(line, "text") ?? "" }));
 
+export const agentRunOf = (raw: Wire): AgentRun => {
+  const account = raw.account && typeof raw.account === "object" ? (raw.account as Wire) : null;
+  return {
+    model: text(raw, "model"),
+    effort: text(raw, "effort"),
+    agent: text(raw, "agent"),
+    account: account ? { provider: flag(account, "provider") } : null,
+  };
+};
+
 export const agentFieldsOf = (raw: Wire) => ({
   subagentType: text(raw, "subagent_type"),
   description: text(raw, "description"),
-  model: text(raw, "model"),
-  effort: text(raw, "effort"),
+  ...agentRunOf(raw),
 });
 const strings = (raw: Wire, key: string): string[] =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
@@ -840,7 +848,12 @@ export class ChatSocket {
       case "agent_state":
         return { type: "agent_state", state: toAgentState(wire) };
       case "history":
-        return { type: "history", items: list(wire, "items") };
+        return {
+          type: "history",
+          items: list(wire, "items"),
+          startIndex: int(wire, "start_index") ?? 0,
+          hasMore: flag(wire, "has_more"),
+        };
       case "stop":
         return { type: "stop", reason: text(wire, "reason"), severity: text(wire, "severity") };
       case "compact":

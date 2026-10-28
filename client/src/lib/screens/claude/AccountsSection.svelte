@@ -1,7 +1,5 @@
 <script lang="ts">
-  import CircleUser from "@lucide/svelte/icons/circle-user";
   import ClipboardPaste from "@lucide/svelte/icons/clipboard-paste";
-  import Component from "@lucide/svelte/icons/component";
   import { t } from "$lib/i18n/index.svelte";
   import { copyText, pasteText } from "$lib/platform/clipboard";
   import { openExternal } from "$lib/platform";
@@ -13,6 +11,7 @@
   import { accountSummary, scopeLabel } from "$lib/screens/settings/settingsValues";
   import { accountsApi, type Account, type ProviderProbe } from "$lib/services/accountsApi";
   import { settingsApi } from "$lib/services/settingsApi";
+  import { accountIcon } from "$lib/ui/accountIcon";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -21,6 +20,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -218,7 +218,7 @@
 <SettingsGroup label={t("ACCOUNTS")}>
   {#each accounts as account (account.id)}
     <PreferenceRow
-      icon={account.provider ? Component : CircleUser}
+      icon={accountIcon(!!account.provider)}
       title={account.label}
       summary={accountSummary(account)}
       alert={loginError === account.id ? t("ACCOUNT_LOGIN_FAILED") : null}
@@ -374,7 +374,7 @@
       <LoadingIndicator size={16} class="mt-3" />
     {/if}
     {#if importFailed}
-      <p class="mt-2 text-body-sm text-red">{t("ACCOUNT_IMPORT_FAILED")}</p>
+      <ErrorText text={t("ACCOUNT_IMPORT_FAILED")} class="mt-2" />
     {/if}
   </CompactDialog>
   <input
@@ -452,7 +452,7 @@
         </div>
       </CardPanel>
     {:else if probe && !probing}
-      <p class="mt-3 text-body-sm text-red">{t("ACCOUNT_PROVIDER_MISSING")}</p>
+      <ErrorText text={t("ACCOUNT_PROVIDER_MISSING")} class="mt-3" />
     {/if}
     <div class="mt-3 flex flex-col gap-2.5">
       {#if probing}

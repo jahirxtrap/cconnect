@@ -259,13 +259,13 @@ class ConnectionPool:
                 connection.expiry = None
             return connection
 
-    def give(self, connection: AgentConnection) -> None:
+    def give(self, connection: AgentConnection, linger: bool = True) -> None:
         connection.users -= 1
         if connection.users <= 0 and connection.expiry is None:
-            connection.expiry = asyncio.create_task(self._expire(connection))
+            connection.expiry = asyncio.create_task(self._expire(connection, persistent_sessions.grace() if linger else 0.0))
 
-    async def _expire(self, connection: AgentConnection) -> None:
-        await asyncio.sleep(persistent_sessions.grace())
+    async def _expire(self, connection: AgentConnection, delay: float) -> None:
+        await asyncio.sleep(delay)
         connection.expiry = None
         if connection.users > 0:
             return

@@ -2399,7 +2399,7 @@ export class ChatState {
             text: event.description ?? "",
             toolName: event.subagentType,
             toolUseId: event.id,
-            agentRun: { model: event.model, effort: event.effort },
+            agentRun: { model: event.model, effort: event.effort, agent: event.agent, account: event.account },
           }),
         );
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];
@@ -2531,8 +2531,9 @@ export class ChatState {
         this.#assistantId = null;
         this.#thinkingId = null;
         this.expandedIds = {};
-        this.oldestLoadedIndex = null;
-        this.transcriptExhausted = true;
+        this.oldestLoadedIndex = event.startIndex;
+        this.transcriptExhausted = !event.hasMore;
+        this.transcriptPaging = false;
         this.transcriptLoading = this.#awaitingHistory();
         break;
       }

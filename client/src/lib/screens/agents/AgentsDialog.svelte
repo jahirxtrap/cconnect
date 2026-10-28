@@ -10,7 +10,7 @@
     type InstalledAgent,
   } from "$lib/data/agentModels";
   import { joined } from "$lib/data/format";
-  import { KeyGate, keyRefused } from "$lib/data/keyGate.svelte";
+  import { KeyGate } from "$lib/data/keyGate.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { agents } from "$lib/services/agents.svelte";
   import { createAgentsApi } from "$lib/services/agentsApi";
@@ -21,6 +21,7 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import IconTile, { TILE_ICON_SIZE } from "$lib/ui/IconTile.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
@@ -76,20 +77,20 @@
 
   const iconOf = (item: CatalogAgent) => (item.icon ? api.catalogIconUrl(item.icon) : null);
 
-  const act = async (action: (key: string) => Promise<{ ok: boolean; status: number; failure: AgentFailure | null }>) => {
+  const act = async (action: () => Promise<{ ok: boolean; failure: AgentFailure | null }>) => {
     busy = true;
     failed = null;
-    const result = await gate.run(action);
+    const result = await action();
     if (result.ok) await refresh();
-    else if (!keyRefused(result)) failed = describe(result.failure);
+    else failed = describe(result.failure);
     busy = false;
   };
 
-  const install = (id: string) => act((key) => api.install(id, key));
+  const install = (id: string) => act(() => api.install(id));
 
   const remove = (agent: InstalledAgent) => {
     removing = null;
-    return act((key) => api.remove(agent.id, key));
+    return act(() => api.remove(agent.id));
   };
 </script>
 
@@ -107,7 +108,7 @@
   {/snippet}
   <div class="flex w-full flex-col [--page-inset:0px]">
     {#if failed}
-      <p class="pb-2 text-body-sm wrap-anywhere whitespace-pre-wrap text-error">{failed}</p>
+      <ErrorText text={failed} class="pb-2" />
     {/if}
     <SectionHeader label={t("AGENTS_INSTALLED")} />
     {#if !listed}
@@ -157,7 +158,7 @@
     </div>
     <SectionHeader label={t("AGENTS_AVAILABLE")} divider />
     {#if catalogFailed}
-      <p class="py-2 text-body-sm wrap-anywhere whitespace-pre-wrap text-error">{catalogFailed}</p>
+      <ErrorText text={catalogFailed} class="py-2" />
     {:else if !catalog}
       <CenteredProgress class="py-3" />
     {:else}

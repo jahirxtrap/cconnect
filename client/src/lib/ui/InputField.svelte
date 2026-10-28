@@ -6,6 +6,7 @@
   import type { Snippet } from "svelte";
   import type { HTMLInputAttributes } from "svelte/elements";
   import { t } from "$lib/i18n/index.svelte";
+  import ErrorText from "./ErrorText.svelte";
   import { FIELD_ACTIONS_CLASS, FIELD_ACTIONS_GAP, FIELD_BOX_CLASS, FIELD_INPUT_CLASS, FIELD_LABEL_CLASS } from "./field";
 
   interface Props {
@@ -24,6 +25,7 @@
     url?: boolean;
     enterKeyHint?: HTMLInputAttributes["enterkeyhint"];
     enabled?: boolean;
+    readonly?: boolean;
     error?: string | null;
     onClear?: (() => void) | null;
     clearAlways?: boolean;
@@ -48,6 +50,7 @@
     url = false,
     enterKeyHint,
     enabled = true,
+    readonly = false,
     error = null,
     onClear = null,
     clearAlways = false,
@@ -100,6 +103,7 @@
           spellcheck={url ? false : undefined}
           enterkeyhint={enterKeyHint}
           disabled={!enabled}
+          {readonly}
           {value}
           {placeholder}
           {onkeydown}
@@ -120,6 +124,7 @@
         {/if}
         <textarea
           bind:this={field}
+          {readonly}
           {value}
           {onkeydown}
           rows={Math.max(1, Math.round(minLines))}
@@ -166,6 +171,6 @@
     {/if}
   </div>
   {#if error}
-    <p class="mt-1 text-body-sm text-error">{error}</p>
+    <ErrorText text={error} class="mt-1" />
   {/if}
 </div>

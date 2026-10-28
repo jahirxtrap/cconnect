@@ -29,6 +29,7 @@ class CustomAgent(BaseModel):
     args: list[str] = []
     edit_args: list[str] = []
     bypass_args: list[str] = []
+    model_args: list[str] = []
     env: dict[str, str] = {}
 
 
@@ -40,6 +41,7 @@ class AgentChanges(BaseModel):
     args: Optional[list[str]] = None
     edit_args: Optional[list[str]] = None
     bypass_args: Optional[list[str]] = None
+    model_args: Optional[list[str]] = None
     env: Optional[dict[str, str]] = None
     enabled: Optional[bool] = None
 
@@ -114,9 +116,7 @@ def agent_icon(agent_id: str):
 
 
 @router.post("/agents/{agent_id}/install")
-async def install_agent(agent_id: str, x_security_key: str = Header("")):
-    if not key_matches(x_security_key):
-        return api_response(status=403)
+async def install_agent(agent_id: str):
     await pool.restart(agent_id)
     try:
         installed = await asyncio.to_thread(agents.install, agent_id)
@@ -127,7 +127,7 @@ async def install_agent(agent_id: str, x_security_key: str = Header("")):
 
 @router.post("/agents")
 def add_agent(body: CustomAgent, x_security_key: str = Header("")):
-    if not key_matches(x_security_key):
+    if body.env and not key_matches(x_security_key):
         return api_response(status=403)
     fields = body.model_dump(exclude={"env"})
     return api_response(data=_listed(agents.add({
@@ -141,10 +141,10 @@ def add_agent(body: CustomAgent, x_security_key: str = Header("")):
 
 @router.patch("/agents/{agent_id}")
 async def change_agent(agent_id: str, body: AgentChanges, x_security_key: str = Header("")):
-    if not key_matches(x_security_key):
-        return api_response(status=403)
     changes = body.model_dump(exclude_none=True)
     if "env" in changes:
+        if not key_matches(x_security_key):
+            return api_response(status=403)
         changes["user_env"] = changes.pop("env")
     updated = agents.update(agent_id, changes)
     if updated is None:
@@ -154,9 +154,7 @@ async def change_agent(agent_id: str, body: AgentChanges, x_security_key: str = 
 
 
 @router.delete("/agents/{agent_id}")
-async def remove_agent(agent_id: str, x_security_key: str = Header("")):
-    if not key_matches(x_security_key):
-        return api_response(status=403)
+async def remove_agent(agent_id: str):
     await pool.restart(agent_id)
     if agents.remove(agent_id) is None:
         raise HTTPException(status_code=404, detail="not found")
@@ -174,9 +172,7 @@ def agent_env(agent_id: str, x_security_key: str = Header("")):
 
 
 @router.get("/agents/{agent_id}/log")
-def agent_log(agent_id: str, x_security_key: str = Header("")):
-    if not key_matches(x_security_key):
-        return api_response(status=403)
+def agent_log(agent_id: str):
     return api_response(data={"lines": pool.log(agent_id)})
 
 

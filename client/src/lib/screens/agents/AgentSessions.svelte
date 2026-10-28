@@ -7,6 +7,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { createAgentsApi, type AgentSessionPage } from "$lib/services/agentsApi";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -63,7 +64,7 @@
 
 <PopupMenu
   {open}
-  label={t("AGENT_SESSIONS")}
+  label={t("SESSIONS")}
   align="end"
   onOpenChange={(value) => {
     open = value;
@@ -71,12 +72,12 @@
   }}
 >
   {#snippet triggerChild(props)}
-    <TooltipIconButton label={t("AGENT_SESSIONS")} {...props}>
+    <TooltipIconButton label={t("SESSIONS")} {...props}>
       <History />
     </TooltipIconButton>
   {/snippet}
   {#if failed}
-    <p class="px-2.5 py-1.5 text-body-sm wrap-anywhere text-error">{failed}</p>
+    <ErrorText text={failed} class="px-2.5 py-1.5" />
   {:else if !page}
     <MenuItem text={t("LOADING")} enabled={false} />
   {:else}

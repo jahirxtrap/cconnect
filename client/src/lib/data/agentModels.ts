@@ -98,6 +98,7 @@ export interface InstalledAgent {
   args: string[];
   editArgs: string[];
   bypassArgs: string[];
+  modelArgs: string[];
   envNames: string[];
   enabled: boolean;
   icon: boolean;
@@ -236,6 +237,7 @@ export const toInstalledAgent = (raw: Wire): InstalledAgent => ({
   args: strings(raw, "args"),
   editArgs: strings(raw, "edit_args"),
   bypassArgs: strings(raw, "bypass_args"),
+  modelArgs: strings(raw, "model_args"),
   envNames: strings(raw, "env"),
   enabled: raw.enabled !== false,
   icon: flag(raw, "icon"),

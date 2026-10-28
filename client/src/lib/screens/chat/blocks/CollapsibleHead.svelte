@@ -9,6 +9,7 @@
   interface Props {
     label: string;
     icon?: IconSource;
+    leading?: Snippet<[string]>;
     summary?: string;
     stat?: string | null;
     meta?: Snippet;
@@ -22,6 +23,7 @@
   const {
     label,
     icon: IconComponent,
+    leading,
     summary = "",
     stat = null,
     meta,
@@ -45,7 +47,9 @@
     ? 'cursor-default'
     : 'cursor-pointer hover:bg-hover'}"
 >
-  {#if IconComponent}
+  {#if leading}
+    {@render leading(`${GLYPH} ${colors.icon}`)}
+  {:else if IconComponent}
     <IconComponent class="{GLYPH} {colors.icon}" />
   {/if}
   <span class="min-w-0 flex-1 truncate text-block {summary ? colors.preview : colors.label}"

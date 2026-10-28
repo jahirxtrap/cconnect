@@ -1,6 +1,4 @@
 <script lang="ts">
-  import CircleUser from "@lucide/svelte/icons/circle-user";
-  import Component from "@lucide/svelte/icons/component";
   import Gauge from "@lucide/svelte/icons/gauge";
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Radio from "@lucide/svelte/icons/radio";
@@ -9,6 +7,7 @@
   import type { LimitWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
   import { contextWindowFor, effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
+  import { accountIcon } from "$lib/ui/accountIcon";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import { MENU_ICON_SIZE } from "$lib/ui/menuSurface";
   import { LINK_LOOKS } from "$lib/ui/linkStatus";
@@ -122,7 +121,7 @@
   );
   const activeAccount = $derived(capabilities?.accounts?.find((item) => item.id === account));
   const accountLabel = $derived(activeAccount?.label ?? account);
-  const AccountIcon = $derived(activeAccount?.provider ? Component : CircleUser);
+  const AccountIcon = $derived(accountIcon(!!activeAccount?.provider));
 
   const modelsAvailable = $derived((capabilities?.models.length ?? 0) > 0);
   const modelLabel = $derived(capabilities?.models.find((item) => item.id === model)?.label ?? model);

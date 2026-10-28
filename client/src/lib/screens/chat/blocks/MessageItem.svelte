@@ -194,7 +194,12 @@
       toolName: fields.subagentType ?? message.toolName,
       agentRun:
         fields.model || fields.effort
-          ? { model: fields.model ?? message.agentRun?.model ?? null, effort: fields.effort ?? message.agentRun?.effort ?? null }
+          ? {
+              model: fields.model ?? message.agentRun?.model ?? null,
+              effort: fields.effort ?? message.agentRun?.effort ?? null,
+              agent: message.agentRun?.agent ?? null,
+              account: message.agentRun?.account ?? null,
+            }
           : message.agentRun,
     }}
     {running}

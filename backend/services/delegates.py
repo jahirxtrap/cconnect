@@ -9,6 +9,7 @@ from services import accounts, agents
 TOOL = "delegate"
 TOOL_ID = f"mcp__cconnect__{TOOL}"
 TASK_TOKEN = "{task}"
+MODEL_TOKEN = "{model}"
 ACCOUNT = "account"
 ACCOUNT_PREFIX = "account:"
 LEGACY_PROTOCOLS = {"acp": agents.ACP, "command": agents.COMMAND}
@@ -43,12 +44,21 @@ def find(ident: str) -> Optional[dict]:
     return next((_agent(agent) for agent in agents.enabled() if agent["id"] == ident), None)
 
 
+def _account_entry(ident: str) -> Optional[dict]:
+    account = ident[len(ACCOUNT_PREFIX):]
+    return next((item for item in accounts.list_accounts() if item["id"] == account), None)
+
+
 def _name_of(ident: str) -> Optional[str]:
     if ident.startswith(ACCOUNT_PREFIX):
-        account = ident[len(ACCOUNT_PREFIX):]
-        return next((item["label"] for item in accounts.list_accounts() if item["id"] == account), None)
+        found = _account_entry(ident)
+        return found["label"] if found else None
     agent = agents.find(ident)
     return agent["name"] if agent else None
+
+
+def _destination(raw_input: Any) -> str:
+    return str(raw_input.get("destination") or "") if isinstance(raw_input, dict) else ""
 
 
 def label_of(raw_input: Any) -> tuple[Optional[str], Optional[str]]:
@@ -57,8 +67,19 @@ def label_of(raw_input: Any) -> tuple[Optional[str], Optional[str]]:
     if raw_input.get("action") == "register":
         line = " ".join([str(raw_input.get("command") or ""), *map(str, raw_input.get("args") or [])]).strip()
         return raw_input.get("name") or None, line or None
-    ident = str(raw_input.get("destination") or "")
+    ident = _destination(raw_input)
     return _name_of(ident) or ident or None, raw_input.get("task")
+
+
+def agent_of(raw_input: Any) -> Optional[str]:
+    ident = _destination(raw_input)
+    return ident if ident and not ident.startswith(ACCOUNT_PREFIX) else None
+
+
+def account_of(raw_input: Any) -> Optional[dict]:
+    ident = _destination(raw_input)
+    found = _account_entry(ident) if ident.startswith(ACCOUNT_PREFIX) else None
+    return {"provider": found["provider"] is not None} if found else None
 
 
 def migrate() -> None:

@@ -14,6 +14,11 @@ interface Stored {
   kept?: Record<string, Kept>;
 }
 
+interface Held {
+  chat: ChatState;
+  stop: () => void;
+}
+
 const stored = (): Stored => {
   try {
     return JSON.parse(settings.agentPane || "{}") as Stored;
@@ -30,7 +35,7 @@ class AgentPane {
   agent = $state<string | null>(stored().agent ?? null);
 
   #kept: Record<string, Kept> = stored().kept ?? {};
-  #states = new Map<string, ChatState>();
+  #held = new Map<string, Held>();
 
   select(agent: string) {
     this.agent = agent;
@@ -42,16 +47,16 @@ class AgentPane {
   }
 
   syncVisibility() {
-    for (const chat of this.#states.values()) chat.syncVisibility();
+    for (const { chat } of this.#held.values()) chat.syncVisibility();
   }
 
   stateFor(environmentId: string | null, agent: string): ChatState {
     const key = keyOf(environmentId, agent);
-    const existing = this.#states.get(key);
-    if (existing) return existing;
+    const existing = this.#held.get(key);
+    if (existing) return existing.chat;
     const kept = this.#kept[key];
     let created!: ChatState;
-    $effect.root(() => {
+    const stop = $effect.root(() => {
       created = new ChatState({
         environmentId,
         sessionId: kept?.session ?? null,
@@ -73,8 +78,17 @@ class AgentPane {
         });
       });
     });
-    this.#states.set(key, created);
+    this.#held.set(key, { chat: created, stop });
     return created;
+  }
+
+  letGo(chat: ChatState) {
+    for (const [key, held] of this.#held) {
+      if (held.chat !== chat) continue;
+      this.#held.delete(key);
+      held.stop();
+      chat.dispose();
+    }
   }
 
   #keep(key: string, session: string, cwd: string) {

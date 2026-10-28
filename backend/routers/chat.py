@@ -43,6 +43,7 @@ from services import sessions as sessions_service
 from services import settings_store, visibility
 from services import todos as todos_store
 from services.claude_runtime import run_prompt
+from services.event_rows import page_start, visible_rows
 from services.live_sessions import registry
 
 router = APIRouter(tags=["Chat"])
@@ -414,9 +415,8 @@ async def chat_ws(ws: WebSocket):
                     state.cwd = msg.cwd or DEFAULT_CWD
                     state.session_id = msg.resume
                     session = registry.create(state)
-                    agent = agent_sessions.AgentSession(msg.agent, state.cwd, sessions_service.project_key_for(state.cwd))
-                    session.bind_agent(agent)
-                    spawn(agent.open(msg.resume))
+                    session.bind_agent(agent_sessions.AgentSession(msg.agent, state.cwd, sessions_service.project_key_for(state.cwd)))
+                    spawn(session.open_agent(msg.resume))
                 else:
                     state = _Session()
                     resumed_cwd = sessions_service.find_session_cwd(msg.resume) if msg.resume else None
@@ -453,6 +453,7 @@ async def chat_ws(ws: WebSocket):
                         await sink({**session.agent.history(), "channel": session.channel})
                 await session.attach(sink, last_seq=msg.last_seq, since_committed=bool(by_session), prefs=seen)
                 if session.agent is not None:
+                    session.wake_agent()
                     if not session.running and session.agent.todos:
                         await send({"type": "todos", "items": session.agent.todos})
                 elif not session.running and session.state.session_id:
@@ -679,7 +680,10 @@ async def chat_ws(ws: WebSocket):
                     await send({"type": "error", "message": "invalid limit"})
                     continue
                 try:
-                    items = sessions_service.get_session_messages(project, sid, seen["prefs"])
+                    if session is not None and session.agent is not None and sid == session.agent.session_id:
+                        items = visible_rows(session.agent.rows, seen["prefs"])
+                    else:
+                        items = sessions_service.get_session_messages(project, sid, seen["prefs"])
                 except ValueError as exc:
                     await send({"type": "error", "message": str(exc)})
                     continue
@@ -687,7 +691,7 @@ async def chat_ws(ws: WebSocket):
                     items = blocks.degrade_items(items)
                 total = len(items)
                 end = total if before_index is None else max(0, min(before_index, total))
-                start = sessions_service.page_start(items, end, limit)
+                start = page_start(items, end, limit)
                 slice_ = [dict(item, index=i) for i, item in enumerate(items[start:end], start=start)]
                 await send({
                     "type": "history_chunk",

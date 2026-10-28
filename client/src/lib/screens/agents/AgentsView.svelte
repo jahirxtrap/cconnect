@@ -39,6 +39,13 @@
   const selected = $derived(usable.find((agent) => agent.id === agentPane.agent) ?? usable[0] ?? null);
   const chat = $derived(selected ? agentPane.stateFor(backend.activeId, selected.id) : null);
   const iconOf = (id: string) => agents.iconOf(profile, id);
+
+  $effect(() => {
+    const shown = chat;
+    return () => {
+      if (shown) agentPane.letGo(shown);
+    };
+  });
 </script>
 
 {#snippet switcher()}

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Lock from "@lucide/svelte/icons/lock";
   import { untrack } from "svelte";
   import {
     AGENT_PROTOCOLS,
@@ -9,18 +10,27 @@
     type AgentProtocol,
     type InstalledAgent,
   } from "$lib/data/agentModels";
-  import { joined, linesOf } from "$lib/data/format";
+  import { joined, linesOf, masked } from "$lib/data/format";
   import { keyRefused, type KeyGate } from "$lib/data/keyGate.svelte";
+  import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { agents } from "$lib/services/agents.svelte";
-  import { createAgentsApi, TASK_TOKEN, type AgentChanges, type CustomAgentFields } from "$lib/services/agentsApi";
+  import {
+    createAgentsApi,
+    MODEL_TOKEN,
+    TASK_TOKEN,
+    type AgentChanges,
+    type CustomAgentFields,
+  } from "$lib/services/agentsApi";
   import { backend } from "$lib/services/backend.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import AgentLogDialog from "./AgentLogDialog.svelte";
   import { AGENT_KIND_LABELS, AGENT_PROTOCOL_LABELS } from "./agentLabels";
 
@@ -42,8 +52,10 @@
   let args = $state(initial?.args.join("\n") ?? "");
   let editArgs = $state(initial?.editArgs.join("\n") ?? "");
   let bypassArgs = $state(initial?.bypassArgs.join("\n") ?? "");
+  let modelArgs = $state(initial?.modelArgs.join("\n") ?? "");
   let enabled = $state(initial?.enabled ?? true);
   let env = $state<string | null>(initial?.envNames.length ? null : "");
+  let locked = $state(false);
   let loadedEnv = "";
   let failed = $state<string | null>(null);
   let saving = $state(false);
@@ -58,22 +70,24 @@
   const subtitle = $derived(
     agent && !custom ? joined(agent.version && t("VERSION_LABEL", agent.version), kindLabel && t(kindLabel)) : null,
   );
+  const hiddenEnv = $derived(agent?.envNames.map((envName) => `${envName}=${masked()}`).join("\n") ?? "");
 
   const report = (failure: AgentFailure | null) => {
     failed = failure ? agentFailureText(failure) : t("CONNECTION_ERROR");
   };
 
-  const loadEnv = async () => {
+  const loadEnv = async (ask: boolean) => {
     if (!agent) return;
     const id = agent.id;
-    const result = await gate.run((key) => api.env(id, key));
+    const result = ask ? await gate.run((key) => api.env(id, key)) : await api.env(id, securityKeys.current);
+    locked = keyRefused(result);
     if (result.ok) {
       loadedEnv = envText(result.value);
       env = loadedEnv;
-    } else if (!keyRefused(result)) report(result.failure);
+    } else if (!locked) report(result.failure);
   };
 
-  if (initial?.envNames.length) void loadEnv();
+  if (initial?.envNames.length) void loadEnv(false);
 
   const fields = (): CustomAgentFields => ({
     name: name.trim(),
@@ -83,6 +97,7 @@
     args: linesOf(args),
     edit_args: command ? linesOf(editArgs) : [],
     bypass_args: command ? linesOf(bypassArgs) : [],
+    model_args: command ? linesOf(modelArgs) : [],
   });
 
   const changed = (current: Partial<CustomAgentFields>, saved: Partial<CustomAgentFields>): AgentChanges =>
@@ -99,6 +114,7 @@
       args: target.args,
       edit_args: target.editArgs,
       bypass_args: target.bypassArgs,
+      model_args: target.modelArgs,
     }),
     ...(env !== null && env !== loadedEnv ? { env: envOf(env) } : {}),
     ...(enabled !== target.enabled ? { enabled } : {}),
@@ -166,23 +182,35 @@
           />
           <p class="text-body-sm text-on-surface-variant">{t("AGENT_MODE_ARGS_HINT")}</p>
         </div>
+        <div class="flex flex-col gap-1.5">
+          <InputField
+            value={modelArgs}
+            oninput={(value) => (modelArgs = value)}
+            label={t("AGENT_MODEL_ARGS")}
+            optional
+            minLines={2}
+          />
+          <p class="text-body-sm text-on-surface-variant">{t("AGENT_MODEL_ARGS_HINT", MODEL_TOKEN)}</p>
+        </div>
       {/if}
     {/if}
-    {#if env === null}
-      <div class="flex flex-col gap-1.5">
-        <p class="text-body-sm text-on-surface-variant">{t("AGENT_ENV_KEPT", agent?.envNames.join(", ") ?? "")}</p>
-        <ActionButton text={t("UNLOCK")} onclick={() => void loadEnv()} />
-      </div>
-    {:else}
-      <InputField
-        value={env}
-        oninput={(value) => (env = value)}
-        label={t("AGENT_ENV")}
-        placeholder={t("AGENT_ENV_PLACEHOLDER")}
-        optional
-        minLines={2}
-      />
-    {/if}
+    <InputField
+      value={env ?? hiddenEnv}
+      oninput={(value) => (env = value)}
+      readonly={env === null}
+      label={t("AGENT_ENV")}
+      placeholder={t("AGENT_ENV_PLACEHOLDER")}
+      optional
+      minLines={2}
+    >
+      {#snippet trailing()}
+        {#if locked}
+          <TooltipIconButton label={t("UNLOCK")} onclick={() => void loadEnv(true)}>
+            <Lock />
+          </TooltipIconButton>
+        {/if}
+      {/snippet}
+    </InputField>
     {#if agent}
       <SwitchRow
         title={t("AGENT_ENABLED")}
@@ -195,11 +223,11 @@
       {/if}
     {/if}
     {#if failed}
-      <p class="text-body-sm wrap-anywhere whitespace-pre-wrap text-error">{failed}</p>
+      <ErrorText text={failed} />
     {/if}
   </div>
 </CompactDialog>
 
 {#if logOpen && agent}
-  <AgentLogDialog {agent} {gate} onDismiss={() => (logOpen = false)} />
+  <AgentLogDialog {agent} onDismiss={() => (logOpen = false)} />
 {/if}

@@ -1,8 +1,11 @@
 <script lang="ts">
-  import Bot from "@lucide/svelte/icons/bot";
   import type { ChatMessage } from "$lib/data/chatModels";
   import { formatDuration, formatTokens, joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
+  import { agents } from "$lib/services/agents.svelte";
+  import { contextServer } from "$lib/services/serverContext";
+  import { accountIcon } from "$lib/ui/accountIcon";
+  import AgentIcon from "$lib/screens/agents/AgentIcon.svelte";
   import Collapsible from "./Collapsible.svelte";
   import MessageItem from "./MessageItem.svelte";
 
@@ -21,6 +24,12 @@
     onToggle = null,
     onSharedLink,
   }: Props = $props();
+
+  const server = contextServer();
+
+  const account = $derived(message.agentRun?.account ?? null);
+  const delegated = $derived(!!account || !!message.agentRun?.agent);
+  const logo = $derived(agents.iconOf(server(), message.agentRun?.agent ?? null));
 
   const keyed = (prefix: string, value: string, fallback: string) => {
     const key = `${prefix}${value.toUpperCase().replace(/-/g, "_")}`;
@@ -42,9 +51,18 @@
   });
 </script>
 
+{#snippet agentLogo(glyph: string)}
+  <AgentIcon url={logo} class={glyph} />
+{/snippet}
+
 <Collapsible
-  label={message.toolName ? keyed("AGENT_TYPE_", message.toolName, message.toolName) : t("AGENT")}
-  icon={Bot}
+  label={message.toolName
+    ? delegated
+      ? message.toolName
+      : keyed("AGENT_TYPE_", message.toolName, message.toolName)
+    : t("AGENT")}
+  icon={account ? accountIcon(account.provider) : undefined}
+  leading={account ? undefined : agentLogo}
   preview={message.text}
   {stat}
   labelOnly={!message.children.length}

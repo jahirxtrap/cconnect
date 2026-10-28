@@ -8,6 +8,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import AgentsDialog from "$lib/screens/agents/AgentsDialog.svelte";
@@ -91,7 +92,7 @@
         <MarkdownText text={problem} dense class="selectable mt-1 text-on-surface-variant" />
       {/if}
       {#if failed}
-        <p class="mt-1 text-body-sm wrap-anywhere text-error">{failed}</p>
+        <ErrorText text={failed} class="mt-1" />
       {/if}
       <div class="mt-2 flex flex-wrap gap-2">
         {#if signIn}

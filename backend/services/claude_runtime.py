@@ -334,7 +334,13 @@ def _agent_input(name: str, raw_input: dict) -> dict:
     if name != delegates.TOOL_ID:
         return raw_input
     label, task = delegates.label_of(raw_input)
-    return {"subagent_type": label, "description": task}
+    return {
+        "subagent_type": label,
+        "description": task,
+        "model": raw_input.get("model"),
+        "agent": delegates.agent_of(raw_input),
+        "account": delegates.account_of(raw_input),
+    }
 
 
 def _agent_event(block_id: Any, raw_input: dict) -> dict:
@@ -345,6 +351,8 @@ def _agent_event(block_id: Any, raw_input: dict) -> dict:
         "description": raw_input.get("description"),
         "model": raw_input.get("model"),
         "effort": raw_input.get("effort"),
+        "agent": raw_input.get("agent"),
+        "account": raw_input.get("account"),
     }
 
 

@@ -57,6 +57,10 @@ export const linesOf = (text: string): string[] =>
     .map((line) => line.trim())
     .filter(Boolean);
 
+const MASK_LENGTH = 12;
+
+export const masked = (length = MASK_LENGTH): string => "•".repeat(Math.min(length, MASK_LENGTH));
+
 export const formatDecimal = (value: number, decimals: number, minimum = decimals): string =>
   value.toLocaleString(undefined, { minimumFractionDigits: minimum, maximumFractionDigits: decimals });
 
