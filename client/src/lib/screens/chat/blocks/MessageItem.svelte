@@ -59,6 +59,7 @@
     onSuggest?: SuggestionPicker | null;
     component?: Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     mods?: ModSurface | null;
+    timestamps?: boolean;
   }
 
   const SPINNER_ID = "spinner";
@@ -81,6 +82,7 @@
     onSuggest = null,
     component,
     mods = null,
+    timestamps = true,
   }: Props = $props();
 
   const server = contextServer();
@@ -107,7 +109,7 @@
 {#snippet userRow(props: Record<string, unknown>)}
   {@const content = userContent(message, server())}
   {@const body = typeof props.text === "string" ? props.text : content.body}
-  {@const showTime = message.timestamp !== null && settings.showTimestamps}
+  {@const showTime = timestamps && message.timestamp !== null && settings.showTimestamps}
   {@const chips = content.attachments.length + content.elements.length}
   {@const corners = joinedCorners(prevRole === "user", nextRole === "user", "panel")}
   <div class="w-full px-(--page-inset)">

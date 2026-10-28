@@ -655,7 +655,6 @@ def runner(live: Any, session: AgentSession, text: str, files: list[str], seed_i
                     "ids": [item["id"]] if item.get("id") else [],
                     "text": item["text"],
                     "consumed": 0,
-                    "ts": int(time.time() * 1000),
                 }
                 live.set_transport(session)
                 for event in await session.prompt(item["text"], item.get("attachments") or []):

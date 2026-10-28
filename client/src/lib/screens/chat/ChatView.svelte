@@ -492,6 +492,7 @@
           onSharedMenu={(url, filename) => (sharedLink = { url, filename })}
           onSuggest={pickSuggestion}
           sessionId={chat.sessionId}
+          timestamps={!chat.agent}
           mods={chat.mods}
           expandedIds={chat.expandedIds}
           savedTop={chat.scrollTop}

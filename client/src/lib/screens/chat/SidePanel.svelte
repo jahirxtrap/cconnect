@@ -194,6 +194,7 @@
             {onAnswer}
             {component}
             onSuggest={index > lastUserAt ? onSuggest : null}
+            timestamps={false}
           />
         </div>
       {/each}

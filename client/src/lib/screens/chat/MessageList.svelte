@@ -45,6 +45,7 @@
     component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     bottomInset?: number;
     mods?: ModSurface | null;
+    timestamps?: boolean;
   }
 
   let {
@@ -68,6 +69,7 @@
     component,
     bottomInset = 0,
     mods = null,
+    timestamps = true,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -180,7 +182,7 @@
 
   const newDays = $derived.by(() => {
     const opened = new Set<number>();
-    if (!settings.showTimestamps) return opened;
+    if (!timestamps || !settings.showTimestamps) return opened;
     let latest: number | null = null;
     for (const item of visible) {
       if (item.timestamp === null) continue;
@@ -266,6 +268,7 @@
     onSuggest={index > lastUserAt ? onSuggest : null}
     {component}
     {mods}
+    {timestamps}
   />
 {/snippet}
 
