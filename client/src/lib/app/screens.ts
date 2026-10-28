@@ -59,14 +59,14 @@ export const SCREENS: ScreenEntry[] = [
     kind: "mods",
     label: "MODS",
     icon: Puzzle,
-    open: () => panes.setKind("mods"),
+    open: () => panes.show("mods"),
     paneOnly: true,
   },
   {
     kind: "agents",
     label: "AGENTS",
     icon: BotMessageSquare,
-    open: () => panes.setKind("agents"),
+    open: () => panes.show("agents"),
     paneOnly: true,
   },
 ];
@@ -85,3 +85,5 @@ export type PaneView = Pick<ScreenEntry, "kind" | "label" | "icon">;
 export const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
 
 export const PANE_VIEWS: PaneView[] = [CHAT_VIEW, ...SCREENS];
+
+export const viewFor = (kind: RightKind): PaneView => PANE_VIEWS.find((view) => view.kind === kind) ?? CHAT_VIEW;

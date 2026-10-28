@@ -941,6 +941,7 @@
   "PANEL_LEFT": "Panneau de gauche",
   "PANEL_RIGHT": "Panneau de droite",
   "PANEL_VIEW": "Vue du panneau",
+  "SWAP_PANES": "Échanger les panneaux",
   "NEW_TAB": "Nouvel onglet",
   "CLOSE_TAB": "Fermer l’onglet",
   "LOCAL_SERVER_BAD_DIR": "Dossier non valide",

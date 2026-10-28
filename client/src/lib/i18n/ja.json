@@ -911,6 +911,7 @@
   "PANEL_LEFT": "左パネル",
   "PANEL_RIGHT": "右パネル",
   "PANEL_VIEW": "パネル表示",
+  "SWAP_PANES": "パネルを入れ替え",
   "NEW_TAB": "新しいタブ",
   "CLOSE_TAB": "タブを閉じる",
   "LOCAL_SERVER_BAD_DIR": "無効なフォルダー",

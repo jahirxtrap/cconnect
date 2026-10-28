@@ -12,6 +12,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { screenFor } from "$lib/app/screens";
   import { isEditing } from "$lib/data/paneFocus.svelte";
+  import { agentUp } from "$lib/data/agentModels";
   import { type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { liveLimits } from "$lib/data/liveLimits.svelte";
@@ -62,11 +63,13 @@
   import RewindDialog from "./RewindDialog.svelte";
   import PaneActions from "./PaneActions.svelte";
   import SidePanel from "./SidePanel.svelte";
-  import TabSwitcher from "./TabSwitcher.svelte";
+  import ChatTabSwitcher from "./ChatTabSwitcher.svelte";
   import BackgroundTasks from "./BackgroundTasks.svelte";
   import TaskIndicator from "./TaskIndicator.svelte";
   import { panes } from "./panes.svelte";
-  import { agentPane } from "$lib/screens/agents/agentPane.svelte";
+  import { paneRole } from "./paneSurface";
+  import AgentTabSwitcher from "$lib/screens/agents/AgentTabSwitcher.svelte";
+  import { agentTabs } from "$lib/screens/agents/agentTabs.svelte";
   import type { ChatState } from "./state.svelte";
   import { tabs } from "./tabs.svelte";
   import { drawer } from "./drawer.svelte";
@@ -208,7 +211,10 @@
         : !chat.capabilitiesReady || chat.switchingAccount || !chat.capabilities?.models.length),
   );
   const actionsEnabled = $derived(!chat.agent || !blocked);
-  const resumable = $derived(!!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume));
+  const pane = paneRole() ?? "center";
+  const chatsWindow = $derived(
+    !!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume) && !panes.historyInList(pane),
+  );
   const canAttach = $derived(!chat.sideOpen && actionsEnabled);
 
   const availableCommands = $derived.by(() => {
@@ -234,7 +240,7 @@
       return { dot: look.dot, spinner: look.spinner, text: t(look.text) };
     }
     if (agentStatus === "auth") return { dot: "bg-orange", spinner: false, text: t("AGENT_SIGN_IN_NEEDED") };
-    if (agentStatus !== "ready") return { dot: "bg-red", spinner: false, text: t("AGENT_UNAVAILABLE") };
+    if (!agentUp(agentStatus)) return { dot: "bg-red", spinner: false, text: t("AGENT_UNAVAILABLE") };
     if (activity === "waiting") return { dot: "bg-orange", spinner: false, text: t("WAITING_USER") };
     if (activity === "compacting") return { dot: "bg-gray", spinner: true, tone: "text-blue", text: t("COMPACTING") };
     if (activity === "retrying") return { dot: "bg-gray", spinner: true, tone: "text-yellow", text: t("WORKING") };
@@ -280,7 +286,7 @@
         chat.mods.act("focus", { id: held ? chat.mods.state.focusedId : null });
         return;
       }
-      panes.setKind("mods");
+      panes.show("mods");
       chat.mods.act("focus", { id: requested });
       chat.mods.raised = requested;
     });
@@ -421,20 +427,24 @@
       {/if}
       <BackgroundTasks tasks={chat.backgroundView} onStop={(id) => chat.stopTask(id)} />
       <TaskIndicator todos={chat.todosView} />
-      {#if resumable}
-        <TooltipIconButton label={t("CHATS")} onclick={() => (agentPane.history = true)}>
+      {#if chatsWindow}
+        <TooltipIconButton label={t("CHATS")} onclick={() => (agentTabs.history[pane] = true)}>
           <History />
         </TooltipIconButton>
       {/if}
     {/if}
     {#if layout.mobile && primary}
-      <TabSwitcher />
+      {#if chat.agent}
+        <AgentTabSwitcher role={pane} />
+      {:else}
+        <ChatTabSwitcher />
+      {/if}
       <PaneActions />
     {/if}
     <TooltipIconButton
       label={t("NEW_CHAT")}
       onclick={() =>
-        chat.agent ? agentPane.restart(chat) : chat.viewOnly ? chat.closeViewOnly() : chat.newSession()}
+        chat.agent ? agentTabs.restart(chat) : chat.viewOnly ? chat.closeViewOnly() : chat.newSession()}
     >
       <SquarePen />
     </TooltipIconButton>
@@ -701,7 +711,7 @@
         tokens: values.tokens === "" ? null : values.tokens === "on",
         timings: values.timings === "" ? null : values.timings === "on",
       });
-      agentPane.syncVisibility();
+      agentTabs.syncVisibility();
       visibilityOpen = false;
     }}
     onDismiss={() => (visibilityOpen = false)}

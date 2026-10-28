@@ -578,14 +578,20 @@ class LiveSession:
             self._sinks.pop(sink, None)
 
     def _publish_activity(self, activity):
+        from services.agent_sessions import watch as agent_watch
         from services.chat_list import hub
 
         session_id = self.state.session_id
         resident = self.resident_alive
+        agent = self.agent
         if self._published_id and self._published_id != session_id:
             hub.set_activity(self._published_id, None, False)
+            if agent is not None:
+                agent_watch.activity(agent.agent_id, agent.cwd, self._published_id, None)
         self._published_id = session_id
         hub.set_activity(session_id, activity, resident)
+        if agent is not None and session_id:
+            agent_watch.activity(agent.agent_id, agent.cwd, session_id, activity)
         announced = (activity, resident)
         if announced == self._announced:
             return

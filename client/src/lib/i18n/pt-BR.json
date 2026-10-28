@@ -941,6 +941,7 @@
   "PANEL_LEFT": "Painel esquerdo",
   "PANEL_RIGHT": "Painel direito",
   "PANEL_VIEW": "Visualização do painel",
+  "SWAP_PANES": "Trocar os painéis",
   "NEW_TAB": "Nova aba",
   "CLOSE_TAB": "Fechar aba",
   "LOCAL_SERVER_BAD_DIR": "Pasta inválida",

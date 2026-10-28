@@ -517,7 +517,7 @@ class Tabs {
       query.set("r", beside.sessionId);
       query.set("rp", beside.projectKey);
     }
-    if (this.rightFocused && query.size) query.set("f", "r");
+    if (this.rightFocused) query.set("f", "r");
     const search = query.toString();
     const target = search ? `/?${search}` : "/";
     if (target !== window.location.pathname + window.location.search) {

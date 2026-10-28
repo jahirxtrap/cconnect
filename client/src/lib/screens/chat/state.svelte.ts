@@ -970,8 +970,9 @@ export class ChatState {
     this.newSession();
   }
 
-  openAgentSession(sessionId: string) {
+  openAgentSession(sessionId: string, cwd: string) {
     if (sessionId === this.sessionId) return;
+    this.cwd = cwd;
     this.#socket.resetResume();
     this.#resetTranscript();
     this.sessionId = sessionId;
@@ -2187,7 +2188,7 @@ export class ChatState {
     return (
       this.agent !== null &&
       this.sessionId !== null &&
-      this.agentState?.status === "connecting" &&
+      (this.agentState?.status === "connecting" || this.agentState?.status === "loading") &&
       this.messages.length === 0
     );
   }

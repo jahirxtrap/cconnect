@@ -15,8 +15,10 @@ from mcps.shared_files import listing
 from services import acp_events, agents, attachments, event_rows, shared, terminal
 from services.acp_peer import AUTH_REQUIRED, INVALID_PARAMS, METHOD_NOT_FOUND, RESOURCE_NOT_FOUND, AcpError
 from services.agent_connections import AgentConnection, pool
+from services.live_sessions import registry
 
 CONNECTING = "connecting"
+LOADING = "loading"
 READY = "ready"
 SIGN_IN = "auth"
 FAILED = "error"
@@ -176,6 +178,9 @@ class AgentSession:
         self._limits: dict[str, int] = {}
         self._opening: Optional[asyncio.Task] = None
         self._chosen: dict[str, Any] = {}
+        if self._process_up():
+            self.status = LOADING
+            self._recall()
 
     def bind(self, emit: Emit, ask: Ask) -> None:
         self._emit = emit
@@ -222,13 +227,14 @@ class AgentSession:
 
     async def open(self, resume: Optional[str] = None, signing_in: bool = False, create_now: bool = False) -> None:
         self.released = False
-        self.status, self.reason, self.detail = CONNECTING, None, ""
+        self.status = LOADING if self._process_up() else CONNECTING
+        self.reason, self.detail = None, ""
         await self._announce()
         try:
             connection = await self._connect()
             if resume:
                 await self._resume(connection, resume)
-            elif create_now or not self._start_blank():
+            elif create_now or not self._recall():
                 await self._create(connection)
             self.status = READY
         except AcpError as exc:
@@ -260,7 +266,10 @@ class AgentSession:
         self.connection = await pool.take(self.agent_id, self.cwd)
         return self.connection
 
-    def _start_blank(self) -> bool:
+    def _process_up(self) -> bool:
+        return (self.connection is not None and self.connection.alive) or pool.find(self.agent_id, self.cwd) is not None
+
+    def _recall(self) -> bool:
         remembered = _defaults().get(self.agent_id) or {}
         if not isinstance(remembered.get("options"), list):
             return False
@@ -694,18 +703,29 @@ async def _gone(connection: AgentConnection, cwd: str, session_id: str) -> bool:
     return True
 
 
+def _activity(session_id: str) -> Optional[str]:
+    live = registry.get_by_session(session_id)
+    return live.activity if live else None
+
+
 async def all_sessions(agent_id: str, cwd: str) -> list[dict]:
     connection = await pool.take(agent_id, cwd)
     try:
         if _present(connection.session_capabilities, "list"):
             return [
-                {"session_id": str(item["sessionId"]), "title": item.get("title"), "updated_at": item.get("updatedAt"), "cwd": item.get("cwd")}
+                {
+                    "session_id": str(item["sessionId"]),
+                    "title": item.get("title"),
+                    "updated_at": item.get("updatedAt"),
+                    "cwd": item.get("cwd"),
+                    "activity": _activity(str(item["sessionId"])),
+                }
                 async for item in _listed(connection, cwd)
             ]
         if not (connection.capabilities.get("loadSession") or _present(connection.session_capabilities, "resume")):
             return []
         return [
-            {"session_id": session_id, "title": None, "updated_at": None, "cwd": cwd}
+            {"session_id": session_id, "title": None, "updated_at": None, "cwd": cwd, "activity": _activity(session_id)}
             for session_id, folder in _known(agent_id).items()
             if folder == cwd
         ]
@@ -767,6 +787,12 @@ class SessionsWatch:
         watching = [queue for queue, key in self._watching.items() if key == (agent_id, cwd)]
         if watching:
             asyncio.get_running_loop().create_task(self._push(agent_id, cwd, watching))
+
+    def activity(self, agent_id: str, cwd: str, session_id: str, activity: Optional[str]) -> None:
+        update = {"type": "activity", "agent": agent_id, "cwd": cwd, "session_id": session_id, "activity": activity}
+        for queue, key in self._watching.items():
+            if key == (agent_id, cwd):
+                queue.put_nowait(update)
 
     async def _push(self, agent_id: str, cwd: str, queues: list[asyncio.Queue]) -> None:
         snapshot = await _snapshot(agent_id, cwd)

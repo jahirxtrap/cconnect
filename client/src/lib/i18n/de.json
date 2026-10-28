@@ -941,6 +941,7 @@
   "PANEL_LEFT": "Linker Bereich",
   "PANEL_RIGHT": "Rechter Bereich",
   "PANEL_VIEW": "Bereichsansicht",
+  "SWAP_PANES": "Bereiche tauschen",
   "NEW_TAB": "Neuer Tab",
   "CLOSE_TAB": "Tab schließen",
   "LOCAL_SERVER_BAD_DIR": "Ungültiger Ordner",

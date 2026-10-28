@@ -6,7 +6,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import ToggleLeft from "@lucide/svelte/icons/toggle-left";
   import ToggleRight from "@lucide/svelte/icons/toggle-right";
-  import { chosenName, type AgentOption, type AgentState } from "$lib/data/agentModels";
+  import { agentUp, chosenName, type AgentOption, type AgentState } from "$lib/data/agentModels";
   import type { ConnectionState } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
   import type { IconSource } from "$lib/ui/icons";
@@ -57,7 +57,7 @@
     <ToolbarState text={t(LINK_LOOKS.connecting.text)} loading />
   {:else if agent.status === "auth"}
     <ToolbarState text={t("AGENT_SIGN_IN_NEEDED")} icon={KeyRound} />
-  {:else if agent.status !== "ready"}
+  {:else if !agentUp(agent.status)}
     <ToolbarState text={t("AGENT_UNAVAILABLE")} dot="bg-red" />
   {:else}
     {#each agent.options as option (option.id)}

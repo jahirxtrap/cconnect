@@ -4,19 +4,15 @@
 </script>
 
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import PanelLeftOpen from "@lucide/svelte/icons/panel-left-open";
   import SquarePen from "@lucide/svelte/icons/square-pen";
-  import { navigation } from "$lib/app/navigation.svelte";
   import ScreenBar from "$lib/app/ScreenBar.svelte";
-  import type { SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
-  import ChatList from "./ChatList.svelte";
-  import type { ChatState } from "./state.svelte";
 
   interface Props {
-    chat: ChatState;
     accent: string;
     expanded: boolean;
     width: number;
@@ -25,37 +21,12 @@
     resizing: boolean;
     onWidth: (value: number) => void;
     onDragging: (active: boolean) => void;
-    onNewTab: (categoryId: string | null) => void;
-    onOpenSession: (session: SessionInfo) => void;
-    onOpenRight: (session: SessionInfo) => void;
-    onRename: (session: SessionInfo) => void;
-    onColor: (session: SessionInfo) => void;
-    onDelete: (session: SessionInfo) => void;
-    onMove: (session: SessionInfo, preset: string | null) => void;
-    onNewCategory: (session: SessionInfo) => void;
-    onOrganize: () => void;
+    onNewChat: () => void;
+    children: Snippet;
   }
 
-  const {
-    chat,
-    accent,
-    expanded,
-    width,
-    max,
-    onExpanded,
-    resizing,
-    onWidth,
-    onDragging,
-    onNewTab,
-    onOpenSession,
-    onOpenRight,
-    onRename,
-    onColor,
-    onDelete,
-    onMove,
-    onNewCategory,
-    onOrganize,
-  }: Props = $props();
+  const { accent, expanded, width, max, onExpanded, resizing, onWidth, onDragging, onNewChat, children }: Props =
+    $props();
 </script>
 
 <div
@@ -65,21 +36,7 @@
   style="width: {expanded ? width : RAIL_WIDTH}px; {accent}"
 >
   {#if expanded}
-    <ChatList
-      {chat}
-      drawerMode={false}
-      onClose={() => onExpanded(false)}
-      onAfterSelect={() => navigation.showChat()}
-      {onNewTab}
-      {onOpenSession}
-      {onOpenRight}
-      {onRename}
-      {onColor}
-      {onDelete}
-      {onMove}
-      {onNewCategory}
-      {onOrganize}
-    />
+    {@render children()}
     <div
       role="separator"
       aria-orientation="vertical"
@@ -98,13 +55,7 @@
       <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => onExpanded(true)}>
         <PanelLeftOpen />
       </TooltipIconButton>
-      <TooltipIconButton
-        label={t("NEW_CHAT")}
-        onclick={() => {
-          chat.newSession();
-          navigation.showChat();
-        }}
-      >
+      <TooltipIconButton label={t("NEW_CHAT")} onclick={onNewChat}>
         <SquarePen />
       </TooltipIconButton>
       <div class="flex-1"></div>

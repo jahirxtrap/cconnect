@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { untrack, type Snippet } from "svelte";
   import BotMessageSquare from "@lucide/svelte/icons/bot-message-square";
   import LogOut from "@lucide/svelte/icons/log-out";
   import Settings2 from "@lucide/svelte/icons/settings-2";
@@ -19,33 +19,52 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ChatView from "$lib/screens/chat/ChatView.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
+  import type { PaneDrag } from "$lib/screens/chat/paneDrag";
+  import { panes } from "$lib/screens/chat/panes.svelte";
+  import { paneRole } from "$lib/screens/chat/paneSurface";
+  import TabStrip from "$lib/screens/chat/TabStrip.svelte";
   import AgentChats from "./AgentChats.svelte";
   import AgentIcon from "./AgentIcon.svelte";
   import AgentsDialog from "./AgentsDialog.svelte";
-  import { agentPane } from "./agentPane.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
+  import { agentTabs } from "./agentTabs.svelte";
 
   interface Props {
     focused: boolean;
+    lead?: Snippet;
+    trailing?: Snippet;
+    onPaneDrag?: PaneDrag;
+    onTabDrag?: (id: string, pointerX: number) => boolean;
   }
 
-  const { focused }: Props = $props();
+  const { focused, lead, trailing, onPaneDrag, onTabDrag }: Props = $props();
 
   const BUTTON_ICON_SIZE = 18;
+  const TAB_ICON_SIZE = 14;
+
+  const role = paneRole() ?? "right";
 
   let open = $state(false);
   let managing = $state(false);
   let signingOut = $state(false);
 
-  const profile = $derived(backend.active);
+  const tab = $derived(agentTabs.activeIn(role));
+  const profile = $derived((tab ? backend.find(tab.environmentId) : null) ?? backend.active);
   const listed = $derived(agents.listOf(profile));
   const usable = $derived(agents.usable(profile));
-  const selected = $derived(usable.find((agent) => agent.id === agentPane.agent) ?? usable[0] ?? null);
-  const chat = $derived(selected ? agentPane.stateFor(backend.activeId, selected.id) : null);
+  const selected = $derived(tab ? (usable.find((agent) => agent.id === tab.agent) ?? null) : null);
+  const chat = $derived(tab && selected ? agentTabs.stateFor(tab) : null);
+  const strip = $derived(agentTabs.in(role).map((item) => ({ id: item.id, title: item.title })));
+  const principal = $derived(layout.mobile && role === "center");
   const iconOf = (id: string) => agents.iconOf(profile, id);
 
   $effect(() => {
-    const shown = chat;
-    if (shown) untrack(() => agentPane.keepOnly(shown));
+    if (!tab && usable.length) untrack(() => agentTabs.ensure(role));
+  });
+
+  $effect(() => {
+    const current = tab;
+    if (current && listed && !selected && usable.length) untrack(() => agentTabs.setAgent(current, usable[0].id));
   });
 
   $effect(() => {
@@ -54,7 +73,8 @@
 </script>
 
 {#snippet switcher()}
-  {#if chat && selected}
+  {#if chat && selected && tab}
+    {@const current = tab}
     <PopupMenu
       {open}
       label={t("AGENTS")}
@@ -74,7 +94,7 @@
           selected={agent.id === selected.id}
           onclick={() => {
             open = false;
-            agentPane.select(agent.id);
+            agentTabs.setAgent(current, agent.id);
           }}
         >
           {#snippet leading()}
@@ -104,13 +124,43 @@
   {/if}
 {/snippet}
 
-{#if chat && selected}
-  <ChatView {chat} viewKey="{backend.activeId}/{selected.id}" {focused} navigationIcon={switcher} />
-  {#if agentPane.history}
-    <AgentChats {chat} {focused} />
+{#snippet tabLeading(id: string)}
+  <AgentIcon url={agentTabs.iconOf(id)} size={TAB_ICON_SIZE} class="shrink-0" />
+{/snippet}
+
+{#snippet navigation()}
+  {@render lead?.()}
+  {@render switcher()}
+{/snippet}
+
+{#if chat && selected && tab}
+  {#if !principal}
+    <TabStrip
+      items={strip}
+      activeId={tab.id}
+      onSelect={(id) => agentTabs.select(role, id)}
+      onNew={() => agentTabs.newChat(role)}
+      onClose={(id) => agentTabs.close(id)}
+      onMove={(id, index) => agentTabs.move(id, index)}
+      onDrop={() => panes.dropTab()}
+      {onPaneDrag}
+      {onTabDrag}
+      group="agents"
+      dot={false}
+      leading={tabLeading}
+      {focused}
+      {lead}
+      {trailing}
+    />
   {/if}
+  <div class="relative flex min-h-0 flex-1 flex-col">
+    <ChatView {chat} viewKey={tab.id} {focused} primary={principal} navigationIcon={principal ? navigation : switcher} />
+    {#if agentTabs.history[role] && !panes.historyInList(role)}
+      <AgentChats {chat} {focused} {role} />
+    {/if}
+  </div>
 {:else}
-  <PaneHeader title={t("AGENTS")} />
+  <PaneHeader title={t("AGENTS")} leading={lead} />
   {#if serverStatus.unavailable}
     <ServerUnavailable class="min-h-0 flex-1" />
   {:else if !listed && !agents.failed(profile)}

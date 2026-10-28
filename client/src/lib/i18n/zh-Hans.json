@@ -911,6 +911,7 @@
   "PANEL_LEFT": "左侧面板",
   "PANEL_RIGHT": "右侧面板",
   "PANEL_VIEW": "面板视图",
+  "SWAP_PANES": "交换面板",
   "NEW_TAB": "新建标签页",
   "CLOSE_TAB": "关闭标签页",
   "LOCAL_SERVER_BAD_DIR": "文件夹无效",

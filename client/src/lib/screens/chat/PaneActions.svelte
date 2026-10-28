@@ -1,14 +1,14 @@
 <script lang="ts">
   import PanelRightClose from "@lucide/svelte/icons/panel-right-close";
   import PanelRightOpen from "@lucide/svelte/icons/panel-right-open";
-  import { screenFor } from "$lib/app/screens";
+  import { viewFor } from "$lib/app/screens";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CenterViewToggle from "./CenterViewToggle.svelte";
   import { panes } from "./panes.svelte";
 
-  const tool = $derived(screenFor(panes.tool));
+  const tool = $derived(viewFor(panes.tool));
 </script>
 
 <div class="flex shrink-0 items-center">

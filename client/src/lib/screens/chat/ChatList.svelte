@@ -1,14 +1,9 @@
 <script lang="ts">
-  import Menu from "@lucide/svelte/icons/menu";
-  import PanelLeftClose from "@lucide/svelte/icons/panel-left-close";
-  import SquarePen from "@lucide/svelte/icons/square-pen";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Plus from "@lucide/svelte/icons/plus";
-  import Settings2 from "@lucide/svelte/icons/settings-2";
   import { rankLabel } from "$lib/app/commands.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
-  import ScreenBar from "$lib/app/ScreenBar.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { sessionLabel, type ChatCategory, type SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
@@ -16,13 +11,11 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { LIST_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
-  import SearchBar from "$lib/ui/SearchBar.svelte";
   import { RowDrag } from "$lib/ui/rowDrag.svelte";
-  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ConversationRow from "./ConversationRow.svelte";
   import { CategoryDrag } from "./dragCategories.svelte";
-  import EnvironmentSelector from "./EnvironmentSelector.svelte";
-  import ProjectSelector from "./ProjectSelector.svelte";
+  import ListTools from "./ListTools.svelte";
+  import SideList from "./SideList.svelte";
   import type { ChatState } from "./state.svelte";
 
   interface Props {
@@ -151,49 +144,29 @@
   });
 </script>
 
-<div class="flex h-full min-h-0 flex-col gap-1 bg-surface pt-2.5 pb-2">
-  <div class="mb-1 flex shrink-0 items-center px-2">
-    <EnvironmentSelector
-      class="flex-1"
-      selected={chat.environmentId}
-      onSelect={(id) => chat.selectEnvironment(id)}
+<SideList
+  environmentId={chat.environmentId}
+  onEnvironment={(id) => chat.selectEnvironment(id)}
+  onNewChat={() => {
+    chat.newSession();
+    onAfterSelect();
+  }}
+  {drawerMode}
+  {onClose}
+>
+  {#snippet tools()}
+    <ListTools
+      {chat}
+      {query}
+      onQuery={(value) => (query = value)}
+      projects={visibleProjects}
+      project={chat.historyProject}
+      projectsLoading={chat.historyLoading}
+      onProject={(projectKey) => chat.selectHistoryProject(projectKey)}
+      organizable={!chat.historyUnavailable}
+      {onOrganize}
     />
-    <TooltipIconButton
-      label={t("NEW_CHAT")}
-      onclick={() => {
-        chat.newSession();
-        onAfterSelect();
-      }}
-    >
-      <SquarePen />
-    </TooltipIconButton>
-    {#if onClose}
-      <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={onClose}>
-        {#if drawerMode}
-          <Menu />
-        {:else}
-          <PanelLeftClose />
-        {/if}
-      </TooltipIconButton>
-    {/if}
-  </div>
-
-  <SearchBar value={query} oninput={(value) => (query = value)} placeholder={t("SEARCH")} class="mx-2" />
-
-  <div class="mt-1.5 flex shrink-0 items-center px-2">
-    <div class="min-w-0 flex-1">
-      <ProjectSelector
-        projects={visibleProjects}
-        selected={chat.historyProject}
-        loading={chat.historyLoading}
-        onSelect={(projectKey) => chat.selectHistoryProject(projectKey)}
-      />
-    </div>
-    <TooltipIconButton label={t("ORGANIZE")} enabled={!chat.historyUnavailable} onclick={onOrganize}>
-      <Settings2 />
-    </TooltipIconButton>
-  </div>
-
+  {/snippet}
   <div
     bind:this={list}
     use:viewportScrollbar
@@ -359,8 +332,4 @@
       <EmptyState text={t("NO_CHATS")} class="h-full" />
     {/if}
   </div>
-
-  <div class="flex shrink-0 items-center px-2 pt-1.5">
-    <ScreenBar />
-  </div>
-</div>
+</SideList>

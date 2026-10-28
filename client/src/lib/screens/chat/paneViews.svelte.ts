@@ -5,8 +5,9 @@ import { layout } from "$lib/platform/layout.svelte";
 import { RowDrag, SPRING_MS, type RowOptions } from "$lib/ui/rowDrag.svelte";
 import { StripDrag, type StripCross } from "$lib/ui/stripDrag.svelte";
 import { panes, type RightKind } from "./panes.svelte";
+import type { PaneRole } from "./tabs.svelte";
 
-export const PANE_BAR_GROUP = "pane-views";
+const PANE_BAR_GROUP = "pane-views";
 
 const HALF = 2;
 
@@ -34,16 +35,7 @@ const inside = (element: HTMLElement | null, x: number, y: number) => {
 const before = (nodes: NodeListOf<HTMLElement> | undefined, at: (box: DOMRect) => boolean) =>
   [...(nodes ?? [])].filter((node) => at(node.getBoundingClientRect())).length;
 
-class PaneViews {
-  menuOpen = $state(false);
-  overMenu = $state(false);
-
-  #strip = $state<HTMLElement | null>(null);
-  #trigger: HTMLElement | null = null;
-  #list: HTMLElement | null = null;
-  #spring: ReturnType<typeof setTimeout> | null = null;
-  #sprung = false;
-
+class PaneOrder {
   readonly #order = $derived.by(() => {
     const custom = settings.paneBar.length > 0 || settings.paneMenu.length > 0;
     const bar = known(custom ? settings.paneBar : DEFAULT_PANE_BAR);
@@ -51,22 +43,45 @@ class PaneViews {
     return { bar, menu: rest.filter((kind) => !bar.includes(kind)) };
   });
 
-  readonly bar = $derived(viewsOf(this.#order.bar));
+  readonly bar = $derived(this.#order.bar);
 
-  readonly barDrag = new StripDrag(() => ({
-    group: PANE_BAR_GROUP,
-    strip: this.#strip,
-    onMove: (id, index) => this.#save(placed(this.#order.bar, kindOf(id), index), this.#order.menu),
-    onSelect: (id) => panes.setKind(kindOf(id)),
-    onDrop: () => this.#dropBar(),
-    onCross: (id, x, y) => this.#crossBar(kindOf(id), x, y),
-  }));
+  readonly menu = $derived(this.#order.menu);
+
+  save(bar: RightKind[], menu: RightKind[]) {
+    settings.paneBar = bar;
+    settings.paneMenu = menu;
+  }
+}
+
+class PaneBar {
+  menuOpen = $state(false);
+  overMenu = $state(false);
+
+  readonly group: string;
+
+  #strip = $state<HTMLElement | null>(null);
+  #trigger: HTMLElement | null = null;
+  #list: HTMLElement | null = null;
+  #spring: ReturnType<typeof setTimeout> | null = null;
+  #sprung = false;
+
+  readonly barDrag: StripDrag;
 
   readonly menuDrag = new RowDrag();
 
-  menuOf(all: boolean): PaneView[] {
-    const kinds = all ? [...this.#order.bar, ...this.#order.menu] : this.#order.menu;
-    return viewsOf(layout.mobile ? without(kinds, "chat") : kinds);
+  constructor(
+    readonly role: PaneRole,
+    readonly order: PaneOrder,
+  ) {
+    this.group = `${PANE_BAR_GROUP}-${role}`;
+    this.barDrag = new StripDrag(() => ({
+      group: this.group,
+      strip: this.#strip,
+      onMove: (id, index) => this.order.save(placed(this.order.bar, kindOf(id), index), this.order.menu),
+      onSelect: (id) => panes.setView(this.role, kindOf(id)),
+      onDrop: () => this.#dropBar(),
+      onCross: (id, x, y) => this.#crossBar(kindOf(id), x, y),
+    }));
   }
 
   strip = (element: HTMLElement) => {
@@ -101,18 +116,13 @@ class PaneViews {
     this.menuDrag.begin(event, kind, this.#rowOptions(index, all));
   }
 
-  #save(bar: RightKind[], menu: RightKind[]) {
-    settings.paneBar = bar;
-    settings.paneMenu = menu;
-  }
-
   #saveAll(kind: RightKind, index: number) {
-    const shown = this.menuOf(true).map((view) => view.kind);
+    const shown = paneViews.menuOf(true).map((view) => view.kind);
     const moved = placed(shown, kind, index);
-    const order = [...this.#order.bar, ...this.#order.menu].map((item) =>
+    const order = [...this.order.bar, ...this.order.menu].map((item) =>
       shown.includes(item) ? (moved.shift() ?? item) : item,
     );
-    this.#save(order.slice(0, this.#order.bar.length), order.slice(this.#order.bar.length));
+    this.order.save(order.slice(0, this.order.bar.length), order.slice(this.order.bar.length));
   }
 
   #rowOptions(index: number, all = false): RowOptions {
@@ -123,7 +133,7 @@ class PaneViews {
       onCommit: (id, target) => {
         if (target.index === null) return;
         if (all) this.#saveAll(kindOf(id), target.index);
-        else this.#save(this.#order.bar, placed(this.#order.menu, kindOf(id), target.index));
+        else this.order.save(this.order.bar, placed(this.order.menu, kindOf(id), target.index));
       },
       onOutside: (id, event) => this.#leaveMenu(kindOf(id), event),
     };
@@ -150,7 +160,7 @@ class PaneViews {
     const index = before(this.#list?.querySelectorAll<HTMLElement>("[data-row]"), (box) => box.top + box.height / HALF < y);
     this.#hover(false);
     this.#sprung = false;
-    this.#save(without(this.#order.bar, kind), placed(this.#order.menu, kind, index));
+    this.order.save(without(this.order.bar, kind), placed(this.order.menu, kind, index));
     queueMicrotask(() => this.menuDrag.adopt(kind, x, y, false, this.#rowOptions(index)));
     return "left";
   }
@@ -159,7 +169,7 @@ class PaneViews {
     const kind = kindOf(this.barDrag.held);
     const over = this.overMenu;
     this.#hover(false);
-    if (over && kind) this.#save(without(this.#order.bar, kind), [...without(this.#order.menu, kind), kind]);
+    if (over && kind) this.order.save(without(this.order.bar, kind), [...without(this.order.menu, kind), kind]);
     if (!this.#sprung) return;
     this.#sprung = false;
     this.menuOpen = false;
@@ -172,11 +182,30 @@ class PaneViews {
       (box) => box.left + box.width / HALF < event.clientX,
     );
     flushSync(() => {
-      this.#save(placed(this.#order.bar, kind, index), without(this.#order.menu, kind));
+      this.order.save(placed(this.order.bar, kind, index), without(this.order.menu, kind));
       this.menuOpen = false;
     });
     this.barDrag.adopt(kind, event.pointerId, event.clientX);
     return true;
+  }
+}
+
+class PaneViews {
+  readonly #order = new PaneOrder();
+
+  readonly bar = $derived(viewsOf(this.#order.bar));
+
+  readonly center = new PaneBar("center", this.#order);
+
+  readonly right = new PaneBar("right", this.#order);
+
+  of(role: PaneRole): PaneBar {
+    return role === "center" ? this.center : this.right;
+  }
+
+  menuOf(all: boolean): PaneView[] {
+    const kinds = all ? [...this.#order.bar, ...this.#order.menu] : this.#order.menu;
+    return viewsOf(layout.mobile ? kinds.filter((kind) => kind !== panes.viewAt("center")) : kinds);
   }
 }
 

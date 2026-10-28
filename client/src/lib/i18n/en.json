@@ -941,6 +941,7 @@
   "PANEL_LEFT": "Left panel",
   "PANEL_RIGHT": "Right panel",
   "PANEL_VIEW": "Panel view",
+  "SWAP_PANES": "Swap panels",
   "NEW_TAB": "New tab",
   "CLOSE_TAB": "Close tab",
   "LOCAL_SERVER_BAD_DIR": "Invalid folder",

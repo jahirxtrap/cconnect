@@ -80,7 +80,7 @@
       return;
     }
     terminalTabs.openLocal(result.value);
-    panes.setKind("terminal");
+    panes.show("terminal");
   };
 </script>
 

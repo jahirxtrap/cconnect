@@ -941,6 +941,7 @@
   "PANEL_LEFT": "Pannello sinistro",
   "PANEL_RIGHT": "Pannello destro",
   "PANEL_VIEW": "Vista del pannello",
+  "SWAP_PANES": "Scambia i pannelli",
   "NEW_TAB": "Nuova scheda",
   "CLOSE_TAB": "Chiudi scheda",
   "LOCAL_SERVER_BAD_DIR": "Cartella non valida",

@@ -17,6 +17,7 @@
   import type { ChatState } from "$lib/screens/chat/state.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
+  import { paneRole } from "$lib/screens/chat/paneSurface";
   import { provideServer } from "$lib/services/serverContext";
   import TabStrip from "$lib/screens/chat/TabStrip.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -58,7 +59,8 @@
   const pane = $derived(mods.shown);
   const commands = $derived(mods.state.commands);
   const tabs = $derived(mods.state.panes.map((entry) => ({ id: entry.id, title: entry.title })));
-  const focused = $derived(panes.focused === "right");
+  const role = paneRole() ?? "right";
+  const focused = $derived(panes.focused === role);
   const owners = $derived([...new Set(mods.state.panes.flatMap((entry) => entry.plugin ?? []))].sort().join(" "));
   const configurable = $derived(
     installed.find((plugin) => plugin.enabled && plugin.options && plugin.name === pane?.plugin) ?? null,

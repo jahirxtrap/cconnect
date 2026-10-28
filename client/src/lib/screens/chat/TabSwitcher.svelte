@@ -3,6 +3,7 @@
   import Square from "@lucide/svelte/icons/square";
   import X from "@lucide/svelte/icons/x";
   import { Dialog } from "bits-ui";
+  import type { Snippet } from "svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
@@ -12,8 +13,20 @@
   import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import { panes } from "./panes.svelte";
-  import { tabs, type Tab } from "./tabs.svelte";
+  import type { StripTab } from "./TabStrip.svelte";
+
+  interface Props {
+    center: StripTab[];
+    right: StripTab[];
+    activeId: string | null;
+    onSelect: (id: string) => void;
+    onClose: (id: string) => void;
+    onMove: (id: string, to: number) => void;
+    onNew: () => void;
+    leading?: Snippet<[string]>;
+  }
+
+  const { center, right, activeId, onSelect, onClose, onMove, onNew, leading }: Props = $props();
 
   let open = $state(false);
 
@@ -22,25 +35,24 @@
     return pushDismiss(() => (open = false));
   });
 
-  const paneDrag = (items: () => Tab[]) =>
-    new ReorderDrag(items, (id, to) => tabs.move(id, to), (id) => {
-      panes.reveal(id);
-      open = false;
-    });
+  const pick = (id: string) => {
+    onSelect(id);
+    open = false;
+  };
 
-  const centerDrag = paneDrag(() => tabs.center);
-  const rightDrag = paneDrag(() => tabs.right);
+  const centerDrag = new ReorderDrag(() => center, (id, to) => onMove(id, to), pick);
+  const rightDrag = new ReorderDrag(() => right, (id, to) => onMove(id, to), pick);
 
   const groups = $derived(
     [
-      { label: t("PANEL_CENTER"), items: tabs.center, drag: centerDrag },
-      { label: t("PANEL_RIGHT"), items: tabs.right, drag: rightDrag },
+      { label: t("PANEL_CENTER"), items: center, drag: centerDrag },
+      { label: t("PANEL_RIGHT"), items: right, drag: rightDrag },
     ].filter((group) => group.items.length),
   );
 
   const closeTab = (id: string) => {
-    const shown = id === panes.focusedTab?.id;
-    panes.close(id);
+    const shown = id === activeId;
+    onClose(id);
     if (shown) open = false;
   };
 </script>
@@ -49,7 +61,7 @@
   <span class="relative inline-flex">
     <Square />
     <span class="absolute inset-0 flex items-center justify-center text-label-sm leading-none">
-      {tabs.list.length}
+      {center.length + right.length}
     </span>
   </span>
 </TooltipIconButton>
@@ -71,7 +83,7 @@
           <TooltipIconButton
             label={t("NEW_TAB")}
             onclick={() => {
-              panes.newTab();
+              onNew();
               open = false;
             }}
           >
@@ -86,37 +98,36 @@
           {/if}
           <div class="grid grid-cols-2 content-start gap-1.5">
             {#each group.items as tab, index (tab.id)}
-              {@render chatCard(tab, index, group.drag)}
+              {@render card(tab, index, group.drag)}
             {/each}
           </div>
         {/each}
-
       </div>
     </Dialog.Content>
   </Dialog.Portal>
 </Dialog.Root>
 
-{#snippet chatCard(tab: Tab, index: number, drag: ReorderDrag)}
+{#snippet card(tab: StripTab, index: number, drag: ReorderDrag)}
   {@const shift = drag.shiftOf(tab.id, index)}
   <div
     use:drag.register={tab.id}
     role="button"
     tabindex="0"
     onpointerdown={(event) => drag.onPointerDown(event, tab.id)}
-    onkeydown={(event) => {
-      if (event.key !== "Enter") return;
-      panes.reveal(tab.id);
-      open = false;
-    }}
+    onkeydown={(event) => event.key === "Enter" && pick(tab.id)}
     style="transform: translate({shift.x}px, {shift.y}px); z-index: {tab.id === drag.draggingId
       ? 1
       : 0}; transition: {drag.transitionOf(tab.id)}"
     class="ripple flex min-h-10 cursor-pointer touch-none items-center gap-1.5 rounded-panel pr-1 pl-2.5 {tab.id ===
-    panes.focusedTab?.id
+    activeId
       ? 'bg-surface-variant text-on-surface'
       : 'bg-surface text-on-surface-variant'}"
   >
-    <StatusDot class="bg-faint" color={sessionColorOf(tab.color)} />
+    {#if leading}
+      {@render leading(tab.id)}
+    {:else}
+      <StatusDot class="bg-faint" color={sessionColorOf(tab.color)} />
+    {/if}
     <span class="min-w-0 flex-1 truncate text-body-md">{tab.title ?? t("NEW_CHAT")}</span>
     <button
       type="button"

@@ -8,12 +8,14 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ProjectPathDialog from "./ProjectPathDialog.svelte";
+  import type { ChatState } from "./state.svelte";
   import { tabs } from "./tabs.svelte";
 
   interface Props {
     projects: ProjectInfo[];
     selected: string | null;
     onSelect: (projectKey: string | null) => void;
+    owner?: ChatState;
     allowAll?: boolean;
     loading?: boolean;
     shown?: string;
@@ -26,6 +28,7 @@
     projects,
     selected,
     onSelect,
+    owner,
     allowAll = true,
     loading = false,
     shown,
@@ -102,7 +105,7 @@
   <ProjectPathDialog
     onConfirm={(path, name) => {
       adding = false;
-      void tabs.state.addProject(path, name || null).then((key) => {
+      void (owner ?? tabs.state).addProject(path, name || null).then((key) => {
         if (key) onSelect(key);
       });
     }}

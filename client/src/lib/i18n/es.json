@@ -941,6 +941,7 @@
   "PANEL_LEFT": "Panel izquierdo",
   "PANEL_RIGHT": "Panel derecho",
   "PANEL_VIEW": "Vista del panel",
+  "SWAP_PANES": "Intercambiar paneles",
   "NEW_TAB": "Nueva pestaña",
   "CLOSE_TAB": "Cerrar pestaña",
   "LOCAL_SERVER_BAD_DIR": "Carpeta inválida",

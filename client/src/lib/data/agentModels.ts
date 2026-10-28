@@ -3,7 +3,9 @@ import { toCommands, type CommandOption, type CommandWire } from "$lib/services/
 import { linesOf } from "./format";
 import { parseIsoMillis } from "./time";
 
-export type AgentStatus = "connecting" | "ready" | "auth" | "error" | "closed";
+export type AgentStatus = "connecting" | "loading" | "ready" | "auth" | "error" | "closed";
+
+export const agentUp = (status: AgentStatus | undefined) => status === "ready" || status === "loading";
 
 export type AgentOptionType = "select" | "boolean";
 
@@ -123,6 +125,7 @@ export interface AgentSession {
   sessionId: string;
   title: string | null;
   updatedAt: number | null;
+  activity: string | null;
 }
 
 export interface AgentLogin {
@@ -137,7 +140,7 @@ export interface AgentFailure {
 
 type Wire = Record<string, unknown>;
 
-const STATUSES: AgentStatus[] = ["connecting", "ready", "auth", "error", "closed"];
+const STATUSES: AgentStatus[] = ["connecting", "loading", "ready", "auth", "error", "closed"];
 const MILLIS_PER_SECOND = 1000;
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
@@ -266,7 +269,14 @@ const timeOf = (value: unknown): number | null => {
 
 export const toAgentSession = (raw: Wire): AgentSession | null => {
   const sessionId = text(raw, "session_id");
-  return sessionId ? { sessionId, title: text(raw, "title") || null, updatedAt: timeOf(raw.updated_at) } : null;
+  return sessionId
+    ? {
+        sessionId,
+        title: text(raw, "title") || null,
+        updatedAt: timeOf(raw.updated_at),
+        activity: text(raw, "activity") || null,
+      }
+    : null;
 };
 
 export const toAgentFailure = (raw: unknown): AgentFailure | null => {

@@ -911,6 +911,7 @@
   "PANEL_LEFT": "왼쪽 패널",
   "PANEL_RIGHT": "오른쪽 패널",
   "PANEL_VIEW": "패널 보기",
+  "SWAP_PANES": "패널 바꾸기",
   "NEW_TAB": "새 탭",
   "CLOSE_TAB": "탭 닫기",
   "LOCAL_SERVER_BAD_DIR": "잘못된 폴더",

@@ -9,6 +9,7 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import { StripDrag } from "$lib/ui/stripDrag.svelte";
   import { PANE_HEADER_CLASS, PANE_SUB_CLASS, paneDim, paneTabClass } from "./paneChrome";
+  import { startPaneDrag, type PaneDrag } from "./paneDrag";
   import { panes } from "./panes.svelte";
   import { usePaneTail } from "./paneSurface";
 
@@ -27,7 +28,7 @@
     onClose: (id: string) => void;
     onMove?: (id: string, index: number) => void;
     onDrop?: () => void;
-    onPaneDrag?: (pointerX: number, done: boolean) => void;
+    onPaneDrag?: PaneDrag;
     onTabDrag?: (id: string, pointerX: number) => boolean;
     group?: string;
     newLabel?: string;
@@ -83,30 +84,6 @@
   const held = $derived(drag.held);
   const mine = $derived(held !== "" && items.some((tab) => tab.id === held));
 
-  const onPaneDown = (event: PointerEvent) => {
-    if (event.button !== 0 || !onPaneDrag) return;
-    if ((event.target as HTMLElement | null)?.closest('[role="tab"], button')) return;
-    event.preventDefault();
-    const startX = event.clientX;
-
-    const onMovePointer = (move: PointerEvent) => {
-      if (move.pointerId !== event.pointerId) return;
-      onPaneDrag(move.clientX, false);
-    };
-
-    const onUp = (up: Event) => {
-      if (up instanceof PointerEvent && up.pointerId !== event.pointerId) return;
-      window.removeEventListener("pointermove", onMovePointer);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      onPaneDrag(up instanceof PointerEvent ? up.clientX : startX, true);
-    };
-
-    window.addEventListener("pointermove", onMovePointer);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-  };
-
   const plusShift = $derived.by(() => {
     if (!mine || !plus) return 0;
     const right = drag.centerOf(held) + drag.widthOf(held) / HALF + drag.dx;
@@ -121,7 +98,7 @@
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div onpointerdown={onPaneDown} class={sub && !tail ? PANE_SUB_CLASS : `${PANE_HEADER_CLASS} ${paneDim(dimmed)}`}>
+<div onpointerdown={(event) => startPaneDrag(event, onPaneDrag)} class={sub && !tail ? PANE_SUB_CLASS : `${PANE_HEADER_CLASS} ${paneDim(dimmed)}`}>
   {#if lead}
     <div class="flex shrink-0 items-center">{@render lead()}</div>
   {/if}

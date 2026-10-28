@@ -28,11 +28,12 @@
 
   interface Props {
     chat: ChatState;
+    projectsOnly?: boolean;
     onDismiss: () => void;
     onOpenChat: () => void;
   }
 
-  const { chat, onDismiss, onOpenChat }: Props = $props();
+  const { chat, projectsOnly = false, onDismiss, onOpenChat }: Props = $props();
 
   const SPACING = 4;
 
@@ -185,112 +186,114 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
   <div bind:this={listElement} class="flex flex-col gap-1 {draggingId === null ? '' : 'cursor-pointer'}">
-    <SelectField
-      label={t("CHAT_ORDER")}
-      selected={chat.chatOrder}
-      options={[
-        { value: "auto", label: t("CHAT_ORDER_AUTO") },
-        { value: "manual", label: t("CHAT_ORDER_MANUAL") },
-      ]}
-      onSelect={(value) => void chat.setChatOrder(value)}
-    />
-    <SelectField
-      label={t("DEFAULT_CATEGORY")}
-      selected={chat.defaultCategory}
-      options={[
-        { value: "", label: t("NO_CATEGORY") },
-        ...chat.scopedCategories.map((category) => ({ value: category.id, label: category.name })),
-      ]}
-      onSelect={(value) => void chat.setDefaultCategory(value)}
-    />
+    {#if !projectsOnly}
+      <SelectField
+        label={t("CHAT_ORDER")}
+        selected={chat.chatOrder}
+        options={[
+          { value: "auto", label: t("CHAT_ORDER_AUTO") },
+          { value: "manual", label: t("CHAT_ORDER_MANUAL") },
+        ]}
+        onSelect={(value) => void chat.setChatOrder(value)}
+      />
+      <SelectField
+        label={t("DEFAULT_CATEGORY")}
+        selected={chat.defaultCategory}
+        options={[
+          { value: "", label: t("NO_CATEGORY") },
+          ...chat.scopedCategories.map((category) => ({ value: category.id, label: category.name })),
+        ]}
+        onSelect={(value) => void chat.setDefaultCategory(value)}
+      />
 
-    <p class="mt-1 mb-1.5 px-1 {SECTION_LABEL_CLASS}">{t("CATEGORIES")}</p>
-    {#each chat.scopedCategories as category, index (category.id)}
-      {@const dragging = draggingId === category.id}
-      {@const hidden = chat.isCategoryHidden(category.id)}
-      <div
-        data-category={category.id}
-        class="relative {draggingId === null ? '' : 'pointer-events-none'}"
-        style="z-index: {dragging ? 1 : 0}"
-      >
+      <p class="mt-1 mb-1.5 px-1 {SECTION_LABEL_CLASS}">{t("CATEGORIES")}</p>
+      {#each chat.scopedCategories as category, index (category.id)}
+        {@const dragging = draggingId === category.id}
+        {@const hidden = chat.isCategoryHidden(category.id)}
         <div
-          class="flex items-center rounded-item pr-1 {dragging ? 'bg-hover' : ''}"
-          style="transform: translateY({dragging ? dragDy : shiftOf(index)}px); transition: {dragging || settling
-            ? 'none'
-            : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
+          data-category={category.id}
+          class="relative {draggingId === null ? '' : 'pointer-events-none'}"
+          style="z-index: {dragging ? 1 : 0}"
         >
-        <span
-          class="flex size-7 shrink-0 cursor-pointer touch-none items-center justify-center text-on-surface-variant"
-          onpointerdown={(event) => startDrag(event, category.id)}
-          role="presentation"
-        >
-          <GripHorizontal size={16} />
-        </span>
-        <div class="min-w-0 flex-1">
-          <EditableText
-            value={editing === category.id ? draft : category.name}
-            editing={editing === category.id}
-            onEdit={() => {
-              editing = category.id;
-              draft = category.name;
-            }}
-            oninput={(value) => (draft = value)}
-            onCommit={() => commit(category)}
-            onCancel={() => (editing = null)}
-          />
-        </div>
-        {#if !settings.lockedProject}
-        <PopupMenu
-          open={ownerMenu === category.id}
-          label={t("PROJECT")}
-          onOpenChange={(value) => (ownerMenu = value ? category.id : null)}
-        >
-          {#snippet trigger()}
+          <div
+            class="flex items-center rounded-item pr-1 {dragging ? 'bg-hover' : ''}"
+            style="transform: translateY({dragging ? dragDy : shiftOf(index)}px); transition: {dragging || settling
+              ? 'none'
+              : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
+          >
             <span
-              class="inline-flex h-7 max-w-32 cursor-pointer items-center gap-1.5 truncate rounded-full px-2.5 text-body-sm text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
+              class="flex size-7 shrink-0 cursor-pointer touch-none items-center justify-center text-on-surface-variant"
+              onpointerdown={(event) => startDrag(event, category.id)}
+              role="presentation"
             >
-              <Folder size={14} class="shrink-0" />
-              <span class="truncate">{ownerLabel(category)}</span>
+              <GripHorizontal size={16} />
             </span>
-          {/snippet}
-          <MenuItem
-            text={t("ALL_PROJECTS")}
-            selected={!category.projectKey}
-            onclick={() => void chat.setCategoryProject(category, "")}
-          />
-          {#each chat.historyProjects as project (project.projectKey)}
-            <MenuItem
-              text={projectLabel(project)}
-              selected={category.projectKey === project.projectKey}
-              onclick={() => void chat.setCategoryProject(category, project.projectKey)}
-            />
-          {/each}
-        </PopupMenu>
-        {/if}
-        <TooltipIconButton label={t("CATEGORY_COLOR")} onclick={() => (colouringCategory = category)}>
-          <Palette color={sessionColorOf(category.color) ?? undefined} />
-        </TooltipIconButton>
-        <TooltipIconButton
-          label={hidden ? t("SHOW") : t("HIDE")}
-                   onclick={() => chat.toggleCategoryHidden(category.id)}
-        >
-          {#if hidden}
-            <EyeOff />
-          {:else}
-            <Eye />
-          {/if}
-        </TooltipIconButton>
-        <TooltipIconButton label={t("DELETE")} onclick={() => (deletingCategory = category)}>
-          <Trash />
-        </TooltipIconButton>
+            <div class="min-w-0 flex-1">
+              <EditableText
+                value={editing === category.id ? draft : category.name}
+                editing={editing === category.id}
+                onEdit={() => {
+                  editing = category.id;
+                  draft = category.name;
+                }}
+                oninput={(value) => (draft = value)}
+                onCommit={() => commit(category)}
+                onCancel={() => (editing = null)}
+              />
+            </div>
+            {#if !settings.lockedProject}
+              <PopupMenu
+                open={ownerMenu === category.id}
+                label={t("PROJECT")}
+                onOpenChange={(value) => (ownerMenu = value ? category.id : null)}
+              >
+                {#snippet trigger()}
+                  <span
+                    class="inline-flex h-7 max-w-32 cursor-pointer items-center gap-1.5 truncate rounded-full px-2.5 text-body-sm text-on-surface-variant transition-colors hover:bg-hover hover:text-on-surface"
+                  >
+                    <Folder size={14} class="shrink-0" />
+                    <span class="truncate">{ownerLabel(category)}</span>
+                  </span>
+                {/snippet}
+                <MenuItem
+                  text={t("ALL_PROJECTS")}
+                  selected={!category.projectKey}
+                  onclick={() => void chat.setCategoryProject(category, "")}
+                />
+                {#each chat.historyProjects as project (project.projectKey)}
+                  <MenuItem
+                    text={projectLabel(project)}
+                    selected={category.projectKey === project.projectKey}
+                    onclick={() => void chat.setCategoryProject(category, project.projectKey)}
+                  />
+                {/each}
+              </PopupMenu>
+            {/if}
+            <TooltipIconButton label={t("CATEGORY_COLOR")} onclick={() => (colouringCategory = category)}>
+              <Palette color={sessionColorOf(category.color) ?? undefined} />
+            </TooltipIconButton>
+            <TooltipIconButton
+              label={hidden ? t("SHOW") : t("HIDE")}
+              onclick={() => chat.toggleCategoryHidden(category.id)}
+            >
+              {#if hidden}
+                <EyeOff />
+              {:else}
+                <Eye />
+              {/if}
+            </TooltipIconButton>
+            <TooltipIconButton label={t("DELETE")} onclick={() => (deletingCategory = category)}>
+              <Trash />
+            </TooltipIconButton>
+          </div>
         </div>
-      </div>
-    {/each}
-    <ActionButton
-      class="w-full"
-      text={t("ADD_CATEGORY")}
-      onclick={() => void chat.createCategory(`${t("CATEGORY")} ${chat.scopedCategories.length + 1}`)}
-    />
+      {/each}
+      <ActionButton
+        class="w-full"
+        text={t("ADD_CATEGORY")}
+        onclick={() => void chat.createCategory(`${t("CATEGORY")} ${chat.scopedCategories.length + 1}`)}
+      />
+    {/if}
 
     {#if !settings.lockedProject}
       <p class="mt-1 mb-1.5 px-1 {SECTION_LABEL_CLASS}">{t("PROJECTS")}</p>
@@ -335,7 +338,7 @@
       <ActionButton class="w-full" text={t("ADD_PROJECT")} onclick={() => (addingProject = true)} />
     {/if}
 
-    {#if chat.trashEnabled}
+    {#if chat.trashEnabled && !projectsOnly}
       <ActionButton class="mt-1 w-full" text={t("TRASH")} onclick={() => (trashOpen = true)} />
     {/if}
   </div>
