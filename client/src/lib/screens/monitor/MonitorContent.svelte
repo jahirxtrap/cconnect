@@ -6,7 +6,7 @@
   import { plural, t } from "$lib/i18n/index.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import { COMPACT_WIDTH } from "$lib/platform/layout.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -53,7 +53,7 @@
   {#if serverStatus.unavailable}
     <ServerUnavailable class="flex-1" />
   {:else if !monitor.info}
-    <EmptyState loading={!monitor.offline} text={t("CONNECTION_ERROR")} class="flex-1" />
+    <ConnectionError loading={!monitor.offline} class="flex-1" />
   {:else}
   {@const current = monitor.info}
   {@const gpu = monitor.gpu}

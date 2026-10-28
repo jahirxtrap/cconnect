@@ -36,8 +36,9 @@
 
   const BASE_CLASS =
     "no-callout inline-flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full transition-colors select-none disabled:cursor-default disabled:opacity-40";
-  const ACTIVE_CLASS = "text-accent enabled:hover:bg-hover";
-  const SELECTED_CLASS = "bg-surface-variant text-accent";
+  const NEUTRAL_PRESS_CLASS = "[--press-color:var(--c-on-surface-variant)]";
+  const ACTIVE_CLASS = `text-accent enabled:hover:bg-hover ${NEUTRAL_PRESS_CLASS}`;
+  const SELECTED_CLASS = `bg-surface-variant text-accent ${NEUTRAL_PRESS_CLASS}`;
   const IDLE_CLASS = "text-on-surface-variant enabled:hover:bg-hover enabled:hover:text-on-surface";
   const PRESS_SLOP = 10;
   const TOUCH_HIDE_MS = 1500;

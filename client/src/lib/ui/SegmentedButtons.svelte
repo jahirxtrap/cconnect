@@ -21,6 +21,7 @@
 <div
   class="{fill ? 'flex w-full' : 'inline-flex'} shrink-0 gap-0.5 rounded-full bg-surface-variant p-0.5 {className}"
   role="tablist"
+  data-press="off"
 >
   {#each options as option, index (option)}
     {@const count = counts[index] ?? null}
@@ -33,7 +34,7 @@
         ? 'flex-1'
         : ''} {index === selected
         ? 'bg-outline-variant text-on-surface'
-        : 'text-on-surface-variant hover:text-on-surface'}"
+        : 'text-on-surface-variant hover:text-on-surface active:text-on-surface'}"
     >
       <span class="truncate">{option}</span>
       {#if count !== null}

@@ -6,6 +6,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
+  import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -74,7 +75,7 @@
   {#if unavailable}
     <EmptyState text={t("WEB_UNAVAILABLE")} class="flex-1" />
   {:else if status === "failed"}
-    <EmptyState text={t("CONNECTION_ERROR")} class="flex-1" />
+    <ConnectionError class="flex-1" />
   {:else}
     <div class="mx-(--page-inset) mb-(--page-inset) min-h-0 flex-1 overflow-hidden rounded-panel bg-terminal">
       {#if Surface}

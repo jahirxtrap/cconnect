@@ -90,6 +90,7 @@
   import { LIST_VIEWPORT_CLASS, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
@@ -384,6 +385,19 @@
 
   const filtering = $derived(!!needle || (kind === "plugins" && pluginFilter.kind !== "all"));
 
+  const failed = $derived(
+    loaded &&
+      (kind === "plugins" || kind === "marketplaces"
+        ? extensions === null
+        : kind === "skills"
+          ? skills === null
+          : kind === "mcp"
+            ? mcpServers === null
+            : kind === "memories"
+              ? memories === null
+              : service === null),
+  );
+
   const shownCount = $derived(
     kind === "plugins"
       ? filteredPlugins.length
@@ -585,6 +599,8 @@
     <ServerUnavailable class="min-h-0 flex-1" />
   {:else if !loaded}
     <CenteredProgress class="flex-1" />
+  {:else if failed}
+    <ConnectionError class="min-h-0 flex-1" />
   {:else if kind !== "status" && !shownCount}
     <EmptyState
       icon={filtering ? NO_RESULTS_ICON : CLAUDE_ICONS[kind]}

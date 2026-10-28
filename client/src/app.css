@@ -344,8 +344,8 @@ html.scanning .qr-overlay {
 [data-pressed] {
   background-image: radial-gradient(
     circle var(--press-reach, 100%) at var(--press-x, 50%) var(--press-y, 50%),
-    color-mix(in srgb, currentColor calc(var(--press-alpha) * 20%), transparent) 0%,
-    color-mix(in srgb, currentColor calc(var(--press-alpha) * 11%), transparent) 100%
+    color-mix(in srgb, var(--press-color, currentColor) calc(var(--press-alpha) * 20%), transparent) 0%,
+    color-mix(in srgb, var(--press-color, currentColor) calc(var(--press-alpha) * 11%), transparent) 100%
   );
 }
 
