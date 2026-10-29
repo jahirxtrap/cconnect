@@ -98,6 +98,20 @@ One component owns the viewport; the chat list (`MessageList`) and the quick cha
   binary search over `offsetTop`) and marks the head that is stuck with `data-stuck`, which
   is all the styling hooks onto; there is no copy of the header to measure or push.
 
+## Panels (`screens/chat/panes.svelte.ts`)
+
+Chat and Agents can sit in either panel, each with its own tabs (`tabs` for Claude,
+`agentTabs` for ACP); the tools are single-instance, so placing one where the other panel
+has it swaps them. The pane a tool goes with (`contextRole`) gives it the environment `focus`
+selects, the folder the terminal opens in and the project Project files follows
+(`contextChat.workingPath`). The list on the left follows the focused pane (`list`).
+
+Svelte runs a derived again when a component reads it while being destroyed, with the values
+from before the change, and keeps the dependencies of that run: bits-ui's tooltip trigger
+reads `disabled` on destroy, which reaches `list` through the side list's props. A `list` that
+branched on the focused pane lost `kind` that way and stopped updating, so it reads all of its
+inputs before deciding. A shared derived that leaves state stuck is checked for the same.
+
 ## Mods (`screens/mods/`)
 
 `ModSurface`, one per chat state, holds the `mods` snapshot and every site's drawing.

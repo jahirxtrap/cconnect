@@ -290,8 +290,10 @@ project and environment — start a long task in one, switch to another, and com
 back to find it where you left it. Desktop and web get a tab bar; on mobile a
 switcher does the same. Open any chat or session in a new tab, reorder them, and
 on desktop reach for the keyboard (Ctrl+T to open, Ctrl+W to close, Ctrl+Tab to
-cycle). With both panels open a tab drags from one to the other as if the two
-bars were one. The tabs you had open come back when you reopen the app, each
+cycle). Chats and ACP agents open in either panel, each panel with its own
+tabs: a tab drags from one bar to the other, **Swap panels** in the panel menu
+trades the two, and the list on the left shows the chats of the panel you are
+in. The tabs you had open come back when you reopen the app, each
 loading only once you switch to it. The side panel's views — terminal, browser,
 project files, mods and ACP agents — sit in a bar you reorder by dragging, moving
 any of them into or out of its menu.
@@ -373,7 +375,8 @@ chat, served over the same authenticated connection.
 
 ## Project files
 
-The side panel also browses the project you are working on. Search the tree by
+The side panel also browses the project of the chat beside it, or another you
+pick. Search the tree by
 typing a few letters of any path, and open a file read-only while Claude edits
 it. Git colours the tree — added, modified, untracked — and inside a file the
 change is painted on the numbered lines themselves, with buttons to walk from
@@ -512,9 +515,10 @@ agent so they're available out of the box from the phone:
   every chat — that's where the file-sharing and progress-check conventions
   live. Your personal additions go in `USER.md`, edited straight from the
   Claude screen.
-- **ACP agents.** A right-panel view runs agents that speak the Agent Client
-  Protocol, such as Copilot, Codex or Gemini, installed from the official
-  catalog or added by hand, each with its own sessions.
+- **ACP agents.** A view for either panel runs agents that speak the Agent
+  Client Protocol, such as Copilot, Codex or Gemini, installed from the
+  official catalog or added by hand, with their chats listed on the left like
+  Claude's.
 - **Delegation.** Claude can hand a task to another AI and get its answer
   back: an ACP agent, an agent CLI added under ACP agents as a command, or
   another of your Claude accounts once its sheet says Claude can use it, with
@@ -658,7 +662,8 @@ the only way in: there is no browser screen to open on its own.
 
 ## Terminal
 
-A terminal opens beside the chat, in a panel you can drag as wide as you need:
+A terminal opens beside the chat and in its folder, in a panel you can drag as
+wide as you need:
 shells on the machine running the backend, each in its own tab, and the SSH hosts
 you saved. They run on the server rather than in the app, so closing it — or
 opening the same backend from your phone — finds them where you left them.

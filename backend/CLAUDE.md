@@ -18,14 +18,16 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 - `core/app.py` — the FastAPI app: router auto-discovery, gzip, catch-all 404. Served as
   `core.app:app`; it lives inside the package so an installed wheel carries it.
 - `core/cli.py` — the `cconnect` command and the supervisor: launches uvicorn as a child
-  and relaunches it on a restart request. Subcommands `run / expose / stop / status /
-  update / migrate / key`, with the launcher's original flags still accepted. `run.py` at
+  and relaunches it on a restart request. Subcommands `run / expose / stop / restart /
+  status / logs / doctor / update / migrate / key`, plus `-v` and `--port`, with the
+  launcher's original flags still accepted. `run.py` at
   the backend root is the three-line entry a checkout (and the desktop app) calls.
 - `core/` — `paths` (**the** path table: every file the backend owns, plus `INSTALLED`,
   which decides where the data folder is), `release` (the version contract), `config`
   (env), `display` (separator and joining, shared with the app), `settings_defs` + `db` +
-  `settings_store` (SQLite KV), `cli_manager`, `sdk`, `responses` (**the** envelope:
-  `{success, status, message, data}`).
+  `settings_store` (SQLite KV), `cli_manager`, `sdk`, `process_job` (on Windows, the job
+  object that takes the agents' processes down with the server), `responses` (**the**
+  envelope: `{success, status, message, data}`).
 - `core/packs/` — the built-in packs and `schema.json` / `builtin.json`, the pack format. The
   client build and the Tauri compile read them too, and so does `core/scripts/page_icon.js`
   (the page icon both browsers report), so all of them ship in the wheel.
@@ -86,10 +88,12 @@ manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins 
 reload, marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`,
 `/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
-Protocol agents: catalog, install, sign-in and sessions; reading or changing their
-environment variables takes the security key), `/api/packs/*` (the server's pack library and its
+Protocol agents: catalog, install, sign-in, forking and deleting sessions; reading or
+changing their environment variables takes the security key), `/api/packs/*` (the server's pack library and its
 previews; deleting from it takes the security key). Live streams: `WS /api/chat/ws`,
-`WS /api/list/ws` (chat/project list), `WS /api/system/ws`, `WS /api/shared/ws`,
+`WS /api/list/ws` (chat/project list), `WS /api/agents/ws` (an agent's chats: `watch`
+names the agent and the folder, the server pushes `sessions` snapshots and `activity`
+changes), `WS /api/system/ws`, `WS /api/shared/ws`,
 `WS /api/packs/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws` (frames and state
 of the server's Chromium; `watch` decides whether it runs, and an opening without it
 watches, which is what an app older than 1.10.3 sends).
@@ -111,7 +115,11 @@ Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`,
 `mod_answer`, `mod_client_module`, and for an ACP agent (a `start` that names one) `set_option`,
 `agent_login`, `agent_logout`, `agent_retry` and `history`. An agent's chat gets `agent_state`
 (status, options, commands, sign-in methods) and `history` (its rows, paged like a transcript)
-outside the seq'd stream.
+outside the seq'd stream. Those rows come from the agent itself, replayed by `session/load`:
+the server stores no agent messages, only the session ids of agents without `session/list`
+(`AGENT_SESSIONS_FILE`). A new agent chat creates its session with the first message once the
+agent's options are remembered (`AGENT_DEFAULTS_FILE`); delegation creates it at once
+(`create_now`).
 
 Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
 the app adopts it, and only `set_generation` changes it. A tab that had not loaded its
@@ -194,7 +202,9 @@ releases the least recently used idle ones past it; the live session releases it
 `session_grace` seconds (300 by default) after the last socket detaches, once nothing runs in the background (`working` counts the
 tasks the CLI reported). A turn whose options differ from the ones the CLI started with
 (`mark`: model, effort, permission mode, mods) closes it and starts a fresh one, and so does
-another account, since the account is the CLI's config folder and credentials. When the CLI
+another account, since the account is the CLI's config folder and credentials. Stopping or
+restarting the server closes the persistent CLIs and the agents' processes first
+(`live_sessions.close_processes`). When the CLI
 starts a turn on its own, a mod sending a prompt or a background task finishing,
 `own_turn` makes the live session adopt it so it streams like any other; an adopted turn
 keeps the running CLI (`resident(keep=True)`) and never reshapes it, or it would kill the
