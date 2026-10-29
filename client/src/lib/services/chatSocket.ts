@@ -37,7 +37,7 @@ import {
   type ModState,
 } from "$lib/data/modModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
-import { nativeSockets, openSocket } from "$lib/platform/androidSocket";
+import { describeSocket, nativeSockets, onSocketTap, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
 import type { TerminalInfo } from "./terminalApi";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
@@ -421,10 +421,19 @@ export class ChatSocket {
   #sideLastSeq = 0;
   #sideResume: string | null = null;
 
+  #subject = "";
+
   constructor(
     private readonly onEvent: (side: boolean, parent: string | null, event: ServerEvent) => void,
     private readonly profile: () => Profile = () => backend.active,
+    private readonly agent: () => string = () => "",
+    private readonly onTap: () => void = () => {},
   ) {}
+
+  describe(subject: string) {
+    this.#subject = subject;
+    describeSocket(this.#socket, subject);
+  }
 
   connect() {
     this.#closed = false;
@@ -675,8 +684,10 @@ export class ChatSocket {
     this.#clearHandshake();
     this.#socket?.close();
     this.onEvent(false, null, { type: "connecting", resumed });
-    const socket = openSocket(url, true);
+    const socket = openSocket(url, true, this.agent());
     this.#socket = socket;
+    describeSocket(socket, this.#subject);
+    onSocketTap(socket, () => this.onTap());
 
     this.#handshake = setTimeout(() => {
       this.#handshake = null;

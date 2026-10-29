@@ -1,14 +1,15 @@
 interface LinkBridge {
-  open: (id: string, url: string) => void;
+  open: (id: string, url: string, agent: string) => void;
   send: (id: string, text: string) => void;
+  describe: (id: string, subject: string) => void;
   close: (id: string) => void;
   reset: () => void;
-  notifications: (done: string, waiting: string) => void;
+  notifications: (done: string, waiting: string, claude: string) => void;
 }
 
 interface Frame {
   id: string;
-  kind: "open" | "message" | "close";
+  kind: "open" | "message" | "close" | "tap";
   payload: string;
 }
 
@@ -36,18 +37,23 @@ class NativeSocket {
   onmessage: ((event: { data: string }) => void) | null = null;
   onclose: ((event: { code: number; reason: string }) => void) | null = null;
   onerror: (() => void) | null = null;
+  ontap: ((session: string) => void) | null = null;
 
   readonly #id: string;
 
-  constructor(url: string) {
+  constructor(url: string, agent: string) {
     install();
     this.#id = `${new URL(url).pathname}#${++opened}`;
     live.set(this.#id, this);
-    bridge()?.open(this.#id, url);
+    bridge()?.open(this.#id, url, agent);
   }
 
   send(text: string) {
     bridge()?.send(this.#id, text);
+  }
+
+  describe(subject: string) {
+    bridge()?.describe(this.#id, subject);
   }
 
   close() {
@@ -66,6 +72,10 @@ class NativeSocket {
       this.onmessage?.({ data: frame.payload });
       return;
     }
+    if (frame.kind === "tap") {
+      this.ontap?.(frame.payload);
+      return;
+    }
     this.readyState = WebSocket.CLOSED;
     live.delete(this.#id);
     this.onclose?.({ code: 1006, reason: frame.payload });
@@ -74,9 +84,17 @@ class NativeSocket {
 
 export const nativeSockets = (): boolean => bridge() !== undefined;
 
-export const openSocket = (url: string, native: boolean): WebSocket =>
-  native && nativeSockets() ? (new NativeSocket(url) as unknown as WebSocket) : new WebSocket(url);
+export const openSocket = (url: string, native: boolean, agent = ""): WebSocket =>
+  native && nativeSockets() ? (new NativeSocket(url, agent) as unknown as WebSocket) : new WebSocket(url);
 
-export const nativeNotifications = (done: string, waiting: string) => {
-  bridge()?.notifications(done, waiting);
+export const describeSocket = (socket: WebSocket | null, subject: string) => {
+  if (socket instanceof NativeSocket) socket.describe(subject);
+};
+
+export const onSocketTap = (socket: WebSocket, onTap: (session: string) => void) => {
+  if (socket instanceof NativeSocket) socket.ontap = onTap;
+};
+
+export const nativeNotifications = (done: string, waiting: string, claude: string) => {
+  bridge()?.notifications(done, waiting, claude);
 };

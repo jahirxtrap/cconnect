@@ -11,6 +11,7 @@ import {
 import { settings } from "./settings.svelte";
 import { isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
 import { createHttp } from "$lib/services/http";
+import { notifier } from "$lib/services/notifier.svelte";
 import { createSettingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
 import { ReconnectingSocket } from "$lib/services/socket";
 
@@ -61,6 +62,10 @@ export class ChatListStore {
             item.activity || item.resident ? { ...item, activity: null, resident: false } : item,
           );
           if (!this.projects.length && !this.sessions.length) this.loading = true;
+        },
+        onTap: (sessionId) => {
+          const session = this.sessions.find((item) => item.sessionId === sessionId);
+          if (session) notifier.reveal(session, profile?.id ?? null);
         },
       },
       () => profile,

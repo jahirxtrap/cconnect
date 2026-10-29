@@ -114,6 +114,7 @@ class MainActivity : TauriActivity() {
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
+    link.tapped(intent)
     takeShare(intent)
     deliverShare()
   }

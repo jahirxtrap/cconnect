@@ -315,6 +315,10 @@ export class ChatState {
     return agents.find(this.environment, this.agent)?.name ?? this.agentState?.info?.title ?? this.agent ?? "";
   }
 
+  get assistantName(): string {
+    return this.agent ? this.agentName : t("CLAUDE");
+  }
+
   get agentTitle(): string | null {
     const opening = this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH);
     return this.agentState?.title || opening || null;
@@ -377,6 +381,8 @@ export class ChatState {
   #socket = new ChatSocket(
     (side, parent, event) => this.#onEvent(side, parent, event),
     () => this.environment,
+    () => (this.agent ? this.agentName : ""),
+    () => notifier.activate(this),
   );
   readonly mods = new ModSurface({
     render: (site, rid) => this.#socket.sendModRender(site, rid),
@@ -647,6 +653,7 @@ export class ChatState {
     this.elements = [];
     if (channel !== null && channel !== this.#socket.channel) {
       this.#rememberPrompt(body);
+      this.#describeAgent();
       this.#socket.sendPrompt(body, uploaded, this.#nextOutgoingId(), channel);
       return;
     }
@@ -696,7 +703,12 @@ export class ChatState {
         this.#optimisticMessageId = messageId;
       }
     }
+    this.#describeAgent();
     this.#pumpQueue();
+  }
+
+  #describeAgent() {
+    if (this.agent) this.#socket.describe(this.agentTitle ?? "");
   }
 
   removeQueued(id: string) {
@@ -2644,14 +2656,14 @@ export class ChatState {
       case "done":
         if (this.streaming && settings.notifyTaskDone && !event.replay) {
           void notifier.notify(
-            t("NOTIF_TASK_DONE"),
+            t("NOTIF_TASK_DONE", this.assistantName),
             this.messages
               .filter((item) => item.role === "assistant")
               .at(-1)
               ?.text.split("\n")
               .find((line) => line.trim())
               ?.slice(0, NOTIFICATION_BODY_LENGTH) ?? null,
-            this.tabId,
+            this,
           );
         }
         this.#resetStreaming();
@@ -2746,9 +2758,10 @@ export class ChatState {
                   : data.titleKey === "questions"
                     ? "NOTIF_QUESTION"
                     : "NOTIF_COMPONENT",
+                this.assistantName,
               ),
               this.#notificationBody(kind, event.blocks, event.toolName, event.input, data.title),
-              this.tabId,
+              this,
               silentActions
                 ? []
                 : event.options

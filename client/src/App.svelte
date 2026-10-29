@@ -21,6 +21,7 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { notifier } from "$lib/services/notifier.svelte";
   import { updater } from "$lib/services/updater.svelte";
+  import { agentTabs } from "$lib/screens/agents/agentTabs.svelte";
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -41,9 +42,18 @@
   tabs.start();
   serverStatus.start();
   void updater.consumeIfInstalled();
-  notifier.start((tabId) => {
-    if (tabId) panes.reveal(tabId);
-  });
+  notifier.start(
+    (chat) => {
+      const agentTab = chat.agent ? agentTabs.tabOf(chat) : null;
+      if (agentTab) {
+        agentTabs.select(agentTab.pane, agentTab.id);
+        panes.setView(agentTab.pane, "agents");
+      } else if (chat.tabId) {
+        panes.reveal(chat.tabId);
+      }
+    },
+    (session, environmentId) => panes.revealSession(session, environmentId),
+  );
   $effect(() => publishNotificationTitles());
   void desktop.start();
 

@@ -471,6 +471,11 @@ class Panes {
     tabs.commit();
   }
 
+  revealSession(session: SessionInfo, environmentId: string | null) {
+    const open = tabs.list.find((tab) => tab.sessionId === session.sessionId);
+    this.reveal((open ?? tabs.openSessionTab(session, environmentId, this.#bring(this.target))).id);
+  }
+
   reveal(id: string) {
     const tab = tabs.list.find((item) => item.id === id);
     if (!tab) return;

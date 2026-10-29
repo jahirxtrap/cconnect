@@ -22,7 +22,14 @@ private const val CHANNEL_ID = "cconnect.chat"
 private const val PING_SECONDS = 20L
 private const val QUEUE_LIMIT = 2000
 private const val BATCH_LIMIT = 200
-private val BUSY = setOf("working", "slow", "compacting")
+private const val ACTIVITY = "activity"
+private const val READY = "ready"
+private const val WAITING = "waiting"
+private const val NAME_SLOT = "{1}"
+private const val TAP = "tap"
+private const val EXTRA_SOCKET = "cconnect.notification.socket"
+private const val EXTRA_SESSION = "cconnect.notification.session"
+private val BUSY = setOf("working", "retrying", "compacting")
 
 class BackgroundLink(private val context: Context, private val view: () -> WebView?) {
   private val client = OkHttpClient.Builder()
@@ -34,12 +41,16 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   private val queued = ConcurrentHashMap<String, MutableList<String>>()
   private val activity = ConcurrentHashMap<String, String>()
   private val titles = ConcurrentHashMap<String, String>()
+  private val agents = ConcurrentHashMap<String, String>()
+  private val subjects = ConcurrentHashMap<String, String>()
+  private val states = ConcurrentHashMap<String, String>()
   private val outbox = ArrayDeque<String>()
   private var draining = false
 
   @Volatile private var awake = true
   @Volatile private var doneTitle = ""
   @Volatile private var waitingTitle = ""
+  @Volatile private var claudeName = ""
 
   fun onForeground() {
     awake = true
@@ -57,27 +68,32 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     for (socket in sockets.values) socket.cancel()
     sockets.clear()
     queued.clear()
+    agents.clear()
+    subjects.clear()
+    states.clear()
   }
 
   @JavascriptInterface
   fun reset() = closeAll()
 
   @JavascriptInterface
-  fun notifications(done: String, waiting: String) {
+  fun notifications(done: String, waiting: String, claude: String) {
     doneTitle = done
     waitingTitle = waiting
+    claudeName = claude
   }
 
   @JavascriptInterface
-  fun open(id: String, url: String) {
-    sockets.remove(id)?.cancel()
-    queued.remove(id)
+  fun open(id: String, url: String, agent: String) {
+    close(id)
+    if (agent.isNotEmpty()) agents[id] = agent
     sockets[id] = client.newWebSocket(
       Request.Builder().url(url.replaceFirst("ws", "http")).build(),
       object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) = emit(id, "open", "")
         override fun onMessage(webSocket: WebSocket, text: String) {
-          if (!awake) watch(text)
+          if (agents.containsKey(id) && text.contains(ACTIVITY)) follow(id, text)
+          if (!awake) watch(id, text)
           emit(id, "message", text)
         }
         override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = emit(id, "close", reason)
@@ -93,19 +109,56 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   }
 
   @JavascriptInterface
+  fun describe(id: String, subject: String) {
+    subjects[id] = subject
+  }
+
+  @JavascriptInterface
   fun close(id: String) {
     sockets.remove(id)?.cancel()
     queued.remove(id)
+    agents.remove(id)
+    subjects.remove(id)
+    states.remove(id)
   }
 
-  private fun watch(text: String) {
+  private fun follow(id: String, text: String) {
+    val event = runCatching { JSONObject(text) }.getOrNull() ?: return
+    when (event.optString("type")) {
+      READY -> states[id] = event.optString(ACTIVITY)
+      ACTIVITY -> moved(id, event.optString("state"))
+    }
+  }
+
+  private fun moved(id: String, now: String) {
+    val before = states.put(id, now).orEmpty()
+    val agent = agents[id] ?: return
+    if (!awake) changed(id, "", before, now, agent, subjects[id].orEmpty())
+  }
+
+  private fun changed(socket: String, session: String, before: String, now: String, name: String, body: String) {
+    if (now == WAITING && before != WAITING) notify(socket, session, titled(waitingTitle, name), body)
+    else if (before in BUSY && now !in BUSY && now != WAITING) notify(socket, session, titled(doneTitle, name), body)
+  }
+
+  private fun titled(template: String, name: String) = template.replace(NAME_SLOT, name)
+
+  fun tapped(intent: Intent) {
+    val socket = intent.getStringExtra(EXTRA_SOCKET) ?: return
+    val session = intent.getStringExtra(EXTRA_SESSION).orEmpty()
+    intent.removeExtra(EXTRA_SOCKET)
+    intent.removeExtra(EXTRA_SESSION)
+    emit(socket, TAP, session)
+  }
+
+  private fun watch(socket: String, text: String) {
     val event = runCatching { JSONObject(text) }.getOrNull() ?: return
     when (event.optString("type")) {
       "snapshot" -> {
         val sessions = event.optJSONArray("sessions") ?: return
         for (index in 0 until sessions.length()) remember(sessions.optJSONObject(index) ?: continue)
       }
-      "session_changed" -> announce(event.optJSONObject("session") ?: return)
+      "session_changed" -> announce(socket, event.optJSONObject("session") ?: return)
     }
   }
 
@@ -116,18 +169,16 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     titles[id] = session.optString("title")
   }
 
-  private fun announce(session: JSONObject) {
+  private fun announce(socket: String, session: JSONObject) {
     val id = session.optString("session_id")
     if (id.isEmpty()) return
     val before = activity[id] ?: ""
     val now = session.optString("activity")
     remember(session)
-    val name = titles[id].orEmpty()
-    if (now == "waiting" && before != "waiting") notify(id, waitingTitle, name)
-    else if (before in BUSY && now !in BUSY && now != "waiting") notify(id, doneTitle, name)
+    changed(socket, id, before, now, claudeName, titles[id].orEmpty())
   }
 
-  private fun notify(id: String, title: String, body: String) {
+  private fun notify(socket: String, session: String, title: String, body: String) {
     if (title.isEmpty()) return
     val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -135,14 +186,18 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
         NotificationChannel(CHANNEL_ID, context.getString(R.string.app_name), NotificationManager.IMPORTANCE_DEFAULT),
       )
     }
+    val key = session.ifEmpty { socket }.hashCode()
     val open = PendingIntent.getActivity(
       context,
-      0,
-      Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-      PendingIntent.FLAG_IMMUTABLE,
+      key,
+      Intent(context, MainActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        .putExtra(EXTRA_SOCKET, socket)
+        .putExtra(EXTRA_SESSION, session),
+      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
     manager.notify(
-      id.hashCode(),
+      key,
       Notification.Builder(context, CHANNEL_ID)
         .setContentTitle(title)
         .setContentText(body)

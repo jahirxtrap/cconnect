@@ -1,4 +1,4 @@
-import { nativeSockets, openSocket } from "$lib/platform/androidSocket";
+import { nativeSockets, onSocketTap, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
 
@@ -7,6 +7,7 @@ export interface SocketHandlers {
   onMessage: (data: Record<string, unknown>) => void;
   onBinary?: (data: ArrayBuffer) => void;
   onDrop?: () => void;
+  onTap?: (session: string) => void;
 }
 
 const MAX_BACKOFF_MS = 15_000;
@@ -94,6 +95,7 @@ export class ReconnectingSocket {
     this.#socket?.close();
     const socket = openSocket(url, this.native);
     socket.binaryType = "arraybuffer";
+    onSocketTap(socket, (session) => this.handlers.onTap?.(session));
     this.#socket = socket;
 
     this.#handshake = setTimeout(() => {
