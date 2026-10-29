@@ -44,7 +44,7 @@
     oninput={(value) => (text = value)}
     {secret}
     singleLine
-    autofocus
+    autoselect
   >
     {#snippet trailing()}
       {#if suffix}

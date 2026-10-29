@@ -14,6 +14,7 @@
   import Trash from "@lucide/svelte/icons/trash";
   import ZoomIn from "@lucide/svelte/icons/zoom-in";
   import ZoomOut from "@lucide/svelte/icons/zoom-out";
+  import { formatPercent } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
@@ -103,7 +104,7 @@
     {/each}
   </MenuSub>
   {#if zoom !== null}
-    <MenuSub icon={ZoomIn} text={t("BROWSER_ZOOM")}>
+    <MenuSub icon={ZoomIn} text={t("BROWSER_ZOOM")} value={formatPercent(zoom)}>
       <MenuItem
         icon={ZoomIn}
         text={t("BROWSER_ZOOM_IN")}

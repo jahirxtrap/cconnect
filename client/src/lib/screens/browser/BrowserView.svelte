@@ -59,6 +59,7 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
+  import { selectField } from "$lib/ui/field";
   import { keepFocus } from "$lib/ui/keepFocus";
   import { PullState } from "$lib/ui/pull.svelte";
   import PullIndicator from "$lib/ui/PullIndicator.svelte";
@@ -681,16 +682,13 @@
   useShortcut("browser.back", goBack);
   useShortcut("browser.forward", () => (onServer ? link?.forward() : deviceBrowser.forward()));
   const selectAddress = (event: FocusEvent) => {
-    if (event.target instanceof HTMLInputElement) event.target.select();
+    if (event.target instanceof HTMLInputElement) selectField(event.target);
   };
 
   function focusAddress() {
     const input = addressBox?.querySelector("input");
     if (!input) return;
-    const take = () => {
-      input.focus();
-      input.select();
-    };
+    const take = () => selectField(input);
     if (onServer) take();
     else void deviceBrowser.release().then(take);
   }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FIELD_BOX_CLASS, FIELD_INPUT_CLASS } from "./field";
+  import { FIELD_BOX_CLASS, FIELD_INPUT_CLASS, selectField } from "./field";
 
   interface Props {
     value: string;
@@ -16,10 +16,7 @@
   let field = $state<HTMLInputElement | null>(null);
 
   $effect(() => {
-    if (editing && field && document.activeElement !== field) {
-      field.focus();
-      field.select();
-    }
+    if (editing && field && document.activeElement !== field) selectField(field);
   });
 </script>
 

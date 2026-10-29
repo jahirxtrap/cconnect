@@ -7,7 +7,14 @@
   import type { HTMLInputAttributes } from "svelte/elements";
   import { t } from "$lib/i18n/index.svelte";
   import ErrorText from "./ErrorText.svelte";
-  import { FIELD_ACTIONS_CLASS, FIELD_ACTIONS_GAP, FIELD_BOX_CLASS, FIELD_INPUT_CLASS, FIELD_LABEL_CLASS } from "./field";
+  import {
+    FIELD_ACTIONS_CLASS,
+    FIELD_ACTIONS_GAP,
+    FIELD_BOX_CLASS,
+    FIELD_INPUT_CLASS,
+    FIELD_LABEL_CLASS,
+    selectField,
+  } from "./field";
 
   interface Props {
     value: string;
@@ -21,6 +28,7 @@
     minLines?: number;
     maxLines?: number;
     autofocus?: boolean;
+    autoselect?: boolean;
     numeric?: boolean;
     url?: boolean;
     enterKeyHint?: HTMLInputAttributes["enterkeyhint"];
@@ -46,6 +54,7 @@
     minLines = 1,
     maxLines,
     autofocus = false,
+    autoselect = false,
     numeric = false,
     url = false,
     enterKeyHint,
@@ -76,8 +85,16 @@
 
   const handle = (event: Event) => oninput((event.currentTarget as HTMLInputElement).value);
 
+  let selected = false;
+
   $effect(() => {
-    if (autofocus) field?.focus();
+    if (!field) return;
+    if (autoselect && !selected) {
+      selected = true;
+      selectField(field);
+    } else if (autofocus || autoselect) {
+      field.focus();
+    }
   });
 </script>
 

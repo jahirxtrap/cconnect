@@ -19,12 +19,13 @@
 
   interface Props {
     text: string;
+    value?: string;
     icon?: IconSource;
     leading?: Snippet;
     children: Snippet;
   }
 
-  const { text, icon: IconComponent, leading, children }: Props = $props();
+  const { text, value, icon: IconComponent, leading, children }: Props = $props();
 
   const drill = isTouch ? menuDrill() : undefined;
 </script>
@@ -35,6 +36,9 @@
   {/if}
   {@render leading?.()}
   <span class="min-w-0 flex-1 truncate text-body-md">{text}</span>
+  {#if value}
+    <span class="shrink-0 pl-4 text-caption text-faint">{value}</span>
+  {/if}
   <ChevronRight size={MENU_ICON_SIZE} class={menuIconClass()} />
 {/snippet}
 
