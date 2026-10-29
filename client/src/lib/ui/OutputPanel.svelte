@@ -8,5 +8,5 @@
 </script>
 
 <p
-  class="selectable rounded-md bg-surface-variant px-3 py-2.5 font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface {className}"
+  class="selectable rounded-md bg-surface-nested px-3 py-2.5 font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface {className}"
 >{text}</p>

@@ -95,7 +95,7 @@
   });
 </script>
 
-<div class="flex min-w-0 shrink-0 flex-col rounded-md bg-surface-variant py-2 font-mono text-body-sm leading-[18px]">
+<div class="flex min-w-0 shrink-0 flex-col rounded-md bg-surface-nested py-2 font-mono text-body-sm leading-[18px]">
   {#each rows as row, index (index)}
     <div class="flex min-w-0 flex-row px-3 {TONES[row.tone]}">
       {#if numbered}

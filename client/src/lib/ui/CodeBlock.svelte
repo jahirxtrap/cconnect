@@ -49,7 +49,7 @@
   };
 </script>
 
-<div class="w-full overflow-hidden rounded-panel bg-surface-variant">
+<div class="w-full overflow-hidden rounded-panel bg-surface-nested">
   <div
     class="flex items-center pr-0.5 pl-2.5"
     style="padding-top: var(--chat-pad-xs)"

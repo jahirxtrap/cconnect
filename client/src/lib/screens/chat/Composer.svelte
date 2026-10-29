@@ -217,7 +217,7 @@
 
   let dismissed = $state(false);
   let highlighted = $state(0);
-  let previewed = $state(false);
+  let preview = $state<{ from: string; shown: string } | null>(null);
 
   const write = (value: string) => {
     onDraft(value);
@@ -227,7 +227,7 @@
   const reopen = () => {
     dismissed = false;
     highlighted = 0;
-    previewed = false;
+    preview = null;
   };
 
   const offer = (value: string) => {
@@ -314,11 +314,13 @@
     );
   };
 
-  const typed = $derived(dismissed ? null : commandToken(draft));
+  const query = $derived(preview && draft === preview.shown ? preview.from : draft);
+
+  const typed = $derived(dismissed ? null : commandToken(query));
 
   const argumentFor = $derived.by(() => {
     if (dismissed || typed !== null) return null;
-    const command = resolve(draft);
+    const command = resolve(query);
     return command?.argumentHint ? command : null;
   });
 
@@ -371,13 +373,15 @@
 
   const cycle = (step: number, keepFirst = false) => {
     if (!pickable.length) return;
-    highlighted = !keepFirst || previewed ? (active + step + pickable.length) % pickable.length : active;
-    previewed = true;
+    highlighted = !keepFirst || preview ? (active + step + pickable.length) % pickable.length : active;
     const entry = pickable[highlighted];
-    if (entry.command) write(commandText(entry.command));
+    const shown = entry.command ? commandText(entry.command) : draft;
+    preview = { from: query, shown };
+    if (entry.command) write(shown);
   };
 
   const complete = (command: CommandOption) => {
+    preview = null;
     write(takesArguments(command) ? commandText(command) : "");
     field?.focus();
     if (!takesArguments(command)) onCommand(command);

@@ -40,9 +40,9 @@
   "colorRoles": {
     "background": "the window behind everything: the chat, the panels and the browser's start page",
     "on-background": "main text and icons",
-    "surface": "panels, dialogs and cards on the background: the chat list, blocks in the chat, date separators",
-    "surface-variant": "raised controls: the composer, fields, chips, toolbar buttons and your own messages",
-    "surface-nested": "a block inside another block, such as the body of an open collapsible",
+    "surface": "panels, dialogs and cards on the background: the chat list, the composer, and Thinking and the other blocks in the chat",
+    "surface-variant": "raised controls and your own messages: fields, chips, buttons, the date separator and the selected row of a list",
+    "surface-nested": "code and command output in the chat and a block inside another block, a tone between surface and surface-variant",
     "float": "menus, popovers and floating cards",
     "on-surface-variant": "secondary text and icons: summaries, captions, inactive icons",
     "faint": "the faintest text and marks: placeholders, timestamps and hints",

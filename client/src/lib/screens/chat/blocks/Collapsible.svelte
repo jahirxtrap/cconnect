@@ -77,7 +77,11 @@
   </div>
   {#if isExpanded && children && !labelOnly}
     <div use:gridHeight data-block-body>
-      <div class="{bodyClass} px-2.5 pb-2.5 [--page-inset:0px]">
+      <div
+        class="{bodyClass} px-2.5 pb-2.5 [--page-inset:0px] {nested
+          ? '[--color-surface-nested:var(--c-surface-variant)]'
+          : ''}"
+      >
         {@render children()}
       </div>
     </div>
