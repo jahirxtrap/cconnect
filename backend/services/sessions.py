@@ -475,7 +475,7 @@ def set_session_color(project_key: str, session_id: str, color: str) -> bool:
     return True
 
 
-_META_FIELD = {"custom-title": "customTitle", "agent-name": "agentName", "agent-color": "agentColor"}
+_META_FIELD = {"custom-title": "customTitle", "ai-title": "aiTitle", "agent-name": "agentName", "agent-color": "agentColor"}
 _PINNED_FIELD = {"custom-title": "title", "agent-color": "color"}
 _pinned: dict[str, dict[str, str]] = {}
 
@@ -549,14 +549,35 @@ async def auto_generate_title(project_key: str, session_id: str, account: str = 
 
     hub.set_activity(session_id, "renaming")
     try:
-        raw = await generate_title(transcript, account)
-        title = raw.replace("\n", " ").strip().strip("\"'").strip().rstrip(".")[:80]
+        title = _clean_title(await generate_title(transcript, account))
         if not title:
             return None
         await rename_session(project_key, session_id, title)
         return title
     finally:
         await hub.settle_activity(session_id)
+
+
+async def name_untitled(project_key: str, session_id: str, account: str = "") -> None:
+    """Write an automatic `ai-title` for a new chat the CLI left untitled; a title the user set is never touched."""
+    file = _session_file(project_key, session_id)
+    if not file.is_file() or (await asyncio.to_thread(_session_meta, file))[2]:
+        return
+    transcript = await asyncio.to_thread(_transcript_for_title, file)
+    if not transcript:
+        return
+    from services.chat_list import hub
+    from services.claude_runtime import generate_title
+
+    title = _clean_title(await generate_title(transcript, account))
+    if not title:
+        return
+    await asyncio.to_thread(_append_entry, file, _meta_entry("ai-title", title, session_id))
+    await hub.resync()
+
+
+def _clean_title(raw: str) -> str:
+    return raw.replace("\n", " ").strip().strip("\"'").strip().rstrip(".")[:80]
 
 
 def delete_session(project_key: str, session_id: str) -> bool:

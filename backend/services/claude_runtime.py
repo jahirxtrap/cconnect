@@ -796,7 +796,6 @@ async def run_prompt(
     account: Optional[str] = None,
     effort: str = "max",
     partial: bool = False,
-    name: Optional[str] = None,
     ask_user: Optional[Callable[[dict], Awaitable[dict]]] = None,
     emit: Optional[Callable[[dict], Awaitable[None]]] = None,
     drain: Optional[AsyncIterator[dict]] = None,
@@ -832,7 +831,7 @@ async def run_prompt(
     if not _model_offered(info, model, account):
         model = None
     effort_level = cli_info.effort_for(info, model, effort, account)
-    extra_args = {"name": name} if name else {}
+    extra_args = {}
     if resume and resume_at:
         extra_args["resume-session-at"] = resume_at
     if drain is not None:

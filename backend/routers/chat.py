@@ -92,7 +92,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
 
     def factory(ask_user, emit):
         async def one(text, attachments, seed_id, drain, request_compact, adopted=False):
-            name = text.strip()[:80] if state.session_id is None else None
+            fresh = state.session_id is None
             compacted = False
             is_compact_cmd = text.strip() == "/compact" or text.strip().startswith("/compact ")
             is_local_cmd = text.strip().startswith("/") and not is_compact_cmd
@@ -129,7 +129,6 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     account=accounts.resolve(state.account),
                     effort=state.effort,
                     partial=state.partial,
-                    name=name,
                     ask_user=ask_user,
                     emit=emit,
                     drain=drain() if drain else None,
@@ -173,6 +172,14 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                         written_from if state.session_id == resumed_sid else 0,
                     )
             if state.cwd and state.session_id:
+                if fresh and not adopted and not is_local_cmd and not is_compact_cmd:
+                    asyncio.get_running_loop().create_task(
+                        sessions_service.name_untitled(
+                            sessions_service.project_key_for(state.cwd),
+                            state.session_id,
+                            accounts.resolve(state.account),
+                        )
+                    )
                 # The token counts and summary are written to the transcript only after the turn.
                 if is_compact_cmd:
                     after = sessions_service.compact_boundary_count(state.cwd, state.session_id)
