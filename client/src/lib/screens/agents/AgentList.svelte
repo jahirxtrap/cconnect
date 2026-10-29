@@ -45,23 +45,21 @@
   {drawerMode}
   {onClose}
 >
-  {#snippet tools()}
-    <ListTools
-      {chat}
-      query={list.query}
-      onQuery={(value) => (list.query = value)}
-      projects={chat?.historyProjects ?? []}
-      project={chat?.historyProject ?? null}
-      projectsLoading={chat?.historyLoading ?? false}
-      onProject={(projectKey) => {
-        if (chat) agentTabs.selectProject(chat, projectKey);
-      }}
-      allProjects={false}
-      organizable={!!chat && !chat.historyUnavailable && !settings.lockedProject}
-      onOrganize={() => {
-        if (chat) onOrganize(chat);
-      }}
-    />
-  {/snippet}
+  <ListTools
+    {chat}
+    query={list.query}
+    onQuery={(value) => (list.query = value)}
+    projects={chat?.historyProjects ?? []}
+    project={chat?.historyProject ?? null}
+    projectsLoading={chat?.historyLoading ?? false}
+    onProject={(projectKey) => {
+      if (chat) agentTabs.selectProject(chat, projectKey);
+    }}
+    allProjects={false}
+    organizable={!!chat && !chat.historyUnavailable && !settings.lockedProject}
+    onOrganize={() => {
+      if (chat) onOrganize(chat);
+    }}
+  />
   <AgentSessionRows {list} {chat} />
 </SideList>

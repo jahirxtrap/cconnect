@@ -5,9 +5,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { sessionColorOptions } from "$lib/design/sessionColors";
   import { accentVars, theme } from "$lib/design/theme.svelte";
-  import type { SessionInfo } from "$lib/data/models";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -15,12 +13,9 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { useAgents } from "$lib/services/agents.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import ColorDialog from "$lib/ui/ColorDialog.svelte";
-  import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import Drawer from "$lib/ui/Drawer.svelte";
   import { DROP_BORDER_CLASS } from "$lib/ui/fileDrop";
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
-  import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
   import { settling } from "$lib/ui/settling.svelte";
@@ -32,9 +27,10 @@
   import PanelPreview, { previewFills } from "./PanelPreview.svelte";
   import PaneViewMenu from "./PaneViewMenu.svelte";
   import ChatList from "./ChatList.svelte";
+  import ChatListDialogs from "./ChatListDialogs.svelte";
+  import { ChatListEdits } from "./chatListEdits.svelte";
   import { panes } from "./panes.svelte";
   import LeftPane, { LEFT_MIN_WIDTH, RAIL_WIDTH } from "./LeftPane.svelte";
-  import MoveSessionDialog from "./MoveSessionDialog.svelte";
   import OrganizeDialog from "./OrganizeDialog.svelte";
   import TabStrip from "./TabStrip.svelte";
   import type { ChatState } from "./state.svelte";
@@ -43,7 +39,6 @@
 
   useAgents();
 
-  const chat = $derived(panes.focusedChat);
   const listChat = $derived(panes.listChat);
   const paneLayer = $derived(layout.mobile && panes.overlaid);
   let paneOpened = $state(false);
@@ -116,21 +111,10 @@
   const centerFocused = $derived(layout.mobile ? !paneLayer : panes.focused === "center");
   const chatFocused = $derived(centerFocused && !panes.centerBusy);
 
-  const terminalCwd = $derived.by(() => {
-    const selected = chat.historyProject;
-    const project = selected
-      ? chatListFor(backend.active)?.projects.find((item) => item.projectKey === selected)
-      : null;
-    return [backend.active?.directory ?? "", project?.path ?? ""].filter(Boolean);
-  });
+  const terminalCwd = $derived([panes.contextChat.workingPath, panes.contextChat.defaultCwd].filter(Boolean));
 
-  let renameTarget = $state<SessionInfo | null>(null);
-  let deleteTarget = $state<SessionInfo | null>(null);
-  let colorTarget = $state<SessionInfo | null>(null);
-  let moveTarget = $state<SessionInfo | null>(null);
-  let movePreset = $state<string | null>(null);
-  let newCategoryTarget = $state<SessionInfo | null>(null);
-  let organizing = $state<{ chat: ChatState; projectsOnly: boolean } | null>(null);
+  const listEdits = new ChatListEdits(() => panes.listChat);
+  let organizing = $state<ChatState | null>(null);
   let dismissed = $state<CompatNotice[]>([]);
   let composerHeight = $state(0);
   let paneFrame = $state<HTMLElement | null>(null);
@@ -188,7 +172,7 @@
   });
 
   const focusFrom = (event: PointerEvent, role: PaneRole) => {
-    if (layout.mobile) return;
+    if (layout.mobile || navigation.centered) return;
     if ((event.target as HTMLElement | null)?.closest('[role="separator"]')) return;
     flushSync(() => panes.focus(role));
   };
@@ -304,7 +288,7 @@
   <div
     class="relative flex min-w-0 flex-1 flex-col {layout.mobile ? '' : `my-(--pane-gap) ${PANE_CARD_CLASS}`}"
     style={centerAccent}
-    data-unfocused={centerFocused ? undefined : true}
+    data-unfocused={centerFocused || navigation.centered ? undefined : true}
     onpointerdowncapture={(event) => focusFrom(event, "center")}
   >
     {#if navigation.centered}
@@ -464,11 +448,12 @@
       {drawerMode}
       {onClose}
       {onAfterSelect}
-      onOrganize={(target) => (organizing = { chat: target, projectsOnly: true })}
+      onOrganize={(target) => (organizing = target)}
     />
   {:else}
     <ChatList
       chat={listChat}
+      edits={listEdits}
       {drawerMode}
       {onClose}
       onAfterSelect={() => {
@@ -477,91 +462,18 @@
       }}
       onNewTab={(categoryId) => panes.newTab(categoryId, panes.list.role)}
       onOpenSession={(session) => panes.openSession(session, panes.list.role)}
-      onOpenRight={(session) => panes.openInRight(session)}
-      onRename={(session) => (renameTarget = session)}
-      onColor={(session) => (colorTarget = session)}
-      onDelete={(session) => (deleteTarget = session)}
-      onMove={(session, preset) => ((movePreset = preset), (moveTarget = session))}
-      onNewCategory={(session) => (newCategoryTarget = session)}
-      onOrganize={() => (organizing = { chat: listChat, projectsOnly: false })}
+      onOpenRight={panes.canOpenRight(panes.list.role) ? (session) => panes.openInRight(session) : null}
     />
   {/if}
 {/snippet}
 
-{#if renameTarget}
-  {@const target = renameTarget}
-  <RenameDialog
-    initial={target.title ?? target.preview ?? ""}
-    onConfirm={(title) => {
-      void listChat.rename(target, title);
-      renameTarget = null;
-    }}
-    onDismiss={() => (renameTarget = null)}
-  />
-{/if}
-
-{#if newCategoryTarget}
-  {@const target = newCategoryTarget}
-  <RenameDialog
-    initial=""
-    title={t("ADD_CATEGORY")}
-    confirmLabel={t("CREATE")}
-    onConfirm={(name) => {
-      void listChat.createCategoryWith(name, target.sessionId);
-      newCategoryTarget = null;
-    }}
-    onDismiss={() => (newCategoryTarget = null)}
-  />
-{/if}
+<ChatListDialogs edits={listEdits} onOpenChat={() => (drawer.open = false)} />
 
 {#if organizing}
   <OrganizeDialog
-    chat={organizing.chat}
-    projectsOnly={organizing.projectsOnly}
+    chat={organizing}
+    projectsOnly
     onDismiss={() => (organizing = null)}
     onOpenChat={() => (drawer.open = false)}
-  />
-{/if}
-
-{#if moveTarget}
-  {@const target = moveTarget}
-  <MoveSessionDialog
-    session={target}
-    projects={listChat.historyProjects}
-    preset={movePreset}
-    onConfirm={(cwd) => {
-      void listChat.move(target, cwd);
-      moveTarget = null;
-    }}
-    onDismiss={() => (moveTarget = null)}
-  />
-{/if}
-
-{#if colorTarget}
-  {@const target = colorTarget}
-  <ColorDialog
-    title={t("CONVERSATION_COLOR")}
-    options={sessionColorOptions(listChat.capabilities?.colors ?? [])}
-    selected={target.color}
-    onSelect={(color) => void listChat.setColor(target, color)}
-    onDismiss={() => (colorTarget = null)}
-  />
-{/if}
-
-{#if deleteTarget}
-  {@const target = deleteTarget}
-  <ConfirmDialog
-    title={t(listChat.trashEnabled ? "TRASH" : "DELETE")}
-    text={t(
-      listChat.trashEnabled ? "TRASH_CONVERSATION_CONFIRM" : "DELETE_CONVERSATION_CONFIRM",
-      target.title ?? target.preview ?? target.sessionId,
-    )}
-    confirmLabel={t(listChat.trashEnabled ? "CONFIRM" : "DELETE")}
-    danger={!listChat.trashEnabled}
-    onConfirm={() => {
-      void listChat.remove(target);
-      deleteTarget = null;
-    }}
-    onDismiss={() => (deleteTarget = null)}
   />
 {/if}

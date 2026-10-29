@@ -68,7 +68,21 @@ export interface SideList {
   role: PaneRole;
 }
 
+interface PaneLayout {
+  mobile: boolean;
+  open: boolean;
+  center: RightKind;
+  right: RightKind;
+}
+
 export const otherPane = (role: PaneRole): PaneRole => (role === "center" ? "right" : "center");
+
+const listAt = (shown: PaneLayout, role: PaneRole): SideList | null => {
+  if (shown.mobile) return { kind: shown.center === AGENTS ? AGENTS : CHAT, role: "center" };
+  if (role === "right" && !shown.open) return null;
+  const kind = role === "center" ? shown.center : shown.right;
+  return BOTH_PANES.includes(kind) ? { kind, role } : null;
+};
 
 const isChatView = (kind: RightKind) => kind === CHAT;
 
@@ -86,6 +100,7 @@ class Panes {
   centerView = $state(settings.viewInCenter);
   claudeDetail = $state<ClaudeKind | null>(null);
   noteId = $state<string | null>(null);
+  history = $state<Record<PaneRole, boolean>>({ center: false, right: false });
 
   #wideOpen = false;
   #mobile = layout.mobile;
@@ -120,15 +135,25 @@ class Panes {
 
   readonly focusedChat = $derived(this.focusedTab ? tabs.stateFor(this.focusedTab) : tabs.state);
 
+  readonly contextRole = $derived<PaneRole | null>(
+    [this.focused, otherPane(this.focused)].find(
+      (role) => this.shownAt(role) && BOTH_PANES.includes(this.viewAt(role)),
+    ) ?? null,
+  );
+
+  readonly contextAgentTab = $derived.by(() => {
+    if (this.contextRole === null || this.viewAt(this.contextRole) !== AGENTS) return null;
+    const tab = agentTabs.activeIn(this.contextRole);
+    return agentTabs.usableState(tab) ? tab : null;
+  });
+
+  readonly contextChat = $derived(this.contextAgentTab ? agentTabs.stateFor(this.contextAgentTab) : this.focusedChat);
+
   readonly list = $derived.by((): SideList => {
-    const current = this.#listAt(this.focused);
-    if (current) {
-      this.#listed = current;
-      return current;
-    }
-    const { kind, role } = this.#listed;
-    if (this.shownAt(role) && this.viewAt(role) === kind) return this.#listed;
-    return this.#listAt(otherPane(this.focused)) ?? this.#listed;
+    const focused = this.focused;
+    const shown: PaneLayout = { mobile: layout.mobile, open: this.open, center: this.centerKind, right: this.kind };
+    this.#listed = listAt(shown, focused) ?? listAt(shown, otherPane(focused)) ?? this.#listed;
+    return this.#listed;
   });
 
   readonly listChat = $derived.by(() => {
@@ -227,11 +252,12 @@ class Panes {
     return !layout.mobile || role === "center";
   }
 
-  #listAt(role: PaneRole): SideList | null {
-    if (layout.mobile) return { kind: this.centerKind === AGENTS ? AGENTS : CHAT, role: "center" };
-    if (!this.shownAt(role)) return null;
-    const kind = this.viewAt(role);
-    return BOTH_PANES.includes(kind) ? { kind, role } : null;
+  historyShown(role: PaneRole): boolean {
+    return this.history[role] && !this.historyInList(role);
+  }
+
+  canOpenRight(role: PaneRole): boolean {
+    return !layout.mobile && role === "center";
   }
 
   revealList() {
@@ -335,6 +361,7 @@ class Panes {
   }
 
   #place(role: PaneRole, kind: RightKind) {
+    if (this.viewAt(role) !== kind) this.history[role] = false;
     if (role === "center") {
       this.centerKind = kind;
       return;
@@ -527,8 +554,7 @@ class Panes {
   focus(role: PaneRole) {
     this.focused = role;
     paneFocus.set(SCOPE[this.busyRole === role ? this.viewAt(otherPane(role)) : this.viewAt(role)]);
-    const environmentId =
-      this.viewAt(role) === AGENTS ? agentTabs.activeIn(role)?.environmentId : this.focusedTab?.environmentId;
+    const environmentId = this.contextRole === null ? null : this.environmentAt(this.contextRole);
     if (environmentId && backend.activeId !== environmentId) backend.select(environmentId);
     tabs.rightFocused = this.focused === "right";
     tabs.rightActiveId = this.#shownRight();

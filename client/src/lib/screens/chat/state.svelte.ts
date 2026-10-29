@@ -350,6 +350,16 @@ export class ChatState {
   readonly historyPath = $derived(this.#projectPath(this.historyProject));
 
   readonly allProjects = $derived(this.withDefaultProject(this.list?.projects ?? []));
+  readonly workingProject = $derived(
+    this.sessionId && this.projectKey
+      ? this.projectKey
+      : this.cwd
+        ? (this.allProjects.find((item) => item.path === this.cwd)?.projectKey ?? projectKeyOf(this.cwd))
+        : null,
+  );
+  readonly workingPath = $derived(
+    this.allProjects.find((item) => item.projectKey === this.workingProject)?.path ?? this.cwd,
+  );
   readonly link = $derived<ConnectionState>(
     serverStatus.link === "connected" ? this.connection : serverStatus.link,
   );

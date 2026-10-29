@@ -51,7 +51,6 @@
   import { PANE_TOP_CLASS } from "$lib/screens/chat/paneChrome";
   import { inPane, usePaneTail } from "$lib/screens/chat/paneSurface";
   import { panelProject } from "$lib/screens/chat/panelProject.svelte";
-  import { tabs } from "$lib/screens/chat/tabs.svelte";
 
   interface Props {
     instant?: boolean;
@@ -223,7 +222,7 @@
 
   const leaveProject = () => {
     if (!pinned) return false;
-    tabs.setPanelProject("");
+    panelProject.pin("");
     return true;
   };
 
@@ -305,7 +304,7 @@
   const projectKey = $derived(panelProject.key);
 
   $effect(() => {
-    if (panelProject.settled && pinned && !panelProject.known(pinned)) tabs.setPanelProject(null);
+    if (panelProject.settled && pinned && !panelProject.known(pinned)) panelProject.pin(null);
   });
 
   const project = $derived(projects.find((item) => item.projectKey === projectKey) ?? null);
@@ -752,7 +751,7 @@
 {/snippet}
 
 {#snippet projectRow(item: ProjectInfo)}
-  <Pressable onclick={() => tabs.setPanelProject(item.projectKey)} class={ROW_CLASS}>
+  <Pressable onclick={() => panelProject.pin(item.projectKey)} class={ROW_CLASS}>
     <FolderClosed size={16} class="shrink-0 text-on-surface-variant" />
     <span class="min-w-0 flex-1 truncate text-body-md">{projectLabel(item)}</span>
   </Pressable>
@@ -905,8 +904,8 @@
         selected={pinned || null}
         shown={project ? projectLabel(project) : (projectKey ?? t("ALL_PROJECTS"))}
         following={pinned === null}
-        onFollow={() => tabs.setPanelProject(null)}
-        onSelect={(key) => tabs.setPanelProject(key ?? "")}
+        onFollow={() => panelProject.pin(null)}
+        onSelect={(key) => panelProject.pin(key ?? "")}
       />
     </div>
   {/if}

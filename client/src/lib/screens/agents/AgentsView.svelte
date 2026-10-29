@@ -56,6 +56,7 @@
   const chat = $derived(tab && selected ? agentTabs.stateFor(tab) : null);
   const strip = $derived(agentTabs.in(role).map((item) => ({ id: item.id, title: item.title })));
   const principal = $derived(layout.mobile && role === "center");
+  const history = $derived(panes.historyShown(role));
   const iconOf = (id: string) => agents.iconOf(profile, id);
 
   $effect(() => {
@@ -134,7 +135,7 @@
 {/snippet}
 
 {#if chat && selected && tab}
-  {#if !principal}
+  {#if !principal && !history}
     <TabStrip
       items={strip}
       activeId={tab.id}
@@ -155,7 +156,7 @@
   {/if}
   <div class="relative flex min-h-0 flex-1 flex-col">
     <ChatView {chat} viewKey={tab.id} {focused} primary={principal} navigationIcon={principal ? navigation : switcher} />
-    {#if agentTabs.history[role] && !panes.historyInList(role)}
+    {#if history}
       <AgentChats {chat} {focused} {role} />
     {/if}
   </div>

@@ -13,6 +13,7 @@ export interface AgentTab {
   sessionId: string | null;
   cwd: string;
   title: string | null;
+  panelProject: string | null;
 }
 
 interface StoredTab {
@@ -22,6 +23,7 @@ interface StoredTab {
   cwd?: string;
   title?: string;
   side?: boolean;
+  pproj?: string;
 }
 
 interface Stored {
@@ -52,7 +54,6 @@ const profileOf = (environmentId: string | null) => backend.find(environmentId) 
 class AgentTabs {
   list = $state<AgentTab[]>([]);
   active = $state<Record<PaneRole, string | null>>({ center: null, right: null });
-  history = $state<Record<PaneRole, boolean>>({ center: false, right: false });
 
   #lastAgent: string | null = null;
   #folders: Record<string, string> = {};
@@ -75,6 +76,7 @@ class AgentTabs {
                 sessionId: item.sid ?? null,
                 cwd: item.cwd ?? "",
                 title: item.title ?? null,
+                panelProject: item.pproj ?? null,
               },
             ]
           : [],
@@ -93,6 +95,7 @@ class AgentTabs {
             sessionId: kept.session,
             cwd: kept.cwd ?? "",
             title: null,
+            panelProject: null,
           },
         ];
       });
@@ -137,7 +140,8 @@ class AgentTabs {
     sessionId: string | null = null,
     cwd = this.#folders[environmentId ?? ""] ?? "",
   ): AgentTab {
-    const tab: AgentTab = { id: this.#nextId(), pane, environmentId, agent, sessionId, cwd, title: null };
+    const panelProject = this.activeIn(pane)?.panelProject ?? null;
+    const tab: AgentTab = { id: this.#nextId(), pane, environmentId, agent, sessionId, cwd, title: null, panelProject };
     this.list = [...this.list, tab];
     this.active[pane] = tab.id;
     this.#lastAgent = agent;
@@ -210,7 +214,6 @@ class AgentTabs {
   swapPanes() {
     this.list = this.list.map((tab) => ({ ...tab, pane: tab.pane === "center" ? "right" : "center" }));
     this.active = { center: this.active.right, right: this.active.center };
-    this.history = { center: this.history.right, right: this.history.center };
     this.#persist();
   }
 
@@ -230,6 +233,10 @@ class AgentTabs {
       return;
     }
     this.#replace(tab, { agent });
+  }
+
+  setPanelProject(id: string, projectKey: string | null) {
+    this.#update(id, { panelProject: projectKey });
   }
 
   folderOf(chat: ChatState): string {
@@ -334,6 +341,7 @@ class AgentTabs {
         ...(tab.cwd ? { cwd: tab.cwd } : {}),
         ...(tab.title ? { title: tab.title } : {}),
         ...(tab.pane === "right" ? { side: true } : {}),
+        ...(tab.panelProject === null ? {} : { pproj: tab.panelProject }),
       })),
     });
   }

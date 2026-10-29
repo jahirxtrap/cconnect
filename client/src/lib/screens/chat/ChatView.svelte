@@ -213,7 +213,8 @@
   const actionsEnabled = $derived(!chat.agent || !blocked);
   const pane = paneRole() ?? "center";
   const chatsWindow = $derived(
-    !!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume) && !panes.historyInList(pane),
+    !panes.historyInList(pane) &&
+      (!chat.agent || (!!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume))),
   );
   const canAttach = $derived(!chat.sideOpen && actionsEnabled);
 
@@ -428,7 +429,7 @@
       <BackgroundTasks tasks={chat.backgroundView} onStop={(id) => chat.stopTask(id)} />
       <TaskIndicator todos={chat.todosView} />
       {#if chatsWindow}
-        <TooltipIconButton label={t("CHATS")} onclick={() => (agentTabs.history[pane] = true)}>
+        <TooltipIconButton label={t("CHATS")} onclick={() => (panes.history[pane] = true)}>
           <History />
         </TooltipIconButton>
       {/if}

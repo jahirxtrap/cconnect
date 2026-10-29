@@ -20,6 +20,7 @@
   import ProjectFilesScreen from "$lib/screens/project/ProjectFilesScreen.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
+  import ChatChats from "./ChatChats.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneHeader from "./PaneHeader.svelte";
   import PanelPreview, { previewFills } from "./PanelPreview.svelte";
@@ -59,7 +60,8 @@
   const group = $derived(panes.groupAt(role));
   const shownTab = $derived(panes.tabAt(role));
   const chatShown = $derived(group !== null && !!shownTab);
-  const oneRow = $derived(layout.mobile && !chatShown);
+  const history = $derived(chatShown && panes.historyShown(role));
+  const oneRow = $derived(layout.mobile && (!chatShown || history));
   const filled = $derived(previewFills(role));
 
   providePaneTail(() => (oneRow ? paneTail : null));
@@ -91,7 +93,7 @@
   <PanelPreview {role} />
 {:else}
   <PaneSurface {role} plain={chatShown || view === "agents"}>
-    {#if chatShown && shownTab}
+    {#if chatShown && shownTab && !history}
       <TabStrip
         items={group === "right" ? tabs.right : tabs.center}
         activeId={shownTab.id}
@@ -113,6 +115,9 @@
     <div class="relative flex min-h-0 flex-1 flex-col">
       {#if chatShown && shownTab}
         <ChatView chat={tabs.stateFor(shownTab)} viewKey={shownTab.id} {focused} />
+        {#if history}
+          <ChatChats chat={tabs.stateFor(shownTab)} {focused} {role} />
+        {/if}
       {:else if view === "notes"}
         <PaneHeader
           title={openNote ? noteTitle(openNote) || t("NOTE_UNTITLED") : t("NOTES")}

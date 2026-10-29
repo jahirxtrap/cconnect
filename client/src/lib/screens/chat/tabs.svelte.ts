@@ -285,8 +285,8 @@ class Tabs {
     };
   }
 
-  setPanelProject(projectKey: string | null) {
-    const current = this.active;
+  setPanelProject(id: string, projectKey: string | null) {
+    const current = this.list.find((tab) => tab.id === id);
     if (!current || current.panelProject === projectKey) return;
     this.list = this.list.map((tab) =>
       tab.id === current.id ? { ...tab, panelProject: projectKey } : tab,

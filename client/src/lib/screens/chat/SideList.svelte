@@ -14,11 +14,10 @@
     onNewChat: () => void;
     drawerMode: boolean;
     onClose: (() => void) | null;
-    tools: Snippet;
     children: Snippet;
   }
 
-  const { environmentId, onEnvironment, onNewChat, drawerMode, onClose, tools, children }: Props = $props();
+  const { environmentId, onEnvironment, onNewChat, drawerMode, onClose, children }: Props = $props();
 </script>
 
 <div class="flex h-full min-h-0 flex-col gap-1 bg-surface pt-2.5 pb-2">
@@ -37,8 +36,6 @@
       </TooltipIconButton>
     {/if}
   </div>
-
-  {@render tools()}
 
   {@render children()}
 

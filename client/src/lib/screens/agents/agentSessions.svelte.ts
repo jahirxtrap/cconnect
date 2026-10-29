@@ -27,6 +27,7 @@ export class AgentSessionList {
   readonly forkable: boolean;
   readonly removable: boolean;
   readonly shown: AgentSession[];
+  readonly rightOpenable: boolean;
   readonly searching = $derived(this.query.trim().length > 0);
 
   constructor(chat: () => ChatState | null, folder: () => string, role: () => PaneRole, opened: () => void) {
@@ -49,6 +50,7 @@ export class AgentSessionList {
         .sort((a, b) => a.rank - b.rank)
         .map((item) => item.session);
     });
+    this.rightOpenable = $derived(panes.canOpenRight(role()));
     this.forkable = $derived(!!chat()?.agentState?.sessions.fork);
     this.removable = $derived.by(() => {
       const support = chat()?.agentState?.sessions;
