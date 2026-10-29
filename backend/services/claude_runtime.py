@@ -267,7 +267,7 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
     """Typed events for the `system` subtypes the app renders; the rest are dropped."""
     if not isinstance(data, dict):
         return []
-    if subtype == "task_started" and data.get("is_backgrounded") and data.get("tool_use_id") and vis["tool_use"] != "off":
+    if subtype == "task_started" and data.get("tool_use_id") and vis["tool_use"] != "off":
         return [{
             "type": "task_running",
             "id": data["tool_use_id"],
