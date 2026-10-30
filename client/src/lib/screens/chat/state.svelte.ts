@@ -26,6 +26,7 @@ import type { PromptCache } from "$lib/data/promptCache";
 import { liveLimits } from "$lib/data/liveLimits.svelte";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
 import { withElements, type PickedElement } from "$lib/data/pickedElements";
+import { userContent } from "$lib/data/userContent";
 import { reloadText } from "$lib/data/reload";
 import { settings } from "$lib/data/settings.svelte";
 import { terminalTabs } from "$lib/data/terminalTabs.svelte";
@@ -141,7 +142,6 @@ const MILLIS_PER_SECOND = 1000;
 interface AttachmentBase {
   id: number;
   name: string;
-  size: number;
   progress: number;
 }
 
@@ -547,13 +547,12 @@ export class ChatState {
         id: this.#attachmentId++,
         file,
         name: file.name,
-        size: file.size,
         progress: 0,
       })),
     ];
   }
 
-  addSharedAttachments(files: SharedFile[]) {
+  addSharedAttachments(files: Pick<SharedFile, "path" | "name">[]) {
     if (this.uploading) return;
     const known = new Set(this.attachments.map((item) => item.path));
     const fresh = files.filter((file) => !known.has(file.path));
@@ -563,7 +562,6 @@ export class ChatState {
         id: this.#attachmentId++,
         path: file.path,
         name: file.name,
-        size: file.size,
         progress: 1,
       })),
     ];
@@ -1223,8 +1221,17 @@ export class ChatState {
     this.rewindTarget = null;
     this.rewindPreview = null;
     this.rewindBusy = false;
-    this.pendingInput = point.text;
+    this.#restoreComposer(point.text);
     return true;
+  }
+
+  #restoreComposer(text: string) {
+    const restored = userContent({ text, attachments: null, images: null }, this.environment);
+    this.attachments = [];
+    this.elements = [];
+    this.addSharedAttachments(restored.attachments);
+    for (const element of restored.elements) this.addElement(element);
+    this.pendingInput = restored.body;
   }
 
   consumePendingInput(): string | null {

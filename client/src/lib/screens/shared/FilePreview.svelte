@@ -150,7 +150,7 @@
     if (!path) return null;
     return () => {
       const target = panes.focusedTab;
-      if (target) tabs.stateFor(target).addSharedAttachments([{ path, name: filename, size: 0 }]);
+      if (target) tabs.stateFor(target).addSharedAttachments([{ path, name: filename }]);
     };
   });
 

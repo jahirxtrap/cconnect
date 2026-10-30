@@ -5,6 +5,7 @@ import { downloadUrl } from "$lib/services/sharedApi";
 import type { ChatMessage } from "./chatModels";
 
 export interface UserAttachment {
+  path: string;
   url: string;
   name: string;
 }
@@ -28,7 +29,10 @@ const isMentionLine = (line: string) =>
 
 const basename = (value: string) => value.split("/").pop() ?? value;
 
-export const userContent = (message: ChatMessage, profile: Profile): UserContent => {
+export const userContent = (
+  message: Pick<ChatMessage, "text" | "attachments" | "images">,
+  profile: Profile,
+): UserContent => {
   const media: UserAttachment[] = [];
   const files: UserAttachment[] = [];
   const split = splitElements(message.text);
@@ -36,7 +40,7 @@ export const userContent = (message: ChatMessage, profile: Profile): UserContent
 
   const push = (path: string, url: string) => {
     const name = basename(path);
-    (previewKindOf(name) === "image" ? media : files).push({ url, name });
+    (previewKindOf(name) === "image" ? media : files).push({ path, url, name });
   };
 
   if (message.attachments) {
@@ -60,9 +64,9 @@ export const userContent = (message: ChatMessage, profile: Profile): UserContent
           if (previewKindOf(name) === "image") {
             const fallback = images[imageIndex];
             imageIndex++;
-            media.push({ url: fallback ? `${url}?fb=${encodeURIComponent(fallback)}` : url, name });
+            media.push({ path, url: fallback ? `${url}?fb=${encodeURIComponent(fallback)}` : url, name });
           } else {
-            files.push({ url, name });
+            files.push({ path, url, name });
           }
         }
         return false;

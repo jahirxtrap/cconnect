@@ -1152,7 +1152,7 @@ def list_checkpoints(project_key: str, session_id: str) -> list[dict]:
         points.append({
             "id": uuid,
             "rewind_id": last_anchor,
-            "text": text[:300],
+            "text": text,
             "ts": entry.get("timestamp"),
         })
     return points
