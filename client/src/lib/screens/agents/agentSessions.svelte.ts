@@ -13,6 +13,7 @@ export const sessionTitle = (session: AgentSession) => session.title ?? sessionI
 
 export class AgentSessionList {
   query = $state("");
+  renaming = $state<AgentSession | null>(null);
   deleting = $state<AgentSession | null>(null);
   failure = $state<string | null>(null);
 
@@ -85,6 +86,14 @@ export class AgentSessionList {
   #openIn(pane: PaneRole, sessionId: string) {
     panes.openAgentTab(this.#role(), pane, sessionId, this.#folder());
     this.#opened();
+  }
+
+  async rename(session: AgentSession, title: string) {
+    this.renaming = null;
+    const chat = this.#chat();
+    if (!chat?.agent) return;
+    const result = await createAgentsApi(() => chat.environment).rename(chat.agent, this.#folder(), session.sessionId, title);
+    if (!result.ok) this.#fail(result.failure);
   }
 
   async remove(session: AgentSession) {

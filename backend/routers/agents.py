@@ -52,6 +52,12 @@ class TerminalLogin(BaseModel):
     cwd: str
 
 
+class SessionRename(BaseModel):
+    cwd: str
+    session: str = Field(min_length=1)
+    title: str = Field("", max_length=200)
+
+
 def _failed(exc: Exception) -> Response:
     if isinstance(exc, agents.AgentError):
         return api_response(status=422, data={"reason": exc.reason, "detail": exc.detail})
@@ -201,6 +207,15 @@ async def agent_session_delete(agent_id: str, cwd: str, session: str):
     try:
         await agent_sessions.forget(agent_id, cwd, session)
     except (AcpError, agents.AgentError, OSError) as exc:
+        return _failed(exc)
+    return api_response()
+
+
+@router.post("/agents/{agent_id}/sessions/rename")
+async def agent_session_rename(agent_id: str, body: SessionRename):
+    try:
+        await agent_sessions.rename(agent_id, body.cwd, body.session, body.title)
+    except OSError as exc:
         return _failed(exc)
     return api_response()
 

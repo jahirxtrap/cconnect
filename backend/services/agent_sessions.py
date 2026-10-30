@@ -82,6 +82,21 @@ def _without(agent_id: str, session_id: str) -> dict[str, str]:
     return {known: cwd for known, cwd in _known(agent_id).items() if known != session_id}
 
 
+def _titles(agent_id: str) -> dict[str, str]:
+    titles = _read(paths.AGENT_TITLES_FILE).get(agent_id)
+    return {str(session_id): str(title) for session_id, title in titles.items()} if isinstance(titles, dict) else {}
+
+
+def _name(agent_id: str, session_id: str, title: Optional[str]) -> None:
+    """Keep the title the user gave a session, or drop it when `title` is None."""
+    stored = _read(paths.AGENT_TITLES_FILE)
+    titles = {known: kept for known, kept in _titles(agent_id).items() if known != session_id}
+    if title:
+        titles[session_id] = title
+    stored[agent_id] = titles
+    _write(paths.AGENT_TITLES_FILE, stored)
+
+
 def _keep_id(connection: AgentConnection, agent_id: str, session_id: str, cwd: str) -> None:
     if session_id and not _present(connection.session_capabilities, "list"):
         _set_known(agent_id, {session_id: cwd, **_without(agent_id, session_id)})
@@ -160,6 +175,8 @@ class AgentSession:
         self.reason: Optional[str] = None
         self.detail = ""
         self.title: Optional[str] = None
+        self._named: Optional[str] = None
+        self._named_for: Optional[str] = None
         self.options: list[dict] = []
         self.commands: list[dict] = []
         self.usage: Optional[dict] = None
@@ -198,7 +215,7 @@ class AgentSession:
             "reason": self.reason,
             "detail": self.detail,
             "session_id": self.session_id,
-            "title": self.title,
+            "title": self._shown_title(),
             "options": self.options,
             "commands": self.commands,
             "usage": self.usage,
@@ -215,6 +232,17 @@ class AgentSession:
             "logout": _present(capabilities.get("auth") or {}, "logout"),
             "info": (connection.info.get("agentInfo") if connection is not None else None) or None,
         }
+
+    def _shown_title(self) -> Optional[str]:
+        if self._named_for != self.session_id:
+            self._named_for = self.session_id
+            self._named = _titles(self.agent_id).get(self.session_id or "")
+        return self._named or self.title
+
+    async def renamed(self, title: Optional[str]) -> None:
+        self._named_for = self.session_id
+        self._named = title
+        await self._announce()
 
     async def _announce(self) -> None:
         if self._emit is not None:
@@ -710,12 +738,13 @@ def _activity(session_id: str) -> Optional[str]:
 
 async def all_sessions(agent_id: str, cwd: str) -> list[dict]:
     connection = await pool.take(agent_id, cwd)
+    titles = _titles(agent_id)
     try:
         if _present(connection.session_capabilities, "list"):
             return [
                 {
                     "session_id": str(item["sessionId"]),
-                    "title": item.get("title"),
+                    "title": titles.get(str(item["sessionId"])) or item.get("title"),
                     "updated_at": item.get("updatedAt"),
                     "cwd": item.get("cwd"),
                     "activity": _activity(str(item["sessionId"])),
@@ -725,12 +754,28 @@ async def all_sessions(agent_id: str, cwd: str) -> list[dict]:
         if not (connection.capabilities.get("loadSession") or _present(connection.session_capabilities, "resume")):
             return []
         return [
-            {"session_id": session_id, "title": None, "updated_at": None, "cwd": cwd, "activity": _activity(session_id)}
+            {
+                "session_id": session_id,
+                "title": titles.get(session_id),
+                "updated_at": None,
+                "cwd": cwd,
+                "activity": _activity(session_id),
+            }
             for session_id, folder in _known(agent_id).items()
             if folder == cwd
         ]
     finally:
         pool.give(connection)
+
+
+async def rename(agent_id: str, cwd: str, session_id: str, title: str) -> None:
+    """Give a session the user's own title over the agent's; an empty title gives it back the agent's."""
+    clean = title.strip() or None
+    _name(agent_id, session_id, clean)
+    live = registry.get_by_session(session_id)
+    if live is not None and isinstance(live.agent, AgentSession):
+        await live.agent.renamed(clean)
+    watch.changed(agent_id, cwd)
 
 
 async def forget(agent_id: str, cwd: str, session_id: str) -> None:
@@ -743,6 +788,8 @@ async def forget(agent_id: str, cwd: str, session_id: str) -> None:
         pool.give(connection)
     if session_id in _known(agent_id):
         _set_known(agent_id, _without(agent_id, session_id))
+    if session_id in _titles(agent_id):
+        _name(agent_id, session_id, None)
     watch.changed(agent_id, cwd)
 
 

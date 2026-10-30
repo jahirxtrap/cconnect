@@ -116,6 +116,13 @@ export const createAgentsApi = (profile: () => Profile) => {
       return outcome(await client.call<Wire>("DELETE", `/agents/${segment(id)}/sessions`, { cwd, session }), () => true);
     },
 
+    async rename(id: string, cwd: string, session: string, title: string) {
+      return outcome(
+        await client.call<Wire>("POST", `/agents/${segment(id)}/sessions/rename`, undefined, { cwd, session, title }),
+        () => true,
+      );
+    },
+
     async loginPreview(id: string, method: string, cwd: string, key: string) {
       return outcome(
         await keyed(key).call<Wire>("GET", `/agents/${segment(id)}/login`, { method, cwd }),

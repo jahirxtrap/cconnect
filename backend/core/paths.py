@@ -52,6 +52,7 @@ TODOS_FILE = STATE_DIR / "session_todos.json"
 DELEGATE_RUNS_DIR = STATE_DIR / "delegate_runs"
 AGENT_SESSIONS_FILE = STATE_DIR / "agent_sessions.json"
 AGENT_DEFAULTS_FILE = STATE_DIR / "agent_defaults.json"
+AGENT_TITLES_FILE = STATE_DIR / "agent_titles.json"
 AI_WORKDIR = Path(os.environ.get("AI_WORKDIR") or STATE_DIR / "internal_task")
 
 NETWORK_STATE_FILE = CACHE_DIR / "network_state.json"

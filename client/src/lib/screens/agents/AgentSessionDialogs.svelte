@@ -3,6 +3,7 @@
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import { sessionTitle, type AgentSessionList } from "./agentSessions.svelte";
 
   interface Props {
@@ -11,6 +12,15 @@
 
   const { list }: Props = $props();
 </script>
+
+{#if list.renaming}
+  {@const target = list.renaming}
+  <RenameDialog
+    initial={target.title ?? ""}
+    onConfirm={(title) => void list.rename(target, title)}
+    onDismiss={() => (list.renaming = null)}
+  />
+{/if}
 
 {#if list.deleting}
   {@const target = list.deleting}
