@@ -88,7 +88,7 @@ manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins 
 reload, marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`,
 `/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
-Protocol agents: catalog, install, sign-in, forking and deleting sessions; reading or
+Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessions; reading or
 changing their environment variables takes the security key), `/api/packs/*` (the server's pack library and its
 previews; deleting from it takes the security key). Live streams: `WS /api/chat/ws`,
 `WS /api/list/ws` (chat/project list), `WS /api/agents/ws` (an agent's chats: `watch`
@@ -117,7 +117,8 @@ Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`,
 (status, options, commands, sign-in methods) and `history` (its rows, paged like a transcript)
 outside the seq'd stream. Those rows come from the agent itself, replayed by `session/load`:
 the server stores no agent messages, only the session ids of agents without `session/list`
-(`AGENT_SESSIONS_FILE`). A new agent chat creates its session with the first message once the
+(`AGENT_SESSIONS_FILE`) and the titles the user gives sessions (`AGENT_TITLES_FILE`), which ACP
+has no request for and which win over the agent's in the list and in `agent_state`. A new agent chat creates its session with the first message once the
 agent's options are remembered (`AGENT_DEFAULTS_FILE`); delegation creates it at once
 (`create_now`).
 

@@ -197,6 +197,12 @@ app, with the files of its folder proxied from the server. The web has no CSP an
 `blob:`, without `allow-same-origin`. `tauri dev` applies no CSP at all, so anything about
 it is checked in a build.
 
+A file Claude links before writing it answers 404 or comes back empty (`fetchBlob` throws
+`MissingFile`). `sourceAction` and the chat's PDF block then wait on its shared folder
+(`services/sharedArrival.svelte.ts`): one `/shared/ws` watch per folder, shared by every file
+still pending and closed once none is, and the file loads again when a snapshot shows it with
+content. A file that loaded never watches.
+
 Chat media blocks share `.media-frame` (`ui/mediaFrame.ts`): a transparent border pulls the
 content's clip a pixel in and an inset `outline` draws the line over the content, or light
 content bleeds into the border along the curve.

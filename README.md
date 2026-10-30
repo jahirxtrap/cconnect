@@ -518,7 +518,7 @@ agent so they're available out of the box from the phone:
 - **ACP agents.** A view for either panel runs agents that speak the Agent
   Client Protocol, such as Copilot, Codex or Gemini, installed from the
   official catalog or added by hand, with their chats listed on the left like
-  Claude's.
+  Claude's and renamed from there.
 - **Delegation.** Claude can hand a task to another AI and get its answer
   back: an ACP agent, an agent CLI added under ACP agents as a command, or
   another of your Claude accounts once its sheet says Claude can use it, with
