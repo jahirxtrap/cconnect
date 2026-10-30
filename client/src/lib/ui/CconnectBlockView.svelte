@@ -5,6 +5,7 @@
   import { isVideo } from "$lib/data/previewKind";
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { mediaSrc, posterSrc } from "$lib/services/mediaSource";
+  import { awaitSharedFile } from "$lib/services/sharedArrival.svelte";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import PageFrame from "./PageFrame.svelte";
@@ -36,7 +37,12 @@
 
   let track = $state<HTMLDivElement | null>(null);
   let page = $state(0);
-  let pdfFailed = $state(false);
+  let pdfFailed = $state<"missing" | "broken" | null>(null);
+
+  $effect(() => {
+    if (data.type !== "pdf" || pdfFailed !== "missing") return;
+    return awaitSharedFile(data.url, () => (pdfFailed = null));
+  });
 
   const goto = (index: number) => {
     const child = track?.children[index] as HTMLElement | undefined;
@@ -172,7 +178,7 @@
         class="flex w-full overflow-hidden {MEDIA_FRAME_CLASS} bg-card"
         style="height: {DOC_HEIGHT}"
       >
-        <PdfView url={data.url} onerror={() => (pdfFailed = true)} />
+        <PdfView url={data.url} onerror={(missing) => (pdfFailed = missing ? "missing" : "broken")} />
       </div>
       {@render expand(data.url)}
     </div>

@@ -1,5 +1,6 @@
 import { backend } from "./backend.svelte";
 import { fileHeaders } from "./projectFilesApi";
+import { awaitSharedFile } from "./sharedArrival.svelte";
 
 export interface SourceOptions {
   url: string;
@@ -14,10 +15,21 @@ type Sourced = HTMLImageElement | HTMLMediaElement | HTMLIFrameElement | HTMLEmb
 export const fetchFile = (url: string, init: RequestInit = {}) =>
   fetch(url, { ...init, cache: "no-cache", headers: fileHeaders(url, backend.sharedProfileOf(url)) });
 
-export const fetchObjectUrl = async (url: string, transform?: (file: Blob) => Promise<Blob>) => {
+const NOT_FOUND = 404;
+
+export class MissingFile extends Error {}
+
+export const fetchBlob = async (url: string) => {
   const response = await fetchFile(url);
+  if (response.status === NOT_FOUND) throw new MissingFile(url);
   if (!response.ok) throw new Error(String(response.status));
   const file = await response.blob();
+  if (!file.size) throw new MissingFile(url);
+  return file;
+};
+
+export const fetchObjectUrl = async (url: string, transform?: (file: Blob) => Promise<Blob>) => {
+  const file = await fetchBlob(url);
   return URL.createObjectURL(transform ? await transform(file) : file);
 };
 
@@ -31,16 +43,20 @@ export const sourceAction = <O extends SourceOptions, T>(
 ) => {
   let held: T | null = null;
   let token = 0;
+  let waiting: (() => void) | null = null;
 
   const release = () => {
     if (held !== null) discard(held);
     held = null;
+    waiting?.();
+    waiting = null;
   };
 
   const apply = async () => {
     const attempt = ++token;
     release();
     const sources = [options.url, options.fallback].filter(Boolean) as string[];
+    let missing = false;
     for (const source of sources) {
       try {
         const value = await acquire(source, options);
@@ -53,11 +69,14 @@ export const sourceAction = <O extends SourceOptions, T>(
         if (attempt !== token) return;
         options.onload?.();
         return;
-      } catch {
+      } catch (error) {
+        missing ||= error instanceof MissingFile;
         continue;
       }
     }
-    if (attempt === token) options.onerror?.();
+    if (attempt !== token) return;
+    options.onerror?.();
+    if (missing) waiting = awaitSharedFile(options.url, () => void apply());
   };
 
   void apply();

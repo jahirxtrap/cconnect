@@ -3,12 +3,12 @@
   import type { PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
   import "pdfjs-dist/web/pdf_viewer.css";
   import { openExternal } from "$lib/platform";
-  import { fetchFile } from "$lib/services/mediaSource";
+  import { fetchBlob, MissingFile } from "$lib/services/mediaSource";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
 
   interface Props {
     url: string;
-    onerror: () => void;
+    onerror: (missing: boolean) => void;
   }
 
   interface Engine {
@@ -209,7 +209,7 @@
     };
 
     start().catch(() => {
-      if (!cancelled) onerror();
+      if (!cancelled) onerror(false);
     });
     const observer = new ResizeObserver(refit);
     observer.observe(box);
@@ -236,9 +236,7 @@
     loading = true;
 
     const open = async () => {
-      const response = await fetchFile(source);
-      if (!response.ok) throw new Error(String(response.status));
-      const data = await response.arrayBuffer();
+      const data = await (await fetchBlob(source)).arrayBuffer();
       if (cancelled) return;
       task = current.pdfjs.getDocument({ data });
       const document_ = await task.promise;
@@ -247,8 +245,8 @@
       current.links.setDocument(document_);
     };
 
-    open().catch(() => {
-      if (!cancelled) onerror();
+    open().catch((error) => {
+      if (!cancelled) onerror(error instanceof MissingFile);
     });
 
     return () => {

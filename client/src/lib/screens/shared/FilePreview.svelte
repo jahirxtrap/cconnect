@@ -203,14 +203,16 @@
     watch.watch(folder);
     const stop = $effect.root(() => {
       $effect(() => {
-        const entry = watch.entries?.find((item) => item.name === name);
-        if (!entry) return;
-        const next = `${entry.size}:${entry.modified}`;
+        const entries = watch.entries;
+        if (!entries) return;
+        const entry = entries.find((item) => item.name === name);
+        const next = entry ? `${entry.size}:${entry.modified}` : "";
         if (signature === null) signature = next;
         else if (signature !== next) {
           signature = next;
           version++;
           loaded = false;
+          failed = false;
         }
       });
     });

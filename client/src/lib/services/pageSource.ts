@@ -1,7 +1,7 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { isTauri } from "$lib/platform";
 import { backend } from "./backend.svelte";
-import { fetchFile, mediaSrc, sourceAction, type SourceOptions } from "./mediaSource";
+import { fetchBlob, mediaSrc, sourceAction, type SourceOptions } from "./mediaSource";
 import { fileHeaders, projectFolderUrl } from "./projectFilesApi";
 import { sharedFolderUrl } from "./sharedApi";
 
@@ -20,9 +20,7 @@ const ISOLATED = "allow-scripts allow-forms allow-modals allow-downloads allow-p
 export const pageSandbox = isTauri ? `${ISOLATED} allow-same-origin` : ISOLATED;
 
 const register = async (url: string, options: PageOptions): Promise<Page> => {
-  const response = await fetchFile(url);
-  if (!response.ok) throw new Error(String(response.status));
-  const file = await response.blob();
+  const file = await fetchBlob(url);
   const html = await (options.transform ? await options.transform(file) : file).text();
   const id = crypto.randomUUID();
   const entry = encodeURIComponent(options.name);
