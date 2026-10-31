@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -33,15 +32,6 @@ def _oauth(field: str, account: str | None = None) -> str | None:
     except (OSError, json.JSONDecodeError):
         return None
     return (data.get("claudeAiOauth") or {}).get(field)
-
-
-def _plan_label(account: str | None = None) -> str | None:
-    subscription = _oauth("subscriptionType", account)
-    if not subscription:
-        return None
-    label = subscription.capitalize()
-    match = re.search(r"(\d+x)$", _oauth("rateLimitTier", account) or "")
-    return f"{label} ({match.group(1)})" if match else label
 
 
 async def _fetch(account: str | None = None) -> dict:
@@ -140,7 +130,7 @@ async def usage_data(account: str | None = None, force: bool = False) -> dict:
     data = await _fetch(account)
     if "error" in data:
         return cached[1] if cached else {"error": data["error"]}
-    fresh = {"plan": _plan_label(account), "windows": _windows(data)}
+    fresh = {"plan": accounts.plan_name(account), "windows": _windows(data)}
     _cache[key] = (time.monotonic(), fresh)
     return fresh
 

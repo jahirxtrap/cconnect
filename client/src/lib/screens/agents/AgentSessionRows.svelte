@@ -1,5 +1,6 @@
 <script lang="ts">
   import History from "@lucide/svelte/icons/history";
+  import KeyRound from "@lucide/svelte/icons/key-round";
   import { t } from "$lib/i18n/index.svelte";
   import ConversationRow from "$lib/screens/chat/ConversationRow.svelte";
   import type { ChatState } from "$lib/screens/chat/state.svelte";
@@ -39,6 +40,8 @@
         onDelete={list.removable ? () => (list.deleting = session) : null}
       />
     {/each}
+  {:else if list.signedOut}
+    <EmptyState icon={icons ? KeyRound : undefined} text={t("AGENT_SIGN_IN_NEEDED")} class="h-full" />
   {:else if list.failed}
     <ConnectionError class="h-full" />
   {:else if chat && !list.sessions}

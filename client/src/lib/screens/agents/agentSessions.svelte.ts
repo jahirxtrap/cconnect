@@ -25,6 +25,7 @@ export class AgentSessionList {
   readonly watch: AgentSessionsWatch | null;
   readonly sessions: AgentSession[] | null;
   readonly failed: boolean;
+  readonly signedOut: boolean;
   readonly forkable: boolean;
   readonly removable: boolean;
   readonly shown: AgentSession[];
@@ -42,6 +43,7 @@ export class AgentSessionList {
     });
     this.sessions = $derived(this.watch?.sessions ?? null);
     this.failed = $derived(this.watch?.failed ?? false);
+    this.signedOut = $derived(this.watch?.signedOut ?? false);
     this.shown = $derived.by(() => {
       const listed = this.sessions ?? [];
       if (!this.searching) return listed;

@@ -224,6 +224,7 @@ async def _signed_in(agent_id: str, held: terminal.Terminal) -> None:
     await held.exited.wait()
     if held.exit_status in (None, 0):
         await pool.restart(agent_id)
+        agent_sessions.watch.refresh(agent_id)
 
 
 async def _login_command(agent_id: str, method: str, cwd: str) -> tuple[str, list[str], dict[str, str]]:

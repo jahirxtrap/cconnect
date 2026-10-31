@@ -1,12 +1,15 @@
-import { toAgentSession, type AgentSession } from "$lib/data/agentModels";
+import { toAgentSession, type AgentSession, type AgentStatus } from "$lib/data/agentModels";
 import { profileKey, type Profile } from "./backend.svelte";
 import { ReconnectingSocket } from "./socket";
 
 type Wire = Record<string, unknown>;
 
+const SIGNED_OUT: AgentStatus = "auth";
+
 export class AgentSessionsWatch {
   sessions = $state<AgentSession[] | null>(null);
   failed = $state(false);
+  signedOut = $state(false);
 
   #socket: ReconnectingSocket;
 
@@ -37,7 +40,8 @@ export class AgentSessionsWatch {
     }
     if (message.type !== "sessions") return;
     const listed = Array.isArray(message.sessions) ? (message.sessions as Wire[]) : null;
-    this.failed = listed === null;
+    this.signedOut = listed === null && message.reason === SIGNED_OUT;
+    this.failed = listed === null && !this.signedOut;
     this.sessions = listed?.flatMap((item) => toAgentSession(item) ?? []) ?? null;
   }
 }

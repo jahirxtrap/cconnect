@@ -255,6 +255,7 @@ class AgentSession:
 
     async def open(self, resume: Optional[str] = None, signing_in: bool = False, create_now: bool = False) -> None:
         self.released = False
+        signed_out = self.status == SIGN_IN
         self.status = LOADING if self._process_up() else CONNECTING
         self.reason, self.detail = None, ""
         await self._announce()
@@ -275,6 +276,8 @@ class AgentSession:
         except OSError as exc:
             self._fail(FAILED, str(exc))
         await self._announce()
+        if signed_out and self.status == READY:
+            watch.refresh(self.agent_id)
         if resume and self._emit is not None:
             await self._emit(self.history())
 
@@ -513,6 +516,7 @@ class AgentSession:
             return
         self._fail(SIGN_IN, "")
         await self._announce()
+        watch.refresh(self.agent_id)
 
     async def _wait(self, asked: Awaitable[dict]) -> Optional[dict]:
         answer = asyncio.ensure_future(asked)
@@ -806,11 +810,16 @@ async def fork(agent_id: str, cwd: str, session_id: str) -> str:
 
 
 async def _snapshot(agent_id: str, cwd: str) -> dict:
+    reason = None
     try:
         listed = await all_sessions(agent_id, cwd)
-    except (AcpError, agents.AgentError, OSError):
+    except AcpError as exc:
         listed = None
-    return {"type": "sessions", "agent": agent_id, "cwd": cwd, "sessions": listed}
+        reason = SIGN_IN if exc.code == AUTH_REQUIRED else FAILED
+    except (agents.AgentError, OSError):
+        listed = None
+        reason = FAILED
+    return {"type": "sessions", "agent": agent_id, "cwd": cwd, "sessions": listed, "reason": reason}
 
 
 class SessionsWatch:
@@ -834,6 +843,10 @@ class SessionsWatch:
         watching = [queue for queue, key in self._watching.items() if key == (agent_id, cwd)]
         if watching:
             asyncio.get_running_loop().create_task(self._push(agent_id, cwd, watching))
+
+    def refresh(self, agent_id: str) -> None:
+        for folder in {cwd for agent, cwd in self._watching.values() if agent == agent_id}:
+            self.changed(agent_id, folder)
 
     def activity(self, agent_id: str, cwd: str, session_id: str, activity: Optional[str]) -> None:
         update = {"type": "activity", "agent": agent_id, "cwd": cwd, "session_id": session_id, "activity": activity}

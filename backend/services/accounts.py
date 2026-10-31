@@ -407,6 +407,12 @@ def _identity(account_id: Optional[str]) -> dict:
     return {key: data[key] for key in _IDENTITY_KEYS if key in data}
 
 
+def plan_name(account_id: Optional[str]) -> Optional[str]:
+    account =_identity(account_id).get("oauthAccount")
+    name = account.get("planDisplayName") if isinstance(account, dict) else None
+    return name if isinstance(name, str) and name.strip() else None
+
+
 def export_bundle(account_id: str) -> Optional[bytes]:
     """Zip the credentials and the account's own config. History, caches, the
     machine id and the linked projects/plugins/skills are all left out."""
