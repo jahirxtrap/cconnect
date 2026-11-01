@@ -35,7 +35,8 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 - `routers/` — thin: validate, call a service, return `api_response()`.
 - `services/` — all the logic. `live_sessions` (turn decoupled from the socket), `claude_runtime`
   (SDK stream → normalized events), `persistent_sessions` (the CLI a chat keeps between
-  turns), `mods` (the CLI's internal UI protocol), `sessions` (transcripts, checkpoints, images), `chat_list`,
+  turns), `mods` (the CLI's internal UI protocol), `control_requests` (the CLI's requests the SDK
+  does not answer), `elicitation` (an MCP form as the chat's form and back), `sessions` (transcripts, checkpoints, images), `chat_list`,
   `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
   `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
   `usage`, `accounts`, `shared`, `git_ops` (the commit panel, on top of the single runner in
@@ -85,7 +86,7 @@ Everything returns `api_response()`. Route groups: `/api/health`, `/api/capabili
 `/api/settings`, `/api/cli`, `/api/sessions/*` (transcript slices, checkpoints + rewind,
 rename/color/move/delete, trash, categories, transcript images), `/api/shared/*` (file
 manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins and their
-reload, marketplaces, skills, MCP, memories, usage, status), `/api/accounts/*`,
+reload, marketplaces, skills, MCP, memories, usage in the app's `lang`, status), `/api/accounts/*`,
 `/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
 Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessions; reading or
@@ -109,7 +110,8 @@ twice — once from disk and once from the replay.
 
 ## WebSocket protocol (`/api/chat/ws`)
 
-Client → server: `start` (with `channel` + `last_seq` to re-attach), `prompt`, `unqueue`,
+Client → server: `start` (with `channel` + `last_seq` to re-attach, and the app's `locale`, which
+the plan usage's names follow), `prompt`, `unqueue`,
 `set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history`,
 `ask`, `usage`, `stop_task`, `reload`, `close_resident`, for mods `mod_render`, `mod_act`,
 `mod_answer`, `mod_client_module`, and for an ACP agent (a `start` that names one) `set_option`,
@@ -219,6 +221,13 @@ need the resident CLI. A chat without one keeps its last surface between turns a
 to redraw it, so uninstalling or disabling a plugin drops what it left there (`forget_plugin`)
 once the turn that still loads it ends. The protocol is not public and moves between CLI versions, so every
 request goes through `mods.request`, which turns a failure into `None` instead of raising.
+
+An MCP server's elicitation reaches the host as the CLI's `elicitation` control request, which the
+SDK rejects as unknown, so every form used to come back cancelled. `control_requests` answers it,
+and the mods' `ui_*` requests, on both kinds of chat: `serve` wraps a persistent CLI's query, and
+`Answering` wraps the transport of a one-shot turn. `elicitation` turns the schema into the chat's
+form and the answer back into `accept` / `decline` / `cancel`, the same mapping an ACP agent's
+`elicitation/create` goes through.
 
 ## Settings and visibility
 

@@ -239,7 +239,8 @@ resume the chat.
 
 **Questions come as forms.** When Claude needs something from you it asks in
 the chat itself — choices, text fields, toggles and a note kept apart from the
-answer — and longer questions arrive as pages you move through. Its replies can
+answer — and longer questions arrive as pages you move through. An MCP server
+that needs a value or wants you to open a page asks the same way. Its replies can
 carry more than text too: galleries, audio, PDFs and live previews, plus blocks
 it draws with bars, text and media. Ask what the session is spending and the
 plan usage is drawn the same way, and ask it to compact and it does.
@@ -275,9 +276,10 @@ from the chat's header. Whatever runs in the
 background is listed under **Running** in that header, each task with a button to
 stop it, and the session stays open while any of it is still working.
 
-Model, effort, permission mode, how much of each turn you see, when the context
-gets compacted, which of CLAUDE.md and AGENTS.md Claude reads as the project's
-instructions, and which Claude CLI the backend drives are all set from the app.
+Model, effort and the effort subagents run at, permission mode, whether Claude may
+write outside the chat's working folders, how much of each turn you see, when the
+context gets compacted, which of CLAUDE.md and AGENTS.md Claude reads as the
+project's instructions, and which Claude CLI the backend drives are all set from the app.
 The server holds the defaults and every client follows them, but each device can
 decide for itself how much of a turn it receives — including a **simple mode**
 that folds thinking and tool detail into a single working block, the way the
@@ -428,9 +430,10 @@ PC:
 - Keep your own standing instructions in a **user prompt** editable from the
   app — it rides along every conversation, on top of the system conventions in
   `backend/core/prompts/CCONNECT.md`.
-- See your **plan usage** at a glance — your subscription tier (Pro, Max 5x,
-  Max 20x) and a bar per limit window: current session, this week, and the
-  per-model weekly caps, each with its reset time.
+- See your **plan usage** at a glance — your plan as Anthropic names it and a bar
+  per limit window: current session, this week with where it went by product,
+  and the per-model weekly caps with how much of the week each can take, each
+  with its reset time.
 - Keep several **Claude accounts** on one backend and switch between them.
 
 ### Multiple accounts
@@ -447,8 +450,8 @@ the turn, not what you see. MCP servers are copied over when the account is
 created, and can be re-synced later.
 
 Pick the account per chat from the composer bar, or set the server-wide default
-from the Claude screen's header (the usage shown there follows it) or in
-Settings. Accounts you haven't signed into yet are listed too, so you can
+from the Claude screen's header (the usage shown there follows it, and its
+picker shows another account's for a quick look) or in Settings. Accounts you haven't signed into yet are listed too, so you can
 finish later.
 
 ### Model providers
