@@ -23,6 +23,8 @@
     compactMin: number | null;
     compactMax: number | null;
     instructionFiles: string | null;
+    subagentEffort: string;
+    blockOutsideWrites: boolean;
     onConfirm: (values: {
       model: string;
       effort: string;
@@ -34,6 +36,8 @@
       autoCompact: boolean;
       autoCompactWindow: number | null;
       instructionFiles: string | null;
+      subagentEffort: string;
+      blockOutsideWrites: boolean;
     }) => void;
     onDismiss: () => void;
   }
@@ -52,6 +56,8 @@
     compactMin,
     compactMax,
     instructionFiles,
+    subagentEffort,
+    blockOutsideWrites,
     onConfirm,
     onDismiss,
   }: Props = $props();
@@ -72,6 +78,15 @@
   let compactAuto = $state(untrack(() => autoCompact));
   let compactAt = $state(untrack(() => (autoCompactWindow === null ? "" : String(autoCompactWindow))));
   let instructions = $state(untrack(() => instructionFiles ?? ""));
+  let subagentLevel = $state(untrack(() => subagentEffort));
+  let writesInside = $state(untrack(() => blockOutsideWrites));
+
+  const subagentOptions = $derived(
+    [...new Set(["", ...capabilities.subagentEfforts, subagentEffort])].map((value) => ({
+      value,
+      label: value || t("OPTION_DEFAULT"),
+    })),
+  );
 
   const windowOptions = $derived.by(() => {
     if (compactMin === null || compactMax === null) return [];
@@ -117,6 +132,8 @@
           autoCompact: compactAuto,
           autoCompactWindow: compactAt === "" ? null : Number(compactAt),
           instructionFiles: instructions || null,
+          subagentEffort: subagentLevel,
+          blockOutsideWrites: writesInside,
         })}
     >
       {t("SAVE")}
@@ -139,6 +156,15 @@
         options={levels.map((value) => ({ value, label: value }))}
         onSelect={(value) => (selectedEffort = value)}
       />
+    {/if}
+    {#if capabilities.subagentEfforts.length}
+      <SelectField
+        label={t("SUBAGENT_EFFORT")}
+        selected={subagentLevel}
+        options={subagentOptions}
+        onSelect={(value) => (subagentLevel = value)}
+      />
+      <p class="-mt-2.5 text-body-sm text-on-surface-variant">{t("SUBAGENT_EFFORT_DESC")}</p>
     {/if}
     {#if capabilities.outputStyles.length}
       <SelectField
@@ -195,6 +221,13 @@
       summary={t("ALWAYS_THINKING_DESC")}
       checked={thinkAlways}
       onChange={(value) => (thinkAlways = value)}
+    />
+    <SwitchRow
+      class="-mt-2"
+      title={t("BLOCK_OUTSIDE_WRITES")}
+      summary={t("BLOCK_OUTSIDE_WRITES_DESC")}
+      checked={writesInside}
+      onChange={(value) => (writesInside = value)}
     />
     <SwitchRow
       class="-mt-2"

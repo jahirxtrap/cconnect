@@ -209,6 +209,7 @@ export interface StartOptions {
   account: string;
   visibility: VisibilityPrefs;
   agent: string | null;
+  locale: string;
 }
 
 export interface GenerationPatch {
@@ -515,6 +516,7 @@ export class ChatSocket {
       effort: options.effort,
       partial: options.partial,
       visibility: options.visibility,
+      locale: options.locale,
       ...(options.agent ? { agent: options.agent } : {}),
       ...(this.#channel ? { channel: this.#channel } : {}),
       last_seq: this.#lastSeq,

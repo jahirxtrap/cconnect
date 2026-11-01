@@ -7,7 +7,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from loguru import logger
 
-from services import mods, settings_store, visibility
+from services import control_requests, elicitation, mods, settings_store, visibility
 
 CLOSE_TIMEOUT = 20.0
 OWN_TURN_TIMEOUT = 300.0
@@ -112,6 +112,7 @@ class PersistentSession:
         try:
             async with ClaudeSDKClient(options=options) as client:
                 self.client = client
+                control_requests.serve(client, elicitation.answers(self.ask_user))
                 self.inbox = asyncio.Queue()
                 if not ready.done():
                     ready.set_result(None)

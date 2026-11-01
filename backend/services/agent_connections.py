@@ -10,7 +10,7 @@ from typing import Any, Awaitable, Callable, Optional, Protocol
 import psutil
 
 from core import packages, process_job, release
-from services import acp_events, agents, persistent_sessions
+from services import agents, elicitation, persistent_sessions
 from services.acp_peer import AUTH_REQUIRED, INTERNAL_ERROR, RESOURCE_NOT_FOUND, STREAM_LIMIT, AcpError, AcpPeer
 
 PROTOCOL_VERSION = 1
@@ -146,7 +146,7 @@ class AgentConnection:
         if receiver is not None:
             return await receiver.requested(method, params)
         if method == ELICIT and self._login_ask is not None:
-            return acp_events.elicitation_answer(await self._login_ask(acp_events.elicitation(params)), params)
+            return elicitation.answer(await self._login_ask(elicitation.form(params)), params)
         raise AcpError(RESOURCE_NOT_FOUND, f"no session for {method}")
 
     async def _notified(self, method: str, params: dict) -> None:

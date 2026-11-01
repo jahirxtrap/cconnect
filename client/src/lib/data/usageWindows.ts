@@ -28,6 +28,12 @@ export const severityTone = (severity: string | null): LimitTone =>
 
 export const limitTone = (window: LimitWindow): LimitTone => severityTone(window.severity);
 
+export interface UsageShare {
+  key: string;
+  label: string;
+  percent: number;
+}
+
 export interface UsageWindow {
   id: string;
   percent: number;
@@ -35,7 +41,13 @@ export interface UsageWindow {
   unused: boolean;
   detail: string | null;
   severity: string | null;
+  model: string | null;
+  share: number | null;
+  breakdown: UsageShare[];
 }
+
+export const usageTitle = (window: UsageWindow): string =>
+  window.model ? t("USAGE_WEEK_MODEL", window.model) : usageWindowLabel(window.id);
 
 export interface Usage {
   plan: string | null;
@@ -47,15 +59,27 @@ type Wire = Record<string, unknown>;
 
 const textOf = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 
+const numberOf = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
+
+const listOf = (raw: Wire, key: string): Wire[] =>
+  Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is Wire => !!item && typeof item === "object") : [];
+
 export const usageOf = (data: Wire): Usage => ({
   plan: textOf(data, "plan"),
-  windows: (Array.isArray(data.windows) ? (data.windows as Wire[]) : []).map((window) => ({
+  windows: listOf(data, "windows").map((window) => ({
     id: textOf(window, "id") ?? "",
-    percent: typeof window.percent === "number" ? window.percent : 0,
+    percent: numberOf(window, "percent") ?? 0,
     resetsAt: textOf(window, "resets_at"),
     unused: window.unused === true,
     detail: textOf(window, "detail"),
     severity: textOf(window, "severity"),
+    model: textOf(window, "model"),
+    share: numberOf(window, "share"),
+    breakdown: listOf(window, "breakdown").map((row) => ({
+      key: textOf(row, "key") ?? "",
+      label: textOf(row, "label") ?? "",
+      percent: numberOf(row, "percent") ?? 0,
+    })),
   })),
   error: textOf(data, "error"),
 });

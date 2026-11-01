@@ -298,6 +298,8 @@
     compactMin={snapshot.autoCompactWindowMin}
     compactMax={snapshot.autoCompactWindowMax}
     instructionFiles={snapshot.instructionFiles}
+    subagentEffort={snapshot.subagentEffort}
+    blockOutsideWrites={snapshot.blockOutsideWrites}
     onConfirm={(values) =>
       void apply({
         model: values.model,
@@ -310,6 +312,8 @@
         auto_compact: values.autoCompact,
         ...(snapshot.autoCompactWindowMin !== null ? { auto_compact_window: values.autoCompactWindow } : {}),
         ...(snapshot.instructionFiles !== null ? { instruction_files: values.instructionFiles } : {}),
+        subagent_effort: values.subagentEffort,
+        block_outside_writes: values.blockOutsideWrites,
       })}
     onDismiss={() => (dialog = null)}
   />

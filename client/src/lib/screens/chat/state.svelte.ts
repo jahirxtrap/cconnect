@@ -74,7 +74,7 @@ interface SideChat {
   sessionId: string | null;
   streaming: boolean;
 }
-import { t } from "$lib/i18n/index.svelte";
+import { i18n, t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { agents } from "$lib/services/agents.svelte";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
@@ -1694,6 +1694,7 @@ export class ChatState {
       account: this.effectiveAccount,
       visibility: settings.visibility,
       agent: this.agent,
+      locale: i18n.resolved,
     });
   }
 

@@ -145,8 +145,9 @@ const heldOf = (data: Wire | null): number => (typeof data?.held === "number" ? 
 const toPluginChange = (data: Wire | null): PluginChange => ({ ...toAction(data), held: heldOf(data) });
 
 export const createClaudeApi = (client: HttpClient, profile: () => Profile) => ({
-  async usage(account: string | null = null, force = false): Promise<Usage | null> {
+  async usage(language: string, account: string | null = null, force = false): Promise<Usage | null> {
     const data = await client.get<Wire>("/claude/usage", {
+      lang: language,
       ...(account ? { account } : {}),
       ...(force ? { force: true } : {}),
     });

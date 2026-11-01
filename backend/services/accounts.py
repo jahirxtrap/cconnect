@@ -526,13 +526,14 @@ def _merge_shared(source: Path, target: Path, keys: tuple[str, ...]) -> None:
         current = json.loads(target.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         current = {}
-    before = {key: current.get(key) for key in keys}
+    before = {key: cli_settings.lookup(current, key) for key in keys}
     for key in keys:
-        if key in primary:
-            current[key] = primary[key]
+        value = cli_settings.lookup(primary, key)
+        if value is None:
+            cli_settings.discard(current, key)
         else:
-            current.pop(key, None)
-    if target.is_file() and before == {key: current.get(key) for key in keys}:
+            cli_settings.assign(current, key, value)
+    if target.is_file() and before == {key: cli_settings.lookup(current, key) for key in keys}:
         return
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(current, indent=2), encoding="utf-8")

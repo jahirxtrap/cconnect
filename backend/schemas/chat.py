@@ -36,6 +36,7 @@ class StartMessage(BaseModel):
     capabilities: list[str] = []
     security_key: Optional[str] = None
     agent: Optional[str] = None
+    locale: Optional[str] = None
 
 
 class PromptMessage(BaseModel):

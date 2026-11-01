@@ -81,11 +81,58 @@ SETTINGS: dict[str, CliSettingDef] = {
         type=bool,
         description="Upload session transcripts to Anthropic",
     ),
+    "subagent_effort": CliSettingDef(
+        json_key="env.CLAUDE_CODE_SUBAGENT_EFFORT",
+        default="",
+        type=str,
+        description="Effort a subagent runs at when its own definition names none; empty follows the chat's",
+    ),
+    "block_outside_writes": CliSettingDef(
+        json_key="permissions.blockWritesOutsideWorkingDirectories",
+        default=False,
+        type=bool,
+        description="Refuse to create or edit files outside the working directories, in every permission mode",
+        unset_by=False,
+    ),
 }
 
 
 def json_keys() -> tuple[str, ...]:
     return tuple(key for defn in SETTINGS.values() for key in (defn.json_key, defn.replaces) if key)
+
+
+def lookup(data: dict, key: str) -> Any:
+    *parents, leaf = key.split(".")
+    for part in parents:
+        data = data.get(part)
+        if not isinstance(data, dict):
+            return None
+    return data.get(leaf)
+
+
+def assign(data: dict, key: str, value: Any) -> None:
+    *parents, leaf = key.split(".")
+    for part in parents:
+        child = data.get(part)
+        if not isinstance(child, dict):
+            child = data[part] = {}
+        data = child
+    data[leaf] = value
+
+
+def discard(data: dict, key: str) -> None:
+    *parents, leaf = key.split(".")
+    chain = [data]
+    for part in parents:
+        child = chain[-1].get(part)
+        if not isinstance(child, dict):
+            return
+        chain.append(child)
+    chain[-1].pop(leaf, None)
+    for depth in range(len(parents), 0, -1):
+        if chain[depth]:
+            return
+        chain[depth - 1].pop(parents[depth - 1], None)
 
 
 def _path() -> Path:
@@ -112,7 +159,7 @@ def _valid(value: Any, expected: type) -> bool:
 
 def _stored(key: str) -> Any:
     defn = SETTINGS[key]
-    value = _read().get(defn.json_key)
+    value = lookup(_read(), defn.json_key)
     return value if _valid(value, defn.type) else None
 
 
@@ -174,9 +221,9 @@ def set(key: str, value: Any) -> None:
             raise ValueError(f"{key} must be at most {defn.maximum}")
     data = _read()
     if not blank:
-        data[defn.json_key] = value
-    elif value is None or _valid(data.get(defn.json_key), defn.type):
-        data.pop(defn.json_key, None)
+        assign(data, defn.json_key, value)
+    elif value is None or _valid(lookup(data, defn.json_key), defn.type):
+        discard(data, defn.json_key)
     _write(data)
     accounts.sync_all_shared_config()
 
@@ -189,11 +236,12 @@ def reset() -> None:
 def migrate() -> None:
     """Move a setting the CLI renamed onto its current key."""
     data = _read()
-    moved = [defn for defn in SETTINGS.values() if defn.replaces and defn.replaces in data]
+    moved = [defn for defn in SETTINGS.values() if defn.replaces and lookup(data, defn.replaces) is not None]
     if not moved:
         return
     for defn in moved:
-        value = data.pop(defn.replaces)
-        if defn.json_key not in data and _valid(value, defn.type) and value != defn.unset_by:
-            data[defn.json_key] = value
+        value = lookup(data, defn.replaces)
+        discard(data, defn.replaces)
+        if lookup(data, defn.json_key) is None and _valid(value, defn.type) and value != defn.unset_by:
+            assign(data, defn.json_key, value)
     _write(data)

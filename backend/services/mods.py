@@ -1,13 +1,12 @@
 """Claude Code mods in a chat: the events their messages become, and the surface CConnect attaches to draw them."""
 
-import json
 import re
 import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 from loguru import logger
 
-from services import cli_info, settings_store
+from services import cli_info, control_requests, settings_store
 
 SURFACE = "desktop"
 CLIENT_ID = "cconnect"
@@ -286,26 +285,18 @@ def settled(kind: str, answer: Any) -> Optional[dict]:
 
 def serve(client: Any, answer: Answerer) -> None:
     """Answer the requests the CLI sends a surface for its mods, leaving every other one to the SDK."""
-    query = getattr(client, "_query", None)
-    if query is None:
-        return
-    handle = query._handle_control_request
 
-    async def handled(request: dict) -> None:
-        data = request.get("request") or {}
-        subtype = data.get("subtype")
-        if subtype not in _ANSWERS:
-            await handle(request)
-            return
-        try:
-            response = await answer(subtype, data) or unanswered(subtype)
-        except Exception as exc:
-            logger.warning(f"{subtype} unanswered: {type(exc).__name__}: {exc}")
-            response = unanswered(subtype)
-        reply = {"type": "control_response", "response": {"subtype": "success", "request_id": request.get("request_id"), "response": response}}
-        await query.transport.write(json.dumps(reply) + "\n")
+    def answering(subtype: str) -> control_requests.Answer:
+        async def answered(data: dict) -> dict:
+            try:
+                return await answer(subtype, data) or unanswered(subtype)
+            except Exception as exc:
+                logger.warning(f"{subtype} unanswered: {type(exc).__name__}: {exc}")
+                return unanswered(subtype)
 
-    query._handle_control_request = handled
+        return answered
+
+    control_requests.serve(client, {subtype: answering(subtype) for subtype in _ANSWERS})
 
 
 async def request(client: Any, subtype: str, /, **payload) -> Optional[dict]:

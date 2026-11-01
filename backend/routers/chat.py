@@ -81,6 +81,7 @@ class _Session:
         self.effort: str = "max"
         self.partial: bool = False
         self.agent: str | None = None
+        self.locale: str | None = None
 
 
 def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False, shown=None):
@@ -137,6 +138,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     request_compact=request_compact,
                     reload=lambda kind: session.reload(f"reload-{kind}"),
                     capabilities=capabilities,
+                    locale=state.locale,
                     on_transport=on_transport,
                     adopt=adopted,
                     read_from=shown if adopted else None,
@@ -311,6 +313,7 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
                 model=_side_model(main_state),
                 emit=emit,
                 capabilities=capabilities,
+                locale=main_state.locale,
                 session_info=lambda: {
                     "session_id": side_state.session_id,
                     "cwd": str(paths.AI_WORKDIR),
@@ -325,14 +328,14 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
     return factory
 
 
-async def _run_usage(send, account: str | None = None, capabilities=None):
+async def _run_usage(send, account: str | None = None, capabilities=None, locale: str | None = None):
     """Send the plan-usage report as a one-off markdown message."""
     from mcps.components import CAPABILITY as COMPONENTS
     from services.usage import CAPABILITY as USAGE, usage_blocks, usage_data, usage_markdown
 
     try:
         if USAGE in (capabilities or ()):
-            await send({"type": "usage", **await usage_data(account), "local": True})
+            await send({"type": "usage", **await usage_data(account, language=locale), "local": True})
         elif COMPONENTS in (capabilities or ()):
             await send({"type": "component", "blocks": await usage_blocks(account), "local": True})
         else:
@@ -437,6 +440,7 @@ async def chat_ws(ws: WebSocket):
                     state.effort = msg.effort or settings_store.get("effort")
                     state.partial = msg.partial if msg.partial is not None else settings_store.get("streaming")
                     session = registry.create(state)
+                session.state.locale = msg.locale or session.state.locale
                 if previous is not None and previous is not session:
                     await previous.detach(sink)
                 await send({
@@ -635,7 +639,12 @@ async def chat_ws(ws: WebSocket):
                         await send({"type": "error", "message": "busy: a side question is already running", "channel": side_session.channel})
 
             elif mtype == "usage":
-                spawn(_run_usage(send, accounts.resolve(session.state.account if session else None), seen["capabilities"]))
+                spawn(_run_usage(
+                    send,
+                    accounts.resolve(session.state.account if session else None),
+                    seen["capabilities"],
+                    session.state.locale if session else None,
+                ))
 
             elif mtype == "reload":
                 if session is not None:

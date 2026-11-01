@@ -19,7 +19,7 @@ from mcps import build_cconnect_server
 from mcps.media import block_types
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, delegates, diffs, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -804,6 +804,7 @@ async def run_prompt(
     request_compact: Optional[Callable[[str], None]] = None,
     reload: Optional[Callable[[str], Awaitable[Optional[dict]]]] = None,
     capabilities: Optional[list[str]] = None,
+    locale: Optional[str] = None,
     session_info: Optional[Callable[[], dict]] = None,
     on_transport: Optional[Callable[[Any], None]] = None,
     resident: Optional[Any] = None,
@@ -878,6 +879,7 @@ async def run_prompt(
                 "background": resident.run_background if resident is not None else None,
                 "visibility": resident.wanted if resident is not None else vis,
                 "capabilities": list(capabilities or ()),
+                "locale": locale,
             },
             only=None if scope["cconnect"] else [SHARE_TOOL],
         )}
@@ -1105,7 +1107,10 @@ async def run_prompt(
             transport = None
             if on_transport is not None:
                 try:
-                    transport = SubprocessCLITransport(prompt=prompt_arg, options=options)
+                    transport = control_requests.Answering(
+                        SubprocessCLITransport(prompt=prompt_arg, options=options),
+                        elicitation.answers(turn_ask),
+                    )
                     on_transport(CliControls(transport))
                 except Exception as exc:
                     logger.warning(f"no interruptible transport: {type(exc).__name__}: {exc}")
@@ -1384,6 +1389,7 @@ async def ask_side_question(
     permission_mode: str = "default",
     emit: Optional[Callable[[dict], Awaitable[None]]] = None,
     capabilities: Optional[list[str]] = None,
+    locale: Optional[str] = None,
     session_info: Optional[Callable[[], dict]] = None,
     model: Optional[str] = None,
 ) -> AsyncIterator[dict]:
@@ -1424,6 +1430,7 @@ async def ask_side_question(
             "account": account,
             "session_info": session_info,
             "capabilities": list(capabilities or ()),
+            "locale": locale,
         }, exclude=("ask_component", "show_component"))}
     tools = scope["tools"]
     if tools is not True:

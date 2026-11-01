@@ -19,11 +19,14 @@ CAPABILITY = "usage"
 
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 _CACHE_SECONDS = 60.0
-_cache: dict[str, tuple[float, dict]] = {}
+_cache: dict[tuple[str, str], tuple[float, dict]] = {}
 _BAR_WIDTH = 20
 _UNUSED_KEY = "unused"
 _UNUSED_TEXT = "You haven't used it yet"
 _SPEND_KEY = "spend"
+_WEEK_KEY = "week"
+_WINDOW_IDS = {"session": "session", "weekly_all": _WEEK_KEY}
+_LABELS = {"session": "Current session", _WEEK_KEY: "This week", _SPEND_KEY: "Extra usage"}
 
 
 def _oauth(field: str, account: str | None = None) -> str | None:
@@ -34,7 +37,7 @@ def _oauth(field: str, account: str | None = None) -> str | None:
     return (data.get("claudeAiOauth") or {}).get(field)
 
 
-async def _fetch(account: str | None = None) -> dict:
+async def _fetch(account: str | None = None, language: str | None = None) -> dict:
     from services import accounts
 
     provider = accounts.provider_for(account)
@@ -48,6 +51,7 @@ async def _fetch(account: str | None = None) -> dict:
         "anthropic-beta": "oauth-2025-04-20",
         "anthropic-version": "2023-06-01",
         "User-Agent": f"claude-code/{bundled_version() or '2.0.0'}",
+        **({"Accept-Language": language} if language else {}),
     }
     try:
         async with httpx.AsyncClient(timeout=8.0) as client:
@@ -63,28 +67,47 @@ async def _fetch(account: str | None = None) -> dict:
         return {"error": f"Couldn't fetch usage: {type(exc).__name__}"}
 
 
-def _window_id(entry: dict) -> str | None:
-    kind = entry.get("kind")
-    if kind == "session":
-        return "session"
-    if kind == "weekly_all":
-        return "week"
-    return ((entry.get("scope") or {}).get("model") or {}).get("display_name")
+def _model(entry: dict) -> str | None:
+    return ((entry.get("scope") or {}).get("model") or {}).get("display_name") or None
+
+
+def _shares(data: dict) -> dict[int, float]:
+    return {
+        item["limit_index"]: float(item["allowance_percent_of_weekly"])
+        for item in data.get("weekly_scoped_shares") or []
+        if isinstance(item, dict)
+        and isinstance(item.get("limit_index"), int)
+        and isinstance(item.get("allowance_percent_of_weekly"), (int, float))
+    }
+
+
+def _breakdown(data: dict) -> list[dict]:
+    rows = (data.get("seven_day_breakdown") or {}).get("rows")
+    return [
+        {"key": str(row.get("key") or ""), "label": str(row.get("display_name") or row.get("key") or ""), "percent": float(row["percent"])}
+        for row in rows or []
+        if isinstance(row, dict) and isinstance(row.get("percent"), (int, float))
+    ]
 
 
 def _windows(data: dict) -> list[dict]:
     out: list[dict] = []
-    for entry in data.get("limits") or []:
+    shares = _shares(data)
+    for index, entry in enumerate(data.get("limits") or []):
         if not isinstance(entry, dict):
             continue
         pct = entry.get("percent")
-        wid = _window_id(entry)
+        model = _model(entry)
+        wid = _WINDOW_IDS.get(entry.get("kind")) or model
         if wid and isinstance(pct, (int, float)):
             win = {
                 "id": wid,
                 "percent": float(pct),
                 "resets_at": entry.get("resets_at"),
                 "severity": entry.get("severity"),
+                "model": model,
+                "share": shares.get(index),
+                "breakdown": _breakdown(data) if wid == _WEEK_KEY else [],
             }
             win["unused"] = not win["resets_at"] and round(win["percent"]) == 0
             out.append(win)
@@ -122,12 +145,12 @@ def _spend(data: dict) -> dict | None:
     }
 
 
-async def usage_data(account: str | None = None, force: bool = False) -> dict:
-    key = account or ""
+async def usage_data(account: str | None = None, force: bool = False, language: str | None = None) -> dict:
+    key = (account or "", language or "")
     cached = _cache.get(key)
     if cached and not force and time.monotonic() - cached[0] < _CACHE_SECONDS:
         return cached[1]
-    data = await _fetch(account)
+    data = await _fetch(account, language)
     if "error" in data:
         return cached[1] if cached else {"error": data["error"]}
     fresh = {"plan": accounts.plan_name(account), "windows": _windows(data)}
@@ -135,14 +158,25 @@ async def usage_data(account: str | None = None, force: bool = False) -> dict:
     return fresh
 
 
-def window_label(wid: str) -> str:
-    if wid == "session":
-        return "Current session"
-    if wid == "week":
-        return "This week"
-    if wid == _SPEND_KEY:
-        return "Extra usage"
-    return wid
+def window_label(win: dict) -> str:
+    if win.get("model"):
+        return f"This week ({win['model']})"
+    return _LABELS.get(win["id"], win["id"])
+
+
+def window_line(win: dict) -> str:
+    spent = ", ".join(f"{row['label']} {round(row['percent'])}%" for row in win.get("breakdown") or [] if row["percent"] > 0)
+    notes = [
+        note
+        for note in (
+            "not used yet" if win["unused"] else "",
+            f"up to {round(win['share'])}% of the weekly limit" if win.get("share") is not None else "",
+            spent,
+        )
+        if note
+    ]
+    line = f"{window_label(win)}: {round(win['percent'])}%"
+    return f"{line} ({'; '.join(notes)})" if notes else line
 
 
 def _bar(pct: float) -> str:
@@ -182,7 +216,7 @@ def _window_hint(win: dict) -> str:
 
 def _window_md(win: dict) -> str:
     pct = win["percent"]
-    lines = [f"**{window_label(win['id'])}** • {round(pct)}%", f"`{_bar(pct)}`"]
+    lines = [f"**{window_label(win)}** • {round(pct)}%", f"`{_bar(pct)}`"]
     hint = _window_hint(win)
     if hint:
         lines.append(hint)
@@ -192,7 +226,7 @@ def _window_md(win: dict) -> str:
 def _bar_block(win: dict) -> dict:
     block = {
         "type": "bar",
-        "label": window_label(win["id"]),
+        "label": window_label(win),
         "text": win.get("detail") or _resets_hint(win.get("resets_at")),
         "value": round(win["percent"]),
     }

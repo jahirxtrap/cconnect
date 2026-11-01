@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 from core import paths
 from mcps.shared_files import listing
-from services import acp_events, agents, attachments, event_rows, shared, terminal
+from services import acp_events, agents, attachments, elicitation, event_rows, shared, terminal
 from services.acp_peer import AUTH_REQUIRED, INVALID_PARAMS, METHOD_NOT_FOUND, RESOURCE_NOT_FOUND, AcpError
 from services.agent_connections import AgentConnection, pool
 from services.live_sessions import registry
@@ -560,9 +560,9 @@ class AgentSession:
 
     async def _elicit(self, params: dict) -> dict:
         if self._ask is None:
-            return {"action": "cancel"}
-        answer = await self._wait(self._ask(acp_events.elicitation(params)))
-        return acp_events.elicitation_answer(answer, params) if answer is not None else {"action": "cancel"}
+            return elicitation.cancelled()
+        answer = await self._wait(self._ask(elicitation.form(params)))
+        return elicitation.answer(answer, params) if answer is not None else elicitation.cancelled()
 
     def _path(self, raw: Any) -> Path:
         path = Path(str(raw or ""))

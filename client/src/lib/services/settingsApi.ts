@@ -38,6 +38,8 @@ export interface SettingsSnapshot {
   autoCompactWindowMin: number | null;
   autoCompactWindowMax: number | null;
   instructionFiles: string | null;
+  subagentEffort: string;
+  blockOutsideWrites: boolean;
   remoteControl: boolean | null;
   coAuthored: boolean;
   sessionUpload: boolean | null;
@@ -76,6 +78,8 @@ export interface SettingsPatch {
   auto_compact?: boolean;
   auto_compact_window?: number | null;
   instruction_files?: string | null;
+  subagent_effort?: string;
+  block_outside_writes?: boolean;
   remote_control?: boolean | null;
   co_authored?: boolean;
   session_upload?: boolean | null;
@@ -151,6 +155,8 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   autoCompactWindowMin: boundOf(wire, "auto_compact_window", "minimum"),
   autoCompactWindowMax: boundOf(wire, "auto_compact_window", "maximum"),
   instructionFiles: wire.instruction_files ? effectiveStr(wire, "instruction_files", "") : null,
+  subagentEffort: effectiveStr(wire, "subagent_effort", ""),
+  blockOutsideWrites: effectiveBool(wire, "block_outside_writes", false),
   remoteControl: effectiveFlag(wire, "remote_control"),
   coAuthored: effectiveBool(wire, "co_authored", true),
   sessionUpload: effectiveFlag(wire, "session_upload"),

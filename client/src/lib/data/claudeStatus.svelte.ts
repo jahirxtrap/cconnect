@@ -2,6 +2,7 @@ import { untrack } from "svelte";
 
 import { accountsStore } from "$lib/data/accountsStore.svelte";
 import { loads } from "$lib/data/inflight";
+import { i18n } from "$lib/i18n/index.svelte";
 import { type AccountsSnapshot } from "$lib/services/accountsApi";
 import { backend } from "$lib/services/backend.svelte";
 import {
@@ -140,7 +141,7 @@ class ClaudeStatus {
     this.usageLoading = untrack(() => this.usage) === null;
     await accountsStore.load();
     const accounts = accountsStore.snapshot;
-    const usage = await claudeApi.usage(accounts?.default ?? null, force);
+    const usage = await claudeApi.usage(i18n.resolved, accounts?.default ?? null, force);
     if (at !== backend.activeId) return;
     this.accounts = accounts;
     this.usage = usage;

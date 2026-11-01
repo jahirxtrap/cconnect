@@ -184,6 +184,7 @@ def make_tools(context: dict) -> list:
     account = context.get("account")
     info = context.get("session_info")
     capabilities = context.get("capabilities") or ()
+    locale = context.get("locale")
     on_provider = bool(accounts.provider_for(account))
 
     if info is not None:
@@ -246,9 +247,9 @@ def make_tools(context: dict) -> list:
 
     @tool("usage", USAGE, {})
     async def usage(args):
-        from services.usage import CAPABILITY as USAGE, usage_blocks, usage_data, window_label
+        from services.usage import CAPABILITY as USAGE, usage_blocks, usage_data, window_line
 
-        data = await usage_data(account)
+        data = await usage_data(account, language=locale)
         if "error" in data:
             return {"content": [{"type": "text", "text": data["error"]}]}
         windows = data.get("windows") or []
@@ -257,10 +258,7 @@ def make_tools(context: dict) -> list:
         elif emit is not None and COMPONENTS in capabilities and windows:
             await emit({"type": "component", "blocks": await usage_blocks(account)})
         lines = [f"Plan: {data['plan']}"] if data.get("plan") else []
-        lines += [
-            f"{window_label(win['id'])}: {round(win['percent'])}%" + (" (not used yet)" if win["unused"] else "")
-            for win in windows
-        ]
+        lines += [window_line(win) for win in windows]
         return {"content": [{"type": "text", "text": "\n".join(lines) or "No usage data available."}]}
 
     tools.append(usage)

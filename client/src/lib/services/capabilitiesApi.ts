@@ -59,6 +59,7 @@ export interface CapabilitiesDefaults {
 export interface Capabilities {
   permissionModes: LabeledOption[];
   models: ModelOption[];
+  subagentEfforts: string[];
   requestLimit: number | null;
   sharedScheme: string;
   packSchema: number | null;
@@ -115,6 +116,7 @@ export interface CommandWire {
 interface CapabilitiesWire extends VersionWire {
   permission_modes?: Array<{ id?: string; label?: string }>;
   models?: ModelWire[];
+  subagent_efforts?: string[];
   request_limit?: number;
   shared_scheme?: string;
   pack_schema?: number;
@@ -204,6 +206,7 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
           fastMode: model.fast_mode === true,
           autoMode: model.auto_mode === true,
         })),
+      subagentEfforts: data.subagent_efforts ?? [],
       requestLimit: data.request_limit ?? null,
       sharedScheme: data.shared_scheme ?? "",
       packSchema: data.pack_schema ?? null,

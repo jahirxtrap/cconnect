@@ -41,6 +41,7 @@ async def get_capabilities(capabilities: str = Query(""), account: str = Query("
         "supported_cli": SUPPORTED_CLI,
         "permission_modes": [{"id": m, "label": PERMISSION_LABELS.get(m, m)} for m in permission_modes()],
         "models": listed,
+        "subagent_efforts": cli_info.subagent_efforts(info),
         "request_limit": REQUEST_LIMIT_BYTES,
         "shared_scheme": SHARED_SCHEME,
         "pack_schema": PACK_SCHEMA["schema"],

@@ -155,14 +155,22 @@ def _entries(info: dict[str, Any]) -> list[dict]:
     return [entry for entry in listed if isinstance(entry, dict) and entry.get("value")] if isinstance(listed, list) else []
 
 
-def _levels(entry: dict) -> list[str]:
-    if not entry.get("supportsEffort"):
-        return []
+def _supported(entry: dict) -> list[str]:
     raw = entry.get("supportedEffortLevels")
-    levels = [level for level in raw if isinstance(level, str)] if isinstance(raw, list) else []
+    if not entry.get("supportsEffort") or not isinstance(raw, list):
+        return []
+    return [level for level in raw if isinstance(level, str)]
+
+
+def _levels(entry: dict) -> list[str]:
+    levels = _supported(entry)
     if not levels:
         return []
     return ["default", *levels, *([ULTRACODE_EFFORT] if "xhigh" in levels else [])]
+
+
+def subagent_efforts(info: dict[str, Any]) -> list[str]:
+    return max((_supported(entry) for entry in _entries(info)), key=len, default=[])
 
 
 def effort_levels_for(model: Optional[str], account: Optional[str] = None) -> list[str]:
