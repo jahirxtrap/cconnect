@@ -10,7 +10,7 @@
 
   const { onclick }: Props = $props();
 
-  const GLYPH = 14;
+  const GLYPH = 16;
 </script>
 
 <button

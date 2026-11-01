@@ -5,6 +5,9 @@
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
+  import { copyText } from "$lib/platform/clipboard";
+  import { speech, speechKey } from "$lib/platform/speech.svelte";
+  import { plainTextSharing, sharePlainText } from "$lib/services/sharedFiles";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
@@ -13,6 +16,7 @@
   import DateSeparator from "./blocks/DateSeparator.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./blocks/gaps";
   import MessageItem from "./blocks/MessageItem.svelte";
+  import type { ReplyHandlers } from "./blocks/ReplyActions.svelte";
   import { rowSite } from "./blocks/rowSite";
   import StatusProgress from "./blocks/StatusProgress.svelte";
   import { runSummary, toolRuns, type ToolRun } from "./toolRuns";
@@ -46,6 +50,11 @@
     bottomInset?: number;
     mods?: ModSurface | null;
     timestamps?: boolean;
+    replies?: ReplyCommands | null;
+  }
+
+  interface ReplyCommands {
+    fork: (reply: ChatMessage) => void;
   }
 
   let {
@@ -70,6 +79,7 @@
     bottomInset = 0,
     mods = null,
     timestamps = true,
+    replies = null,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -90,6 +100,74 @@
   );
 
   const roleAfter = (index: number): GapRole | null => visible[index + 1]?.role ?? (status ? "status" : null);
+
+  const speakKey = (item: ChatMessage) => speechKey(sessionId, item.id);
+
+  const endsReply = (item: ChatMessage, index: number) =>
+    item.role === "assistant" &&
+    !item.ephemeral &&
+    !!item.text.trim() &&
+    (visible[index + 1] ? visible[index + 1].role === "user" : !streaming);
+
+  interface Picked {
+    text: string;
+    first: number;
+    last: number;
+  }
+
+  let picked = $state<Picked | null>(null);
+  let armed: Picked | null = null;
+
+  const midOf = (node: Node): number | null => {
+    const value = (node instanceof Element ? node : node.parentElement)?.closest("[data-mid]")?.getAttribute("data-mid");
+    return value ? Number(value) : null;
+  };
+
+  const onselectionchange = () => {
+    const selection = window.getSelection();
+    const text = selection?.toString() ?? "";
+    const range = selection && !selection.isCollapsed && selection.rangeCount && text.trim() ? selection.getRangeAt(0) : null;
+    if (!range || !scroller?.holds(range.commonAncestorContainer)) {
+      picked = null;
+      return;
+    }
+    const first = visible.findIndex((item) => item.id === midOf(range.startContainer));
+    const last = visible.findIndex((item) => item.id === midOf(range.endContainer));
+    picked = first >= 0 && last >= 0 ? { text, first, last } : null;
+  };
+
+  const turnStart = (index: number) => {
+    for (let at = index - 1; at >= 0; at--) if (visible[at].role === "user") return at;
+    return 0;
+  };
+
+  const selectionKey = (item: ChatMessage) => `${speakKey(item)}:selection`;
+
+  const toggleSpeech = (item: ChatMessage) => {
+    const chosen = armed;
+    armed = null;
+    if (speech.speaking === speakKey(item) || speech.speaking === selectionKey(item)) speech.stop();
+    else if (chosen) speech.speakText(selectionKey(item), chosen.text);
+    else speech.speakMarkdown(speakKey(item), item.text);
+  };
+
+  const lastReplyAt = $derived(visible.findLastIndex((item, index) => endsReply(item, index)));
+
+  const replyOf = (item: ChatMessage, index: number): ReplyHandlers | null => {
+    if (!endsReply(item, index)) return null;
+    const last = index === lastReplyAt;
+    const start = turnStart(index);
+    const selected = picked && picked.first >= start && picked.last <= index ? picked : null;
+    return {
+      speaking: speech.speaking === speakKey(item) || speech.speaking === selectionKey(item),
+      selection: selected !== null,
+      onArm: () => (armed = selected),
+      onCopy: () => void copyText(item.text),
+      onShare: plainTextSharing() ? () => void sharePlainText(item.text) : null,
+      onSpeak: speech.available ? () => toggleSpeech(item) : null,
+      onFork: replies && (item.uuid || last) ? () => replies.fork(item) : null,
+    };
+  };
 
   const lastUserAt = $derived(
     visible.reduce((last, item, index) => (item.role === "user" ? index : last), -1),
@@ -269,6 +347,7 @@
     {component}
     {mods}
     {timestamps}
+    reply={replyOf(item, index)}
   />
 {/snippet}
 
@@ -330,3 +409,5 @@
       </div>
     {/if}
 </ChatScroller>
+
+<svelte:document {onselectionchange} />

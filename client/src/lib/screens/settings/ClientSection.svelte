@@ -14,11 +14,13 @@
   import SunMoon from "@lucide/svelte/icons/sun-moon";
   import SwatchBook from "@lucide/svelte/icons/swatch-book";
   import Type from "@lucide/svelte/icons/type";
+  import Volume2 from "@lucide/svelte/icons/volume-2";
   import { settings } from "$lib/data/settings.svelte";
   import { theme, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
+  import { speech } from "$lib/platform/speech.svelte";
   import { deviceBrowsing } from "$lib/screens/browser/deviceEngine";
   import PacksDialog from "$lib/screens/packs/PacksDialog.svelte";
   import { useServerPacks } from "$lib/services/serverPacks.svelte";
@@ -36,6 +38,7 @@
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
   import { appearanceOptions, localeOptions } from "./settingsValues";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
+  import SpeechDialog from "./SpeechDialog.svelte";
   import ThemeDialog from "./ThemeDialog.svelte";
 
   let dialog = $state<SettingsDialog | null>(null);
@@ -172,6 +175,14 @@
       onclick={() => (dialog = "browser")}
     />
   {/if}
+  {#if speech.available}
+    <PreferenceRow
+      icon={Volume2}
+      title={t("SPEECH")}
+      summary={rowSummary("speech")}
+      onclick={() => (dialog = "speech")}
+    />
+  {/if}
   {#if isDesktop}
     <PreferenceRow
       icon={DiscordIcon}
@@ -222,4 +233,6 @@
   <DiscordDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "browser"}
   <BrowserDialog onDismiss={() => (dialog = null)} />
+{:else if dialog === "speech"}
+  <SpeechDialog onDismiss={() => (dialog = null)} />
 {/if}

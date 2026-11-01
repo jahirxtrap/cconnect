@@ -36,7 +36,7 @@
         onOpenNewTab={() => list.openTab(session)}
         onOpenRight={list.rightOpenable ? () => list.openRight(session) : null}
         onRename={() => (list.renaming = session)}
-        onFork={list.forkable ? () => void list.fork(session) : null}
+        onFork={list.forkable ? () => (list.forking = session) : null}
         onDelete={list.removable ? () => (list.deleting = session) : null}
       />
     {/each}

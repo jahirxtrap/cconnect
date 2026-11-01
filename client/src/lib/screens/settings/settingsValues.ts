@@ -13,6 +13,7 @@ import { packs } from "$lib/design/packs/registry.svelte";
 import { FONT_KINDS, THEME_KINDS } from "$lib/design/packs/schema";
 import { theme } from "$lib/design/theme.svelte";
 import { i18n, LOCALES, localeName, plural, t } from "$lib/i18n/index.svelte";
+import { AUTO_READ_ALWAYS, AUTO_READ_BACKGROUND, AUTO_READ_OFF } from "$lib/platform/speech.svelte";
 import { offeredPacks } from "$lib/screens/packs/packText";
 import { tabs } from "$lib/screens/chat/tabs.svelte";
 import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
@@ -118,6 +119,16 @@ export const notificationsValue = (): string =>
 
 export const discordValue = (): string =>
   settings.discord.enabled ? t("OPTION_ON") : t("OPTION_OFF");
+
+const AUTO_READ_LABELS: Record<string, string> = {
+  [AUTO_READ_OFF]: "OPTION_OFF",
+  [AUTO_READ_ALWAYS]: "SPEECH_AUTO_READ_ALWAYS",
+  [AUTO_READ_BACKGROUND]: "SPEECH_AUTO_READ_BACKGROUND",
+};
+
+export const autoReadLabel = (mode: string): string => t(AUTO_READ_LABELS[mode] ?? "OPTION_OFF");
+
+export const speechValue = (): string => autoReadLabel(settings.speechAutoRead);
 
 export const environmentValue = (): string =>
   backend.active ? joined(backend.active.name, address(backend.active)) : t("NO_ENVIRONMENTS");

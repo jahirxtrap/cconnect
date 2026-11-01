@@ -185,6 +185,22 @@ export const shareFile = async (filename: string, blob: Blob) => {
   if (!(await shareData(filename, blob))) await saveFileToDownloads(filename, blob);
 };
 
+export const plainTextSharing = (): boolean =>
+  typeof androidDownloads()?.shareText === "function" || typeof navigator.share === "function";
+
+export const sharePlainText = async (text: string) => {
+  const bridge = androidDownloads();
+  if (bridge?.shareText) {
+    bridge.shareText(text);
+    return;
+  }
+  try {
+    await navigator.share({ text });
+  } catch {
+    return;
+  }
+};
+
 export const shareText = async (filename: string, text: string) => {
   if (await shareData(filename, textBlob(text))) return;
   if (navigator.share) {

@@ -39,6 +39,7 @@ class MainActivity : TauriActivity() {
   private lateinit var downloads: Downloads
   private val installer by lazy { Installer(this) }
   private val dictation by lazy { Dictation(this) { content } }
+  private val narrator = lazy { Speech(this) { content } }
   private var pendingSave: Triple<String, String, String>? = null
   private var content: WebView? = null
   private var pendingShare: String? = null
@@ -206,6 +207,7 @@ class MainActivity : TauriActivity() {
   override fun onDestroy() {
     link.closeAll()
     browser.closeAll()
+    if (narrator.isInitialized()) narrator.value.shutdown()
     super.onDestroy()
   }
 
@@ -227,6 +229,7 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(CodeScanner(), "AndroidQrScan")
     webView.addJavascriptInterface(installer, "AndroidInstaller")
     webView.addJavascriptInterface(Voice(), "AndroidVoice")
+    webView.addJavascriptInterface(Narrator(), "AndroidSpeech")
     webView.addJavascriptInterface(googleAuth, "AndroidGoogleAuth")
     webView.addJavascriptInterface(link, "AndroidLink")
     webView.addJavascriptInterface(browser, "AndroidBrowser")
@@ -263,6 +266,21 @@ class MainActivity : TauriActivity() {
 
     @JavascriptInterface
     fun stop() = dictation.stop()
+  }
+
+  inner class Narrator {
+    @JavascriptInterface
+    fun isAvailable(): Boolean = narrator.value.available()
+
+    @JavascriptInterface
+    fun voices(): String = narrator.value.voices()
+
+    @JavascriptInterface
+    fun speak(key: String, chunks: String, language: String, voice: String, rate: Float) =
+      narrator.value.speak(key, chunks, language, voice, rate)
+
+    @JavascriptInterface
+    fun stop() = narrator.value.stop()
   }
 
   inner class Background {

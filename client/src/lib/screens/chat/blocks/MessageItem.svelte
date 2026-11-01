@@ -36,6 +36,7 @@
   import InteractionBlock from "./InteractionBlock.svelte";
   import NoticeCard from "./NoticeCard.svelte";
   import PlanBlock from "./PlanBlock.svelte";
+  import ReplyActions, { type ReplyHandlers } from "./ReplyActions.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
   import { rowSite } from "./rowSite";
@@ -60,6 +61,7 @@
     component?: Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     mods?: ModSurface | null;
     timestamps?: boolean;
+    reply?: ReplyHandlers | null;
   }
 
   const SPINNER_ID = "spinner";
@@ -83,6 +85,7 @@
     component,
     mods = null,
     timestamps = true,
+    reply = null,
   }: Props = $props();
 
   const server = contextServer();
@@ -257,6 +260,9 @@
       <ModInline {mods} component={site} instanceId={rowId} {props} engine={assistantRow} inset />
     {:else}
       {@render assistantRow(props)}
+    {/if}
+    {#if reply}
+      <ReplyActions timestamp={timestamps && settings.showTimestamps ? message.timestamp : null} {...reply} />
     {/if}
   {:else if message.role === "thinking"}
     <Collapsible

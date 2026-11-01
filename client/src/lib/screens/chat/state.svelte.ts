@@ -36,6 +36,7 @@ import { withElements, type PickedElement } from "$lib/data/pickedElements";
 import { userContent } from "$lib/data/userContent";
 import { reloadText } from "$lib/data/reload";
 import { settings } from "$lib/data/settings.svelte";
+import { AUTO_READ_ALWAYS, AUTO_READ_BACKGROUND, speech, speechKey } from "$lib/platform/speech.svelte";
 import { terminalTabs } from "$lib/data/terminalTabs.svelte";
 
 const PREFILLED_TYPES = new Set<ComponentType>(["input", "notes", "path", "file", "color"]);
@@ -608,6 +609,7 @@ export class ChatState {
   }
 
   submit(text: string) {
+    speech.stop();
     if (this.agent) {
       void this.sendPrompt(text);
       return;
@@ -1240,7 +1242,15 @@ export class ChatState {
     return { ...session, sessionId, title, lastActive: null, activity: null, resident: false, rewind: null };
   }
 
-  async forkAt(point: RewindPoint): Promise<SessionInfo | null> {
+  forkAt(point: RewindPoint): Promise<SessionInfo | null> {
+    return this.#forkCurrent(point.rewindId);
+  }
+
+  forkReply(reply: ChatMessage): Promise<SessionInfo | null> {
+    return this.#forkCurrent(reply.uuid);
+  }
+
+  async #forkCurrent(upTo: string | null): Promise<SessionInfo | null> {
     const sessionId = this.sessionId;
     if (!sessionId || this.rewindBusy) return null;
     const current: SessionInfo = this.listed ?? {
@@ -1257,9 +1267,17 @@ export class ChatState {
       rewind: null,
     };
     this.rewindBusy = true;
-    const forked = await this.fork(current, point.rewindId);
+    const forked = await this.fork(current, upTo);
     this.rewindBusy = false;
     return forked;
+  }
+
+  #readAloud() {
+    const mode = settings.speechAutoRead;
+    const away = document.hidden || !document.hasFocus();
+    if (mode !== AUTO_READ_ALWAYS && !(mode === AUTO_READ_BACKGROUND && away)) return;
+    const last = this.messages.filter((item) => item.role === "assistant" && !item.ephemeral).at(-1);
+    if (last?.text.trim()) speech.speakMarkdown(speechKey(this.sessionId, last.id), last.text);
   }
 
   restoreComposer(text: string) {
@@ -1976,6 +1994,7 @@ export class ChatState {
         result: item.result,
         images: this.#imageUrls(item, sessionId, projectKey),
         timestamp: item.timestamp,
+        uuid: item.uuid,
       }),
       parent: item.parent,
     };
@@ -2697,6 +2716,13 @@ export class ChatState {
       case "cache":
         this.promptCache = event.cache;
         break;
+      case "anchor": {
+        const target = this.#assistantId;
+        if (target !== null) {
+          this.messages = this.messages.map((item) => (item.id === target ? { ...item, uuid: event.uuid } : item));
+        }
+        break;
+      }
       case "rate_limit":
         liveLimits.set(this.environmentId, this.effectiveAccount, event.windows);
         break;
@@ -2709,6 +2735,7 @@ export class ChatState {
         this.#bindSession(event.sessionId ?? this.sessionId);
         break;
       case "done":
+        if (this.streaming && !event.replay) this.#readAloud();
         if (this.streaming && settings.notifyTaskDone && !event.replay) {
           void notifier.notify(
             t("NOTIF_TASK_DONE", this.assistantName),

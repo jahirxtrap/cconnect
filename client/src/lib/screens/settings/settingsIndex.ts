@@ -7,6 +7,7 @@ import { androidBackground } from "$lib/platform/androidBackground";
 import { layout } from "$lib/platform/layout.svelte";
 import { webApp } from "$lib/platform/pwa.svelte";
 import { describe, shortcuts, SHORTCUTS } from "$lib/platform/shortcuts.svelte";
+import { speech } from "$lib/platform/speech.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
 import { driveAvailable } from "$lib/services/drive/config";
 import { deviceBrowsing } from "$lib/screens/browser/deviceEngine";
@@ -46,6 +47,7 @@ import {
   sdkValue,
   serviceStatusValue,
   skillsValue,
+  speechValue,
   themeValue,
   toolsValue,
   userPromptValue,
@@ -72,6 +74,7 @@ export type SettingsDialog =
   | "shortcuts"
   | "discord"
   | "browser"
+  | "speech"
   | "generation"
   | "permissions"
   | "sessions"
@@ -109,6 +112,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "chat_files", label: "CHAT_FILES", summary: "CHAT_FILES_SUMMARY", available: () => !layout.mobile, section: "client", group: "SETTINGS_CLIENT" },
   { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
   { id: "browser", label: "BROWSER", summary: "BROWSER_SUMMARY", available: () => deviceBrowsing, section: "client", group: "SETTINGS_CLIENT", dialog: "browser" },
+  { id: "speech", label: "SPEECH", value: speechValue, available: () => speech.available, section: "client", group: "SETTINGS_CLIENT", dialog: "speech" },
 
   { id: "notifications", label: "NOTIFICATIONS", value: notificationsValue, section: "background", group: "BACKGROUND_GROUP", dialog: "notifications" },
   { id: "battery", label: "BATTERY_OPTIMIZATION", summary: "BATTERY_OPTIMIZATION_SUMMARY", available: () => androidBackground() !== null, section: "background", group: "BACKGROUND_GROUP" },

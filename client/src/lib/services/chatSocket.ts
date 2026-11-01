@@ -154,6 +154,7 @@ export type ServerEvent =
     }
   | { type: "rate_limit"; windows: LimitWindow[] }
   | { type: "cache"; cache: PromptCache | null }
+  | { type: "anchor"; uuid: string }
   | { type: "done"; replay: boolean }
   | { type: "interrupted" }
   | { type: "attached" }
@@ -1030,6 +1031,8 @@ export class ChatSocket {
         };
       case "cache":
         return { type: "cache", cache: promptCacheOf(wire.cache) };
+      case "anchor":
+        return typeof wire.uuid === "string" ? { type: "anchor", uuid: wire.uuid } : null;
       case "done":
         return { type: "done", replay: wire.replay === true };
       case "interrupted":

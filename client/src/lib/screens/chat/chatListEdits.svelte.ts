@@ -7,6 +7,7 @@ export class ChatListEdits {
   deleting = $state<SessionInfo | null>(null);
   moving = $state<{ session: SessionInfo; preset: string | null } | null>(null);
   categorizing = $state<SessionInfo | null>(null);
+  forking = $state<{ session: SessionInfo; open: (forked: SessionInfo) => void } | null>(null);
   organizing = $state(false);
 
   #chat: () => ChatState;

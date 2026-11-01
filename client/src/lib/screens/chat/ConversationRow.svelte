@@ -140,7 +140,7 @@
         <MenuItem icon={PanelRight} text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
       {/if}
       {#if onFork}
-        <MenuItem icon={GitFork} text={t("AGENT_CHAT_FORK")} onclick={() => run(onFork)} />
+        <MenuItem icon={GitFork} text={t("CHAT_FORK")} onclick={() => run(onFork)} />
       {/if}
       {#if onPlace}
         <MenuSub icon={Tag} text={t("CATEGORY")}>

@@ -34,6 +34,17 @@
   />
 {/if}
 
+{#if list.forking}
+  {@const target = list.forking}
+  <ConfirmDialog
+    title={t("CHAT_FORK")}
+    text={t("FORK_CONFIRM_ALL", sessionTitle(target))}
+    confirmLabel={t("CHAT_FORK")}
+    onConfirm={() => void list.fork(target)}
+    onDismiss={() => (list.forking = null)}
+  />
+{/if}
+
 {#if list.failure}
   {@const message = list.failure}
   <CompactDialog title={t("CONNECTION_ERROR")} onDismiss={() => (list.failure = null)}>

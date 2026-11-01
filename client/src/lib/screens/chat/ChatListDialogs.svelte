@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { sessionLabel } from "$lib/data/models";
   import { sessionColorOptions } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import ColorDialog from "$lib/ui/ColorDialog.svelte";
@@ -88,5 +89,20 @@
       edits.deleting = null;
     }}
     onDismiss={() => (edits.deleting = null)}
+  />
+{/if}
+
+{#if edits.forking}
+  {@const target = edits.forking}
+  <ConfirmDialog
+    title={t("CHAT_FORK")}
+    text={t("FORK_CONFIRM_ALL", sessionLabel(target.session))}
+    confirmLabel={t("CHAT_FORK")}
+    onConfirm={() => {
+      const { session, open } = target;
+      void chat.fork(session).then((forked) => forked && open(forked));
+      edits.forking = null;
+    }}
+    onDismiss={() => (edits.forking = null)}
   />
 {/if}

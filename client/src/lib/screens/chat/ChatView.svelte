@@ -13,7 +13,7 @@
   import { screenFor } from "$lib/app/screens";
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { agentUp } from "$lib/data/agentModels";
-  import { type InteractionData } from "$lib/data/chatModels";
+  import { type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { liveLimits } from "$lib/data/liveLimits.svelte";
   import { projectNameOf, sessionIdPreview } from "$lib/data/models";
@@ -212,6 +212,14 @@
   );
   const actionsEnabled = $derived(!chat.agent || !blocked);
   const pane = paneRole() ?? "center";
+
+  let forkingReply = $state<ChatMessage | null>(null);
+
+  const replyCommands = $derived(
+    chat.agent || chat.viewOnly || chat.sessionId === null
+      ? null
+      : { fork: (reply: ChatMessage) => (forkingReply = reply) },
+  );
   const chatsWindow = $derived(
     !panes.historyInList(pane) &&
       (!chat.agent || (!!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume))),
@@ -506,6 +514,7 @@
           onSuggest={pickSuggestion}
           sessionId={chat.sessionId}
           timestamps={!chat.agent}
+          replies={replyCommands}
           mods={chat.mods}
           expandedIds={chat.expandedIds}
           savedTop={chat.scrollTop}
@@ -658,6 +667,22 @@
     onUpload={(file, onProgress) => chat.uploadComponentFile(file, onProgress)}
   />
 {/snippet}
+
+{#if forkingReply}
+  {@const reply = forkingReply}
+  <ConfirmDialog
+    title={t("CHAT_FORK")}
+    text={t("FORK_CONFIRM_HERE")}
+    confirmLabel={t("CHAT_FORK")}
+    onConfirm={() => {
+      void chat.forkReply(reply).then((forked) => {
+        if (forked) panes.openSession(forked, pane);
+      });
+      forkingReply = null;
+    }}
+    onDismiss={() => (forkingReply = null)}
+  />
+{/if}
 
 {#if rewindOpen}
   <RewindDialog

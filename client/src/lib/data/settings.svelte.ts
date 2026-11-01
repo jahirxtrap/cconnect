@@ -263,6 +263,27 @@ class Settings {
     this.#write("minimize_to_tray", value);
   }
 
+  get speechAutoRead() {
+    return this.#read<string>("speech_auto_read");
+  }
+  set speechAutoRead(value: string) {
+    this.#write("speech_auto_read", value);
+  }
+
+  get speechVoice() {
+    return this.#read<string>("speech_voice");
+  }
+  set speechVoice(value: string) {
+    this.#write("speech_voice", value);
+  }
+
+  get speechRate() {
+    return this.#read<number>("speech_rate");
+  }
+  set speechRate(value: number) {
+    this.#write("speech_rate", value);
+  }
+
   get modBandHandle() {
     return this.#read<boolean>("mod_band_handle");
   }

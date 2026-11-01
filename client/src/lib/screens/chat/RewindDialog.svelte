@@ -84,7 +84,7 @@
       onclick={() => (mode = "conversation")}
     />
     <DialogSelectItem
-      label={t("REWIND_FORK")}
+      label={t("FORK_FROM_HERE")}
       selected={mode === "fork"}
       enabled={!busy}
       onclick={() => (mode = "fork")}

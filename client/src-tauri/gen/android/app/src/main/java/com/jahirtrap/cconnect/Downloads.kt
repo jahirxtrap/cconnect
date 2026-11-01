@@ -103,6 +103,17 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
     }
 
     @JavascriptInterface
+    fun shareText(text: String) {
+        runCatching {
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_TEXT, text)
+            }
+            activity.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
+    @JavascriptInterface
     fun openData(filename: String, base64: String) {
         workers.execute {
             val file = cacheData(filename, base64) ?: return@execute

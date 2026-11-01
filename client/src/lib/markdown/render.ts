@@ -95,6 +95,34 @@ md.renderer.rules.list_item_open = (tokens, index, options, _env, self) => {
 
 export const renderInline = (markdown: string): string => md.renderInline(markdown);
 
+const spokenInline = (token: Token): string => {
+  let href: string | null = null;
+  let text = "";
+  for (const child of token.children ?? []) {
+    if (child.type === "link_open") href = String(child.attrGet("href") ?? "");
+    else if (child.type === "link_close") href = null;
+    else if ((child.type === "text" || child.type === "code_inline") && child.content !== href) text += child.content;
+    else if (child.type === "softbreak" || child.type === "hardbreak") text += " ";
+  }
+  return text.replace(/\s+/g, " ").trim();
+};
+
+export const speakableParagraphs = (markdown: string): string[] => {
+  const paragraphs: string[] = [];
+  let row: string[] | null = null;
+  for (const token of md.parse(markdown, {})) {
+    if (token.type === "tr_open") row = [];
+    else if (token.type === "tr_close" && row) {
+      if (row.length) paragraphs.push(row.join(", "));
+      row = null;
+    } else if (token.type === "inline") {
+      const text = spokenInline(token);
+      if (text) (row ?? paragraphs).push(text);
+    }
+  }
+  return paragraphs;
+};
+
 const renderRun = (run: Token[]): string => md.renderer.renderInline(run, md.options, {}).trim();
 
 const inlineSegments = (token: Token): Segment[] => {

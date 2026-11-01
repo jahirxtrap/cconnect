@@ -96,6 +96,8 @@
 
   export const find = (selector: string) => container?.querySelector<HTMLElement>(selector) ?? null;
 
+  export const holds = (node: Node) => container?.contains(node) ?? false;
+
   const firstVisible = (): HTMLElement | null => {
     if (!content) return null;
     const items = content.children;

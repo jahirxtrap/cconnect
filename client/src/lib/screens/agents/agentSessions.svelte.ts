@@ -15,6 +15,7 @@ export class AgentSessionList {
   query = $state("");
   renaming = $state<AgentSession | null>(null);
   deleting = $state<AgentSession | null>(null);
+  forking = $state<AgentSession | null>(null);
   failure = $state<string | null>(null);
 
   #chat: () => ChatState | null;
@@ -75,6 +76,7 @@ export class AgentSessionList {
   }
 
   async fork(session: AgentSession) {
+    this.forking = null;
     const chat = this.#chat();
     if (!chat?.agent) return;
     const result = await createAgentsApi(() => chat.environment).fork(chat.agent, this.#folder(), session.sessionId);

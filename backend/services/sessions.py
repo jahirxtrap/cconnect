@@ -1698,7 +1698,7 @@ def get_session_messages(
                 text = block.get("text", "").strip()
                 text, notifs = _split_notifications(text)
                 if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
-                    item = {"type": "text", "role": role, "text": text}
+                    item = {"type": "text", "role": role, "text": text, "uuid": entry.get("uuid")}
                     if user_images:
                         item["images"] = user_images
                         user_images = None

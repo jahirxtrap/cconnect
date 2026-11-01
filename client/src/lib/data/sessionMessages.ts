@@ -36,6 +36,7 @@ export interface SessionMessage {
   timestamp: number | null;
   parent: string | null;
   toolUseId: string | null;
+  uuid: string | null;
 }
 
 type Wire = Record<string, unknown>;
@@ -174,6 +175,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     timestamp: int(raw, "ts"),
     parent: text(raw, "parent"),
     toolUseId: text(raw, "id"),
+    uuid: text(raw, "uuid"),
   };
 };
 

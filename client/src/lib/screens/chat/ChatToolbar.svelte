@@ -18,6 +18,7 @@
   import ToolbarSelect from "./ToolbarSelect.svelte";
   import ToolbarState from "./ToolbarState.svelte";
   import ToolbarToggle from "./ToolbarToggle.svelte";
+  import SpeechToggle from "./SpeechToggle.svelte";
   import VisibilityToggle from "./VisibilityToggle.svelte";
 
   interface Props {
@@ -207,6 +208,7 @@
 
     <VisibilityToggle {simpleMode} {onVisibility} />
   {/if}
+  <SpeechToggle />
 </div>
 
 {#if !disconnected && !connecting && !loading && ready && contextWindow !== null}

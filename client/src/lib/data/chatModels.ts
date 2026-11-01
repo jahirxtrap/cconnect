@@ -205,6 +205,7 @@ export interface ChatMessage {
   children: ChatMessage[];
   sendStatus: SendStatus;
   usage: Usage | null;
+  uuid: string | null;
 }
 
 export interface TodoItem {
@@ -377,5 +378,6 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   children: [],
   sendStatus: "sent",
   usage: null,
+  uuid: null,
   ...patch,
 });

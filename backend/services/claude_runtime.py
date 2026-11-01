@@ -1195,6 +1195,11 @@ async def run_prompt(
                         if parent:
                             event["parent"] = parent
                         yield event
+                    if not parent and message.uuid and any(
+                        type(block).__name__ == "TextBlock" and (getattr(block, "text", "") or "").strip()
+                        for block in message.content or []
+                    ):
+                        yield {"type": "anchor", "uuid": message.uuid}
                     if not parent:
                         usage = getattr(message, "usage", None)
                         total = _usage_context(usage)

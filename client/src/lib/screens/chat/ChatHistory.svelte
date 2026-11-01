@@ -275,10 +275,12 @@
                 }
               : null}
             onFork={() =>
-              void chat.fork(session).then((forked) => {
-                if (!forked) return;
-                onOpenSession(forked);
-                onAfterSelect();
+              (edits.forking = {
+                session,
+                open: (forked) => {
+                  onOpenSession(forked);
+                  onAfterSelect();
+                },
               })}
             onDelete={() => (edits.deleting = session)}
             trash={chat.trashEnabled}
