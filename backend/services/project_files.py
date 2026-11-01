@@ -2,8 +2,9 @@
 
 import re
 import subprocess
+import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional, TypeVar
 
 from loguru import logger
 
@@ -18,6 +19,11 @@ _HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))?")
 _repos: dict[str, Optional[Path]] = {}
 _indexes: dict[str, Optional[set[str]]] = {}
 _statuses: dict[str, dict[str, str]] = {}
+_generations: dict[str, int] = {}
+_builds: dict[tuple[int, str], threading.Lock] = {}
+_guard = threading.Lock()
+
+Cached = TypeVar("Cached")
 
 
 def root_for(project_key: str) -> Optional[Path]:
@@ -68,11 +74,25 @@ def _build_index(repo: Path) -> Optional[set[str]]:
     return tracked
 
 
-def index_of(repo: Path) -> Optional[set[str]]:
+def _cached(cache: dict[str, Cached], repo: Path, build: Callable[[Path], Cached]) -> Cached:
     key = str(repo)
-    if key not in _indexes:
-        _indexes[key] = _build_index(repo)
-    return _indexes[key]
+    if key in cache:
+        return cache[key]
+    with _guard:
+        lock = _builds.setdefault((id(cache), key), threading.Lock())
+    with lock:
+        if key in cache:
+            return cache[key]
+        generation = _generations.get(key, 0)
+        value = build(repo)
+        with _guard:
+            if _generations.get(key, 0) == generation:
+                cache[key] = value
+        return value
+
+
+def index_of(repo: Path) -> Optional[set[str]]:
+    return _cached(_indexes, repo, _build_index)
 
 
 def _build_status(repo: Path) -> dict[str, str]:
@@ -94,10 +114,7 @@ def _build_status(repo: Path) -> dict[str, str]:
 
 
 def statuses(repo: Path) -> dict[str, str]:
-    key = str(repo)
-    if key not in _statuses:
-        _statuses[key] = _build_status(repo)
-    return _statuses[key]
+    return _cached(_statuses, repo, _build_status)
 
 
 def _relative(base: Path, path: Path) -> str:
@@ -334,7 +351,29 @@ def deleted_at_head(root: Path, relpath: str) -> bool:
     return statuses(repo).get(_relative(repo, path), "").strip().startswith("D")
 
 
-def invalidate() -> None:
+def _affected(touched: list[Path], known: set[str]) -> set[str]:
+    owners = {str(repo) for repo in map(repo_of, touched) if repo is not None}
+    return owners | {key for key in known if any(Path(key).is_relative_to(path) for path in touched)}
+
+
+def _drop(stale: set[str], overtake: bool) -> None:
+    with _guard:
+        for key in stale:
+            _indexes.pop(key, None)
+            _statuses.pop(key, None)
+            if overtake:
+                _generations[key] = _generations.get(key, 0) + 1
+
+
+def invalidate(touched: Optional[list[Path]] = None) -> None:
     _repos.clear()
-    _indexes.clear()
-    _statuses.clear()
+    with _guard:
+        known = set(_indexes) | set(_statuses) | {key for _, key in _builds}
+    _drop(known if touched is None else _affected(touched, known), overtake=True)
+
+
+def forget(root: Path) -> None:
+    _repos.clear()
+    with _guard:
+        cached = set(_indexes) | set(_statuses)
+    _drop(_affected([root], cached), overtake=False)

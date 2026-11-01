@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import time
+from contextlib import suppress
 from functools import lru_cache
 from pathlib import Path
 
@@ -51,6 +52,8 @@ def _redact(record) -> None:
 
 
 def reset_log_file() -> None:
+    with suppress(OSError):
+        paths.SERVER_LOG_FILE.replace(paths.PREVIOUS_SERVER_LOG_FILE)
     paths.SERVER_LOG_FILE.write_text("", encoding="utf-8")
 
 

@@ -2,7 +2,8 @@
 
 One recursive watcher per project a client is looking at, started on the first subscriber
 and stopped with the last, so nothing runs while the explorer is closed. A burst drops the
-git caches and carries the paths it touched, truncated past `_MAX_PATHS`.
+git caches of the repositories it touched, every one of them once it is truncated past
+`_MAX_PATHS`, and carries the paths.
 """
 
 import asyncio
@@ -25,6 +26,12 @@ def _inside(root: Path, path: str) -> str:
         return Path(path).relative_to(root).as_posix()
     except ValueError:
         return ""
+
+
+def _touched(changed: dict[str, set[str]], overflowed: set[str], roots: dict[str, Path]) -> Optional[list[Path]]:
+    if overflowed or any(key not in roots for key in changed):
+        return None
+    return [roots[key] / path for key, paths in changed.items() for path in paths]
 
 
 def _relevant(path: str) -> bool:
@@ -51,6 +58,7 @@ class ProjectWatchHub:
     def __init__(self):
         self._subscribers: dict[asyncio.Queue, str] = {}
         self._observers: dict[str, object] = {}
+        self._roots: dict[str, Path] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
         self._pending: dict[str, set[str]] = {}
@@ -101,6 +109,7 @@ class ProjectWatchHub:
         root = project_files.root_for(project_key)
         if root is None:
             return
+        project_files.forget(root)
         try:
             from watchdog.events import FileSystemEventHandler
             from watchdog.observers import Observer
@@ -122,10 +131,12 @@ class ProjectWatchHub:
             return
         with self._lock:
             self._observers[project_key] = observer
+            self._roots[project_key] = root
 
     def _release(self, project_key: str):
         with self._lock:
             observer = self._observers.pop(project_key, None)
+            self._roots.pop(project_key, None)
         if observer is None:
             return
         try:
@@ -155,9 +166,10 @@ class ProjectWatchHub:
             self._overflowed = set()
             self._timer = None
             targets = [(q, key) for q, key in self._subscribers.items() if key in changed]
+            roots = dict(self._roots)
         if not changed:
             return
-        project_files.invalidate()
+        project_files.invalidate(_touched(changed, overflowed, roots))
         if loop is None:
             return
         for queue, key in targets:

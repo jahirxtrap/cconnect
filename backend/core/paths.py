@@ -60,6 +60,7 @@ CONTEXT_WINDOWS_FILE = CACHE_DIR / "context_windows.json"
 BROWSER_PROFILE_DIR = Path(os.environ.get("BROWSER_PROFILE_DIR") or CACHE_DIR / "browser")
 
 SERVER_LOG_FILE = LOGS_DIR / "server.jsonl"
+PREVIOUS_SERVER_LOG_FILE = LOGS_DIR / "server.prev.jsonl"
 DETACHED_LOG_FILE = LOGS_DIR / "detached.log"
 
 

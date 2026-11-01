@@ -93,6 +93,7 @@
   let locked = $state(false);
   let showChanged = $state(settings.projectChangedOnly);
   let changed = $state<ProjectEntry[] | null>(null);
+  let changesSlot = "";
   let showLog = $state(false);
   let commits = $state<GitCommit[] | null>(null);
   let logDone = $state(false);
@@ -470,6 +471,11 @@
 
   const folderOf = (path: string) => path.slice(0, Math.max(0, path.lastIndexOf("/")));
 
+  const inRepo = (path: string, known: GitRepo[] | null) =>
+    known === null ||
+    path.includes(".git/") ||
+    known.some((repo) => !repo.relative || path === repo.relative || path.startsWith(`${repo.relative}/`));
+
   const remember = () => {
     if (!compact || !placed) return;
     rememberProject(placed, {
@@ -570,7 +576,11 @@
       return;
     }
     if (!key) return;
-    if (!burst.truncated && !burst.paths.length && untrack(() => changed) !== null) return;
+    const known = untrack(() => repos);
+    const target = untrack(() => slot);
+    const current = changesSlot === target && untrack(() => changed) !== null;
+    if (current && !burst.truncated && !burst.paths.some((path) => inRepo(path, known))) return;
+    changesSlot = target;
     void projectFilesApi.changes(key).then((found) => {
       if (projectKey !== key || !showChanged) return;
       changed = found ?? [];
