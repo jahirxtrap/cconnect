@@ -1,5 +1,6 @@
 """Browse Claude Code projects and session transcripts."""
 
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -248,6 +249,24 @@ def set_session_color(session_id: str, body: ColorBody):
     if not updated:
         raise HTTPException(status_code=404, detail="session not found")
     return api_response(message="updated")
+
+
+class ForkBody(BaseModel):
+    project: str
+    up_to: Optional[str] = None
+    title: Optional[str] = None
+
+
+@router.post("/sessions/{session_id}/fork")
+async def fork_session(session_id: str, body: ForkBody):
+    try:
+        forked = await asyncio.to_thread(sessions_service.fork_session, body.project, session_id, body.up_to, body.title)
+    except (ValueError, FileNotFoundError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if forked is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    await chat_list.hub.resync()
+    return api_response(data=forked)
 
 
 class RewindPreviewBody(BaseModel):

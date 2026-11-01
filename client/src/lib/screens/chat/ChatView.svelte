@@ -672,6 +672,16 @@
       void chat.rewind(mode).then((done) => {
         if (done) rewindOpen = false;
       })}
+    onFork={() => {
+      const point = chat.rewindTarget;
+      if (!point) return;
+      void chat.forkAt(point).then((forked) => {
+        if (!forked) return;
+        chat.dismissRewind();
+        rewindOpen = false;
+        tabs.stateFor(panes.openSession(forked, pane)).restoreComposer(point.text);
+      });
+    }}
     onDismiss={() => {
       chat.dismissRewind();
       rewindOpen = false;

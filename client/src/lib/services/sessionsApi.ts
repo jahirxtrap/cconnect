@@ -132,6 +132,15 @@ export const createSessionsApi = (http: HttpClient) => ({
     );
   },
 
+  async fork(sessionId: string, project: string, upTo: string | null, title: string): Promise<string | null> {
+    const data = await http.post<{ session_id?: string }>(`/sessions/${sessionId}/fork`, {
+      project,
+      up_to: upTo,
+      title,
+    });
+    return data?.session_id ?? null;
+  },
+
   async remove(sessionId: string, project: string): Promise<boolean> {
     return (await http.delete(`/sessions/${sessionId}`, { project })) !== null;
   },

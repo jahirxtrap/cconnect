@@ -21,7 +21,14 @@ import {
 } from "$lib/data/chatModels";
 import { agentStopText, type AgentState } from "$lib/data/agentModels";
 import { emptyModState, type ModState } from "$lib/data/modModels";
-import { isBusyActivity, projectKeyOf, type ChatCategory, type ProjectInfo, type SessionInfo } from "$lib/data/models";
+import {
+  isBusyActivity,
+  projectKeyOf,
+  sessionLabel,
+  type ChatCategory,
+  type ProjectInfo,
+  type SessionInfo,
+} from "$lib/data/models";
 import type { PromptCache } from "$lib/data/promptCache";
 import { liveLimits } from "$lib/data/liveLimits.svelte";
 import { isVisible, parseSessionMessage, type SessionMessage } from "$lib/data/sessionMessages";
@@ -1221,11 +1228,41 @@ export class ChatState {
     this.rewindTarget = null;
     this.rewindPreview = null;
     this.rewindBusy = false;
-    this.#restoreComposer(point.text);
+    this.restoreComposer(point.text);
     return true;
   }
 
-  #restoreComposer(text: string) {
+  async fork(session: SessionInfo, upTo: string | null = null): Promise<SessionInfo | null> {
+    if (!session.projectKey) return null;
+    const title = t("CHAT_FORK_TITLE", sessionLabel(session));
+    const sessionId = await this.#sessions.fork(session.sessionId, session.projectKey, upTo, title);
+    if (!sessionId) return null;
+    return { ...session, sessionId, title, lastActive: null, activity: null, resident: false, rewind: null };
+  }
+
+  async forkAt(point: RewindPoint): Promise<SessionInfo | null> {
+    const sessionId = this.sessionId;
+    if (!sessionId || this.rewindBusy) return null;
+    const current: SessionInfo = this.listed ?? {
+      sessionId,
+      projectKey: this.#projectKey(),
+      path: this.cwd,
+      lastActive: null,
+      size: 0,
+      preview: null,
+      title: null,
+      color: null,
+      activity: null,
+      resident: false,
+      rewind: null,
+    };
+    this.rewindBusy = true;
+    const forked = await this.fork(current, point.rewindId);
+    this.rewindBusy = false;
+    return forked;
+  }
+
+  restoreComposer(text: string) {
     const restored = userContent({ text, attachments: null, images: null }, this.environment);
     this.attachments = [];
     this.elements = [];

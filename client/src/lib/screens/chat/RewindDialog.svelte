@@ -18,19 +18,22 @@
     busy: boolean;
     onSelect: (point: RewindPoint) => void;
     onRewind: (mode: "both" | "conversation") => void;
+    onFork: () => void;
     onBack: () => void;
     onDismiss: () => void;
   }
 
-  const { points, loading, target, preview, busy, onSelect, onRewind, onBack, onDismiss }: Props =
+  const { points, loading, target, preview, busy, onSelect, onRewind, onFork, onBack, onDismiss }: Props =
     $props();
 
   const codeAvailable = $derived(preview?.canRewind !== false);
 
-  let both = $state(true);
+  let mode = $state<"both" | "conversation" | "fork">("both");
+
+  const both = $derived(mode === "both");
 
   $effect(() => {
-    if (preview !== null && !preview.canRewind) both = false;
+    if (preview !== null && !preview.canRewind && mode === "both") mode = "conversation";
   });
 
   const ordered = $derived([...points].reverse());
@@ -40,9 +43,13 @@
   <CompactDialog title={t("REWIND")} onDismiss={() => !busy && onBack()}>
     {#snippet buttons()}
       <Button onclick={onBack} variant="outlined" enabled={!busy}>{t("CANCEL")}</Button>
-      <Button variant="destructive" onclick={() => onRewind(both ? "both" : "conversation")} enabled={!busy}>
-        {t("ACCEPT")}
-      </Button>
+      {#if mode === "fork"}
+        <Button onclick={onFork} enabled={!busy}>{t("ACCEPT")}</Button>
+      {:else}
+        <Button variant="destructive" onclick={() => onRewind(both ? "both" : "conversation")} enabled={!busy}>
+          {t("ACCEPT")}
+        </Button>
+      {/if}
     {/snippet}
 
     <CardPanel>
@@ -68,13 +75,19 @@
       label={t("REWIND_BOTH")}
       selected={both}
       enabled={!busy && codeAvailable}
-      onclick={() => (both = true)}
+      onclick={() => (mode = "both")}
     />
     <DialogSelectItem
       label={t("REWIND_CONVERSATION")}
-      selected={!both}
+      selected={mode === "conversation"}
       enabled={!busy}
-      onclick={() => (both = false)}
+      onclick={() => (mode = "conversation")}
+    />
+    <DialogSelectItem
+      label={t("REWIND_FORK")}
+      selected={mode === "fork"}
+      enabled={!busy}
+      onclick={() => (mode = "fork")}
     />
   </CompactDialog>
 {:else}

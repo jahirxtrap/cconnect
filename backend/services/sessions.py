@@ -721,6 +721,17 @@ def session_cwd(project_key: str, session_id: str) -> Optional[str]:
     return _read_cwd(file)
 
 
+def fork_session(project_key: str, session_id: str, up_to: Optional[str], title: Optional[str]) -> Optional[dict]:
+    from claude_agent_sdk import fork_session as fork
+    from services import rewind
+
+    cwd = session_cwd(project_key, session_id)
+    if not cwd:
+        return None
+    forked = fork(session_id, up_to_message_id=up_to or rewind.get_pending(session_id), title=title)
+    return {"session_id": forked.session_id, "project_key": project_key, "path": cwd}
+
+
 def _parse_ask_result(content: object, qtexts: list[str]) -> dict[str, tuple[str, str]]:
     """Parse an AskUserQuestion tool_result into {question: (answer, note)}."""
     from services.claude_runtime import _flatten_result_content
@@ -842,6 +853,7 @@ def session_context(cwd: str, session_id: str, max_chars: int = 4000) -> str:
 
 
 _BRANCH_KEYS = ("uuid", "parentUuid", "logicalParentUuid", "isSidechain", "type", "subtype", "isCompactSummary")
+_CHAIN_TYPES = frozenset({"user", "assistant", "attachment", "system", "progress"})
 
 
 def _conversation_row(entry: dict) -> Optional[dict]:
@@ -1078,7 +1090,7 @@ def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
     leaf = None
     for e in entries:
         u = e.get("uuid")
-        if not u or e.get("isSidechain"):
+        if not u or e.get("isSidechain") or e.get("type") not in _CHAIN_TYPES:
             continue
         by_uuid[u] = e
         if _is_compact_marker(e):
@@ -1103,6 +1115,7 @@ def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
     return [
         e for e in entries
         if not e.get("uuid")
+        or e.get("type") not in _CHAIN_TYPES
         or e.get("isSidechain")
         or _is_compact_marker(e)
         or e.get("uuid") in active
