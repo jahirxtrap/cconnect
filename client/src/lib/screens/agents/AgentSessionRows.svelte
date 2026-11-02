@@ -15,23 +15,22 @@
   interface Props {
     list: AgentSessionList;
     chat: ChatState | null;
-    icons?: boolean;
   }
 
-  const { list, chat, icons = false }: Props = $props();
+  const { list, chat }: Props = $props();
 </script>
 
 {#snippet fallback()}
   {#if list.searching}
-    <EmptyState icon={icons ? NO_RESULTS_ICON : undefined} text={t("NO_RESULTS")} class="h-full" />
+    <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="h-full" />
   {:else if list.signedOut}
-    <EmptyState icon={icons ? KeyRound : undefined} text={t("AGENT_SIGN_IN_NEEDED")} class="h-full" />
+    <EmptyState icon={KeyRound} text={t("AGENT_SIGN_IN_NEEDED")} class="h-full" />
   {:else if list.failed}
     <ConnectionError class="h-full" />
   {:else if chat && !list.sessions}
     <CenteredProgress class="h-full" />
   {:else}
-    <EmptyState icon={icons ? History : undefined} text={t("NO_CHATS")} class="h-full" />
+    <EmptyState icon={History} text={t("NO_CHATS")} class="h-full" />
   {/if}
 {/snippet}
 

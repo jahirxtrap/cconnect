@@ -1,12 +1,10 @@
 <script lang="ts">
   import NotepadText from "@lucide/svelte/icons/notepad-text";
-  import Plus from "@lucide/svelte/icons/plus";
   import { formatRecent } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
-  import Button from "$lib/ui/Button.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SearchBar from "$lib/ui/SearchBar.svelte";
@@ -15,12 +13,11 @@
 
   interface Props {
     onOpen: (id: string) => void;
-    onNew?: (() => void) | null;
     selectedId?: string | null;
     column?: boolean;
   }
 
-  const { onOpen, onNew = null, selectedId = null, column = false }: Props = $props();
+  const { onOpen, selectedId = null, column = false }: Props = $props();
 
   const INSET = "px-(--page-inset) pb-(--page-inset)";
 
@@ -84,19 +81,16 @@
   </div>
 {/snippet}
 
-{#snippet create()}
-  <Button small onclick={() => onNew?.()}>
-    <Plus size={16} />
-    {t("NEW_NOTE")}
-  </Button>
-{/snippet}
-
 {#if column}
   <div use:viewportScrollbar class="rounded-viewport scrollbar-thin flex min-h-0 flex-col gap-1 overflow-y-auto [--viewport-inset:0px]">
     {#each listed as note (note.id)}
       {@render row(note)}
     {:else}
-      <EmptyState text={t(notes.searching ? "NO_RESULTS" : "NOTES_EMPTY")} class="flex-1" />
+      <EmptyState
+        icon={notes.searching ? NO_RESULTS_ICON : NotepadText}
+        text={t(notes.searching ? "NO_RESULTS" : "NOTES_EMPTY")}
+        class="flex-1"
+      />
     {/each}
   </div>
 {:else}
@@ -114,14 +108,9 @@
 
   {#if !listed.length}
     {#if notes.searching}
-      <EmptyState text={t("NO_RESULTS")} class="flex-1" />
+      <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="flex-1" />
     {:else}
-      <EmptyState
-        icon={NotepadText}
-        text={t("NOTES_EMPTY")}
-        action={onNew ? create : undefined}
-        class="flex-1"
-      />
+      <EmptyState icon={NotepadText} text={t("NOTES_EMPTY")} class="flex-1" />
     {/if}
   {:else if notes.cards}
     <div use:viewportScrollbar class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-y-auto {INSET}">

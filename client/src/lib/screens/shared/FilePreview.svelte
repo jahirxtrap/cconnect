@@ -11,7 +11,9 @@
   import Trash from "@lucide/svelte/icons/trash";
   import Type from "@lucide/svelte/icons/type";
   import type { Snippet } from "svelte";
+  import type { PreviewLinks } from "$lib/app/navigation.svelte";
   import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
+  import { wikiLinks } from "$lib/markdown/render";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { fetchFile, mediaSrc } from "$lib/services/mediaSource";
@@ -35,6 +37,7 @@
   import CodeView from "$lib/ui/CodeView.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import { fileIcon } from "$lib/ui/fileIcons";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
@@ -62,6 +65,7 @@
     ready?: boolean;
     revision?: number;
     forcedKind?: PreviewKind | null;
+    links?: PreviewLinks | null;
   }
 
   interface Shown {
@@ -91,6 +95,7 @@
     ready = true,
     revision = 0,
     forcedKind = null,
+    links = null,
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
@@ -292,7 +297,7 @@
         class="h-full w-full object-contain {loaded ? '' : 'invisible'}"
       />
       {#if failed}
-        <EmptyState text={t("FILE_UNAVAILABLE")} class="absolute inset-0" />
+        <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="absolute inset-0" />
       {:else if !loaded}
         <CenteredProgress class="absolute inset-0" />
       {/if}
@@ -314,7 +319,7 @@
     </div>
   {:else if kind === "pdf"}
     {#if failed}
-      <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
+      <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
     {:else if nativePdf}
       <iframe
         use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
@@ -334,15 +339,15 @@
       class="min-h-0 w-full flex-1 border-0"
     />
   {:else if failed}
-    <EmptyState text={t("FILE_UNAVAILABLE")} class="flex-1" />
+    <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
   {:else if shown === null}
     <CenteredProgress class="flex-1" />
   {:else if binary}
-    <EmptyState text={t("FILE_BINARY")} class="flex-1" />
+    <EmptyState icon={fileIcon(filename)} text={t("FILE_BINARY")} class="flex-1" />
   {:else if prose}
     {#key shown.base}
       <div use:viewportScrollbar class="{TEXT_SCROLL_CLASS} overflow-y-auto px-2.5 py-3">
-        <MarkdownText text={shown.body} />
+        <MarkdownText text={links?.wiki ? wikiLinks(shown.body) : shown.body} linkTarget={links?.resolve ?? null} />
       </div>
     {/key}
   {:else}

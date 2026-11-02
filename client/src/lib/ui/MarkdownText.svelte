@@ -25,6 +25,7 @@
     onSharedLink?: ((url: string, filename: string) => void) | null;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
     onSuggest?: SuggestionPicker | null;
+    linkTarget?: ((href: string) => (() => void) | null) | null;
     dense?: boolean;
     class?: string;
   }
@@ -34,6 +35,7 @@
     onSharedLink = null,
     onSharedMenu = null,
     onSuggest = null,
+    linkTarget = null,
     dense = false,
     class: className = "",
   }: Props = $props();
@@ -60,7 +62,9 @@
   };
 
   const open = (url: string, filename = filenameOf(url)) => {
-    if (onSharedLink && shared(url)) onSharedLink(url, filename);
+    const target = linkTarget?.(url);
+    if (target) target();
+    else if (onSharedLink && shared(url)) onSharedLink(url, filename);
     else externalLink = url;
   };
 
@@ -111,7 +115,7 @@
         anchor.dataset.decorated = "true";
         anchor.dataset.press = "off";
         const url = anchor.getAttribute("href") ?? "";
-        const own = shared(url);
+        const own = shared(url) || !!linkTarget?.(url);
         const icon = (own ? (isArchive(filenameOf(url)) ? archive : file) : external).cloneNode(
           true,
         ) as SVGElement;

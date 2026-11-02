@@ -53,7 +53,7 @@
       },
     }}
   />
-  <AgentSessionRows {list} {chat} icons />
+  <AgentSessionRows {list} {chat} />
 </ChatsWindow>
 
 {#if organizing}

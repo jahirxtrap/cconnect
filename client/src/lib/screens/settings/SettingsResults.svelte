@@ -3,7 +3,7 @@
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import { entryHint, searchSettings, sectionLabel, type SettingsEntry } from "./settingsIndex";
@@ -46,5 +46,5 @@
     </Pressable>
   {/each}
 {:else}
-  <EmptyState text={t("NO_RESULTS")} class="py-8" />
+  <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="py-8" />
 {/each}

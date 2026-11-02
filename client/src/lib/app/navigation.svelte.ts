@@ -27,11 +27,17 @@ const subOf = (path: string): string | null => {
   return base ? decodeURIComponent(path.slice(base.length + 1)) || null : null;
 };
 
+export interface PreviewLinks {
+  resolve: (href: string) => (() => void) | null;
+  wiki: boolean;
+}
+
 export interface PreviewRequest {
   url: string;
   name: string;
   kind?: PreviewKind | null;
   onDelete: (() => void) | null;
+  links?: PreviewLinks | null;
 }
 
 const WEB_BLOCKED: Route[] = ["/terminal", "/browser", "/project"];
@@ -183,9 +189,10 @@ class Navigation {
   }
 
   openPreview(request: PreviewRequest) {
+    const stacked = this.previewOverlay;
     this.preview = request;
     this.previewPane = false;
-    window.history.pushState({ overlay: "preview" }, "", window.location.href);
+    if (!stacked) window.history.pushState({ overlay: "preview" }, "", window.location.href);
   }
 
   closePreview() {

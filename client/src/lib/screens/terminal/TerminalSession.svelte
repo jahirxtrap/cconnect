@@ -2,6 +2,7 @@
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import X from "@lucide/svelte/icons/x";
+  import { screenFor } from "$lib/app/screens";
   import type { TerminalConnector, TerminalStatus } from "$lib/data/terminalLink";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
@@ -73,7 +74,7 @@
   </AppTopBar>
 
   {#if unavailable}
-    <EmptyState text={t("WEB_UNAVAILABLE")} class="flex-1" />
+    <EmptyState icon={screenFor("terminal").icon} text={t("WEB_UNAVAILABLE")} class="flex-1" />
   {:else if status === "failed"}
     <ConnectionError class="flex-1" />
   {:else}

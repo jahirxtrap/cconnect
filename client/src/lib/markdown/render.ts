@@ -95,6 +95,11 @@ md.renderer.rules.list_item_open = (tokens, index, options, _env, self) => {
 
 export const renderInline = (markdown: string): string => md.renderInline(markdown);
 
+const WIKI_LINK_RE = /\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g;
+
+export const wikiLinks = (markdown: string): string =>
+  markdown.replace(WIKI_LINK_RE, (_match, target: string, label?: string) => `[${(label ?? target).trim()}](${target.trim()})`);
+
 const spokenInline = (token: Token): string => {
   let href: string | null = null;
   let text = "";

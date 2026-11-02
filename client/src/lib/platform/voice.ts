@@ -1,4 +1,5 @@
 import { i18n } from "$lib/i18n/index.svelte";
+import { speech } from "./speech.svelte";
 
 interface RecognitionAlternative {
   transcript: string;
@@ -98,6 +99,7 @@ const startAndroid = (bridge: AndroidVoice, { onPartial, onFinal, onEnd }: Dicta
 
 export const startDictation = (dictation: Dictation): (() => void) => {
   active?.();
+  speech.stop();
 
   const bridge = android();
   if (bridge) {

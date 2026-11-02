@@ -33,6 +33,6 @@ export const MENU_ICON_SIZE = 16;
 
 export const menuIconClass = (danger = false) => `shrink-0 ${danger ? "" : "text-on-surface-variant"}`;
 
-export const DIALOG_OVERLAY_CLASS = "fixed inset-0 z-60 bg-black/55";
+export const DIALOG_OVERLAY_CLASS = "dialog-overlay fixed inset-0 z-60 bg-black/55";
 
 export const DIALOG_SURFACE_CLASS = "menu-surface rounded-xl bg-surface shadow-float [--c-card:var(--c-hover)]";

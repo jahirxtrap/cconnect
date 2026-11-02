@@ -53,6 +53,18 @@ html[data-theme="dark"] {
   animation: none;
 }
 
+.dialog-overlay {
+  animation: overlay-enter 120ms ease-out;
+}
+
+.dialog-overlay[data-state="closed"] {
+  animation: menu-exit 90ms linear forwards;
+}
+
+.dialog-overlay[data-instant]:not([data-state="closed"]) {
+  animation: none;
+}
+
 .menu-surface[data-side="left"] {
   translate: max(0px, 100% - var(--bits-floating-available-width, 100%));
 }
@@ -159,6 +171,12 @@ html[data-theme="dark"] {
 
 @keyframes menu-exit {
   to {
+    opacity: 0;
+  }
+}
+
+@keyframes overlay-enter {
+  from {
     opacity: 0;
   }
 }

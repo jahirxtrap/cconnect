@@ -445,12 +445,34 @@
 
   const scopeLabel = (scope: string) => (scope === "global" ? t("MEMORY_GLOBAL") : t("MEMORIES"));
 
+  const memoryKey = (name: string) =>
+    name
+      .replace(/^\.\//, "")
+      .split(/[?#]/)[0]
+      .replace(/\.md$/i, "")
+      .replaceAll("_", "-")
+      .toLowerCase();
+
+  const memoryLink = (href: string) => {
+    if (/^[a-z][a-z0-9+.-]*:/i.test(href)) return null;
+    let wanted = href;
+    try {
+      wanted = decodeURIComponent(href);
+    } catch {
+      wanted = href;
+    }
+    const key = memoryKey(wanted);
+    const linked = [...(memories?.global ?? []), ...(memories?.project ?? [])].find((memory) => memoryKey(memory.name) === key);
+    return linked ? () => openMemory(linked.scope, linked.name) : null;
+  };
+
   const openMemory = (scope: string, name: string) => {
     const project = scope === "global" ? null : memoriesProject;
     openFilePreview({
       url: claudeApi.memoryUrl(scope, project, name),
       name,
       onDelete: () => void claudeApi.deleteMemory(scope, project, name).then(load),
+      links: { resolve: memoryLink, wiki: true },
     });
   };
 

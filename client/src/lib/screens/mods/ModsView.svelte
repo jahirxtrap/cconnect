@@ -5,6 +5,7 @@
   import SquareSlash from "@lucide/svelte/icons/square-slash";
   import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
+  import { screenFor } from "$lib/app/screens";
   import type { ModCommand } from "$lib/data/modModels";
   import { paneFocus } from "$lib/data/paneFocus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -36,6 +37,8 @@
   }
 
   const { chat }: Props = $props();
+
+  const MODS_ICON = screenFor("mods").icon;
 
   provideServer(() => chat.environment);
 
@@ -177,15 +180,15 @@
 {:else if loading}
   <CenteredProgress class="min-h-0 flex-1" />
 {:else if missing}
-  <EmptyState text={t(missing.text)} class="min-h-0 flex-1">
+  <EmptyState icon={MODS_ICON} text={t(missing.text)} class="min-h-0 flex-1">
     {#snippet action()}
       <ActionButton text={t("SETTINGS")} onclick={() => navigation.openSettings(missing.setting)} />
     {/snippet}
   </EmptyState>
 {:else if !mods.state.surface}
-  <EmptyState text={t("MOD_PANES_IDLE")} class="min-h-0 flex-1" />
+  <EmptyState icon={MODS_ICON} text={t("MOD_PANES_IDLE")} class="min-h-0 flex-1" />
 {:else if !pane}
-  <EmptyState text={t("MOD_PANES_EMPTY")} class="min-h-0 flex-1" />
+  <EmptyState icon={MODS_ICON} text={t("MOD_PANES_EMPTY")} class="min-h-0 flex-1" />
 {:else}
   {#key pane.id}
     <ModSite
@@ -203,7 +206,7 @@
         <CenteredProgress class="flex-1" />
       {/snippet}
       {#snippet blank()}
-        <EmptyState text={t("MOD_PANE_BLANK")} class="flex-1" />
+        <EmptyState icon={MODS_ICON} text={t("MOD_PANE_BLANK")} class="flex-1" />
       {/snippet}
     </ModSite>
   {/key}

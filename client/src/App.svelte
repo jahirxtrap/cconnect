@@ -170,6 +170,7 @@
     filename={request.name}
     forcedKind={request.kind}
     onDelete={request.onDelete}
+    links={request.links}
     onClose={() => navigation.closePreview()}
   />
 {/if}

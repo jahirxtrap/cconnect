@@ -80,6 +80,6 @@
   {:else if editing}
     <NotesEditor note={editing} />
   {:else}
-    <NotesList onOpen={select} onNew={split ? null : create} />
+    <NotesList onOpen={select} />
   {/if}
 </div>

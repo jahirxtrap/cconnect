@@ -11,7 +11,6 @@
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
-  import Button from "$lib/ui/Button.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
@@ -56,14 +55,7 @@
   {/if}
 
   {#if !sshStore.profiles.length}
-    <EmptyState icon={Network} text={t("NO_HOSTS")} class="flex-1">
-      {#snippet action()}
-        <Button small onclick={() => (adding = true)}>
-          <Plus size={16} />
-          {t("ADD_SSH_HOST")}
-        </Button>
-      {/snippet}
-    </EmptyState>
+    <EmptyState icon={Network} text={t("NO_HOSTS")} class="flex-1" />
   {:else}
     <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
       <div class="flex flex-col rounded-lg bg-card p-1">

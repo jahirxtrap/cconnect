@@ -610,7 +610,6 @@ export class ChatState {
   }
 
   submit(text: string) {
-    speech.stop();
     if (this.agent) {
       void this.sendPrompt(text);
       return;

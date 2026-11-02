@@ -50,7 +50,7 @@
 
 <Dialog.Root open onOpenChange={(open) => !open && onDismiss()}>
   <Dialog.Portal>
-    <Dialog.Overlay class={DIALOG_OVERLAY_CLASS} />
+    <Dialog.Overlay class={DIALOG_OVERLAY_CLASS} data-instant={instant || undefined} />
     <Dialog.Content
       data-instant={instant || undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}

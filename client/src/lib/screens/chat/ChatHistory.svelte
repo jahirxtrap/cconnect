@@ -1,11 +1,12 @@
 <script lang="ts">
+  import History from "@lucide/svelte/icons/history";
   import { rankLabel } from "$lib/app/commands.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { sessionLabel, type SessionInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import EmptyState from "$lib/ui/EmptyState.svelte";
+  import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import CategoryGroups from "./CategoryGroups.svelte";
   import type { ChatListEdits } from "./chatListEdits.svelte";
@@ -118,13 +119,13 @@
   {/snippet}
   {#snippet fallback()}
     {#if searching}
-      <EmptyState text={t("NO_RESULTS")} class="h-full" />
+      <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="h-full" />
     {:else if chat.historyLoading}
       <CenteredProgress class="h-full" />
     {:else if chat.historyUnavailable}
       <ServerUnavailable class="h-full" />
     {:else}
-      <EmptyState text={t("NO_CHATS")} class="h-full" />
+      <EmptyState icon={History} text={t("NO_CHATS")} class="h-full" />
     {/if}
   {/snippet}
 </CategoryGroups>
