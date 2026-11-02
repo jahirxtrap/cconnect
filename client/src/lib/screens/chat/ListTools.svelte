@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import EnvironmentSelector from "./EnvironmentSelector.svelte";
   import ProjectSelector from "./ProjectSelector.svelte";
   import type { ChatState } from "./state.svelte";
 
@@ -18,6 +19,7 @@
     allProjects?: boolean;
     organizable: boolean;
     onOrganize: () => void;
+    environment?: { selected: string | null; onSelect: (id: string) => void } | null;
   }
 
   const {
@@ -31,12 +33,16 @@
     allProjects = true,
     organizable,
     onOrganize,
+    environment = null,
   }: Props = $props();
 </script>
 
 <SearchBar value={query} oninput={onQuery} placeholder={t("SEARCH")} class="mx-2" />
 
 <div class="mt-1.5 flex shrink-0 items-center px-2">
+  {#if environment}
+    <EnvironmentSelector compact selected={environment.selected} onSelect={environment.onSelect} />
+  {/if}
   <div class="min-w-0 flex-1">
     <ProjectSelector
       {projects}

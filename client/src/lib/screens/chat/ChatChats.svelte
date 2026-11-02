@@ -28,6 +28,7 @@
     onNewTab={(categoryId) => panes.newTab(categoryId, role)}
     onOpenSession={(session) => panes.openSession(session, role)}
     onOpenRight={panes.canOpenRight(role) ? (session) => panes.openInRight(session) : null}
+    environmentPicker
   />
 </ChatsWindow>
 

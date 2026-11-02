@@ -1,7 +1,7 @@
 import { untrack } from "svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { ChatState } from "$lib/screens/chat/state.svelte";
-import type { PaneRole } from "$lib/screens/chat/tabs.svelte";
+import { tabs, type PaneRole } from "$lib/screens/chat/tabs.svelte";
 import { agents } from "$lib/services/agents.svelte";
 import { backend } from "$lib/services/backend.svelte";
 
@@ -14,6 +14,7 @@ export interface AgentTab {
   cwd: string;
   title: string | null;
   panelProject: string | null;
+  pinned: boolean;
 }
 
 interface StoredTab {
@@ -24,6 +25,7 @@ interface StoredTab {
   title?: string;
   side?: boolean;
   pproj?: string;
+  pin?: boolean;
 }
 
 interface Stored {
@@ -77,6 +79,7 @@ class AgentTabs {
                 cwd: item.cwd ?? "",
                 title: item.title ?? null,
                 panelProject: item.pproj ?? null,
+                pinned: item.pin === true,
               },
             ]
           : [],
@@ -96,6 +99,7 @@ class AgentTabs {
             cwd: kept.cwd ?? "",
             title: null,
             panelProject: null,
+            pinned: false,
           },
         ];
       });
@@ -125,9 +129,21 @@ class AgentTabs {
     return this.list.find((tab) => tab.id === id) ?? null;
   }
 
+  start() {
+    $effect(() => {
+      const anchor = tabs.active?.environmentId ?? null;
+      if (!anchor) return;
+      untrack(() => {
+        for (const tab of this.list) {
+          if (tab.environmentId !== anchor && this.#follows(tab)) this.#moveTo(tab, anchor, false);
+        }
+      });
+    });
+  }
+
   ensure(pane: PaneRole) {
     if (this.in(pane).length) return;
-    const environmentId = backend.activeId;
+    const environmentId = tabs.active?.environmentId ?? backend.activeId;
     const usable = agents.usable(profileOf(environmentId));
     const agent = usable.find((item) => item.id === this.#lastAgent) ?? usable[0];
     if (agent) this.open(pane, environmentId, agent.id);
@@ -139,9 +155,20 @@ class AgentTabs {
     agent: string,
     sessionId: string | null = null,
     cwd = this.#folders[environmentId ?? ""] ?? "",
+    pinned = false,
   ): AgentTab {
     const panelProject = this.activeIn(pane)?.panelProject ?? null;
-    const tab: AgentTab = { id: this.#nextId(), pane, environmentId, agent, sessionId, cwd, title: null, panelProject };
+    const tab: AgentTab = {
+      id: this.#nextId(),
+      pane,
+      environmentId,
+      agent,
+      sessionId,
+      cwd,
+      title: null,
+      panelProject,
+      pinned,
+    };
     this.list = [...this.list, tab];
     this.active[pane] = tab.id;
     this.#lastAgent = agent;
@@ -156,7 +183,7 @@ class AgentTabs {
       return;
     }
     const held = this.#held.get(current.id)?.chat;
-    this.open(pane, current.environmentId, current.agent, null, held ? this.folderOf(held) : current.cwd);
+    this.open(pane, current.environmentId, current.agent, null, held ? this.folderOf(held) : current.cwd, current.pinned);
   }
 
   load(tab: AgentTab, sessionId: string, cwd: string) {
@@ -218,10 +245,18 @@ class AgentTabs {
   }
 
   setEnvironment(tab: AgentTab, environmentId: string) {
-    if (tab.environmentId === environmentId) return;
+    if (tab.environmentId === environmentId) this.#update(tab.id, { pinned: true });
+    else this.#moveTo(tab, environmentId, true);
+  }
+
+  #follows(tab: AgentTab): boolean {
+    return !tab.pinned && !tab.sessionId && (this.#held.get(tab.id)?.chat.untouched ?? true);
+  }
+
+  #moveTo(tab: AgentTab, environmentId: string, pinned: boolean) {
     const usable = agents.usable(profileOf(environmentId));
     const agent = usable.find((item) => item.id === tab.agent) ?? usable.find((item) => item.id === this.#lastAgent) ?? usable[0];
-    this.#replace(tab, { environmentId, agent: agent?.id ?? tab.agent, cwd: this.#folders[environmentId] ?? "" });
+    this.#replace(tab, { environmentId, agent: agent?.id ?? tab.agent, cwd: this.#folders[environmentId] ?? "", pinned });
   }
 
   setAgent(tab: AgentTab, agent: string) {
@@ -229,7 +264,7 @@ class AgentTabs {
     if (tab.agent === agent) return;
     const chat = this.#held.get(tab.id)?.chat;
     if (chat && !chat.untouched) {
-      this.open(tab.pane, tab.environmentId, agent, null, this.folderOf(chat));
+      this.open(tab.pane, tab.environmentId, agent, null, this.folderOf(chat), tab.pinned);
       return;
     }
     this.#replace(tab, { agent });
@@ -342,6 +377,7 @@ class AgentTabs {
         ...(tab.title ? { title: tab.title } : {}),
         ...(tab.pane === "right" ? { side: true } : {}),
         ...(tab.panelProject === null ? {} : { pproj: tab.panelProject }),
+        ...(tab.pinned ? { pin: true } : {}),
       })),
     });
   }

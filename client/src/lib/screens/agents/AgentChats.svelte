@@ -44,6 +44,14 @@
     allProjects={false}
     organizable={!chat.historyUnavailable && !settings.lockedProject}
     onOrganize={() => (organizing = true)}
+    environment={{
+      selected: agentTabs.tabOf(chat)?.environmentId ?? chat.environmentId,
+      onSelect: (id) => {
+        const tab = agentTabs.tabOf(chat);
+        if (tab) agentTabs.setEnvironment(tab, id);
+        panes.syncEnvironment();
+      },
+    }}
   />
   <AgentSessionRows {list} {chat} icons />
 </ChatsWindow>

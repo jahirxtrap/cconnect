@@ -37,6 +37,7 @@
   onEnvironment={(id) => {
     if (tab) agentTabs.setEnvironment(tab, id);
     else backend.select(id);
+    panes.syncEnvironment();
   }}
   onNewChat={() => {
     panes.newListChat();

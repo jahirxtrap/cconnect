@@ -40,6 +40,8 @@
   layout.start();
   navigation.start();
   tabs.start();
+  agentTabs.start();
+  panes.syncEnvironment();
   serverStatus.start();
   void updater.consumeIfInstalled();
   notifier.start(

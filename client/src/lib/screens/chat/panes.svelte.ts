@@ -554,11 +554,15 @@ class Panes {
   focus(role: PaneRole) {
     this.focused = role;
     paneFocus.set(SCOPE[this.busyRole === role ? this.viewAt(otherPane(role)) : this.viewAt(role)]);
-    const environmentId = this.contextRole === null ? null : this.environmentAt(this.contextRole);
-    if (environmentId && backend.activeId !== environmentId) backend.select(environmentId);
+    this.syncEnvironment();
     tabs.rightFocused = this.focused === "right";
     tabs.rightActiveId = this.#shownRight();
     tabs.syncUrl();
+  }
+
+  syncEnvironment() {
+    const environmentId = this.contextRole === null ? null : this.environmentAt(this.contextRole);
+    if (environmentId && backend.activeId !== environmentId) backend.select(environmentId);
   }
 
   commit() {

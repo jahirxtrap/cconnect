@@ -20,9 +20,10 @@
     onNewTab: (categoryId: string | null) => void;
     onOpenSession: (session: SessionInfo) => void;
     onOpenRight: ((session: SessionInfo) => void) | null;
+    environmentPicker?: boolean;
   }
 
-  const { chat, edits, onAfterSelect, onNewTab, onOpenSession, onOpenRight }: Props = $props();
+  const { chat, edits, onAfterSelect, onNewTab, onOpenSession, onOpenRight, environmentPicker = false }: Props = $props();
 
   let query = $state("");
 
@@ -50,6 +51,9 @@
   onProject={(projectKey) => chat.selectHistoryProject(projectKey)}
   organizable={!chat.historyUnavailable}
   onOrganize={() => (edits.organizing = true)}
+  environment={environmentPicker
+    ? { selected: chat.environmentId, onSelect: (id) => chat.selectEnvironment(id) }
+    : null}
 />
 <CategoryGroups
   {chat}
