@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::Serialize;
@@ -32,7 +31,6 @@ pub struct BrowserKeys(Mutex<HashSet<String>>);
 #[derive(Default)]
 pub struct KeyboardFocus {
     page: Mutex<Option<String>>,
-    away: AtomicBool,
 }
 
 fn keep_focus<R: Runtime>(app: &AppHandle<R>, page: Option<String>) {
@@ -49,32 +47,81 @@ fn forget_focus<R: Runtime>(app: &AppHandle<R>, page: &str) {
     }
 }
 
-pub fn window_left<R: Runtime>(app: &AppHandle<R>) {
-    app.state::<KeyboardFocus>().away.store(true, Ordering::Relaxed);
-}
-
-pub fn window_resized<R: Runtime>(app: &AppHandle<R>) {
-    let minimized = app
-        .get_window(crate::MAIN_WINDOW)
-        .and_then(|window| window.is_minimized().ok())
-        .unwrap_or(false);
-    if minimized {
-        window_left(app);
-    }
-}
-
-pub fn window_back<R: Runtime>(app: &AppHandle<R>) {
-    let focus = app.state::<KeyboardFocus>();
-    if !focus.away.swap(false, Ordering::Relaxed) {
-        return;
-    }
-    let page = focus.page.lock().ok().and_then(|held| held.clone());
+#[cfg(windows)]
+fn refocus<R: Runtime>(app: &AppHandle<R>) {
+    let page = app.state::<KeyboardFocus>().page.lock().ok().and_then(|held| held.clone());
     let target = page
         .and_then(|label| app.get_webview(&label))
         .or_else(|| app.get_webview(crate::MAIN_WINDOW));
     if let Some(webview) = target {
         let _ = webview.set_focus();
     }
+}
+
+#[cfg(windows)]
+const REFOCUS_SUBCLASS: usize = 0xCC0F;
+
+#[cfg(windows)]
+fn refocus_message() -> u32 {
+    use std::sync::OnceLock;
+    use windows_sys::Win32::UI::WindowsAndMessaging::RegisterWindowMessageW;
+
+    static MESSAGE: OnceLock<u32> = OnceLock::new();
+    *MESSAGE.get_or_init(|| {
+        let name: Vec<u16> = "CConnect.Refocus\0".encode_utf16().collect();
+        unsafe { RegisterWindowMessageW(name.as_ptr()) }
+    })
+}
+
+#[cfg(windows)]
+pub fn hold_keyboard<R: Runtime>(app: &AppHandle<R>) {
+    use windows_sys::Win32::UI::Shell::SetWindowSubclass;
+
+    let Some(window) = app.get_window(crate::MAIN_WINDOW) else {
+        return;
+    };
+    let Ok(hwnd) = window.hwnd() else {
+        return;
+    };
+    let app = app.clone();
+    let restore: Box<dyn Fn()> = Box::new(move || refocus(&app));
+    unsafe {
+        SetWindowSubclass(
+            hwnd.0 as _,
+            Some(activation_proc),
+            REFOCUS_SUBCLASS,
+            Box::into_raw(Box::new(restore)) as usize,
+        )
+    };
+}
+
+#[cfg(windows)]
+unsafe extern "system" fn activation_proc(
+    hwnd: windows_sys::Win32::Foundation::HWND,
+    message: u32,
+    wparam: windows_sys::Win32::Foundation::WPARAM,
+    lparam: windows_sys::Win32::Foundation::LPARAM,
+    _subclass: usize,
+    data: usize,
+) -> windows_sys::Win32::Foundation::LRESULT {
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::GetFocus;
+    use windows_sys::Win32::UI::Shell::DefSubclassProc;
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        PostMessageW, SIZE_MAXIMIZED, SIZE_RESTORED, WA_INACTIVE, WM_ACTIVATE, WM_SETFOCUS, WM_SIZE,
+    };
+
+    let refocus_message = refocus_message();
+    let activated = message == WM_ACTIVATE && (wparam & 0xFFFF) as u32 != WA_INACTIVE && (wparam >> 16) & 0xFFFF == 0;
+    let shown = message == WM_SIZE && (wparam as u32 == SIZE_RESTORED || wparam as u32 == SIZE_MAXIMIZED);
+    if activated || shown || message == WM_SETFOCUS {
+        PostMessageW(hwnd, refocus_message, 0, 0);
+    } else if message == refocus_message {
+        if GetFocus() == hwnd {
+            (*(data as *const Box<dyn Fn()>))();
+        }
+        return 0;
+    }
+    DefSubclassProc(hwnd, message, wparam, lparam)
 }
 
 #[derive(Clone, Serialize)]

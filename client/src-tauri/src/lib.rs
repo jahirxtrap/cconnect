@@ -146,6 +146,8 @@ pub fn run() {
             hide_helper_windows();
             #[cfg(desktop)]
             present_window(_app);
+            #[cfg(windows)]
+            browser::hold_keyboard(_app.handle());
             #[cfg(desktop)]
             opened::hold(_app.handle(), std::env::args().skip(1).map(std::path::PathBuf::from));
             #[cfg(target_os = "android")]
@@ -245,20 +247,7 @@ pub fn run() {
             } if label == MAIN_WINDOW => {
                 use tauri_plugin_window_state::AppHandleExt;
                 let _ = app.save_window_state(state_flags());
-                browser::window_left(app);
             }
-            #[cfg(desktop)]
-            tauri::RunEvent::WindowEvent {
-                label,
-                event: tauri::WindowEvent::Resized(_),
-                ..
-            } if label == MAIN_WINDOW => browser::window_resized(app),
-            #[cfg(desktop)]
-            tauri::RunEvent::WindowEvent {
-                label,
-                event: tauri::WindowEvent::Focused(true),
-                ..
-            } if label == MAIN_WINDOW => browser::window_back(app),
             tauri::RunEvent::WindowEvent {
                 label,
                 event: tauri::WindowEvent::Destroyed,
