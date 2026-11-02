@@ -331,8 +331,9 @@
     confirmLabel={t("NETWORK_CONNECT")}
     secret
     onConfirm={(password) => {
+      const network = ssid;
       passwordFor = null;
-      void run(ssid, () => networkApi.connect(ssid, password));
+      void run(network, () => networkApi.connect(network, password));
     }}
     onDismiss={() => (passwordFor = null)}
   />

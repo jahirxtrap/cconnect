@@ -12,10 +12,12 @@
   const { site = null, onDismiss, onCleared }: Props = $props();
 
   const clear = async () => {
+    const target = site;
+    const cleared = onCleared;
     onDismiss();
-    if (site) await deviceBrowser.clearSite(site).catch(() => undefined);
+    if (target) await deviceBrowser.clearSite(target).catch(() => undefined);
     else await deviceBrowser.clearData().catch(() => undefined);
-    onCleared?.();
+    cleared?.();
   };
 </script>
 

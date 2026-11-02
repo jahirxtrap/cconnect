@@ -1066,6 +1066,15 @@ class SessionRegistry:
         for session in idle[:max(excess, 0)]:
             await session.release_process()
 
+    def on_account(self, account_id):
+        return [session for session in self._sessions.values() if session.agent is None and accounts.resolve(session.state.account) == account_id]
+
+    async def release_all(self, sessions):
+        for session in sessions:
+            if session.running:
+                await session.interrupt()
+            await session.release_process()
+
 
 registry = SessionRegistry()
 

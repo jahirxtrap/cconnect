@@ -16,8 +16,10 @@ import stat
 import subprocess
 import zipfile
 
+import psutil
 import sys
 from base64 import b64encode
+from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 
@@ -43,6 +45,7 @@ _MODEL_ALIASES = ("SONNET", "OPUS", "HAIKU")
 
 _synced: dict[str, tuple[int, ...]] = {}
 _META_FILE = "account.json"
+_DELETING = ".deleting"
 _SHARED_DIRS = ("projects", "plugins", "skills")
 _COPIED_FILES = ("settings.json",)
 _ID_RE = re.compile(r"[^a-z0-9-]+")
@@ -67,7 +70,11 @@ def config_dir(account_id: Optional[str]) -> Optional[Path]:
     if not account_id or account_id == PRIMARY_ID:
         return None
     path = paths.ACCOUNTS_DIR / account_id
-    return path if path.is_dir() else None
+    return path if path.is_dir() and not _tombstone(account_id).exists() else None
+
+
+def _tombstone(account_id: str) -> Path:
+    return paths.ACCOUNTS_DIR / f"{account_id}{_DELETING}"
 
 
 def provider_for(account_id: Optional[str]) -> dict:
@@ -185,7 +192,7 @@ def list_accounts() -> list[dict]:
     }]
     if paths.ACCOUNTS_DIR.is_dir():
         for entry in sorted(paths.ACCOUNTS_DIR.iterdir()):
-            if entry.is_dir() and not entry.name.endswith(".lock"):
+            if entry.is_dir() and not entry.name.endswith(".lock") and config_dir(entry.name) is not None:
                 provider = provider_for(entry.name)
                 items.append({
                     "id": entry.name,
@@ -304,7 +311,7 @@ def _slug(label: str, taken: set[str]) -> str:
 
 
 def create(label: str) -> dict:
-    taken = {a["id"] for a in list_accounts()}
+    taken = {a["id"] for a in list_accounts()} | {marker.name.removesuffix(_DELETING) for marker in paths.ACCOUNTS_DIR.glob(f"*{_DELETING}")}
     account_id = _slug(label, taken)
     path = paths.ACCOUNTS_DIR / account_id
     path.mkdir(parents=True, exist_ok=True)
@@ -319,16 +326,43 @@ def create(label: str) -> dict:
     return {"id": account_id, "label": label, "logged_in": False, "primary": False, "provider": None}
 
 
-def delete(account_id: str) -> bool:
-    path = config_dir(account_id)
-    if path is None:
+def forget(account_id: str) -> bool:
+    """Take an account out of every list at once; ``purge`` removes its folder once nothing holds it."""
+    if config_dir(account_id) is None:
         return False
-    for name in _SHARED_DIRS:
-        paths.unlink_dir(path / name)
-    shutil.rmtree(path, ignore_errors=True)
+    _tombstone(account_id).touch()
     if settings_store.get("account") == account_id:
         settings_store.set("account", None)
     return True
+
+
+def purge(account_id: str) -> bool:
+    path = paths.ACCOUNTS_DIR / account_id
+    if path.is_dir():
+        for name in _SHARED_DIRS:
+            paths.unlink_dir(path / name)
+        _stop_processes_in(path)
+        if not _remove_tree(path):
+            return False
+    _tombstone(account_id).unlink(missing_ok=True)
+    return True
+
+
+def purge_forgotten() -> None:
+    if not paths.ACCOUNTS_DIR.is_dir():
+        return
+    for marker in paths.ACCOUNTS_DIR.glob(f"*{_DELETING}"):
+        purge(marker.name.removesuffix(_DELETING))
+
+
+def _stop_processes_in(folder: Path) -> None:
+    for process in psutil.process_iter(["exe"]):
+        exe = process.info.get("exe")
+        if exe and Path(exe).is_relative_to(folder):
+            with suppress(psutil.Error):
+                for child in process.children(recursive=True):
+                    child.kill()
+                process.kill()
 
 
 def _write_meta(account_id: str, changes: dict) -> bool:

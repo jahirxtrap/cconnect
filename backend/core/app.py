@@ -34,6 +34,7 @@ async def lifespan(app: FastAPI):
     from services import delegates
     delegates.migrate()
     from services import accounts
+    await asyncio.to_thread(accounts.purge_forgotten)
     await asyncio.to_thread(accounts.link_all_shared_dirs)
     paths.RUNTIME_FILE.write_text(f"PORT={PORT}\nPID={os.getpid()}\n", encoding="utf-8")
     system_monitor.setup_log_capture()

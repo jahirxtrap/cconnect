@@ -1,5 +1,7 @@
 """Claude accounts: list, create, rename, delegation, delete and remote OAuth login."""
 
+import asyncio
+
 from fastapi import APIRouter, Request, Response
 
 from core.responses import api_response
@@ -12,7 +14,7 @@ from schemas.accounts import (
     ProviderProbeRequest,
     ProviderUpdateRequest,
 )
-from services import account_login, accounts, cli_info, providers
+from services import account_login, accounts, cli_info, live_sessions, providers
 
 router = APIRouter(tags=["accounts"])
 
@@ -99,10 +101,30 @@ def set_account_delegation(account_id: str, payload: AccountDelegationRequest):
 
 
 @router.delete("/accounts/{account_id}")
-def delete_account(account_id: str):
-    if not accounts.delete(account_id):
+async def delete_account(account_id: str):
+    holders = live_sessions.registry.on_account(account_id)
+    if not accounts.forget(account_id):
         return api_response(status=404)
+    account_login.cancel(account_id)
+    cli_info.invalidate()
+    _pending_purges.add(asyncio.create_task(_purge(account_id, holders)))
     return api_response()
+
+
+_PURGE_ATTEMPTS = 10
+_PURGE_PAUSE = 1.0
+_pending_purges: set[asyncio.Task] = set()
+
+
+async def _purge(account_id: str, holders: list) -> None:
+    try:
+        await live_sessions.registry.release_all(holders)
+        for _ in range(_PURGE_ATTEMPTS):
+            if await asyncio.to_thread(accounts.purge, account_id):
+                return
+            await asyncio.sleep(_PURGE_PAUSE)
+    finally:
+        _pending_purges.discard(asyncio.current_task())
 
 
 @router.post("/accounts/import")

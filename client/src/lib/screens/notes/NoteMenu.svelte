@@ -67,9 +67,10 @@
     confirmLabel={t("DELETE")}
     danger
     onConfirm={() => {
+      const id = note.id;
       deleting = false;
       onDeleted();
-      notes.remove(note.id);
+      notes.remove(id);
     }}
     onDismiss={() => (deleting = false)}
   />

@@ -117,8 +117,9 @@
     text={t("PACK_REPLACE_CONFIRM", inspected.pack.info.name, installedVersion ?? "", inspected.pack.info.version)}
     confirmLabel={t("PACK_REPLACE")}
     onConfirm={() => {
+      const chosen = action;
       confirming = null;
-      void perform(action);
+      void perform(chosen);
     }}
     onDismiss={() => (confirming = null)}
   />
