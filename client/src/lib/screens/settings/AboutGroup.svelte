@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Bug from "@lucide/svelte/icons/bug";
   import Coffee from "@lucide/svelte/icons/coffee";
 
   import FileText from "@lucide/svelte/icons/file-text";
@@ -12,6 +13,8 @@
   import { t } from "$lib/i18n/index.svelte";
   import {
     contributorProfile,
+    ISSUES_URL,
+    issueUrl,
     KOFI_URL,
     ownerProfile,
     releaseNotes,
@@ -20,7 +23,7 @@
     type Profile,
     type Release,
   } from "$lib/services/githubApi";
-  import { isTauri, openExternal } from "$lib/platform";
+  import { isTauri, openExternal, systemName } from "$lib/platform";
   import { webApp } from "$lib/platform/pwa.svelte";
   import { updater } from "$lib/services/updater.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
@@ -56,6 +59,16 @@
   const checking = $derived(serverStatus.releaseChecking);
 
   const open = (url: string) => openExternal(url);
+
+  const reportProblem = () =>
+    open(
+      issueUrl({
+        app: APP_VERSION,
+        platform: `${systemName()} (${isTauri ? "app" : "web"})`,
+        server: serverStatus.version?.serverVersion ?? null,
+        cli: serverStatus.version?.cliVersion ?? null,
+      }),
+    );
 
   const check = () => serverStatus.checkRelease(true);
 
@@ -193,6 +206,17 @@
     title={t("REPOSITORY")}
     summary={REPO_URL.replace("https://", "")}
     onclick={() => open(REPO_URL)}
+  >
+    {#snippet trailing()}
+      <ExternalIndicator />
+    {/snippet}
+  </PreferenceRow>
+
+  <PreferenceRow
+    icon={Bug}
+    title={t("REPORT_PROBLEM")}
+    summary={ISSUES_URL.replace("https://", "")}
+    onclick={reportProblem}
   >
     {#snippet trailing()}
       <ExternalIndicator />

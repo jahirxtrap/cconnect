@@ -7,7 +7,16 @@ const REPO = "cconnect";
 
 export const REPO_URL = `https://github.com/${OWNER}/${REPO}`;
 export const RELEASES_URL = `${REPO_URL}/releases`;
+export const ISSUES_URL = `${REPO_URL}/issues`;
 export const KOFI_URL = "https://ko-fi.com/jahirtrap";
+
+const ISSUE_TEMPLATE = "bug_report.yml";
+
+export const issueUrl = (fields: Record<string, string | null>) => {
+  const query = new URLSearchParams({ template: ISSUE_TEMPLATE });
+  for (const [field, value] of Object.entries(fields)) if (value) query.set(field, value);
+  return `${ISSUES_URL}/new?${query}`;
+};
 
 export interface Release {
   tag: string;

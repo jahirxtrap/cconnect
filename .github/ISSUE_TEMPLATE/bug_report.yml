@@ -1,0 +1,51 @@
+name: Bug report
+description: Something in CConnect does not work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Reporting from **Settings → About → Report a problem** in the app fills in the versions below for the server it is connected to.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, and what you were doing when it happened.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest way to see it again, if you found one.
+      placeholder: |
+        1.
+        2.
+        3.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: input
+    id: app
+    attributes:
+      label: App version
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: The system, and whether it is the installed app or the web app.
+  - type: input
+    id: server
+    attributes:
+      label: Server version
+  - type: input
+    id: cli
+    attributes:
+      label: Claude Code version
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Anything from the server log (Monitor in the app) that looks related. Leave tokens and keys out.
+      render: text

@@ -211,6 +211,7 @@ class DeviceBrowser {
     const stored = store.get<StoredTabs>(STORE_KEY, { tabs: [], active: "" });
     this.tabs = stored.tabs.map((tab) => ({ ...blank(tab.id, tab.url, tab.title, tab.favicon), home: !!tab.home }));
     this.activeId = this.tabs.some((tab) => tab.id === stored.active) ? stored.active : (this.tabs[0]?.id ?? "");
+    if (isDesktop) window.addEventListener("focus", () => void this.release());
     browserListen<PageState>("browser-state", (state) => this.#apply(state));
     browserListen<{ id: string; url: string }>("browser-open", (request) => {
       const at = this.tabs.findIndex((tab) => tab.id === request.id);

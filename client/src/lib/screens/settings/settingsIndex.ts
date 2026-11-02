@@ -203,6 +203,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "install", label: "INSTALL_APP", summary: "INSTALL_APP_SUMMARY", available: () => webApp.offered, section: "about", group: "ABOUT" },
   { id: "support", label: "SUPPORT_CREATOR", section: "about", group: "ABOUT" },
   { id: "repository", label: "REPOSITORY", section: "about", group: "ABOUT" },
+  { id: "report_problem", label: "REPORT_PROBLEM", section: "about", group: "ABOUT" },
   { id: "privacy_policy", label: "PRIVACY_POLICY", section: "about", group: "ABOUT" },
   { id: "terms", label: "TERMS_OF_SERVICE", section: "about", group: "ABOUT" },
 ];
