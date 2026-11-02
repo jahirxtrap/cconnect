@@ -33,6 +33,7 @@
     type DevicePick,
   } from "./deviceBrowser.svelte";
   import { deviceBrowsing } from "./deviceEngine";
+  import { serverBrowser } from "./serverBrowser.svelte";
   import { joined } from "$lib/data/format";
   import { pendingRefresh } from "$lib/data/inflight";
   import type { ElementSource } from "$lib/data/pickedElements";
@@ -422,6 +423,16 @@
     const wanted = onServer && (page.running || launching);
     link?.watch(wanted);
     if (!wanted) ready = false;
+  });
+
+  $effect(() => {
+    if (!link || serverBrowser.pending === null) return;
+    untrack(() => {
+      const url = serverBrowser.take();
+      if (url === null) return;
+      serverHome = false;
+      openOnServer(url);
+    });
   });
 
   $effect(() => {

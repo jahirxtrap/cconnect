@@ -562,6 +562,10 @@ export class ChatSocket {
     this.#send({ type: "agent_login", method });
   }
 
+  sendAgentLoginCancel() {
+    this.#send({ type: "agent_login_cancel" });
+  }
+
   sendAgentLogout() {
     this.#send({ type: "agent_logout" });
   }

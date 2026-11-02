@@ -509,6 +509,8 @@
   "VIEW": "보기",
   "OPEN": "열기",
   "OPEN_EXTERNAL_LINK": "외부 링크 열기",
+  "OPEN_ON_SERVER": "서버 브라우저에서 열기",
+  "AGENT_SIGNING_IN": "로그인 중…",
   "OPEN_EXTERNAL_LINK_MESSAGE": "다음 외부 링크를 엽니다.\n{1}",
   "HTML_PREVIEW_UNAVAILABLE": "여기서는 HTML 미리 보기를 사용할 수 없습니다",
   "OPEN_EXTERNALLY": "외부 앱에서 열기",

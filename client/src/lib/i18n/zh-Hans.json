@@ -509,6 +509,8 @@
   "VIEW": "查看",
   "OPEN": "打开",
   "OPEN_EXTERNAL_LINK": "打开外部链接",
+  "OPEN_ON_SERVER": "在服务器的浏览器中打开",
+  "AGENT_SIGNING_IN": "正在登录…",
   "OPEN_EXTERNAL_LINK_MESSAGE": "即将打开外部链接：\n{1}",
   "HTML_PREVIEW_UNAVAILABLE": "此处不支持 HTML 预览",
   "OPEN_EXTERNALLY": "在外部打开",

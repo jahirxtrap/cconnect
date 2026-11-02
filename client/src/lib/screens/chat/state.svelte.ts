@@ -1024,6 +1024,10 @@ export class ChatState {
     this.#socket.sendAgentLogin(method);
   }
 
+  agentLoginCancel() {
+    this.#socket.sendAgentLoginCancel();
+  }
+
   agentLogout() {
     this.#socket.sendAgentLogout();
   }

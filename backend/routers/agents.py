@@ -86,6 +86,20 @@ def _offered(item: dict, installed: dict[str, dict]) -> dict:
     }
 
 
+class BrowseRequest(BaseModel):
+    url: str
+    token: str
+
+
+@router.post("/agents/browse")
+async def browse(payload: BrowseRequest):
+    connection = pool.by_browse_token(payload.token)
+    if connection is None or urlparse(payload.url).scheme not in ("http", "https"):
+        return api_response(status=404)
+    await connection.browsed(payload.url)
+    return api_response()
+
+
 @router.get("/agents")
 def list_agents():
     return api_response(data={

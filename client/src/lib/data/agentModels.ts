@@ -76,6 +76,8 @@ export interface AgentState {
   commands: CommandOption[];
   usage: AgentUsage | null;
   methods: AgentMethod[];
+  signingIn: boolean;
+  loginUrl: string | null;
   prompt: AgentPromptSupport;
   sessions: AgentSessionSupport;
   logout: boolean;
@@ -215,6 +217,8 @@ export const toAgentState = (raw: Wire): AgentState => {
         ? [{ id, name: text(method, "name") ?? id, description: text(method, "description") ?? "", terminal: flag(method, "terminal") }]
         : [];
     }),
+    signingIn: flag(raw, "signing_in"),
+    loginUrl: text(raw, "login_url"),
     prompt: { image: flag(prompt, "image"), audio: flag(prompt, "audio"), embedded: flag(prompt, "embedded") },
     sessions: {
       list: flag(sessions, "list"),

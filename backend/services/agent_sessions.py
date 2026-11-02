@@ -194,6 +194,7 @@ class AgentSession:
         self._terminals: dict[str, terminal.Terminal] = {}
         self._limits: dict[str, int] = {}
         self._opening: Optional[asyncio.Task] = None
+        self._signing_in: Optional[asyncio.Task] = None
         self._chosen: dict[str, Any] = {}
         if self._process_up():
             self.status = LOADING
@@ -220,6 +221,8 @@ class AgentSession:
             "commands": self.commands,
             "usage": self.usage,
             "methods": connection.methods() if connection is not None and self.status == SIGN_IN else [],
+            "signing_in": self._signing_in is not None,
+            "login_url": connection.login_url if connection is not None and self._signing_in is not None else None,
             "prompt": {"image": bool(prompt.get("image")), "audio": bool(prompt.get("audio")), "embedded": bool(prompt.get("embeddedContext"))},
             "sessions": {
                 "list": _present(sessions, "list"),
@@ -497,13 +500,26 @@ class AgentSession:
         connection = self.connection
         if connection is None or self._ask is None:
             return
+        self._signing_in = asyncio.current_task()
+        await self._announce()
         try:
             await connection.authenticate(method_id, self._ask)
         except AcpError as exc:
             self._fail(SIGN_IN, str(exc), LOGIN_FAILED)
-            await self._announce()
             return
+        except asyncio.CancelledError:
+            return
+        finally:
+            self._signing_in = None
+            await self._announce()
         await self.open(self.session_id, signing_in=True)
+
+    def cancel_login(self) -> None:
+        if self._signing_in is not None:
+            self._signing_in.cancel()
+
+    async def linked(self) -> None:
+        await self._announce()
 
     async def logout(self) -> None:
         connection = self.connection

@@ -20,6 +20,10 @@ def cancelled() -> dict:
     return {"action": CANCEL}
 
 
+def accepted() -> dict:
+    return {"action": ACCEPT}
+
+
 def _field(name: str, spec: dict, required: bool) -> list[dict]:
     kind = spec.get("type")
     label = str(spec.get("title") or name)

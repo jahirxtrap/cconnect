@@ -564,6 +564,10 @@ async def chat_ws(ws: WebSocket):
                 if session is not None and session.agent is not None:
                     spawn(session.agent.login(msg.method))
 
+            elif mtype == "agent_login_cancel":
+                if session is not None and session.agent is not None:
+                    session.agent.cancel_login()
+
             elif mtype == "agent_logout":
                 if session is not None and session.agent is not None:
                     spawn(session.agent.logout())

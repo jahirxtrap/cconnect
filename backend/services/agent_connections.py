@@ -2,19 +2,26 @@
 
 import asyncio
 import collections
+import hmac
+import secrets
 import shutil
+import sys
 from contextlib import suppress
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional, Protocol
 
 import psutil
 
-from core import packages, process_job, release
+from core import packages, paths, process_job, release
+from core.config import PORT
 from services import agents, elicitation, persistent_sessions
 from services.acp_peer import AUTH_REQUIRED, INTERNAL_ERROR, RESOURCE_NOT_FOUND, STREAM_LIMIT, AcpError, AcpPeer
 
 PROTOCOL_VERSION = 1
 ELICIT = "elicitation/create"
+ELICIT_COMPLETE = "elicitation/complete"
+BROWSE_PATH = "/api/agents/browse"
+BROWSE_SCRIPT = paths.SCRIPTS_DIR / "browse.py"
 LOG_LINES = 400
 TERMINAL_METHOD = "terminal"
 LEGACY_TERMINAL_AUTH = "terminal-auth"
@@ -36,6 +43,8 @@ class Receiver(Protocol):
     async def received(self, update: dict) -> None: ...
 
     async def requested(self, method: str, params: dict) -> Any: ...
+
+    async def linked(self) -> None: ...
 
     def dropped(self) -> None: ...
 
@@ -76,6 +85,9 @@ class AgentConnection:
         self._peer: Optional[AcpPeer] = None
         self._tasks: list[asyncio.Task] = []
         self._login_ask: Optional[Ask] = None
+        self._completions: dict[str, asyncio.Event] = {}
+        self.browse_token = secrets.token_urlsafe(24)
+        self.login_url: Optional[str] = None
         self.expiry: Optional[asyncio.Task] = None
 
     @property
@@ -99,8 +111,18 @@ class AgentConnection:
     def auth_methods(self) -> list[dict]:
         return [method for method in self.info.get("authMethods") or [] if isinstance(method, dict) and method.get("id")]
 
-    async def open(self) -> None:
+    def _launch(self) -> tuple[list[str], dict[str, str]]:
         argv, env = agents.launch(self.agent)
+        return argv, {
+            **env,
+            "BROWSER": f'"{sys.executable}" "{BROWSE_SCRIPT}" %s',
+            "CCONNECT_BROWSE_URL": f"http://127.0.0.1:{PORT}{BROWSE_PATH}",
+            "CCONNECT_BROWSE_TOKEN": self.browse_token,
+        }
+
+    async def open(self) -> None:
+        argv, env = self._launch()
+        launchable = Path(argv[0]).suffix.lower() not in BATCH_SUFFIXES
         self._process = await asyncio.create_subprocess_exec(
             *argv,
             cwd=self.cwd,
@@ -117,7 +139,7 @@ class AgentConnection:
         try:
             self.info = await self._peer.call("initialize", {
                 "protocolVersion": PROTOCOL_VERSION,
-                "clientCapabilities": CLIENT_CAPABILITIES,
+                "clientCapabilities": {**CLIENT_CAPABILITIES, "auth": {"terminal": launchable}},
                 "clientInfo": CLIENT_INFO,
             }) or {}
         except BaseException:
@@ -146,13 +168,38 @@ class AgentConnection:
         if receiver is not None:
             return await receiver.requested(method, params)
         if method == ELICIT and self._login_ask is not None:
-            return elicitation.answer(await self._login_ask(elicitation.form(params)), params)
+            return await self._login_elicit(params)
         raise AcpError(RESOURCE_NOT_FOUND, f"no session for {method}")
 
+    async def _login_elicit(self, params: dict) -> dict:
+        key = str(params.get("elicitationId") or "")
+        completed = self._completions.setdefault(key, asyncio.Event()) if key else asyncio.Event()
+        asked = asyncio.ensure_future(self._login_ask(elicitation.form(params)))
+        closing = asyncio.ensure_future(completed.wait())
+        try:
+            await asyncio.wait({asked, closing}, return_when=asyncio.FIRST_COMPLETED)
+        finally:
+            closing.cancel()
+            self._completions.pop(key, None)
+        if asked.done():
+            return elicitation.answer(asked.result(), params)
+        asked.cancel()
+        return elicitation.accepted()
+
     async def _notified(self, method: str, params: dict) -> None:
+        if method == ELICIT_COMPLETE:
+            completed = self._completions.get(str(params.get("elicitationId") or ""))
+            if completed is not None:
+                completed.set()
+            return
         receiver = self.receivers.get(params.get("sessionId") or "")
         if receiver is not None and method == "session/update":
             await receiver.received(params.get("update") or {})
+
+    async def browsed(self, url: str) -> None:
+        self.login_url = url
+        for receiver in list(self.receivers.values()):
+            await receiver.linked()
 
     async def call(self, method: str, params: dict) -> Any:
         if self._peer is None:
@@ -175,23 +222,26 @@ class AgentConnection:
         self.receivers.pop(session_id, None)
 
     def methods(self) -> list[dict]:
-        """The ways to sign in this agent offers, as the app lists them."""
-        return [
-            {
+        """The ways to sign in this agent offers, as the app lists them; a terminal one only when it can be launched."""
+        listed = []
+        for method in self.auth_methods:
+            terminal = self.terminal_login(method["id"]) is not None
+            if method.get("type") == TERMINAL_METHOD and not terminal:
+                continue
+            listed.append({
                 "id": method["id"],
                 "name": str(method.get("name") or method["id"]),
                 "description": str(method.get("description") or ""),
-                "terminal": self.terminal_login(method["id"]) is not None,
-            }
-            for method in self.auth_methods
-        ]
+                "terminal": terminal,
+            })
+        return listed
 
     def terminal_login(self, method_id: str) -> Optional[tuple[list[str], dict[str, str]]]:
         """The program and environment a terminal runs to sign this agent in, when the method is a terminal one."""
         method = next((item for item in self.auth_methods if item["id"] == method_id), None)
         if method is None:
             return None
-        argv, env = agents.launch(self.agent)
+        argv, env = self._launch()
         if Path(argv[0]).suffix.lower() in BATCH_SUFFIXES:
             return None
         if method.get("type") == TERMINAL_METHOD:
@@ -210,6 +260,7 @@ class AgentConnection:
             await self.call("authenticate", {"methodId": method_id})
         finally:
             self._login_ask = None
+            self.login_url = None
         self.auth_required = False
 
     async def logout(self) -> None:
@@ -242,6 +293,12 @@ class ConnectionPool:
     def find(self, agent_id: str, cwd: str) -> Optional[AgentConnection]:
         connection = self._connections.get((agent_id, cwd))
         return connection if connection is not None and connection.alive else None
+
+    def by_browse_token(self, token: str) -> Optional[AgentConnection]:
+        return next(
+            (connection for connection in self._connections.values() if token and hmac.compare_digest(connection.browse_token, token)),
+            None,
+        )
 
     async def take(self, agent_id: str, cwd: str) -> AgentConnection:
         key = (agent_id, cwd)

@@ -9,7 +9,7 @@ from core.config import PUBLIC_ACCESS_TOKEN
 from core.responses import api_response
 
 # Open so the mobile app can probe connectivity before it has a token.
-_OPEN_PATHS = frozenset({"/api/health"})
+_OPEN_PATHS = frozenset({"/api/health", "/api/agents/browse"})
 
 
 def _provided_token(authorization: str, query_token: str) -> str:

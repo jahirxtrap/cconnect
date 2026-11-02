@@ -12,6 +12,7 @@
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import AgentsDialog from "$lib/screens/agents/AgentsDialog.svelte";
+  import { serverBrowser } from "$lib/screens/browser/serverBrowser.svelte";
   import { panes } from "./panes.svelte";
   import type { ChatState } from "./state.svelte";
 
@@ -94,8 +95,20 @@
       {#if failed}
         <ErrorText text={failed} class="mt-1" />
       {/if}
+      {#if current.signingIn}
+        <p class="mt-1 text-body-md text-on-surface-variant">{t("AGENT_SIGNING_IN")}</p>
+        {#if current.loginUrl}
+          <MarkdownText text={`[${current.loginUrl}](${current.loginUrl})`} dense class="selectable mt-1 wrap-anywhere" />
+        {/if}
+      {/if}
       <div class="mt-2 flex flex-wrap gap-2">
-        {#if signIn}
+        {#if current.signingIn}
+          {#if current.loginUrl}
+            {@const url = current.loginUrl}
+            <Button variant="outlined" onclick={() => serverBrowser.open(url)}>{t("OPEN_ON_SERVER")}</Button>
+          {/if}
+          <Button variant="outlined" onclick={() => chat.agentLoginCancel()}>{t("CANCEL")}</Button>
+        {:else if signIn}
           {#each current.methods as method (method.id)}
             <Button variant="outlined" onclick={() => void choose(method)}>{method.name}</Button>
           {/each}

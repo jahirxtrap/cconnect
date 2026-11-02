@@ -517,6 +517,8 @@
   "VIEW": "View",
   "OPEN": "Open",
   "OPEN_EXTERNAL_LINK": "Open external link",
+  "OPEN_ON_SERVER": "In the server's browser",
+  "AGENT_SIGNING_IN": "Signing in…",
   "OPEN_EXTERNAL_LINK_MESSAGE": "This will open an external link:\n{1}",
   "HTML_PREVIEW_UNAVAILABLE": "HTML preview is not available here",
   "OPEN_EXTERNALLY": "Open externally",
