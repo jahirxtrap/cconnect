@@ -3,6 +3,7 @@ import {
   parsePlacement,
   parseProject,
   parseSession,
+  placementKey,
   type ChatCategory,
   type ChatPlacement,
   type ProjectInfo,
@@ -149,12 +150,18 @@ export class ChatListStore {
 
   upsertPlacement(item: ChatPlacement) {
     if (!item.sessionId) return;
-    this.placement = { ...this.placement, [item.sessionId]: item };
+    this.placement = { ...this.placement, [placementKey(item.agent, item.sessionId)]: item };
   }
 
-  movePlacement(sessionId: string, categoryId: string | null, index: number | null, order: string[]) {
+  movePlacement(
+    agent: string | null,
+    sessionId: string,
+    categoryId: string | null,
+    index: number | null,
+    order: string[],
+  ) {
     const siblings = order.filter((id) => id !== sessionId);
-    const positions = siblings.map((id) => this.placement[id]?.position ?? 0);
+    const positions = siblings.map((id) => this.placement[placementKey(agent, id)]?.position ?? 0);
     const spot = index === null ? positions.length : Math.max(0, Math.min(index, positions.length));
     const previous = spot > 0 ? positions[spot - 1] : null;
     const following = spot < positions.length ? positions[spot] : null;
@@ -163,11 +170,11 @@ export class ChatListStore {
       : previous === null ? following! - 1024
       : following === null ? previous + 1024
       : (previous + following) / 2;
-    this.upsertPlacement({ sessionId, categoryId, position });
+    this.upsertPlacement({ sessionId, categoryId, position, agent });
   }
 
-  removePlacement(sessionId: string) {
-    const { [sessionId]: _gone, ...rest } = this.placement;
+  removePlacement(key: string) {
+    const { [key]: _gone, ...rest } = this.placement;
     this.placement = rest;
   }
 
@@ -195,7 +202,12 @@ export class ChatListStore {
           .map(parseCategory)
           .sort((a, b) => a.position - b.position);
         this.placement = Object.fromEntries(
-          ((message.placement as Record<string, unknown>[]) ?? []).map(parsePlacement).map((item) => [item.sessionId, item]),
+          [
+            ...((message.placement as Record<string, unknown>[]) ?? []),
+            ...((message.agent_placement as Record<string, unknown>[]) ?? []),
+          ]
+            .map(parsePlacement)
+            .map((item) => [placementKey(item.agent, item.sessionId), item]),
         );
         this.loading = false;
         break;
@@ -206,10 +218,14 @@ export class ChatListStore {
         this.removeCategory(message.category_id as string);
         break;
       case "placement_changed":
+      case "agent_placement_changed":
         this.upsertPlacement(parsePlacement((message.placement as Record<string, unknown>) ?? {}));
         break;
       case "placement_removed":
         this.removePlacement(message.session_id as string);
+        break;
+      case "agent_placement_removed":
+        this.removePlacement(placementKey(message.agent as string, message.session_id as string));
         break;
       case "session_changed":
         this.upsertSession(parseSession((message.session as Record<string, unknown>) ?? {}));

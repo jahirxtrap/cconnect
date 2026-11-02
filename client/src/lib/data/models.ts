@@ -19,6 +19,7 @@ export interface ChatPlacement {
   sessionId: string;
   categoryId: string | null;
   position: number;
+  agent: string | null;
 }
 
 export interface SessionInfo {
@@ -120,7 +121,10 @@ export const parsePlacement = (raw: Wire): ChatPlacement => ({
   sessionId: text(raw.session_id) ?? "",
   categoryId: text(raw.category_id),
   position: number(raw.position) ?? 0,
+  agent: text(raw.agent),
 });
+
+export const placementKey = (agent: string | null, sessionId: string) => (agent ? `${agent}\n${sessionId}` : sessionId);
 
 export const parseSharedEntry = (raw: Wire): SharedEntry => ({
   name: text(raw.name) ?? "",

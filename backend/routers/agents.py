@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from core.access import key_matches
 from core.responses import FILE_HEADERS, api_response
 from core.ws import stream_watch
-from services import agent_registry, agent_sessions, agents, terminal
+from services import agent_registry, agent_sessions, agents, categories, chat_list, terminal
 from services.acp_peer import AcpError
 from services.agent_connections import pool
 
@@ -165,7 +165,16 @@ async def remove_agent(agent_id: str):
     await pool.restart(agent_id)
     if agents.remove(agent_id) is None:
         raise HTTPException(status_code=404, detail="not found")
+    _placements_removed(agent_id, categories.forget_agent(agent_id))
     return api_response()
+
+
+def _placements_removed(agent_id: str, session_ids: list[str]):
+    if session_ids:
+        chat_list.hub.publish([
+            {"type": "agent_placement_removed", "agent": agent_id, "session_id": session_id}
+            for session_id in session_ids
+        ])
 
 
 @router.get("/agents/{agent_id}/env")
@@ -208,7 +217,37 @@ async def agent_session_delete(agent_id: str, cwd: str, session: str):
         await agent_sessions.forget(agent_id, cwd, session)
     except (AcpError, agents.AgentError, OSError) as exc:
         return _failed(exc)
+    if categories.forget_session(session, agent_id):
+        _placements_removed(agent_id, [session])
     return api_response()
+
+
+class SessionPlace(BaseModel):
+    session: str = Field(min_length=1)
+    category_id: Optional[str] = None
+    index: Optional[int] = None
+
+
+@router.post("/agents/{agent_id}/sessions/category")
+async def agent_session_place(agent_id: str, body: SessionPlace):
+    try:
+        placement = categories.place_session(body.session, body.category_id, body.index, agent_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    chat_list.hub.publish([{"type": "agent_placement_changed", "placement": placement}])
+    return api_response(data=placement)
+
+
+class SessionOrder(BaseModel):
+    sessions: list[str]
+
+
+@router.post("/agents/{agent_id}/sessions/order")
+async def agent_session_order(agent_id: str, body: SessionOrder):
+    created = categories.seed_order(body.sessions, agent_id)
+    if created:
+        chat_list.hub.publish([{"type": "agent_placement_changed", "placement": item} for item in created])
+    return api_response(data=created)
 
 
 @router.post("/agents/{agent_id}/sessions/rename")

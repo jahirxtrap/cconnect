@@ -123,6 +123,20 @@ export const createAgentsApi = (profile: () => Profile) => {
       );
     },
 
+    async place(id: string, session: string, categoryId: string | null, index: number | null): Promise<boolean> {
+      return (
+        await client.call<Wire>("POST", `/agents/${segment(id)}/sessions/category`, undefined, {
+          session,
+          category_id: categoryId,
+          index,
+        })
+      ).ok;
+    },
+
+    async seedOrder(id: string, sessions: string[]): Promise<boolean> {
+      return (await client.call<Wire>("POST", `/agents/${segment(id)}/sessions/order`, undefined, { sessions })).ok;
+    },
+
     async loginPreview(id: string, method: string, cwd: string, key: string) {
       return outcome(
         await keyed(key).call<Wire>("GET", `/agents/${segment(id)}/login`, { method, cwd }),

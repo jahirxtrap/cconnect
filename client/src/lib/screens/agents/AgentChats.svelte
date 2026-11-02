@@ -49,5 +49,5 @@
 </ChatsWindow>
 
 {#if organizing}
-  <OrganizeDialog {chat} projectsOnly onDismiss={() => (organizing = false)} onOpenChat={() => (organizing = false)} />
+  <OrganizeDialog {chat} trash={false} onDismiss={() => (organizing = false)} onOpenChat={() => (organizing = false)} />
 {/if}

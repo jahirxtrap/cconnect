@@ -472,7 +472,7 @@
 {#if organizing}
   <OrganizeDialog
     chat={organizing}
-    projectsOnly
+    trash={false}
     onDismiss={() => (organizing = null)}
     onOpenChat={() => (drawer.open = false)}
   />

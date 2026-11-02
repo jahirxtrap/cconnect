@@ -34,6 +34,17 @@
   />
 {/if}
 
+{#if list.categorizing}
+  {@const target = list.categorizing}
+  <RenameDialog
+    initial=""
+    title={t("ADD_CATEGORY")}
+    confirmLabel={t("CREATE")}
+    onConfirm={(name) => void list.createCategoryWith(name, target)}
+    onDismiss={() => (list.categorizing = null)}
+  />
+{/if}
+
 {#if list.forking}
   {@const target = list.forking}
   <ConfirmDialog

@@ -50,6 +50,26 @@ class SessionPlacement(Base):
     )
 
 
+class AgentSessionPlacement(Base):
+    __tablename__ = "agent_session_placement"
+
+    agent: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="ACP agent the chat runs on; its session ids are only unique within that agent",
+    )
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Session id the agent gave the chat; the row goes when the chat is deleted from the app or the agent is removed",
+    )
+    category_id: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Category holding the chat; NULL keeps it in the uncategorised group",
+    )
+    position: Mapped[float] = mapped_column(
+        comment="Sort key inside the category among that agent's chats, only read while the order is manual",
+    )
+
+
 class TrashedSession(Base):
     __tablename__ = "trashed_sessions"
 

@@ -1,6 +1,12 @@
 import { rankLabel } from "$lib/app/commands.svelte";
 import { agentFailureText, type AgentFailure, type AgentSession } from "$lib/data/agentModels";
-import { sessionIdPreview } from "$lib/data/models";
+import {
+  placementKey,
+  projectKeyOf,
+  sessionIdPreview,
+  type ChatCategory,
+  type ChatPlacement,
+} from "$lib/data/models";
 import { t } from "$lib/i18n/index.svelte";
 import { agentSessionsFor, type AgentSessionsWatch } from "$lib/services/agentSessionsWatch.svelte";
 import { createAgentsApi } from "$lib/services/agentsApi";
@@ -16,7 +22,10 @@ export class AgentSessionList {
   renaming = $state<AgentSession | null>(null);
   deleting = $state<AgentSession | null>(null);
   forking = $state<AgentSession | null>(null);
+  categorizing = $state<AgentSession | null>(null);
   failure = $state<string | null>(null);
+
+  #seeded = new Set<string>();
 
   #chat: () => ChatState | null;
   #folder: () => string;
@@ -31,6 +40,8 @@ export class AgentSessionList {
   readonly removable: boolean;
   readonly shown: AgentSession[];
   readonly rightOpenable: boolean;
+  readonly projectKey: string;
+  readonly categories: ChatCategory[];
   readonly searching = $derived(this.query.trim().length > 0);
 
   constructor(chat: () => ChatState | null, folder: () => string, role: () => PaneRole, opened: () => void) {
@@ -60,6 +71,59 @@ export class AgentSessionList {
       const support = chat()?.agentState?.sessions;
       return !!support && (support.delete || !support.list);
     });
+    this.projectKey = $derived(projectKeyOf(folder()));
+    this.categories = $derived.by(() => {
+      const used = new Set((this.sessions ?? []).map((session) => this.placementOf(session)?.categoryId));
+      return (chat()?.categories ?? []).filter(
+        (category) => category.projectKey === this.projectKey || (!category.projectKey && used.has(category.id)),
+      );
+    });
+    $effect(() => {
+      const current = chat();
+      const agent = current?.agent;
+      if (!current || !agent || current.chatOrder !== "manual" || !this.sessions) return;
+      const missing = [...this.sessions]
+        .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
+        .filter((session) => !this.placementOf(session) && !this.#seeded.has(placementKey(agent, session.sessionId)))
+        .map((session) => session.sessionId);
+      if (!missing.length) return;
+      for (const sessionId of missing) this.#seeded.add(placementKey(agent, sessionId));
+      void createAgentsApi(() => current.environment).seedOrder(agent, missing);
+    });
+  }
+
+  placementOf(session: AgentSession): ChatPlacement | undefined {
+    const current = this.#chat();
+    return current?.agent ? current.placement[placementKey(current.agent, session.sessionId)] : undefined;
+  }
+
+  move(sessionId: string, categoryId: string | null, index: number | null, order: string[]) {
+    const chat = this.#chat();
+    if (!chat?.agent) return;
+    chat.list?.movePlacement(chat.agent, sessionId, categoryId, index, order);
+    void createAgentsApi(() => chat.environment).place(chat.agent, sessionId, categoryId, index);
+  }
+
+  place(session: AgentSession, categoryId: string | null) {
+    const chat = this.#chat();
+    if (!chat?.agent) return;
+    void createAgentsApi(() => chat.environment).place(chat.agent, session.sessionId, categoryId, null);
+  }
+
+  async createCategoryWith(name: string, session: AgentSession) {
+    this.categorizing = null;
+    const chat = this.#chat();
+    if (!chat?.agent) return;
+    const created = await chat.createCategoryFor(name, this.projectKey);
+    if (created) await createAgentsApi(() => chat.environment).place(chat.agent, session.sessionId, created.id, 0);
+  }
+
+  newIn(categoryId: string) {
+    const chat = this.#chat();
+    if (!chat) return;
+    agentTabs.restart(chat, this.#folder());
+    chat.pendingCategoryId = categoryId;
+    this.#opened();
   }
 
   open(session: AgentSession) {

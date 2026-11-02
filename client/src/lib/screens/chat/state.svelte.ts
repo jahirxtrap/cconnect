@@ -85,6 +85,7 @@ interface SideChat {
 import { i18n, t } from "$lib/i18n/index.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { agents } from "$lib/services/agents.svelte";
+import { createAgentsApi } from "$lib/services/agentsApi";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
 import {
   commandFor,
@@ -789,11 +790,12 @@ export class ChatState {
 
   #bindSession(sessionId: string | null) {
     if (!sessionId) return;
+    const born = this.sessionId === null;
     if (this.agent) {
       this.sessionId = sessionId;
+      if (born) this.#claimPendingCategory(sessionId);
       return;
     }
-    const born = this.sessionId === null;
     const list = this.list;
     if (list && !list.sessions.some((item) => item.sessionId === sessionId)) {
       list.upsertSession(
@@ -824,7 +826,8 @@ export class ChatState {
     if (!sessionId) return;
     const owner = this.categoriesFor(projectKeyOf(this.cwd));
     const categoryId = owner.some((item) => item.id === wanted) ? wanted : null;
-    void this.placeSession(sessionId, categoryId, 0);
+    if (this.agent) void createAgentsApi(() => this.environment).place(this.agent, sessionId, categoryId, 0);
+    else void this.placeSession(sessionId, categoryId, 0);
   }
 
   openSideChat() {
@@ -1479,14 +1482,18 @@ export class ChatState {
     if (created) this.list?.upsertCategory(created);
   }
 
-  async createCategoryWith(name: string, sessionId: string) {
+  async createCategoryFor(name: string, projectKey: string | null): Promise<ChatCategory | null> {
     const clean = name.trim();
-    if (!clean) return;
+    if (!clean) return null;
+    const created = await this.#sessions.createCategory(clean, null, projectKey);
+    if (created) this.list?.upsertCategory(created);
+    return created;
+  }
+
+  async createCategoryWith(name: string, sessionId: string) {
     const owner = this.list?.sessions.find((item) => item.sessionId === sessionId)?.projectKey ?? null;
-    const created = await this.#sessions.createCategory(clean, null, owner);
-    if (!created) return;
-    this.list?.upsertCategory(created);
-    await this.#sessions.placeSession(sessionId, created.id, 0);
+    const created = await this.createCategoryFor(name, owner);
+    if (created) await this.#sessions.placeSession(sessionId, created.id, 0);
   }
 
   async renameCategory(category: ChatCategory, name: string) {

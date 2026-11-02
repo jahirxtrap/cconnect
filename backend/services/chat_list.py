@@ -85,6 +85,7 @@ class ChatListHub:
                 "sessions": list(self._sessions.values()),
                 "categories": organization["categories"],
                 "placement": organization["placement"],
+                "agent_placement": organization["agent_placement"],
             }
 
     def publish(self, events: list[dict]):
