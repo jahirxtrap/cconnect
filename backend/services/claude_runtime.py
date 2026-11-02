@@ -169,7 +169,7 @@ def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]]) -> list
 
 def _cli_settings(scope: dict) -> dict[str, Any]:
     """The CLI reads its auto-memory outside the setting sources, so it needs its own switch."""
-    deny = [_ENV_RULE] if scope["hosted"] else [_ENV_RULE, *providers.HOSTED_TOOLS]
+    deny = [] if scope["hosted"] else list(providers.HOSTED_TOOLS)
     overrides: dict[str, Any] = {"permissions": {"deny": deny}}
     if not scope["memory"]:
         overrides["autoMemoryEnabled"] = False
@@ -644,9 +644,7 @@ _OTHER_SHARED = (
     "nor downloads from it. The one to use is {shared}."
 )
 
-_ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
-_ENV_KEY = os.path.normcase(str(_ENV_FILE))
-_ENV_RULE = f"Read({str(_ENV_FILE).replace(os.sep, '/')})"
+_ENV_KEY = os.path.normcase(str(paths.ENV_FILE.resolve()))
 _ENV_TOKEN = re.compile(r"(?<![\w.-])([^\s\"';|&<>]*\.env)(?![\w.-])")
 
 
@@ -712,17 +710,26 @@ async def _block_stale_shared(input_data, tool_use_id, context):
     return {}
 
 
-async def _block_secrets(input_data, tool_use_id, context):
-    data = input_data or {}
-    if _mentions_env_file(data.get("tool_input"), data.get("cwd") or os.getcwd()):
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": _NO_SECRETS,
+def _secrets_guard(unlocked: Callable[[], bool]):
+    """The server's own .env stays out of reach unless the chat carries the security key."""
+
+    async def guard(input_data, tool_use_id, context):
+        data = input_data or {}
+        if not unlocked() and _mentions_env_file(data.get("tool_input"), data.get("cwd") or os.getcwd()):
+            return {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": _NO_SECRETS,
+                }
             }
-        }
-    return {}
+        return {}
+
+    return guard
+
+
+def _locked() -> bool:
+    return False
 
 
 class CliControls:
@@ -810,6 +817,7 @@ async def run_prompt(
     resident: Optional[Any] = None,
     adopt: bool = False,
     read_from: Optional[int] = None,
+    unlocked: Callable[[], bool] = _locked,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
@@ -862,6 +870,7 @@ async def run_prompt(
         cli_path=cli_manager.resolve_cli_path(),
         enable_file_checkpointing=True,
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
+        add_dirs=[str(_shared_dir(cwd))],
     )
     turn_emit = resident.emit if resident is not None else emit
     turn_ask = resident.ask_user if resident is not None else ask_user
@@ -912,7 +921,7 @@ async def run_prompt(
         overrides["outputStyle"] = style
     options_kwargs["settings"] = json.dumps(overrides)
     hooks_map: dict[str, Any] = {
-        "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
+        "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _secrets_guard(unlocked), _block_stale_shared])]
     }
     loop = asyncio.get_running_loop() if emit is not None else None
 
@@ -1440,7 +1449,7 @@ async def ask_side_question(
     tools = scope["tools"]
     if tools is not True:
         options_kwargs["tools"] = tools if isinstance(tools, list) else []
-    hooks = [HookMatcher(matcher=None, hooks=[_block_background, _block_secrets, _block_stale_shared])]
+    hooks = [HookMatcher(matcher=None, hooks=[_block_background, _secrets_guard(_locked), _block_stale_shared])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
         hooks.append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))

@@ -45,6 +45,7 @@ class PromptMessage(BaseModel):
     attachments: list[str] = []
     id: Optional[str] = None
     channel: Optional[str] = None
+    security_key: Optional[str] = None
 
 
 class SetGenerationMessage(BaseModel):

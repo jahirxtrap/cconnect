@@ -15,6 +15,7 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from core import paths
+from core.access import key_matches
 from core.config import DEFAULT_CWD, permission_modes, resolve_permission_mode
 from core.responses import api_response
 from core.ws import send_event
@@ -119,6 +120,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
             try:
                 async for event in run_prompt(
                     resident=resident,
+                    unlocked=lambda: session.unlocked,
                     prompt=prompt_text,
                     images=prompt_images,
                     cwd=state.cwd,
@@ -501,6 +503,7 @@ async def chat_ws(ws: WebSocket):
                 target = registry.get(msg.channel) if msg.channel and msg.channel != session.channel else session
                 if target is None:
                     continue
+                target.unlocked = key_matches(msg.security_key or "")
                 if target.running:
                     await target.enqueue(msg.id, msg.text, msg.attachments)
                 elif msg.id and target.already_consumed(msg.id):

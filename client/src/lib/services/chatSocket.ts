@@ -539,6 +539,7 @@ export class ChatSocket {
       ...(attachments.length ? { attachments } : {}),
       ...(id ? { id } : {}),
       ...(channel ? { channel } : {}),
+      security_key: securityKeys.current || undefined,
     });
   }
 

@@ -46,6 +46,7 @@ class LiveSession:
     def __init__(self, channel, state):
         self.channel = channel
         self.state = state
+        self.unlocked = False
         self._sinks = {}
         self._worker = None
         self._pending = {}  # rid -> {"future": Future, "event": stamped dict | None}
