@@ -1,7 +1,7 @@
 <script lang="ts">
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { joined } from "$lib/data/format";
-  import type { Usage } from "$lib/data/usageWindows";
+  import { usageErrorText, type Usage } from "$lib/data/usageWindows";
   import { i18n, t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { claudeApi } from "$lib/services/claudeApi";
@@ -55,7 +55,7 @@
       void claudeStatus.loadUsage(manual);
       return;
     }
-    void claudeApi.usage(i18n.resolved, viewing, manual).then((value) => {
+    void claudeApi.usage(i18n.resolved, viewing).then((value) => {
       if (account === viewing) viewed = { id: viewing, usage: value };
     });
   });
@@ -83,7 +83,7 @@
   {#if loading}
     <EmptyState text={t("LOADING")} />
   {:else if !usage || usage.error !== null || !usage.windows.length}
-    <EmptyState text={usage?.error || pending} />
+    <EmptyState text={usageErrorText(usage) || pending} />
   {:else}
     <UsageWindows windows={usage.windows} class="p-4" />
   {/if}

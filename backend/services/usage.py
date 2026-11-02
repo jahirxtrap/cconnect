@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import time
@@ -18,8 +19,12 @@ logger = logging.getLogger(__name__)
 CAPABILITY = "usage"
 
 _USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
-_CACHE_SECONDS = 60.0
-_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+_PROFILE_URL = "https://api.anthropic.com/api/oauth/profile"
+_REJECTED = (401, 403)
+_PROVIDER = "provider"
+_SIGNED_OUT = "signed_out"
+_UNAUTHORIZED = "unauthorized"
+_UNAVAILABLE = "unavailable"
 _BAR_WIDTH = 20
 _UNUSED_KEY = "unused"
 _UNUSED_TEXT = "You haven't used it yet"
@@ -29,7 +34,7 @@ _WINDOW_IDS = {"session": "session", "weekly_all": _WEEK_KEY}
 _LABELS = {"session": "Current session", _WEEK_KEY: "This week", _SPEND_KEY: "Extra usage"}
 
 
-def _oauth(field: str, account: str | None = None) -> str | None:
+def _oauth(field: str, account: str | None = None) -> object:
     try:
         data = json.loads(accounts.credentials_path(account).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -37,15 +42,33 @@ def _oauth(field: str, account: str | None = None) -> str | None:
     return (data.get("claudeAiOauth") or {}).get(field)
 
 
-async def _fetch(account: str | None = None, language: str | None = None) -> dict:
-    from services import accounts
+def _expired(account: str | None) -> bool:
+    expires = _oauth("expiresAt", account)
+    return isinstance(expires, (int, float)) and expires / 1000 <= time.time()
 
+
+async def _get(client: httpx.AsyncClient, url: str, headers: dict) -> dict:
+    try:
+        resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+        return resp.json()
+    except httpx.HTTPStatusError as exc:
+        code = exc.response.status_code
+        if code in _REJECTED:
+            return {"error": f"Couldn't fetch usage: {code} (sign in to the CLI again)", "reason": _UNAUTHORIZED}
+        return {"error": f"Couldn't fetch usage: {code}", "reason": _UNAVAILABLE}
+    except (httpx.HTTPError, json.JSONDecodeError) as exc:
+        logger.debug(f"usage fetch failed: {type(exc).__name__}: {exc}")
+        return {"error": f"Couldn't fetch usage: {type(exc).__name__}", "reason": _UNAVAILABLE}
+
+
+async def _fetch(account: str | None, language: str | None) -> tuple[dict, str | None]:
     provider = accounts.provider_for(account)
     if provider:
-        return {"error": f"This account runs on {provider['base_url']}, not on a Claude plan"}
+        return {"error": f"This account runs on {provider['base_url']}, not on a Claude plan", "reason": _PROVIDER}, None
     token = _oauth("accessToken", account)
     if not token:
-        return {"error": "No Claude token found (are you signed in to the CLI?)"}
+        return {"error": "No Claude token found (are you signed in to the CLI?)", "reason": _SIGNED_OUT}, accounts.plan_name(account)
     headers = {
         "Authorization": f"Bearer {token}",
         "anthropic-beta": "oauth-2025-04-20",
@@ -53,18 +76,17 @@ async def _fetch(account: str | None = None, language: str | None = None) -> dic
         "User-Agent": f"claude-code/{bundled_version() or '2.0.0'}",
         **({"Accept-Language": language} if language else {}),
     }
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.get(_USAGE_URL, headers=headers)
-        resp.raise_for_status()
-        return resp.json()
-    except httpx.HTTPStatusError as exc:
-        code = exc.response.status_code
-        hint = " (sign in to the CLI again)" if code in (401, 403) else ""
-        return {"error": f"Couldn't fetch usage: {code}{hint}"}
-    except (httpx.HTTPError, json.JSONDecodeError) as exc:
-        logger.debug(f"usage fetch failed: {type(exc).__name__}: {exc}")
-        return {"error": f"Couldn't fetch usage: {type(exc).__name__}"}
+    async with httpx.AsyncClient(timeout=8.0) as client:
+        usage, profile = await asyncio.gather(_get(client, _USAGE_URL, headers), _get(client, _PROFILE_URL, headers))
+    plan = (profile.get("organization") or {}).get("plan_display_name") if "error" not in profile else None
+    return usage, plan if isinstance(plan, str) and plan.strip() else accounts.plan_name(account)
+
+
+async def _renew(account: str | None) -> None:
+    """Start the CLI as this account, which refreshes its OAuth token the way only the CLI may."""
+    from services import cli_info
+
+    await cli_info.server_info(refresh=True, account=account)
 
 
 def _model(entry: dict) -> str | None:
@@ -145,17 +167,16 @@ def _spend(data: dict) -> dict | None:
     }
 
 
-async def usage_data(account: str | None = None, force: bool = False, language: str | None = None) -> dict:
-    key = (account or "", language or "")
-    cached = _cache.get(key)
-    if cached and not force and time.monotonic() - cached[0] < _CACHE_SECONDS:
-        return cached[1]
-    data = await _fetch(account, language)
+async def usage_data(account: str | None = None, language: str | None = None) -> dict:
+    if not accounts.provider_for(account) and _expired(account):
+        await _renew(account)
+    data, plan = await _fetch(account, language)
+    if data.get("reason") == _UNAUTHORIZED:
+        await _renew(account)
+        data, plan = await _fetch(account, language)
     if "error" in data:
-        return cached[1] if cached else {"error": data["error"]}
-    fresh = {"plan": accounts.plan_name(account), "windows": _windows(data)}
-    _cache[key] = (time.monotonic(), fresh)
-    return fresh
+        return {"error": data["error"], "reason": data["reason"], "plan": plan}
+    return {"plan": plan, "windows": _windows(data)}
 
 
 def window_label(win: dict) -> str:

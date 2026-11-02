@@ -128,7 +128,7 @@ class ClaudeStatus {
       this.#usageAgain ||= force;
       return this.#usageRun;
     }
-    this.#usageRun = this.#runUsage(force);
+    this.#usageRun = this.#runUsage();
     await this.#usageRun;
     this.#usageRun = null;
     if (!this.#usageAgain) return;
@@ -136,12 +136,12 @@ class ClaudeStatus {
     await this.#loadUsage(true);
   }
 
-  async #runUsage(force: boolean) {
+  async #runUsage() {
     const at = this.#sync();
     this.usageLoading = untrack(() => this.usage) === null;
     await accountsStore.load();
     const accounts = accountsStore.snapshot;
-    const usage = await claudeApi.usage(i18n.resolved, accounts?.default ?? null, force);
+    const usage = await claudeApi.usage(i18n.resolved, accounts?.default ?? null);
     if (at !== backend.activeId) return;
     this.accounts = accounts;
     this.usage = usage;

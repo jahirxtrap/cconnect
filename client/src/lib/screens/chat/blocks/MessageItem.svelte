@@ -14,6 +14,7 @@
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
+  import { usageErrorText } from "$lib/data/usageWindows";
   import { userContent } from "$lib/data/userContent";
   import { elementLabel } from "$lib/data/pickedElements";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
@@ -412,7 +413,7 @@
     <div class="w-full px-(--page-inset)">
       <CardPanel>
         {#if message.usage.error !== null || !message.usage.windows.length}
-          <p class="text-body-md text-on-surface-variant">{message.usage.error ?? t("NO_USAGE_DATA")}</p>
+          <p class="text-body-md text-on-surface-variant">{usageErrorText(message.usage) ?? t("NO_USAGE_DATA")}</p>
         {:else}
           <UsageWindows windows={message.usage.windows} />
         {/if}

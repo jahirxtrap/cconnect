@@ -153,7 +153,10 @@ def credentials_path(account_id: Optional[str] = None) -> Path:
 
 def _claude_json(account_id: Optional[str]) -> Path:
     path = config_dir(account_id)
-    return (path / ".claude.json") if path else (Path.home() / ".claude.json")
+    if path:
+        return path / ".claude.json"
+    configured = os.environ.get("CLAUDE_CONFIG_DIR")
+    return Path(configured) / ".claude.json" if configured else Path.home() / ".claude.json"
 
 
 def is_logged_in(account_id: Optional[str]) -> bool:

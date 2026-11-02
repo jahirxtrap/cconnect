@@ -53,7 +53,21 @@ export interface Usage {
   plan: string | null;
   windows: UsageWindow[];
   error: string | null;
+  reason: string | null;
 }
+
+const USAGE_REASONS: Record<string, string> = {
+  provider: "USAGE_PROVIDER",
+  signed_out: "ACCOUNT_PENDING",
+  unauthorized: "USAGE_SIGN_IN_AGAIN",
+  unavailable: "USAGE_FAILED",
+};
+
+export const usageErrorText = (usage: Usage | null): string | null => {
+  if (!usage?.error) return null;
+  const key = usage.reason ? USAGE_REASONS[usage.reason] : undefined;
+  return key ? t(key) : usage.error;
+};
 
 type Wire = Record<string, unknown>;
 
@@ -82,4 +96,5 @@ export const usageOf = (data: Wire): Usage => ({
     })),
   })),
   error: textOf(data, "error"),
+  reason: textOf(data, "reason"),
 });
