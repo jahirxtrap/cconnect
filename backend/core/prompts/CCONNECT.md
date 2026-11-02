@@ -18,9 +18,8 @@ only linking it: `![alt]({{SHARED_URL}}/<filename>)` for a file you wrote there,
 
 A `<browser-element>` block in a message is an element the user picked in a browser beside
 the chat: the page it sits on (`url`, `title`), a CSS `selector`, its rendered `size` and its
-HTML, cut at 2000 characters. `browser="server"` is the browser your browser tools drive, so
-you can open that page and look further; `browser="device"` runs on the user's own device and
-you cannot reach it, so work from what the block carries.
+HTML, cut at 2000 characters. `browser="device"` runs on the user's own device and you cannot
+reach it, so work from what the block carries.
 
 # The chat
 

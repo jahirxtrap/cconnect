@@ -142,9 +142,16 @@ def _join(text: str, block: str) -> str:
     return f"{text}\n\n{block.strip()}" if text else block.strip()
 
 
-def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]]) -> list[str]:
+def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]], scope: dict) -> list[str]:
     caps = list(capabilities or ())
-    guides = [_blocks_guide(caps), _browser_guide(caps), _suggestions_guide(), _mods_guide()]
+    guides = [
+        _blocks_guide(caps),
+        _browser_guide(caps) if scope["cconnect"] else "",
+        _suggestions_guide(),
+        _mods_guide() if scope["project_files"] else "",
+    ]
+    if not scope["instructions"]:
+        return guides
     user = claude_assets.get_user_prompt().strip()
     if user:
         guides.append(
@@ -185,15 +192,11 @@ def _shared_dir(cwd: Optional[str]) -> Path:
     return shared.project_dir(sessions.project_key_for(cwd) if cwd else "")
 
 
-def _system_append(
-    cwd: Optional[str] = None,
-    capabilities: Optional[list[str]] = None,
-    guides: bool = True,
-) -> str:
+def system_append(cwd: Optional[str], capabilities: Optional[list[str]], scope: dict) -> str:
     """Read on every call so the markdown can be edited without restarting the server."""
     text = _prompt_file("CCONNECT.md")
-    if guides:
-        for guide in _extra_guides(cwd, capabilities):
+    if scope["guides"]:
+        for guide in _extra_guides(cwd, capabilities, scope):
             text = _join(text, guide)
     if not text:
         return ""
@@ -848,7 +851,7 @@ async def run_prompt(
 
     from services import accounts
     scope = accounts.context_scope(account)
-    append = _system_append(cwd, capabilities, scope["guides"])
+    append = system_append(cwd, capabilities, scope)
     system_prompt: Optional[dict | str] = append or None
     if scope["preset"]:
         system_prompt = {"type": "preset", "preset": "claude_code"}
@@ -1420,7 +1423,7 @@ async def ask_side_question(
         "something you said or already told them. Never invent files, code, commands, or facts: if you "
         "don't know, say so plainly instead of guessing."
     )
-    shared = _system_append(None, [], scope["guides"])
+    shared = system_append(None, [], scope)
     if shared:
         system = f"{system}\n\n{shared}"
     prompt = f"<session_context>\n{context}\n</session_context>\n\n{question}" if (context and not resume_id) else question

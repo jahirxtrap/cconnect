@@ -12,9 +12,10 @@ from urllib.parse import urlparse
 
 from core import paths
 from mcps.shared_files import listing
-from services import acp_events, agents, attachments, elicitation, event_rows, shared, terminal
+from services import acp_events, agents, attachments, claude_runtime, elicitation, event_rows, providers, shared, terminal
 from services.acp_peer import AUTH_REQUIRED, INVALID_PARAMS, METHOD_NOT_FOUND, RESOURCE_NOT_FOUND, AcpError
 from services.agent_connections import AgentConnection, pool
+from services.agent_mcp import AgentMcp
 from services.live_sessions import registry
 
 CONNECTING = "connecting"
@@ -165,10 +166,21 @@ def _commands(listed: Any) -> list[dict]:
 
 
 class AgentSession:
-    def __init__(self, agent_id: str, cwd: str, project_key: str, resume: Optional[str] = None):
+    def __init__(
+        self,
+        agent_id: str,
+        cwd: str,
+        project_key: str,
+        resume: Optional[str] = None,
+        capabilities: Optional[list[str]] = None,
+        guided: bool = False,
+    ):
         self.agent_id = agent_id
         self.cwd = cwd
         self.project_key = project_key
+        self.capabilities = list(capabilities or ())
+        self.guided = guided
+        self._mcp: Optional[AgentMcp] = None
         self.session_id: Optional[str] = resume
         self.connection: Optional[AgentConnection] = None
         self.status = CONNECTING
@@ -311,8 +323,25 @@ class AgentSession:
         self.commands = remembered.get("commands") or []
         return True
 
+    async def _context(self, connection: AgentConnection) -> dict:
+        """The cconnect tools and guides this chat hands the agent, in the shape its capabilities accept."""
+        if not self.guided:
+            return {"mcpServers": []}
+        text = claude_runtime.system_append(self.cwd, self.capabilities, providers.AGENT_SCOPE)
+        if self._mcp is None:
+            self._mcp = AgentMcp(
+                {"session_info": lambda: {"cwd": self.cwd, "session_id": self.session_id}, "emit": self._publish},
+                text,
+            )
+            await self._mcp.start()
+        http = bool((connection.capabilities.get("mcpCapabilities") or {}).get("http"))
+        context: dict = {"mcpServers": [self._mcp.entry(http)]}
+        if connection.session_capabilities.get("systemPrompt") is not None and text:
+            context["systemPrompt"] = {"mode": "append", "content": [{"type": "text", "text": text}]}
+        return context
+
     async def _create(self, connection: AgentConnection) -> None:
-        result = await connection.call("session/new", {"cwd": self.cwd, "mcpServers": []}) or {}
+        result = await connection.call("session/new", {"cwd": self.cwd, **await self._context(connection)}) or {}
         self.session_id = str(result.get("sessionId") or "")
         connection.bind(self.session_id, self)
         _keep_id(connection, self.agent_id, self.session_id, self.cwd)
@@ -336,7 +365,7 @@ class AgentSession:
     async def _attach(self, connection: AgentConnection, session_id: str, replay: bool) -> None:
         self.session_id = session_id
         connection.bind(session_id, self)
-        params = {"sessionId": session_id, "cwd": self.cwd, "mcpServers": []}
+        params = {"sessionId": session_id, "cwd": self.cwd, **await self._context(connection)}
         if replay and connection.capabilities.get("loadSession"):
             self._replaying, self._replayed = True, []
             try:
@@ -585,7 +614,8 @@ class AgentSession:
         if not path.is_absolute():
             raise AcpError(INVALID_PARAMS, f"{path} is not an absolute path")
         resolved = path.resolve()
-        if not resolved.is_relative_to(Path(self.cwd).resolve()):
+        allowed = (Path(self.cwd).resolve(), shared.project_dir(self.project_key).resolve())
+        if not any(resolved.is_relative_to(folder) for folder in allowed):
             raise AcpError(INVALID_PARAMS, f"{path} is outside {self.cwd}")
         return resolved
 
@@ -695,6 +725,9 @@ class AgentSession:
         self._emit = None
         self._ask = None
         self.released = True
+        served, self._mcp = self._mcp, None
+        if served is not None:
+            await served.close()
         if connection is not None:
             if self.session_id:
                 connection.unbind(self.session_id)

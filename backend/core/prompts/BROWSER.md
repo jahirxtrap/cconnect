@@ -8,3 +8,6 @@ Anything that speaks the DevTools Protocol reaches that same browser at `$CCONNE
 — Playwright, Puppeteer, Selenium, or the Playwright MCP already pointed at it. Use one of those
 to click through a flow, and the browser tools to open a page, read it or look at it. Never
 close the browser or its last tab: it is the user's window, not yours.
+
+A `<browser-element>` with `browser="server"` was picked in this browser, so you can open that
+page and look further.

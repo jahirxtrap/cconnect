@@ -23,11 +23,13 @@ _FILE_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep"]
 HOSTED_TOOLS = ["WebSearch", "WebFetch"]
 
 CONTEXT_SCOPES = (
-    {"id": "full", "preset": True, "guides": True, "project_files": True, "memory": True, "cconnect": True, "tools": True, "search": True, "hosted": True},
-    {"id": "standard", "preset": True, "guides": True, "project_files": True, "memory": True, "cconnect": True, "tools": True, "search": True, "hosted": False},
-    {"id": "light", "preset": False, "guides": True, "project_files": False, "memory": False, "cconnect": False, "tools": _FILE_TOOLS, "search": False, "hosted": False},
-    {"id": "minimal", "preset": False, "guides": False, "project_files": False, "memory": False, "cconnect": False, "tools": False, "search": False, "hosted": False},
+    {"id": "full", "preset": True, "guides": True, "instructions": True, "project_files": True, "memory": True, "cconnect": True, "tools": True, "search": True, "hosted": True},
+    {"id": "standard", "preset": True, "guides": True, "instructions": True, "project_files": True, "memory": True, "cconnect": True, "tools": True, "search": True, "hosted": False},
+    {"id": "light", "preset": False, "guides": True, "instructions": True, "project_files": False, "memory": False, "cconnect": False, "tools": _FILE_TOOLS, "search": False, "hosted": False},
+    {"id": "minimal", "preset": False, "guides": False, "instructions": False, "project_files": False, "memory": False, "cconnect": False, "tools": False, "search": False, "hosted": False},
 )
+
+AGENT_SCOPE = {"guides": True, "instructions": False, "project_files": False, "cconnect": False}
 
 SCOPE_IDS = tuple(scope["id"] for scope in CONTEXT_SCOPES)
 FULL_SCOPE = SCOPE_IDS[0]

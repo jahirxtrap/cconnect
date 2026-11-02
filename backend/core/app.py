@@ -18,7 +18,7 @@ from core.db import init_db
 from core.rate_limit import limiter
 from core.responses import api_response
 from core.sdk import ensure_sdk_installed, ensure_subscription_auth
-from services import cli_settings, settings_store, system_monitor
+from services import agent_mcp, cli_settings, settings_store, system_monitor
 from middleware.error_handler import register_error_handlers
 from middleware.public_auth import register_public_auth_middleware
 from middleware.security import register_security_middleware
@@ -97,6 +97,8 @@ for module_info in pkgutil.iter_modules(routers_pkg.__path__):
     module = importlib.import_module(f"routers.{module_info.name}")
     if hasattr(module, "router"):
         app.include_router(module.router, prefix="/api")
+
+app.mount(agent_mcp.PATH, agent_mcp.asgi)
 
 
 @app.api_route(
