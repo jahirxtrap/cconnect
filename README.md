@@ -177,20 +177,24 @@ both down. It survives the terminal, not a reboot.
 
 ## Run the backend from the desktop app
 
-The desktop app can start the backend for you instead of running `python run.py`
-yourself. In Settings → Local server, point it at the backend folder, choose how
-to run Python (auto-detect a virtualenv there, the system Python, or a path you
-pick) and the mode — local, tailnet only, a Tailscale Funnel or Caddy — and it launches the server on
-startup, showing its status and, in public mode, the URL and token to connect
-with. It only manages a server it started; if one is already running, it steps
-aside.
+The desktop app can start the backend for you. In Settings → Local server,
+**Source** picks what it runs: **Native**, the installed `cconnect` command,
+found on its own or at a path you give, or **Repository**, a backend folder with
+Python auto-detected from a virtualenv there, the system's, or a path you pick.
+Choose the mode — local, tailnet only, a Tailscale Funnel or Caddy — and with
+**Start on launch** on it launches the server when the app opens, showing its
+status and, in public mode, the URL and token to connect with. Once the server
+is up it adds itself to Environments as Local server, with the token and the
+security key when the mode needs them, unless an environment already points at
+it; a token or key that changed is updated there instead. It only manages a
+server it started; if one is already running, it steps aside.
 
 ## Connecting
 
 Open Settings → Environments and add the server: on mobile, scan the QR
 (top-right of the dialog) to autofill it from `--expose`'s output; on desktop,
-paste the address and token by hand. The connection becomes active immediately
-and the chat reconnects.
+paste the address and token by hand, or let the local server add itself. The
+connection becomes active immediately and the chat reconnects.
 
 Each environment can carry its own colour, which takes over the whole app while
 it's the active one — a glance tells you whether you're driving your laptop or a
@@ -254,6 +258,15 @@ arrive as mentions it can open directly.
 preview exactly what would change on disk (`+added −removed • files`), and
 choose whether to roll back the conversation alone or code and conversation
 together.
+
+**Fork** copies a chat into a new one and leaves the original as it is: the
+whole conversation from the chat's menu, or up to a point from Rewind or from
+the row under each reply, which also shares and copies it.
+
+**Listen** reads a reply aloud — from the row under it, or just the part you
+select — with the voices the system ships. **Read aloud** in the Client settings
+picks the voice and the speed, and can read the last reply by itself when the
+work is done, always or only while the app is in the background.
 
 **Arrow up walks back** through what you already sent in this chat, straight
 from the composer, and arrow down comes forward again — with what you were
@@ -521,7 +534,7 @@ agent so they're available out of the box from the phone:
 - **ACP agents.** A view for either panel runs agents that speak the Agent
   Client Protocol, such as Copilot, Codex or Gemini, installed from the
   official catalog or added by hand, with their chats listed on the left like
-  Claude's and renamed from there.
+  Claude's, sorted into categories and renamed from there.
 - **Delegation.** Claude can hand a task to another AI and get its answer
   back: an ACP agent, an agent CLI added under ACP agents as a command, or
   another of your Claude accounts once its sheet says Claude can use it, with
@@ -615,7 +628,9 @@ Claude CLI — they support. When something falls behind, a notice in the chat
 takes you straight to the right place: the app's own update (with its
 changelog), the server requirement, or the CLI update button. On the desktop and
 Android the app also tells you once when a new version of it is out. Release notes
-for both CConnect and Claude Code are readable in the app. Settings → Recovery
+for both CConnect and Claude Code are readable in the app, and **Report a
+problem** in Settings → About opens a GitHub issue with the app, system, server
+and CLI versions already filled in. Settings → Recovery
 exports your settings to copy them into another install, or keeps copies of them
 in your Google Drive (encrypted with a password if you give one, and with this
 device's notes, packs and backgrounds if you want them along); the chats

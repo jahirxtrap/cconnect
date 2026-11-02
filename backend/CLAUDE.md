@@ -84,12 +84,14 @@ exists, or the QR would point nowhere.
 
 Everything returns `api_response()`. Route groups: `/api/health`, `/api/capabilities`,
 `/api/settings`, `/api/cli`, `/api/sessions/*` (transcript slices, checkpoints + rewind,
-rename/color/move/delete, trash, categories, transcript images), `/api/shared/*` (file
+rename/color/move/delete, fork through the SDK's `fork_session` up to a message or the
+pending rewind point, trash, categories, transcript images), `/api/shared/*` (file
 manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins and their
 reload, marketplaces, skills, MCP, memories, usage in the app's `lang`, status), `/api/accounts/*`,
 `/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
-Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessions; reading or
+Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessions, and their
+category and manual order, kept in `agent_session_placement` beside Claude's; reading or
 changing their environment variables takes the security key), `/api/packs/*` (the server's pack library and its
 previews; deleting from it takes the security key). Live streams: `WS /api/chat/ws`,
 `WS /api/list/ws` (chat/project list), `WS /api/agents/ws` (an agent's chats: `watch`
@@ -134,6 +136,7 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 | event | notes |
 |---|---|
 | `assistant_text` / `thinking` / `todos` / `task` | streamed content and indicators |
+| `anchor` | the transcript uuid of a top-level reply with text, which forking from that reply goes up to |
 | `tool_use` / `tool_result` | `file_change` replaces them for Edit/Write/MultiEdit/NotebookEdit, with the diff already classified |
 | `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
 | `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase |
