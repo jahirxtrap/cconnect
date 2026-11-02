@@ -1,4 +1,5 @@
 import type { AuthKind } from "$lib/data/auth";
+import { isTauri } from "$lib/platform";
 import { secureStore } from "$lib/platform/secureStorage";
 import { store } from "$lib/platform/storage";
 
@@ -24,6 +25,29 @@ export interface EnvironmentProfile {
 }
 
 const adopted = (profile: EnvironmentProfile): EnvironmentProfile => ({ ...profile, accent: profile.accent ?? null });
+
+const DEFAULT_PORT = 8723;
+
+export const blankEnvironment = (): EnvironmentProfile => ({
+  id: crypto.randomUUID(),
+  name: "",
+  kind: isTauri ? "http" : "https",
+  host: "",
+  port: isTauri ? DEFAULT_PORT : null,
+  authKind: "none",
+  authToken: "",
+  authUser: "",
+  authPassword: "",
+  authHeaderName: "",
+  authHeaderValue: "",
+  directory: "",
+  account: "",
+  model: "",
+  effort: "",
+  permissionMode: "",
+  streaming: null,
+  accent: null,
+});
 
 export type Profile = EnvironmentProfile | null;
 

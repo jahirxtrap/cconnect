@@ -2,7 +2,7 @@ import { navigation } from "$lib/app/navigation.svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { t } from "$lib/i18n/index.svelte";
 import { localServer } from "$lib/services/localServer.svelte";
-import { isTauri } from "./index";
+import { isDesktop, isTauri } from "./index";
 
 const TRAY_ID = "cconnect";
 
@@ -27,7 +27,9 @@ class Desktop {
     if (!isTauri) return;
     await this.#window();
     await this.#tray();
-    if (settings.localServerEnabled && settings.localServerDir) localServer.start();
+    if (!isDesktop) return;
+    await localServer.watch();
+    if (settings.localServerEnabled && (localServer.native || settings.localServerDir)) localServer.start();
   }
 
   async #window() {

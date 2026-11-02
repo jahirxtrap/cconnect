@@ -43,13 +43,9 @@
   const summary = $derived(localServerValue() || null);
 
   $effect(() => {
-    let stop: (() => void) | null = null;
-    void localServer.watch().then((unlisten) => (stop = unlisten));
+    void localServer.refresh();
     const probe = setInterval(() => void localServer.refresh(), PROBE_MS);
-    return () => {
-      stop?.();
-      clearInterval(probe);
-    };
+    return () => clearInterval(probe);
   });
 </script>
 

@@ -17,7 +17,7 @@
   import { plural, t } from "$lib/i18n/index.svelte";
   import { useAgents } from "$lib/services/agents.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { localServer } from "$lib/services/localServer.svelte";
+  import { isLocalProfile, localServer } from "$lib/services/localServer.svelte";
   import { type SettingsPatch } from "$lib/services/settingsApi";
   import { systemApi, type ServerUpdate } from "$lib/services/systemApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
@@ -54,8 +54,6 @@
   let updating = $state(false);
   let failure = $state<string | null>(null);
 
-  const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
-
   const version = $derived(serverStatus.version?.serverVersion ?? null);
 
   const versionSummary = $derived(
@@ -68,10 +66,7 @@
 
   const localInfo = $derived(localServer.info);
   const managedHere = $derived(
-    localServer.native &&
-      localInfo.managed &&
-      LOCAL_HOSTS.includes((backend.active?.host ?? "").toLowerCase()) &&
-      (backend.active?.port ?? 0) === localInfo.port,
+    localServer.native && localInfo.managed && isLocalProfile(backend.active, localInfo.port),
   );
 
   const applyUpdate = async () => {

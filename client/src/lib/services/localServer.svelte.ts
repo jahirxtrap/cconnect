@@ -1,5 +1,8 @@
+import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { settings } from "$lib/data/settings.svelte";
+import { t } from "$lib/i18n/index.svelte";
 import { isTauri } from "$lib/platform";
+import { backend, blankEnvironment, tokenOf, type Profile } from "./backend.svelte";
 
 export type LocalServerError =
   | "bad_dir"
@@ -31,6 +34,11 @@ export const localServerStateOf = (info: LocalServerInfo): LocalServerState => {
 };
 
 const STATUS_EVENT = "local-server://status";
+
+const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
+
+export const isLocalProfile = (profile: Profile, port: number) =>
+  !!profile && LOCAL_HOSTS.includes(profile.host.toLowerCase()) && profile.port === port;
 
 const empty: LocalServerInfo = {
   managed: false,
@@ -82,7 +90,26 @@ class LocalServer {
     if (!isTauri) return () => {};
     const { listen } = await import("@tauri-apps/api/event");
     await this.refresh();
-    return listen<LocalServerInfo>(STATUS_EVENT, (event) => (this.info = event.payload));
+    return listen<LocalServerInfo>(STATUS_EVENT, (event) => this.#apply(event.payload));
+  }
+
+  #apply(info: LocalServerInfo) {
+    const started = localServerStateOf(info) === "running" && localServerStateOf(this.info) !== "running";
+    this.info = info;
+    if (started) this.#adopt(info);
+  }
+
+  #adopt({ port, token, securityKey }: LocalServerInfo) {
+    const profile = backend.environments.find((item) => isLocalProfile(item, port)) ?? this.#environment(port);
+    if (token && tokenOf(profile) !== token) backend.update(profile.id, { authKind: "bearer", authToken: token });
+    if (securityKey && securityKeys.keyFor(profile) !== securityKey) securityKeys.setFor(profile, securityKey);
+  }
+
+  #environment(port: number) {
+    const profile = { ...blankEnvironment(), name: t("LOCAL_SERVER"), host: LOCAL_HOSTS[0], port };
+    backend.save([...backend.environments, profile]);
+    if (backend.environments.length === 1) backend.select(profile.id);
+    return profile;
   }
 
   async #call<T>(command: string, args: Record<string, unknown> = {}): Promise<T | null> {
@@ -91,7 +118,7 @@ class LocalServer {
       const { invoke } = await import("@tauri-apps/api/core");
       const result = await invoke<T>(command, args);
       if (result && typeof result === "object" && "managed" in result) {
-        this.info = result as unknown as LocalServerInfo;
+        this.#apply(result as unknown as LocalServerInfo);
       }
       return result;
     } catch {

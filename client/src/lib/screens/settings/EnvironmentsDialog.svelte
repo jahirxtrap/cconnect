@@ -6,11 +6,10 @@
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { isTauri } from "$lib/platform";
   import { parseQrPayload } from "$lib/data/qrPayload";
   import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
-  import { address, backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
+  import { address, backend, blankEnvironment, type EnvironmentProfile } from "$lib/services/backend.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -36,32 +35,9 @@
   const applyQr = (raw: string) => {
     const payload = parseQrPayload(raw);
     if (!payload) return;
-    editing = { ...blank(), host: payload.url, authKind: "bearer", authToken: payload.token };
+    editing = { ...blankEnvironment(), host: payload.url, authKind: "bearer", authToken: payload.token };
     isNew = true;
   };
-
-  const blank = (): EnvironmentProfile => ({
-    id: crypto.randomUUID(),
-    name: "",
-    kind: isTauri ? "http" : "https",
-    host: "",
-    port: isTauri ? DEFAULT_PORT : null,
-    authKind: "none",
-    authToken: "",
-    authUser: "",
-    authPassword: "",
-    authHeaderName: "",
-    authHeaderValue: "",
-    directory: "",
-    account: "",
-    model: "",
-    effort: "",
-    permissionMode: "",
-    streaming: null,
-    accent: null,
-  });
-
-  const DEFAULT_PORT = 8723;
 
   let editing = $state<EnvironmentProfile | null>(null);
   let isNew = $state(false);
@@ -147,7 +123,7 @@
     <ActionButton
       text={t("ADD_ENVIRONMENT")}
       onclick={() => {
-        editing = blank();
+        editing = blankEnvironment();
         isNew = true;
       }}
       class="w-full"
