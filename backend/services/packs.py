@@ -35,7 +35,8 @@ def entries() -> list[dict]:
     for file in sorted(paths.PACKS_DIR.glob(f"*{EXTENSION}")):
         info = _info(file)
         if info is not None:
-            listed.append({**info, "file": file.name, "size": file.stat().st_size})
+            stat = file.stat()
+            listed.append({**info, "file": file.name, "size": stat.st_size, "modified": stat.st_mtime_ns})
     return listed
 
 

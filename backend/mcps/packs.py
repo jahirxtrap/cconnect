@@ -46,7 +46,9 @@ GUIDE = "\n".join(
         "motif of the pack's own and no text: a screenshot or fine detail turns to noise at that size.",
         "Every other file is optional and takes its id from its name.",
         "use is what the app's Use button applies, and without it the button is not offered: the first light "
-        "theme, dark theme, terminal, accent and background listed, and the first font of each kind.",
+        "theme, dark theme, terminal, accent and background listed, and the first font of each kind. For the "
+        f"accent it also takes {' or '.join(SCHEMA['accentSources'].values())}, which follow the system's color or "
+        "the theme's own instead of one of the pack's.",
         f"themes/<id>.json: {{name, kind: {' or '.join(SCHEMA['themeKinds'])}, extends?: theme id, accent?, "
         "syntax?: syntax id, colors: {token: color}}. A token left out comes from extends, or from the default "
         "theme of its kind, and the -bg, hover and scrollbar tokens derive from their base color.",

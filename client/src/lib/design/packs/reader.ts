@@ -11,6 +11,7 @@ import type {
   ThemeFile,
 } from "./model";
 import {
+  ACCENT_SOURCE_IDS,
   BACKGROUND_FITS,
   BUILTIN_PACK_IDS,
   COLOR_KEYS,
@@ -363,8 +364,9 @@ export const readPack = (source: PackSource, builtin: boolean, known: KnownIds):
   const usable = new Set(
     [result.themes, result.terminals, result.accents, result.fonts, result.backgrounds].flat().map((item) => item.id),
   );
+  const sourced = (local: string) => ACCENT_SOURCE_IDS.includes(local);
   for (const local of info.use) {
-    if (!usable.has(qualify(local))) throw new PackError("reference", MANIFEST, "use", local);
+    if (!sourced(local) && !usable.has(qualify(local))) throw new PackError("reference", MANIFEST, "use", local);
   }
-  return { ...result, info: { ...info, use: info.use.map(qualify) } };
+  return { ...result, info: { ...info, use: info.use.map((local) => (sourced(local) ? local : qualify(local))) } };
 };

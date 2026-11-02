@@ -125,11 +125,15 @@ class ChatBackground {
 
   async remove(id: string) {
     await blobStore.remove(uploadKey(id));
+    this.forget(id);
+    this.#keepEffects(without(this.saved, id));
+    this.#keepUploads(this.uploads.filter((upload) => upload !== id));
+  }
+
+  forget(id: string) {
     if (this.urls[id]) URL.revokeObjectURL(this.urls[id]);
     this.urls = without(this.urls, id);
     this.#loading.delete(id);
-    this.#keepEffects(without(this.saved, id));
-    this.#keepUploads(this.uploads.filter((upload) => upload !== id));
   }
 
   async uploadedImages(): Promise<{ id: string; blob: Blob }[]> {

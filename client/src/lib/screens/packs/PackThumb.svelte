@@ -4,6 +4,8 @@
   import { packSource } from "$lib/design/packs/library";
   import type { Pack } from "$lib/design/packs/model";
   import type { PackSource } from "$lib/design/packs/reader";
+  import { packImageKey } from "$lib/design/packs/storage";
+  import { imageCache } from "$lib/services/imageCache.svelte";
   import IconTile from "$lib/ui/IconTile.svelte";
 
   interface Props {
@@ -13,24 +15,30 @@
 
   const { pack, source = null }: Props = $props();
 
-  let url = $state<string | null>(null);
+  let offered = $state<string | null>(null);
+
+  const key = $derived(pack.info.preview && !source ? packImageKey(pack.info.id, pack.info.preview) : null);
+  const url = $derived(key ? imageCache.get(key) : offered);
+
+  const blobOf = (found: PackSource | null, path: string): Blob | null => {
+    const bytes = found?.bytes(path);
+    return bytes ? new Blob([bytes as BlobPart], { type: guessMimeType(path) ?? "" }) : null;
+  };
 
   $effect(() => {
     const path = pack.info.preview;
-    url = null;
-    if (!path) return;
-    let alive = true;
-    let made: string | null = null;
-    void (source ? Promise.resolve(source) : packSource(pack)).then((found) => {
-      const bytes = found?.bytes(path);
-      if (!alive || !bytes) return;
-      made = URL.createObjectURL(new Blob([bytes as BlobPart], { type: guessMimeType(path) ?? "" }));
-      url = made;
-    });
-    return () => {
-      alive = false;
-      if (made) URL.revokeObjectURL(made);
-    };
+    if (key && path) imageCache.load(key, async () => blobOf(await packSource(pack), path));
+  });
+
+  $effect(() => {
+    const path = pack.info.preview;
+    offered = null;
+    if (!source || !path) return;
+    const blob = blobOf(source, path);
+    if (!blob) return;
+    const made = URL.createObjectURL(blob);
+    offered = made;
+    return () => URL.revokeObjectURL(made);
   });
 </script>
 

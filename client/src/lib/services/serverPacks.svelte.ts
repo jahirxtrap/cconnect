@@ -2,7 +2,8 @@ import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { backend, withToken } from "./backend.svelte";
 import { createHttp, type HttpResult } from "./http";
-import { fetchFile } from "./mediaSource";
+import { imageCache } from "./imageCache.svelte";
+import { fetchBlob, fetchFile } from "./mediaSource";
 import { ReconnectingSocket } from "./socket";
 
 export interface ServerPack {
@@ -13,6 +14,7 @@ export interface ServerPack {
   preview: string | null;
   contents: Record<string, number>;
   file: string;
+  modified: number;
 }
 
 type Wire = Record<string, unknown>;
@@ -31,6 +33,7 @@ const toPack = (raw: Wire): ServerPack | null => {
     preview: textOf(raw, "preview"),
     contents: (raw.contents as Record<string, number> | undefined) ?? {},
     file,
+    modified: typeof raw.modified === "number" ? raw.modified : 0,
   };
 };
 
@@ -60,6 +63,15 @@ class ServerPacks {
 
   urlOf(pack: ServerPack, suffix = ""): string {
     return withToken(`${backend.baseUrl}/packs/${encodeURIComponent(pack.file)}${suffix}`, backend.active);
+  }
+
+  previewKey(pack: ServerPack): string {
+    return `${backend.baseUrl}/packs/${pack.file}?v=${pack.modified}`;
+  }
+
+  loadPreview(pack: ServerPack) {
+    const url = this.urlOf(pack, "/preview");
+    imageCache.load(this.previewKey(pack), () => fetchBlob(url));
   }
 
   async download(pack: ServerPack): Promise<Blob | null> {

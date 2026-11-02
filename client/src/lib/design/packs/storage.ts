@@ -1,5 +1,6 @@
 import { blobStore } from "$lib/platform/blobStore";
 import { store } from "$lib/platform/storage";
+import { imageCache } from "$lib/services/imageCache.svelte";
 import { openArchive } from "./archive";
 import { builtinSource } from "./builtin";
 import type { Pack } from "./model";
@@ -34,14 +35,18 @@ export const writeCatalog = (packs: Pack[]) => store.set<Catalog>(CATALOG_KEY, {
 
 export const archiveBlob = async (id: string): Promise<Blob | null> => (await blobStore.get(archiveKey(id))) ?? null;
 
+export const packImageKey = (id: string, path = "") => `pack:${id}:${path}`;
+
 export const storeArchive = async (id: string, blob: Blob) => {
   await blobStore.put(archiveKey(id), blob);
   opened.delete(id);
+  imageCache.drop(packImageKey(id));
 };
 
 export const dropArchive = async (id: string) => {
   await blobStore.remove(archiveKey(id));
   opened.delete(id);
+  imageCache.drop(packImageKey(id));
 };
 
 export const sourceOf = (id: string): Promise<PackSource | null> => {

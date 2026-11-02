@@ -360,7 +360,7 @@ def read_pack(data: bytes) -> dict:
     }
     if not any(contents.values()):
         raise PackFormatError("empty")
-    usable = themes | terminals | accents | {key.partition("/")[2] for key in fonts} | backgrounds
+    usable = themes | terminals | accents | {key.partition("/")[2] for key in fonts} | backgrounds | set(SCHEMA["accentSources"].values())
     for local in info["use"]:
         if local not in usable:
             raise PackFormatError("reference", MANIFEST, "use", local)

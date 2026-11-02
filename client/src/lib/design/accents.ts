@@ -1,6 +1,8 @@
-export const DYNAMIC_ACCENT = "dynamic";
+import { ACCENT_SOURCES } from "./packs/schema";
 
-export const THEME_ACCENT = "theme";
+export const DYNAMIC_ACCENT = ACCENT_SOURCES.dynamic;
+
+export const THEME_ACCENT = ACCENT_SOURCES.theme;
 
 export const DEFAULT_ACCENT = THEME_ACCENT;
 

@@ -11,7 +11,7 @@
   import { PACK_EXTENSION, PACK_MIME } from "$lib/design/packs/schema";
   import { t } from "$lib/i18n/index.svelte";
   import { systemName } from "$lib/platform";
-  import { mediaSrc } from "$lib/services/mediaSource";
+  import { imageCache } from "$lib/services/imageCache.svelte";
   import { serverPacks, useServerPacks, type ServerPack } from "$lib/services/serverPacks.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -53,6 +53,10 @@
   const installed = $derived(packs.all.filter((pack) => !pack.builtin));
   const builtin = $derived(packs.all.filter((pack) => pack.builtin));
   const onServer = $derived(serverStandings());
+
+  $effect(() => {
+    for (const listed of onServer) if (listed.entry.preview) serverPacks.loadPreview(listed.entry);
+  });
   const openedPack = $derived(opened ? packs.packOf(opened) : undefined);
 
   const pick = (event: Event) => {
@@ -120,13 +124,9 @@
           onclick={() => offerServer(listed.entry)}
         >
           {#snippet leading()}
-            {#if listed.entry.preview}
-              <img
-                use:mediaSrc={{ url: serverPacks.urlOf(listed.entry, "/preview") }}
-                alt=""
-                draggable="false"
-                class="size-11 shrink-0 rounded-lg object-cover"
-              />
+            {@const preview = listed.entry.preview ? imageCache.get(serverPacks.previewKey(listed.entry)) : null}
+            {#if preview}
+              <img src={preview} alt="" draggable="false" class="size-11 shrink-0 rounded-lg object-cover" />
             {:else}
               <IconTile icon={Package} />
             {/if}

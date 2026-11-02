@@ -35,6 +35,10 @@ export const EFFECT_RANGES = schema.backgroundEffects as Readonly<Record<Backgro
 
 export const BACKGROUND_FITS = schema.backgroundFits as readonly BackgroundFit[];
 
+export const ACCENT_SOURCES = schema.accentSources;
+
+export const ACCENT_SOURCE_IDS: readonly string[] = Object.values(ACCENT_SOURCES);
+
 export const FONT_FORMATS: readonly string[] = schema.fontFormats;
 
 export const IMAGE_FORMATS: readonly string[] = schema.imageFormats;

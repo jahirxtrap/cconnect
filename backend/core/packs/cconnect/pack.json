@@ -1,8 +1,8 @@
 {
-  "schema": 1,
+  "schema": 4,
   "id": "cconnect",
   "name": "CConnect",
   "version": "1.0.0",
   "author": "CConnect",
-  "use": ["cconnect-light", "cconnect-dark", "black"]
+  "use": ["cconnect-light", "cconnect-dark", "black", "theme"]
 }

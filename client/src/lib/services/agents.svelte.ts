@@ -2,13 +2,12 @@ import { untrack } from "svelte";
 import type { InstalledAgent } from "$lib/data/agentModels";
 import { createAgentsApi, type AgentList } from "./agentsApi";
 import { backend, type Profile } from "./backend.svelte";
-import { fetchObjectUrl } from "./mediaSource";
+import { imageCache } from "./imageCache.svelte";
+import { fetchBlob } from "./mediaSource";
 
 class Agents {
   #lists = $state<Record<string, AgentList>>({});
   #failed = $state<Record<string, boolean>>({});
-  #icons = $state<Record<string, string>>({});
-  #asked = new Set<string>();
 
   listOf(profile: Profile): AgentList | null {
     return profile ? (this.#lists[profile.id] ?? null) : null;
@@ -32,15 +31,11 @@ class Agents {
   }
 
   iconSrc(url: string): string | null {
-    return this.#icons[url] ?? null;
+    return imageCache.get(url);
   }
 
   loadIcon(url: string) {
-    if (this.#asked.has(url)) return;
-    this.#asked.add(url);
-    fetchObjectUrl(url)
-      .then((src) => (this.#icons = { ...this.#icons, [url]: src }))
-      .catch(() => this.#asked.delete(url));
+    imageCache.load(url, () => fetchBlob(url));
   }
 
   async refresh(profile: Profile = backend.active) {
