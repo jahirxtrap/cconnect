@@ -222,6 +222,10 @@ class MainActivity : TauriActivity() {
 
   override fun onWebViewCreate(webView: WebView) {
     content = webView
+    webView.post {
+      val chrome = webView.webChromeClient
+      if (chrome != null && chrome !is Fullscreen) webView.webChromeClient = Fullscreen(this, chrome)
+    }
     webView.addJavascriptInterface(SystemBars(), "AndroidSystemBars")
     webView.addJavascriptInterface(SafeAreaBridge(), "AndroidInsets")
     webView.addJavascriptInterface(downloads, "AndroidDownloads")

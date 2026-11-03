@@ -1,53 +1,47 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
+use tauri::async_runtime::JoinHandle;
 use tauri::State;
 use tauri_plugin_http::reqwest;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::OnceCell;
+use tokio::time::{sleep, timeout};
 
 const LOOPBACK: &str = "127.0.0.1";
+const ACCEPT_RETRY: Duration = Duration::from_millis(50);
+const HEAD_WAIT: Duration = Duration::from_secs(10);
+const UPSTREAM_WAIT: Duration = Duration::from_secs(30);
+const WRITE_WAIT: Duration = Duration::from_secs(60);
 const HEAD_LIMIT: usize = 16 * 1024;
 const HEAD_END: &[u8] = b"\r\n\r\n";
 const PASSED: [&str; 4] = ["content-type", "content-length", "content-range", "accept-ranges"];
 const COMMON: &str = "cache-control: no-store\r\naccess-control-allow-origin: *\r\naccess-control-expose-headers: content-type, content-length, content-range, accept-ranges\r\nconnection: close\r\n";
 const PREFLIGHT: &str = "access-control-allow-methods: GET, HEAD, OPTIONS\r\naccess-control-allow-headers: range\r\naccess-control-max-age: 600\r\n";
 
-type Sources = Arc<Mutex<HashMap<String, Source>>>;
-
-#[derive(Clone)]
 struct Source {
+    id: String,
     url: String,
     headers: HashMap<String, String>,
 }
 
 #[derive(Default)]
 pub struct Media {
-    sources: Sources,
     client: reqwest::Client,
-    port: OnceCell<u16>,
+    listeners: Mutex<HashMap<String, JoinHandle<()>>>,
 }
 
-impl Media {
-    async fn port(&self) -> Result<u16, String> {
-        self.port
-            .get_or_try_init(|| async {
-                let listener = TcpListener::bind((LOOPBACK, 0)).await.map_err(|error| error.to_string())?;
-                let port = listener.local_addr().map_err(|error| error.to_string())?.port();
-                let (sources, client) = (self.sources.clone(), self.client.clone());
-                tauri::async_runtime::spawn(async move {
-                    while let Ok((socket, _)) = listener.accept().await {
-                        let (sources, client) = (sources.clone(), client.clone());
-                        tauri::async_runtime::spawn(async move {
-                            let _ = serve(socket, &sources, &client).await;
-                        });
-                    }
-                });
-                Ok(port)
-            })
-            .await
-            .copied()
+async fn listen(listener: TcpListener, source: Arc<Source>, client: reqwest::Client) {
+    loop {
+        let Ok((socket, _)) = listener.accept().await else {
+            sleep(ACCEPT_RETRY).await;
+            continue;
+        };
+        let (source, client) = (source.clone(), client.clone());
+        tauri::async_runtime::spawn(async move {
+            let _ = serve(socket, &source, &client).await;
+        });
     }
 }
 
@@ -69,8 +63,12 @@ async fn reply(socket: &mut TcpStream, status: &str, extra: &str) -> std::io::Re
     socket.write_all(head.as_bytes()).await
 }
 
-async fn serve(mut socket: TcpStream, sources: &Sources, client: &reqwest::Client) -> std::io::Result<()> {
-    let head = read_head(&mut socket).await?;
+fn stalled(_: tokio::time::error::Elapsed) -> std::io::Error {
+    std::io::ErrorKind::TimedOut.into()
+}
+
+async fn serve(mut socket: TcpStream, source: &Source, client: &reqwest::Client) -> std::io::Result<()> {
+    let head = timeout(HEAD_WAIT, read_head(&mut socket)).await.map_err(stalled)??;
     let mut lines = head.split("\r\n");
     let mut request = lines.next().unwrap_or_default().split(' ');
     let method = request.next().unwrap_or_default();
@@ -83,10 +81,9 @@ async fn serve(mut socket: TcpStream, sources: &Sources, client: &reqwest::Clien
         return reply(&mut socket, "204 No Content", PREFLIGHT).await;
     }
     let id = target.trim_start_matches('/').split(['?', '#']).next().unwrap_or_default();
-    let source = sources.lock().ok().and_then(|registered| registered.get(id).cloned());
-    let Some(source) = source else {
+    if id != source.id {
         return reply(&mut socket, "404 Not Found", "").await;
-    };
+    }
     let mut upstream = client.get(&source.url).header("accept-encoding", "identity");
     for (name, value) in &source.headers {
         upstream = upstream.header(name, value);
@@ -94,8 +91,10 @@ async fn serve(mut socket: TcpStream, sources: &Sources, client: &reqwest::Clien
     if let Some(range) = &range {
         upstream = upstream.header("range", range);
     }
-    let Ok(mut response) = upstream.send().await else {
-        return reply(&mut socket, "502 Bad Gateway", "").await;
+    let mut response = match timeout(UPSTREAM_WAIT, upstream.send()).await {
+        Ok(Ok(response)) => response,
+        Ok(Err(_)) => return reply(&mut socket, "502 Bad Gateway", "").await,
+        Err(_) => return reply(&mut socket, "504 Gateway Timeout", "").await,
     };
     let status = response.status();
     let mut answer = format!("HTTP/1.1 {} {}\r\n", status.as_u16(), status.canonical_reason().unwrap_or_default());
@@ -110,8 +109,8 @@ async fn serve(mut socket: TcpStream, sources: &Sources, client: &reqwest::Clien
     if method == "HEAD" {
         return Ok(());
     }
-    while let Ok(Some(chunk)) = response.chunk().await {
-        socket.write_all(&chunk).await?;
+    while let Ok(Ok(Some(chunk))) = timeout(UPSTREAM_WAIT, response.chunk()).await {
+        timeout(WRITE_WAIT, socket.write_all(&chunk)).await.map_err(stalled)??;
     }
     socket.shutdown().await
 }
@@ -123,18 +122,25 @@ pub async fn media_open(
     url: String,
     headers: HashMap<String, String>,
 ) -> Result<String, String> {
-    let port = media.port().await?;
-    media
-        .sources
+    let listener = TcpListener::bind((LOOPBACK, 0)).await.map_err(|error| error.to_string())?;
+    let port = listener.local_addr().map_err(|error| error.to_string())?.port();
+    let source = Arc::new(Source { id: id.clone(), url, headers });
+    let task = tauri::async_runtime::spawn(listen(listener, source, media.client.clone()));
+    let replaced = media
+        .listeners
         .lock()
         .map_err(|error| error.to_string())?
-        .insert(id.clone(), Source { url, headers });
+        .insert(id.clone(), task);
+    if let Some(replaced) = replaced {
+        replaced.abort();
+    }
     Ok(format!("http://{LOOPBACK}:{port}/{id}"))
 }
 
 #[tauri::command]
 pub fn media_close(media: State<'_, Media>, id: String) {
-    if let Ok(mut sources) = media.sources.lock() {
-        sources.remove(&id);
+    let closed = media.listeners.lock().ok().and_then(|mut listeners| listeners.remove(&id));
+    if let Some(closed) = closed {
+        closed.abort();
     }
 }
