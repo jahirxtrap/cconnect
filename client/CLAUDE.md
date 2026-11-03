@@ -28,7 +28,10 @@ Themes, terminal colours, fonts, accents and chat backgrounds come from packs
 the schema in, and the client reader (`design/packs/reader.ts`) has to validate exactly as
 `backend/services/pack_format.py` does. The Packs dialog lists the server's whole library,
 each entry with its standing against the installed copy (`standingFor`); only `new` and
-`newer` offer an action, and `offeredPacks` counts those for the settings row. Deleting from
+`newer` offer an action, and `offeredPacks` counts those for the settings row. Pack icons and
+the server's previews come from `services/imageCache` (decoded once, keyed by the pack and its
+archive or by the server's `modified`, and dropped when an archive changes), so reopening the
+dialog draws them at once; Shared, project files and chat media never go through it. Deleting from
 the server asks for the security key through `SecurityKeyDialog` and stores it only once a
 request with it went through, as the terminal does.
 
@@ -188,7 +191,16 @@ picking is left out on touch screens.
 `sharedProfileOf`, the headers from `fileHeaders` (the security key only on the project file
 routes), and `cache: "no-cache"`, or a file rewritten under the same name comes back from
 Chromium's heuristic cache. `mediaSrc` and `posterSrc` hand it to an element as an object
-URL; nothing loads a server URL straight into `src`. HTML goes through `ui/PageFrame.svelte`
+URL. Video, audio, the large images (preview and chat) and PDFs go through `serveFile` instead,
+so they play and show while they download: in the apps a loopback server
+(`src-tauri/src/media.rs`, `127.0.0.1` on a free port, started on first use) forwards the
+element's range requests with `fileHeaders` and copies the body as it arrives, under a random id
+that `media_close` drops; on the web the URL carries `?token=`, and falls back to the object URL
+when a header cannot travel in it (the security key, basic or custom auth). A custom protocol
+cannot do this on Android: the WebView treats an intercepted response as the whole file and
+skips the requested offset inside it. Android allows cleartext only to `127.0.0.1`
+(`res/xml/network_security_config.xml`; the debug source set allows all of it, for
+`tauri android dev`). HTML goes through `ui/PageFrame.svelte`
 (`pageSrc`, the themed scrollbar and the sandbox, the same in the chat and the preview): a
 `blob:` document inherits the app's CSP and loses its scripts, styles and fonts, so in the apps
 `preview_open` registers the page and the iframe loads it from the `preview` protocol

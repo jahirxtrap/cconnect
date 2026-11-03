@@ -534,7 +534,10 @@ agent so they're available out of the box from the phone:
 - **ACP agents.** A view for either panel runs agents that speak the Agent
   Client Protocol, such as Copilot, Codex or Gemini, installed from the
   official catalog or added by hand, with their chats listed on the left like
-  Claude's, sorted into categories and renamed from there.
+  Claude's, sorted into categories and renamed from there. They get CConnect's
+  `share_files` and its guides, so they hand you files and answer with galleries,
+  PDFs and next-step buttons, and an agent that signs in through a web page shows
+  it in its card, to finish in the server's browser from another device.
 - **Delegation.** Claude can hand a task to another AI and get its answer
   back: an ACP agent, an agent CLI added under ACP agents as a command, or
   another of your Claude accounts once its sheet says Claude can use it, with
@@ -600,7 +603,7 @@ required for a plain local run.
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `--expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
 | `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `run.py` when it exposes the server, so you rarely write it yourself |
-| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server and an ACP agent's environment variables. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
+| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
 | `WEB_CONCURRENCY` | `2` | Uvicorn workers with `run.py --production`. Ignored on Windows, which always runs one |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |

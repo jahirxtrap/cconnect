@@ -44,7 +44,11 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   while a socket watches one of its tabs), `agents` / `agent_registry` (the ACP agents installed
   from the official catalog or added by hand), `agent_connections` / `agent_sessions` /
   `acp_peer` / `acp_events` (one process per agent and folder, a chat's session on it, and its
-  updates turned into the chat's events), `event_rows` (those events as history rows),
+  updates turned into the chat's events), `agent_mcp` (the `cconnect` MCP an agent's chat gets:
+  `share_files` and the guides of `system_append(..., AGENT_SCOPE)`, served at
+  `/api/mcp/agent/<token>` over HTTP, or through `core/scripts/mcp_bridge.py` on stdio, and the
+  same guides as `systemPrompt` only when the agent advertises it), `event_rows` (those events
+  as history rows),
   `delegates` / `delegate_runner` / `delegate_runs` (handing a task to an agent or another
   account, with the model it asks for), `packs` / `pack_format` (the server's pack library and the
   validation the client's reader mirrors), `prompt_cache`, `tool_calls` / `tool_props`,
@@ -64,12 +68,17 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 
 `PUBLIC_ACCESS_TOKEN` is honoured only when `CCONNECT_AUTH_ACTIVE=1`, so a token left in
 `.env` never locks down a plain local run. `PublicAuthMiddleware` gates every `/api/*`
-except `/api/health`; the WS handshake checks the same header via `ws_bearer_ok`.
+except `/api/health` and the two routes an agent's own process calls on loopback with a token
+of its connection instead: `/api/agents/browse` (the `BROWSER` helper,
+`core/scripts/browse.py`, which still opens the page on the PC and hands the URL to the agent's
+card) and `/api/mcp/agent/<token>`. The WS handshake checks the same header via `ws_bearer_ok`.
 
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
 Claude — the shells, the files git ignores, every git write, deleting a pack from the
-server's library and an agent's environment variables. It only gates while the Bearer gate is on (`gated()`), so a plain local
+server's library and an agent's environment variables. It also lifts the PreToolUse hook that
+keeps Claude off the server's own `paths.ENV_FILE`: the chat sends the key with every `prompt`
+and the hook asks the live session on each call. It only gates while the Bearer gate is on (`gated()`), so a plain local
 run is open. Each route checks it for itself; there is no middleware for it, and a read that
 the panel needs before it can ask for anything (`repos`) is deliberately outside it.
 
