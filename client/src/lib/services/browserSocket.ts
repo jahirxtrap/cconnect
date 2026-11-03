@@ -39,6 +39,7 @@ export interface BrowserHooks {
   onConnected: (value: boolean) => void;
   onPicked: (pick: BrowserPick) => void;
   onCursor: (shape: string) => void;
+  onEditing: (active: boolean, tapped: boolean) => void;
   onClipboard: (text: string) => void;
   onError: () => void;
 }
@@ -104,6 +105,10 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
       }
       if (data.type === "cursor") {
         hooks.onCursor((data.shape as string) || "auto");
+        return;
+      }
+      if (data.type === "editing") {
+        hooks.onEditing(data.active === true, data.tapped === true);
         return;
       }
       if (data.type === "clipboard") {

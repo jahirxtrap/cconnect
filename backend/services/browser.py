@@ -103,6 +103,30 @@ _CURSOR_SCRIPT = """(() => {
   addEventListener('mouseover', report, true);
 })();"""
 
+_EDITING_BINDING = "cconnectEditing"
+
+_EDITING_SCRIPT = """(() => {
+  if (window.__cconnectEditing) return;
+  window.__cconnectEditing = true;
+  const NOT_TYPED = /^(button|checkbox|color|file|hidden|image|radio|range|reset|submit)$/i;
+  const focused = () => {
+    let node = document.activeElement;
+    while (node && node.shadowRoot && node.shadowRoot.activeElement) node = node.shadowRoot.activeElement;
+    return node;
+  };
+  const editable = (node) =>
+    !!node && !node.disabled && !node.readOnly &&
+    (node.isContentEditable || node.tagName === 'TEXTAREA' || (node.tagName === 'INPUT' && !NOT_TYPED.test(node.type)));
+  const report = (tapped) => {
+    const node = focused();
+    if (node && /^(IFRAME|FRAME)$/.test(node.tagName)) return;
+    if (window.cconnectEditing) window.cconnectEditing(JSON.stringify({ active: editable(node), tapped }));
+  };
+  addEventListener('focusin', () => report(false), true);
+  addEventListener('focusout', () => setTimeout(() => report(false), 0), true);
+  addEventListener('mouseup', () => { if (editable(focused())) report(true); }, true);
+})();"""
+
 _HIGHLIGHT = {
     "showInfo": True,
     "contentColor": {"r": 111, "g": 168, "b": 220, "a": 0.45},
@@ -221,6 +245,16 @@ def _fetch_icon(url: str, agent: str) -> str:
     if not body or len(body) > _ICON_BYTES or not kind.startswith("image/"):
         return ""
     return f"data:{kind};base64,{base64.b64encode(body).decode('ascii')}"
+
+
+def _editing(payload: str) -> dict:
+    try:
+        reported = json.loads(payload)
+    except ValueError:
+        reported = {}
+    if not isinstance(reported, dict):
+        reported = {}
+    return {"active": reported.get("active") is True, "tapped": reported.get("tapped") is True}
 
 
 @dataclass
@@ -573,7 +607,11 @@ class BrowserSession:
         self._tabs[tab.id] = tab
         await self._cdp.call("Page.enable", {}, tab.session)
         await self._cdp.call("Runtime.enable", {}, tab.session)
-        for binding, script in ((_CURSOR_BINDING, _CURSOR_SCRIPT), (_ICON_BINDING, _ICON_WATCH)):
+        for binding, script in (
+            (_CURSOR_BINDING, _CURSOR_SCRIPT),
+            (_EDITING_BINDING, _EDITING_SCRIPT),
+            (_ICON_BINDING, _ICON_WATCH),
+        ):
             await self._cdp.call("Runtime.addBinding", {"name": binding}, tab.session)
             await self._cdp.call("Page.addScriptToEvaluateOnNewDocument", {"source": script}, tab.session)
             await self._cdp.call("Runtime.evaluate", {"expression": script}, tab.session)
@@ -801,6 +839,8 @@ class BrowserSession:
         if method == "Runtime.bindingCalled":
             if params.get("name") == _CURSOR_BINDING and session == self._page:
                 self._publish(("cursor", {"shape": params.get("payload") or "auto"}))
+            elif params.get("name") == _EDITING_BINDING and session == self._page:
+                self._publish(("editing", _editing(params.get("payload") or "")))
             elif params.get("name") == _ICON_BINDING:
                 tab = next((item for item in self._tabs.values() if item.session == session), None)
                 if tab is not None:

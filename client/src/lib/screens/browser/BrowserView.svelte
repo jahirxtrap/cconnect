@@ -85,6 +85,10 @@
   const CTRL = 2;
   const META = 4;
   const SHIFT = 8;
+  const ACTIVATION_MS = 5000;
+  const BACKSPACE = { key: "Backspace", code: "Backspace", keyCode: 8 };
+  const INPUT_KEYS = new Set(["Unidentified", "Process"]);
+  const PRESSED_KEYS = new Set(["Backspace", "Enter", "Tab"]);
   const SIDE_KEY = "browser.side";
   const PAGE_KEYS = new Set(["browser.copy", "browser.cut", "browser.paste"]);
   const WATCHED = ["class", "data-state", "open", "hidden", "inert"];
@@ -96,6 +100,7 @@
 
   let surface = $state<HTMLDivElement | null>(null);
   let canvas = $state<HTMLCanvasElement | null>(null);
+  let typer = $state<HTMLInputElement | null>(null);
   let addressBox = $state<HTMLElement | null>(null);
   const IDLE_PAGE: BrowserState = {
     available: true,
@@ -128,6 +133,8 @@
   let context: CanvasRenderingContext2D | null = null;
   let lastFrame: ImageBitmap | null = null;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  let typed = "";
+  let touchedAt = -Infinity;
 
   const onServer = $derived(side === "server");
 
@@ -393,6 +400,7 @@
           if (!value) ready = false;
         },
         onCursor: (shape) => (cursor = shape),
+        onEditing: editingChanged,
         onClipboard: (text) => {
           if (text) void copyText(text);
         },
@@ -426,7 +434,7 @@
   });
 
   $effect(() => {
-    if (!link || serverBrowser.pending === null) return;
+    if (!link || !connected || serverBrowser.pending === null) return;
     untrack(() => {
       const url = serverBrowser.take();
       if (url === null) return;
@@ -659,6 +667,73 @@
       keyCode: event.keyCode,
       modifiers: modifiers(event),
     });
+  };
+
+  const press = (key: string, code: string, keyCode: number, flags = 0, text = "") => {
+    link?.key({ event: text ? "keyDown" : "rawKeyDown", key, code, keyCode, text, modifiers: flags });
+    link?.key({ event: "keyUp", key, code, keyCode, modifiers: flags });
+  };
+
+  const keyboardUp = () => !!typer && document.activeElement === typer;
+
+  const clearTyped = () => {
+    if (typer) typer.value = "";
+    typed = "";
+  };
+
+  const openKeyboard = () => {
+    const node = typer;
+    if (!node) return;
+    clearTyped();
+    if (keyboardUp()) node.blur();
+    node.focus({ preventScroll: true });
+  };
+
+  const closeKeyboard = () => {
+    if (keyboardUp()) canvas?.focus({ preventScroll: true });
+  };
+
+  const editingChanged = (active: boolean, tapped: boolean) => {
+    if (!active) closeKeyboard();
+    else if (keyboardUp() && !tapped) clearTyped();
+    else if (keyboardUp() || performance.now() - touchedAt < ACTIVATION_MS) openKeyboard();
+  };
+
+  const typedByInput = (event: KeyboardEvent) =>
+    event.isComposing ||
+    INPUT_KEYS.has(event.key) ||
+    (event.key.length === 1 && !event.ctrlKey && !event.metaKey) ||
+    (event.key === BACKSPACE.key && !!typer?.value);
+
+  const typerInput = () => {
+    touchedAt = performance.now();
+    const value = typer?.value ?? "";
+    let kept = 0;
+    while (kept < typed.length && kept < value.length && typed[kept] === value[kept]) kept++;
+    for (let index = kept; index < typed.length; index++) press(BACKSPACE.key, BACKSPACE.code, BACKSPACE.keyCode);
+    if (value.length > kept) link?.text(value.slice(kept));
+    typed = value;
+  };
+
+  const typerKeyDown = (event: KeyboardEvent) => {
+    touchedAt = performance.now();
+    if (typedByInput(event)) return;
+    if (event.key === "Escape") {
+      closeKeyboard();
+      return;
+    }
+    if (!PRESSED_KEYS.has(event.key)) {
+      onkeydown(event);
+      return;
+    }
+    event.preventDefault();
+    press(event.key, event.code, event.keyCode, modifiers(event), event.key === "Enter" ? "\r" : "");
+    if (event.key !== BACKSPACE.key) clearTyped();
+  };
+
+  const typerKeyUp = (event: KeyboardEvent) => {
+    if (typedByInput(event) || PRESSED_KEYS.has(event.key) || event.key === "Escape") return;
+    onkeyup(event);
   };
 
   const selectTab = (id: string) => {
@@ -925,7 +1000,9 @@
       class="max-h-full max-w-full bg-background outline-none {onServer ? (framed ? '' : 'invisible') : 'hidden'}"
       style="cursor: {page.picking ? 'crosshair' : cursor}"
       onpointerdown={(event) => {
-        canvas?.focus();
+        const touch = event.pointerType === "touch";
+        if (touch) touchedAt = performance.now();
+        if (!touch || !keyboardUp()) canvas?.focus();
         pointer(event, "mousePressed");
       }}
       onpointerup={(event) => pointer(event, "mouseReleased")}
@@ -935,6 +1012,19 @@
       {onkeydown}
       {onkeyup}
     ></canvas>
+    <input
+      bind:this={typer}
+      type="text"
+      tabindex="-1"
+      autocomplete="off"
+      autocapitalize="off"
+      autocorrect="off"
+      spellcheck={false}
+      class="pointer-events-none absolute bottom-0 left-0 size-px opacity-0"
+      oninput={typerInput}
+      onkeydown={typerKeyDown}
+      onkeyup={typerKeyUp}
+    />
     {#if !onServer}
       {#if atHome}
         {@render home()}
