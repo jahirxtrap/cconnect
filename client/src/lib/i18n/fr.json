@@ -519,7 +519,7 @@
   "OPEN_EXTERNAL_LINK": "Ouvrir un lien externe",
   "OPEN_ON_SERVER": "Dans le navigateur du serveur",
   "AGENT_SIGNING_IN": "Connexion…",
-  "OPEN_EXTERNAL_LINK_MESSAGE": "Un lien externe va s’ouvrir :\n{1}",
+  "OPEN_EXTERNAL_LINK_MESSAGE": "Un lien externe va s’ouvrir :",
   "HTML_PREVIEW_UNAVAILABLE": "L’aperçu HTML n’est pas disponible ici",
   "OPEN_EXTERNALLY": "Ouvrir en externe",
   "NO_FILES": "Aucun fichier",

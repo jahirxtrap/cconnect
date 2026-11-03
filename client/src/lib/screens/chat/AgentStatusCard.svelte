@@ -8,6 +8,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CopyField from "$lib/ui/CopyField.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
@@ -89,18 +90,22 @@
   <div class="pb-2">
     <CardPanel>
       <p class="text-label-lg text-accent">{t(title, chat.agentName)}</p>
-      {#if problem}
-        <MarkdownText text={problem} dense class="selectable mt-1 text-on-surface-variant" />
-      {/if}
-      {#if failed}
-        <ErrorText text={failed} class="mt-1" />
-      {/if}
-      {#if current.signingIn}
-        <p class="mt-1 text-body-md text-on-surface-variant">{t("AGENT_SIGNING_IN")}</p>
-        {#if current.loginUrl}
-          <MarkdownText text={`[${current.loginUrl}](${current.loginUrl})`} dense class="selectable mt-1 wrap-anywhere" />
+      <div class="scrollbar-thin max-h-36 overflow-y-auto">
+        {#if problem && !current.signingIn}
+          <MarkdownText text={problem} dense class="selectable mt-1 text-on-surface-variant" />
         {/if}
-      {/if}
+        {#if failed}
+          <ErrorText text={failed} class="mt-1" />
+        {/if}
+        {#if current.signingIn}
+          <p class="mt-1 text-body-md text-on-surface-variant">{t("AGENT_SIGNING_IN")}</p>
+          {#if current.loginUrl}
+            <div class="mt-2">
+              <CopyField value={current.loginUrl} url />
+            </div>
+          {/if}
+        {/if}
+      </div>
       <div class="mt-2 flex flex-wrap gap-2">
         {#if current.signingIn}
           {#if current.loginUrl}

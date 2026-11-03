@@ -532,7 +532,7 @@ class AgentSession:
         self._signing_in = asyncio.current_task()
         await self._announce()
         try:
-            await connection.authenticate(method_id, self._ask)
+            await connection.authenticate(method_id, self._ask, self._announce)
         except AcpError as exc:
             self._fail(SIGN_IN, str(exc), LOGIN_FAILED)
             return
@@ -546,9 +546,6 @@ class AgentSession:
     def cancel_login(self) -> None:
         if self._signing_in is not None:
             self._signing_in.cancel()
-
-    async def linked(self) -> None:
-        await self._announce()
 
     async def logout(self) -> None:
         connection = self.connection

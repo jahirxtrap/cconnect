@@ -37,14 +37,13 @@ CLIENT_CAPABILITIES = {
 }
 
 Ask = Callable[[dict], Awaitable[dict]]
+Linked = Callable[[], Awaitable[None]]
 
 
 class Receiver(Protocol):
     async def received(self, update: dict) -> None: ...
 
     async def requested(self, method: str, params: dict) -> Any: ...
-
-    async def linked(self) -> None: ...
 
     def dropped(self) -> None: ...
 
@@ -85,6 +84,7 @@ class AgentConnection:
         self._peer: Optional[AcpPeer] = None
         self._tasks: list[asyncio.Task] = []
         self._login_ask: Optional[Ask] = None
+        self._login_linked: Optional[Linked] = None
         self._completions: dict[str, asyncio.Event] = {}
         self.browse_token = secrets.token_urlsafe(24)
         self.login_url: Optional[str] = None
@@ -198,8 +198,8 @@ class AgentConnection:
 
     async def browsed(self, url: str) -> None:
         self.login_url = url
-        for receiver in list(self.receivers.values()):
-            await receiver.linked()
+        if self._login_linked is not None:
+            await self._login_linked()
 
     async def call(self, method: str, params: dict) -> Any:
         if self._peer is None:
@@ -254,12 +254,14 @@ class AgentConnection:
             return None
         return [program, *_strings(legacy.get("args"))], {**env, **_env(legacy.get("env"))}
 
-    async def authenticate(self, method_id: str, ask: Ask) -> None:
+    async def authenticate(self, method_id: str, ask: Ask, linked: Linked) -> None:
         self._login_ask = ask
+        self._login_linked = linked
         try:
             await self.call("authenticate", {"methodId": method_id})
         finally:
             self._login_ask = None
+            self._login_linked = None
             self.login_url = None
         self.auth_required = False
 

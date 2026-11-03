@@ -511,7 +511,7 @@
   "OPEN_EXTERNAL_LINK": "外部リンクを開く",
   "OPEN_ON_SERVER": "サーバーのブラウザーで開く",
   "AGENT_SIGNING_IN": "サインイン中…",
-  "OPEN_EXTERNAL_LINK_MESSAGE": "次の外部リンクを開きます：\n{1}",
+  "OPEN_EXTERNAL_LINK_MESSAGE": "次の外部リンクを開きます：",
   "HTML_PREVIEW_UNAVAILABLE": "ここでは HTML のプレビューを利用できません",
   "OPEN_EXTERNALLY": "外部アプリで開く",
   "NO_FILES": "ファイルはありません",
