@@ -23,7 +23,7 @@ pub struct Previews {
     client: reqwest::Client,
 }
 
-pub(crate) fn empty(status: StatusCode) -> Response<Vec<u8>> {
+fn empty(status: StatusCode) -> Response<Vec<u8>> {
     let mut response = Response::new(Vec::new());
     *response.status_mut() = status;
     response

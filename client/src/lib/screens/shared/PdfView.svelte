@@ -3,7 +3,7 @@
   import type { PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
   import "pdfjs-dist/web/pdf_viewer.css";
   import { openExternal } from "$lib/platform";
-  import { fetchBlob, MissingFile } from "$lib/services/mediaSource";
+  import { MissingFile, serveFile, type ServedFile } from "$lib/services/mediaSource";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
 
   interface Props {
@@ -233,12 +233,17 @@
     if (!current) return;
     let cancelled = false;
     let task: PDFDocumentLoadingTask | null = null;
+    let served: ServedFile | null = null;
     loading = true;
 
     const open = async () => {
-      const data = await (await fetchBlob(source)).arrayBuffer();
-      if (cancelled) return;
-      task = current.pdfjs.getDocument({ data });
+      const file = await serveFile(source);
+      if (cancelled) {
+        file.close();
+        return;
+      }
+      served = file;
+      task = current.pdfjs.getDocument({ url: file.src });
       const document_ = await task.promise;
       if (cancelled) return;
       current.view.setDocument(document_);
@@ -252,6 +257,7 @@
     return () => {
       cancelled = true;
       void task?.destroy();
+      served?.close();
     };
   });
 </script>

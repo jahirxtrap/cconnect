@@ -1,4 +1,4 @@
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "$lib/platform";
 import { backend, tokenOf, withToken } from "./backend.svelte";
 import { fileHeaders } from "./projectFilesApi";
@@ -20,8 +20,8 @@ export const fetchFile = (url: string, init: RequestInit = {}, extra: Record<str
 const NOT_FOUND = 404;
 const RANGE_NOT_SATISFIABLE = 416;
 const FIRST_BYTE = { Range: "bytes=0-0" };
-const STREAM_SCHEME = "stream";
 const AUTHORIZATION = "Authorization";
+const IMAGE_FAILED = "image failed to load";
 
 export class MissingFile extends Error {}
 
@@ -48,12 +48,12 @@ const probeFile = async (url: string) => {
   if (!response.ok) throw new Error(String(response.status));
 };
 
-interface Stream {
+export interface ServedFile {
   src: string;
   close: () => void;
 }
 
-const streamOf = async (url: string): Promise<Stream> => {
+export const serveFile = async (url: string): Promise<ServedFile> => {
   const profile = backend.sharedProfileOf(url);
   const headers = fileHeaders(url, profile);
   const unsent = Object.keys(headers).filter((name) => !(name === AUTHORIZATION && tokenOf(profile)));
@@ -64,12 +64,23 @@ const streamOf = async (url: string): Promise<Stream> => {
   await probeFile(url);
   if (!isTauri) return { src: withToken(url, profile), close: () => undefined };
   const id = crypto.randomUUID();
-  await invoke("stream_open", { id, url, headers });
-  return {
-    src: `${convertFileSrc("", STREAM_SCHEME)}${id}`,
-    close: () => void invoke("stream_close", { id }).catch(() => undefined),
-  };
+  const src = await invoke<string>("media_open", { id, url, headers });
+  return { src, close: () => void invoke("media_close", { id }).catch(() => undefined) };
 };
+
+const closeServed = (served: ServedFile) => served.close();
+
+const loaded = (node: HTMLImageElement) =>
+  new Promise<void>((done, fail) => {
+    const settled = new AbortController();
+    const finish = (ok: boolean) => {
+      settled.abort();
+      if (ok) done();
+      else fail(new Error(IMAGE_FAILED));
+    };
+    node.addEventListener("load", () => finish(true), { signal: settled.signal });
+    node.addEventListener("error", () => finish(false), { signal: settled.signal });
+  });
 
 export const sourceAction = <O extends SourceOptions, T>(
   options: O,
@@ -106,6 +117,9 @@ export const sourceAction = <O extends SourceOptions, T>(
         options.onload?.();
         return;
       } catch (error) {
+        if (attempt !== token) return;
+        if (held !== null) discard(held);
+        held = null;
         missing ||= error instanceof MissingFile;
         continue;
       }
@@ -142,14 +156,27 @@ export function mediaSrc(node: Sourced, options: SourceOptions) {
   );
 }
 
-export function streamSrc(node: HTMLMediaElement, options: SourceOptions) {
+export function servedSrc(node: HTMLMediaElement | HTMLIFrameElement, options: SourceOptions) {
   return sourceAction(
     options,
-    streamOf,
-    (stream) => {
-      node.src = stream.src;
+    serveFile,
+    (served) => {
+      node.src = served.src;
     },
-    (stream) => stream.close(),
+    closeServed,
+  );
+}
+
+export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
+  return sourceAction(
+    options,
+    serveFile,
+    (served) => {
+      const done = loaded(node);
+      node.src = served.src;
+      return done;
+    },
+    closeServed,
   );
 }
 

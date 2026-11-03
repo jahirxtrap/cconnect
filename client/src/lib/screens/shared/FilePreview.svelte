@@ -16,7 +16,7 @@
   import { wikiLinks } from "$lib/markdown/render";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { fetchFile, mediaSrc, streamSrc } from "$lib/services/mediaSource";
+  import { fetchFile, imageSrc, servedSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
@@ -285,7 +285,7 @@
   {#if kind === "image"}
     <ZoomPane class="min-h-0 flex-1">
       <img
-        use:mediaSrc={{
+        use:imageSrc={{
           url: source,
           fallback,
           onload: () => (loaded = true),
@@ -294,7 +294,7 @@
         alt={filename}
         draggable="false"
         data-native-menu
-        class="h-full w-full object-contain {loaded ? '' : 'invisible'}"
+        class="h-full w-full object-contain {failed ? 'invisible' : ''}"
       />
       {#if failed}
         <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="absolute inset-0" />
@@ -305,14 +305,14 @@
   {:else if kind === "video"}
     <!-- svelte-ignore a11y_media_has_caption -->
     <video
-      use:streamSrc={{ url: source, onerror: () => (failed = true) }}
+      use:servedSrc={{ url: source, onerror: () => (failed = true) }}
       controls
       class="min-h-0 flex-1 bg-black"
     ></video>
   {:else if kind === "audio"}
     <div class="flex min-h-0 flex-1 items-center justify-center p-6">
       <audio
-        use:streamSrc={{ url: source, onerror: () => (failed = true) }}
+        use:servedSrc={{ url: source, onerror: () => (failed = true) }}
         controls
         class="w-full max-w-lg"
       ></audio>
@@ -322,7 +322,7 @@
       <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
     {:else if nativePdf}
       <iframe
-        use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+        use:servedSrc={{ url: source, onerror: () => (failed = true) }}
         use:refitOnResize
         title={filename}
         class="min-h-0 w-full flex-1 border-0"

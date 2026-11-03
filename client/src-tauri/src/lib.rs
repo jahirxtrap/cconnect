@@ -3,6 +3,7 @@ mod android;
 #[cfg(desktop)]
 mod browser;
 mod local_server;
+mod media;
 mod oauth;
 #[cfg(desktop)]
 mod opened;
@@ -11,7 +12,6 @@ mod preview;
 mod secret;
 mod shield;
 mod ssh;
-mod stream;
 mod system;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 mod webkit;
@@ -167,8 +167,7 @@ pub fn run() {
         .manage(shield::Shield::default())
         .manage(preview::Previews::default())
         .register_asynchronous_uri_scheme_protocol(preview::SCHEME, preview::serve)
-        .manage(stream::Streams::default())
-        .register_asynchronous_uri_scheme_protocol(stream::SCHEME, stream::serve)
+        .manage(media::Media::default())
         .invoke_handler(tauri::generate_handler![
             ssh::ssh_connect,
             ssh::ssh_send,
@@ -191,8 +190,8 @@ pub fn run() {
             presence::presence_clear,
             preview::preview_open,
             preview::preview_close,
-            stream::stream_open,
-            stream::stream_close,
+            media::media_open,
+            media::media_close,
             #[cfg(desktop)]
             opened::opened_files,
             #[cfg(desktop)]
