@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "CConnect",
-  "version": "2.0.8",
+  "version": "2.0.9",
   "identifier": "com.jahirtrap.cconnect",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -79,7 +79,7 @@
       }
     },
     "android": {
-      "versionCode": 81
+      "versionCode": 82
     },
     "linux": {
       "deb": {

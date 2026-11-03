@@ -1,9 +1,9 @@
-- Fork in a chat's menu, in Rewind or under a reply opens a new chat with the conversation up to there, and the original stays as it is
-- Listen under a reply reads it aloud, or only what you select, and Read aloud in the Client settings picks the voice and speed and can read the last reply when the work is done
-- ACP chats go into categories and keep the order you drag them into, the same as Claude's
-- The local server the desktop app starts adds itself to Environments, with its token and security key when it needs them, and Start on launch now also starts the installed cconnect command
-- Report a problem in About opens a GitHub issue with your app, system, server and CLI versions already filled in
-- Opening Project files no longer disconnects the app the first time, keyboard shortcuts work again after restoring a minimized window, and Share and Copy sit under each reply
+- Signing in to an ACP agent shows the link in its chat, and In the server's browser lets you finish from your phone
+- ACP agents can send you files and answer with galleries, PDFs and buttons, like Claude
+- ACP agents use the environment of your Claude chat until you pick another, and on the phone the Chats window has its own environment picker
+- With the security key Claude can read and edit the server's .env
+- Videos and audio play while they download and jump straight to where you seek, and PDFs and large images show as they arrive
+- Keyboard shortcuts also work after switching to another program, another account's usage loads with its plan instead of failing, deleting an account always removes it, links between memories open the memory, Write only in working folders lets Claude save to Shared, pack icons show at once, Use on the CConnect pack sets the accent to From theme, and reading aloud no longer stops when you send a message
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
