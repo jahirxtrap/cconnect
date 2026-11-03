@@ -28,33 +28,10 @@ const HISTORY_PROBE: &str = "[location.href, window.navigation ? window.navigati
 #[derive(Default)]
 pub struct BrowserKeys(Mutex<HashSet<String>>);
 
-#[derive(Default)]
-pub struct KeyboardFocus {
-    page: Mutex<Option<String>>,
-}
-
-fn keep_focus<R: Runtime>(app: &AppHandle<R>, page: Option<String>) {
-    if let Ok(mut held) = app.state::<KeyboardFocus>().page.lock() {
-        *held = page;
-    }
-}
-
-fn forget_focus<R: Runtime>(app: &AppHandle<R>, page: &str) {
-    if let Ok(mut held) = app.state::<KeyboardFocus>().page.lock() {
-        if held.as_deref() == Some(page) {
-            *held = None;
-        }
-    }
-}
-
 #[cfg(windows)]
 fn refocus<R: Runtime>(app: &AppHandle<R>) {
-    let page = app.state::<KeyboardFocus>().page.lock().ok().and_then(|held| held.clone());
-    let target = page
-        .and_then(|label| app.get_webview(&label))
-        .or_else(|| app.get_webview(crate::MAIN_WINDOW));
-    if let Some(webview) = target {
-        let _ = webview.set_focus();
+    if let Some(main) = app.get_webview(crate::MAIN_WINDOW) {
+        let _ = main.set_focus();
     }
 }
 
@@ -292,7 +269,6 @@ fn signal<R: Runtime>(webview: &Webview<R>, id: &str, json: &str) {
             );
         }
         Some("focused") => {
-            keep_focus(app, Some(webview.label().to_string()));
             let _ = app.emit_to(crate::MAIN_WINDOW, FOCUSED_EVENT, serde_json::json!({ "id": id }));
         }
         Some("zoom") => {
@@ -670,6 +646,7 @@ pub async fn browser_open<R: Runtime>(
             .map_err(|error| error.to_string())?;
     }
     let builder = profiled(WebviewBuilder::new(name, WebviewUrl::External(parse(&url)?)), &app, &proxy)?
+        .focused(false)
         .initialization_script_for_all_frames(crate::PAGE_SCRIPT)
         .on_page_load(|webview, payload| {
             let mut state = PageState::of(&tab_of(webview.label()));
@@ -790,7 +767,6 @@ pub(crate) fn tabs_of<R: Runtime>(app: &AppHandle<R>) -> Vec<Webview<R>> {
 }
 
 pub(crate) fn hide_all<R: Runtime>(app: &AppHandle<R>) {
-    keep_focus(app, None);
     for tab in tabs_of(app) {
         let _ = tab.hide();
     }
@@ -912,9 +888,6 @@ pub async fn browser_bounds<R: Runtime>(
 #[tauri::command]
 pub async fn browser_visible<R: Runtime>(app: AppHandle<R>, id: String, visible: bool) -> Result<(), String> {
     let webview = page(&app, &id)?;
-    if !visible {
-        forget_focus(&app, webview.label());
-    }
     let result = if visible { webview.show() } else { webview.hide() };
     result.map_err(|error| error.to_string())
 }
@@ -947,16 +920,12 @@ pub async fn browser_reload<R: Runtime>(app: AppHandle<R>, id: String) -> Result
 
 #[tauri::command]
 pub async fn browser_focus<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
-    let webview = page(&app, &id)?;
-    keep_focus(&app, Some(webview.label().to_string()));
-    webview.set_focus().map_err(|error| error.to_string())
+    page(&app, &id)?.set_focus().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
 pub async fn browser_close<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
-    let page = label(&id)?;
-    forget_focus(&app, &page);
-    match app.get_webview(&page) {
+    match app.get_webview(&label(&id)?) {
         Some(webview) => webview.close().map_err(|error| error.to_string()),
         None => Ok(()),
     }
@@ -1082,7 +1051,6 @@ pub async fn browser_cdp<R: Runtime>(
 
 #[tauri::command]
 pub async fn browser_release<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
-    keep_focus(&app, None);
     app.get_webview(crate::MAIN_WINDOW)
         .ok_or_else(|| "no main webview".to_string())?
         .set_focus()

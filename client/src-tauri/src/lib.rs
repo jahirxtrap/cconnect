@@ -126,7 +126,6 @@ pub fn run() {
         );
         builder = builder.plugin(tauri_plugin_drag::init());
         builder = builder.manage(browser::BrowserKeys::default());
-        builder = builder.manage(browser::KeyboardFocus::default());
         builder = builder.on_page_load(|webview, payload| {
             use tauri::Manager;
             if webview.label() == MAIN_WINDOW && matches!(payload.event(), tauri::webview::PageLoadEvent::Started) {
