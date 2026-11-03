@@ -2,7 +2,7 @@
   import ImageOff from "@lucide/svelte/icons/image-off";
   import { visibleName } from "$lib/data/format";
   import { isVideo } from "$lib/data/previewKind";
-  import { mediaSrc } from "$lib/services/mediaSource";
+  import { mediaSrc, streamSrc } from "$lib/services/mediaSource";
   import CenteredProgress from "./CenteredProgress.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
 
@@ -38,7 +38,7 @@
 >
   {#if video}
     <!-- svelte-ignore a11y_media_has_caption -->
-    <video use:mediaSrc={{ url: resolved }} controls class="max-h-full max-w-full object-contain"></video>
+    <video use:streamSrc={{ url: resolved }} controls class="max-h-full max-w-full object-contain"></video>
   {:else if state === "error"}
     <button
       type="button"

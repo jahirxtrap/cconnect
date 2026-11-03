@@ -1,4 +1,6 @@
-import { backend } from "./backend.svelte";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { isTauri } from "$lib/platform";
+import { backend, tokenOf, withToken } from "./backend.svelte";
 import { fileHeaders } from "./projectFilesApi";
 import { awaitSharedFile } from "./sharedArrival.svelte";
 
@@ -12,10 +14,14 @@ export interface SourceOptions {
 
 type Sourced = HTMLImageElement | HTMLMediaElement | HTMLIFrameElement | HTMLEmbedElement;
 
-export const fetchFile = (url: string, init: RequestInit = {}) =>
-  fetch(url, { ...init, cache: "no-cache", headers: fileHeaders(url, backend.sharedProfileOf(url)) });
+export const fetchFile = (url: string, init: RequestInit = {}, extra: Record<string, string> = {}) =>
+  fetch(url, { ...init, cache: "no-cache", headers: { ...fileHeaders(url, backend.sharedProfileOf(url)), ...extra } });
 
 const NOT_FOUND = 404;
+const RANGE_NOT_SATISFIABLE = 416;
+const FIRST_BYTE = { Range: "bytes=0-0" };
+const STREAM_SCHEME = "stream";
+const AUTHORIZATION = "Authorization";
 
 export class MissingFile extends Error {}
 
@@ -34,6 +40,36 @@ export const fetchObjectUrl = async (url: string, transform?: (file: Blob) => Pr
 };
 
 const revoke = (url: string) => URL.revokeObjectURL(url);
+
+const probeFile = async (url: string) => {
+  const response = await fetchFile(url, {}, FIRST_BYTE);
+  void response.body?.cancel();
+  if (response.status === NOT_FOUND || response.status === RANGE_NOT_SATISFIABLE) throw new MissingFile(url);
+  if (!response.ok) throw new Error(String(response.status));
+};
+
+interface Stream {
+  src: string;
+  close: () => void;
+}
+
+const streamOf = async (url: string): Promise<Stream> => {
+  const profile = backend.sharedProfileOf(url);
+  const headers = fileHeaders(url, profile);
+  const unsent = Object.keys(headers).filter((name) => !(name === AUTHORIZATION && tokenOf(profile)));
+  if (!isTauri && unsent.length) {
+    const src = await fetchObjectUrl(url);
+    return { src, close: () => revoke(src) };
+  }
+  await probeFile(url);
+  if (!isTauri) return { src: withToken(url, profile), close: () => undefined };
+  const id = crypto.randomUUID();
+  await invoke("stream_open", { id, url, headers });
+  return {
+    src: `${convertFileSrc("", STREAM_SCHEME)}${id}`,
+    close: () => void invoke("stream_close", { id }).catch(() => undefined),
+  };
+};
 
 export const sourceAction = <O extends SourceOptions, T>(
   options: O,
@@ -103,6 +139,17 @@ export function mediaSrc(node: Sourced, options: SourceOptions) {
       if (node instanceof HTMLImageElement) await node.decode().catch(() => undefined);
     },
     revoke,
+  );
+}
+
+export function streamSrc(node: HTMLMediaElement, options: SourceOptions) {
+  return sourceAction(
+    options,
+    streamOf,
+    (stream) => {
+      node.src = stream.src;
+    },
+    (stream) => stream.close(),
   );
 }
 

@@ -16,7 +16,7 @@
   import { wikiLinks } from "$lib/markdown/render";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { fetchFile, mediaSrc } from "$lib/services/mediaSource";
+  import { fetchFile, mediaSrc, streamSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
@@ -305,14 +305,14 @@
   {:else if kind === "video"}
     <!-- svelte-ignore a11y_media_has_caption -->
     <video
-      use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+      use:streamSrc={{ url: source, onerror: () => (failed = true) }}
       controls
       class="min-h-0 flex-1 bg-black"
     ></video>
   {:else if kind === "audio"}
     <div class="flex min-h-0 flex-1 items-center justify-center p-6">
       <audio
-        use:mediaSrc={{ url: source, onerror: () => (failed = true) }}
+        use:streamSrc={{ url: source, onerror: () => (failed = true) }}
         controls
         class="w-full max-w-lg"
       ></audio>

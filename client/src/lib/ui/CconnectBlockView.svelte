@@ -4,7 +4,7 @@
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import { isVideo } from "$lib/data/previewKind";
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
-  import { mediaSrc, posterSrc } from "$lib/services/mediaSource";
+  import { posterSrc, streamSrc } from "$lib/services/mediaSource";
   import { awaitSharedFile } from "$lib/services/sharedArrival.svelte";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
@@ -84,7 +84,7 @@
     >
       <!-- svelte-ignore a11y_media_has_caption -->
       <video
-        use:mediaSrc={{ url: item.url }}
+        use:streamSrc={{ url: item.url }}
         use:posterSrc={item.poster}
         controls
         class="max-h-full max-w-full object-contain"
@@ -156,7 +156,7 @@
     {#each data.items as item (item.url)}
       <div class="flex w-full min-w-0 flex-col gap-1">
         <span class="truncate text-body-sm text-on-surface-variant">{item.title ?? fileName(item.url)}</span>
-        <audio use:mediaSrc={{ url: item.url }} controls class="w-full"></audio>
+        <audio use:streamSrc={{ url: item.url }} controls class="w-full"></audio>
       </div>
     {/each}
   </CardPanel>
