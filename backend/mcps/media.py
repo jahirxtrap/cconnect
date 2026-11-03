@@ -29,7 +29,8 @@ MEDIA = (
         "capability": "media.html",
         "inline": "an html page",
         "outside": "an html page",
-        "block": "`html` — takes `url` and `title`",
+        "block": "`html` — takes `url` and `title`; the page loads the files of its folder and its "
+        "subfolders by relative path, a reference by the name it shows",
     },
 )
 

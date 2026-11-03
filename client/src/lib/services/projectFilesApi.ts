@@ -76,6 +76,16 @@ export const fileHeaders = (url: string, profile: Profile): Record<string, strin
   ...(KEYED_ROUTES.includes(projectRouteOf(url, profile) ?? "") ? securityKeys.headersFor(profile) : {}),
 });
 
+export const projectFileOf = (
+  url: string,
+  profile: Profile = backend.active,
+): { project: string; path: string } | null => {
+  if (projectRouteOf(url, profile) !== FILE_ROUTE) return null;
+  const [route, query] = url.split("?");
+  const key = route.slice(`${baseUrlOf(profile)}${PROJECTS}/`.length, route.lastIndexOf("/"));
+  return { project: decodeURIComponent(key), path: new URLSearchParams(query).get(PATH_PARAM) ?? "" };
+};
+
 export const projectFolderUrl = (url: string, profile: Profile = backend.active): string | null => {
   if (projectRouteOf(url, profile) !== FILE_ROUTE) return null;
   const [route, query] = url.split("?");

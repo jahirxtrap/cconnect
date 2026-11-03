@@ -84,7 +84,10 @@ def list_entries(relpath: str = "") -> list[dict]:
 
 
 def resolve_file(relpath: str) -> Optional[Path]:
+    """A file by the name it shows: a reference answers to its name with or without `.ccref`."""
     path = _resolve(relpath)
+    if not path.is_file() and not shared_links.is_link(path.name):
+        path = path.with_name(shared_links.link_name(path.name))
     if not path.is_file():
         return None
     return content_path(path)

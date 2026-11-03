@@ -4,10 +4,11 @@ from fastapi import FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from core.responses import api_response
+from services import pages
 
 MAX_BODY_SIZE = 500 * 1_048_576
 
-FRAMEABLE_PATHS = ("/api/shared/", "/api/shared-archive-file")
+FRAMEABLE_PATHS = ("/api/shared/", "/api/shared-archive-file", f"{pages.PATH}/")
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):

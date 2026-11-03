@@ -7,11 +7,11 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from core.config import PUBLIC_ACCESS_TOKEN
 from core.responses import api_response
-from services import agent_mcp
+from services import agent_mcp, pages
 
 # Open so the mobile app can probe connectivity before it has a token.
 _OPEN_PATHS = frozenset({"/api/health", "/api/agents/browse"})
-_OPEN_PREFIX = f"{agent_mcp.PATH}/"
+_OPEN_PREFIXES = (f"{agent_mcp.PATH}/", f"{pages.PATH}/")
 
 
 def _provided_token(authorization: str, query_token: str) -> str:
@@ -44,7 +44,7 @@ class PublicAuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         if PUBLIC_ACCESS_TOKEN is None:
             return await call_next(request)
-        if request.url.path in _OPEN_PATHS or request.url.path.startswith(_OPEN_PREFIX):
+        if request.url.path in _OPEN_PATHS or request.url.path.startswith(_OPEN_PREFIXES):
             return await call_next(request)
         if not http_bearer_ok(request):
             return api_response(status=401)
