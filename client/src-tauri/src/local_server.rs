@@ -31,6 +31,7 @@ const PORT_KEY: &str = "PORT";
 const PID_KEY: &str = "PID";
 const TOKEN_KEY: &str = "PUBLIC_ACCESS_TOKEN";
 const SECURITY_KEY_KEY: &str = "SECURITY_KEY";
+const LIFELINE_VAR: &str = "CCONNECT_LIFELINE";
 const HEALTH_PATH: &str = "/api/health";
 const STOP_PATH: &str = "/api/system/stop";
 const RESTART_PATH: &str = "/api/system/restart";
@@ -456,7 +457,9 @@ fn start_inner(
         .env("PYTHONUNBUFFERED", "1")
         .env("PYTHONIOENCODING", "utf-8")
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .stdin(Stdio::piped())
+        .envs([(LIFELINE_VAR, "1")]);
     #[cfg(windows)]
     command.creation_flags(CREATE_NO_WINDOW);
     if config.mode != "local" {

@@ -13,6 +13,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import threading
 import time
 from contextlib import suppress
 from datetime import datetime
@@ -30,6 +31,7 @@ _ENV_PATH = paths.ENV_FILE
 _TOKEN_VAR = "PUBLIC_ACCESS_TOKEN"
 _SECURITY_KEY_VAR = "SECURITY_KEY"
 _HOSTNAME_VAR = "PUBLIC_HOSTNAME"
+_LIFELINE_VAR = "CCONNECT_LIFELINE"
 _PROVIDERS = ("tailscale", "tailnet", "caddy")
 _PRIVATE_PROVIDERS = ("tailnet",)
 _STOP_TIMEOUT = 10
@@ -548,6 +550,20 @@ def _restart() -> None:
     print(f"Restarting the backend (pid {live['PID']}).")
 
 
+def _watch_lifeline() -> None:
+    stream = sys.stdin.buffer if sys.stdin else None
+    if stream is None:
+        return
+
+    def wait() -> None:
+        with suppress(OSError, ValueError):
+            while stream.read(4096):
+                pass
+        paths.STOP_FLAG.touch()
+
+    threading.Thread(target=wait, name="lifeline", daemon=True).start()
+
+
 def _port_state(port: int) -> str:
     live = _runtime()
     if live and int(live.get("PORT") or 0) == port:
@@ -697,8 +713,10 @@ def main():
 
     paths.RESTART_FLAG.unlink(missing_ok=True)
     paths.STOP_FLAG.unlink(missing_ok=True)
+    if os.environ.pop(_LIFELINE_VAR, None):
+        _watch_lifeline()
     while True:
-        process = subprocess.Popen(cmd, cwd=paths.BACKEND_DIR)
+        process = subprocess.Popen(cmd, cwd=paths.BACKEND_DIR, stdin=subprocess.DEVNULL)
         asked = False
         stopped = False
         try:
