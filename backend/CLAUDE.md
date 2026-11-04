@@ -22,6 +22,11 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   status / logs / doctor / update / migrate / key`, plus `-v` and `--port`, with the
   launcher's original flags still accepted. `run.py` at
   the backend root is the three-line entry a checkout (and the desktop app) calls.
+  uvicorn always runs one worker: every registry lives in the process's memory, so a second
+  one would split chats and sockets. The desktop app starts its local server with
+  `CCONNECT_LIFELINE=1` and a pipe on stdin; when the pipe closes the supervisor stops the
+  way `stop` does, so a server never outlives the app that launched it. uvicorn itself gets
+  `stdin=DEVNULL`, or Windows deadlocks on the inherited pipe.
 - `core/` — `paths` (**the** path table: every file the backend owns, plus `INSTALLED`,
   which decides where the data folder is), `release` (the version contract), `config`
   (env), `display` (separator and joining, shared with the app), `settings_defs` + `db` +
@@ -52,10 +57,16 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `delegates` / `delegate_runner` / `delegate_runs` (handing a task to an agent or another
   account, with the model it asks for), `packs` / `pack_format` (the server's pack library and the
   validation the client's reader mirrors), `prompt_cache`, `tool_calls` / `tool_props`,
-  `api_errors`, `directory_watch` (the base of the shared and pack watchers).
+  `api_errors`, `directory_watch` (the base of the shared and pack watchers) and
+  `project_watch` (Project files), which start and stop watchdog off the event loop (on Linux
+  starting it walks the whole tree, one inotify watch per folder, and a large project froze
+  the server meanwhile), `pages` (an HTML page served with the folder around it, so its
+  styles, scripts and images load), `processes` (what the server runs, matched to its chat,
+  agent, terminal or browser, and stopped the way that screen stops it).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
 - `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
-  substituted per request), `BLOCKS.md`, `BROWSER.md`, `MODS.md` (only what this app adds
+  substituted per request), `BLOCKS.md`, `BROWSER.md`, `INSTALL.md` (the install cards,
+  appended when the app advertises `install`), `MODS.md` (only what this app adds
   for a mod Claude writes, appended while mods are on) and `SUGGESTIONS.md`. Versioned, so
   the user-owned `USER.md` and the per-project prompts live in `data/config/prompts/`
   instead (never deleted — emptied). `{{SHARED_URL}}` resolves to `config.SHARED_SCHEME`
@@ -71,7 +82,9 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 except `/api/health` and the two routes an agent's own process calls on loopback with a token
 of its connection instead: `/api/agents/browse` (the `BROWSER` helper,
 `core/scripts/browse.py`, which still opens the page on the PC and hands the URL to the agent's
-card) and `/api/mcp/agent/<token>`. The WS handshake checks the same header via `ws_bearer_ok`.
+card) and `/api/mcp/agent/<token>`, plus the files of a registered page, `/api/pages/<id>/…`,
+whose random id is the token: an iframe cannot send headers. The WS handshake checks the same
+header via `ws_bearer_ok`.
 
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
@@ -95,20 +108,26 @@ Everything returns `api_response()`. Route groups: `/api/health`, `/api/capabili
 `/api/settings`, `/api/cli`, `/api/sessions/*` (transcript slices, checkpoints + rewind,
 rename/color/move/delete, fork through the SDK's `fork_session` up to a message or the
 pending rewind point, trash, categories, transcript images), `/api/shared/*` (file
-manager; listing is the `WS /api/shared/ws`), `/api/claude/*` (prompts, plugins and their
-reload, marketplaces, skills, MCP, memories, usage in the app's `lang`, status), `/api/accounts/*`,
-`/api/system/*`, `/api/network/*`, `/api/git/*` (repositories under a project, identities,
+manager; listing is the `WS /api/shared/ws`; an upload streams to disk, so `PUT` is outside
+`MAX_BODY_SIZE`), `/api/claude/*` (prompts, plugins and their reload, marketplaces, skills,
+MCP, memories, usage in the app's `lang`, status; installing an MCP server from its
+`.mcp.json` entry and a skill from a folder of a git repository, the two install links that
+need the server), `/api/accounts/*`, `/api/system/*` (also the processes the server runs and
+`processes/{pid}/stop`), `/api/pages` (registers an HTML page and serves the folder around
+it), `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
 Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessions, and their
 category and manual order, kept in `agent_session_placement` beside Claude's; reading or
 changing their environment variables takes the security key), `/api/packs/*` (the server's pack library and its
-previews; deleting from it takes the security key). Live streams: `WS /api/chat/ws`,
+previews; deleting from it takes the security key; `fetch` downloads a pack link, https only,
+and hands it back without keeping it). Live streams: `WS /api/chat/ws`,
 `WS /api/list/ws` (chat/project list), `WS /api/agents/ws` (an agent's chats: `watch`
 names the agent and the folder, the server pushes `sessions` snapshots and `activity`
 changes), `WS /api/system/ws`, `WS /api/shared/ws`,
 `WS /api/packs/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws` (frames and state
 of the server's Chromium; `watch` decides whether it runs, and an opening without it
-watches, which is what an app older than 1.10.3 sends).
+watches, which is what an app older than 1.10.3 sends; `home` loads the blank page, so Back
+returns to the page before it).
 
 A route that answers with a file uses `FILE_HEADERS` (`core/responses.py`): without
 `Cache-Control: no-cache`, the `last-modified` of a `FileResponse` lets a browser keep a copy

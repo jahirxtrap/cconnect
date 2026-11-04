@@ -7,9 +7,10 @@ and forking, replies read aloud, persistent sessions that keep a chat's CLI runn
 along with its background tasks, chats with ACP agents in either panel, delegating a
 task to another AI or agent, and the panes and band Claude Code mods draw — over
 HTTP/WS, reachable on the tailnet or publicly through a Tailscale Funnel. They also manage
-the Claude install itself (CLI, plugins, marketplaces, MCP servers, skills, memories), a
-file manager over the shared folder, an explorer of the project that shows its git diff
-and commits it, a browser that opens pages on the device or on the PC, a PC monitor, an
+the Claude install itself (CLI, plugins, marketplaces, MCP servers, skills, memories, also
+from `cconnect://install` links and the cards Claude offers), a file manager over the shared
+folder, an explorer of the project that shows its git diff and commits it, a browser that
+opens pages on the device or on the PC, a PC monitor with the processes the server runs, an
 SSH client and notes, with themes, fonts and chat backgrounds installed from `.ccpack`
 packs, in ten languages.
 

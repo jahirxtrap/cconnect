@@ -173,8 +173,9 @@ Two sides share one panel and one tab strip, switched by `BrowserSideSwitch`:
 Viewport under ⋮ (`BrowserOptionsMenu`) emulates through CDP on Windows and sets the WebKit
 agent and page zoom on macOS and Linux; on Android it only switches the agent between the
 mobile and the desktop site, and the page stays at 1:1 so a touch lands where it falls. Zoom
-is kept per host (`settings.browserZoom`). Home is a state of the tab (`home`, stored with
-the tabs), not an address, so going back leaves it for the page underneath. On Android,
+is kept per host (`settings.browserZoom`). Home loads a blank page (`HOME_PAGE`) on both
+sides, as Chrome does, so Back returns to the page before it: `blankPage(url)` is the one check
+for it, and the server's browser gets its own `home` message. On Android,
 `Browser.kt` owns a pull while it is out: the moves feed the indicator and none reach the
 page until the finger passes back above where the pull started, and its views take no
 window insets, or a page pads its bottom bar for a system bar it does not sit on. The
@@ -193,21 +194,24 @@ routes), and `cache: "no-cache"`, or a file rewritten under the same name comes 
 Chromium's heuristic cache. `mediaSrc` and `posterSrc` hand it to an element as an object
 URL. Video, audio, the large images (preview and chat) and PDFs go through `serveFile` instead,
 so they play and show while they download: in the apps a loopback server
-(`src-tauri/src/media.rs`, `127.0.0.1` on a free port, started on first use) forwards the
-element's range requests with `fileHeaders` and copies the body as it arrives, under a random id
-that `media_close` drops; on the web the URL carries `?token=`, and falls back to the object URL
+(`src-tauri/src/media.rs`) forwards the element's range requests with `fileHeaders` and copies
+the body as it arrives. Each file gets its own listener on a free port of `127.0.0.1`, closed by
+`media_close`: Chromium keeps at most six connections per origin, and with one port for every
+file a seek in one video left the others waiting. On the web the URL carries `?token=`, and falls back to the object URL
 when a header cannot travel in it (the security key, basic or custom auth). A custom protocol
 cannot do this on Android: the WebView treats an intercepted response as the whole file and
 skips the requested offset inside it. Android allows cleartext only to `127.0.0.1`
 (`res/xml/network_security_config.xml`; the debug source set allows all of it, for
 `tauri android dev`). HTML goes through `ui/PageFrame.svelte`
-(`pageSrc`, the themed scrollbar and the sandbox, the same in the chat and the preview): a
-`blob:` document inherits the app's CSP and loses its scripts, styles and fonts, so in the apps
-`preview_open` registers the page and the iframe loads it from the `preview` protocol
-(`src-tauri/src/preview.rs`) — an origin of its own, without CSP and out of reach of the
-app, with the files of its folder proxied from the server. The web has no CSP and keeps
-`blob:`, without `allow-same-origin`. `tauri dev` applies no CSP at all, so anything about
-it is checked in a build.
+(`pageSrc`, the themed scrollbar and the sandbox, the same in the chat and the preview). The
+server serves the page with the folder around it (`POST /api/pages`, then
+`/api/pages/<id>/<file>`), on its own origin, so the iframe keeps `allow-same-origin` and
+`localStorage` works. A server older than 2.1.0 has no such route, and the page falls back:
+a `blob:` document inherits the app's CSP and loses its scripts, styles and fonts, so in the
+apps `preview_open` registers the page and the iframe loads it from the `preview` protocol
+(`src-tauri/src/preview.rs`), an origin of its own with the files of its folder proxied from
+the server; the web has no CSP and keeps `blob:`, without `allow-same-origin`. `tauri dev`
+applies no CSP at all, so anything about it is checked in a build.
 
 A file Claude links before writing it answers 404 or comes back empty (`fetchBlob` throws
 `MissingFile`). `sourceAction` and the chat's PDF block then wait on its shared folder
@@ -218,6 +222,29 @@ content. A file that loaded never watches.
 Chat media blocks share `.media-frame` (`ui/mediaFrame.ts`): a transparent border pulls the
 content's clip a pixel in and an inset `outline` draws the line over the content, or light
 content bleeds into the border along the curve.
+
+## Install links (`data/installRequest.ts`, `screens/install/`)
+
+`cconnect://install/<kind>?…` (`mcp`, `plugin`, `marketplace`, `skill`, `agent`, `pack`),
+Cursor's `mcp/install` link and the chat's `install` block all go through the one reader,
+`installRequest.ts`, which rejects anything malformed. A link reaches the app from a message
+(`MarkdownText`), from the system on the desktop (`opened.rs`, the same path as an opened
+`.ccpack`; the bundler registers the scheme, so `tauri dev` cannot test it) and on Android
+(`MainActivity` hands it to `window.__cconnectLink`). The web app only takes them inside the
+chat. Everything ends in `InstallDialog`, which shows what runs, lets the user pick the
+environment and installs through its own `createHttp` for it, since the global `claudeApi`
+always talks to the active one; a pack goes to `packOffers.offerRemote` instead, with the
+server downloading the file. Nothing installs without the user pressing Install.
+
+## Markdown (`markdown/render.ts`)
+
+`MarkdownText` takes a `flavor`. `chat` renders no HTML and turns images into cards; `note`
+and `document` (notes, and `.md` files in the preview) render the HTML GitHub allows, cleaned
+by `markdown/githubHtml.ts` (DOMPurify): GitHub's tags and attributes, the renderer's own
+classes and only `text-align` in `style`. A relative image there moves to `data-relative-src`
+and loads beside the file through `imageSrc`, never against the app's origin. Tailwind's
+preflight makes every `img` a block, which breaks `<p align="center">`, so `.markdown-document
+img` puts it back inline.
 
 ## PDF (`screens/shared/PdfView.svelte`)
 
