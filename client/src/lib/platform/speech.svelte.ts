@@ -1,6 +1,9 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { settings } from "$lib/data/settings.svelte";
 import { i18n } from "$lib/i18n/index.svelte";
 import { speakableParagraphs } from "$lib/markdown/render";
+import { isTauri, systemName } from "$lib/platform";
 
 interface AndroidSpeech {
   isAvailable: () => boolean;
@@ -31,6 +34,8 @@ export const AUTO_READ_BACKGROUND = "background";
 export const AUTO_READ_MODES = [AUTO_READ_OFF, AUTO_READ_ALWAYS, AUTO_READ_BACKGROUND];
 
 const CHUNK_LENGTH = 220;
+const SYSTEM_EVENT = "speech";
+const systemSpeech = isTauri && systemName() === "linux";
 const SENTENCE_RE = /[^.!?。！？\n]+[.!?。！？]*\s*/g;
 const LINE_RE = /\n+/;
 
@@ -70,14 +75,14 @@ class Speech {
   speaking = $state<string | null>(null);
   voices = $state<SpeechVoice[]>([]);
 
-  readonly available: boolean;
+  available = $state(!systemSpeech && (android() !== null || synth() !== null));
 
   #run = 0;
 
   constructor() {
-    this.available = android() !== null || synth() !== null;
     scope().__cconnectSpeech = (event) => this.#received(event);
-    if (!android()) synth()?.addEventListener("voiceschanged", () => this.#loadVoices());
+    if (systemSpeech) void listen<SpeechEvent>(SYSTEM_EVENT, (message) => this.#received(message.payload));
+    else if (!android()) synth()?.addEventListener("voiceschanged", () => this.#loadVoices());
     this.#loadVoices();
   }
 
@@ -105,11 +110,22 @@ class Speech {
   stop() {
     this.#run++;
     this.speaking = null;
+    if (systemSpeech) void invoke("speech_stop").catch(() => undefined);
     android()?.stop();
     synth()?.cancel();
   }
 
   #loadVoices() {
+    if (systemSpeech) {
+      void invoke<SpeechVoice[]>("speech_voices").then(
+        (voices) => {
+          this.voices = voices;
+          this.available = true;
+        },
+        () => (this.available = false),
+      );
+      return;
+    }
     const bridge = android();
     if (bridge) {
       try {
@@ -145,6 +161,14 @@ class Speech {
     if (!chunks.length) return;
     const run = this.#run;
     this.speaking = key;
+    const settle = () => {
+      if (this.#run === run) this.speaking = null;
+    };
+    if (systemSpeech) {
+      const spoken = { key, chunks, language: this.language, voice: voicing.voice, rate: voicing.rate };
+      void invoke("speech_speak", spoken).catch(settle);
+      return;
+    }
     const bridge = android();
     if (bridge) {
       bridge.speak(key, JSON.stringify(chunks), this.language, voicing.voice, voicing.rate);
@@ -156,9 +180,6 @@ class Speech {
       return;
     }
     const voice = this.#webVoice(engine, voicing.voice);
-    const settle = () => {
-      if (this.#run === run) this.speaking = null;
-    };
     chunks.forEach((chunk, index) => {
       const utterance = new SpeechSynthesisUtterance(chunk);
       utterance.lang = voice?.lang ?? this.language;

@@ -11,6 +11,10 @@ mod presence;
 mod preview;
 mod secret;
 mod shield;
+#[cfg(target_os = "linux")]
+mod speech;
+#[cfg(target_os = "linux")]
+mod speechd;
 mod ssh;
 mod system;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -140,6 +144,11 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_barcode_scanner::init());
     }
 
+    #[cfg(target_os = "linux")]
+    {
+        builder = builder.manage(speech::Speech::default());
+    }
+
     builder
         .setup(|_app| {
             #[cfg(windows)]
@@ -236,6 +245,12 @@ pub fn run() {
             browser::browser_clear_data,
             #[cfg(desktop)]
             browser::browser_data_size,
+            #[cfg(target_os = "linux")]
+            speech::speech_voices,
+            #[cfg(target_os = "linux")]
+            speech::speech_speak,
+            #[cfg(target_os = "linux")]
+            speech::speech_stop,
             shield::browser_shield,
             shield::browser_shield_update
         ])
