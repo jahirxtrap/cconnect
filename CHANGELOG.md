@@ -1,9 +1,11 @@
-- Signing in to an ACP agent shows the link in its chat, and In the server's browser lets you finish from your phone
-- ACP agents can send you files and answer with galleries, PDFs and buttons, like Claude
-- ACP agents use the environment of your Claude chat until you pick another, and on the phone the Chats window has its own environment picker
-- With the security key Claude can read and edit the server's .env
-- Videos and audio play while they download and jump straight to where you seek, and PDFs and large images show as they arrive
-- Keyboard shortcuts also work after switching to another program, another account's usage loads with its plan instead of failing, deleting an account always removes it, links between memories open the memory, Write only in working folders lets Claude save to Shared, pack icons show at once, Use on the CConnect pack sets the accent to From theme, and reading aloud no longer stops when you send a message
+- Install MCP servers, plugins, marketplaces, skills, ACP agents and packs from a cconnect://install link or from the cards Claude offers in the chat, picking the environment they go to — nothing installs until you press Install
+- Processes in the Monitor shows what CConnect runs — chats, ACP agents, terminals and the browser — with their CPU and memory, and stops any of them
+- Model and effort share one chip in the chat's toolbar, and so do an ACP agent's model and reasoning level
+- Screens keep where you scrolled when you come back to them
+- Markdown files and notes show the HTML GitHub allows, like centered images, badges and collapsible sections
+- Listen and Read aloud also work on Linux, with the system's voices
+- Shared and chat attachments take files of any size and packs up to 500 MB, HTML pages also load the files beside them on the web and keep what they save, Home in the browser works like Chrome's and Back returns to the page you left, videos go fullscreen on Android, and a note without a name takes it from its first line without the Markdown symbols
+- The local server no longer keeps running after the app closes or updates, opening a large project no longer freezes the server, and ACP agents stop with it
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
