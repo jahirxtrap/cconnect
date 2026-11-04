@@ -161,7 +161,7 @@
     {/if}
   </div>
 {:else}
-  <PaneHeader title={t("AGENTS")} leading={lead} />
+  <PaneHeader title={t("AGENTS")} leading={lead} actions={trailing} />
   {#if serverStatus.unavailable}
     <ServerUnavailable class="min-h-0 flex-1" />
   {:else if !listed && !agents.failed(profile)}

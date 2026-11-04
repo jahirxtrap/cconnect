@@ -4,12 +4,12 @@ import asyncio
 
 from urllib.parse import quote
 
-from fastapi import APIRouter, Header, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi import APIRouter, Header, HTTPException, Query, Request, Response, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from core.access import key_matches
-from core.responses import FILE_HEADERS, api_response
+from core.responses import api_response, file_response
 from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
 from services import project_files, project_watch
@@ -105,7 +105,7 @@ def project_archive_file(project_key: str, path: str, inner: str, x_security_key
 
 
 @router.get("/projects/{project_key}/file")
-def project_file(project_key: str, path: str, x_security_key: str = Header("")):
+def project_file(project_key: str, path: str, request: Request, x_security_key: str = Header("")):
     try:
         resolved = project_files.resolve_file(_root(project_key), path, key_matches(x_security_key))
     except ValueError as exc:
@@ -114,9 +114,9 @@ def project_file(project_key: str, path: str, x_security_key: str = Header("")):
         if project_files.deleted_at_head(_root(project_key), path):
             return Response(content=b"", media_type="text/plain")
         raise HTTPException(status_code=404, detail="file not found")
-    return FileResponse(
+    return file_response(
+        request,
         resolved,
         filename=resolved.name,
         content_disposition_type="inline",
-        headers=FILE_HEADERS,
     )

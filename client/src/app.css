@@ -461,6 +461,10 @@ body {
   .lucide-icon {
     stroke-width: 1.75;
   }
+
+  img:not([src]) {
+    visibility: hidden;
+  }
 }
 
 input,

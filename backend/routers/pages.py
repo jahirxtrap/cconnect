@@ -1,11 +1,11 @@
 from typing import Optional
 
-from fastapi import APIRouter, Header, HTTPException
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from core.access import key_matches
-from core.responses import FILE_HEADERS, api_response
+from core.responses import FILE_HEADERS, api_response, file_response
 from services import pages
 
 router = APIRouter(tags=["Pages"])
@@ -34,7 +34,7 @@ def close_page(page_id: str):
 
 
 @router.get("/pages/{page_id}/{rest:path}")
-def page_file(page_id: str, rest: str):
+def page_file(page_id: str, rest: str, request: Request):
     found = pages.page(page_id)
     if found is None:
         raise HTTPException(status_code=404, detail="page not found")
@@ -43,4 +43,4 @@ def page_file(page_id: str, rest: str):
     resolved = pages.file_of(found, rest)
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    return FileResponse(resolved, headers=FILE_HEADERS)
+    return file_response(request, resolved)

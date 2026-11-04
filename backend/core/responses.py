@@ -1,14 +1,26 @@
 """Standardized API response helpers."""
 
+import os
 from http import HTTPStatus
 from math import ceil
+from pathlib import Path
 from typing import Any, Iterable, Optional
 
 import orjson
+from fastapi import Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.staticfiles import NotModifiedResponse
 
 FILE_HEADERS = {"Content-Encoding": "identity", "Cache-Control": "no-cache"}
+
+
+def file_response(request: Request, path: Path, **options: Any) -> Response:
+    response = FileResponse(path, stat_result=os.stat(path), headers=FILE_HEADERS, **options)
+    held = request.headers.get("if-none-match", "")
+    if response.headers["etag"] in [tag.strip(" W/") for tag in held.split(",")]:
+        return NotModifiedResponse(response.headers)
+    return response
 
 
 class ORJSONResponse(JSONResponse):

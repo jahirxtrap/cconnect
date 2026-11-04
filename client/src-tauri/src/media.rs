@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -14,10 +14,12 @@ const ACCEPT_RETRY: Duration = Duration::from_millis(50);
 const HEAD_WAIT: Duration = Duration::from_secs(10);
 const UPSTREAM_WAIT: Duration = Duration::from_secs(30);
 const WRITE_WAIT: Duration = Duration::from_secs(60);
+const IDLE_LIMIT: usize = 256;
 const HEAD_LIMIT: usize = 16 * 1024;
 const HEAD_END: &[u8] = b"\r\n\r\n";
-const PASSED: [&str; 4] = ["content-type", "content-length", "content-range", "accept-ranges"];
-const COMMON: &str = "cache-control: no-store\r\naccess-control-allow-origin: *\r\naccess-control-expose-headers: content-type, content-length, content-range, accept-ranges\r\nconnection: close\r\n";
+const FORWARDED: [&str; 4] = ["range", "if-range", "if-none-match", "if-modified-since"];
+const PASSED: [&str; 6] = ["content-type", "content-length", "content-range", "accept-ranges", "etag", "last-modified"];
+const COMMON: &str = "cache-control: no-cache\r\naccess-control-allow-origin: *\r\naccess-control-expose-headers: content-type, content-length, content-range, accept-ranges\r\nconnection: close\r\n";
 const PREFLIGHT: &str = "access-control-allow-methods: GET, HEAD, OPTIONS\r\naccess-control-allow-headers: range\r\naccess-control-max-age: 600\r\n";
 
 struct Source {
@@ -26,10 +28,38 @@ struct Source {
     headers: HashMap<String, String>,
 }
 
+struct Served {
+    src: String,
+    task: JoinHandle<()>,
+    leases: usize,
+}
+
+#[derive(Default)]
+struct Servers {
+    served: HashMap<String, Served>,
+    leases: HashMap<String, String>,
+    idle: VecDeque<String>,
+}
+
 #[derive(Default)]
 pub struct Media {
     client: reqwest::Client,
-    listeners: Mutex<HashMap<String, JoinHandle<()>>>,
+    servers: Mutex<Servers>,
+}
+
+fn key_of(url: &str, headers: &HashMap<String, String>) -> String {
+    let mut pairs: Vec<String> = headers.iter().map(|(name, value)| format!("{name}: {value}")).collect();
+    pairs.sort();
+    format!("{url}\n{}", pairs.join("\n"))
+}
+
+fn reuse(servers: &mut Servers, key: &str, id: &str) -> Option<String> {
+    let served = servers.served.get_mut(key)?;
+    served.leases += 1;
+    let src = served.src.clone();
+    servers.idle.retain(|idle| idle != key);
+    servers.leases.insert(id.to_string(), key.to_string());
+    Some(src)
 }
 
 async fn listen(listener: TcpListener, source: Arc<Source>, client: reqwest::Client) {
@@ -73,10 +103,11 @@ async fn serve(mut socket: TcpStream, source: &Source, client: &reqwest::Client)
     let mut request = lines.next().unwrap_or_default().split(' ');
     let method = request.next().unwrap_or_default();
     let target = request.next().unwrap_or_default();
-    let range = lines
+    let forwarded: Vec<(String, String)> = lines
         .filter_map(|line| line.split_once(':'))
-        .find(|(name, _)| name.trim().eq_ignore_ascii_case("range"))
-        .map(|(_, value)| value.trim().to_string());
+        .map(|(name, value)| (name.trim().to_ascii_lowercase(), value.trim().to_string()))
+        .filter(|(name, _)| FORWARDED.contains(&name.as_str()))
+        .collect();
     if method == "OPTIONS" {
         return reply(&mut socket, "204 No Content", PREFLIGHT).await;
     }
@@ -85,11 +116,8 @@ async fn serve(mut socket: TcpStream, source: &Source, client: &reqwest::Client)
         return reply(&mut socket, "404 Not Found", "").await;
     }
     let mut upstream = client.get(&source.url).header("accept-encoding", "identity");
-    for (name, value) in &source.headers {
+    for (name, value) in source.headers.iter().chain(forwarded.iter().map(|(name, value)| (name, value))) {
         upstream = upstream.header(name, value);
-    }
-    if let Some(range) = &range {
-        upstream = upstream.header("range", range);
     }
     let mut response = match timeout(UPSTREAM_WAIT, upstream.send()).await {
         Ok(Ok(response)) => response,
@@ -122,25 +150,51 @@ pub async fn media_open(
     url: String,
     headers: HashMap<String, String>,
 ) -> Result<String, String> {
+    let key = key_of(&url, &headers);
+    let reused = {
+        let mut servers = media.servers.lock().map_err(|error| error.to_string())?;
+        reuse(&mut servers, &key, &id)
+    };
+    if let Some(src) = reused {
+        return Ok(src);
+    }
     let listener = TcpListener::bind((LOOPBACK, 0)).await.map_err(|error| error.to_string())?;
     let port = listener.local_addr().map_err(|error| error.to_string())?.port();
     let source = Arc::new(Source { id: id.clone(), url, headers });
     let task = tauri::async_runtime::spawn(listen(listener, source, media.client.clone()));
-    let replaced = media
-        .listeners
-        .lock()
-        .map_err(|error| error.to_string())?
-        .insert(id.clone(), task);
-    if let Some(replaced) = replaced {
-        replaced.abort();
+    let mut servers = media.servers.lock().map_err(|error| error.to_string())?;
+    if let Some(src) = reuse(&mut servers, &key, &id) {
+        task.abort();
+        return Ok(src);
     }
-    Ok(format!("http://{LOOPBACK}:{port}/{id}"))
+    let src = format!("http://{LOOPBACK}:{port}/{id}");
+    servers.served.insert(key.clone(), Served { src: src.clone(), task, leases: 1 });
+    servers.leases.insert(id, key);
+    Ok(src)
 }
 
 #[tauri::command]
 pub fn media_close(media: State<'_, Media>, id: String) {
-    let closed = media.listeners.lock().ok().and_then(|mut listeners| listeners.remove(&id));
-    if let Some(closed) = closed {
-        closed.abort();
+    let Ok(mut servers) = media.servers.lock() else {
+        return;
+    };
+    let Some(key) = servers.leases.remove(&id) else {
+        return;
+    };
+    let Some(served) = servers.served.get_mut(&key) else {
+        return;
+    };
+    served.leases -= 1;
+    if served.leases > 0 {
+        return;
+    }
+    servers.idle.push_back(key);
+    while servers.idle.len() > IDLE_LIMIT {
+        let Some(oldest) = servers.idle.pop_front() else {
+            break;
+        };
+        if let Some(gone) = servers.served.remove(&oldest) {
+            gone.task.abort();
+        }
     }
 }

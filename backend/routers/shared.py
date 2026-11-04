@@ -5,12 +5,12 @@ from typing import Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Header, HTTPException, Request, WebSocket
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 from starlette.requests import ClientDisconnect
 from pydantic import BaseModel
 
 from core.access import key_matches
-from core.responses import FILE_HEADERS, api_response
+from core.responses import api_response, file_response
 from core.ws import stream_watch
 from services import shared as shared_service
 from services.shared_watch import hub as watch_hub
@@ -212,18 +212,18 @@ async def upload_shared(path: str, request: Request, policy: Literal["keep", "re
 
 
 @router.get("/shared/{path:path}")
-def download_shared(path: str):
+def download_shared(path: str, request: Request):
     try:
         resolved = shared_service.resolve_file(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    return FileResponse(
+    return file_response(
+        request,
         resolved,
         filename=shared_service.visible_of(path),
         content_disposition_type="inline",
-        headers=FILE_HEADERS,
     )
 
 

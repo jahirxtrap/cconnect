@@ -20,6 +20,7 @@ export const fetchFile = (url: string, init: RequestInit = {}, extra: Record<str
 const NOT_FOUND = 404;
 const RANGE_NOT_SATISFIABLE = 416;
 const FIRST_BYTE = { Range: "bytes=0-0" };
+const VERSION_HEADERS = ["etag", "last-modified"];
 const AUTHORIZATION = "Authorization";
 const IMAGE_FAILED = "image failed to load";
 
@@ -46,7 +47,11 @@ const probeFile = async (url: string) => {
   void response.body?.cancel();
   if (response.status === NOT_FOUND || response.status === RANGE_NOT_SATISFIABLE) throw new MissingFile(url);
   if (!response.ok) throw new Error(String(response.status));
+  return VERSION_HEADERS.map((name) => response.headers.get(name)).find(Boolean) ?? crypto.randomUUID();
 };
+
+const versioned = (url: string, version: string) =>
+  `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}`;
 
 export interface ServedFile {
   src: string;
@@ -61,10 +66,10 @@ export const serveFile = async (url: string): Promise<ServedFile> => {
     const src = await fetchObjectUrl(url);
     return { src, close: () => revoke(src) };
   }
-  await probeFile(url);
-  if (!isTauri) return { src: withToken(url, profile), close: () => undefined };
+  const target = versioned(url, await probeFile(url));
+  if (!isTauri) return { src: withToken(target, profile), close: () => undefined };
   const id = crypto.randomUUID();
-  const src = await invoke<string>("media_open", { id, url, headers });
+  const src = await invoke<string>("media_open", { id, url: target, headers });
   return { src, close: () => void invoke("media_close", { id }).catch(() => undefined) };
 };
 

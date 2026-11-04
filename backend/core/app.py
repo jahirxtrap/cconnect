@@ -90,6 +90,7 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["ETag"],
 )
 register_error_handlers(app)
 

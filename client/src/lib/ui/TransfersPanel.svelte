@@ -5,9 +5,10 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import X from "@lucide/svelte/icons/x";
-  import { transfers } from "$lib/data/transfers.svelte";
+  import { openFilePreview } from "$lib/app/filePreview";
+  import { transfers, type Transfer } from "$lib/data/transfers.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { isDesktop } from "$lib/platform";
+  import { isDesktop, isTauri } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { dragSaved, openTransfer } from "$lib/services/sharedFiles";
   import FloatDock from "./FloatDock.svelte";
@@ -21,6 +22,11 @@
   const running = $derived(transfers.active.length);
 
   let panelHeight = $state(0);
+
+  const open = (item: Transfer) => {
+    if (isTauri) void openTransfer(item.saved, item.url, item.name);
+    else openFilePreview({ url: item.url, name: item.name, onDelete: null });
+  };
 
   $effect(() => {
     layout.transfersInset = items.length ? panelHeight + layout.menuPadding.bottom + layout.bottomInset : 0;
@@ -81,7 +87,7 @@
               <button
                 type="button"
                 disabled={!openable}
-                onclick={() => void openTransfer(item.saved, item.url, item.name)}
+                onclick={() => open(item)}
                 class="block min-w-0 flex-1 truncate text-left text-body-md {item.status === 'done'
                   ? 'text-on-surface-variant'
                   : ''} {openable ? 'cursor-pointer' : 'cursor-default'}"
