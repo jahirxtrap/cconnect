@@ -69,14 +69,14 @@ async def projects_ws(ws: WebSocket):
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "watch":
-                project_watch.hub.watch(queue, str(msg.get("project_key") or ""))
+                await asyncio.to_thread(project_watch.hub.watch, queue, str(msg.get("project_key") or ""))
     except WebSocketDisconnect:
         pass
     except Exception as exc:
         logger.debug(f"projects_ws ended: {type(exc).__name__}: {exc}")
     finally:
         pump_task.cancel()
-        project_watch.hub.unsubscribe(queue)
+        await asyncio.to_thread(project_watch.hub.unsubscribe, queue)
 
 
 @router.get("/projects/{project_key}/archive")

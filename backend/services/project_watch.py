@@ -61,6 +61,7 @@ class ProjectWatchHub:
         self._roots: dict[str, Path] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
+        self._lifecycle = threading.Lock()
         self._pending: dict[str, set[str]] = {}
         self._overflowed: set[str] = set()
         self._timer: Optional[threading.Timer] = None
@@ -69,10 +70,11 @@ class ProjectWatchHub:
         self._loop = asyncio.get_running_loop()
 
     def stop(self):
-        with self._lock:
-            keys = list(self._observers)
-        for key in keys:
-            self._release(key)
+        with self._lifecycle:
+            with self._lock:
+                keys = list(self._observers)
+            for key in keys:
+                self._release(key)
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()
@@ -81,19 +83,21 @@ class ProjectWatchHub:
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue):
-        with self._lock:
-            previous = self._subscribers.pop(queue, "")
-        self._prune(previous)
+        with self._lifecycle:
+            with self._lock:
+                previous = self._subscribers.pop(queue, "")
+            self._prune(previous)
 
     def watch(self, queue: asyncio.Queue, project_key: str):
-        with self._lock:
-            if queue not in self._subscribers:
-                return
-            previous = self._subscribers[queue]
-            self._subscribers[queue] = project_key
-        if previous != project_key:
-            self._prune(previous)
-            self._acquire(project_key)
+        with self._lifecycle:
+            with self._lock:
+                if queue not in self._subscribers:
+                    return
+                previous = self._subscribers[queue]
+                self._subscribers[queue] = project_key
+            if previous != project_key:
+                self._prune(previous)
+                self._acquire(project_key)
 
     def _watched_by(self, project_key: str) -> int:
         with self._lock:
