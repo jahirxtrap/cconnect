@@ -1,3 +1,4 @@
+import { plainLines } from "$lib/markdown/render";
 import { layout } from "$lib/platform/layout.svelte";
 import { store } from "$lib/platform/storage";
 
@@ -21,28 +22,24 @@ const ITEMS_KEY = "notes.items";
 const VIEW_KEY = "notes.view";
 const LEGACY_KEY = "notes.scratch";
 const SAVE_DELAY_MS = 400;
-const TITLE_LIMIT = 80;
+const TITLE_LIMIT = 40;
+const ELLIPSIS = "…";
 const HISTORY_GAP_MS = 800;
 const HISTORY_LIMIT = 200;
 
-const stripped = (line: string) =>
-  line
-    .replace(/^#{1,6}\s+/, "")
-    .replace(/^[-*]\s+\[[ xX]\]\s+/, "")
-    .replace(/^[-*]\s+/, "")
-    .replace(/^\d+[.)]\s+/, "")
-    .trim();
-
-export const noteTitle = (note: Note): string => {
-  if (note.title) return note.title;
-  const line = note.body.split("\n").map(stripped).find((text) => text.length > 0) ?? "";
-  return line.slice(0, TITLE_LIMIT);
+const clipped = (line: string): string => {
+  const glyphs = [...line];
+  if (glyphs.length <= TITLE_LIMIT) return line;
+  const cut = glyphs.slice(0, TITLE_LIMIT - 1).join("");
+  const space = cut.lastIndexOf(" ");
+  return `${(space > 0 ? cut.slice(0, space) : cut).trimEnd()}${ELLIPSIS}`;
 };
 
-export const notePreview = (body: string): string => {
-  const lines = body.split("\n").map(stripped).filter((text) => text.length > 0);
-  return lines.slice(1).join(" ");
-};
+const autoTitle = (body: string): string => clipped(plainLines(body)[0] ?? "");
+
+export const noteTitle = (note: Note): string => note.title || autoTitle(note.body);
+
+export const notePreview = (body: string): string => plainLines(body).slice(1).join(" ");
 
 const restored = (): Note[] => {
   const saved = store.get<Note[] | null>(ITEMS_KEY, null);
@@ -88,7 +85,9 @@ class Notes {
   rename(id: string, title: string) {
     const named = title.trim();
     this.items = this.items.map((note) =>
-      note.id === id ? { ...note, title: named || undefined, updatedAt: Date.now() } : note,
+      note.id === id
+        ? { ...note, title: named && named !== autoTitle(note.body) ? named : undefined, updatedAt: Date.now() }
+        : note,
     );
     this.#save();
   }

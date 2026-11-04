@@ -145,6 +145,36 @@ export const speakableParagraphs = (markdown: string): string[] => {
   return paragraphs;
 };
 
+const PLAIN_TEXT = new Set(["text", "text_special", "code_inline"]);
+const LINE_BREAKS = new Set(["softbreak", "hardbreak"]);
+const CODE_BLOCKS = new Set(["fence", "code_block"]);
+
+const plainInline = (token: Token): string =>
+  (token.children ?? [])
+    .map((child) => (PLAIN_TEXT.has(child.type) ? child.content : LINE_BREAKS.has(child.type) ? "\n" : ""))
+    .join("");
+
+const htmlText = (html: string): string =>
+  new DOMParser().parseFromString(githubHtml(html), "text/html").body.textContent ?? "";
+
+export const plainLines = (markdown: string): string[] => {
+  const blocks: string[] = [];
+  let row: string[] | null = null;
+  for (const token of ENGINES.note.parse(markdown, {})) {
+    if (token.type === "tr_open") row = [];
+    else if (token.type === "tr_close" && row) {
+      blocks.push(row.join(", "));
+      row = null;
+    } else if (token.type === "inline") (row ?? blocks).push(plainInline(token));
+    else if (CODE_BLOCKS.has(token.type)) blocks.push(token.content);
+    else if (token.type === "html_block") blocks.push(htmlText(token.content));
+  }
+  return blocks
+    .flatMap((block) => block.split("\n"))
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+};
+
 const renderRun = (run: Token[]): string => md.renderer.renderInline(run, md.options, {}).trim();
 
 const inlineSegments = (token: Token): Segment[] => {
