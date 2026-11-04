@@ -1,10 +1,11 @@
 import { serverStatus } from "$lib/data/serverStatus.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { networkApi, type NetworkStatus } from "$lib/services/networkApi";
-import { systemApi, type GpuInfo, type LogEntry, type SystemInfo } from "$lib/services/systemApi";
+import { systemApi, type GpuInfo, type LogEntry, type ProcessesSnapshot, type SystemInfo } from "$lib/services/systemApi";
 
 const HISTORY_CAP = 90;
 const LOG_CAP = 300;
+const RESOURCES_PAGE = "RESOURCES";
 
 const append = (history: number[], value: number) => [...history, value].slice(-HISTORY_CAP);
 
@@ -13,6 +14,7 @@ interface MonitorSnapshot {
   gpu: GpuInfo | null;
   network: NetworkStatus | null;
   logs: LogEntry[];
+  processes: ProcessesSnapshot | null;
   cpuHistory: number[];
   gpuHistory: number[];
   memHistory: number[];
@@ -24,6 +26,7 @@ const blank: MonitorSnapshot = {
   gpu: null,
   network: null,
   logs: [],
+  processes: null,
   cpuHistory: [],
   gpuHistory: [],
   memHistory: [],
@@ -58,12 +61,22 @@ class Monitor {
   vramHistory = $state<number[]>([]);
   logs = $state<LogEntry[]>([]);
   network = $state<NetworkStatus | null>(null);
+  processes = $state<ProcessesSnapshot | null>(null);
   logRevision = $state(0);
-  page = $state(0);
+  #shown = $state(RESOURCES_PAGE);
 
-  readonly pages = $derived(
-    this.network?.supported === true ? ["RESOURCES", "NETWORK", "SERVER_LOGS"] : ["RESOURCES", "SERVER_LOGS"],
-  );
+  readonly pages = $derived([
+    RESOURCES_PAGE,
+    ...(this.processes !== null ? ["PROCESSES"] : []),
+    ...(this.network?.supported === true ? ["NETWORK"] : []),
+    "SERVER_LOGS",
+  ]);
+
+  readonly page = $derived(Math.max(0, this.pages.indexOf(this.#shown)));
+
+  select(index: number) {
+    this.#shown = this.pages[index] ?? RESOURCES_PAGE;
+  }
 
   #socket: { close: () => void } | null = null;
   #environmentId: string | null = null;
@@ -99,6 +112,7 @@ class Monitor {
       this.#environmentId = next;
       this.#restore((next === null ? undefined : this.#slots.get(next)) ?? blank);
     }
+    this.#restore({ ...blank, logs: this.logs, network: this.network });
     this.failed = false;
     this.reloadNetwork();
     this.#socket = systemApi.stream({
@@ -119,6 +133,7 @@ class Monitor {
         this.logs = [...this.logs, ...items].slice(-LOG_CAP);
         this.logRevision++;
       },
+      onProcesses: (snapshot) => (this.processes = snapshot),
       onDrop: () => (this.failed = true),
     });
   }
@@ -129,6 +144,7 @@ class Monitor {
       gpu: this.gpu,
       network: this.network,
       logs: this.logs,
+      processes: this.processes,
       cpuHistory: this.cpuHistory,
       gpuHistory: this.gpuHistory,
       memHistory: this.memHistory,
@@ -141,6 +157,7 @@ class Monitor {
     this.gpu = snapshot.gpu;
     this.network = snapshot.network;
     this.logs = snapshot.logs;
+    this.processes = snapshot.processes;
     this.cpuHistory = snapshot.cpuHistory;
     this.gpuHistory = snapshot.gpuHistory;
     this.memHistory = snapshot.memHistory;

@@ -14,7 +14,7 @@
   <SegmentedButtons
     options={monitor.pages.map((key) => t(key))}
     selected={monitor.page}
-    onSelect={(index) => (monitor.page = index)}
+    onSelect={(index) => monitor.select(index)}
     {fill}
   />
 {/if}

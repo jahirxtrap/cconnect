@@ -32,6 +32,7 @@ _MAX_CLI_MESSAGE_BYTES = 32 * 1024 * 1024
 _AGENTS_MD_PLUGIN = "cc-plugin-agents-md@builtin"
 _OUTPUT_SHARE = 4
 _MIN_OUTPUT_TOKENS = 1024
+CHANNEL_ENV = "CCONNECT_CHANNEL"
 _CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
 _TURN_CLOCK_SKEW_MS = 5000
 _RETRY_FIELDS = ("attempt", "max_retries", "retry_delay_ms", "error_status", "error", "no_response")
@@ -821,6 +822,7 @@ async def run_prompt(
     adopt: bool = False,
     read_from: Optional[int] = None,
     unlocked: Callable[[], bool] = _locked,
+    channel: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     from claude_agent_sdk._internal.transport.subprocess_cli import SubprocessCLITransport
     from claude_agent_sdk import (
@@ -900,6 +902,8 @@ async def run_prompt(
         allowed = tools if isinstance(tools, list) else []
         options_kwargs["tools"] = [*allowed, _SHARE_RULE] if scope["guides"] else allowed
     session_env = _cli_env(account)
+    if channel:
+        session_env[CHANNEL_ENV] = channel
     if scope["search"]:
         session_env["ENABLE_TOOL_SEARCH"] = "true"
     window = cli_info.provider_window(model, account)

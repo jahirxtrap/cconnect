@@ -17,6 +17,7 @@
   import { formatUptime, monitor } from "./monitor.svelte";
   import MonitorTabs from "./MonitorTabs.svelte";
   import NetworkPage from "./NetworkPage.svelte";
+  import ProcessesPage from "./ProcessesPage.svelte";
 
   const pane = inPane();
 
@@ -63,7 +64,7 @@
     </div>
   {/if}
 
-  <TabPager selected={monitor.page} onSelect={(index) => (monitor.page = index)} class="min-h-0 flex-1">
+  <TabPager selected={monitor.page} onSelect={(index) => monitor.select(index)} class="min-h-0 flex-1">
     <div class={TAB_PAGE_CLASS}>
       <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}">
         <div class="grid gap-2.5 {narrow ? '' : 'grid-cols-2'}">
@@ -151,6 +152,12 @@
         </SettingsGroup>
       </div>
     </div>
+
+    {#if monitor.processes !== null}
+      <div class={TAB_PAGE_CLASS}>
+        <ProcessesPage snapshot={monitor.processes} info={current} />
+      </div>
+    {/if}
 
     {#if hasNetwork && monitor.network}
       <div class={TAB_PAGE_CLASS}>

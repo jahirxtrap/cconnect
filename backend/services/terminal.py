@@ -275,6 +275,10 @@ def listing() -> list[dict]:
     return [meta(term) for term in sorted(_terminals.values(), key=lambda item: item.created_at)]
 
 
+def running() -> list[Terminal]:
+    return [term for term in _terminals.values() if term.alive]
+
+
 def close(session_id: str) -> bool:
     term = _terminals.pop(session_id, None)
     if term is None:

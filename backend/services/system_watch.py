@@ -5,10 +5,12 @@ import threading
 import time
 from typing import Optional
 
-from services import system_monitor
+from services import processes, system_monitor
 
 _SNAPSHOT_INTERVAL = 2.0
+_FIRST_WINDOW = 0.5
 _LOG_TAIL_INTERVAL = 0.5
+_OWNERS_WAIT = 1.0
 _HISTORY_CAP = 90
 _LOG_CAP = 300
 
@@ -18,48 +20,58 @@ class SystemWatchHub:
         self._subscribers: set[asyncio.Queue] = set()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
-        self._stop = threading.Event()
-        self._started = False
+        self._running: Optional[threading.Event] = None
         self._history: list[dict] = []
         self._logs: list[dict] = []
+        self._processes: Optional[dict] = None
         self._offset = 0
 
     async def start(self):
         self._loop = asyncio.get_running_loop()
 
     def stop(self):
-        self._stop.set()
+        with self._lock:
+            running, self._running = self._running, None
+        if running is not None:
+            running.set()
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()
         with self._lock:
             self._subscribers.add(queue)
-            first = len(self._subscribers) == 1
             replay = {"type": "history", "items": list(self._history), "logs": list(self._logs)}
+            listed = self._processes
+            started = None
+            if self._running is None:
+                started = self._running = threading.Event()
         queue.put_nowait(replay)
-        if first and not self._started:
-            self._started = True
-            self._stop.clear()
-            threading.Thread(target=self._sample_loop, name="system-watch", daemon=True).start()
+        if listed is not None:
+            queue.put_nowait(listed)
+        if started is not None:
+            threading.Thread(target=self._sample_loop, args=(started,), name="system-watch", daemon=True).start()
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue):
         with self._lock:
             self._subscribers.discard(queue)
-            idle = not self._subscribers
-        if idle and self._started:
-            self._started = False
-            self.stop()
+            running = self._running if not self._subscribers else None
+            if running is not None:
+                self._running = None
+                self._history.clear()
+                self._processes = None
+        if running is not None:
+            running.set()
 
-    def _sample_loop(self):
-        next_snapshot = 0.0
-        while not self._stop.is_set():
+    def _sample_loop(self, stopped: threading.Event):
+        system_monitor.prime_cpu()
+        next_snapshot = time.monotonic() + _FIRST_WINDOW
+        while not stopped.is_set():
             now = time.monotonic()
             if now >= next_snapshot:
                 next_snapshot = now + _SNAPSHOT_INTERVAL
                 self._push_snapshot()
             self._push_logs()
-            self._stop.wait(_LOG_TAIL_INTERVAL)
+            stopped.wait(_LOG_TAIL_INTERVAL)
 
     def _push_snapshot(self):
         try:
@@ -70,6 +82,20 @@ class SystemWatchHub:
         with self._lock:
             self._history.append(event)
             del self._history[:-_HISTORY_CAP]
+        self._broadcast(event)
+        self._push_processes()
+
+    def _push_processes(self):
+        loop = self._loop
+        if loop is None:
+            return
+        try:
+            found = asyncio.run_coroutine_threadsafe(processes.owners(), loop).result(_OWNERS_WAIT)
+            event = {"type": "processes", **processes.snapshot(found)}
+        except Exception:
+            return
+        with self._lock:
+            self._processes = event
         self._broadcast(event)
 
     def _push_logs(self):

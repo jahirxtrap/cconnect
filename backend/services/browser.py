@@ -353,6 +353,10 @@ class BrowserSession:
         return self._cdp is not None and not self._cdp.closed
 
     @property
+    def pid(self) -> Optional[int]:
+        return self._process.pid if self._process is not None and self._process.poll() is None else None
+
+    @property
     def _page(self) -> str:
         tab = self._tabs.get(self._active)
         return tab.session if tab else ""

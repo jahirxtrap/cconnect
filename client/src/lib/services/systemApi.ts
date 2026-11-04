@@ -1,5 +1,6 @@
+import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { backend, type Profile } from "./backend.svelte";
-import { http, type HttpClient } from "./http";
+import { createHttp, http, type HttpClient, type HttpResult } from "./http";
 import { ReconnectingSocket } from "./socket";
 
 export interface DirEntry {
@@ -62,6 +63,35 @@ export interface LogEntry {
   message: string;
 }
 
+export const PROCESS_KINDS = ["server", "chat", "agent", "terminal", "browser", "other"] as const;
+
+export type ProcessKind = (typeof PROCESS_KINDS)[number];
+
+export interface ProcessUsage {
+  pid: number;
+  name: string;
+  cpu: number;
+  memory: number;
+  started: number;
+}
+
+export type ProcessStop = "open" | "key" | null;
+
+export interface ProcessEntry extends ProcessUsage {
+  kind: ProcessKind;
+  title: string | null;
+  detail: string | null;
+  activity: string | null;
+  stop: ProcessStop;
+  processes: ProcessUsage[];
+}
+
+export interface ProcessesSnapshot {
+  items: ProcessEntry[];
+  cpu: number;
+  memory: number;
+}
+
 export interface ServerUpdate {
   ok: boolean;
   message: string;
@@ -80,6 +110,7 @@ export interface SystemHandlers {
   onHistory: (samples: SystemInfo[], logs: LogEntry[]) => void;
   onInfo: (info: SystemInfo) => void;
   onLogs: (items: LogEntry[]) => void;
+  onProcesses: (snapshot: ProcessesSnapshot) => void;
   onDrop: () => void;
 }
 
@@ -126,6 +157,30 @@ const parseInfo = (raw: Wire): SystemInfo => ({
   netTx: raw.network?.tx ?? 0,
 });
 
+const parseUsage = (raw: Wire): ProcessUsage => ({
+  pid: raw.pid ?? 0,
+  name: raw.name ?? "",
+  cpu: raw.cpu ?? 0,
+  memory: raw.memory ?? 0,
+  started: raw.started ?? 0,
+});
+
+const parseProcess = (raw: Wire): ProcessEntry => ({
+  ...parseUsage(raw),
+  kind: PROCESS_KINDS.includes(raw.kind) ? raw.kind : "other",
+  title: raw.title ?? null,
+  detail: raw.detail ?? null,
+  activity: raw.activity ?? null,
+  stop: raw.stop === "open" || raw.stop === "key" ? raw.stop : null,
+  processes: ((raw.processes as Wire[]) ?? []).map(parseUsage),
+});
+
+const parseProcesses = (raw: Wire): ProcessesSnapshot => ({
+  items: ((raw.items as Wire[]) ?? []).map(parseProcess),
+  cpu: raw.total?.cpu ?? 0,
+  memory: raw.total?.memory ?? 0,
+});
+
 const parseUpdate = (raw: Wire): ServerUpdate => ({
   ok: raw.ok !== false,
   message: raw.message ?? "",
@@ -149,6 +204,10 @@ const parseLog = (raw: Wire): LogEntry => ({
 export const createSystemApi = (client: HttpClient, profile: () => Profile) => ({
   async restart(): Promise<boolean> {
     return (await client.post("/system/restart")) !== null;
+  },
+
+  stopProcess(pid: number, key: string): Promise<HttpResult<Wire>> {
+    return createHttp(profile, () => securityKeys.headers(key)).call<Wire>("POST", `/system/processes/${pid}/stop`, undefined, {});
   },
 
   async checkUpdate(): Promise<ServerUpdate | null> {
@@ -183,6 +242,7 @@ export const createSystemApi = (client: HttpClient, profile: () => Profile) => (
         onMessage: (message) => {
           if (message.type === "system") handlers.onInfo(parseInfo(message));
           else if (message.type === "logs") handlers.onLogs(((message.items as Wire[]) ?? []).map(parseLog));
+          else if (message.type === "processes") handlers.onProcesses(parseProcesses(message));
           else if (message.type === "history") {
             handlers.onHistory(
               ((message.items as Wire[]) ?? []).map(parseInfo),

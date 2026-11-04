@@ -98,6 +98,10 @@ def setup_log_capture() -> None:
         std = logging.getLogger(name)
         std.handlers = [_InterceptHandler()]
         std.propagate = False
+    prime_cpu()
+
+
+def prime_cpu() -> None:
     psutil.cpu_percent(interval=None)
 
 

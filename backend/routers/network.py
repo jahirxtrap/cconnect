@@ -1,5 +1,7 @@
 """Host network status, Wi-Fi control and bandwidth tests."""
 
+import asyncio
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.responses import api_response
@@ -15,23 +17,14 @@ router = APIRouter(tags=["network"])
 async def get_network():
     if not network.SUPPORTED:
         return api_response(data={"supported": False})
-    return api_response(data={
-        "supported": True,
-        "wired_control": network.WIRED_CONTROL,
-        "needs_password": network.WIRED_CONTROL and not network.has_sudo_password(),
-        "speedtest": speedtest.available(),
-        "connectivity": network.connectivity(),
-        "wifi_radio": network.wifi_radio_state(),
-        "wifi_ssid": network.wifi_current(),
-        "interfaces": network.interfaces(),
-    })
+    return api_response(data={**await asyncio.to_thread(network.status), "speedtest": speedtest.available()})
 
 
 @router.get("/network/wifi")
 async def scan_wifi():
     if not network.SUPPORTED:
         return api_response(status=404)
-    return api_response(data={"networks": network.wifi_scan()})
+    return api_response(data={"networks": await asyncio.to_thread(network.wifi_scan)})
 
 
 @router.post("/network/wifi/connect")

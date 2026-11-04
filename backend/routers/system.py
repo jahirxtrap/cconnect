@@ -3,18 +3,27 @@
 import asyncio
 import os
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Header, Query, WebSocket, WebSocketDisconnect
 
 from core import paths
+from core.access import key_matches
 from core.config import RESTART_EXIT_CODE
 from core.responses import api_response
 from core.ws import send_event
 from middleware.public_auth import ws_bearer_ok
-from services import directories, live_sessions, repo, system_monitor, system_watch
+from services import directories, live_sessions, processes, repo, system_monitor, system_watch
 
 router = APIRouter(tags=["system"])
 
 _EXIT_DELAY = 0.5
+_STOP_STATUS = {processes.STOPPED: 200, processes.LOCKED: 403}
+_STOP_MISSING = 404
+
+
+@router.post("/system/processes/{pid}/stop")
+async def stop_process(pid: int, x_security_key: str = Header("")):
+    stopped = await processes.stop(pid, key_matches(x_security_key))
+    return api_response(status=_STOP_STATUS.get(stopped, _STOP_MISSING))
 
 
 @router.get("/system")

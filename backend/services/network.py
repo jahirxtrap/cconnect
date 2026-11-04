@@ -307,6 +307,18 @@ def wifi_radio_state() -> Optional[bool]:
     return None
 
 
+def status() -> dict:
+    return {
+        "supported": True,
+        "wired_control": WIRED_CONTROL,
+        "needs_password": WIRED_CONTROL and not has_sudo_password(),
+        "connectivity": connectivity(),
+        "wifi_radio": wifi_radio_state(),
+        "wifi_ssid": wifi_current(),
+        "interfaces": interfaces(),
+    }
+
+
 def _windows_wifi_adapter() -> Optional[str]:
     for adapter in _ps_json(
         "Get-NetAdapter | Where-Object { $_.MediaType -eq 'Native 802.11' -and $_.Status -ne 'Not Present' }"

@@ -101,6 +101,10 @@ class AgentConnection:
         )
 
     @property
+    def pid(self) -> Optional[int]:
+        return self._process.pid if self._process is not None and self._process.returncode is None else None
+
+    @property
     def capabilities(self) -> dict:
         return self.info.get("agentCapabilities") or {}
 
@@ -294,6 +298,9 @@ class ConnectionPool:
     def log(self, agent_id: str) -> list[str]:
         return list(self._logs.get(agent_id) or [])
 
+    def connections(self) -> list[AgentConnection]:
+        return list(self._connections.values())
+
     def find(self, agent_id: str, cwd: str) -> Optional[AgentConnection]:
         connection = self._connections.get((agent_id, cwd))
         return connection if connection is not None and connection.alive else None
@@ -333,6 +340,12 @@ class ConnectionPool:
         connection.expiry = None
         if connection.users > 0:
             return
+        await self._retire(connection)
+
+    async def stop(self, connection: AgentConnection) -> None:
+        if connection.expiry is not None:
+            connection.expiry.cancel()
+            connection.expiry = None
         await self._retire(connection)
 
     async def _retire(self, connection: AgentConnection) -> None:

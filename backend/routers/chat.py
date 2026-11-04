@@ -120,6 +120,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
             try:
                 async for event in run_prompt(
                     resident=resident,
+                    channel=session.channel,
                     unlocked=lambda: session.unlocked,
                     prompt=prompt_text,
                     images=prompt_images,
