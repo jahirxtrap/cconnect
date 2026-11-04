@@ -604,7 +604,6 @@ required for a plain local run.
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
 | `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `run.py` when it exposes the server, so you rarely write it yourself |
 | `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
-| `WEB_CONCURRENCY` | `2` | Uvicorn workers with `run.py --production`. Ignored on Windows, which always runs one |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
 | `BROWSER_HEADLESS` | `1` | Runs it without a window; set `0` to watch the real browser on the server |

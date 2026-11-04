@@ -402,7 +402,7 @@ def _flag_parser() -> argparse.ArgumentParser:
     """The launcher's original flags, accepted alongside the subcommands."""
     parser = argparse.ArgumentParser(description="CConnect backend launcher.")
     parser.add_argument("--production", action="store_true",
-                        help="No reload, multi-worker (Linux/macOS only).")
+                        help="No reload (Linux/macOS only).")
     parser.add_argument("--expose", choices=list(_PROVIDERS), default="",
                         help="Serve the backend through the given provider: tailnet keeps it "
                              "inside your tailnet, tailscale and caddy publish it.")
@@ -433,7 +433,7 @@ def _command_parser() -> argparse.ArgumentParser:
 
     run = commands.add_parser("run", help="Serve on this machine and its network. The default.")
     run.add_argument("--production", action="store_true",
-                     help="No reload, multi-worker (Linux/macOS only).")
+                     help="No reload (Linux/macOS only).")
     run.add_argument("--detach", action="store_true",
                      help="Run in the background; the server outlives the terminal.")
     run.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
@@ -446,7 +446,7 @@ def _command_parser() -> argparse.ArgumentParser:
     expose.add_argument("--detach", action="store_true",
                         help="Run in the background; the server outlives the terminal.")
     expose.add_argument("--production", action="store_true",
-                        help="No reload, multi-worker (Linux/macOS only).")
+                        help="No reload (Linux/macOS only).")
     expose.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
 
     commands.add_parser("stop", help="Stop a backend started with --detach.")
@@ -691,13 +691,9 @@ def main():
         _print_security_key(key_generated)
 
     reload = not args.production and not is_windows
-    workers = int(os.environ.get("WEB_CONCURRENCY", "2")) if (args.production and not is_windows) else 1
 
     cmd = [sys.executable, "-m", "uvicorn", _APP, "--host", "0.0.0.0", "--port", str(port)]
-    if reload:
-        cmd += ["--reload", "--reload-exclude", str(paths.DATA_DIR)]
-    elif workers > 1:
-        cmd += ["--workers", str(workers)]
+    cmd += ["--reload", "--reload-exclude", str(paths.DATA_DIR)] if reload else ["--workers", "1"]
 
     paths.RESTART_FLAG.unlink(missing_ok=True)
     paths.STOP_FLAG.unlink(missing_ok=True)

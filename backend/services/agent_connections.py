@@ -26,6 +26,7 @@ LOG_LINES = 400
 TERMINAL_METHOD = "terminal"
 LEGACY_TERMINAL_AUTH = "terminal-auth"
 BATCH_SUFFIXES = (".bat", ".cmd")
+CLOSING = "closing"
 CLIENT_INFO = {"name": "cconnect", "title": "CConnect", "version": release.VERSION}
 CLIENT_CAPABILITIES = {
     "fs": {"readTextFile": True, "writeTextFile": True},
@@ -288,6 +289,7 @@ class ConnectionPool:
         self._connections: dict[tuple[str, str], AgentConnection] = {}
         self._locks: dict[tuple[str, str], asyncio.Lock] = {}
         self._logs: dict[str, collections.deque] = {}
+        self._closing = False
 
     def log(self, agent_id: str) -> list[str]:
         return list(self._logs.get(agent_id) or [])
@@ -305,6 +307,8 @@ class ConnectionPool:
     async def take(self, agent_id: str, cwd: str) -> AgentConnection:
         key = (agent_id, cwd)
         async with self._locks.setdefault(key, asyncio.Lock()):
+            if self._closing:
+                raise agents.AgentError(CLOSING, agent_id)
             connection = self._connections.get(key)
             if connection is None or not connection.alive:
                 agent = agents.usable(agent_id)
@@ -342,6 +346,10 @@ class ConnectionPool:
             await self._retire(connection)
 
     async def close_all(self) -> None:
+        self._closing = True
+        for lock in list(self._locks.values()):
+            async with lock:
+                pass
         for connection in list(self._connections.values()):
             await self._retire(connection)
 
