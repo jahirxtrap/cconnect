@@ -1,4 +1,5 @@
 import { authWire, type AuthInput } from "$lib/data/auth";
+import type { McpConfig } from "$lib/data/installRequest";
 import { usageOf, type Usage } from "$lib/data/usageWindows";
 import { backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { http, type HttpClient } from "./http";
@@ -102,6 +103,10 @@ export interface ActionResult {
 
 export interface PluginChange extends ActionResult {
   held: number;
+}
+
+export interface ActionOutcome extends ActionResult {
+  status: number;
 }
 
 
@@ -294,6 +299,11 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return data?.files ?? [];
   },
 
+  async skillInstall(source: string, path: string, ref: string): Promise<ActionOutcome> {
+    const result = await client.call<Wire>("POST", "/claude/skills/install", undefined, { source, path, ref });
+    return { ...toAction(result.data), status: result.status };
+  },
+
   skillFileUrl(plugin: string | null, skillId: string, file = "SKILL.md"): string {
     const base = baseUrlOf(profile());
     const pluginPart = plugin ? `&plugin=${encodeURIComponent(plugin)}` : "";
@@ -319,6 +329,11 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
 
   async mcpAdd(name: string, target: string, transport: string, auth: AuthInput, env: string[]): Promise<ActionResult> {
     return toAction(await client.post<Wire>("/claude/mcp", { name, target, transport, auth: authWire(auth), env }));
+  },
+
+  async mcpAddConfig(name: string, config: McpConfig): Promise<ActionOutcome> {
+    const result = await client.call<Wire>("POST", "/claude/mcp/config", undefined, { name, config });
+    return { ...toAction(result.data), status: result.status };
   },
 
   async mcpRemove(name: string): Promise<ActionResult> {

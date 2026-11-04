@@ -12,6 +12,7 @@
   import { theme } from "$lib/design/theme.svelte";
   import { restorePacks } from "$lib/design/packs/library";
   import { publishNotificationTitles } from "$lib/platform/androidNotify";
+  import { listenOpenedLinks } from "$lib/platform/openedLinks";
   import { listenNativeFiles } from "$lib/platform/pastedContent";
   import { desktop } from "$lib/platform/desktop.svelte";
   import { watchPresence } from "$lib/platform/discordPresence.svelte";
@@ -25,6 +26,8 @@
   import ChatScreen from "$lib/screens/chat/ChatScreen.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
+  import InstallDialog from "$lib/screens/install/InstallDialog.svelte";
+  import { installOffers } from "$lib/screens/install/installOffers.svelte";
   import { monitor } from "$lib/screens/monitor/monitor.svelte";
   import PackOfferDialog from "$lib/screens/packs/PackOfferDialog.svelte";
   import { takePacks } from "$lib/screens/packs/packIntake";
@@ -36,6 +39,7 @@
 
   theme.start();
   listenNativeFiles(takePacks);
+  listenOpenedLinks((link) => installOffers.offerLink(link));
   void restorePacks();
   layout.start();
   navigation.start();
@@ -160,6 +164,12 @@
 {#if packOffers.current}
   {#key packOffers.current.id}
     <PackOfferDialog offer={packOffers.current} onDismiss={() => packOffers.dismiss()} />
+  {/key}
+{/if}
+
+{#if installOffers.current}
+  {#key installOffers.current.id}
+    <InstallDialog request={installOffers.current.request} onDismiss={() => installOffers.dismiss()} />
   {/key}
 {/if}
 

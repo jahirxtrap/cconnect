@@ -1,5 +1,6 @@
 import mimetypes
 
+import httpx
 from fastapi import APIRouter, Header, HTTPException, WebSocket
 from fastapi.responses import FileResponse, Response
 
@@ -7,7 +8,7 @@ from core.access import key_matches
 from core.responses import FILE_HEADERS, api_response
 from core.ws import stream_watch
 from services import packs
-from services.pack_format import MIME
+from services.pack_format import MIME, PackFormatError
 
 router = APIRouter(tags=["Packs"])
 
@@ -15,6 +16,17 @@ router = APIRouter(tags=["Packs"])
 @router.websocket("/packs/ws")
 async def packs_ws(ws: WebSocket):
     await stream_watch(ws, packs.watch, lambda queue, _message: packs.watch.set_path(queue, ""))
+
+
+@router.get("/packs/fetch")
+def fetch_pack(url: str):
+    try:
+        data = packs.fetch(url)
+    except PackFormatError as exc:
+        return api_response(status=422, message=str(exc))
+    except httpx.HTTPError as exc:
+        return api_response(status=502, message=str(exc))
+    return Response(content=data, media_type=MIME, headers=FILE_HEADERS)
 
 
 @router.get("/packs/{name}")

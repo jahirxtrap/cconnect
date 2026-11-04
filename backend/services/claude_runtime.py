@@ -109,6 +109,10 @@ def _blocks_guide(capabilities: list[str]) -> str:
     return guide.replace("{{BLOCK_TYPES}}", types)
 
 
+def _install_guide(capabilities: list[str]) -> str:
+    return _prompt_file("INSTALL.md") if "install" in capabilities else ""
+
+
 def _suggestions_guide() -> str:
     if not settings_store.get("suggestions"):
         return ""
@@ -148,6 +152,7 @@ def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]], scope: 
     guides = [
         _blocks_guide(caps),
         _browser_guide(caps) if scope["cconnect"] else "",
+        _install_guide(caps) if scope["cconnect"] else "",
         _suggestions_guide(),
         _mods_guide() if scope["project_files"] else "",
     ]

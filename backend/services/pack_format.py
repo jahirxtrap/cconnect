@@ -40,6 +40,7 @@ _MESSAGES = {
     "reserved": "The id {0} belongs to a built-in pack",
     "duplicate": "{0} repeats an id already in the pack",
     "empty": "The pack has nothing to install",
+    "source": "{0} is not an https address",
 }
 
 

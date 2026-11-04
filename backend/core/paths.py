@@ -1,6 +1,7 @@
 """Every path the backend owns, grouped by what the data is."""
 
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -85,6 +86,14 @@ def unlink_dir(target: Path) -> None:
         )
     else:
         target.unlink()
+
+
+def remove_tree(target: Path) -> bool:
+    for item in target.rglob("*"):
+        if item.is_file() and not os.access(item, os.W_OK):
+            item.chmod(stat.S_IWRITE)
+    shutil.rmtree(target, ignore_errors=True)
+    return not target.exists()
 
 
 OWNED_DIRS = (

@@ -121,7 +121,7 @@ pub fn run() {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
             }
-            opened::hold(app, argv.into_iter().skip(1).map(std::path::PathBuf::from));
+            opened::take(app, argv.into_iter().skip(1).collect());
         }));
         builder = builder.manage(opened::Opened::default());
         builder = builder.plugin(
@@ -158,7 +158,7 @@ pub fn run() {
             #[cfg(windows)]
             browser::hold_keyboard(_app.handle());
             #[cfg(desktop)]
-            opened::hold(_app.handle(), std::env::args().skip(1).map(std::path::PathBuf::from));
+            opened::take(_app.handle(), std::env::args().skip(1).collect());
             #[cfg(target_os = "android")]
             android::install(_app.handle());
             Ok(())
@@ -203,6 +203,8 @@ pub fn run() {
             media::media_close,
             #[cfg(desktop)]
             opened::opened_files,
+            #[cfg(desktop)]
+            opened::opened_links,
             #[cfg(desktop)]
             browser::browser_open,
             #[cfg(desktop)]
@@ -280,7 +282,8 @@ pub fn run() {
             }
             #[cfg(target_os = "macos")]
             tauri::RunEvent::Opened { urls } => {
-                opened::hold(app, urls.into_iter().filter_map(|url| url.to_file_path().ok()));
+                opened::hold(app, urls.iter().filter_map(|url| url.to_file_path().ok()));
+                opened::hold_links(app, urls.iter().map(|url| url.to_string()));
             }
             tauri::RunEvent::Exit => {
                 #[cfg(desktop)]

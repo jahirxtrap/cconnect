@@ -74,9 +74,17 @@ class ServerPacks {
     imageCache.load(this.previewKey(pack), () => fetchBlob(url));
   }
 
-  async download(pack: ServerPack): Promise<Blob | null> {
+  download(pack: ServerPack): Promise<Blob | null> {
+    return this.#blob(this.urlOf(pack));
+  }
+
+  fetchLink(url: string): Promise<Blob | null> {
+    return this.#blob(withToken(`${backend.baseUrl}/packs/fetch?url=${encodeURIComponent(url)}`, backend.active));
+  }
+
+  async #blob(url: string): Promise<Blob | null> {
     try {
-      const response = await fetchFile(this.urlOf(pack));
+      const response = await fetchFile(url);
       return response.ok ? await response.blob() : null;
     } catch {
       return null;

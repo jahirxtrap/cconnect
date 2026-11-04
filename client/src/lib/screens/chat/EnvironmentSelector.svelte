@@ -4,7 +4,7 @@
   import { joined } from "$lib/data/format";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { backend, address } from "$lib/services/backend.svelte";
+  import { address, backend, environmentOptions } from "$lib/services/backend.svelte";
   import AppLogo from "$lib/ui/AppLogo.svelte";
   import { SUBTITLE_CLASS, TITLE_CLASS } from "$lib/ui/AppTopBar.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
@@ -27,13 +27,7 @@
   const profile = $derived(backend.find(selected));
   const locked = $derived(!profile || settings.environmentLocked);
 
-  const options = $derived(
-    backend.environments.map((profile) => ({
-      value: profile.id,
-      label: profile.name,
-      subtitle: address(profile),
-    })),
-  );
+  const options = $derived(environmentOptions());
 </script>
 
 {#if compact}

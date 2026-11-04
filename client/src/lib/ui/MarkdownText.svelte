@@ -1,5 +1,6 @@
 <script lang="ts">
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
+  import Download from "@lucide/svelte/icons/download";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import FileIcon from "@lucide/svelte/icons/file";
   import FolderArchive from "@lucide/svelte/icons/folder-archive";
@@ -9,9 +10,11 @@
   import OctagonAlert from "@lucide/svelte/icons/octagon-alert";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import { isArchive, visibleName } from "$lib/data/format";
+  import { isInstallLink } from "$lib/data/installRequest";
   import { t } from "$lib/i18n/index.svelte";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { createSegmenter, type Segment } from "$lib/markdown/render";
+  import { installOffers } from "$lib/screens/install/installOffers.svelte";
   import { backend, sharedRootOf } from "$lib/services/backend.svelte";
   import { contextServer } from "$lib/services/serverContext";
   import CconnectBlockView from "./CconnectBlockView.svelte";
@@ -64,6 +67,7 @@
   const open = (url: string, filename = filenameOf(url)) => {
     const target = linkTarget?.(url);
     if (target) target();
+    else if (isInstallLink(url)) installOffers.offerLink(url);
     else if (onSharedLink && shared(url)) onSharedLink(url, filename);
     else externalLink = url;
   };
@@ -100,7 +104,7 @@
       }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;
-      const [file, archive, external, ...alerts] = sources;
+      const [file, archive, external, install, ...alerts] = sources;
       for (const quote of node.querySelectorAll<HTMLElement>("blockquote.md-alert")) {
         if (quote.dataset.decorated) continue;
         quote.dataset.decorated = "true";
@@ -115,10 +119,10 @@
         anchor.dataset.decorated = "true";
         anchor.dataset.press = "off";
         const url = anchor.getAttribute("href") ?? "";
-        const own = shared(url) || !!linkTarget?.(url);
-        const icon = (own ? (isArchive(filenameOf(url)) ? archive : file) : external).cloneNode(
-          true,
-        ) as SVGElement;
+        const installing = isInstallLink(url);
+        const own = installing || shared(url) || !!linkTarget?.(url);
+        const source = installing ? install : own ? (isArchive(filenameOf(url)) ? archive : file) : external;
+        const icon = source.cloneNode(true) as SVGElement;
         icon.classList.add("md-link-icon");
         if (own) anchor.prepend(icon);
         else anchor.append(icon);
@@ -141,6 +145,7 @@
   <FileIcon size={16} />
   <FolderArchive size={16} />
   <ExternalLink size={16} />
+  <Download size={16} />
   <Info size={16} />
   <Lightbulb size={16} />
   <MessageSquareWarning size={16} />

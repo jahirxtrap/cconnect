@@ -30,6 +30,9 @@ import org.json.JSONObject
 
 private const val SHARE_ATTEMPTS = 20
 private const val SHARE_RETRY_MS = 400L
+private const val PASTE_HOOK = "__cconnectPaste"
+private const val LINK_HOOK = "__cconnectLink"
+private const val LINK_SCHEME = "cconnect"
 private const val WEBVIEW_DATA = "app_webview"
 private const val WEBVIEW_SEED = "variations_seed"
 
@@ -42,8 +45,7 @@ class MainActivity : TauriActivity() {
   private val narrator = lazy { Speech(this) { content } }
   private var pendingSave: Triple<String, String, String>? = null
   private var content: WebView? = null
-  private var pendingShare: String? = null
-  private var pendingOpened = false
+  private var pendingCall: Pair<String, String>? = null
   private var shareAttempts = 0
   @Volatile private var safeArea: Insets = Insets.NONE
   @Volatile private var keyboard = 0
@@ -131,6 +133,11 @@ class MainActivity : TauriActivity() {
   }
 
   private fun takeShare(intent: Intent?) {
+    val link = intent?.takeIf { it.action == Intent.ACTION_VIEW }?.data?.takeIf { it.scheme == LINK_SCHEME }
+    if (link != null) {
+      queueCall(LINK_HOOK, JSONObject.quote(link.toString()))
+      return
+    }
     val uris = when (intent?.action) {
       Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
       Intent.ACTION_SEND_MULTIPLE ->
@@ -141,21 +148,22 @@ class MainActivity : TauriActivity() {
     if (uris.isEmpty()) return
     val json = PastedContent.encode(this, uris)
     if (json == "[]") return
-    pendingShare = json
-    pendingOpened = intent.action == Intent.ACTION_VIEW
+    queueCall(PASTE_HOOK, "${JSONObject.quote(json)}, ${intent.action == Intent.ACTION_VIEW}")
+  }
+
+  private fun queueCall(hook: String, arguments: String) {
+    pendingCall = hook to arguments
     shareAttempts = 0
   }
 
   /** The web view only takes it once the app registered its hook, which lags a cold start. */
   private fun deliverShare() {
-    val json = pendingShare ?: return
+    val (hook, arguments) = pendingCall ?: return
     val view = content ?: return
     if (shareAttempts++ > SHARE_ATTEMPTS) return
     view.postDelayed({
-      view.evaluateJavascript(
-        "window.__cconnectPaste ? (window.__cconnectPaste(${JSONObject.quote(json)}, $pendingOpened), true) : false",
-      ) { accepted ->
-        if (accepted == "true") pendingShare = null else deliverShare()
+      view.evaluateJavascript("window.$hook ? (window.$hook($arguments), true) : false") { accepted ->
+        if (accepted == "true") pendingCall = null else deliverShare()
       }
     }, SHARE_RETRY_MS)
   }

@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
 const OPENED_EVENT: &str = "opened-files";
+const LINKS_EVENT: &str = "opened-links";
+const LINK_SCHEME: &str = "cconnect:";
 
 #[derive(Deserialize)]
 struct PackSchema {
@@ -18,7 +20,10 @@ static SCHEMA: LazyLock<PackSchema> = LazyLock::new(|| {
 });
 
 #[derive(Default)]
-pub struct Opened(Mutex<Vec<PathBuf>>);
+pub struct Opened {
+    files: Mutex<Vec<PathBuf>>,
+    links: Mutex<Vec<String>>,
+}
 
 #[derive(Serialize)]
 pub struct OpenedFile {
@@ -37,15 +42,39 @@ pub fn hold(app: &AppHandle, paths: impl IntoIterator<Item = PathBuf>) {
     if packs.is_empty() {
         return;
     }
-    if let Ok(mut held) = app.state::<Opened>().0.lock() {
+    if let Ok(mut held) = app.state::<Opened>().files.lock() {
         held.extend(packs);
     }
     let _ = app.emit(OPENED_EVENT, ());
 }
 
+pub fn hold_links(app: &AppHandle, args: impl IntoIterator<Item = String>) {
+    let links: Vec<String> = args
+        .into_iter()
+        .filter(|arg| arg.to_ascii_lowercase().starts_with(LINK_SCHEME))
+        .collect();
+    if links.is_empty() {
+        return;
+    }
+    if let Ok(mut held) = app.state::<Opened>().links.lock() {
+        held.extend(links);
+    }
+    let _ = app.emit(LINKS_EVENT, ());
+}
+
+pub fn take(app: &AppHandle, args: Vec<String>) {
+    hold(app, args.iter().map(PathBuf::from));
+    hold_links(app, args);
+}
+
+#[tauri::command]
+pub fn opened_links(state: State<'_, Opened>) -> Vec<String> {
+    state.links.lock().map(|mut held| std::mem::take(&mut *held)).unwrap_or_default()
+}
+
 #[tauri::command]
 pub fn opened_files(state: State<'_, Opened>) -> Vec<OpenedFile> {
-    let paths = state.0.lock().map(|mut held| std::mem::take(&mut *held)).unwrap_or_default();
+    let paths = state.files.lock().map(|mut held| std::mem::take(&mut *held)).unwrap_or_default();
     paths
         .into_iter()
         .filter_map(|path| {

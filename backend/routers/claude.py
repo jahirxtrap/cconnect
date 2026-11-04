@@ -47,6 +47,12 @@ class PluginReloadBody(BaseModel):
     force: bool = False
 
 
+class SkillInstallBody(BaseModel):
+    source: str
+    path: str = ""
+    ref: str = ""
+
+
 class MarketplaceActionBody(BaseModel):
     action: str  # add | remove | update
     target: str  # source for add, name otherwise
@@ -58,6 +64,20 @@ class McpAddBody(BaseModel):
     transport: str = "stdio"
     auth: ProviderAuth = Field(default_factory=ProviderAuth)
     env: list[str] = Field(default_factory=list)
+
+
+class McpConfig(BaseModel):
+    command: str = ""
+    args: list[str] = Field(default_factory=list)
+    env: dict[str, str] = Field(default_factory=dict)
+    url: str = ""
+    type: str = ""
+    headers: dict[str, str] = Field(default_factory=dict)
+
+
+class McpConfigBody(BaseModel):
+    name: str
+    config: McpConfig
 
 
 class ToggleBody(BaseModel):
@@ -200,6 +220,12 @@ def get_skill_file(skill: str, plugin: str | None = None, file: str = "SKILL.md"
     return Response(content=text, media_type="text/markdown; charset=utf-8")
 
 
+@router.post("/claude/skills/install")
+async def install_skill(body: SkillInstallBody):
+    result = await asyncio.to_thread(claude_manage.install_skill, body.source, body.path, body.ref)
+    return api_response(data=await claude_manage.reload_after(result, "reload-skills"))
+
+
 @router.get("/claude/mcp")
 def get_mcp():
     return api_response(data=claude_assets.list_mcp_servers())
@@ -210,6 +236,11 @@ def add_mcp(body: McpAddBody):
     return api_response(
         data=claude_manage.mcp_add(body.name, body.target, body.transport, body.auth.model_dump(), body.env)
     )
+
+
+@router.post("/claude/mcp/config")
+def add_mcp_config(body: McpConfigBody):
+    return api_response(data=claude_manage.mcp_add_config(body.name, body.config.model_dump()))
 
 
 @router.post("/claude/mcp/toggle")

@@ -10,7 +10,7 @@
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { address, backend } from "$lib/services/backend.svelte";
+  import { backend, environmentOptions } from "$lib/services/backend.svelte";
   import { accountsStore } from "$lib/data/accountsStore.svelte";
   import { claudeRefresh } from "$lib/data/claudeRefresh.svelte";
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
@@ -213,11 +213,7 @@
 {#if envOpen}
   <SelectDialog
     title={t("ENVIRONMENT")}
-    options={backend.environments.map((profile) => ({
-      value: profile.id,
-      label: profile.name,
-      subtitle: address(profile),
-    }))}
+    options={environmentOptions()}
     selected={chat.environmentId ?? ""}
     onSelect={(id) => chat.selectEnvironment(id)}
     onDismiss={() => (envOpen = false)}

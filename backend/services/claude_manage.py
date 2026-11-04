@@ -5,24 +5,30 @@ import json
 import re
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from core import cli_manager, paths
-from services import accounts, claude_assets, cli_settings, files
+from services import accounts, claude_assets, cli_settings, files, git
 
 _PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "update"})
 _PLUGIN_REMOVALS = frozenset({"uninstall", "disable"})
 _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
+_MCP_REMOTE = ("http", "sse")
 
 OFFICIAL_MARKETPLACE = "anthropics/claude-plugins-official"
 
 _ENV_ENTRY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
-_PLUGIN_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_FOLDER_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_GITHUB_REPO = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _NOTE = re.compile(r"^\S+ (hooks|calls): (.+)$")
 _NOTE_ITEMS = re.compile(r",\s*(?![^{]*\})")
 _VIA = re.compile(r"\s*\(via [^)]*\)$")
 _COMMAND_HOOK = re.compile(r"^command\.run\{command=([^}]+)\}$")
 _COPY_SKIPS = (".git", "node_modules")
+_SECURE_GIT = "https://"
+_SKILL_FILE = "SKILL.md"
+_CLONE_TIMEOUT = 120
 
 
 def _shared(result: dict) -> dict:
@@ -82,15 +88,15 @@ def _plugin_place(plugin: str) -> tuple[list[str], str | None]:
     return (["-s", scope] if scope else []), (project_path if project_path and Path(project_path).is_dir() else None)
 
 
-async def reload_plugins(force: bool) -> dict:
+async def reload_plugins(force: bool, command: str = "reload-plugins") -> dict:
     from services.live_sessions import registry
 
-    reports = await asyncio.gather(*(live.reload("reload-plugins", hold=not force) for live in registry.residents()))
+    reports = await asyncio.gather(*(live.reload(command, hold=not force) for live in registry.residents()))
     return {"held": sum(1 for report in reports if report and report.get("held"))}
 
 
-async def reload_after(result: dict) -> dict:
-    return {**result, **await reload_plugins(force=False)} if result.get("ok") else result
+async def reload_after(result: dict, command: str = "reload-plugins") -> dict:
+    return {**result, **await reload_plugins(False, command)} if result.get("ok") else result
 
 
 async def after_plugin_action(action: str, plugin: str, result: dict) -> dict:
@@ -177,7 +183,7 @@ def set_plugin_options(plugin: str, values: dict[str, str]) -> dict:
 def add_local_plugin(source: str) -> dict:
     folder = Path(source).expanduser()
     name = claude_assets.read_manifest(folder).get("name")
-    if not isinstance(name, str) or not _PLUGIN_NAME.match(name):
+    if not isinstance(name, str) or not _FOLDER_NAME.match(name):
         return {"ok": False, "message": "the folder holds no plugin manifest with a valid name"}
     target = claude_assets.SKILLS_DIR / name
     if target.exists():
@@ -191,6 +197,65 @@ def add_local_plugin(source: str) -> dict:
         shutil.copytree(folder, target, ignore=shutil.ignore_patterns(*_COPY_SKIPS))
     except OSError as exc:
         return {"ok": False, "message": str(exc)}
+    return _shared({"ok": True, "message": ""})
+
+
+def _clone_url(source: str) -> str | None:
+    if _GITHUB_REPO.match(source):
+        return f"https://github.com/{source}.git"
+    return source if source.startswith(_SECURE_GIT) else None
+
+
+def _skill_skips(directory: str, names: list[str]) -> list[str]:
+    return [name for name in names if name in _COPY_SKIPS or paths.is_link(Path(directory) / name)]
+
+
+def _fetch_skill(url: str, path: str, ref: str, scratch: Path) -> Path | str:
+    checkout = scratch / "checkout"
+    branch = ["--branch", ref] if ref else []
+    steps = [
+        (scratch, ["clone", "--depth", "1", "--filter=blob:none", "--sparse", *branch, "--", url, str(checkout)]),
+        (checkout, ["sparse-checkout", "set", path] if path else ["sparse-checkout", "disable"]),
+    ]
+    for root, args in steps:
+        try:
+            done = git.run(root, *args, timeout=_CLONE_TIMEOUT, writes=True)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return str(exc)
+        if done.returncode != 0:
+            return (done.stderr.strip().splitlines() or [f"git {args[0]} failed"])[-1]
+    folder = (checkout / path).resolve()
+    if not folder.is_relative_to(checkout.resolve()) or not (folder / _SKILL_FILE).is_file():
+        return f"no {_SKILL_FILE} in {path or 'the root of the repository'}"
+    return folder
+
+
+def install_skill(source: str, path: str, ref: str) -> dict:
+    url = _clone_url(source.strip())
+    if url is None:
+        return {"ok": False, "message": "the source must be owner/repo on GitHub or an https git URL"}
+    path = path.strip().strip("/")
+    name = (path or url.removesuffix(".git")).rstrip("/").rpartition("/")[2]
+    if not _FOLDER_NAME.match(name):
+        return {"ok": False, "message": f"{name} is not a valid skill name"}
+    target = claude_assets.SKILLS_DIR / name
+    if claude_assets.read_manifest(target):
+        return {"ok": False, "message": f"the local plugin {name} already uses that name"}
+    scratch = Path(tempfile.mkdtemp(prefix="cconnect-skill-"))
+    try:
+        folder = _fetch_skill(url, path, ref.strip(), scratch)
+        if isinstance(folder, str):
+            return {"ok": False, "message": folder}
+        if paths.is_link(target):
+            paths.unlink_dir(target)
+        elif target.exists() and not paths.remove_tree(target):
+            return {"ok": False, "message": f"{target} could not be replaced"}
+        shutil.copytree(folder, target, ignore=_skill_skips)
+    except OSError as exc:
+        paths.remove_tree(target)
+        return {"ok": False, "message": str(exc)}
+    finally:
+        paths.remove_tree(scratch)
     return _shared({"ok": True, "message": ""})
 
 
@@ -235,20 +300,34 @@ async def ensure_official_marketplace() -> None:
     await asyncio.to_thread(marketplace_action, "add", OFFICIAL_MARKETPLACE)
 
 
+def _mcp_add(name: str, transport: str, target: str, args: list[str], env: list[str], headers: dict[str, str]) -> dict:
+    if not name or not target:
+        return {"ok": False, "message": "name and command/url are required"}
+    if transport in _MCP_REMOTE:
+        flags = [arg for key, value in headers.items() for arg in ("--header", f"{key}: {value}")]
+        return _shared(_run(["mcp", "add", "-s", "user", "--transport", transport, name, target, *flags]))
+    if not all(_ENV_ENTRY.match(entry) for entry in env):
+        return {"ok": False, "message": "environment variables go one per line as KEY=value"}
+    flags = [arg for entry in env for arg in ("-e", entry)]
+    return _shared(_run(["mcp", "add", "-s", "user", name, *flags, "--", target, *args]))
+
+
 def mcp_add(
     name: str, target: str, transport: str = "stdio", auth: dict | None = None, env: list[str] | None = None
 ) -> dict:
-    if not name or not target:
-        return {"ok": False, "message": "name and command/url are required"}
-    if transport in ("http", "sse"):
-        headers = accounts.auth_headers(auth or {})
-        flags = [arg for key, value in headers.items() for arg in ("--header", f"{key}: {value}")]
-        return _shared(_run(["mcp", "add", "-s", "user", "--transport", transport, name, target, *flags]))
+    if transport in _MCP_REMOTE:
+        return _mcp_add(name, transport, target, [], [], accounts.auth_headers(auth or {}))
+    command, *args = target.split() or [""]
     entries = [entry.strip() for entry in env or () if entry.strip()]
-    if not all(_ENV_ENTRY.match(entry) for entry in entries):
-        return {"ok": False, "message": "environment variables go one per line as KEY=value"}
-    flags = [arg for entry in entries for arg in ("-e", entry)]
-    return _shared(_run(["mcp", "add", "-s", "user", name, *flags, "--", *target.split()]))
+    return _mcp_add(name, transport, command, args, entries, {})
+
+
+def mcp_add_config(name: str, config: dict) -> dict:
+    if config.get("url"):
+        transport = config.get("type") if config.get("type") in _MCP_REMOTE else _MCP_REMOTE[0]
+        return _mcp_add(name, transport, config["url"], [], [], config.get("headers") or {})
+    env = [f"{key}={value}" for key, value in (config.get("env") or {}).items()]
+    return _mcp_add(name, "stdio", config.get("command") or "", config.get("args") or [], env, {})
 
 
 def mcp_remove(name: str) -> dict:

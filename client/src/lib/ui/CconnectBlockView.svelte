@@ -6,6 +6,7 @@
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { posterSrc, servedSrc } from "$lib/services/mediaSource";
   import { awaitSharedFile } from "$lib/services/sharedArrival.svelte";
+  import InstallCards from "$lib/screens/install/InstallCards.svelte";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import PageFrame from "./PageFrame.svelte";
@@ -162,6 +163,8 @@
   </CardPanel>
 {:else if data.type === "suggestions"}
   <SuggestionChips items={data.items} onSelect={onSuggest} />
+{:else if data.type === "install"}
+  <InstallCards items={data.items} />
 {:else if data.type === "pdf"}
   {#if pdfFailed}
     <a

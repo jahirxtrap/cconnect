@@ -9,4 +9,5 @@ export const CLIENT_CAPABILITIES = [
   "usage",
   "terminal",
   "browser",
+  "install",
 ];

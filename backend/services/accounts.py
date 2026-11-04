@@ -12,7 +12,6 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import zipfile
 
@@ -254,14 +253,6 @@ def _merge_dir(source: Path, target: Path) -> tuple[list[Path], bool]:
     return adopted, merged
 
 
-def _remove_tree(target: Path) -> bool:
-    for item in target.rglob("*"):
-        if item.is_file() and not os.access(item, os.W_OK):
-            item.chmod(stat.S_IWRITE)
-    shutil.rmtree(target, ignore_errors=True)
-    return not target.exists()
-
-
 def _link_dir(source: Path, target: Path) -> None:
     if paths.is_link(target):
         if target.resolve() == source.resolve():
@@ -269,7 +260,7 @@ def _link_dir(source: Path, target: Path) -> None:
         paths.unlink_dir(target)
     elif target.is_dir():
         adopted, merged = _merge_dir(target, source)
-        if not merged or not _remove_tree(target):
+        if not merged or not paths.remove_tree(target):
             logger.warning(f"accounts: {target} could not be emptied to share {source}")
             return
         for path in adopted:
@@ -345,7 +336,7 @@ def purge(account_id: str) -> bool:
         for name in _SHARED_DIRS:
             paths.unlink_dir(path / name)
         _stop_processes_in(path)
-        if not _remove_tree(path):
+        if not paths.remove_tree(path):
             return False
     _tombstone(account_id).unlink(missing_ok=True)
     return True

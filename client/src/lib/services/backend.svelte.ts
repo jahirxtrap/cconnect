@@ -160,3 +160,6 @@ class Backend {
 }
 
 export const backend = new Backend();
+
+export const environmentOptions = () =>
+  backend.environments.map((profile) => ({ value: profile.id, label: profile.name, subtitle: address(profile) }));

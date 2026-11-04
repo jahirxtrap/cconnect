@@ -1,3 +1,5 @@
+import { installFromItem, type InstallRequest } from "$lib/data/installRequest";
+
 export const CCONNECT_LANG = "cconnect";
 
 const MAX_SUGGESTIONS = 3;
@@ -31,7 +33,8 @@ export type CconnectBlock =
   | { type: "playlist"; items: PlaylistItem[] }
   | { type: "pdf"; url: string; title?: string }
   | { type: "html"; url: string; title?: string }
-  | { type: "suggestions"; items: SuggestionItem[] };
+  | { type: "suggestions"; items: SuggestionItem[] }
+  | { type: "install"; items: InstallRequest[] };
 
 const str = (value: unknown): string | undefined =>
   typeof value === "string" && value.trim() ? value : undefined;
@@ -87,6 +90,10 @@ export function parseCconnectBlock(source: string): CconnectBlock | null {
           })
         : [];
       return list.length ? { type: "suggestions", items: list.slice(0, MAX_SUGGESTIONS) } : null;
+    }
+    case "install": {
+      const list = items(data.items).flatMap((item) => installFromItem(item) ?? []);
+      return list.length ? { type: "install", items: list } : null;
     }
     default:
       return null;

@@ -3,10 +3,16 @@ import os
 import zipfile
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
+
+import httpx
 
 from core import paths
 from services.directory_watch import DirectoryWatchHub
 from services.pack_format import EXTENSION, SCHEMA, PackFormatError, preview_of, read_pack
+
+_SECURE = "https"
+_FETCH_TIMEOUT = 30
 
 _read: dict[str, tuple[int, int, Optional[dict]]] = {}
 
@@ -62,6 +68,23 @@ def save(source: Path) -> dict:
     staged.write_bytes(data)
     os.replace(staged, target)
     return info
+
+
+def fetch(url: str) -> bytes:
+    if urlparse(url).scheme != _SECURE:
+        raise PackFormatError("source", url)
+    limit = SCHEMA["maxPackBytes"]
+    data = bytearray()
+    with httpx.stream("GET", url, follow_redirects=True, timeout=_FETCH_TIMEOUT) as response:
+        if response.url.scheme != _SECURE:
+            raise PackFormatError("source", str(response.url))
+        response.raise_for_status()
+        for chunk in response.iter_bytes():
+            data.extend(chunk)
+            if len(data) > limit:
+                raise PackFormatError("size", url, str(limit))
+    read_pack(bytes(data))
+    return bytes(data)
 
 
 def remove(name: str) -> bool:

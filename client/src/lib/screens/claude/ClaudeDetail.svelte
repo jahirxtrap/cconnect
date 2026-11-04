@@ -103,6 +103,7 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
+  import FactList from "$lib/ui/FactList.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
@@ -913,17 +914,6 @@
   />
 {/snippet}
 
-{#snippet facts(rows: { label: string; text: string | null }[])}
-  {#if rows.length}
-    <dl class="grid grid-cols-[6rem_minmax(0,1fr)] gap-x-2.5 gap-y-2 text-body-sm">
-      {#each rows as fact (fact.label)}
-        <dt class="text-faint">{fact.label}</dt>
-        <dd class="wrap-anywhere">{fact.text}</dd>
-      {/each}
-    </dl>
-  {/if}
-{/snippet}
-
 {#snippet pluginBody(plugin: Plugin)}
   {#if plugin.mod && !pluginReview}
     <CenteredProgress class="py-6" />
@@ -937,7 +927,7 @@
     {#if plugin.description}
       <p class="text-body-md text-on-surface-variant">{plugin.description}</p>
     {/if}
-    {@render facts(rows)}
+    <FactList {rows} />
     {#if plugin.mod && pluginReview}
       {#each pluginReview.errors as error (error)}
         <ErrorText text={error} />
@@ -1272,12 +1262,12 @@
 {/snippet}
 
 {#snippet mcpBody(server: McpServer)}
-  {@render facts(
-    [
+  <FactList
+    rows={[
       { label: t("TRANSPORT"), text: server.type ?? "" },
       { label: t("COMMAND_OR_URL"), text: server.detail ?? "" },
-    ].filter((fact) => fact.text),
-  )}
+    ].filter((fact) => fact.text)}
+  />
   {#if dialogBusy === "toggle"}
     <LinearProgress />
   {/if}

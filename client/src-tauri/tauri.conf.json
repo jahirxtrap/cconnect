@@ -89,5 +89,12 @@
         "release": "1"
       }
     }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["cconnect"]
+      }
+    }
   }
 }
