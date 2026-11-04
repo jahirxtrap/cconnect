@@ -29,6 +29,8 @@ export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w
 export const MENU_ITEM_CLASS =
   "flex min-h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors outline-none select-none";
 
+export const MENU_DIVIDER_CLASS = "my-1 border-t border-outline-variant";
+
 export const MENU_ICON_SIZE = 16;
 
 export const menuIconClass = (danger = false) => `shrink-0 ${danger ? "" : "text-on-surface-variant"}`;

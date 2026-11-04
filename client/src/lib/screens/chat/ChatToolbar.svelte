@@ -3,13 +3,16 @@
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
+  import { joined } from "$lib/data/format";
   import type { PromptCache } from "$lib/data/promptCache";
   import type { LimitWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
   import { contextWindowFor, effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
   import { accountIcon } from "$lib/ui/accountIcon";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import { MENU_ICON_SIZE } from "$lib/ui/menuSurface";
+  import MenuSlider from "$lib/ui/MenuSlider.svelte";
+  import MenuSub from "$lib/ui/MenuSub.svelte";
+  import { MENU_DIVIDER_CLASS, MENU_ICON_SIZE } from "$lib/ui/menuSurface";
   import { LINK_LOOKS } from "$lib/ui/linkStatus";
   import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import ContextRing from "./ContextRing.svelte";
@@ -30,7 +33,6 @@
     loading: boolean;
     model: string;
     modelSelected: string;
-    effort: string;
     effortSelected: string;
     permissionMode: string;
     permissionSelected: string;
@@ -64,7 +66,6 @@
     loading,
     model,
     modelSelected,
-    effort,
     effortSelected,
     permissionMode,
     permissionSelected,
@@ -97,7 +98,7 @@
   ]);
   const effortLevels = $derived(effortLevelsFor(capabilities, model));
   const effortOptions = $derived([
-    serverOption,
+    { value: "", label: joined(t("SERVER_DEFAULT"), capabilities?.defaults.effort) },
     ...effortLevels.map((value) => ({ value, label: value })),
   ]);
   const permissionOptions = $derived([
@@ -163,13 +164,15 @@
       <ToolbarState text={t("MODEL_UNAVAILABLE")} icon={Sparkles} />
     {:else}
       <ToolbarSelect label={t("MODEL")} icon={Sparkles} text={modelLabel}>
-        {@render choices(modelOptions, modelSelected, onModel)}
-      </ToolbarSelect>
-    {/if}
-
-    {#if effortLevels.length && !switching}
-      <ToolbarSelect label={t("EFFORT")} icon={Gauge} text={effort}>
-        {@render choices(effortOptions, effortSelected, onEffort)}
+        {#if effortLevels.length}
+          <MenuSub text={t("MODEL")} icon={Sparkles} value={modelLabel}>
+            {@render choices(modelOptions, modelSelected, onModel)}
+          </MenuSub>
+          <div class={MENU_DIVIDER_CLASS}></div>
+          <MenuSlider text={t("EFFORT")} icon={Gauge} options={effortOptions} selected={effortSelected} onPick={onEffort} />
+        {:else}
+          {@render choices(modelOptions, modelSelected, onModel)}
+        {/if}
       </ToolbarSelect>
     {/if}
 
@@ -192,7 +195,7 @@
       <ToolbarSelect label={t("ACCOUNT")} icon={AccountIcon} text={accountLabel}>
         {@render choices(accountOptions, accountSelected, onAccount)}
         {#if providerAccounts.length}
-          <div class="my-1 border-t border-outline-variant"></div>
+          <div class={MENU_DIVIDER_CLASS}></div>
           {@render choices(providerAccounts, accountSelected, onAccount)}
         {/if}
       </ToolbarSelect>

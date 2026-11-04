@@ -625,7 +625,6 @@
       loading={chat.transcriptLoading}
       model={chat.effectiveModel}
       modelSelected={chat.modelOverride}
-      effort={chat.effectiveEffort}
       effortSelected={chat.effortOverride}
       permissionMode={chat.effectivePermissionMode}
       permissionSelected={chat.permissionOverride}

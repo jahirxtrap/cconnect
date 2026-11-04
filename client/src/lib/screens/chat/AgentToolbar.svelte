@@ -12,6 +12,9 @@
   import type { IconSource } from "$lib/ui/icons";
   import { LINK_LOOKS } from "$lib/ui/linkStatus";
   import MenuItem from "$lib/ui/MenuItem.svelte";
+  import MenuSlider from "$lib/ui/MenuSlider.svelte";
+  import MenuSub from "$lib/ui/MenuSub.svelte";
+  import { MENU_DIVIDER_CLASS } from "$lib/ui/menuSurface";
   import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
   import ContextRing from "./ContextRing.svelte";
@@ -43,9 +46,28 @@
 
   const iconOf = (option: AgentOption): IconSource => CATEGORY_ICONS[option.category] ?? SlidersHorizontal;
   const labelOf = (option: AgentOption): string => option.name || t("AGENT_MODE");
+  const selectOf = (category: string) =>
+    agent?.options.find((option) => option.category === category && option.type === "select");
   const ready = $derived(link === "connected" && agent?.status === "ready");
   const limit = $derived(contextWindow ?? agent?.usage?.size ?? null);
+  const model = $derived(selectOf("model"));
+  const level = $derived(model ? selectOf("thought_level") : undefined);
+  const shown = $derived((agent?.options ?? []).filter((option) => option !== level));
 </script>
+
+{#snippet choices(option: AgentOption)}
+  {#each option.choices as choice, index (choice.value)}
+    {#if choice.group && choice.group !== option.choices[index - 1]?.group}
+      <p class="px-2.5 pt-1.5 pb-1 {SECTION_LABEL_CLASS}">{choice.group}</p>
+    {/if}
+    <MenuItem
+      text={choice.name}
+      description={choice.description}
+      selected={choice.value === option.current}
+      onclick={() => onOption(option.id, choice.value)}
+    />
+  {/each}
+{/snippet}
 
 <div class="flex h-full min-w-0 flex-1 items-stretch">
 <div
@@ -61,7 +83,7 @@
   {:else if !agentUp(agent.status)}
     <ToolbarState text={t("AGENT_UNAVAILABLE")} dot="bg-red" />
   {:else}
-    {#each agent.options as option (option.id)}
+    {#each shown as option (option.id)}
       {#if option.type === "boolean"}
         <ToolbarToggle
           label={labelOf(option)}
@@ -77,17 +99,21 @@
         </ToolbarToggle>
       {:else}
         <ToolbarSelect label={labelOf(option)} icon={iconOf(option)} text={chosenName(option)}>
-          {#each option.choices as choice, index (choice.value)}
-            {#if choice.group && choice.group !== option.choices[index - 1]?.group}
-              <p class="px-2.5 pt-1.5 pb-1 {SECTION_LABEL_CLASS}">{choice.group}</p>
-            {/if}
-            <MenuItem
-              text={choice.name}
-              description={choice.description}
-              selected={choice.value === option.current}
-              onclick={() => onOption(option.id, choice.value)}
+          {#if option === model && level}
+            <MenuSub text={labelOf(option)} icon={iconOf(option)} value={chosenName(option)}>
+              {@render choices(option)}
+            </MenuSub>
+            <div class={MENU_DIVIDER_CLASS}></div>
+            <MenuSlider
+              text={labelOf(level)}
+              icon={iconOf(level)}
+              options={level.choices.map((choice) => ({ value: choice.value, label: choice.name }))}
+              selected={String(level.current ?? "")}
+              onPick={(value) => onOption(level.id, value)}
             />
-          {/each}
+          {:else}
+            {@render choices(option)}
+          {/if}
         </ToolbarSelect>
       {/if}
     {/each}
