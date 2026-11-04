@@ -133,6 +133,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     node.style.cursor = hovered || dragging ? "pointer" : "";
     lane.style.width = `${content}px`;
     lane.style.top = `${node.scrollTop + node.clientHeight - thickness}px`;
+    rail.style.left = `${-(parseFloat(getComputedStyle(node).paddingLeft) || 0)}px`;
     rail.style.width = `${viewport}px`;
     thumb.style.opacity = awake || hovered || dragging ? "1" : "0";
     thumb.style.height = `${thickness}px`;
