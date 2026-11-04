@@ -13,9 +13,12 @@
   import { isInstallLink } from "$lib/data/installRequest";
   import { t } from "$lib/i18n/index.svelte";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
-  import { createSegmenter, type Segment } from "$lib/markdown/render";
+  import { RELATIVE_SRC } from "$lib/markdown/githubHtml";
+  import { createSegmenter, type MarkdownFlavor, type Segment } from "$lib/markdown/render";
   import { installOffers } from "$lib/screens/install/installOffers.svelte";
   import { backend, sharedRootOf } from "$lib/services/backend.svelte";
+  import { besideFile } from "$lib/services/fileLinks";
+  import { imageSrc } from "$lib/services/mediaSource";
   import { contextServer } from "$lib/services/serverContext";
   import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
@@ -29,6 +32,8 @@
     onSharedMenu?: ((url: string, filename: string) => void) | null;
     onSuggest?: SuggestionPicker | null;
     linkTarget?: ((href: string) => (() => void) | null) | null;
+    flavor?: MarkdownFlavor;
+    fileUrl?: string | null;
     dense?: boolean;
     class?: string;
   }
@@ -39,13 +44,15 @@
     onSharedMenu = null,
     onSuggest = null,
     linkTarget = null,
+    flavor = "chat",
+    fileUrl = null,
     dense = false,
     class: className = "",
   }: Props = $props();
 
   const ALERT_KINDS = ["note", "tip", "important", "warning", "caution"];
 
-  const segments = createSegmenter();
+  const segments = $derived(createSegmenter(flavor));
   const server = contextServer();
   const sharedRoot = $derived(sharedRootOf(server()));
   const resolved = $derived(backend.resolveShared(text, server()));
@@ -92,15 +99,24 @@
 
   const decorate = (node: HTMLElement) => {
     const bars = new Map<HTMLElement, { destroy: () => void }>();
-    const apply = () => {
-      for (const [scroller, bar] of bars) {
-        if (scroller.isConnected) continue;
-        bar.destroy();
-        bars.delete(scroller);
+    const images = new Map<HTMLImageElement, { destroy: () => void }>();
+    const prune = <T extends Element>(held: Map<T, { destroy: () => void }>) => {
+      for (const [element, handle] of held) {
+        if (element.isConnected) continue;
+        handle.destroy();
+        held.delete(element);
       }
+    };
+    const apply = () => {
+      prune(bars);
+      prune(images);
       for (const scroller of node.querySelectorAll<HTMLElement>("table, pre")) {
         if (bars.has(scroller)) continue;
         bars.set(scroller, hscrollbar(scroller, { touchIndicator: true }));
+      }
+      for (const image of fileUrl ? node.querySelectorAll<HTMLImageElement>(`img[${RELATIVE_SRC}]`) : []) {
+        const url = images.has(image) ? null : besideFile(fileUrl ?? "", image.getAttribute(RELATIVE_SRC) ?? "");
+        if (url) images.set(image, imageSrc(image, { url }));
       }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;
@@ -136,6 +152,8 @@
         observer.disconnect();
         bars.forEach((bar) => bar.destroy());
         bars.clear();
+        images.forEach((image) => image.destroy());
+        images.clear();
       },
     };
   };
@@ -155,7 +173,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="markdown chat-gap flex w-full flex-col {dense ? 'markdown-dense' : ''} {className}"
+  class="markdown chat-gap flex w-full flex-col {dense ? 'markdown-dense' : ''} {flavor === 'chat' ? '' : 'markdown-document'} {className}"
   onclickcapture={onClick}
   oncontextmenu={onContextMenu}
   use:decorate
@@ -181,7 +199,7 @@
           class="flex cursor-pointer list-none items-center gap-1.5 text-label-lg text-on-surface-variant select-none"
         >
           <ChevronRight size={12} class="shrink-0" />
-          {part.summary}
+          {@html part.summary}
         </summary>
         <div class="chat-gap flex flex-col pt-1 pl-2">
           {@render blocks(part.children)}

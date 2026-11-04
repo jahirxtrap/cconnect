@@ -1,5 +1,6 @@
 import MarkdownIt from "markdown-it";
 import { CCONNECT_LANG, parseCconnectBlock, type CconnectBlock } from "./cconnectBlock";
+import { githubHtml } from "./githubHtml";
 
 type Token = ReturnType<InstanceType<typeof MarkdownIt>["parse"]>[number];
 
@@ -23,75 +24,91 @@ const DEFAULT_SUMMARY = "Details";
 const ITEM_LOOKAHEAD = 3;
 const ALERT_LOOKAHEAD = 2;
 
-const md = new MarkdownIt({ html: false, linkify: true, breaks: true });
-
-md.core.ruler.push("task_markers", (state) => {
-  const tokens = state.tokens;
-  tokens.forEach((token, index) => {
-    if (token.type !== "list_item_open") return;
-    const inline = tokens.slice(index + 1, index + 1 + ITEM_LOOKAHEAD).find((item) => item.type === "inline");
-    const match = inline?.content.match(TASK_RE);
-    if (!inline || !match) return;
-    inline.content = inline.content.replace(TASK_RE, "");
-    const first = inline.children?.[0];
-    if (first) first.content = first.content.replace(TASK_RE, "");
-    token.attrJoin("class", match[1].toLowerCase() === "x" ? "task task-done" : "task");
-  });
-  return true;
-});
-
-md.core.ruler.push("github_alerts", (state) => {
-  const tokens = state.tokens;
-  tokens.forEach((token, index) => {
-    if (token.type !== "blockquote_open") return;
-    const inline = tokens.slice(index + 1, index + 1 + ALERT_LOOKAHEAD).find((item) => item.type === "inline");
-    const match = inline?.content.split("\n")[0].match(ALERT_RE);
-    if (!inline || !match) return;
-    const kind = match[1].toLowerCase();
-    token.attrJoin("class", `md-alert md-alert-${kind}`);
-    token.attrSet("data-alert", kind);
-    inline.content = inline.content.split("\n").slice(1).join("\n");
-    inline.children = inline.children?.slice(inline.children.findIndex((child) => child.type === "softbreak") + 1) ?? [];
-  });
-  return true;
-});
-
 const BULLETS = ["•", "◦", "▪"];
 let bulletDepth = 0;
 const counters: number[] = [];
 
-md.renderer.rules.ordered_list_open = (tokens, index, options, _env, self) => {
-  counters.push(Number(tokens[index].attrGet("start") ?? 1));
-  return self.renderToken(tokens, index, options);
+const engine = (html: boolean, breaks: boolean) => {
+  const instance = new MarkdownIt({ html, linkify: true, breaks });
+
+  instance.core.ruler.push("task_markers", (state) => {
+    const tokens = state.tokens;
+    tokens.forEach((token, index) => {
+      if (token.type !== "list_item_open") return;
+      const inline = tokens.slice(index + 1, index + 1 + ITEM_LOOKAHEAD).find((item) => item.type === "inline");
+      const match = inline?.content.match(TASK_RE);
+      if (!inline || !match) return;
+      inline.content = inline.content.replace(TASK_RE, "");
+      const first = inline.children?.[0];
+      if (first) first.content = first.content.replace(TASK_RE, "");
+      token.attrJoin("class", match[1].toLowerCase() === "x" ? "task task-done" : "task");
+    });
+    return true;
+  });
+
+  instance.core.ruler.push("github_alerts", (state) => {
+    const tokens = state.tokens;
+    tokens.forEach((token, index) => {
+      if (token.type !== "blockquote_open") return;
+      const inline = tokens.slice(index + 1, index + 1 + ALERT_LOOKAHEAD).find((item) => item.type === "inline");
+      const match = inline?.content.split("\n")[0].match(ALERT_RE);
+      if (!inline || !match) return;
+      const kind = match[1].toLowerCase();
+      token.attrJoin("class", `md-alert md-alert-${kind}`);
+      token.attrSet("data-alert", kind);
+      inline.content = inline.content.split("\n").slice(1).join("\n");
+      inline.children = inline.children?.slice(inline.children.findIndex((child) => child.type === "softbreak") + 1) ?? [];
+    });
+    return true;
+  });
+
+  instance.renderer.rules.ordered_list_open = (tokens, index, options, _env, self) => {
+    counters.push(Number(tokens[index].attrGet("start") ?? 1));
+    return self.renderToken(tokens, index, options);
+  };
+
+  instance.renderer.rules.ordered_list_close = (tokens, index, options, _env, self) => {
+    counters.pop();
+    return self.renderToken(tokens, index, options);
+  };
+
+  instance.renderer.rules.bullet_list_open = (tokens, index, options, _env, self) => {
+    bulletDepth++;
+    return self.renderToken(tokens, index, options);
+  };
+
+  instance.renderer.rules.bullet_list_close = (tokens, index, options, _env, self) => {
+    bulletDepth--;
+    return self.renderToken(tokens, index, options);
+  };
+
+  instance.renderer.rules.list_item_open = (tokens, index, options, _env, self) => {
+    const token = tokens[index];
+    const classes = String(token.attrGet("class") ?? "");
+    const marker = classes.includes("task-done")
+      ? "☑"
+      : classes.includes("task")
+        ? "☐"
+        : token.markup === "." || token.markup === ")"
+          ? `${counters.length ? counters[counters.length - 1]++ : 1}.`
+          : BULLETS[Math.min(Math.max(bulletDepth, 1) - 1, BULLETS.length - 1)];
+    return `${self.renderToken(tokens, index, options)}<span class="li-marker">${marker}&nbsp;</span>`;
+  };
+
+  return instance;
 };
 
-md.renderer.rules.ordered_list_close = (tokens, index, options, _env, self) => {
-  counters.pop();
-  return self.renderToken(tokens, index, options);
+export type MarkdownFlavor = "chat" | "note" | "document";
+
+const md = engine(false, true);
+
+const ENGINES: Record<MarkdownFlavor, InstanceType<typeof MarkdownIt>> = {
+  chat: md,
+  note: engine(true, true),
+  document: engine(true, false),
 };
 
-md.renderer.rules.bullet_list_open = (tokens, index, options, _env, self) => {
-  bulletDepth++;
-  return self.renderToken(tokens, index, options);
-};
-
-md.renderer.rules.bullet_list_close = (tokens, index, options, _env, self) => {
-  bulletDepth--;
-  return self.renderToken(tokens, index, options);
-};
-
-md.renderer.rules.list_item_open = (tokens, index, options, _env, self) => {
-  const token = tokens[index];
-  const classes = String(token.attrGet("class") ?? "");
-  const marker = classes.includes("task-done")
-    ? "☑"
-    : classes.includes("task")
-      ? "☐"
-      : token.markup === "." || token.markup === ")"
-        ? `${counters.length ? counters[counters.length - 1]++ : 1}.`
-        : BULLETS[Math.min(Math.max(bulletDepth, 1) - 1, BULLETS.length - 1)];
-  return `${self.renderToken(tokens, index, options)}<span class="li-marker">${marker}&nbsp;</span>`;
-};
+const cleaned = (flavor: MarkdownFlavor, html: string): string => (flavor === "chat" ? html : githubHtml(html));
 
 export const renderInline = (markdown: string): string => md.renderInline(markdown);
 
@@ -164,13 +181,14 @@ const merged = (list: Segment[], joinHtml = true): Segment[] =>
     return acc;
   }, []);
 
-const fromTokens = (tokens: Token[]): Segment[] => {
+const fromTokens = (tokens: Token[], flavor: MarkdownFlavor): Segment[] => {
   const result: Segment[] = [];
+  const renderer = ENGINES[flavor];
   let buffer: Token[] = [];
 
   const flush = () => {
     if (!buffer.length) return;
-    result.push({ kind: "html", html: md.renderer.render(buffer, md.options, {}) });
+    result.push({ kind: "html", html: cleaned(flavor, renderer.renderer.render(buffer, renderer.options, {})) });
     buffer = [];
   };
 
@@ -184,7 +202,7 @@ const fromTokens = (tokens: Token[]): Segment[] => {
       continue;
     }
     const inline = token.type === "paragraph_open" && token.level === 0 ? tokens[index + 1] : undefined;
-    const images = inline?.type === "inline" ? inlineSegments(inline) : [];
+    const images = flavor === "chat" && inline?.type === "inline" ? inlineSegments(inline) : [];
     if (images.length) {
       flush();
       result.push(...images);
@@ -197,16 +215,16 @@ const fromTokens = (tokens: Token[]): Segment[] => {
   return merged(result);
 };
 
-export const segments = (markdown: string): Segment[] => {
+export const segments = (markdown: string, flavor: MarkdownFlavor = "chat"): Segment[] => {
   const match = DETAILS_RE.exec(markdown);
-  if (!match) return fromTokens(md.parse(markdown, {}));
+  if (!match) return fromTokens(ENGINES[flavor].parse(markdown, {}), flavor);
   const body = match[1];
-  const summary = SUMMARY_RE.exec(body)?.[1]?.trim() || DEFAULT_SUMMARY;
+  const summary = cleaned(flavor, ENGINES[flavor].renderInline(SUMMARY_RE.exec(body)?.[1]?.trim() || DEFAULT_SUMMARY));
   const start = match.index;
   return [
-    ...segments(markdown.slice(0, start)),
-    { kind: "details", summary, children: segments(body.replace(SUMMARY_RE, "").trim()) },
-    ...segments(markdown.slice(start + match[0].length)),
+    ...segments(markdown.slice(0, start), flavor),
+    { kind: "details", summary, children: segments(body.replace(SUMMARY_RE, "").trim(), flavor) },
+    ...segments(markdown.slice(start + match[0].length), flavor),
   ];
 };
 
@@ -224,7 +242,7 @@ const endsBlock = (chunk: string) => {
   return !OPEN_ITEM_RE.test(lines[lines.length - 1] ?? "");
 };
 
-export const createSegmenter = () => {
+export const createSegmenter = (flavor: MarkdownFlavor = "chat") => {
   let prefix = "";
   let head: Segment[] = [];
   let fences = 0;
@@ -258,12 +276,12 @@ export const createSegmenter = () => {
       }
     }
     if (cut > 0) {
-      head = [...head, ...segments(tail.slice(0, cut))];
+      head = [...head, ...segments(tail.slice(0, cut), flavor)];
       prefix = markdown.slice(0, prefix.length + cut);
       fences = cutFences;
       details = cutDetails;
     }
-    const pending = segments(markdown.slice(prefix.length));
+    const pending = segments(markdown.slice(prefix.length), flavor);
     return head.length ? merged([...head, ...pending], false) : pending;
   };
 };

@@ -347,7 +347,12 @@
   {:else if prose}
     {#key shown.base}
       <div use:viewportScrollbar class="{TEXT_SCROLL_CLASS} overflow-y-auto px-2.5 py-3">
-        <MarkdownText text={links?.wiki ? wikiLinks(shown.body) : shown.body} linkTarget={links?.resolve ?? null} />
+        <MarkdownText
+          text={links?.wiki ? wikiLinks(shown.body) : shown.body}
+          linkTarget={links?.resolve ?? null}
+          flavor="document"
+          fileUrl={url}
+        />
       </div>
     {/key}
   {:else}

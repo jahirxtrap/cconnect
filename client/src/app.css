@@ -706,6 +706,12 @@ a > .md-link-icon:last-child {
   border-top: 1px solid var(--c-outline-variant);
 }
 
+.markdown-document img {
+  display: inline;
+  max-width: 100%;
+  height: auto;
+}
+
 .markdown table {
   display: block;
   overflow-x: auto;

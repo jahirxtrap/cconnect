@@ -179,7 +179,7 @@
     </div>
     {#if notes.formatted}
       <div use:tasks use:viewportScrollbar class="tasks-live selectable overflow-y-auto {BODY_CLASS}">
-        <MarkdownText text={note.body} class="markdown-chat" />
+        <MarkdownText text={note.body} flavor="note" class="markdown-chat" />
       </div>
     {:else}
       <textarea
