@@ -18,6 +18,10 @@
 
   export type ClaudeKind = (typeof CLAUDE_KINDS)[number];
 
+  export const CLAUDE_MEMORY = "claude";
+
+  const memoryOf = (kind: ClaudeKind) => `${CLAUDE_MEMORY}:${kind}`;
+
   export const CLAUDE_TABS: Record<ClaudeKind, string> = {
     plugins: "PLUGINS",
     skills: "SKILLS",
@@ -631,7 +635,7 @@
     />
   {:else if embedded && kind !== "status"}
     <div bind:clientHeight={viewHeight} class="flex min-h-0 flex-1 flex-col">
-    <PullToRefresh {refreshing} onRefresh={null}>
+    <PullToRefresh {refreshing} onRefresh={null} memory={memoryOf(kind)}>
       <div class="px-(--page-inset) pb-(--page-inset)">
       <div bind:clientWidth={areaWidth} class="flex items-start" style="gap: {GAP_REM}rem">
         <div class="min-w-0 flex-1">
@@ -735,6 +739,7 @@
     <PullToRefresh
       {refreshing}
       onRefresh={kind === "status" ? () => void refresh() : null}
+      memory={memoryOf(kind)}
       class={kind === "status" ? "" : LIST_VIEWPORT_CLASS}
     >
     <div class="{kind === 'status' ? 'flex min-h-full flex-col px-(--page-inset)' : ''} pb-(--page-inset)">

@@ -464,6 +464,7 @@
   };
 
   const slot = $derived(`${backend.activeId ?? ""}|${projectKey ?? ""}`);
+  const memoryOf = (view: string) => `project|${slot}|${activeRepo?.path ?? ""}|${view}`;
 
   let placed = "";
   let logged = "";
@@ -942,7 +943,7 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if !projectKey}
       {#if projects.length}
-        <ScrollCard frame={LIST_FRAME}>
+        <ScrollCard frame={LIST_FRAME} memory={memoryOf("projects")}>
           {#each projects as item (item.projectKey)}
             {@render projectRow(item)}
           {/each}
@@ -954,7 +955,7 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged && !activeRepo}
       {#if repoRows.length}
-        <ScrollCard frame={LIST_FRAME}>
+        <ScrollCard frame={LIST_FRAME} memory={memoryOf("repos")}>
           {#each repoRows as item (item.path)}
             {@render repoRow(item)}
           {/each}
@@ -966,7 +967,7 @@
       {#if commits === null}
         <CenteredProgress class="min-h-0 flex-1" />
       {:else if commits.length}
-        <ScrollCard frame={LIST_FRAME} onscroll={onListScroll}>
+        <ScrollCard frame={LIST_FRAME} memory={memoryOf("log")} onscroll={onListScroll}>
           {#each commits as commit, index (commit.hash)}
             {@render commitRow(commit, index, index === commits.length - 1)}
           {/each}
@@ -978,7 +979,7 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged}
       {#if files.length}
-        <ScrollCard frame={LIST_FRAME}>
+        <ScrollCard frame={LIST_FRAME} memory={memoryOf("changed")}>
           {#each changedRows as row (row.entry.path)}
             {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true)}
           {/each}
@@ -997,7 +998,7 @@
         <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
       {/if}
     {:else if rows.length}
-      <ScrollCard frame={LIST_FRAME}>
+      <ScrollCard frame={LIST_FRAME} memory={memoryOf("tree")}>
         {#each rows as row (row.entry.path)}
           {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
             activate(row.entry),

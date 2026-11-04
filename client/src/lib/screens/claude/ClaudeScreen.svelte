@@ -23,7 +23,13 @@
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import ClaudeDetail, { CLAUDE_KINDS, CLAUDE_TABS, STATUS_PAGE, type ClaudeKind } from "./ClaudeDetail.svelte";
+  import ClaudeDetail, {
+    CLAUDE_KINDS,
+    CLAUDE_MEMORY,
+    CLAUDE_TABS,
+    STATUS_PAGE,
+    type ClaudeKind,
+  } from "./ClaudeDetail.svelte";
   import ClaudeActions from "./ClaudeActions.svelte";
   import ClaudeSections from "./ClaudeSections.svelte";
 
@@ -131,7 +137,12 @@
 {/snippet}
 
 {#snippet sections()}
-  <PullToRefresh {refreshing} onRefresh={() => void refresh()} class="[scrollbar-gutter:stable]">
+  <PullToRefresh
+    {refreshing}
+    onRefresh={() => void refresh()}
+    memory={CLAUDE_MEMORY}
+    class="[scrollbar-gutter:stable]"
+  >
     <div class="px-(--page-inset) pb-(--page-inset)">
       <div bind:clientWidth={sectionsWidth}>
         <ClaudeSections

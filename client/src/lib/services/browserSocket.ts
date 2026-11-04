@@ -53,6 +53,7 @@ export interface BrowserViewport {
 export interface BrowserLink {
   watch: (enabled: boolean) => void;
   navigate: (url: string) => void;
+  home: () => void;
   back: () => void;
   forward: () => void;
   reload: () => void;
@@ -150,6 +151,7 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
       post({ type: "watch", enabled, ...viewport() });
     },
     navigate: (url) => post({ type: "navigate", url }),
+    home: () => post({ type: "home" }),
     back: () => post({ type: "back" }),
     forward: () => post({ type: "forward" }),
     reload: () => post({ type: "reload" }),

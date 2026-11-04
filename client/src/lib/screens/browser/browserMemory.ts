@@ -2,7 +2,6 @@ import type { BrowserState } from "$lib/services/browserSocket";
 
 export interface BrowserPosition {
   page: BrowserState;
-  home: boolean;
   frame: ImageBitmap | null;
 }
 

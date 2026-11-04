@@ -37,6 +37,8 @@ async def _dispatch(session: BrowserSession, payload: dict):
         await session.insert(str(payload.get("value") or ""))
     elif kind == "navigate":
         await session.navigate(str(payload.get("url") or ""))
+    elif kind == "home":
+        await session.go_home()
     elif kind == "reload":
         await session.reload()
     elif kind == "back":

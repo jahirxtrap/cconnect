@@ -4,11 +4,13 @@
   import { PullState } from "./pull.svelte";
   import PullIndicator from "./PullIndicator.svelte";
   import { viewportScrollbar } from "./scrollbar";
+  import { rememberScroll } from "./scrollMemory";
 
   interface Props {
     refreshing?: boolean;
     onRefresh?: (() => void) | null;
     scroller?: HTMLDivElement | null;
+    memory?: string | null;
     onscroll?: () => void;
     onscrollend?: () => void;
     class?: string;
@@ -19,6 +21,7 @@
     refreshing = false,
     onRefresh = null,
     scroller = $bindable(null),
+    memory = null,
     onscroll,
     onscrollend,
     class: className = "",
@@ -80,6 +83,10 @@
   });
 
   $effect(() => () => pull.dispose());
+
+  $effect(() => {
+    if (memory && scroller) return rememberScroll(scroller, memory);
+  });
 </script>
 
 <div class="relative min-h-0 flex-1">

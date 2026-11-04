@@ -880,16 +880,17 @@
 
   $effect(() => () => untrack(remember));
 
+  const slot = $derived(`${backend.activeId ?? ""}|${archive ?? ""}|${archiveDir}|${path}`);
+
   $effect(() => {
-    const environment = backend.activeId;
     const current = archive;
-    const slot = `${environment ?? ""}|${current ?? ""}|${archiveDir}|${path}`;
+    const target = slot;
     untrack(() => {
       remember();
-      listed = slot;
+      listed = target;
       exitSelection();
       endGesture();
-      const saved = compact ? recallShared(slot) : undefined;
+      const saved = compact ? recallShared(target) : undefined;
       entries = saved ?? [];
       loaded = saved !== undefined;
     });
@@ -1222,6 +1223,7 @@
         {:else if ordered.length}
           <ScrollCard
             bind:scroller={list}
+            memory={`shared|${slot}`}
             onpointerdown={onPointerDown}
             onpointermove={onPointerMove}
             onpointerup={onPointerUp}

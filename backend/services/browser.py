@@ -414,10 +414,13 @@ class BrowserSession:
         target = url.strip()
         if not target:
             return
-        if "://" not in target:
+        if "://" not in target and not target.startswith("about:"):
             target = f"https://{target}"
         self._loaded.clear()
         await self._cdp.call("Page.navigate", {"url": target}, self._page)
+
+    async def go_home(self):
+        await self.navigate(_HOME)
 
     async def await_load(self, timeout: float = _LOAD_TIMEOUT) -> bool:
         try:

@@ -26,6 +26,7 @@
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
     androidBrowsing,
+    blankPage,
     captureName,
     deviceBrowser,
     nativePick,
@@ -138,33 +139,20 @@
 
   const onServer = $derived(side === "server");
 
-  const blank = (url: string) => !url || url.startsWith("about:");
-
-  const titleOf = (title: string, url: string) => title || (blank(url) ? "" : url) || t("NEW_TAB");
-
-  const entryOf = (id: string, title: string, url: string, favicon: string, home: boolean): BrowserEntry =>
-    home ? { id, title: t("NEW_TAB"), url, favicon: "" } : { id, title: titleOf(title, url), url, favicon };
+  const entryOf = (id: string, title: string, url: string, favicon: string): BrowserEntry =>
+    blankPage(url) ? { id, title: t("NEW_TAB"), url, favicon: "" } : { id, title: title || url, url, favicon };
 
   const DRAFT_TAB = "draft";
 
-  let serverHome = $state(false);
   let serverDraft = $state(false);
   const deviceEntries = $derived<BrowserEntry[]>(
-    deviceBrowser.tabs.map((tab) => entryOf(tab.id, tab.title, tab.url, tab.favicon, tab.home)),
+    deviceBrowser.tabs.map((tab) => entryOf(tab.id, tab.title, tab.url, tab.favicon)),
   );
   const serverEntries = $derived<BrowserEntry[]>(
     page.running
-      ? page.tabs.map((tab) =>
-          entryOf(
-            tab.id,
-            tab.title,
-            tab.url,
-            tab.favicon ?? "",
-            (serverHome && tab.id === page.activeTab) || blank(tab.url),
-          ),
-        )
+      ? page.tabs.map((tab) => entryOf(tab.id, tab.title, tab.url, tab.favicon ?? ""))
       : serverDraft
-        ? [entryOf(DRAFT_TAB, "", "", "", true)]
+        ? [entryOf(DRAFT_TAB, "", "", "")]
         : [],
   );
   const entries = $derived(onServer ? serverEntries : deviceEntries);
@@ -172,16 +160,10 @@
     onServer ? (page.running || !serverDraft ? page.activeTab : DRAFT_TAB) : deviceBrowser.activeId,
   );
   const active = $derived(entries.find((entry) => entry.id === activeId) ?? null);
-  const serverAtHome = $derived(
-    serverHome || (page.running ? blank(page.url) : !ready && !launching && page.available),
-  );
+  const serverAtHome = $derived(page.running ? blankPage(page.url) : !ready && !launching && page.available);
   const atHome = $derived(onServer ? serverAtHome : deviceBrowser.atHome);
   const framed = $derived(ready && !serverAtHome && !serverStatus.unavailable);
-  const canGoBack = $derived(
-    onServer
-      ? page.canGoBack || (serverHome && page.running)
-      : !!deviceBrowser.active?.canGoBack || (atHome && !!deviceBrowser.active?.url),
-  );
+  const canGoBack = $derived(onServer ? page.canGoBack : !!deviceBrowser.active?.canGoBack);
   const canGoForward = $derived(onServer ? page.canGoForward : !!deviceBrowser.active?.canGoForward);
   const pageUrl = $derived(onServer ? page.url : (deviceBrowser.active?.url ?? ""));
   const shownUrl = $derived(atHome ? "" : pageUrl);
@@ -229,13 +211,12 @@
   };
 
   const goHome = () => {
-    if (onServer) serverHome = true;
+    if (onServer) link?.home();
     else deviceBrowser.goHome();
   };
 
   const goBack = () => {
-    if (onServer && serverHome) serverHome = false;
-    else if (onServer) link?.back();
+    if (onServer) link?.back();
     else deviceBrowser.back();
   };
   const picking = $derived(onServer ? page.picking : deviceBrowser.picking);
@@ -340,7 +321,6 @@
   };
 
   const navigate = (input: string) => {
-    serverHome = false;
     if (!onServer) {
       deviceBrowser.navigate(input);
       return;
@@ -387,7 +367,6 @@
       const saved = takeBrowser(environment);
       if (!saved) return;
       page = saved.page;
-      serverHome = saved.home;
       if (saved.frame) paint(saved.frame);
     });
     const created = browserLink(
@@ -416,13 +395,12 @@
     link = created;
     return () => {
       created.close();
-      rememberBrowser(environment, { page, home: serverHome, frame: lastFrame });
+      rememberBrowser(environment, { page, frame: lastFrame });
       lastFrame = null;
       link = null;
       ready = false;
       connected = false;
       dropped = false;
-      serverHome = false;
       page = { ...IDLE_PAGE };
     };
   });
@@ -438,7 +416,6 @@
     untrack(() => {
       const url = serverBrowser.take();
       if (url === null) return;
-      serverHome = false;
       openOnServer(url);
     });
   });
@@ -742,7 +719,6 @@
       return;
     }
     if (id === DRAFT_TAB) return;
-    serverHome = false;
     link?.switchTab(id);
   };
 

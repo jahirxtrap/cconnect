@@ -7,6 +7,7 @@
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
+  import { scrollMemory } from "$lib/ui/scrollMemory";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import NoteMenu from "./NoteMenu.svelte";
   import { notePreview, notes, noteTitle, type Note } from "./notes.svelte";
@@ -113,7 +114,11 @@
       <EmptyState icon={NotepadText} text={t("NOTES_EMPTY")} class="flex-1" />
     {/if}
   {:else if notes.cards}
-    <div use:viewportScrollbar class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-y-auto {INSET}">
+    <div
+      use:viewportScrollbar
+      use:scrollMemory={"notes|cards"}
+      class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-y-auto {INSET}"
+    >
       <div class="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {#each listed as note (note.id)}
           {@render card(note)}
@@ -121,7 +126,11 @@
       </div>
     </div>
   {:else}
-    <div use:viewportScrollbar class="rounded-viewport scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}">
+    <div
+      use:viewportScrollbar
+      use:scrollMemory={"notes|rows"}
+      class="rounded-viewport scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}"
+    >
       {#each listed as note (note.id)}
         {@render row(note)}
       {/each}

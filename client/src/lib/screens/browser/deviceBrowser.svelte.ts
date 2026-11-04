@@ -15,7 +15,6 @@ export interface DeviceTab {
   canGoBack: boolean;
   canGoForward: boolean;
   open: boolean;
-  home: boolean;
 }
 
 export interface DeviceBounds {
@@ -26,7 +25,7 @@ export interface DeviceBounds {
 }
 
 interface StoredTabs {
-  tabs: { id: string; url: string; title: string; favicon?: string; home?: boolean }[];
+  tabs: { id: string; url: string; title: string; favicon?: string }[];
   active: string;
 }
 
@@ -121,10 +120,14 @@ const MODES = new Set(androidBrowsing ? [DESKTOP_SITE] : Object.keys(PRESETS));
 const known = (name: string) => !name || MODES.has(name);
 
 
+export const HOME_PAGE = "about:blank";
+
+export const blankPage = (url: string) => !url || url.startsWith("about:");
+
 export const addressOf = (input: string): string | null => {
   const target = input.trim();
   if (!target) return null;
-  if (target.includes("://")) return target;
+  if (target.includes("://") || target.startsWith("about:")) return target;
   if (LOCAL_HOST.test(target)) return `http://${target}`;
   if (!/\s/.test(target) && HOST_LIKE.test(target)) return `https://${target}`;
   return `${SEARCH_URL}${encodeURIComponent(target)}`;
@@ -162,7 +165,6 @@ const blank = (id: string, url = "", title = "", favicon = ""): DeviceTab => ({
   canGoBack: false,
   canGoForward: false,
   open: false,
-  home: false,
 });
 
 const sameBounds = (a: DeviceBounds | null, b: DeviceBounds | null) =>
@@ -209,7 +211,7 @@ class DeviceBrowser {
     if (this.#started) return;
     this.#started = true;
     const stored = store.get<StoredTabs>(STORE_KEY, { tabs: [], active: "" });
-    this.tabs = stored.tabs.map((tab) => ({ ...blank(tab.id, tab.url, tab.title, tab.favicon), home: !!tab.home }));
+    this.tabs = stored.tabs.map((tab) => blank(tab.id, tab.url, tab.title, tab.favicon));
     this.activeId = this.tabs.some((tab) => tab.id === stored.active) ? stored.active : (this.tabs[0]?.id ?? "");
     browserListen<PageState>("browser-state", (state) => this.#apply(state));
     browserListen<{ id: string; url: string }>("browser-open", (request) => {
@@ -475,15 +477,14 @@ class DeviceBrowser {
       this.newTab(url);
       return;
     }
-    this.#update(tab.id, { url, home: false });
+    this.#update(tab.id, { url });
     this.#persist();
     if (tab.open) void browserCall("browser_navigate", { id: tab.id, url });
     this.#present();
   }
 
   get atHome(): boolean {
-    const tab = this.active;
-    return !tab?.url || tab.home;
+    return blankPage(this.active?.url ?? "");
   }
 
   goHome() {
@@ -494,19 +495,14 @@ class DeviceBrowser {
     }
     if (this.atHome) return;
     if (this.picking) this.pick(false);
-    this.#update(tab.id, { home: true });
+    this.#update(tab.id, { url: HOME_PAGE });
     this.#persist();
+    if (tab.open) void browserCall("browser_navigate", { id: tab.id, url: HOME_PAGE });
     this.#present();
   }
 
   back() {
     const tab = this.active;
-    if (tab?.home && tab.url) {
-      this.#update(tab.id, { home: false });
-      this.#persist();
-      this.#present();
-      return;
-    }
     if (tab?.open) void browserCall("browser_back", { id: tab.id });
   }
 
@@ -556,7 +552,7 @@ class DeviceBrowser {
   #present() {
     const tab = this.active;
     const hole = this.#hole;
-    const showing = tab && tab.url && !tab.home && hole && !this.#hidden ? tab.id : null;
+    const showing = tab && !blankPage(tab.url) && hole && !this.#hidden ? tab.id : null;
     if (this.#shownId && this.#shownId !== showing) {
       void browserCall("browser_visible", { id: this.#shownId, visible: false });
       this.#shownId = null;
@@ -711,7 +707,7 @@ class DeviceBrowser {
 
   #persist() {
     store.set<StoredTabs>(STORE_KEY, {
-      tabs: this.tabs.map(({ id, url, title, favicon, home }) => ({ id, url, title, favicon, home })),
+      tabs: this.tabs.map(({ id, url, title, favicon }) => ({ id, url, title, favicon })),
       active: this.activeId,
     });
   }

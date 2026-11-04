@@ -12,6 +12,7 @@
     subtitle?: string | null;
     refreshing?: boolean;
     onRefresh?: (() => void) | null;
+    memory?: string | null;
     actions?: Snippet;
     toolbar?: Snippet;
     children?: Snippet;
@@ -22,6 +23,7 @@
     subtitle,
     refreshing = false,
     onRefresh = null,
+    memory = null,
     actions,
     toolbar,
     children,
@@ -37,7 +39,7 @@
     {/snippet}
   </AppTopBar>
   {@render toolbar?.()}
-  <PullToRefresh {refreshing} {onRefresh}>
+  <PullToRefresh {refreshing} {onRefresh} {memory}>
     {@render children?.()}
   </PullToRefresh>
 </div>

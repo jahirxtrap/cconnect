@@ -14,7 +14,12 @@
   const page = useSettingsPage((section) => blocks[section]?.scrollIntoView({ block: "start", behavior: "instant" }));
 </script>
 
-<Screen title={t("SETTINGS")} refreshing={page.refreshing} onRefresh={() => void page.refresh()}>
+<Screen
+  title={t("SETTINGS")}
+  refreshing={page.refreshing}
+  onRefresh={() => void page.refresh()}
+  memory="settings"
+>
   {#snippet actions()}
     {#if !isTouch}
       <TooltipIconButton label={t("REFRESH")} shortcut="window.refresh" onclick={() => void page.refresh()}>

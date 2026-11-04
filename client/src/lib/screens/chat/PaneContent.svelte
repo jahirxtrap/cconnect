@@ -6,7 +6,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import ClaudeActions from "$lib/screens/claude/ClaudeActions.svelte";
-  import ClaudeDetail from "$lib/screens/claude/ClaudeDetail.svelte";
+  import ClaudeDetail, { CLAUDE_MEMORY } from "$lib/screens/claude/ClaudeDetail.svelte";
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import BrowserView from "$lib/screens/browser/BrowserView.svelte";
   import AgentsView from "$lib/screens/agents/AgentsView.svelte";
@@ -153,7 +153,11 @@
           <ClaudeDetail kind={panes.claudeDetail} onClose={() => (panes.claudeDetail = null)} />
         {:else}
           <PaneHeader title={t("CLAUDE")} actions={claudeActions} />
-          <PullToRefresh refreshing={claudeRefresh.refreshing} onRefresh={() => void claudeRefresh.run()}>
+          <PullToRefresh
+            refreshing={claudeRefresh.refreshing}
+            onRefresh={() => void claudeRefresh.run()}
+            memory={CLAUDE_MEMORY}
+          >
             <div class="px-2 pb-2">
               <ClaudeSections
                 tick={claudeRefresh.tick}

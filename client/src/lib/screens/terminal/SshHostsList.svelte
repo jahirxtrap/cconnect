@@ -15,6 +15,7 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
+  import { scrollMemory } from "$lib/ui/scrollMemory";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import SshEditDialog from "./SshEditDialog.svelte";
 
@@ -57,7 +58,11 @@
   {#if !sshStore.profiles.length}
     <EmptyState icon={Network} text={t("NO_HOSTS")} class="flex-1" />
   {:else}
-    <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
+    <div
+      use:viewportScrollbar
+      use:scrollMemory={"ssh-hosts"}
+      class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)"
+    >
       <div class="flex flex-col rounded-lg bg-card p-1">
         {#each sshStore.profiles as profile (profile.id)}
           {@const OsIcon = osIcon(profile.os)}
