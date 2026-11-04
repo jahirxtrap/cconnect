@@ -1,30 +1,24 @@
-# CConnect
+<p align="center">
+  <img src=".github/assets/banner.png" alt="CConnect" width="760">
+</p>
 
 Mobile, desktop and web interface for **Claude Code**. Drive Claude Code running
 on your PC — sessions, files, projects, file edits, interactive permission
 prompts — from an Android app, a desktop app for Windows, Linux and macOS, or
 any browser, locally over Tailscale or publicly over a Tailscale Funnel.
 
+<p align="center">
+  <a href="https://cconnect.dev">Website</a> ·
+  <a href="https://app.cconnect.dev">Web app</a> ·
+  <a href="https://github.com/jahirxtrap/cconnect/releases/latest">Download</a> ·
+  <a href="https://github.com/jahirxtrap/cconnect/wiki">Wiki</a>
+</p>
+
 ```
 [Android / Desktop / Web client] ──HTTP/WS──> [Backend :8723 on the PC] ──Agent SDK──> [Claude Code]
 ```
 
-## Structure
-
-```
-cconnect/
-├── backend/   # FastAPI bridge (Python) — see backend/CLAUDE.md
-└── client/    # Desktop, web and Android app (Svelte + Tauri) — Windows, Linux, macOS, the browser and Android — see client/CLAUDE.md
-```
-
-The desktop, web and Android apps are one Svelte + Tauri codebase: the desktop
-build is a native installer per OS, and the web build is the same UI hosted as a
-static site (see [Web app](#web-app)). The assets are named `cconnect-tauri`.
-
-None of the installers is signed, so the first launch needs one extra step:
-macOS says the developer is unidentified and lets you through from **System
-Settings → Privacy & Security → Open anyway**, and Windows hides the button
-behind **More info** in the SmartScreen notice. Only the first time.
+---
 
 ## Install
 
@@ -36,24 +30,18 @@ curl -fsSL https://cconnect.dev/install.sh | sh     # macOS, Linux, WSL
 irm https://cconnect.dev/install.ps1 | iex          # Windows PowerShell
 ```
 
-It installs [uv](https://docs.astral.sh/uv/) if it is missing and leaves the
-`cconnect` command on your PATH, in an environment of its own. Its data —
-settings, accounts, the shared folder and the trash — lives in `~/.cconnect/data`;
-the conversations stay with the Claude CLI, in `~/.claude`.
+It installs [uv](https://docs.astral.sh/uv/) if it is missing and leaves the `cconnect` command on
+your PATH. Its data lives in `~/.cconnect/data`; the conversations stay with the Claude CLI, in
+`~/.claude`.
 
-From a git checkout instead, the same code with the same commands:
+Run `cconnect`, open the app and add the server under **Settings → Environments** — on a phone, scan
+the QR the server prints. The apps are on the
+[latest release](https://github.com/jahirxtrap/cconnect/releases/latest) and the web app is at
+[app.cconnect.dev](https://app.cconnect.dev). The installers aren't signed, so the first launch asks
+once: **More info** on Windows, **Privacy & Security → Open anyway** on macOS.
 
-```bash
-cd backend
-python -m venv .venv && source .venv/Scripts/activate
-pip install -e .
-python run.py
-```
-
-A checkout keeps its data in `backend/data`; `cconnect migrate <that folder>` copies
-it into an installed one without touching the original.
-
-### Commands
+<details>
+<summary><b>Commands</b></summary>
 
 | Command | What it does |
 |---|---|
@@ -72,652 +60,129 @@ it into an installed one without touching the original.
 | `cconnect migrate <folder>` | Copy a previous data folder into this one |
 | `cconnect key` | Print the security key, `--rotate` to replace it |
 
-The launcher's original flags still work — `python run.py --expose tailscale`,
-`--detach`, `--stop`, `--security-key` — so scripts written against them keep running.
-
-## Run modes
-
-The backend runs local or public, and public has two providers. Every example
-below is written as `python run.py`; `cconnect` takes the same commands.
-
-### Local HTTP (no auth)
-
-```bash
-python run.py
-```
-
-- Backend listens on `:8723`, no auth.
-- **From the same machine** — the desktop app, or a browser on the PC — use
-  `http://localhost:8723`. Nothing else to install.
-- **From another device**, both it and the PC need **Tailscale**, signed into the
-  same account: connect to the PC's tailnet IP (`100.x.x.x`) shown in the
-  Tailscale app, e.g. `http://100.x.x.x:8723`. No funnel needed. Tailscale is how
-  your phone reaches the PC here, not something the backend itself requires.
-
-### Tailnet HTTPS (no token, never leaves your tailnet)
-
-```bash
-python run.py --expose tailnet
-```
-
-Runs `tailscale serve --bg 8723`, so the machine answers at
-`https://<machine>.<tailnet>.ts.net` with a real certificate — reachable only from
-devices signed into your tailnet, never from the internet. No token: the tailnet is
-the gate, the same as the local mode. It is what you want when the browser refuses a
-plain `http://100.x.x.x` because the page itself came over HTTPS. `Ctrl+C` (or
-`cconnect stop`) runs `tailscale serve reset` and the address stops answering.
-
-**Requirement:** Tailscale installed and signed in. HTTPS certificates must be on for
-the tailnet, which is the same switch Funnel needs.
-
-### Public HTTPS (token-gated, exposes the PC over the internet)
-
-```bash
-python run.py --expose tailscale
-```
-
-What this does:
-
-1. Runs `tailscale up` and `tailscale funnel --bg 8723` to publish the backend
-   at `https://<hostname>.<tailnet>.ts.net` (port 443).
-2. If `PUBLIC_ACCESS_TOKEN` is unset, generates one and persists it in
-   `backend/.env` (reused on subsequent runs).
-3. Prints the public URL, the token, and a **scannable QR** encoding
-   `{"url":"...","token":"..."}` for the mobile app.
-4. Gates every `/api/*` route — except `/api/health` — behind
-   `Authorization: Bearer <token>`. The WebSocket handshake checks the same.
-5. On `Ctrl+C` (or process exit) runs `tailscale funnel --https=443 off` to
-   close the funnel.
-
-**Requirement (PC only):** Tailscale installed, signed in, and **Funnel
-enabled for this node** in the tailnet ACL. Your device needs only an internet
-connection — no Tailscale required.
-
-### Public HTTPS behind your own proxy
-
-```bash
-python run.py --expose caddy --public-host cc.example.com
-```
-
-Same result as the funnel — public URL, token, QR — but the HTTPS comes from a
-reverse proxy you already run instead of Tailscale. Natural fit for a VPS, which
-has a public IP and doesn't need a tunnel to be reachable, and for serving more
-than one backend from the same machine: each hostname routes to its own port and
-keeps its own token. With Caddy that's the whole config:
-
-```
-cc.example.com { reverse_proxy 127.0.0.1:8723 }
-```
-
-The certificate is Let's Encrypt's, so any name that resolves to the machine
-works — your own domain, a free `duckdns.org` subdomain, or nothing at all:
-**omit `--public-host` and the backend derives `<user>-<public-ip>.sslip.io`**,
-a name sslip.io resolves straight back to that address with no registration. Set
-`PUBLIC_HOSTNAME` in `backend/.env` to avoid repeating the flag.
-
-Nothing is started or stopped here: the proxy is a service of its own, so this
-mode only publishes where it answers and turns the token on. That means the
-hostname has to be one your proxy actually serves — CConnect warns before
-printing the QR when the name doesn't resolve to this machine or when nothing is
-listening on 443. On a machine behind NAT the sslip.io default can't work, so it
-refuses to guess and asks for a hostname instead.
-
-### Detached (leave it running over SSH)
-
-```bash
-python run.py --detach --expose tailscale
-python run.py --stop
-```
-
-Meant for a VPS you reach over SSH: `--detach` prints the URL, token and QR as
-usual, then hands the terminal back and keeps the server running in its own
-process — closing the session (or the terminal) no longer takes it down. Output
-goes to `backend/data/logs/detached.log`, the funnel stays up, and `--stop` shuts
-both down. It survives the terminal, not a reboot.
-
-## Run the backend from the desktop app
-
-The desktop app can start the backend for you. In Settings → Local server,
-**Source** picks what it runs: **Native**, the installed `cconnect` command,
-found on its own or at a path you give, or **Repository**, a backend folder with
-Python auto-detected from a virtualenv there, the system's, or a path you pick.
-Choose the mode — local, tailnet only, a Tailscale Funnel or Caddy — and with
-**Start on launch** on it launches the server when the app opens, showing its
-status and, in public mode, the URL and token to connect with. Once the server
-is up it adds itself to Environments as Local server, with the token and the
-security key when the mode needs them, unless an environment already points at
-it; a token or key that changed is updated there instead. It only manages a
-server it started; if one is already running, it steps aside.
-
-## Connecting
-
-Open Settings → Environments and add the server: on mobile, scan the QR
-(top-right of the dialog) to autofill it from `--expose`'s output; on desktop,
-paste the address and token by hand, or let the local server add itself. The
-connection becomes active immediately and the chat reconnects.
-
-Each environment can carry its own colour, which takes over the whole app while
-it's the active one — a glance tells you whether you're driving your laptop or a
-VPS. Leave it unset to keep the accent you picked in Settings, or set it to
-dynamic so that environment follows the system colour.
-
-Once you settle on one machine and one project, a **lock** pins them. Close the
-padlock next to the active environment, or next to its working directory, and
-every picker that would switch them goes quiet — the chat, Shared, Monitor and
-the Claude screen show the current one as plain text instead of a menu. The
-environments list itself stays open, so there's always a way back.
-
-## Web app
-
-The desktop UI also runs in the browser — the same code, nothing to install.
-It's a plain static site, so it can be hosted anywhere and opened from any
-browser.
-
-Because the page is served over HTTPS, the browser only lets it reach a backend
-over **HTTPS/WSS**, so it pairs with either mode that terminates TLS:
-`cconnect expose tailnet` for a backend only your tailnet can reach, with no
-token to paste, or `cconnect expose tailscale` for the public Funnel, with its
-token. (For that reason the environment form on web offers only HTTPS; the
-native apps keep plain HTTP for local backends.) Updating is just a reload. It
-is hosted at https://app.cconnect.dev/.
-
-It can also be installed, and then it opens in its own window without the
-browser bar. **Install app** in Settings → About opens the browser's own
-install dialog on Chrome and Edge; on the iPhone there is no such dialog, and no
-way to open one, so it shows the two steps instead: the share button in Safari's
-own bar, then *Add to Home Screen*. The entry disappears once it is installed.
-
-## In the chat
-
-Claude Code's own slash commands show up in the composer, plus a `/usage` view
-of your plan's token limits. The context ring in the composer bar shows how full
-the context is, your session and weekly limits as they move, and how long the cache
-has left. A **quick chat** button opens a pane under the chat for a
-throwaway question — handy to ask something while a long task keeps running,
-without derailing it.
-
-**Queue** keeps your messages flowing: send another while Claude is still
-working and it's held, then picked up in order and placed in the conversation
-as each one runs — and anything still waiting comes back if you reload or
-resume the chat.
-
-**Questions come as forms.** When Claude needs something from you it asks in
-the chat itself — choices, text fields, toggles and a note kept apart from the
-answer — and longer questions arrive as pages you move through. An MCP server
-that needs a value or wants you to open a page asks the same way. Its replies can
-carry more than text too: galleries, audio, PDFs and live previews, plus blocks
-it draws with bars, text and media. Ask what the session is spending and the
-plan usage is drawn the same way, and ask it to compact and it does.
-
-**Attachments** travel with your message: tap the clip, pick any files or
-photos on your device, and they land on the PC before the prompt runs. Images
-reach Claude as real vision input — it sees them, not a path — and other files
-arrive as mentions it can open directly.
-
-**Rewind** takes a conversation back to an earlier point. Pick the moment,
-preview exactly what would change on disk (`+added −removed • files`), and
-choose whether to roll back the conversation alone or code and conversation
-together.
-
-**Fork** copies a chat into a new one and leaves the original as it is: the
-whole conversation from the chat's menu, or up to a point from Rewind or from
-the row under each reply, which also shares and copies it.
-
-**Listen** reads a reply aloud — from the row under it, or just the part you
-select — with the voices the system ships. **Read aloud** in the Client settings
-picks the voice and the speed, and can read the last reply by itself when the
-work is done, always or only while the app is in the background.
-
-**Arrow up walks back** through what you already sent in this chat, straight
-from the composer, and arrow down comes forward again — with what you were
-writing kept aside and handed back at the end.
-
-**Dictate instead of typing.** The microphone next to Send writes what you say
-into the composer — words appear as you speak and each finished sentence lands
-in the message. On Android it goes through the phone's own recogniser, which
-works offline once the language is downloaded; on the desktop app and the
-browser it uses the engine they ship. Attach and the slash commands moved into
-the **+** menu beside it, so the bar keeps two buttons.
-
-**Persistent sessions** keep a chat's Claude process running while you have it
-open: a message is answered without starting the CLI first, and commands can
-keep working in the background between turns. Each one holds its own process
-(around 400 MB of memory, not counting its MCP servers), so **Sessions** in the
-Server settings chooses how many chats and ACP agents may keep one at once and how
-long each waits after the last device closes it, and you can close it yourself
-from the chat's header. Whatever runs in the
-background is listed under **Running** in that header, each task with a button to
-stop it, and the session stays open while any of it is still working.
-
-Model, effort and the effort subagents run at, permission mode, whether Claude may
-write outside the chat's working folders, how much of each turn you see, when the
-context gets compacted, which of CLAUDE.md and AGENTS.md Claude reads as the
-project's instructions, and which Claude CLI the backend drives are all set from the app.
-The server holds the defaults and every client follows them, but each device can
-decide for itself how much of a turn it receives — including a **simple mode**
-that folds thinking and tool detail into a single working block, the way the
-quick chat already reads.
-
-## Tabs
-
-Keep several chats open at once, each in its own tab with its own session,
-project and environment — start a long task in one, switch to another, and come
-back to find it where you left it. Desktop and web get a tab bar; on mobile a
-switcher does the same. Open any chat or session in a new tab, reorder them, and
-on desktop reach for the keyboard (Ctrl+T to open, Ctrl+W to close, Ctrl+Tab to
-cycle). Chats and ACP agents open in either panel, each panel with its own
-tabs: a tab drags from one bar to the other, **Swap panels** in the panel menu
-trades the two, and the list on the left shows the chats of the panel you are
-in. The tabs you had open come back when you reopen the app, each
-loading only once you switch to it. The side panel's views — terminal, browser,
-project files, mods and ACP agents — sit in a bar you reorder by dragging, moving
-any of them into or out of its menu.
-
-## Themes and packs
-
-**Theme** in the Client settings picks a light theme, a dark theme and the
-terminal colours apart — CConnect's own and two dozen more, from Claude and
-GitHub to Dracula and Nord — and **Appearance** chooses between them or follows
-the system. The accent colour can come from the theme, **Font** sets the
-typefaces for text, code, symbols and emoji, and **Chat background** puts the
-CConnect logo, a background from a pack or a picture of your own behind the
-conversation.
-
-All of that travels as a `.ccpack` pack. **Packs** installs one from a file or
-from those available on the server — Claude can write one for you and leave it
-there — and opening a `.ccpack` in the chat, in Shared, from the desktop or from
-any app on Android shows what it brings, to install, save, share or open
-elsewhere. When its author picked what to apply, **Use** puts all of it on at
-once. From Samsung's My Files, use **Import pack** instead.
-
-Every pack on the server stays in that list, the ones you already have too:
-it offers to install a new one, to update yours when the server holds a newer
-version, and to delete one from the server, which takes the security key.
-
-## Mods
-
-Claude Code mods are plugins that change what Claude shows and how it behaves:
-panes that stay beside the chat and update as it works, a band above the
-composer, a status line, notices and commands of their own. CConnect draws them
-in its own style instead of as terminal text, on desktop, web and Android alike.
-
-Panes open in the side panel's **Mods** view, one tab each, and take the same
-shortcuts as the chat's tabs. The band sits on top of the composer with the mods'
-status line under it, and its bar hides and shows it; with **Collapsible mods
-band** off in Settings that is left to a shortcut of your own. **Mods**, on by
-default in the server settings, shows what mods report in any chat, while panes
-and the band also need persistent sessions, since the Claude process that stays
-running is the one drawing them. It rides on an internal Claude Code protocol
-that can change between versions, so it is marked experimental.
-
-**Reload plugins** under ⋮ in the Mods view, or `/reload-plugins` and
-`/reload-skills` in the composer, bring in what you changed without leaving the
-chat. Installing a plugin or switching one on or off reloads the open persistent
-chats on its own, and asks first when they would lose their cache.
-
-They install like any plugin, from a marketplace or from a folder. When Claude
-writes one for you in a chat, CConnect asks before turning it on for that
-session (a mod is code, and it runs with the same access you have), and **Mods
-from chats** in the catalog installs it for every chat. In the Claude screen a
-mod's card lists its commands and, in plain words, what it reaches (the
-interface, your files, programs, the internet, requests to Claude), and its
-options are edited from there.
-
-## Shared
-
-The shared folder grew into a full file manager. Browse `backend/data/shared/` from
-the app: upload files (with per-file progress you can cancel), create folders,
-rename, sort by name/date/type/size, and long-press (or right-click on desktop)
-to multi-select — then move, copy, share, delete, save to Downloads, or copy a
-file's PC path. Open a file to preview it in place — images with zoom, video,
-audio, PDF, SVG, Markdown, source code and HTML — and delete it right from the
-preview if it's no longer needed.
-
-With the side panel open the preview lands there instead of covering the chat,
-so you can watch a file while Claude rewrites it — it reloads on its own when it
-changes on disk. A button blows it up to full screen, and closing it gives you
-back the panel you had. The same goes for a file Claude links in the chat: one
-tap opens it, and the rest of the actions stay in the viewer's menu.
-
-Each project keeps its own folder inside it: what you upload from a chat and what
-Claude writes for you land there, so with a project pinned you see that project's
-files and nothing else. The three-dot menu filters what to show — images, video,
-audio, PDF, Markdown, code, archives, packs.
-
-It works in both directions: drop a file into `backend/data/shared/` on the PC — or
-just ask Claude to write one there — and you get a tap-to-download link in the
-chat, served over the same authenticated connection.
-
-## Project files
-
-The side panel also browses the project of the chat beside it, or another you
-pick. Search the tree by
-typing a few letters of any path, and open a file read-only while Claude edits
-it. Git colours the tree — added, modified, untracked — and inside a file the
-change is painted on the numbered lines themselves, with buttons to walk from
-one to the next. An eye in the file's header moves it to the centre pane, where
-it takes the place of the chat, and from either side it expands to the whole
-window. A toggle folds the tree down to only what changed. An archive opens in
-the tree like a folder, and a file inside it previews without extracting
-anything. From a file you can
-mention its full path in the chat or copy it. What git ignores stays hidden
-until you unlock it with the security key.
-
-With that changed view open, a bar at the bottom carries the branch, how far
-ahead or behind it is, and everything a commit takes: tick the files that go in,
-write the message — or have Claude write it from what you marked, following a
-prompt of your own kept in the Claude screen — choose the author among the
-identities the repository knows, amend the last commit, and pull or push. The
-same bar opens the branch's history: the commits behind it, newest first,
-loading more as you reach the end. Every repository under the project is listed,
-not only the one at its root, so each file is committed to the one it belongs
-to.
-
-Throwing away the changes of what you ticked, pushing a branch that has no
-remote yet, and forcing a push are each one confirmation away. The security key
-gates all of it: without it the bar shows the branch you are on and nothing
-else.
-
-## Notes
-
-A built-in Markdown editor keeps as many notes as you need, shown as a list or
-as cards and searchable across all of them. A bar formats as you write (tasks you
-tick, bullets, headings, bold, code) with undo and redo, the preview renders the
-note as Markdown, and any of them can be duplicated, saved, exported or shared as
-a file. What you type stays between sessions. Syntax highlighting covers
-everything Shiki knows, here and anywhere else code shows up.
-
-## Manage Claude Code itself
-
-The **Claude** screen is a remote manager for the Claude Code install on the
-PC:
-
-- See the active CLI version, switch where it comes from, update it, and read
-  the official changelog without leaving the app.
-- Browse any **marketplace** catalog and install **plugins** from the app;
-  enable, disable, update, or uninstall the ones you have.
-- Add or remove **MCP servers**, with the credentials or environment variables
-  they need, and marketplaces.
-- Read the **skills** your plugins provide, and view or delete Claude's
-  **memories**, globally or per project.
-- Keep your own standing instructions in a **user prompt** editable from the
-  app — it rides along every conversation, on top of the system conventions in
-  `backend/core/prompts/CCONNECT.md`.
-- See your **plan usage** at a glance — your plan as Anthropic names it and a bar
-  per limit window: current session, this week with where it went by product,
-  and the per-model weekly caps with how much of the week each can take, each
-  with its reset time.
-- Keep several **Claude accounts** on one backend and switch between them.
-
-### Multiple accounts
-
-One backend can hold more than one Claude login. Add an account from the Claude
-screen and sign in without leaving the app: it hands you a link — copy it, open
-it on whatever device you like, approve the account there and paste the code
-back. Nothing is typed on the server, and each account keeps its own
-credentials, refreshed by the CLI as usual.
-
-What they share is everything you'd want in common — the same conversation
-history, plugins and skills — so switching accounts only changes who pays for
-the turn, not what you see. MCP servers are copied over when the account is
-created, and can be re-synced later.
-
-Pick the account per chat from the composer bar, or set the server-wide default
-from the Claude screen's header (the usage shown there follows it, and its
-picker shows another account's for a quick look) or in Settings. Accounts you haven't signed into yet are listed too, so you can
-finish later.
-
-### Model providers
-
-An account doesn't have to be a Claude login. A **provider** one points the CLI
-at an address of your own, anything answering the Anthropic API — a model running
-on your machine with [Ollama](https://ollama.com), or a gateway like
-[OmniRoute](https://github.com/diegosouzapw/OmniRoute) standing in front of
-hundreds of them. Give it the address and, if it asks for one, a token, an API
-key or a header of your own; the models it serves are read from there and become
-the list you pick from, effort levels and context window included, for the reply,
-the quick chat and the title the chat writes for itself.
-
-Models that cannot call tools are left out, since Claude Code leans on them for
-everything it does, and a small model tends to describe a tool call instead of
-making one — the system prompt alone is around 17K tokens, which also rules out
-anything with a short context window.
-
-An account can also move between backends. Export it and you get a small zip
-holding its credentials and its own settings — no conversations, no projects,
-nothing tied to the machine it came from. Import it from the same dialog you add
-an account in: the bundle always lands on a **new** account, so it can never
-overwrite a login you're already using.
-
-## Watch the PC
-
-The **Monitor** screen shows what the machine is doing while Claude works:
-CPU, GPU and memory as live graphs (VRAM and temperature included when
-there's an NVIDIA card), storage per disk, the server's own logs streaming
-in over a dedicated WebSocket, and a device card — OS with its brand icon,
-hostname, uptime, CPU/GPU models. If the machine runs on a battery — a laptop,
-or a phone hosting the backend — its charge shows there too, with the time left
-when the system reports it. Switch between resources, network and logs,
-change servers right from the top bar, and **restart the backend remotely** —
-one confirmation, the server relaunches itself and the app reconnects on its
-own.
-
-### Network
-
-A **Network** tab manages the PC's connection from wherever you are: whether it
-really has internet (a captive portal counts as no), live upload/download, every
-interface with the one carrying traffic marked, the Wi-Fi networks in range with
-their signal, and an on-demand **speed test** through the Ookla CLI when it's
-installed.
-
-You can also act on it — join another Wi-Fi network, turn the radio off, and on
-Linux bring a wired interface up or down. Since a wrong move over a remote link
-would strand you, every change is guarded: an action that would leave the
-machine with no way out is refused outright, and anything else is applied, then
-verified — if the new network has no internet, the previous one is restored on
-its own. A watchdog does the same if the machine ends up offline for any other
-reason. The tab only appears on backends that support it (Windows and Linux).
-
-## Built-in features
-
-On top of plain Claude Code, the backend ships a few helpers wired into the
-agent so they're available out of the box from the phone:
-
-- **Cross-project progress check.** Ask things like _"how's the README I left
-  running in <other-project> going?"_ and Claude summarizes that other
-  session's latest activity into Done / Pending / Files touched / Next step,
-  without you having to open it.
-- **Editable system prompt.** `backend/core/prompts/CCONNECT.md` is auto-appended to
-  every chat — that's where the file-sharing and progress-check conventions
-  live. Your personal additions go in `USER.md`, edited straight from the
-  Claude screen.
-- **ACP agents.** A view for either panel runs agents that speak the Agent
-  Client Protocol, such as Copilot, Codex or Gemini, installed from the
-  official catalog or added by hand, with their chats listed on the left like
-  Claude's, sorted into categories and renamed from there. They get CConnect's
-  `share_files` and its guides, so they hand you files and answer with galleries,
-  PDFs and next-step buttons, and an agent that signs in through a web page shows
-  it in its card, to finish in the server's browser from another device.
-- **Delegation.** Claude can hand a task to another AI and get its answer
-  back: an ACP agent, an agent CLI added under ACP agents as a command, or
-  another of your Claude accounts once its sheet says Claude can use it, with
-  the model you ask for when the destination offers a choice. Claude can also
-  install an agent from the catalog when you ask; in a persistent chat the task
-  can run in the background while the conversation goes on.
-
-## Discord
-
-The desktop app can show on your Discord profile what you are working on: the
-action, the elapsed time of the turn, the model, the environment, the project
-folder or the chat title. Each piece is a switch of its own and everything is
-off until you turn the integration on — the content of the messages never goes
-out, at any setting. It talks to the Discord desktop client over its local
-socket, so nothing leaves the machine and there is nothing to publish while it
-is off.
+</details>
+
+## Reaching your PC
+
+- **Local.** `cconnect` serves on port 8723 with no auth. The desktop app or a browser on the PC
+  use `http://localhost:8723`; your other devices reach it over Tailscale at the PC's `100.x.x.x`
+  address.
+- **Tailnet.** `cconnect expose tailnet` serves HTTPS with a real certificate, only to the devices
+  on your tailnet, still with no token.
+- **Tailscale Funnel.** `cconnect expose tailscale` publishes it on the internet behind a token,
+  printed with a QR for the phone to scan.
+- **Your own proxy.** `cconnect expose caddy` does the same behind Caddy or any reverse proxy, a
+  natural fit for a VPS.
+
+`--detach` keeps it running after the terminal closes, and the desktop app can start and stop it
+for you from **Settings → Local server**. The web app only reaches a server over HTTPS, so it pairs
+with the tailnet mode or a public one.
+
+---
+
+## Features
+
+### Chat
+
+- **Tabs and panels.** Several chats at once, each with its own project and environment; chats and
+  ACP agents open in either panel, and the tabs come back when you reopen the app.
+- **Queue.** Send while Claude is still working: messages are held, run in order and survive a reload.
+- **Questions as forms.** Claude asks with choices, fields and toggles, and answers with galleries,
+  audio, PDFs and live previews.
+- **Attachments.** Files and photos land on the PC before the prompt runs, and images reach Claude
+  as real vision input.
+- **Rewind and fork.** Take a conversation back to any point, with a preview of what changes on
+  disk, or copy it into a new chat.
+- **Listen and dictate.** Replies read aloud with the system's voices, and the microphone writes as
+  you speak.
+- **Persistent sessions.** A chat keeps its Claude process between turns, so replies start at once
+  and background tasks keep running, each listed in the header with a button to stop it.
+- **Your settings, from the app.** Model, effort, permission mode and how much of each turn you see,
+  down to a simple mode, with a ring that tracks the context and your plan's limits.
+
+### Files and code
+
+- **Shared files.** A file manager over the server's shared folder: upload with progress, organize,
+  and preview images, video, audio, PDF, Markdown, code and HTML. What Claude writes there arrives
+  as a link in the chat.
+- **Project files.** Browse the chat's project with git colours and each change painted on its
+  lines, then commit, pull and push from the same panel.
+- **Notes.** A Markdown editor with formatting, search and syntax highlighting.
+
+### The PC
+
+- **Monitor.** CPU, GPU, memory, disks and the server's logs, live. **Processes** shows what
+  CConnect runs and stops any of it; **Network** checks the connection, switches Wi-Fi and runs a
+  speed test.
+- **Terminal and SSH.** Shells on the server, in tabs that outlive the app, and an SSH client for
+  your other machines.
+- **Browser.** Pages on this device or on the server, with an ad blocker. Claude can open, read and
+  capture pages on the server to check its own work.
+
+### Claude Code
+
+- **The install, managed.** The CLI and its updates, plugins and marketplaces, MCP servers, skills,
+  memories and a user prompt of your own.
+- **Install from a link.** MCP servers, plugins, agents and packs from a web page, a message or a
+  card Claude offers. See [Install links](https://github.com/jahirxtrap/cconnect/wiki/Install-links).
+- **Accounts and providers.** Several Claude logins on one server, and providers such as Ollama or
+  OmniRoute for other models.
+- **ACP agents and delegation.** Copilot, Codex, Gemini and other agents in chats of their own, and
+  Claude can hand a task to one of them or to another of your accounts.
+- **Mods.** Panes, a band and status lines from Claude Code mods, drawn in CConnect's own style.
+- **Plan usage.** Your session and weekly limits, with their reset times.
+
+### Make it yours
+
+- **Themes and packs.** Light and dark themes, terminal colours, fonts, accents and chat
+  backgrounds, installed from `.ccpack` packs. See [how to make one](https://github.com/jahirxtrap/cconnect/wiki/Packs).
+- **Settings.** Searchable, in ten languages, with copies you can keep in Google Drive, and an
+  optional Discord status.
+
+---
 
 ## Optional tools
 
-Installing the command, or `pip install -e .` in a checkout, covers everything the
-backend imports; the Claude Code CLI is the only hard requirement on top. A handful
-of features reach for a program that isn't a Python package, so they're worth
-installing if you want the full set — none of them is needed to start the server,
-and each one degrades on its own.
+Only the Claude Code CLI is required. Each of these adds something, and the server runs without it.
 
-- **Tailscale** — the `expose tailscale` mode and its QR pairing. Without it
-  you're limited to local access, unless you front the backend yourself.
-- **Caddy** (or nginx, or any reverse proxy) — the `expose caddy` mode. Unlike
-  the rest of this list it isn't a binary you install and forget: it's a service
-  you configure and leave running, and CConnect never starts or stops it.
-- **git** — the Claude screen clones plugin marketplaces with it. The backend
-  never calls it directly; the CLI does, which is why it's easy to miss.
-- **unrar** and **rar** — reading and writing `.rar` in the file manager, one
-  binary each. On Windows, WinRAR provides both and the backend finds them under
-  `Program Files` without touching `PATH`; on Debian and Ubuntu they're the
-  `unrar` and `rar` packages (`unrar-free` is a limited reimplementation and
-  chokes on recent archives); on macOS, Homebrew's `rar` formula covers both.
-  Every other format the file manager offers works out of the box.
-- **Ookla speedtest** — the speed test in Monitor → Network, which otherwise
-  reports the CLI as unavailable.
-- **Node.js** — the ACP agents the catalog ships as npm packages. Python ones
-  install with **uv** when it is on the `PATH`, which also fetches the Python
-  version they ask for, and with pip otherwise; binaries need neither.
+- **Tailscale** — the tailnet and Funnel modes.
+- **Caddy**, or any reverse proxy — the `expose caddy` mode.
+- **git** — cloning plugin marketplaces.
+- **unrar** and **rar** — `.rar` archives in the file manager.
+- **Ookla speedtest** — the speed test in Monitor.
+- **Node.js** — ACP agents shipped as npm packages.
 
 ## Configuration
 
-Everything the backend reads comes from environment variables, taken from the
-process or from a `backend/.env` file (see `.env.example`). None of them is
-required for a plain local run.
+Everything the backend reads comes from environment variables, taken from the process or from
+`~/.cconnect/data/config/.env`. None of them is required for a plain local run.
+
+<details>
+<summary><b>Environment variables</b></summary>
 
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `8723` | Port the backend binds to |
-| `CCONNECT_DATA_DIR` | `backend/data` | Everything the backend owns on disk and would carry to another machine — settings, accounts, your prompts, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
-| `CCONNECT_CACHE_DIR` | `backend/cache` | What it can rebuild on its own, beside the data folder rather than inside it, so a migration never drags it along |
+| `CCONNECT_DATA_DIR` | `~/.cconnect/data` | Everything the backend owns on disk and would carry to another machine — settings, accounts, your prompts, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
+| `CCONNECT_CACHE_DIR` | `~/.cconnect/cache` | What it can rebuild on its own, beside the data folder rather than inside it, so a migration never drags it along |
 | `CCONNECT_SHARED_DIR` | `<data>/shared` | The drop folder on its own. Point two backends at the same one and both serve the same files |
 | `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Where Claude Code keeps its sessions |
-| `DEFAULT_CWD` | parent of `backend/` | Directory a chat starts in when neither the app nor the connection picks one |
-| `AI_WORKDIR` | `backend/data/state/internal_task` | Throwaway cwd for the internal helper actions (titles, quick questions), kept out of your history |
+| `DEFAULT_CWD` | your home folder | Directory a chat starts in when neither the app nor the connection picks one |
+| `AI_WORKDIR` | `<data>/state/internal_task` | Throwaway cwd for the internal helper actions (titles, quick questions), kept out of your history |
 | `DEFAULT_MODEL` | `opus` | Model used when the app doesn't override it |
 | `DEFAULT_EFFORT` | `max` | Same, for the effort level |
 | `DEFAULT_PERMISSION_MODE` | `default` | Same, for the permission mode |
-| `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `--expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
-| `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `--expose caddy`. `--public-host` on the command line wins over it |
-| `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `run.py` when it exposes the server, so you rarely write it yourself |
-| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `--security-key --rotate` replaces it. It is the only gate |
+| `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
+| `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `expose caddy`. `--public-host` on the command line wins over it |
+| `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `cconnect` when it exposes the server, so you rarely write it yourself |
+| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `cconnect key --rotate` replaces it. It is the only gate |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
 | `BROWSER_HEADLESS` | `1` | Runs it without a window; set `0` to watch the real browser on the server |
 | `BROWSER_QUALITY` | `70` | JPEG quality of the streamed frames. Lower it on a slow link — the pane stays sharp because the resolution does not change |
-| `BROWSER_PROFILE_DIR` | `backend/cache/browser` | Its own profile, so it never touches the one you browse with |
+| `BROWSER_PROFILE_DIR` | `<cache>/browser` | Its own profile, so it never touches the one you browse with |
 
-## Settings
-
-A search box finds any option by name or by its value, wherever it lives, and
-takes you to it. A **Privacy** section decides what leaves the machine: remote
-control from claude.ai, commit co-authorship, and session upload. The backend
-also updates itself from here, and on desktop the local server is started,
-restarted or stopped from the same place. On the desktop Settings opens in the
-centre beside your chats, the same as Claude, Monitor, Shared and Notes.
-
-The app comes in ten languages — English, Spanish, Brazilian Portuguese, French,
-German, Italian, Japanese, Simplified Chinese, Korean and Russian — and follows
-the system's unless you pick one under **Language**.
-
-## Staying current
-
-The app and the backend declare which versions of each other — and of the
-Claude CLI — they support. When something falls behind, a notice in the chat
-takes you straight to the right place: the app's own update (with its
-changelog), the server requirement, or the CLI update button. On the desktop and
-Android the app also tells you once when a new version of it is out. Release notes
-for both CConnect and Claude Code are readable in the app, and **Report a
-problem** in Settings → About opens a GitHub issue with the app, system, server
-and CLI versions already filled in. Settings → Recovery
-exports your settings to copy them into another install, or keeps copies of them
-in your Google Drive (encrypted with a password if you give one, and with this
-device's notes, packs and backgrounds if you want them along); the chats
-themselves stay on the server.
-
-## Browser
-
-The browser panel opens pages in two places, and a button at the start of its
-tabs switches between them:
-
-- **This device**: the desktop app and Android browse with the system's own
-  engine (WebView2, WebKit or the Android WebView), in a profile of their own
-  apart from the app's, so scrolling, video and signing in work as in any
-  browser. On the phone, going back steps back through the page first.
-- **Server**: a Chrome or Edge already installed on the machine hosting the
-  backend, streamed to the panel, so it reaches that machine's `localhost` and
-  a page that needs your session there stays logged in. It starts only once you
-  open one of its tabs, and it is the only side the web app has.
-
-Both carry tabs with the site's icon, back and forward, a reload and a home
-button. Home is a start page of CConnect's with a search box and your
-favorites, which you add from ⋮ or from the **+** on that page with the name and
-address you choose, and edit or delete from the tile itself.
-
-⋮ beside the address holds the rest: **Viewport** loads the page as a phone or a
-tablet (shrunk to fit the panel), or on Android as the mobile or the desktop
-site; **Zoom** is remembered per site, with Ctrl + / − / 0 on the desktop; and
-from there you pick an element (a chip carrying the page it came from, left out
-on touch screens), attach a screenshot of the page to the chat, open it outside
-CConnect, copy its link or add it to your favorites. On Android the page takes
-your touches where you put them, and pulling down from its top reloads it.
-
-This device's browser has an ad blocker built in and on by default (EasyList,
-EasyPrivacy and uBlock Origin's filters, with Annoyances and Cookie notices to
-add) that leaves local and tailnet addresses alone; the shield inside the
-address bar turns it off for a site, and its tooltip counts what it blocked.
-**Clear site data** and **Clear browsing data** under ⋮ ask before deleting
-anything. **Browser** in the Client settings picks the lists, sets a proxy (the
-system's, none, or one of your own with the addresses that skip it) and clears
-the browsing data the same way.
-
-Claude reaches the server side through three tools (open a page, read what is
-on it, take a screenshot) so it can check its own work on a site instead of
-guessing; the tools appear only while the panel is enabled in Settings → Tools,
-and you can take the mouse and the keyboard back at any moment. The panel is
-the only way in: there is no browser screen to open on its own.
-
-## Terminal
-
-A terminal opens beside the chat and in its folder, in a panel you can drag as
-wide as you need:
-shells on the machine running the backend, each in its own tab, and the SSH hosts
-you saved. They run on the server rather than in the app, so closing it — or
-opening the same backend from your phone — finds them where you left them.
-
-Getting in takes the key the server prints on every start (`SECURITY_KEY`,
-replaced with `python run.py --security-key --rotate`). It is the only gate, so
-treat it as a password to the machine. The same key decides whether Claude may
-open a shell and run a command in it, which you can also turn off from
-Settings → Tools, whether the project explorer shows the files git ignores
-and lets you commit them, and whether **Packs** can delete a pack from the
-server.
-
-## SSH client
-
-The app also bundles a lightweight SSH client. Open Settings → SSH
-hosts to save a target — its address, the SSH port (`22` unless the server
-listens somewhere else), and the credentials you log in with — then open it
-to an embedded terminal. On Linux that's your shell user + password;
-on Windows hosts running OpenSSH it's your account password. Password auth
-must be enabled on the target. A keepalive keeps the session connected, with
-a Wi-Fi lock on mobile when the screen turns off, and Ctrl+V pastes the
-clipboard into the terminal.
-
-### Local
-
-Your device and the target on the same network — use the target's LAN IP or
-hostname. No extra setup.
-
-### Remote (via Tailscale)
-
-Install Tailscale on both your device and the target machine, sign into the
-same account, and use the target's tailnet IP (`100.x.x.x`) shown in the
-Tailscale app. The port stays the same (`22`); no port forwarding, no VPN
-setup.
+</details>
 
 ## License
 
