@@ -7,6 +7,7 @@ from core.responses import api_response
 from services import pages
 
 MAX_BODY_SIZE = 500 * 1_048_576
+STREAMED_UPLOAD = ("PUT", "/api/shared/")
 
 FRAMEABLE_PATHS = ("/api/shared/", "/api/shared-archive-file", f"{pages.PATH}/")
 
@@ -30,8 +31,10 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        method, prefix = STREAMED_UPLOAD
+        streamed = request.method == method and request.url.path.startswith(prefix)
         content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > MAX_BODY_SIZE:
+        if not streamed and content_length and int(content_length) > MAX_BODY_SIZE:
             return api_response(status=413)
         return await call_next(request)
 
