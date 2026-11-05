@@ -1,6 +1,6 @@
 """Live chat/project list updates over a dedicated WebSocket.
 
-A filesystem watcher (``watchdog``, with a polling fallback when it is missing or
+A filesystem watcher (``watchfiles``, in its own thread, with a polling fallback when it
 fails) over the Claude projects directory keeps a lightweight in-memory snapshot of
 the session/project list. On any change it re-scans, reusing cached metadata for
 files whose (mtime, size) is unchanged, diffs against the snapshot and broadcasts
@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger
+from watchfiles import watch
 
 from core.config import CLAUDE_PROJECTS_DIR
 from services import projects as projects_service
 from services import rewind
 from services import sessions as sessions_service
 
-_DEBOUNCE_SECONDS = 0.5
+_DEBOUNCE_MS = 500
 _POLL_SECONDS = 2.0
 
 
@@ -44,9 +45,7 @@ class ChatListHub:
         self._subscribers: set[asyncio.Queue] = set()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
-        self._pending = threading.Event()
         self._stop = threading.Event()
-        self._observer = None
         self._started = False
 
     async def start(self):
@@ -59,12 +58,6 @@ class ChatListHub:
 
     def stop(self):
         self._stop.set()
-        self._pending.set()
-        if self._observer is not None:
-            try:
-                self._observer.stop()
-            except Exception:
-                pass
 
     def subscribe(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue()
@@ -174,46 +167,28 @@ class ChatListHub:
         loop.call_soon_threadsafe(deliver)
 
     def _begin_watching(self):
-        base = CLAUDE_PROJECTS_DIR
-        handler = None
-        if Path(base).is_dir():
+        threading.Thread(target=self._watch_loop, name="chat-list-watch", daemon=True).start()
+
+    def _watch_loop(self):
+        base = Path(CLAUDE_PROJECTS_DIR)
+        if base.is_dir():
             try:
-                from watchdog.events import FileSystemEventHandler
-                from watchdog.observers import Observer
-
-                hub = self
-
-                class _Handler(FileSystemEventHandler):
-                    def on_any_event(self, event):
-                        hub._pending.set()
-
-                observer = Observer()
-                observer.schedule(_Handler(), base, recursive=True)
-                observer.daemon = True
-                observer.start()
-                self._observer = observer
-                handler = "watchdog"
-            except Exception as exc:
-                logger.info(f"chat_list: watchdog unavailable ({exc}); falling back to polling")
-        if handler == "watchdog":
-            threading.Thread(target=self._debounce_loop, name="chat-list-watch", daemon=True).start()
-        else:
-            threading.Thread(target=self._poll_loop, name="chat-list-poll", daemon=True).start()
-
-    def _debounce_loop(self):
-        while not self._stop.is_set():
-            self._pending.wait()
-            if self._stop.is_set():
+                for _ in watch(
+                    base,
+                    watch_filter=None,
+                    debounce=_DEBOUNCE_MS,
+                    stop_event=self._stop,
+                    raise_interrupt=False,
+                    ignore_permission_denied=True,
+                ):
+                    self._refresh(True)
                 return
-            self._stop.wait(_DEBOUNCE_SECONDS)
-            self._pending.clear()
-            self._refresh(True)
+            except Exception as exc:
+                logger.info(f"chat_list: {base} cannot be watched ({exc}); falling back to polling")
+        self._poll_loop()
 
     def _poll_loop(self):
-        while not self._stop.is_set():
-            self._stop.wait(_POLL_SECONDS)
-            if self._stop.is_set():
-                return
+        while not self._stop.wait(_POLL_SECONDS):
             self._refresh(True)
 
     def _scan(self) -> tuple[dict, dict]:

@@ -4,8 +4,9 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from loguru import logger
+from watchfiles import watch
 
-_DEBOUNCE_SECONDS = 0.4
+_DEBOUNCE_MS = 400
 _POLL_SECONDS = 2.0
 
 
@@ -17,9 +18,7 @@ class DirectoryWatchHub:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
         self._lifecycle = threading.Lock()
-        self._pending = threading.Event()
         self._halted: Optional[threading.Event] = None
-        self._observer = None
 
     async def start(self):
         self._loop = asyncio.get_running_loop()
@@ -61,57 +60,33 @@ class DirectoryWatchHub:
 
     def _halt(self):
         halted, self._halted = self._halted, None
-        observer, self._observer = self._observer, None
-        if halted is None:
-            return
-        halted.set()
-        self._pending.set()
-        if observer is not None:
-            try:
-                observer.stop()
-            except Exception:
-                pass
+        if halted is not None:
+            halted.set()
 
     def _begin_watching(self):
         halted = threading.Event()
         self._halted = halted
-        watching = False
+        threading.Thread(target=self._watch_loop, args=(halted,), name=f"watch-{self._root.name}", daemon=True).start()
+
+    def _watch_loop(self, halted: threading.Event):
         if self._root.is_dir():
             try:
-                from watchdog.events import FileSystemEventHandler
-                from watchdog.observers import Observer
-
-                hub = self
-
-                class _Handler(FileSystemEventHandler):
-                    def on_any_event(self, event):
-                        hub._pending.set()
-
-                observer = Observer()
-                observer.schedule(_Handler(), str(self._root), recursive=True)
-                observer.daemon = True
-                observer.start()
-                self._observer = observer
-                watching = True
-            except Exception as exc:
-                logger.info(f"directory_watch: watchdog unavailable ({exc}); falling back to polling")
-        loop = self._debounce_loop if watching else self._poll_loop
-        prefix = "watch" if watching else "poll"
-        threading.Thread(target=loop, args=(halted,), name=f"{prefix}-{self._root.name}", daemon=True).start()
-
-    def _debounce_loop(self, halted: threading.Event):
-        while not halted.is_set():
-            self._pending.wait()
-            if halted.is_set() or halted.wait(_DEBOUNCE_SECONDS):
+                for _ in watch(
+                    self._root,
+                    watch_filter=None,
+                    debounce=_DEBOUNCE_MS,
+                    stop_event=halted,
+                    raise_interrupt=False,
+                    ignore_permission_denied=True,
+                ):
+                    self._broadcast()
                 return
-            self._pending.clear()
-            self._broadcast()
+            except Exception as exc:
+                logger.info(f"directory_watch: {self._root} cannot be watched ({exc}); falling back to polling")
+        self._poll_loop(halted)
 
     def _poll_loop(self, halted: threading.Event):
-        while not halted.is_set():
-            halted.wait(_POLL_SECONDS)
-            if halted.is_set():
-                return
+        while not halted.wait(_POLL_SECONDS):
             self._broadcast()
 
     def _broadcast(self):

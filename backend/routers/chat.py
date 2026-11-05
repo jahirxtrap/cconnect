@@ -98,14 +98,6 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
             compacted = False
             is_compact_cmd = text.strip() == "/compact" or text.strip().startswith("/compact ")
             is_local_cmd = text.strip().startswith("/") and not is_compact_cmd
-            boundaries_before = (
-                sessions_service.compact_boundary_count(state.cwd, state.session_id)
-                if is_compact_cmd and state.cwd and state.session_id else 0
-            )
-            local_cmds_before = (
-                sessions_service.local_command_count(state.cwd, state.session_id)
-                if is_local_cmd and state.cwd and state.session_id else 0
-            )
             prompt_text, prompt_images = text, None
             if attachments:
                 from services import attachments as attachments_service
@@ -169,12 +161,13 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                             sessions_service.record_prompt_history(state.cwd, state.session_id, prompt_text)
                     yield event
             finally:
+                since = written_from if state.session_id == resumed_sid else 0
                 if state.cwd and state.session_id:
                     await asyncio.to_thread(
                         sessions_service.normalize_session_entrypoint,
                         state.cwd,
                         state.session_id,
-                        written_from if state.session_id == resumed_sid else 0,
+                        since,
                     )
             if state.cwd and state.session_id:
                 if fresh and not adopted and not is_local_cmd and not is_compact_cmd:
@@ -187,19 +180,20 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     )
                 # The token counts and summary are written to the transcript only after the turn.
                 if is_compact_cmd:
-                    after = sessions_service.compact_boundary_count(state.cwd, state.session_id)
-                    if after > boundaries_before:
-                        data = sessions_service.latest_compact(state.cwd, state.session_id)
+                    if await asyncio.to_thread(sessions_service.compacted_since, state.cwd, state.session_id, since):
+                        data = await asyncio.to_thread(sessions_service.latest_compact, state.cwd, state.session_id)
                         if data:
                             yield {"type": "compact", **data}
                             if data.get("post_tokens"):
                                 yield {"type": "context", "context_tokens": data["post_tokens"]}
                 elif compacted:
-                    data = sessions_service.latest_compact(state.cwd, state.session_id)
+                    data = await asyncio.to_thread(sessions_service.latest_compact, state.cwd, state.session_id)
                     if data:
                         yield {"type": "compact_summary", **data}
-                elif is_local_cmd and sessions_service.local_command_count(state.cwd, state.session_id) > local_cmds_before:
-                    md = sessions_service.latest_local_command(state.cwd, state.session_id)
+                elif is_local_cmd:
+                    md = await asyncio.to_thread(
+                        sessions_service.local_command_since, state.cwd, state.session_id, since
+                    )
                     if md:
                         yield {"type": "command", "markdown": md}
 
@@ -262,7 +256,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
         if mid:
             await session.commit_user(mid, text)
         return True
-    turn_start = _turn_start(session, prefs)
+    turn_start = await asyncio.to_thread(_turn_start, session, prefs)
     if not session.start(
         _build_turn_runner(session, text, attachments, seed_id=mid, wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport),
         seed_id=mid,
@@ -278,7 +272,7 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
 
 async def _adopt_turn(session, prefs=None, capabilities=None):
     """Show a turn the CLI started on its own, such as a prompt a mod submitted, as it runs."""
-    turn_start = _turn_start(session, prefs)
+    turn_start = await asyncio.to_thread(_turn_start, session, prefs)
     if session.start(
         _build_turn_runner(session, "", wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport, adopt=True, shown=session.shown_size),
     ):
@@ -306,7 +300,9 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
     def factory(ask_user, emit):
         async def gen():
             from services.claude_runtime import ask_side_question
-            context = sessions_service.session_context(main_state.cwd, main_state.session_id or "")
+            context = await asyncio.to_thread(
+                sessions_service.session_context, main_state.cwd, main_state.session_id or ""
+            )
             async for ev in ask_side_question(
                 question, context, resume_id,
                 partial=settings_store.get("streaming"),
@@ -453,6 +449,7 @@ async def chat_ws(ws: WebSocket):
                 session.state.locale = msg.locale or session.state.locale
                 if previous is not None and previous is not session:
                     await previous.detach(sink)
+                committed = await asyncio.to_thread(_committed_index, session, seen["prefs"]) if by_session else None
                 await send({
                     "type": "ready",
                     "session_id": session.state.session_id,
@@ -464,7 +461,7 @@ async def chat_ws(ws: WebSocket):
                     "activity": session.activity,
                     "resident": session.resident_alive,
                     "resumed": bool(by_session),
-                    "committed_count": _committed_index(session, seen["prefs"]) if by_session else None,
+                    "committed_count": committed,
                     "queued": session.queued_items(),
                     "agent": session.state.agent,
                 })
@@ -478,7 +475,8 @@ async def chat_ws(ws: WebSocket):
                     if not session.running and session.agent.todos:
                         await send({"type": "todos", "items": session.agent.todos})
                 elif not session.running and session.state.session_id:
-                    tasks = sessions_service.session_tasks(
+                    tasks = await asyncio.to_thread(
+                        sessions_service.session_tasks,
                         session.state.session_id,
                         sessions_service.project_key_for(session.state.cwd or ""),
                     )
@@ -714,7 +712,7 @@ async def chat_ws(ws: WebSocket):
                     if session is not None and session.agent is not None and sid == session.agent.session_id:
                         items = visible_rows(session.agent.rows, seen["prefs"])
                     else:
-                        items = sessions_service.get_session_messages(project, sid, seen["prefs"])
+                        items = await asyncio.to_thread(sessions_service.get_session_messages, project, sid, seen["prefs"])
                 except ValueError as exc:
                     await send({"type": "error", "message": str(exc)})
                     continue

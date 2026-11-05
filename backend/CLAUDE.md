@@ -58,9 +58,9 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   account, with the model it asks for), `packs` / `pack_format` (the server's pack library and the
   validation the client's reader mirrors), `prompt_cache`, `tool_calls` / `tool_props`,
   `api_errors`, `directory_watch` (the base of the shared and pack watchers) and
-  `project_watch` (Project files), which start and stop watchdog off the event loop (on Linux
-  starting it walks the whole tree, one inotify watch per folder, and a large project froze
-  the server meanwhile), `pages` (an HTML page served with the folder around it, so its
+  `project_watch` (Project files), which run `watchfiles` in a thread of their own, as
+  `chat_list` does (on Linux starting it walks the whole tree, one inotify watch per folder,
+  and a large project froze the server when that ran on the event loop), `pages` (an HTML page served with the folder around it, so its
   styles, scripts and images load), `processes` (what the server runs, matched to its chat,
   agent, terminal or browser, and stopped the way that screen stops it).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.

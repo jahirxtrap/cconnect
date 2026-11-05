@@ -5,10 +5,13 @@ import json
 import os
 import re
 import shutil
+import threading
 import time
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Optional
+
+import orjson
 
 from core import data_migration, paths
 from core.config import CLAUDE_PROJECTS_DIR
@@ -31,7 +34,10 @@ _CLI_ENTRYPOINT = b'"entrypoint":"cli"'
 
 _TRAVELLING_TYPES = {"user", "assistant"}
 _MEDIA_TYPES = {"image", "document"}
-_request_totals: dict[str, tuple[int, int, int, int]] = {}
+_TASK_TOOLS = (b"TaskCreate", b"TaskUpdate")
+_request_totals: dict[str, tuple[int, int, int]] = {}
+_task_scans: dict[str, tuple[int, dict, dict, bool]] = {}
+_task_lock = threading.Lock()
 
 
 def _base() -> Path:
@@ -125,6 +131,16 @@ def _trash_dir(project_key: str) -> Path:
     return path
 
 
+def _parse(line: bytes) -> Any:
+    try:
+        return orjson.loads(line)
+    except orjson.JSONDecodeError:
+        try:
+            return json.loads(line)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+
+
 def _iter_lines(path: Path, offset: int = 0):
     with path.open("rb") as fh:
         if offset:
@@ -133,10 +149,32 @@ def _iter_lines(path: Path, offset: int = 0):
             line = raw.strip()
             if not line:
                 continue
-            try:
-                yield json.loads(line)
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                continue
+            entry = _parse(line)
+            if entry is not None:
+                yield entry
+
+
+def _complete_lines(path: Path, offset: int):
+    """Complete lines from offset with the offset past each; a line still being written waits for the next read."""
+    with path.open("rb") as fh:
+        fh.seek(offset)
+        for raw in fh:
+            if not raw.endswith(b"\n"):
+                return
+            offset += len(raw)
+            yield raw, offset
+
+
+def _entries_since(path: Path, offset: int):
+    for raw, _ in _complete_lines(path, offset):
+        line = raw.strip()
+        entry = _parse(line) if line else None
+        if isinstance(entry, dict):
+            yield entry
+
+
+def _is_boundary(entry: dict) -> bool:
+    return entry.get("type") == "system" and entry.get("subtype") == "compact_boundary"
 
 
 def _last_compact_offset(path: Path, block: int = 1 << 20) -> int:
@@ -237,28 +275,26 @@ def request_weight(project_key: str, session_id: str, trashed: bool = False) -> 
         return None
     if not file.is_file():
         return None
-    start = _last_compact_offset(file)
     key = str(file)
-    base, offset, total, media = _request_totals.get(key, (start, start, 0, 0))
     try:
-        if base != start or not start <= offset <= file.stat().st_size:
-            offset, total, media = start, 0, 0
-        with file.open("rb") as fh:
-            fh.seek(offset)
-            for raw in fh:
-                if not raw.endswith(b"\n"):
-                    break
-                offset += len(raw)
-                try:
-                    entry = json.loads(raw)
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    continue
-                weight, media_weight = _entry_weight(entry)
-                total += weight
-                media += media_weight
+        cached = _request_totals.get(key)
+        if cached is None or cached[0] > file.stat().st_size:
+            cached = (_last_compact_offset(file), 0, 0)
+        offset, total, media = cached
+        for raw, end in _complete_lines(file, offset):
+            offset = end
+            entry = _parse(raw)
+            if not isinstance(entry, dict):
+                continue
+            if _is_boundary(entry):
+                total, media = 0, 0
+                continue
+            weight, media_weight = _entry_weight(entry)
+            total += weight
+            media += media_weight
     except OSError:
         return None
-    _request_totals[key] = (start, offset, total, media)
+    _request_totals[key] = (offset, total, media)
     return total, media
 
 
@@ -352,6 +388,7 @@ def _read_cwd(path: Path) -> Optional[str]:
 
 
 _META_WINDOW = 256 * 1024
+_WINDOW_GROWTH = 4
 
 
 def _tail_offset(path: Path, window: int) -> int:
@@ -782,45 +819,27 @@ def _compact_summary_text(entry: dict) -> str:
     return ""
 
 
-def compact_boundary_count(cwd: str, session_id: str) -> int:
-    """How many compaction boundaries the transcript holds; comparing before/after a turn
-    tells whether a manual /compact actually compacted (it emits no live boundary event)."""
-    try:
-        file = _session_file(project_key_for(cwd), session_id)
-    except ValueError:
-        return 0
-    if not file.is_file():
-        return 0
-    return sum(
-        1 for e in _iter_lines(file)
-        if e.get("type") == "system" and e.get("subtype") == "compact_boundary"
-    )
-
-
-def local_command_count(cwd: str, session_id: str) -> int:
-    """Count of local-command outputs in the transcript; compare before/after a turn to detect a new one."""
-    try:
-        file = _session_file(project_key_for(cwd), session_id)
-    except ValueError:
-        return 0
-    if not file.is_file():
-        return 0
-    return sum(
-        1 for e in _iter_lines(file)
-        if e.get("type") == "system" and e.get("subtype") == "local_command"
-    )
-
-
-def latest_local_command(cwd: str, session_id: str) -> Optional[str]:
-    """Markdown body of the most recent local-command output."""
+def _transcript(cwd: str, session_id: str) -> Optional[Path]:
     try:
         file = _session_file(project_key_for(cwd), session_id)
     except ValueError:
         return None
-    if not file.is_file():
+    return file if file.is_file() else None
+
+
+def compacted_since(cwd: str, session_id: str, offset: int) -> bool:
+    """Whether a compaction boundary was written past offset."""
+    file = _transcript(cwd, session_id)
+    return file is not None and any(_is_boundary(entry) for entry in _entries_since(file, offset))
+
+
+def local_command_since(cwd: str, session_id: str, offset: int) -> Optional[str]:
+    """Markdown body of the latest local-command output written past offset."""
+    file = _transcript(cwd, session_id)
+    if file is None:
         return None
     raw = None
-    for e in _iter_lines(file):
+    for e in _entries_since(file, offset):
         if e.get("type") == "system" and e.get("subtype") == "local_command":
             content = e.get("content")
             if isinstance(content, str) and "<local-command-stdout>" in content:
@@ -834,22 +853,23 @@ def latest_local_command(cwd: str, session_id: str) -> Optional[str]:
 def session_context(cwd: str, session_id: str, max_chars: int = 4000) -> str:
     """Recent user/assistant text from the live session, as reference context for a side
     question. Returns the tail (most recent), command-meta and sidechain entries excluded."""
-    if not session_id:
+    file = _transcript(cwd, session_id) if session_id else None
+    if file is None:
         return ""
-    try:
-        file = _session_file(project_key_for(cwd), session_id)
-    except ValueError:
-        return ""
-    if not file.is_file():
-        return ""
-    parts: list[str] = []
-    for entry in _iter_lines(file):
-        if entry.get("type") not in _TRAVELLING_TYPES or entry.get("isMeta") or entry.get("isSidechain"):
-            continue
-        text = _text_from_content(entry.get("message", {}).get("content"))
-        if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
-            parts.append(f"{entry.get('type')}: {text}")
-    return "\n".join(parts)[-max_chars:]
+    window = _META_WINDOW
+    while True:
+        start = _tail_offset(file, window)
+        parts: list[str] = []
+        for entry in _iter_lines(file, start):
+            if entry.get("type") not in _TRAVELLING_TYPES or entry.get("isMeta") or entry.get("isSidechain"):
+                continue
+            text = _text_from_content(entry.get("message", {}).get("content"))
+            if text and not _COMMAND_META_RE.search(text) and not _INTERRUPT_RE.match(text):
+                parts.append(f"{entry.get('type')}: {text}")
+        context = "\n".join(parts)
+        if start == 0 or len(context) >= max_chars:
+            return context[-max_chars:]
+        window *= _WINDOW_GROWTH
 
 
 _BRANCH_KEYS = ("uuid", "parentUuid", "logicalParentUuid", "isSidechain", "type", "subtype", "isCompactSummary")
@@ -917,49 +937,64 @@ def _tasks_from_transcript(project_key: str, session_id: str) -> Optional[list[d
         return None
     if not path.is_file():
         return None
+    key = str(path)
+    with _task_lock:
+        try:
+            scan = _task_scans.get(key)
+            if scan is None or scan[0] > path.stat().st_size:
+                scan = (0, {}, {}, False)
+            offset, calls, tasks, seen = scan
+            for raw, end in _complete_lines(path, offset):
+                offset = end
+                if any(tool in raw for tool in _TASK_TOOLS) or any(call.encode() in raw for call in calls):
+                    seen = _replay_tasks(_parse(raw), calls, tasks) or seen
+        except OSError:
+            return None
+        _task_scans[key] = (offset, calls, tasks, seen)
+        return [dict(task) for task in tasks.values()] if seen else None
 
-    calls: dict[str, tuple[str, dict]] = {}
-    tasks: dict[str, dict] = {}
+
+def _replay_tasks(entry: Any, calls: dict[str, tuple[str, dict]], tasks: dict[str, dict]) -> bool:
+    if not isinstance(entry, dict) or entry.get("type") not in _TRAVELLING_TYPES:
+        return False
+    message = entry.get("message")
+    content = message.get("content") if isinstance(message, dict) else None
+    if not isinstance(content, list):
+        return False
     seen = False
-    for entry in _iter_lines(path):
-        if entry.get("type") not in _TRAVELLING_TYPES:
+    for block in content:
+        if not isinstance(block, dict):
             continue
-        message = entry.get("message")
-        content = message.get("content") if isinstance(message, dict) else None
-        if not isinstance(content, list):
+        if block.get("type") == "tool_use" and block.get("name") in ("TaskCreate", "TaskUpdate"):
+            if isinstance(block.get("id"), str):
+                calls[block["id"]] = (block["name"], block.get("input") or {})
+            seen = True
             continue
-        for block in content:
-            if not isinstance(block, dict):
-                continue
-            if block.get("type") == "tool_use" and block.get("name") in ("TaskCreate", "TaskUpdate"):
-                calls[block.get("id")] = (block["name"], block.get("input") or {})
-                seen = True
-                continue
-            if block.get("type") != "tool_result":
-                continue
-            call = calls.pop(block.get("tool_use_id"), None)
-            if call is None:
-                continue
-            name, params = call
-            output = _text_from_content(block.get("content")).lower()
-            if "tool_use_error" in output or "inputvalidationerror" in output:
-                continue
-            if name == "TaskCreate":
-                match = _TASK_CREATED_RE.search(output)
-                if match:
-                    tasks[match.group(1)] = {
-                        "id": match.group(1),
-                        "content": str(params.get("subject") or ""),
-                        "status": "pending",
-                    }
-                continue
-            key = str(params.get("taskId") or "")
-            status = params.get("status")
-            if "not found" in output or status == "deleted":
-                tasks.pop(key, None)
-            elif status and key in tasks:
-                tasks[key]["status"] = status
-    return list(tasks.values()) if seen else None
+        if block.get("type") != "tool_result":
+            continue
+        call = calls.pop(block.get("tool_use_id"), None)
+        if call is None:
+            continue
+        name, params = call
+        output = _text_from_content(block.get("content")).lower()
+        if "tool_use_error" in output or "inputvalidationerror" in output:
+            continue
+        if name == "TaskCreate":
+            match = _TASK_CREATED_RE.search(output)
+            if match:
+                tasks[match.group(1)] = {
+                    "id": match.group(1),
+                    "content": str(params.get("subject") or ""),
+                    "status": "pending",
+                }
+            continue
+        key = str(params.get("taskId") or "")
+        status = params.get("status")
+        if "not found" in output or status == "deleted":
+            tasks.pop(key, None)
+        elif status and key in tasks:
+            tasks[key]["status"] = status
+    return seen
 
 
 def session_tasks(session_id: str, project_key: str = "") -> list[dict]:
@@ -1018,18 +1053,15 @@ def latest_compact(cwd: str, session_id: str) -> Optional[dict]:
     omits the token counts and summary, so the client finalizes the block after the turn to
     match the resumed view. ``postTokens`` was dropped from the CLI's compactMetadata, so the
     post-compaction size is recovered from the first real turn's usage after the boundary."""
-    try:
-        file = _session_file(project_key_for(cwd), session_id)
-    except ValueError:
-        return None
-    if not file.is_file():
+    file = _transcript(cwd, session_id)
+    if file is None:
         return None
     meta: dict = {}
     summary = ""
     post: Optional[int] = None
     post_locked = False
-    for entry in _iter_lines(file):
-        if entry.get("type") == "system" and entry.get("subtype") == "compact_boundary":
+    for entry in _iter_lines(file, _last_compact_offset(file)):
+        if _is_boundary(entry):
             meta = entry.get("compactMetadata") or {}
             summary = ""
             post = None
@@ -1894,21 +1926,33 @@ def get_message_image(
     file = _session_file(project_key, session_id, trashed)
     if not file.is_file():
         return None
-    for entry in _iter_lines(file):
-        if entry.get("uuid") != uuid:
-            continue
-        content = (entry.get("message") or {}).get("content")
-        if not isinstance(content, list) or not (0 <= index < len(content)):
-            return None
-        block = content[index]
-        if not isinstance(block, dict) or block.get("type") != "image":
-            return None
-        source = block.get("source") or {}
-        data = source.get("data")
-        if not isinstance(data, str):
-            return None
-        try:
-            return source.get("media_type") or "image/png", base64.b64decode(data)
-        except Exception:
+    tail = _last_compact_offset(file)
+    entry = _entry_by_uuid(file, uuid, tail) or (_entry_by_uuid(file, uuid, 0, tail) if tail else None)
+    if entry is None:
+        return None
+    content = (entry.get("message") or {}).get("content")
+    if not isinstance(content, list) or not (0 <= index < len(content)):
+        return None
+    block = content[index]
+    if not isinstance(block, dict) or block.get("type") != "image":
+        return None
+    source = block.get("source") or {}
+    data = source.get("data")
+    if not isinstance(data, str):
+        return None
+    try:
+        return source.get("media_type") or "image/png", base64.b64decode(data)
+    except Exception:
+        return None
+
+
+def _entry_by_uuid(file: Path, uuid: str, start: int, stop: Optional[int] = None) -> Optional[dict]:
+    needle = uuid.encode()
+    for raw, end in _complete_lines(file, start):
+        if needle in raw:
+            entry = _parse(raw)
+            if isinstance(entry, dict) and entry.get("uuid") == uuid:
+                return entry
+        if stop is not None and end >= stop:
             return None
     return None

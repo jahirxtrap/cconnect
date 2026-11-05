@@ -1,5 +1,6 @@
 """Cross-chat progress query: summarize what's happening in another Claude Code project."""
 
+import asyncio
 from pathlib import Path
 from typing import Any, Optional
 
@@ -158,7 +159,7 @@ async def _summarize(project_key: str, session_id: Optional[str] = None, account
     file = _session_file(project_key, session_id) if session_id else _latest_session_file(project_key)
     if not file or not file.is_file():
         return None
-    transcript, has_work = _transcript_for_progress(file)
+    transcript, has_work = await asyncio.to_thread(_transcript_for_progress, file)
     if not transcript:
         return None
     if not has_work:

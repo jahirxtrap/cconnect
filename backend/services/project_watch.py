@@ -12,11 +12,12 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger
+from watchfiles import watch
 
 from core import paths
 from services import project_files
 
-_DEBOUNCE_SECONDS = 0.4
+_DEBOUNCE_MS = 400
 _MAX_PATHS = 200
 _GIT_INTERNALS = {"index", "HEAD"}
 
@@ -26,12 +27,6 @@ def _inside(root: Path, path: str) -> str:
         return Path(path).relative_to(root).as_posix()
     except ValueError:
         return ""
-
-
-def _touched(changed: dict[str, set[str]], overflowed: set[str], roots: dict[str, Path]) -> Optional[list[Path]]:
-    if overflowed or any(key not in roots for key in changed):
-        return None
-    return [roots[key] / path for key, paths in changed.items() for path in paths]
 
 
 def _relevant(path: str) -> bool:
@@ -57,14 +52,11 @@ def _relevant(path: str) -> bool:
 class ProjectWatchHub:
     def __init__(self):
         self._subscribers: dict[asyncio.Queue, str] = {}
-        self._observers: dict[str, object] = {}
+        self._stops: dict[str, threading.Event] = {}
         self._roots: dict[str, Path] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
         self._lifecycle = threading.Lock()
-        self._pending: dict[str, set[str]] = {}
-        self._overflowed: set[str] = set()
-        self._timer: Optional[threading.Timer] = None
 
     async def start(self):
         self._loop = asyncio.get_running_loop()
@@ -72,7 +64,7 @@ class ProjectWatchHub:
     def stop(self):
         with self._lifecycle:
             with self._lock:
-                keys = list(self._observers)
+                keys = list(self._stops)
             for key in keys:
                 self._release(key)
 
@@ -108,80 +100,59 @@ class ProjectWatchHub:
             self._release(project_key)
 
     def _acquire(self, project_key: str):
-        if not project_key or project_key in self._observers:
+        if not project_key or project_key in self._stops:
             return
         root = project_files.root_for(project_key)
         if root is None:
             return
         project_files.forget(root)
-        try:
-            from watchdog.events import FileSystemEventHandler
-            from watchdog.observers import Observer
-
-            hub = self
-
-            class _Handler(FileSystemEventHandler):
-                def on_any_event(self, event):
-                    for raw in (event.src_path, getattr(event, "dest_path", "")):
-                        if raw and _relevant(str(raw)):
-                            hub._touch(project_key, _inside(root, str(raw)))
-
-            observer = Observer()
-            observer.schedule(_Handler(), str(root), recursive=True)
-            observer.daemon = True
-            observer.start()
-        except Exception as exc:
-            logger.info(f"project_watch: watchdog unavailable ({exc}); the tree needs a refresh")
-            return
+        stop = threading.Event()
         with self._lock:
-            self._observers[project_key] = observer
+            self._stops[project_key] = stop
             self._roots[project_key] = root
+        threading.Thread(
+            target=self._watch, args=(project_key, root, stop), name=f"project-{root.name}", daemon=True
+        ).start()
 
     def _release(self, project_key: str):
         with self._lock:
-            observer = self._observers.pop(project_key, None)
+            stop = self._stops.pop(project_key, None)
             self._roots.pop(project_key, None)
-        if observer is None:
-            return
+        if stop is not None:
+            stop.set()
+
+    def _watch(self, project_key: str, root: Path, stop: threading.Event):
         try:
-            observer.stop()
-        except Exception:
-            pass
+            for changes in watch(
+                root,
+                watch_filter=None,
+                debounce=_DEBOUNCE_MS,
+                stop_event=stop,
+                raise_interrupt=False,
+                ignore_permission_denied=True,
+            ):
+                self._publish(project_key, root, [path for _, path in changes if _relevant(path)])
+        except Exception as exc:
+            logger.info(f"project_watch: {root} cannot be watched ({exc}); the tree needs a refresh")
 
-    def _touch(self, project_key: str, path: str):
-        with self._lock:
-            touched = self._pending.setdefault(project_key, set())
-            if not path or len(touched) >= _MAX_PATHS:
-                self._overflowed.add(project_key)
-            else:
-                touched.add(path)
-            if self._timer is not None:
-                return
-            self._timer = threading.Timer(_DEBOUNCE_SECONDS, self._flush)
-            self._timer.daemon = True
-            self._timer.start()
-
-    def _flush(self):
-        loop = self._loop
-        with self._lock:
-            changed = self._pending
-            overflowed = self._overflowed
-            self._pending = {}
-            self._overflowed = set()
-            self._timer = None
-            targets = [(q, key) for q, key in self._subscribers.items() if key in changed]
-            roots = dict(self._roots)
+    def _publish(self, project_key: str, root: Path, changed: list[str]):
         if not changed:
             return
-        project_files.invalidate(_touched(changed, overflowed, roots))
+        inside = {_inside(root, path) for path in changed}
+        truncated = "" in inside or len(inside) > _MAX_PATHS
+        touched = sorted(path for path in inside if path)[:_MAX_PATHS]
+        project_files.invalidate(None if truncated else [root / path for path in touched])
+        loop = self._loop
         if loop is None:
             return
-        for queue, key in targets:
+        with self._lock:
+            targets = [queue for queue, key in self._subscribers.items() if key == project_key]
+        for queue in targets:
             loop.call_soon_threadsafe(queue.put_nowait, {
                 "type": "changed",
-                "project_key": key,
-                "paths": sorted(changed[key]),
-                "truncated": key in overflowed,
+                "project_key": project_key,
+                "paths": touched,
+                "truncated": truncated,
             })
 
 

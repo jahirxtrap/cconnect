@@ -1,6 +1,6 @@
 import asyncio
 import os
-import re
+import shlex
 from typing import Optional
 
 import psutil
@@ -26,8 +26,6 @@ _LAUNCH_WORDS = frozenset({"tool", "run", "exec", "dlx", "x", "uvx"})
 _VALUE_FLAGS = frozenset({"--from", "--with", "-p", "--package", "--python", "-c"})
 _GENERIC_SCRIPTS = frozenset({"server", "main", "index", "app", "cli", "__main__", "run", "start"})
 _NPX_SCRIPTS = frozenset({"npx-cli", "npm-cli"})
-_EVAL = re.compile(r"""eval '((?:[^']|'\\''|'"'"')*)'""")
-_QUOTE_ESCAPES = ("'\\''", "'\"'\"'")
 _DETAIL_LIMIT = 80
 
 _tracked: dict[int, psutil.Process] = {}
@@ -149,10 +147,11 @@ def _script(token: str) -> str:
 
 
 def _shell_command(script: str) -> str:
-    match = _EVAL.search(script)
-    command = match.group(1) if match else script
-    for escape in _QUOTE_ESCAPES:
-        command = command.replace(escape, "'")
+    try:
+        words = shlex.split(script)
+    except ValueError:
+        words = []
+    command = next((words[index + 1] for index, word in enumerate(words[:-1]) if word == "eval"), script)
     return " ".join(command.split())[:_DETAIL_LIMIT]
 
 
