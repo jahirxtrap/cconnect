@@ -1,4 +1,3 @@
-import { rankLabel } from "$lib/app/commands.svelte";
 import { agentFailureText, type AgentFailure, type AgentSession } from "$lib/data/agentModels";
 import {
   placementKey,
@@ -7,6 +6,7 @@ import {
   type ChatCategory,
   type ChatPlacement,
 } from "$lib/data/models";
+import { rankLabel } from "$lib/data/textMatch";
 import { t } from "$lib/i18n/index.svelte";
 import { agentSessionsFor, type AgentSessionsWatch } from "$lib/services/agentSessionsWatch.svelte";
 import { createAgentsApi } from "$lib/services/agentsApi";

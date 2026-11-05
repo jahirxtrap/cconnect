@@ -3,6 +3,7 @@ import { navigation } from "$lib/app/navigation.svelte";
 import { NAV_SCREENS } from "$lib/app/screens";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { projectLabel, projectNameOf, type SessionInfo } from "$lib/data/models";
+import { rankLabel } from "$lib/data/textMatch";
 import { t } from "$lib/i18n/index.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { panes } from "$lib/screens/chat/panes.svelte";
@@ -21,21 +22,6 @@ export interface Command {
   icon?: IconSource;
   run: () => void;
 }
-
-const strip = (value: string) =>
-  value
-    .toLocaleLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-
-export const rankLabel = (label: string, query: string): number => rank(label, strip(query.trim()));
-
-const rank = (label: string, query: string): number => {
-  const haystack = strip(label);
-  if (haystack.startsWith(query)) return 0;
-  if (haystack.includes(` ${query}`)) return 1;
-  return haystack.includes(query) ? 2 : -1;
-};
 
 const sessionLabel = (session: SessionInfo) =>
   session.title?.trim() || session.preview?.trim() || t("NEW_CHAT");
@@ -95,10 +81,9 @@ export const collectCommands = (): Command[] => {
 };
 
 export const filterCommands = (commands: Command[], query: string): Command[] => {
-  const needle = strip(query.trim());
-  if (!needle) return commands;
+  if (!query.trim()) return commands;
   return commands
-    .map((command) => ({ command, score: rank(command.label, needle) }))
+    .map((command) => ({ command, score: rankLabel(command.label, query) }))
     .filter((entry) => entry.score >= 0)
     .sort((a, b) => a.score - b.score)
     .map((entry) => entry.command);

@@ -1,4 +1,5 @@
-import { plural } from "$lib/i18n/index.svelte";
+import { i18n, plural } from "$lib/i18n/index.svelte";
+import { MILLIS_PER_MINUTE, MILLIS_PER_SECOND } from "./time";
 
 const SIZE_UNITS = ["KB", "MB", "GB", "TB"];
 
@@ -32,12 +33,32 @@ export const formatTokens = (value: number): string => {
   return `${Math.round(value / (MILLION / 10)) / 10}M`;
 };
 
+type DurationUnit = "millisecond" | "second" | "minute";
+
+const unitFormats = new Map<string, Intl.NumberFormat>();
+
+const formatUnit = (value: number, unit: DurationUnit, decimals = 0): string => {
+  const key = `${i18n.resolved}:${unit}:${decimals}`;
+  let format = unitFormats.get(key);
+  if (!format) {
+    format = new Intl.NumberFormat(i18n.resolved, {
+      style: "unit",
+      unit,
+      unitDisplay: "short",
+      maximumFractionDigits: decimals,
+    });
+    unitFormats.set(key, format);
+  }
+  return format.format(value);
+};
+
 export const formatDuration = (millis: number): string => {
-  if (millis < 1000) return `${Math.round(millis)} ms`;
-  if (millis < 60_000) return `${Math.round(millis / 100) / 10} s`;
-  const minutes = Math.floor(millis / 60_000);
-  const seconds = Math.round((millis % 60_000) / 1000);
-  return seconds > 0 ? `${minutes} min ${seconds} s` : `${minutes} min`;
+  if (millis < MILLIS_PER_SECOND) return formatUnit(Math.round(millis), "millisecond");
+  if (millis < MILLIS_PER_MINUTE) return formatUnit(millis / MILLIS_PER_SECOND, "second", 1);
+  const minutes = Math.floor(millis / MILLIS_PER_MINUTE);
+  const seconds = Math.round((millis % MILLIS_PER_MINUTE) / MILLIS_PER_SECOND);
+  const whole = formatUnit(minutes, "minute");
+  return seconds > 0 ? `${whole} ${formatUnit(seconds, "second")}` : whole;
 };
 
 export const formatDays = (days: number): string => {

@@ -22,7 +22,15 @@ export const snapToDevicePixel = (value: number) => {
   return Math.round(value * scale) / scale;
 };
 
+const SNAPPED_HEIGHT = "calc-size(auto, round(up, size, var(--px-grid, 1px)))";
+
+const snapsInLayout = typeof CSS !== "undefined" && CSS.supports("height", "calc-size(auto, round(up, size, 1px))");
+
 export const gridHeight = (node: HTMLElement) => {
+  if (snapsInLayout) {
+    node.style.height = SNAPPED_HEIGHT;
+    return {};
+  }
   let pad = 0;
   const read = () => {
     const natural = node.getBoundingClientRect().height - pad;

@@ -1,4 +1,4 @@
-import { decodeBase64 } from "./base64";
+import { decodeBase64, encodeBase64 } from "./base64";
 
 const MARK = "cconnect-encrypted";
 const FORMAT = 1;
@@ -7,7 +7,6 @@ const ITERATIONS = 310_000;
 const SALT_BYTES = 16;
 const IV_BYTES = 12;
 const KEY_BITS = 256;
-const CHUNK = 0x8000;
 
 interface Envelope {
   app: string;
@@ -18,13 +17,6 @@ interface Envelope {
   iv: string;
   data: string;
 }
-
-const encode = (bytes: Uint8Array): string => {
-  let text = "";
-  for (let at = 0; at < bytes.length; at += CHUNK) text += String.fromCharCode(...bytes.subarray(at, at + CHUNK));
-  return btoa(text);
-};
-
 
 const keyOf = async (passphrase: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<CryptoKey> => {
   const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, [
@@ -59,9 +51,9 @@ export const encryptBackup = async (plain: string, passphrase: string): Promise<
     version: FORMAT,
     kdf: KDF,
     iterations: ITERATIONS,
-    salt: encode(salt),
-    iv: encode(iv),
-    data: encode(new Uint8Array(sealed)),
+    salt: encodeBase64(salt),
+    iv: encodeBase64(iv),
+    data: encodeBase64(new Uint8Array(sealed)),
   };
   return JSON.stringify(envelope);
 };

@@ -75,12 +75,17 @@ fraction of a pixel on every open/close. It takes two halves and neither is enou
   it inside `@supports (width: round(1px, 1px))` — a 14px gap that was half a device pixel
   is what clipped the rounded edge of the bars inside a pager. A hardcoded list of snapped
   values is the wrong shape for this; let CSS do the rounding.
-- `gridHeight` pads a node up to the next device pixel from a `ResizeObserver`, which is
-  what a collapsible body needs. It rounds the padding to Blink's layout unit, and that unit
-  is 1/64 of a **device** pixel where Chromium lays out in device pixels (WebView2, Android):
-  rounding to 1/64 of a CSS px instead left the body 0.016 device px short at dPR 1.25, and
-  the text below it jumped a pixel on every open. An arbitrary epsilon there is wrong and
-  unstable.
+- `gridHeight` rounds a node's height up to the next device pixel, which is what a
+  collapsible body needs. Where the engine has `calc-size()` (Chromium: WebView2, Android)
+  it sets `height: calc-size(auto, round(up, size, var(--px-grid)))` and layout lands on the
+  grid exactly, with no observer. Elsewhere (WebKit) it pads from a `ResizeObserver`,
+  rounding the padding to Blink's layout unit, 1/64 of a **device** pixel: rounding to 1/64
+  of a CSS px instead left the body 0.016 device px short at dPR 1.25, and the text below it
+  jumped a pixel on every open. An arbitrary epsilon there is wrong and unstable.
+- Measure the grid with the browser at a real scale (`--force-device-scale-factor`): CDP's
+  emulated `deviceScaleFactor` lays out in CSS px and reports misses that do not exist.
+- `content-visibility: auto` is not usable in the message list: Chromium remembers a
+  skipped row's height up to 1/64 of a device pixel short, which moves everything below it.
 
 ## Chat scroller (`screens/chat/ChatScroller.svelte`)
 
@@ -255,7 +260,10 @@ the device pixel ratio, so the canvas stays one to one with the screen: never ov
 stretched page goes soft. The fit takes the next multiple up and centres the page, and the
 frame clips the extra pixel or two. The user's zoom is its own state, never derived from the
 rounded scale, and while a resize runs the page repaints every 150 ms if it is on screen and
-once 250 ms after it stops.
+once 250 ms after it stops. Pages are drawn on the main thread: leave pdf.js's renderer worker
+(`GlobalWorkerOptions.rendererSrc`) off. A cancelled render drops the drawing the page was
+showing, and with the worker a render outlasts the next repaint of a resize, so the pages go
+blank under pdf.js's spinner while the panel is dragged.
 
 ## Image preview (`lib/ui/ZoomPane.svelte`)
 

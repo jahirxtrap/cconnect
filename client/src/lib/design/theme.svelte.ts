@@ -1,4 +1,5 @@
 import { untrack } from "svelte";
+import { devicePixelRatio } from "svelte/reactivity/window";
 import { DEFAULT_ACCENT, DYNAMIC_ACCENT, THEME_ACCENT, withAlpha } from "./accents";
 import { DEFAULT_FONTS } from "./fonts";
 import { loadFace } from "./packs/faces";
@@ -114,8 +115,10 @@ class Theme {
 
   start() {
     prefersDark().addEventListener("change", (event) => (this.systemDark = event.matches));
-    this.#publishPixelGrid();
     void this.#loadSystemAccent();
+    $effect(() => {
+      document.documentElement.style.setProperty("--px-grid", `${1 / (devicePixelRatio.current || 1)}px`);
+    });
     $effect(() => this.paint());
   }
 
@@ -153,14 +156,6 @@ class Theme {
     if (!isTauri) return;
     const { invoke } = await import("@tauri-apps/api/core");
     this.systemAccent = await invoke<string | null>("system_accent").catch(() => null);
-  }
-
-  #publishPixelGrid() {
-    const density = window.devicePixelRatio || 1;
-    document.documentElement.style.setProperty("--px-grid", `${1 / density}px`);
-    window
-      .matchMedia(`(resolution: ${density}dppx)`)
-      .addEventListener("change", () => this.#publishPixelGrid(), { once: true });
   }
 }
 

@@ -16,7 +16,8 @@ export const formatDateShort = (millis: number): string =>
 export const formatDay = (millis: number): string =>
   new Date(millis).toLocaleDateString(undefined, { dateStyle: "medium" });
 
-const MILLIS_PER_MINUTE = 60_000;
+export const MILLIS_PER_SECOND = 1000;
+export const MILLIS_PER_MINUTE = 60_000;
 const MILLIS_PER_DAY = 86_400_000;
 
 export const dayIndex = (millis: number): number =>

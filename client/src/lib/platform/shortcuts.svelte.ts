@@ -33,7 +33,20 @@ const NAMED_KEYS: Record<string, string> = {
 
 const DIGIT_KEYS = Object.fromEntries(Array.from({ length: 10 }, (_, digit) => [String(digit), `Digit${digit}`]));
 
-const SYMBOL_KEYS: Record<string, string> = { ...DIGIT_KEYS, "+": "Equal", "=": "Equal", "-": "Minus" };
+const LETTER_KEYS = Object.fromEntries(
+  [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"].flatMap((letter) => [
+    [letter, `Key${letter}`],
+    [letter.toLowerCase(), `Key${letter}`],
+  ]),
+);
+
+const SYMBOL_KEYS: Record<string, string> = {
+  ...DIGIT_KEYS,
+  ...LETTER_KEYS,
+  "+": "Equal",
+  "=": "Equal",
+  "-": "Minus",
+};
 
 export const SHORTCUTS: ShortcutDef[] = [
   { id: "tab.new", label: "SHORTCUT_TAB_NEW", scope: "chat", keys: "Mod+KeyT" },
@@ -124,13 +137,15 @@ export const defaultKeys = (id: string): string => {
 export const keysIn = (id: string, custom: ShortcutKeys): string =>
   custom[id] === undefined ? defaultKeys(id) : normalize(custom[id]);
 
+export const keyCodeOf = (event: KeyboardEvent): string => SYMBOL_KEYS[event.key] ?? event.code;
+
 export const signature = (event: KeyboardEvent): string =>
   [
     ...(event.ctrlKey ? ["Ctrl"] : []),
     ...(event.altKey ? ["Alt"] : []),
     ...(event.shiftKey ? ["Shift"] : []),
     ...(event.metaKey ? ["Meta"] : []),
-    SYMBOL_KEYS[event.key] ?? event.code,
+    keyCodeOf(event),
   ].join("+");
 
 const keyLabel = (code: string): string => {

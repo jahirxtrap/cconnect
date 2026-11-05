@@ -1,9 +1,9 @@
 <script lang="ts">
   import History from "@lucide/svelte/icons/history";
-  import { rankLabel } from "$lib/app/commands.svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
   import { sessionLabel, type SessionInfo } from "$lib/data/models";
+  import { rankLabel } from "$lib/data/textMatch";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";

@@ -67,6 +67,7 @@
   import { holdRefresh } from "$lib/data/inflight";
   import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
+  import { matchesLabel } from "$lib/data/textMatch";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, openExternal } from "$lib/platform";
@@ -328,10 +329,10 @@
     void runAction(() => claudeApi.addLocalPlugin(path));
   };
 
-  const needle = $derived((embedded ? query : skillQuery).trim().toLowerCase());
+  const needle = $derived((embedded ? query : skillQuery).trim());
 
   const matches = (...fields: (string | null | undefined)[]) =>
-    !needle || fields.some((field) => field?.toLowerCase().includes(needle));
+    !needle || fields.some((field) => matchesLabel(field, needle));
 
   let pluginFilter = $state.raw<PluginFilter>({ kind: "all" });
 
@@ -374,8 +375,8 @@
     (extensions?.marketplaces ?? []).filter((market) => matches(market.name, market.repo)),
   );
   const catalogMatches = (entry: { name: string; description: string | null }) => {
-    const query = catalogQuery.trim().toLowerCase();
-    return !query || entry.name.toLowerCase().includes(query) || !!entry.description?.toLowerCase().includes(query);
+    const query = catalogQuery.trim();
+    return !query || matchesLabel(entry.name, query) || matchesLabel(entry.description, query);
   };
 
   const filteredCatalog = $derived((catalog ?? []).filter(catalogMatches));

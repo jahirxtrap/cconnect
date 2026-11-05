@@ -11,6 +11,7 @@
   import { formatRecent } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
+  import { keyCodeOf } from "$lib/platform/shortcuts.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import { SCROLL_ROW_CLASS, TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -84,13 +85,13 @@
   };
 
   const onKeydown = (event: KeyboardEvent) => {
-    if ((event.metaKey || event.ctrlKey) && event.code === "KeyZ") {
+    if ((event.metaKey || event.ctrlKey) && keyCodeOf(event) === "KeyZ") {
       event.preventDefault();
       if (event.shiftKey) redo();
       else undo();
       return;
     }
-    if ((event.metaKey || event.ctrlKey) && event.code === "KeyY") {
+    if ((event.metaKey || event.ctrlKey) && keyCodeOf(event) === "KeyY") {
       event.preventDefault();
       redo();
       return;

@@ -1,3 +1,4 @@
+import { matchesLabel } from "$lib/data/textMatch";
 import { plainLines } from "$lib/markdown/render";
 import { layout } from "$lib/platform/layout.svelte";
 import { store } from "$lib/platform/storage";
@@ -60,10 +61,10 @@ class Notes {
   #timer: ReturnType<typeof setTimeout> | null = null;
 
   readonly listed = $derived.by(() => {
-    const needle = this.searching ? this.query.trim().toLowerCase() : "";
+    const needle = this.searching ? this.query.trim() : "";
     return this.items
       .filter((note) => !note.deletedAt)
-      .filter((note) => !needle || `${note.title ?? ""}\n${note.body}`.toLowerCase().includes(needle))
+      .filter((note) => !needle || matchesLabel(`${note.title ?? ""}\n${note.body}`, needle))
       .sort((left, right) => right.updatedAt - left.updatedAt);
   });
 

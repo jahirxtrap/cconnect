@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { matchesLabel } from "$lib/data/textMatch";
   import { t } from "$lib/i18n/index.svelte";
   import { pluginKey, type ClaudeApi, type Plugin } from "$lib/services/claudeApi";
   import PluginOptionsDialog from "$lib/screens/claude/PluginOptionsDialog.svelte";
@@ -21,8 +22,8 @@
   let query = $state("");
 
   const matches = (plugin: Plugin) => {
-    const wanted = query.trim().toLowerCase();
-    return !wanted || plugin.name.toLowerCase().includes(wanted) || !!plugin.description?.toLowerCase().includes(wanted);
+    const wanted = query.trim();
+    return !wanted || matchesLabel(plugin.name, wanted) || matchesLabel(plugin.description, wanted);
   };
 
   const shown = $derived((mods ?? []).filter(matches));

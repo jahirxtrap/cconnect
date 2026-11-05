@@ -1,6 +1,6 @@
-import { rankLabel } from "$lib/app/commands.svelte";
 import { accountsStore } from "$lib/data/accountsStore.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
+import { rankLabel } from "$lib/data/textMatch";
 import { t } from "$lib/i18n/index.svelte";
 import { isDesktop, isTauri } from "$lib/platform";
 import { androidBackground } from "$lib/platform/androidBackground";

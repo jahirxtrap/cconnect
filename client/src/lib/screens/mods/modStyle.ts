@@ -122,7 +122,7 @@ const NEUTRAL = new Set(["gray", "grey", "white", "whiteBright", "black", "black
 
 const borderColorOf = (props: Props): string => {
   const own = typeof props.borderColor === "string" && !NEUTRAL.has(props.borderColor) ? modColor(props.borderColor) : null;
-  if (props.borderDimColor) return own ? `color-mix(in srgb, ${own} 45%, transparent)` : "var(--color-outline-variant)";
+  if (props.borderDimColor) return own ? `rgb(from ${own} r g b / 45%)` : "var(--color-outline-variant)";
   return own ?? "var(--color-outline)";
 };
 
@@ -161,7 +161,7 @@ export const boxStyle = (props: Props, buttonRow: ButtonRow): string => {
 
 export const textStyle = (props: Props): string => {
   const own = modColor(props.color);
-  const color = props.dimColor ? (own ? `color-mix(in srgb, ${own} 60%, transparent)` : DIM) : own;
+  const color = props.dimColor ? (own ? `rgb(from ${own} r g b / 60%)` : DIM) : own;
   const background = modColor(props.backgroundColor);
   const weight =
     typeof props.weight === "string" && Object.hasOwn(WEIGHTS, props.weight)
@@ -288,7 +288,7 @@ const edge = (side: string, percent: number) =>
   `linear-gradient(to ${side}, currentColor ${percent}%, transparent ${percent}%)`;
 
 const shade = (percent: number) => {
-  const tone = `color-mix(in srgb, currentColor ${percent}%, transparent)`;
+  const tone = `rgb(from currentColor r g b / ${percent}%)`;
   return `linear-gradient(${tone}, ${tone})`;
 };
 
