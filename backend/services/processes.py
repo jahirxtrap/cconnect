@@ -17,6 +17,7 @@ KEYED = "key"
 STOPPED = "stopped"
 LOCKED = "locked"
 UNKNOWN = "unknown"
+QUICK_CHAT = "quick_chat"
 _CORES = psutil.cpu_count() or 1
 _EXE = ".exe"
 _SHELLS = frozenset({"bash", "sh", "zsh", "dash", "fish"})
@@ -67,7 +68,9 @@ async def owners() -> dict:
         key=lambda root: len(root[0]),
         reverse=True,
     )
-    chats = {session.channel: _chat(session, titles, projects, roots) for session in registry.live()}
+    live = registry.live()
+    chats = {session.channel: _chat(session, titles, projects, roots) for session in live}
+    sides = {session.channel: session.state.side_of for session in live if session.state.side_of}
     pids: dict[int, dict] = {}
     for connection in agent_pool.connections():
         if connection.pid is not None:
@@ -88,7 +91,7 @@ async def owners() -> dict:
         }
     if browser.session.pid is not None:
         pids[browser.session.pid] = {"kind": "browser", "title": None, "detail": None, "project_key": None, "stop": OPEN}
-    return {"chats": chats, "pids": pids}
+    return {"chats": chats, "sides": sides, "pids": pids}
 
 
 def _tracked_process(process: psutil.Process) -> psutil.Process:
@@ -221,15 +224,15 @@ def _channel_of(process: psutil.Process) -> Optional[str]:
         return None
 
 
-def _owner(process: psutil.Process, found: dict) -> dict:
+def _owner(process: psutil.Process, channel: Optional[str], found: dict) -> tuple[int | str, dict]:
     known = found["pids"].get(process.pid)
     if known is not None:
-        return known
-    channel = _channel_of(process)
-    chat = found["chats"].get(channel) if channel else None
-    if chat is not None:
-        return chat
-    return {"kind": "other", "title": None, "detail": None, "project_key": None, "stop": None}
+        return process.pid, known
+    for key in (found["sides"].get(channel), channel):
+        chat = found["chats"].get(key) if key else None
+        if chat is not None:
+            return key, chat
+    return process.pid, {"kind": "other", "title": None, "detail": None, "project_key": None, "stop": None}
 
 
 def _sum(entries: list[dict], field: str) -> float:
@@ -278,25 +281,34 @@ def snapshot(found: dict) -> dict:
     def measured(processes: list[psutil.Process]) -> list[dict]:
         return [entry for entry in (usage_of(process) for process in processes) if entry is not None]
 
-    items = []
-    for process in tops:
+    channels = {process.pid: _channel_of(process) for process in tops}
+    grouped: dict[int | str, dict] = {}
+    for process in sorted(tops, key=lambda top: channels[top.pid] in found["sides"]):
         usage = usage_of(process)
         if usage is None:
             continue
-        listed = measured([process, *below(process.pid)])
-        parts = [_part(process, [usage])]
+        root = _part(process, [usage])
+        if channels[process.pid] in found["sides"]:
+            root["role"] = QUICK_CHAT
+        parts = [root]
         for child in children.get(process.pid, []):
             branch = measured([child, *below(child.pid)])
             if branch:
                 parts.append(_part(child, branch))
-        items.append({
-            **_owner(process, found),
-            **usage,
-            "cpu": _sum(listed, "cpu"),
-            "memory": _sum(listed, "memory"),
-            "processes": sorted(listed, key=_by_memory, reverse=True),
-            "parts": sorted(parts, key=_by_memory, reverse=True),
-        })
+        key, owner = _owner(process, channels[process.pid], found)
+        item = grouped.setdefault(key, {**owner, **usage, "processes": [], "parts": []})
+        item["processes"].extend(measured([process, *below(process.pid)]))
+        item["parts"].extend(parts)
+    items = [
+        {
+            **item,
+            "cpu": _sum(item["processes"], "cpu"),
+            "memory": _sum(item["processes"], "memory"),
+            "processes": sorted(item["processes"], key=_by_memory, reverse=True),
+            "parts": sorted(item["parts"], key=_by_memory, reverse=True),
+        }
+        for item in grouped.values()
+    ]
     own = usage_of(server)
     if own is not None:
         items.append({**_SERVER, **own, "processes": [own], "parts": [_part(server, [own])]})

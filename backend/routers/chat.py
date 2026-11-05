@@ -83,6 +83,7 @@ class _Session:
         self.partial: bool = False
         self.agent: str | None = None
         self.locale: str | None = None
+        self.side_of: str | None = None
 
 
 def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False, shown=None):
@@ -292,7 +293,7 @@ def _side_model(state: _Session) -> str | None:
     return _resolve_model(state.model)
 
 
-def _build_side_runner(main_state: _Session, side_state: _Session, question: str, resume_id: str | None, capabilities: list[str]):
+def _build_side_runner(main_state: _Session, side_state: _Session, question: str, resume_id: str | None, capabilities: list[str], channel: str):
     """LiveSession runner for one quick-chat turn: runs the isolated side question (with the
     interaction callback for permissions/AskUserQuestion) and records the side SDK session id
     so it can be resumed/reattached like the main turn. The trailing ``done`` is added by the
@@ -313,6 +314,7 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
                 emit=emit,
                 capabilities=capabilities,
                 locale=main_state.locale,
+                channel=channel,
                 session_info=lambda: {
                     "session_id": side_state.session_id,
                     "cwd": str(paths.AI_WORKDIR),
@@ -646,9 +648,10 @@ async def chat_ws(ws: WebSocket):
                         side_state = _Session()
                         side_state.cwd = session.state.cwd
                         side_state.session_id = resume_id
+                        side_state.side_of = session.channel
                         side_session = registry.create(side_state)
                         await side_session.attach(send)
-                    if not side_session.start(_build_side_runner(session.state, side_session.state, question, resume_id, seen["capabilities"])):
+                    if not side_session.start(_build_side_runner(session.state, side_session.state, question, resume_id, seen["capabilities"], side_session.channel)):
                         await send({"type": "error", "message": "busy: a side question is already running", "channel": side_session.channel})
 
             elif mtype == "usage":

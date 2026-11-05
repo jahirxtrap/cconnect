@@ -1418,6 +1418,7 @@ async def ask_side_question(
     locale: Optional[str] = None,
     session_info: Optional[Callable[[], dict]] = None,
     model: Optional[str] = None,
+    channel: Optional[str] = None,
 ) -> AsyncIterator[dict]:
     """Quick side question in an isolated, resumable session. ``context`` seeds the first turn,
     ``resume_id`` continues it for memory, ``ask_user`` surfaces permission prompts."""
@@ -1436,6 +1437,9 @@ async def ask_side_question(
     if shared:
         system = f"{system}\n\n{shared}"
     prompt = f"<session_context>\n{context}\n</session_context>\n\n{question}" if (context and not resume_id) else question
+    side_env = _cli_env(accounts.resolve(account))
+    if channel:
+        side_env[CHANNEL_ENV] = channel
     options_kwargs: dict[str, Any] = dict(
         cwd=str(paths.AI_WORKDIR),
         permission_mode=permission_mode,
@@ -1445,7 +1449,7 @@ async def ask_side_question(
         include_partial_messages=partial,
         cli_path=cli_manager.resolve_cli_path(),
         resume=resume_id,
-        env=_cli_env(accounts.resolve(account)),
+        env=side_env,
         settings=json.dumps(_cli_settings(scope)),
         max_buffer_size=_MAX_CLI_MESSAGE_BYTES,
     )

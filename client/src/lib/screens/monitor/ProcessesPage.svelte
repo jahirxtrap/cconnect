@@ -117,7 +117,9 @@
     );
 
   const partsOf = (item: ProcessEntry): ProcessPart[] =>
-    item.parts.length ? item.parts : item.processes.map((entry) => ({ ...entry, detail: null, count: 1 }));
+    item.parts.length ? item.parts : item.processes.map((entry) => ({ ...entry, detail: null, count: 1, role: null }));
+
+  const partTitle = (part: ProcessPart) => (part.role === "quick_chat" ? t("QUICK_CHAT") : part.name);
 
   const partSubtitle = (part: ProcessPart) =>
     joined(part.detail, part.count > 1 ? plural("PROCESSES_COUNT", part.count) : `PID ${part.pid}`);
@@ -186,7 +188,7 @@
         </ListRow>
         {#if expanded[item.pid]}
           {#each partsOf(item) as part (part.pid)}
-            <ListRow title={part.name} subtitle={partSubtitle(part)} padding={CHILD_PADDING}>
+            <ListRow title={partTitle(part)} subtitle={partSubtitle(part)} padding={CHILD_PADDING}>
               {#snippet trailing()}
                 {@render usage(part)}
               {/snippet}

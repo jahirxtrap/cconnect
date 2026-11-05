@@ -75,9 +75,12 @@ export interface ProcessUsage {
   started: number;
 }
 
+export type ProcessRole = "quick_chat" | null;
+
 export interface ProcessPart extends ProcessUsage {
   detail: string | null;
   count: number;
+  role: ProcessRole;
 }
 
 export type ProcessStop = "open" | "key" | null;
@@ -176,6 +179,7 @@ const parsePart = (raw: Wire): ProcessPart => ({
   ...parseUsage(raw),
   detail: raw.detail ?? null,
   count: raw.count ?? 1,
+  role: raw.role === "quick_chat" ? raw.role : null,
 });
 
 const parseProcess = (raw: Wire): ProcessEntry => ({
