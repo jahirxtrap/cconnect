@@ -10,7 +10,7 @@ from services.claude_runtime import CHANNEL_ENV
 from services.live_sessions import registry
 
 KINDS = ("server", "chat", "agent", "terminal", "browser", "other")
-_SERVER = {"kind": "server", "title": None, "detail": None, "stop": None}
+_SERVER = {"kind": "server", "title": None, "detail": None, "project_key": None, "stop": None}
 OPEN = "open"
 KEYED = "key"
 STOPPED = "stopped"
@@ -21,13 +21,28 @@ _CORES = psutil.cpu_count() or 1
 _tracked: dict[int, psutil.Process] = {}
 
 
-def _chat(session, titles: dict, projects: dict) -> dict:
+def _folder(path: str) -> str:
+    return os.path.normcase(os.path.normpath(path))
+
+
+def _project_key(cwd: str, roots: list[tuple[str, str]]) -> Optional[str]:
+    if not cwd:
+        return None
+    folder = _folder(cwd)
+    for root, key in roots:
+        if folder == root or folder.startswith(root.rstrip(os.sep) + os.sep):
+            return key
+    return sessions.project_key_for(cwd)
+
+
+def _chat(session, titles: dict, projects: dict, roots: list[tuple[str, str]]) -> dict:
     listed = titles.get(session.state.session_id) or {}
     cwd = session.state.cwd or ""
     return {
         "kind": "chat",
         "title": listed.get("title") or listed.get("preview"),
         "detail": projects.get(cwd) or sessions._project_name(cwd),
+        "project_key": _project_key(cwd, roots),
         "activity": session.activity,
         "stop": OPEN,
     }
@@ -35,8 +50,14 @@ def _chat(session, titles: dict, projects: dict) -> dict:
 
 async def owners() -> dict:
     titles = {item.get("session_id"): item for item in chat_list.hub.sessions()}
-    projects = {item.get("path"): item.get("name") for item in chat_list.hub.projects()}
-    chats = {session.channel: _chat(session, titles, projects) for session in registry.live()}
+    listed = chat_list.hub.projects()
+    projects = {item.get("path"): item.get("name") for item in listed}
+    roots = sorted(
+        ((_folder(item["path"]), item["project_key"]) for item in listed if item.get("path") and item.get("project_key")),
+        key=lambda root: len(root[0]),
+        reverse=True,
+    )
+    chats = {session.channel: _chat(session, titles, projects, roots) for session in registry.live()}
     pids: dict[int, dict] = {}
     for connection in agent_pool.connections():
         if connection.pid is not None:
@@ -44,12 +65,19 @@ async def owners() -> dict:
                 "kind": "agent",
                 "title": connection.agent.get("name") or connection.agent.get("id"),
                 "detail": sessions._project_name(connection.cwd),
+                "project_key": _project_key(connection.cwd, roots),
                 "stop": OPEN,
             }
     for term in terminal.running():
-        pids[term.pid] = {"kind": "terminal", "title": term.title, "detail": term.cwd, "stop": KEYED}
+        pids[term.pid] = {
+            "kind": "terminal",
+            "title": term.title,
+            "detail": term.cwd,
+            "project_key": _project_key(term.cwd, roots),
+            "stop": KEYED,
+        }
     if browser.session.pid is not None:
-        pids[browser.session.pid] = {"kind": "browser", "title": None, "detail": None, "stop": OPEN}
+        pids[browser.session.pid] = {"kind": "browser", "title": None, "detail": None, "project_key": None, "stop": OPEN}
     return {"chats": chats, "pids": pids}
 
 
@@ -91,7 +119,7 @@ def _owner(process: psutil.Process, found: dict) -> dict:
     chat = found["chats"].get(channel) if channel else None
     if chat is not None:
         return chat
-    return {"kind": "other", "title": None, "detail": None, "stop": None}
+    return {"kind": "other", "title": None, "detail": None, "project_key": None, "stop": None}
 
 
 def _sum(entries: list[dict], field: str) -> float:

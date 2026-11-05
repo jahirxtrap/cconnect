@@ -81,6 +81,7 @@ export interface ProcessEntry extends ProcessUsage {
   kind: ProcessKind;
   title: string | null;
   detail: string | null;
+  projectKey: string | null;
   activity: string | null;
   stop: ProcessStop;
   processes: ProcessUsage[];
@@ -170,6 +171,7 @@ const parseProcess = (raw: Wire): ProcessEntry => ({
   kind: PROCESS_KINDS.includes(raw.kind) ? raw.kind : "other",
   title: raw.title ?? null,
   detail: raw.detail ?? null,
+  projectKey: raw.project_key ?? null,
   activity: raw.activity ?? null,
   stop: raw.stop === "open" || raw.stop === "key" ? raw.stop : null,
   processes: ((raw.processes as Wire[]) ?? []).map(parseUsage),

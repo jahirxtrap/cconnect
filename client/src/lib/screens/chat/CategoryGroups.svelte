@@ -47,13 +47,13 @@
   }
 
   const groups = $derived.by((): Group[] => {
-    if (!categories.length) return [{ category: null, items }];
     const ordered = (list: T[]) =>
       chat.chatOrder === "manual"
         ? [...list].sort(
             (a, b) => (placementOf(a)?.position ?? Number.MAX_VALUE) - (placementOf(b)?.position ?? Number.MAX_VALUE),
           )
         : [...list].sort((a, b) => recency(b) - recency(a));
+    if (!categories.length) return [{ category: null, items: ordered(items) }];
     const shown = new Set(categories.map((category) => category.id));
     const groupOf = (item: T) => {
       const placed = placementOf(item)?.categoryId ?? null;

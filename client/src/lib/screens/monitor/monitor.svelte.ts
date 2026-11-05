@@ -67,7 +67,7 @@ class Monitor {
 
   readonly pages = $derived([
     RESOURCES_PAGE,
-    ...(this.processes !== null ? ["PROCESSES"] : []),
+    "PROCESSES",
     ...(this.network?.supported === true ? ["NETWORK"] : []),
     "SERVER_LOGS",
   ]);
@@ -112,7 +112,6 @@ class Monitor {
       this.#environmentId = next;
       this.#restore((next === null ? undefined : this.#slots.get(next)) ?? blank);
     }
-    this.#restore({ ...blank, logs: this.logs, network: this.network });
     this.failed = false;
     this.reloadNetwork();
     this.#socket = systemApi.stream({

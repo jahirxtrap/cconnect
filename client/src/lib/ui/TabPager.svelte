@@ -18,13 +18,24 @@
   let pager = $state<HTMLDivElement | null>(null);
   let shown = 0;
   let placed: HTMLDivElement | null = null;
+  let pages = 0;
   let settling = false;
+
+  $effect(() => {
+    const node = pager;
+    if (!node) return;
+    const observer = new MutationObserver(() => (pages = node.children.length));
+    observer.observe(node, { childList: true });
+    return () => observer.disconnect();
+  });
 
   $effect(() => {
     const index = selected;
     const node = pager;
     if (!node) return;
-    const far = placed !== node || Math.abs(index - shown) > 1;
+    const count = node.children.length;
+    const far = placed !== node || count !== pages || Math.abs(index - shown) > 1;
+    pages = count;
     if (placed === node && index === shown) return;
     placed = node;
     shown = index;

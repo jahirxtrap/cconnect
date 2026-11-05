@@ -3,9 +3,13 @@
   import Power from "@lucide/svelte/icons/power";
   import Server from "@lucide/svelte/icons/server";
   import { PANE_VIEWS } from "$lib/app/screens";
+  import { chatListFor } from "$lib/data/chatList.svelte";
   import { KeyGate } from "$lib/data/keyGate.svelte";
   import { formatDecimal, formatSize, joined } from "$lib/data/format";
+  import { projectNameOf } from "$lib/data/models";
+  import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import type { IconSource } from "$lib/ui/icons";
@@ -72,7 +76,12 @@
   let stopping = $state<Record<number, boolean>>({});
   let confirming = $state<ProcessEntry | null>(null);
 
-  const processes = $derived(snapshot.items);
+  const locked = $derived(settings.lockedProject);
+  const processes = $derived(locked ? snapshot.items.filter((item) => item.projectKey === locked) : snapshot.items);
+  const total = (field: "cpu" | "memory") => processes.reduce((sum, item) => sum + item[field], 0);
+  const ownName = $derived(
+    locked ? projectNameOf(chatListFor(backend.active)?.projects ?? [], locked) : t("APP_NAME"),
+  );
 
   const now = $derived.by(() => {
     void snapshot;
@@ -85,8 +94,8 @@
     ),
   );
 
-  const ownCpu = $derived(Math.min(snapshot.cpu, info.cpuPercent));
-  const ownMemory = $derived(Math.min(snapshot.memory, info.memoryUsed));
+  const ownCpu = $derived(Math.min(locked ? total("cpu") : snapshot.cpu, info.cpuPercent));
+  const ownMemory = $derived(Math.min(locked ? total("memory") : snapshot.memory, info.memoryUsed));
 
   const iconOf = (kind: ProcessKind): IconSource =>
     OWN_ICONS[kind] ?? PANE_VIEWS.find((view) => view.kind === VIEWS[kind])?.icon ?? Cpu;
@@ -131,7 +140,7 @@
       value={percent(info.cpuPercent)}
       own={ownCpu / PERCENT}
       rest={(info.cpuPercent - ownCpu) / PERCENT}
-      ownLabel={joined(t("APP_NAME"), percent(ownCpu))}
+      ownLabel={joined(ownName, percent(ownCpu))}
       restLabel={joined(t("PROCESSES_REST"), percent(info.cpuPercent - ownCpu))}
     />
     <UsageSplit
@@ -139,7 +148,7 @@
       value="{formatSize(info.memoryUsed)} / {formatSize(info.memoryTotal)}"
       own={info.memoryTotal ? ownMemory / info.memoryTotal : 0}
       rest={info.memoryTotal ? (info.memoryUsed - ownMemory) / info.memoryTotal : 0}
-      ownLabel={joined(t("APP_NAME"), formatSize(ownMemory))}
+      ownLabel={joined(ownName, formatSize(ownMemory))}
       restLabel={joined(t("PROCESSES_REST"), formatSize(info.memoryUsed - ownMemory))}
     />
   </div>

@@ -6,6 +6,7 @@
   import { plural, t } from "$lib/i18n/index.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
   import { COMPACT_WIDTH } from "$lib/platform/layout.svelte";
+  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
@@ -153,11 +154,13 @@
       </div>
     </div>
 
-    {#if monitor.processes !== null}
-      <div class={TAB_PAGE_CLASS}>
+    <div class={TAB_PAGE_CLASS}>
+      {#if monitor.processes}
         <ProcessesPage snapshot={monitor.processes} info={current} />
-      </div>
-    {/if}
+      {:else}
+        <CenteredProgress class="flex-1" />
+      {/if}
+    </div>
 
     {#if hasNetwork && monitor.network}
       <div class={TAB_PAGE_CLASS}>
