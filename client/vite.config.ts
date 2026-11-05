@@ -31,12 +31,14 @@ export default defineConfig(({ mode }) => {
       alias: { $lib: fileURLToPath(new URL("./src/lib", import.meta.url)) },
     },
     clearScreen: false,
+    optimizeDeps: { entries: ["index.html"] },
     server: {
       host: mobileHost || false,
       port: 1420,
       strictPort: true,
       hmr: mobileHost ? { protocol: "ws", host: mobileHost, port: 1421 } : undefined,
       fs: { allow: [searchForWorkspaceRoot(process.cwd()), builtinPacks] },
+      watch: { ignored: ["**/src-tauri/**"] },
     },
     build: { target: "es2022" },
   };

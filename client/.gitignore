@@ -1,5 +1,6 @@
 node_modules
 dist
 .svelte-kit
+.svelte-check
 src-tauri/target
 src-tauri/gen/schemas

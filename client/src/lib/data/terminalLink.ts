@@ -6,7 +6,7 @@ export interface TerminalHooks {
 }
 
 export interface TerminalLink {
-  send: (data: Uint8Array) => void;
+  send: (data: Uint8Array<ArrayBuffer>) => void;
   resize: (cols: number, rows: number) => void;
   close: () => void;
 }

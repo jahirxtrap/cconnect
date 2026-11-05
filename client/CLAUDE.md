@@ -351,6 +351,16 @@ npm run build     # svelte-check + vite build
 npm run tauri dev | build
 ```
 
+`svelte-check` type-checks with TypeScript 7 (`--tsgo`, the Go compiler, installed as
+`@typescript/native`), and still needs TypeScript 6 as `typescript` for its own Svelte
+transforms: neither package can go. It writes the transformed files to `.svelte-check`, and
+`--incremental` is what removes the output of a deleted component; without it, a deleted
+`.svelte` keeps reporting its old errors.
+
+Vite ignores `src-tauri` in its watcher and takes `index.html` as its only entry
+(`optimizeDeps.entries`). Cargo's output there runs to tens of thousands of files with a hundred
+HTML pages among them, and crawling it made the dev server take over a minute to serve the app.
+
 ## Conventions
 
 1. **Backend is the source of truth**; mirror its event shapes verbatim.

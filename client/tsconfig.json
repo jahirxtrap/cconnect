@@ -12,7 +12,6 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "baseUrl": ".",
     "types": ["unplugin-icons/types/svelte", "vite/client"],
     "paths": { "$lib/*": ["./src/lib/*"] }
   },
