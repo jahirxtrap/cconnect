@@ -24,6 +24,7 @@
     type ProcessEntry,
     type ProcessesSnapshot,
     type ProcessKind,
+    type ProcessPart,
     type ProcessUsage,
     type SystemInfo,
   } from "$lib/services/systemApi";
@@ -115,6 +116,12 @@
       item.processes.length > 1 ? plural("PROCESSES_COUNT", item.processes.length) : null,
     );
 
+  const partsOf = (item: ProcessEntry): ProcessPart[] =>
+    item.parts.length ? item.parts : item.processes.map((entry) => ({ ...entry, detail: null, count: 1 }));
+
+  const partSubtitle = (part: ProcessPart) =>
+    joined(part.detail, part.count > 1 ? plural("PROCESSES_COUNT", part.count) : `PID ${part.pid}`);
+
   const toggle = (pid: number) => (expanded = { ...expanded, [pid]: !expanded[pid] });
 
   const stop = async (item: ProcessEntry) => {
@@ -164,7 +171,7 @@
           icon={iconOf(item.kind)}
           title={titleOf(item)}
           subtitle={subtitleOf(item)}
-          onclick={item.processes.length > 1 ? () => toggle(item.pid) : undefined}
+          onclick={partsOf(item).length > 1 ? () => toggle(item.pid) : undefined}
         >
           {#snippet trailing()}
             <div class="flex items-center gap-2">
@@ -178,10 +185,10 @@
           {/snippet}
         </ListRow>
         {#if expanded[item.pid]}
-          {#each item.processes as child (child.pid)}
-            <ListRow title={child.name} subtitle={`PID ${child.pid}`} padding={CHILD_PADDING}>
+          {#each partsOf(item) as part (part.pid)}
+            <ListRow title={part.name} subtitle={partSubtitle(part)} padding={CHILD_PADDING}>
               {#snippet trailing()}
-                {@render usage(child)}
+                {@render usage(part)}
               {/snippet}
             </ListRow>
           {/each}

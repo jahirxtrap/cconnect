@@ -1,5 +1,6 @@
 import asyncio
 import os
+import re
 from typing import Optional
 
 import psutil
@@ -17,6 +18,17 @@ STOPPED = "stopped"
 LOCKED = "locked"
 UNKNOWN = "unknown"
 _CORES = psutil.cpu_count() or 1
+_EXE = ".exe"
+_SHELLS = frozenset({"bash", "sh", "zsh", "dash", "fish"})
+_SHELL_LABEL = "Bash"
+_LAUNCHERS = frozenset({"uvx", "uv", "npx", "npm", "pnpm", "bunx", "bun", "yarn", "node", "python", "python3", "py", "deno", "pipx"})
+_LAUNCH_WORDS = frozenset({"tool", "run", "exec", "dlx", "x", "uvx"})
+_VALUE_FLAGS = frozenset({"--from", "--with", "-p", "--package", "--python", "-c"})
+_GENERIC_SCRIPTS = frozenset({"server", "main", "index", "app", "cli", "__main__", "run", "start"})
+_NPX_SCRIPTS = frozenset({"npx-cli", "npm-cli"})
+_EVAL = re.compile(r"""eval '((?:[^']|'\\''|'"'"')*)'""")
+_QUOTE_ESCAPES = ("'\\''", "'\"'\"'")
+_DETAIL_LIMIT = 80
 
 _tracked: dict[int, psutil.Process] = {}
 
@@ -89,6 +101,14 @@ def _tracked_process(process: psutil.Process) -> psutil.Process:
     return process
 
 
+def _own_memory(process: psutil.Process) -> int:
+    try:
+        info = process.memory_full_info()
+    except (psutil.AccessDenied, AttributeError):
+        return process.memory_info().rss
+    return getattr(info, "pss", info.uss)
+
+
 def _usage(process: psutil.Process) -> Optional[dict]:
     try:
         tracked = _tracked_process(process)
@@ -97,11 +117,102 @@ def _usage(process: psutil.Process) -> Optional[dict]:
                 "pid": tracked.pid,
                 "name": tracked.name(),
                 "cpu": tracked.cpu_percent(None) / _CORES,
-                "memory": tracked.memory_info().rss,
+                "memory": _own_memory(tracked),
                 "started": tracked.create_time(),
             }
     except psutil.Error:
         return None
+
+
+def _program(token: str) -> str:
+    name = token.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1]
+    return name[: -len(_EXE)] if name.lower().endswith(_EXE) else name
+
+
+def _package(spec: str) -> str:
+    at = spec.find("@", 1)
+    return spec[:at] if at > 0 else spec
+
+
+def _script(token: str) -> str:
+    parts = [part for part in token.replace("\\", "/").split("/") if part]
+    if "node_modules" in parts:
+        rest = parts[len(parts) - parts[::-1].index("node_modules"):]
+        if rest[:1] == [".bin"] and len(rest) > 1:
+            return rest[1]
+        if rest and rest[0].startswith("@") and len(rest) > 1:
+            return f"{rest[0]}/{rest[1]}"
+        if rest:
+            return rest[0]
+    stem = parts[-1].rsplit(".", 1)[0] if parts else token
+    return parts[-2] if stem.lower() in _GENERIC_SCRIPTS and len(parts) > 1 else stem
+
+
+def _shell_command(script: str) -> str:
+    match = _EVAL.search(script)
+    command = match.group(1) if match else script
+    for escape in _QUOTE_ESCAPES:
+        command = command.replace(escape, "'")
+    return " ".join(command.split())[:_DETAIL_LIMIT]
+
+
+def _launched(cmdline: list[str], fallback: str) -> tuple[str, Optional[str]]:
+    if not cmdline:
+        return _program(fallback), None
+    program = _program(cmdline[0]).lower()
+    args = [arg.replace("^", "") for arg in cmdline[1:]]
+    if program == "cmd":
+        after = next((args[index + 1:] for index, arg in enumerate(args) if arg.lower() == "/c"), [])
+        rest = " ".join(after).split()
+        return _launched(rest, rest[0]) if rest else (program, None)
+    if program in _SHELLS:
+        script = next((args[index + 1] for index, arg in enumerate(args[:-1]) if arg == "-c"), None)
+        return (_SHELL_LABEL, _shell_command(script)) if script else (program, None)
+    if program not in _LAUNCHERS:
+        return _program(fallback), None
+    skip = False
+    for index, arg in enumerate(args):
+        if skip:
+            skip = False
+            continue
+        if arg == "-m" and index + 1 < len(args):
+            return args[index + 1], None
+        if arg in _VALUE_FLAGS:
+            skip = True
+            continue
+        if arg.startswith("-") or arg in _LAUNCH_WORDS:
+            continue
+        if arg.startswith("@"):
+            return _package(arg), None
+        if "/" in arg or "\\" in arg:
+            if _program(arg).rsplit(".", 1)[0] in _NPX_SCRIPTS:
+                return _launched(["npx", *args[index + 1:]], fallback)
+            return _script(arg), None
+        return _package(arg), None
+    return program, None
+
+
+def _label(process: psutil.Process) -> tuple[str, Optional[str]]:
+    try:
+        cmdline = process.cmdline()
+        if len(cmdline) == 1 and " " in cmdline[0] and not os.path.exists(cmdline[0]):
+            cmdline = cmdline[0].split()
+        return _launched(cmdline, process.name())
+    except psutil.Error:
+        return process.name(), None
+
+
+def _part(root: psutil.Process, usages: list[dict]) -> dict:
+    name, detail = _label(root)
+    return {
+        "pid": usages[0]["pid"],
+        "name": name,
+        "detail": detail,
+        "cpu": _sum(usages, "cpu"),
+        "memory": _sum(usages, "memory"),
+        "started": usages[0]["started"],
+        "count": len(usages),
+    }
 
 
 def _channel_of(process: psutil.Process) -> Optional[str]:
@@ -124,6 +235,10 @@ def _owner(process: psutil.Process, found: dict) -> dict:
 
 def _sum(entries: list[dict], field: str) -> float:
     return sum(entry[field] for entry in entries)
+
+
+def _by_memory(entry: dict) -> float:
+    return entry["memory"]
 
 
 def snapshot(found: dict) -> dict:
@@ -154,22 +269,38 @@ def snapshot(found: dict) -> dict:
             found_below.extend(below(child.pid))
         return found_below
 
+    usages: dict[int, Optional[dict]] = {}
+
+    def usage_of(process: psutil.Process) -> Optional[dict]:
+        if process.pid not in usages:
+            usages[process.pid] = _usage(process)
+        return usages[process.pid]
+
+    def measured(processes: list[psutil.Process]) -> list[dict]:
+        return [entry for entry in (usage_of(process) for process in processes) if entry is not None]
+
     items = []
     for process in tops:
-        usage = _usage(process)
+        usage = usage_of(process)
         if usage is None:
             continue
-        listed = [usage, *(entry for entry in (_usage(child) for child in below(process.pid)) if entry is not None)]
+        listed = measured([process, *below(process.pid)])
+        parts = [_part(process, [usage])]
+        for child in children.get(process.pid, []):
+            branch = measured([child, *below(child.pid)])
+            if branch:
+                parts.append(_part(child, branch))
         items.append({
             **_owner(process, found),
             **usage,
             "cpu": _sum(listed, "cpu"),
             "memory": _sum(listed, "memory"),
-            "processes": sorted(listed, key=lambda entry: entry["memory"], reverse=True),
+            "processes": sorted(listed, key=_by_memory, reverse=True),
+            "parts": sorted(parts, key=_by_memory, reverse=True),
         })
-    own = _usage(server)
+    own = usage_of(server)
     if own is not None:
-        items.append({**_SERVER, **own, "processes": [own]})
+        items.append({**_SERVER, **own, "processes": [own], "parts": [_part(server, [own])]})
     return {
         "items": sorted(items, key=lambda item: (KINDS.index(item["kind"]), item["started"])),
         "total": {"cpu": _sum(items, "cpu"), "memory": _sum(items, "memory")},

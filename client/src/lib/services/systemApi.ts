@@ -75,6 +75,11 @@ export interface ProcessUsage {
   started: number;
 }
 
+export interface ProcessPart extends ProcessUsage {
+  detail: string | null;
+  count: number;
+}
+
 export type ProcessStop = "open" | "key" | null;
 
 export interface ProcessEntry extends ProcessUsage {
@@ -85,6 +90,7 @@ export interface ProcessEntry extends ProcessUsage {
   activity: string | null;
   stop: ProcessStop;
   processes: ProcessUsage[];
+  parts: ProcessPart[];
 }
 
 export interface ProcessesSnapshot {
@@ -166,6 +172,12 @@ const parseUsage = (raw: Wire): ProcessUsage => ({
   started: raw.started ?? 0,
 });
 
+const parsePart = (raw: Wire): ProcessPart => ({
+  ...parseUsage(raw),
+  detail: raw.detail ?? null,
+  count: raw.count ?? 1,
+});
+
 const parseProcess = (raw: Wire): ProcessEntry => ({
   ...parseUsage(raw),
   kind: PROCESS_KINDS.includes(raw.kind) ? raw.kind : "other",
@@ -175,6 +187,7 @@ const parseProcess = (raw: Wire): ProcessEntry => ({
   activity: raw.activity ?? null,
   stop: raw.stop === "open" || raw.stop === "key" ? raw.stop : null,
   processes: ((raw.processes as Wire[]) ?? []).map(parseUsage),
+  parts: ((raw.parts as Wire[]) ?? []).map(parsePart),
 });
 
 const parseProcesses = (raw: Wire): ProcessesSnapshot => ({
