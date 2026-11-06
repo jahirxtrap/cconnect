@@ -62,6 +62,7 @@
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { selectField } from "$lib/ui/field";
   import { keepFocus } from "$lib/ui/keepFocus";
+  import { TOUCH_SLOP } from "$lib/ui/press";
   import { PullState } from "$lib/ui/pull.svelte";
   import PullIndicator from "$lib/ui/PullIndicator.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -80,6 +81,7 @@
   const MIN_HEIGHT = 240;
   const MAX_SCALE = 3;
   const BUTTONS = ["left", "middle", "right", "back", "forward"];
+  const PRIMARY_BUTTON = 1;
   const SCOPES: ShortcutScope[] = ["browser", "global"];
   const ALT = 1;
   const CTRL = 2;
@@ -580,15 +582,30 @@
     return { x: event.offsetX / scale, y: event.offsetY / scale };
   };
 
-  const pointer = (event: PointerEvent, kind: string) => {
+  const pointer = (event: PointerEvent, kind: string, buttons = event.buttons) => {
     const spot = at(event);
     link?.mouse({
       event: kind,
       x: spot.x,
       y: spot.y,
-      button: kind === "mouseMoved" && event.buttons === 0 ? "none" : (BUTTONS[event.button] ?? "left"),
-      buttons: event.buttons,
+      button: kind === "mouseMoved" && buttons === 0 ? "none" : (BUTTONS[event.button] ?? "left"),
+      buttons,
       clickCount: kind === "mouseMoved" ? 0 : event.detail || 1,
+      modifiers: modifiers(event),
+    });
+  };
+
+  const scrollPage = (event: MouseEvent, deltaX: number, deltaY: number) => {
+    const spot = at(event);
+    link?.mouse({
+      event: "mouseWheel",
+      x: spot.x,
+      y: spot.y,
+      button: "none",
+      buttons: 0,
+      clickCount: 0,
+      deltaX,
+      deltaY,
       modifiers: modifiers(event),
     });
   };
@@ -598,18 +615,48 @@
     const lines =
       event.deltaMode === 1 ? WHEEL_LINE_PX : event.deltaMode === 2 ? (surface?.clientHeight ?? 1) : 1;
     const factor = lines / shown();
-    const spot = at(event);
-    link?.mouse({
-      event: "mouseWheel",
-      x: spot.x,
-      y: spot.y,
-      button: "none",
-      buttons: 0,
-      clickCount: 0,
-      deltaX: event.deltaX * factor,
-      deltaY: event.deltaY * factor,
-      modifiers: modifiers(event),
-    });
+    scrollPage(event, event.deltaX * factor, event.deltaY * factor);
+  };
+
+  let swipe: { id: number; x: number; y: number; moved: boolean } | null = null;
+
+  const pressCanvas = (event: PointerEvent) => {
+    const touch = event.pointerType === "touch";
+    if (touch) touchedAt = performance.now();
+    if (!touch || !keyboardUp()) canvas?.focus();
+    if (!touch) {
+      pointer(event, "mousePressed");
+      return;
+    }
+    if (swipe === null) swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
+  };
+
+  const moveCanvas = (event: PointerEvent) => {
+    if (event.pointerType !== "touch") {
+      pointer(event, "mouseMoved");
+      return;
+    }
+    if (swipe?.id !== event.pointerId) return;
+    const dx = event.clientX - swipe.x;
+    const dy = event.clientY - swipe.y;
+    if (!swipe.moved && Math.hypot(dx, dy) < TOUCH_SLOP) return;
+    swipe = { id: swipe.id, x: event.clientX, y: event.clientY, moved: true };
+    const scale = shown();
+    scrollPage(event, -dx / scale, -dy / scale);
+  };
+
+  const releaseCanvas = (event: PointerEvent) => {
+    if (event.pointerType !== "touch") {
+      pointer(event, "mouseReleased");
+      return;
+    }
+    if (swipe?.id !== event.pointerId) return;
+    const tapped = !swipe.moved;
+    swipe = null;
+    if (!tapped) return;
+    touchedAt = performance.now();
+    pointer(event, "mousePressed", PRIMARY_BUTTON);
+    pointer(event, "mouseReleased", 0);
   };
 
   const onkeydown = (event: KeyboardEvent) => {
@@ -972,16 +1019,16 @@
     <canvas
       bind:this={canvas}
       tabindex="0"
-      class="max-h-full max-w-full bg-background outline-none {onServer ? (framed ? '' : 'invisible') : 'hidden'}"
+      class="max-h-full max-w-full touch-none bg-background outline-none {onServer
+        ? framed
+          ? ''
+          : 'invisible'
+        : 'hidden'}"
       style="cursor: {page.picking ? 'crosshair' : cursor}"
-      onpointerdown={(event) => {
-        const touch = event.pointerType === "touch";
-        if (touch) touchedAt = performance.now();
-        if (!touch || !keyboardUp()) canvas?.focus();
-        pointer(event, "mousePressed");
-      }}
-      onpointerup={(event) => pointer(event, "mouseReleased")}
-      onpointermove={(event) => pointer(event, "mouseMoved")}
+      onpointerdown={pressCanvas}
+      onpointerup={releaseCanvas}
+      onpointermove={moveCanvas}
+      onpointercancel={() => (swipe = null)}
       oncontextmenu={(event) => event.preventDefault()}
       {onwheel}
       {onkeydown}
