@@ -1154,6 +1154,11 @@ async def run_prompt(
                 raw = message.event
                 if vis()["simple"] and _stream_event_is_working(raw):
                     yield {"type": "working"}
+                if not parent and isinstance(raw, dict) and raw.get("type") == "message_delta":
+                    total = _usage_context(raw.get("usage"))
+                    if total and total != context_tokens:
+                        context_tokens = total
+                        yield {"type": "context", "context_tokens": total}
                 idx = raw.get("index") if isinstance(raw, dict) else None
                 if isinstance(raw, dict) and raw.get("type") == "content_block_start":
                     if isinstance(idx, int):

@@ -184,8 +184,11 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 
 **Context size** travels only in `context` — `result` does not carry it, and the clients
 *assign* the value, so a `null` clears the ring. The live number is
-`input_tokens + cache_read + cache_creation` from each `AssistantMessage.usage`, emitted
-only when it changes; on a live `compact_boundary` it is `compact_metadata.post_tokens`. A manual
+`input_tokens + cache_read + cache_creation` from each `AssistantMessage.usage` and from the
+main conversation's `message_delta` stream event, emitted only when it changes: a model
+provider can send `0` in `message_start`, which is what the `AssistantMessage` carries, and the
+real counts only in `message_delta`. On a live `compact_boundary` it is
+`compact_metadata.post_tokens`. A manual
 `/compact` emits no live boundary, so the router derives it from `latest_compact()` after
 the turn. Opening a session that isn't running still takes it from the transcript
 (`sessions.last_context_tokens`), which reports the last usage in the file — so a session

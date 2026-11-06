@@ -1569,7 +1569,9 @@ export class ChatState {
   }
 
   async trash() {
-    return await this.#sessions.trash();
+    const trash = await this.#sessions.trash();
+    const locked = settings.lockedProject;
+    return locked ? { ...trash, items: trash.items.filter((item) => item.projectKey === locked) } : trash;
   }
 
   async openTrashed(sessionId: string, projectKey: string) {
@@ -1652,7 +1654,11 @@ export class ChatState {
   }
 
   async emptyTrash() {
-    await this.#sessions.emptyTrash();
+    if (!settings.lockedProject) {
+      await this.#sessions.emptyTrash();
+      return;
+    }
+    for (const item of (await this.trash()).items) await this.#sessions.purgeTrashed(item.sessionId);
   }
 
   async addProject(path: string, name: string | null = null) {
