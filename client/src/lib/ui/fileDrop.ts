@@ -49,7 +49,6 @@ const zoneAt = (position: { x: number; y: number }) => {
 
 let listening = false;
 
-/** WebKitGTK never fills dataTransfer.files, so the desktop apps take the paths from Tauri. */
 const listenNative = () => {
   if (listening || !isTauri) return;
   listening = true;

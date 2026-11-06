@@ -19,10 +19,6 @@ import androidx.core.view.inputmethod.InputConnectionCompat
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Files the system hands to the web view — the clipboard's paste, the keyboard's GIFs and stickers.
- *  The page is a <textarea>, which only ever takes plain text, so without declaring this the system
- *  refuses the paste on its own ("CConnect no admite el pegado de imágenes aquí") and nothing ever
- *  reaches JS. Declaring it here is what the Compose client gets from `contentReceiver`. */
 class PastedContent(private val webView: WebView) : OnReceiveContentListener {
 
     companion object {

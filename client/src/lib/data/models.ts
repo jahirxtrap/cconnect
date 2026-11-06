@@ -36,6 +36,20 @@ export interface SessionInfo {
   rewind: string | null;
 }
 
+export const sessionInfo = (
+  known: Pick<SessionInfo, "sessionId" | "projectKey" | "path"> & Partial<SessionInfo>,
+): SessionInfo => ({
+  lastActive: null,
+  size: 0,
+  preview: null,
+  title: null,
+  color: null,
+  activity: null,
+  resident: false,
+  rewind: null,
+  ...known,
+});
+
 export interface SharedEntry {
   name: string;
   isDir: boolean;

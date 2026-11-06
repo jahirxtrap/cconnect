@@ -17,8 +17,13 @@ export const formatDay = (millis: number): string =>
   new Date(millis).toLocaleDateString(undefined, { dateStyle: "medium" });
 
 export const MILLIS_PER_SECOND = 1000;
-export const MILLIS_PER_MINUTE = 60_000;
-const MILLIS_PER_DAY = 86_400_000;
+export const SECONDS_PER_MINUTE = 60;
+export const SECONDS_PER_HOUR = 3_600;
+export const SECONDS_PER_DAY = 86_400;
+export const HOURS_PER_DAY = 24;
+export const MILLIS_PER_MINUTE = SECONDS_PER_MINUTE * MILLIS_PER_SECOND;
+export const MILLIS_PER_HOUR = SECONDS_PER_HOUR * MILLIS_PER_SECOND;
+const MILLIS_PER_DAY = SECONDS_PER_DAY * MILLIS_PER_SECOND;
 
 export const dayIndex = (millis: number): number =>
   Math.trunc((millis - new Date(millis).getTimezoneOffset() * MILLIS_PER_MINUTE) / MILLIS_PER_DAY);

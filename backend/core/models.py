@@ -34,23 +34,26 @@ class SessionCategory(Base):
     )
 
 
-class SessionPlacement(Base):
+class _InCategory:
+    category_id: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Category holding the chat; NULL keeps it in the uncategorised group",
+    )
+
+
+class SessionPlacement(_InCategory, Base):
     __tablename__ = "session_placement"
 
     session_id: Mapped[str] = mapped_column(
         primary_key=True,
         comment="Transcript id on disk; rows whose session is gone are pruned",
     )
-    category_id: Mapped[Optional[str]] = mapped_column(
-        nullable=True,
-        comment="Category holding the chat; NULL keeps it in the uncategorised group",
-    )
     position: Mapped[float] = mapped_column(
         comment="Sort key inside the category, only read while the order is manual",
     )
 
 
-class AgentSessionPlacement(Base):
+class AgentSessionPlacement(_InCategory, Base):
     __tablename__ = "agent_session_placement"
 
     agent: Mapped[str] = mapped_column(
@@ -60,10 +63,6 @@ class AgentSessionPlacement(Base):
     session_id: Mapped[str] = mapped_column(
         primary_key=True,
         comment="Session id the agent gave the chat; the row goes when the chat is deleted from the app or the agent is removed",
-    )
-    category_id: Mapped[Optional[str]] = mapped_column(
-        nullable=True,
-        comment="Category holding the chat; NULL keeps it in the uncategorised group",
     )
     position: Mapped[float] = mapped_column(
         comment="Sort key inside the category among that agent's chats, only read while the order is manual",

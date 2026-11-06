@@ -1,6 +1,7 @@
 import { untrack } from "svelte";
 
 import { accountsStore } from "$lib/data/accountsStore.svelte";
+import { EnvironmentSlots } from "$lib/data/environmentSlots";
 import { loads } from "$lib/data/inflight";
 import { i18n } from "$lib/i18n/index.svelte";
 import { type AccountsSnapshot } from "$lib/services/accountsApi";
@@ -53,8 +54,7 @@ class ClaudeStatus {
   loading = $state(true);
   usageLoading = $state(true);
 
-  #slots = new Map<string, ClaudeSnapshot>();
-  #environmentId: string | null = null;
+  #environment = new EnvironmentSlots(blank, () => this.#capture(), (snapshot) => this.#restore(snapshot));
   #usageRun: Promise<void> | null = null;
   #usageAgain = false;
 
@@ -149,10 +149,7 @@ class ClaudeStatus {
   }
 
   forget() {
-    const current = backend.activeId;
-    if (current !== null) this.#slots.delete(current);
-    this.#environmentId = current;
-    this.#restore(blank);
+    this.#environment.forget(backend.activeId);
   }
 
   ensure() {
@@ -166,12 +163,7 @@ class ClaudeStatus {
 
   #sync(): string | null {
     const next = backend.activeId;
-    if (next === this.#environmentId) return next;
-    untrack(() => {
-      if (this.#environmentId !== null) this.#slots.set(this.#environmentId, this.#capture());
-      this.#environmentId = next;
-      this.#restore((next === null ? undefined : this.#slots.get(next)) ?? blank);
-    });
+    untrack(() => this.#environment.follow(next));
     return next;
   }
 

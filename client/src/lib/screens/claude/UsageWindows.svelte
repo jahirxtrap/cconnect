@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatPercent } from "$lib/data/format";
-  import { formatDayTime, parseIsoMillis } from "$lib/data/time";
+  import { formatDayTime, HOURS_PER_DAY, MILLIS_PER_HOUR, MILLIS_PER_MINUTE, parseIsoMillis } from "$lib/data/time";
   import { severityTone, usageTitle, type UsageWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
   import CollapsibleSection from "$lib/ui/CollapsibleSection.svelte";
@@ -13,9 +13,6 @@
 
   const { windows, class: className = "" }: Props = $props();
 
-  const MILLIS_PER_HOUR = 3_600_000;
-  const MILLIS_PER_MINUTE = 60_000;
-  const HOURS_PER_DAY = 24;
   const PERCENT = 100;
 
   const resetsLabel = (resetsAt: string | null) => {

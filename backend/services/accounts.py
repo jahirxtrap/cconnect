@@ -54,7 +54,6 @@ _IDENTITY_FILE = ".claude.json"
 _BUNDLE_FILES = (_CREDENTIALS_FILE, "settings.json", _IDENTITY_FILE, _META_FILE)
 _IDENTITY_KEYS = ("oauthAccount", "userID")
 
-# Keys a secondary account always takes from the primary instead of keeping its own.
 _SHARED_KEYS = ("mcpServers",)
 _SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces", "pluginConfigs") + cli_settings.json_keys()
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024

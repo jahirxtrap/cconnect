@@ -1,6 +1,7 @@
 import { untrack } from "svelte";
 import { settings } from "$lib/data/settings.svelte";
-import { ChatState } from "$lib/screens/chat/state.svelte";
+import { holdChat, type HeldChat } from "$lib/screens/chat/heldChats.svelte";
+import type { ChatState } from "$lib/screens/chat/state.svelte";
 import { tabs, type PaneRole } from "$lib/screens/chat/tabs.svelte";
 import { agents } from "$lib/services/agents.svelte";
 import { backend } from "$lib/services/backend.svelte";
@@ -36,11 +37,6 @@ interface Stored {
   kept?: Record<string, { session?: string; cwd?: string }>;
 }
 
-interface Held {
-  chat: ChatState;
-  stop: () => void;
-}
-
 const PANES: PaneRole[] = ["center", "right"];
 
 const stored = (): Stored => {
@@ -60,7 +56,7 @@ class AgentTabs {
   #lastAgent: string | null = null;
   #folders: Record<string, string> = {};
   #counter = 0;
-  #held = new Map<string, Held>();
+  #held = new Map<string, HeldChat>();
 
   constructor() {
     const saved = stored();
@@ -304,30 +300,23 @@ class AgentTabs {
   }
 
   stateFor(tab: AgentTab): ChatState {
-    const existing = this.#held.get(tab.id);
-    if (existing) return existing.chat;
-    let created!: ChatState;
-    const stop = $effect.root(() => {
-      created = new ChatState({
-        environmentId: tab.environmentId,
-        sessionId: tab.sessionId,
-        projectKey: null,
-        cwd: tab.cwd,
-        agent: tab.agent,
-      });
-      $effect(() => {
-        const cwd = created.cwd;
-        untrack(() => this.#keepFolder(tab.id, created.environmentId, cwd));
-      });
-      $effect(() => {
-        const session = created.sessionId;
-        const title = created.agentTitle;
-        const talked = created.messages.length > 0;
-        if (session && talked) untrack(() => this.#update(tab.id, { sessionId: session, title }));
-      });
-    });
-    this.#held.set(tab.id, { chat: created, stop });
-    return created;
+    return holdChat(
+      this.#held,
+      tab.id,
+      { environmentId: tab.environmentId, sessionId: tab.sessionId, projectKey: null, cwd: tab.cwd, agent: tab.agent },
+      (chat) => {
+        $effect(() => {
+          const cwd = chat.cwd;
+          untrack(() => this.#keepFolder(tab.id, chat.environmentId, cwd));
+        });
+        $effect(() => {
+          const session = chat.sessionId;
+          const title = chat.agentTitle;
+          const talked = chat.messages.length > 0;
+          if (session && talked) untrack(() => this.#update(tab.id, { sessionId: session, title }));
+        });
+      },
+    );
   }
 
   #replace(tab: AgentTab, patch: Partial<AgentTab>) {

@@ -1,4 +1,6 @@
+import { EnvironmentSlots } from "$lib/data/environmentSlots";
 import { serverStatus } from "$lib/data/serverStatus.svelte";
+import { SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from "$lib/data/time";
 import { backend } from "$lib/services/backend.svelte";
 import { networkApi, type NetworkStatus } from "$lib/services/networkApi";
 import { systemApi, type GpuInfo, type LogEntry, type ProcessesSnapshot, type SystemInfo } from "$lib/services/systemApi";
@@ -33,9 +35,6 @@ const blank: MonitorSnapshot = {
   vramHistory: [],
 };
 
-const SECONDS_PER_DAY = 86_400;
-const SECONDS_PER_HOUR = 3_600;
-const SECONDS_PER_MINUTE = 60;
 
 export const formatUptime = (seconds: number) => {
   const total = Math.floor(seconds);
@@ -79,39 +78,30 @@ class Monitor {
   }
 
   #socket: { close: () => void } | null = null;
-  #environmentId: string | null = null;
-  #slots = new Map<string, MonitorSnapshot>();
+  #environment = new EnvironmentSlots(blank, () => this.#capture(), (snapshot) => this.#restore(snapshot));
 
   setActive(active: boolean) {
     if (!active) {
       this.#close();
       return;
     }
-    if (!this.#socket || this.#environmentId !== backend.activeId) this.#open();
+    if (!this.#socket || this.#environment.current !== backend.activeId) this.#open();
   }
 
   forget() {
-    const current = backend.activeId;
-    if (current !== null) this.#slots.delete(current);
-    this.#environmentId = current;
-    this.#restore(blank);
+    this.#environment.forget(backend.activeId);
   }
 
   reloadNetwork() {
-    const at = this.#environmentId;
+    const at = this.#environment.current;
     void networkApi.status().then((status) => {
-      if (at === this.#environmentId) this.network = status;
+      if (at === this.#environment.current) this.network = status;
     });
   }
 
   #open() {
     this.#close();
-    const next = backend.activeId;
-    if (this.#environmentId !== next) {
-      if (this.#environmentId !== null) this.#slots.set(this.#environmentId, this.#capture());
-      this.#environmentId = next;
-      this.#restore((next === null ? undefined : this.#slots.get(next)) ?? blank);
-    }
+    this.#environment.follow(backend.activeId);
     this.failed = false;
     this.reloadNetwork();
     this.#socket = systemApi.stream({

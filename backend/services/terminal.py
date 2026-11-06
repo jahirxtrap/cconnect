@@ -17,7 +17,6 @@ from typing import Optional
 
 import psutil
 
-from core.config import DEFAULT_CWD
 from services import settings_store
 
 _WINDOWS = sys.platform == "win32"

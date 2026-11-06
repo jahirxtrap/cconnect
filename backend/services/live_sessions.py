@@ -24,9 +24,6 @@ from services import (
     visibility,
 )
 
-# How many recent stamped events to retain per session for replay on reconnect.
-# A very long disconnect can outrun this; the client then falls back to the
-# on-disk transcript via load_history.
 OUTBOX_MAX = 5000
 
 STOP_GRACE = 15.0
@@ -49,11 +46,11 @@ class LiveSession:
         self.unlocked = False
         self._sinks = {}
         self._worker = None
-        self._pending = {}  # rid -> {"future": Future, "event": stamped dict | None}
+        self._pending = {}
         self._seq = 0
         self._committed_seq = 0
         self._outbox = collections.deque(maxlen=OUTBOX_MAX)
-        self._lock = asyncio.Lock()  # serialize emit vs. replay so seq order holds
+        self._lock = asyncio.Lock()
         self._inbox = asyncio.Queue()
         self._queued = []
         self._inflight = []
@@ -614,7 +611,7 @@ class LiveSession:
         consumed = event.get("consumed", 0)
         self._unconsumed -= consumed
         if consumed:
-            self._drained.set()  # the queue is moving: an interrupt can let the turn run on
+            self._drained.set()
         if ids:
             done = set(ids)
             self._inflight = [it for it in self._inflight if it.get("id") not in done]
@@ -679,8 +676,6 @@ class LiveSession:
     async def enqueue(self, mid, text, attachments=None):
         if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued + self._inflight)):
             return False
-        # Stamped on arrival: the client renders the bubble when the turn reaches the message,
-        # which can be minutes later, and a reattach replays that event later still.
         item = {"id": mid, "text": text, "attachments": list(attachments or []), "ts": int(time.time() * 1000)}
         self._queued.append(item)
         await self._inbox.put(item)
@@ -798,7 +793,7 @@ class LiveSession:
         self._queued = list(carried)
         self._inflight = []
         self._unconsumed = 0
-        self._sent = 1  # the seed; every drained item adds one
+        self._sent = 1
         self._results = 0
         self._cancelled.clear()
         self._result_seen = False
@@ -959,7 +954,7 @@ class LiveSession:
                         self._inbox.put_nowait(_CLOSE)
         except asyncio.CancelledError:
             self._settle()
-            raise  # interrupt(): stop without a trailing `done`
+            raise
         except Exception as exc:
             logger.error(f"live session worker failed: {type(exc).__name__}: {exc}")
             if not self._stopping:

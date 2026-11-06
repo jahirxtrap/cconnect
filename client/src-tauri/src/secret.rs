@@ -1,6 +1,5 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 
-// Mirrors the Compose client: DPAPI on Windows, plain text elsewhere.
 #[cfg(windows)]
 mod platform {
     use windows_sys::Win32::Foundation::LocalFree;

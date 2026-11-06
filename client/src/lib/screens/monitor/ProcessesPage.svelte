@@ -6,6 +6,7 @@
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { KeyGate } from "$lib/data/keyGate.svelte";
   import { formatDecimal, formatSize, joined } from "$lib/data/format";
+  import { MILLIS_PER_SECOND } from "$lib/data/time";
   import { projectNameOf } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
@@ -40,7 +41,6 @@
 
   const { snapshot, info }: Props = $props();
 
-  const MILLIS_PER_SECOND = 1000;
   const PERCENT = 100;
   const CHILD_PADDING = "py-1.5 pl-9 pr-3";
   const CARD_CLASS = "rounded-lg bg-card p-3.5";

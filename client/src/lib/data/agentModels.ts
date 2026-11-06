@@ -1,7 +1,7 @@
 import { t } from "$lib/i18n/index.svelte";
 import { toCommands, type CommandOption, type CommandWire } from "$lib/services/capabilitiesApi";
 import { linesOf } from "./format";
-import { parseIsoMillis } from "./time";
+import { MILLIS_PER_SECOND, parseIsoMillis } from "./time";
 
 export type AgentStatus = "connecting" | "loading" | "ready" | "auth" | "error" | "closed";
 
@@ -143,7 +143,6 @@ export interface AgentFailure {
 type Wire = Record<string, unknown>;
 
 const STATUSES: AgentStatus[] = ["connecting", "loading", "ready", "auth", "error", "closed"];
-const MILLIS_PER_SECOND = 1000;
 
 const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 const number = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);

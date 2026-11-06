@@ -1,3 +1,4 @@
+import { followPointer } from "./followPointer";
 import { DRAG_PRESS_MS } from "./press";
 
 const DRAG_THRESHOLD = 8;
@@ -75,10 +76,7 @@ export class ReorderDrag {
     };
 
     const detach = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.removeEventListener("blur", onUp);
+      unfollow();
       if (timer !== null) clearTimeout(timer);
       timer = null;
     };
@@ -126,10 +124,7 @@ export class ReorderDrag {
       else this.#end();
     };
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("blur", onUp);
+    const unfollow = followPointer(onMove, onUp, true);
   }
 
   #indexOf(id: string | null) {

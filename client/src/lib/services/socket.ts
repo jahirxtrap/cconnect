@@ -1,3 +1,4 @@
+import { MILLIS_PER_SECOND } from "$lib/data/time";
 import { nativeSockets, onSocketTap, openSocket } from "$lib/platform/androidSocket";
 import { onWake } from "$lib/platform/wake";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
@@ -13,21 +14,93 @@ export interface SocketHandlers {
 const MAX_BACKOFF_MS = 15_000;
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
-const MILLIS_PER_SECOND = 1000;
 
-export const CONNECT_TIMEOUT_MS = 12_000;
+const CONNECT_TIMEOUT_MS = 12_000;
 
-export const backoffFor = (attempts: number) =>
+const backoffFor = (attempts: number) =>
   Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS << Math.min(attempts, MAX_BACKOFF_SHIFT));
+
+export class Redial {
+  #attempts = 0;
+  #timer: ReturnType<typeof setTimeout> | null = null;
+  #handshake: ReturnType<typeof setTimeout> | null = null;
+  #closed = true;
+  #stopWake: (() => void) | null = null;
+
+  constructor(
+    private readonly open: () => void,
+    private readonly wake: (stale: boolean) => void,
+  ) {}
+
+  get closed(): boolean {
+    return this.#closed;
+  }
+
+  get waiting(): boolean {
+    return this.#timer !== null;
+  }
+
+  start() {
+    this.#closed = false;
+    this.restart();
+    this.#stopWake ??= onWake((stale) => {
+      if (!this.#closed) this.wake(stale);
+    });
+    this.open();
+  }
+
+  restart() {
+    this.#attempts = 0;
+    this.#clearTimer();
+  }
+
+  dialing(socket: WebSocket, expired: () => void) {
+    this.cancelDial();
+    this.#handshake = setTimeout(() => {
+      this.#handshake = null;
+      if (socket.readyState !== WebSocket.OPEN) expired();
+    }, CONNECT_TIMEOUT_MS);
+  }
+
+  cancelDial() {
+    if (this.#handshake !== null) clearTimeout(this.#handshake);
+    this.#handshake = null;
+  }
+
+  reached() {
+    this.#attempts = 0;
+    this.cancelDial();
+  }
+
+  later(): boolean {
+    if (this.#closed || this.#timer !== null) return false;
+    const backoff = backoffFor(this.#attempts);
+    this.#attempts++;
+    this.#timer = setTimeout(() => {
+      this.#timer = null;
+      if (!this.#closed) this.open();
+    }, backoff);
+    return true;
+  }
+
+  stop() {
+    this.#closed = true;
+    this.#clearTimer();
+    this.cancelDial();
+    this.#stopWake?.();
+    this.#stopWake = null;
+  }
+
+  #clearTimer() {
+    if (this.#timer !== null) clearTimeout(this.#timer);
+    this.#timer = null;
+  }
+}
 
 export class ReconnectingSocket {
   #socket: WebSocket | null = null;
   #generation = 0;
-  #attempts = 0;
-  #timer: ReturnType<typeof setTimeout> | null = null;
-  #handshake: ReturnType<typeof setTimeout> | null = null;
-  #closed = false;
-  #stopWake: (() => void) | null = null;
+  #redial = new Redial(() => this.#open(), (stale) => this.#onWake(stale));
 
   #ping: ReturnType<typeof setInterval> | null = null;
 
@@ -40,11 +113,7 @@ export class ReconnectingSocket {
   ) {}
 
   connect() {
-    this.#closed = false;
-    this.#attempts = 0;
-    this.#clearTimer();
-    this.#stopWake ??= onWake((stale) => this.#onWake(stale));
-    this.#open();
+    this.#redial.start();
   }
 
   send(payload: unknown) {
@@ -52,34 +121,18 @@ export class ReconnectingSocket {
   }
 
   close() {
-    this.#closed = true;
-    this.#clearTimer();
-    this.#clearHandshake();
+    this.#redial.stop();
     this.#stopPing();
-    this.#stopWake?.();
-    this.#stopWake = null;
     this.#generation++;
     this.#socket?.close(1000);
     this.#socket = null;
   }
 
   #onWake(stale: boolean) {
-    if (this.#closed) return;
     const trusted = this.native && nativeSockets();
     if ((trusted || !stale) && this.#socket?.readyState === WebSocket.OPEN) return;
-    this.#attempts = 0;
-    this.#clearTimer();
+    this.#redial.restart();
     this.#open();
-  }
-
-  #clearTimer() {
-    if (this.#timer !== null) clearTimeout(this.#timer);
-    this.#timer = null;
-  }
-
-  #clearHandshake() {
-    if (this.#handshake !== null) clearTimeout(this.#handshake);
-    this.#handshake = null;
   }
 
   #stopPing() {
@@ -91,24 +144,21 @@ export class ReconnectingSocket {
     const url = socketUrlOf(this.profile(), this.path);
     if (!url) return;
     const generation = ++this.#generation;
-    this.#clearHandshake();
     this.#socket?.close();
     const socket = openSocket(url, this.native);
     socket.binaryType = "arraybuffer";
     onSocketTap(socket, (session) => this.handlers.onTap?.(session));
     this.#socket = socket;
 
-    this.#handshake = setTimeout(() => {
-      this.#handshake = null;
-      if (generation !== this.#generation || socket.readyState === WebSocket.OPEN) return;
+    this.#redial.dialing(socket, () => {
+      if (generation !== this.#generation) return;
       socket.close();
       this.#scheduleReopen();
-    }, CONNECT_TIMEOUT_MS);
+    });
 
     socket.onopen = () => {
       if (generation !== this.#generation) return;
-      this.#attempts = 0;
-      this.#clearHandshake();
+      this.#redial.reached();
       this.#startPing();
       this.handlers.onOpen?.();
     };
@@ -137,14 +187,9 @@ export class ReconnectingSocket {
 
   #scheduleReopen() {
     this.#stopPing();
-    this.#clearHandshake();
-    if (this.#closed || this.#timer !== null) return;
+    this.#redial.cancelDial();
+    if (this.#redial.closed || this.#redial.waiting) return;
     this.handlers.onDrop?.();
-    const backoff = backoffFor(this.#attempts);
-    this.#attempts++;
-    this.#timer = setTimeout(() => {
-      this.#timer = null;
-      if (!this.#closed) this.#open();
-    }, backoff);
+    this.#redial.later();
   }
 }

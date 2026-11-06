@@ -5,6 +5,12 @@ import { uploadAttachment } from "$lib/services/uploadApi";
 export type TransferKind = "upload" | "download";
 export type TransferStatus = "active" | "done" | "failed";
 
+type TransferRun = (
+  onProgress: (value: number) => void,
+  signal: AbortSignal,
+  keep: (saved: string) => void,
+) => Promise<boolean>;
+
 export interface Transfer {
   id: number;
   kind: TransferKind;
@@ -52,16 +58,7 @@ class TransferManager {
     ).then((saved) => this.#settle(id, saved !== null));
   }
 
-  async task(
-    kind: TransferKind,
-    name: string,
-    run: (
-      onProgress: (value: number) => void,
-      signal: AbortSignal,
-      keep: (saved: string) => void,
-    ) => Promise<boolean>,
-    url = "",
-  ) {
+  async task(kind: TransferKind, name: string, run: TransferRun, url = "") {
     const id = this.#start(kind, name, "", url);
     const abort = new AbortController();
     this.#aborts.set(id, abort);
@@ -79,15 +76,7 @@ class TransferManager {
     }
   }
 
-  download(
-    name: string,
-    run: (
-      onProgress: (value: number) => void,
-      signal: AbortSignal,
-      keep: (saved: string) => void,
-    ) => Promise<boolean>,
-    url = "",
-  ) {
+  download(name: string, run: TransferRun, url = "") {
     return this.task("download", name, run, url);
   }
 

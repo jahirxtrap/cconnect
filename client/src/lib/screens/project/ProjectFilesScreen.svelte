@@ -19,7 +19,7 @@
   import { openFilePreview } from "$lib/app/filePreview";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
-  import { formatDateShort } from "$lib/data/time";
+  import { formatDateShort, MILLIS_PER_SECOND } from "$lib/data/time";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -64,7 +64,6 @@
   const ROW_CLASS = "flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left";
   const LIST_FRAME = "flex-1 rounded-panel";
   const SEARCH_DELAY_MS = 200;
-  const MILLIS_PER_SECOND = 1000;
   const RAIL_X = 18;
   const RAIL_GAP = 18;
   const HEAD_SIZE = 16;

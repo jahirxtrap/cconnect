@@ -1,16 +1,9 @@
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
-import type { ClashPolicy } from "./sharedApi";
+import { encodePath, type ClashPolicy } from "./sharedApi";
 
 export const UPLOAD_DIR = "uploads";
 const OK_MIN = 200;
 const OK_MAX = 299;
-
-const encodePath = (path: string) =>
-  path
-    .split("/")
-    .filter(Boolean)
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
 
 export const uploadAttachment = (
   file: File,

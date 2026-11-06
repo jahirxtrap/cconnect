@@ -6,8 +6,7 @@ import json
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.responses import api_response
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import opening_message, send_event
 from services import browser
 from services.browser import BrowserSession
 
@@ -67,16 +66,8 @@ async def _dispatch(session: BrowserSession, payload: dict):
 
 @router.websocket("/browser/ws")
 async def browser_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
-        return
-    await ws.accept()
-    try:
-        opening = await ws.receive_json()
-    except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
-        return
-    if not isinstance(opening, dict):
-        await ws.close(code=1008)
+    opening = await opening_message(ws)
+    if opening is None:
         return
 
     session = browser.session

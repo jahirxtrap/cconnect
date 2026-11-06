@@ -96,7 +96,6 @@ class Notifier {
     else if (Notification.permission !== "denied") this.granted = (await Notification.requestPermission()) === "granted";
   }
 
-  // Only a tap on the notification jumps to its tab; regaining focus on your own must not.
   #open() {
     const chat = this.#pending;
     this.#pending = null;

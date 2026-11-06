@@ -139,6 +139,8 @@
   --pane-gap: 0.375rem;
   --dot-size: 8px;
   --hairline: 1px;
+  --mod-border-bold: 2px;
+  --mod-border-double: 3px;
 }
 
 @supports (width: round(1px, 1px)) {

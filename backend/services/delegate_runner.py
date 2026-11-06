@@ -112,31 +112,28 @@ def _model_of(account: str, wanted: Optional[str]) -> str:
     return wanted or accounts.model_for(account, settings_store.get("model"))
 
 
-async def _model(destination: dict, task: str, turn: Turn) -> str:
+def _account_options(destination: dict, turn: Turn, **extra):
     from claude_agent_sdk import ClaudeAgentOptions
 
     account = accounts.resolve(destination["account"])
-    options = ClaudeAgentOptions(
+    return ClaudeAgentOptions(
         cwd=turn.cwd,
         model=_model_of(account, turn.model),
         cli_path=cli_manager.resolve_cli_path(),
         env=_cli_env(account),
-        system_prompt=MODEL_PROMPT,
-        setting_sources=[],
-        tools=[],
+        **extra,
     )
+
+
+async def _model(destination: dict, task: str, turn: Turn) -> str:
+    options = _account_options(destination, turn, system_prompt=MODEL_PROMPT, setting_sources=[], tools=[])
     return await _stream(options, task, turn.vis, turn.report)
 
 
 async def _claude(destination: dict, task: str, turn: Turn) -> str:
-    from claude_agent_sdk import ClaudeAgentOptions
-
-    account = accounts.resolve(destination["account"])
-    options = ClaudeAgentOptions(
-        cwd=turn.cwd,
-        model=_model_of(account, turn.model),
-        cli_path=cli_manager.resolve_cli_path(),
-        env=_cli_env(account),
+    options = _account_options(
+        destination,
+        turn,
         system_prompt={"type": "preset", "preset": "claude_code"},
         setting_sources=["project"],
         permission_mode=turn.mode,

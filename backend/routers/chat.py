@@ -18,9 +18,8 @@ from core import paths
 from core.access import key_matches
 from core.config import DEFAULT_CWD, permission_modes, resolve_permission_mode
 from core.responses import api_response
-from core.ws import send_event
+from core.ws import accept_authorized, send_event
 from mcps import terminal as terminal_mcp
-from middleware.public_auth import ws_bearer_ok
 from schemas.chat import (
     AgentLoginMessage,
     ModActionMessage,
@@ -179,7 +178,6 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                             accounts.resolve(state.account),
                         )
                     )
-                # The token counts and summary are written to the transcript only after the turn.
                 if is_compact_cmd:
                     if await asyncio.to_thread(sessions_service.compacted_since, state.cwd, state.session_id, since):
                         data = await asyncio.to_thread(sessions_service.latest_compact, state.cwd, state.session_id)
@@ -373,15 +371,12 @@ async def _send_mod_reply(send, session, rid: int, work):
 
 @router.websocket("/chat/ws")
 async def chat_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        # Close before accept() so the handshake is rejected at the HTTP layer.
-        await ws.close(code=1008)
+    if not await accept_authorized(ws):
         return
-    await ws.accept()
     send_lock = asyncio.Lock()
-    session = None        # main lane
-    side_session = None   # quick-chat lane
-    bg_tasks: set = set()  # keep refs so fire-and-forget tasks aren't GC'd mid-run
+    session = None
+    side_session = None
+    bg_tasks: set = set()
 
     async def send(payload: dict):
         async with send_lock:
@@ -744,7 +739,6 @@ async def chat_ws(ws: WebSocket):
     except Exception as exc:
         logger.error(f"chat_ws error: {type(exc).__name__}: {exc}")
     finally:
-        # Detach only — the workers keep running so a reconnect can re-attach.
         if session is not None:
             await session.detach(sink)
         if side_session is not None:

@@ -31,13 +31,12 @@
     deviceBrowser,
     nativePick,
     type DeviceBounds,
-    type DevicePick,
   } from "./deviceBrowser.svelte";
   import { deviceBrowsing } from "./deviceEngine";
   import { serverBrowser } from "./serverBrowser.svelte";
   import { joined } from "$lib/data/format";
   import { pendingRefresh } from "$lib/data/inflight";
-  import type { ElementSource } from "$lib/data/pickedElements";
+  import type { ElementPick, ElementSource } from "$lib/data/pickedElements";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { settings, type BrowserFavorite } from "$lib/data/settings.svelte";
@@ -263,7 +262,7 @@
     );
   });
 
-  const pickToChat = (source: ElementSource, url: string, title: string, pick: DevicePick) => {
+  const pickToChat = (source: ElementSource, url: string, title: string, pick: ElementPick) => {
     const target = panes.focusedTab;
     if (!target) return;
     tabs.stateFor(target).addElement({

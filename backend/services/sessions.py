@@ -15,7 +15,7 @@ import orjson
 
 from core import data_migration, paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import delegate_runs, delegates, mods, prompt_cache, settings_store, tool_calls, visibility
+from services import delegate_runs, delegates, mods, prompt_cache, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
@@ -1638,7 +1638,7 @@ def get_session_messages(
         etype = entry.get("type")
         if etype == "system" and entry.get("subtype") == "compact_boundary":
             if i != last_boundary:
-                continue  # an earlier compaction, part of the truncated-away history
+                continue
             meta = entry.get("compactMetadata") or {}
             compact_block = {
                 "type": "compact",

@@ -15,8 +15,6 @@ from typing import Optional
 from core.settings_defs import SETTINGS
 from services import settings_store
 
-# Same fallback locations the SDK's own _find_cli scans after PATH, using the
-# platform-correct binary name (claude.exe on Windows, claude elsewhere).
 _CLI_NAME = "claude.exe" if platform.system() == "Windows" else "claude"
 _KNOWN_LOCATIONS = (
     Path.home() / ".local/bin" / _CLI_NAME,
@@ -148,7 +146,7 @@ def update_cli(source: Optional[str] = None, custom_path: Optional[str] = None) 
 def set_source(source: str, custom_path: Optional[str] = None) -> None:
     if source == "custom" and not (custom_path and Path(custom_path).exists()):
         raise ValueError("custom source requires an existing path")
-    settings_store.set("cli_source", source)  # validates against the registry's allowed set
+    settings_store.set("cli_source", source)
     settings_store.set("cli_custom_path", custom_path)
     invalidate_version_cache()
 

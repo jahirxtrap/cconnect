@@ -1,4 +1,5 @@
 import { flushSync } from "svelte";
+import { followPointer } from "./followPointer";
 import { DRAG_PRESS_MS } from "./press";
 
 const DRAG_THRESHOLD = 8;
@@ -173,10 +174,7 @@ export class StripDrag {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const detach = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.removeEventListener("blur", onUp);
+      unfollow();
       if (timer !== null) clearTimeout(timer);
       timer = null;
     };
@@ -229,9 +227,6 @@ export class StripDrag {
       else if (!panning) this.options().onSelect?.(id);
     };
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("blur", onUp);
+    const unfollow = followPointer(onMove, onUp, true);
   }
 }

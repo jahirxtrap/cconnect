@@ -5,8 +5,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.responses import api_response
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import accept_authorized, send_event
 from schemas.network import SudoRequest, WifiConnectRequest, InterfaceRequest, RadioRequest
 from services import network, speedtest
 
@@ -82,10 +81,8 @@ async def get_job(job_id: str):
 
 @router.websocket("/network/speedtest/ws")
 async def speedtest_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
+    if not await accept_authorized(ws):
         return
-    await ws.accept()
     try:
         async for event in speedtest.run():
             await send_event(ws, event)

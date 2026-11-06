@@ -22,7 +22,6 @@ class SecureStore {
           this.#values.set(key, plain === null ? null : this.#parse(plain));
           continue;
         }
-        // Written before encryption existed: keep it and store it protected.
         this.#values.set(key, raw);
         if (raw !== null) void this.#persist(key, raw);
       }

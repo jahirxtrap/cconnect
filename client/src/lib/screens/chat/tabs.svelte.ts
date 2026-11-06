@@ -4,17 +4,10 @@ import { chatListFor, onSessionForgotten } from "$lib/data/chatList.svelte";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 import { isBusyActivity, sessionIdPreview, sessionLabel, type SessionInfo } from "$lib/data/models";
 import { backend } from "$lib/services/backend.svelte";
-import { ChatState } from "./state.svelte";
+import { holdChat, type HeldChat } from "./heldChats.svelte";
+import type { ChatOverrides, ChatState } from "./state.svelte";
 
 export type PaneRole = "center" | "right";
-
-export interface TabOverrides {
-  model: string;
-  effort: string;
-  account: string;
-  permissionMode: string;
-  streaming: boolean | null;
-}
 
 export interface Tab {
   id: string;
@@ -25,7 +18,7 @@ export interface Tab {
   projectKey: string | null;
   title: string | null;
   color: string | null;
-  overrides: TabOverrides;
+  overrides: ChatOverrides;
   panelProject: string | null;
   viewTitle?: string | null;
 }
@@ -38,7 +31,7 @@ interface StoredTab {
   title?: string;
   color?: string;
   side?: boolean;
-  over?: Partial<TabOverrides>;
+  over?: Partial<ChatOverrides>;
   pproj?: string;
 }
 
@@ -93,7 +86,7 @@ class Tabs {
   rightFocused = $state(false);
 
   #counter = 0;
-  #states = new Map<string, { chat: ChatState; stop: () => void }>();
+  #states = new Map<string, HeldChat>();
 
   readonly center = $derived(this.list.filter((tab) => tab.pane === "center"));
   readonly right = $derived(this.list.filter((tab) => tab.pane === "right"));
@@ -190,40 +183,38 @@ class Tabs {
     return `tab${this.#counter++}`;
   }
 
-  /** Owns its reactive scope: a state built inside a component derived dies with it. */
   stateFor(tab: Tab): ChatState {
-    const existing = this.#states.get(tab.id);
-    if (existing) return existing.chat;
-    let created!: ChatState;
-    const stop = $effect.root(() => {
-      created = new ChatState({
+    return holdChat(
+      this.#states,
+      tab.id,
+      {
         environmentId: tab.environmentId,
         sessionId: tab.sessionId,
         projectKey: tab.projectKey,
         cwd: tab.cwd,
         color: tab.color,
         overrides: tab.overrides,
-      });
-      $effect(() => {
-        const view = created.viewOnly;
-        const patch = {
-          sessionId: created.sessionId,
-          projectKey: created.projectKey,
-          viewTitle: view ? (view.title ?? sessionIdPreview(view.sessionId)) : null,
-        };
-        untrack(() => this.update(tab.id, patch));
-      });
-      $effect(() => {
-        const sessionId = created.sessionId;
-        const anchor = created.listedRewind;
-        untrack(() => created.followRewind(sessionId, anchor));
-      });
-    });
-    created.tabId = tab.id;
-    created.onContextChange = () => this.#syncContext(tab.id, created);
-    created.onOverrides = (patch) => this.setOverrides(tab.id, patch);
-    this.#states.set(tab.id, { chat: created, stop });
-    return created;
+      },
+      (chat) => {
+        chat.tabId = tab.id;
+        chat.onContextChange = () => this.#syncContext(tab.id, chat);
+        chat.onOverrides = (patch) => this.setOverrides(tab.id, patch);
+        $effect(() => {
+          const view = chat.viewOnly;
+          const patch = {
+            sessionId: chat.sessionId,
+            projectKey: chat.projectKey,
+            viewTitle: view ? (view.title ?? sessionIdPreview(view.sessionId)) : null,
+          };
+          untrack(() => this.update(tab.id, patch));
+        });
+        $effect(() => {
+          const sessionId = chat.sessionId;
+          const anchor = chat.listedRewind;
+          untrack(() => chat.followRewind(sessionId, anchor));
+        });
+      },
+    );
   }
 
   liveState(id: string): ChatState | null {
@@ -274,7 +265,7 @@ class Tabs {
     };
   }
 
-  #environmentOverrides(environmentId: string | null): TabOverrides {
+  #environmentOverrides(environmentId: string | null): ChatOverrides {
     const profile = backend.find(environmentId);
     return {
       model: profile?.model ?? "",
@@ -294,7 +285,7 @@ class Tabs {
     this.#persist();
   }
 
-  setOverrides(id: string, patch: Partial<TabOverrides>) {
+  setOverrides(id: string, patch: Partial<ChatOverrides>) {
     const current = this.list.find((tab) => tab.id === id);
     if (!current) return;
     this.list = this.list.map((tab) =>

@@ -17,7 +17,7 @@ export type ClashPolicy = "keep" | "replace" | "skip";
 
 type Wire = Record<string, any>;
 
-const encodePath = (path: string) =>
+export const encodePath = (path: string) =>
   path
     .split("/")
     .filter(Boolean)

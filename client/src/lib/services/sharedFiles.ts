@@ -1,3 +1,4 @@
+import type { WriteFileOptions } from "@tauri-apps/plugin-fs";
 import { encodeBase64 } from "$lib/data/base64";
 import { transfers } from "$lib/data/transfers.svelte";
 import { isDesktop, isTauri, openExternal } from "$lib/platform";
@@ -44,7 +45,18 @@ const TEXT_TYPE = "text/markdown";
 
 const headersJson = (url: string) => JSON.stringify(fileHeaders(url, backend.sharedProfileOf(url)));
 
-const saveBlob = async (blob: Blob, filename: string): Promise<string | null> => {
+const writeBlob = async (path: string, blob: Blob, options?: WriteFileOptions) => {
+  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  await writeFile(path, new Uint8Array(await blob.arrayBuffer()), options);
+};
+
+const askSavePath = async (filename: string): Promise<string | null> => {
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const target = await save({ defaultPath: filename });
+  return typeof target === "string" ? target : null;
+};
+
+const saveBlob =async (blob: Blob, filename: string): Promise<string | null> => {
   if (!isTauri) {
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -54,10 +66,9 @@ const saveBlob = async (blob: Blob, filename: string): Promise<string | null> =>
     URL.revokeObjectURL(objectUrl);
     return "";
   }
-  const bytes = new Uint8Array(await blob.arrayBuffer());
   try {
-    const { writeFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
-    await writeFile(filename, bytes, { baseDir: BaseDirectory.Download });
+    const { BaseDirectory } = await import("@tauri-apps/plugin-fs");
+    await writeBlob(filename, blob, { baseDir: BaseDirectory.Download });
     const { downloadDir, join } = await import("@tauri-apps/api/path");
     return await join(await downloadDir(), filename);
   } catch {
@@ -155,11 +166,8 @@ export const saveFileAs = async (filename: string, blob: Blob) => {
     await saveBlobAs(blob, filename);
     return;
   }
-  const { save } = await import("@tauri-apps/plugin-dialog");
-  const target = await save({ defaultPath: filename });
-  if (typeof target !== "string") return;
-  const { writeFile } = await import("@tauri-apps/plugin-fs");
-  await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
+  const target = await askSavePath(filename);
+  if (target !== null) await writeBlob(target, blob);
 };
 
 export const saveTextAs = (filename: string, text: string) => saveFileAs(filename, textBlob(text));
@@ -249,14 +257,12 @@ export const saveSharedAs = async (url: string, filename: string) => {
     });
     return;
   }
-  const { save } = await import("@tauri-apps/plugin-dialog");
-  const target = await save({ defaultPath: filename });
-  if (typeof target !== "string") return;
-  const { writeFile } = await import("@tauri-apps/plugin-fs");
+  const target = await askSavePath(filename);
+  if (target === null) return;
   await transfers.download(filename, async (onProgress, signal, keep) => {
     const blob = await fetchTracked(url, onProgress, signal);
     if (!blob) return false;
-    await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
+    await writeBlob(target, blob);
     keep(target);
     return true;
   });
@@ -270,13 +276,12 @@ export const saveAllShared = async (items: SharedItem[]) => {
   const { open } = await import("@tauri-apps/plugin-dialog");
   const directory = await open({ directory: true, multiple: false });
   if (typeof directory !== "string") return;
-  const { writeFile } = await import("@tauri-apps/plugin-fs");
   for (const item of items) {
     await transfers.download(item.name, async (onProgress, signal, keep) => {
       const blob = await fetchTracked(item.url, onProgress, signal);
       if (!blob) return false;
       const target = `${directory}/${item.name}`;
-      await writeFile(target, new Uint8Array(await blob.arrayBuffer()));
+      await writeBlob(target, blob);
       keep(target);
       return true;
     });
@@ -327,10 +332,10 @@ const openData = async (filename: string, blob: Blob): Promise<boolean> => {
     return true;
   }
   try {
-    const { writeFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+    const { mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
     const target = `cconnect/${filename}`;
     await mkdir("cconnect", { baseDir: BaseDirectory.Temp, recursive: true });
-    await writeFile(target, new Uint8Array(await blob.arrayBuffer()), { baseDir: BaseDirectory.Temp });
+    await writeBlob(target, blob, { baseDir: BaseDirectory.Temp });
     const { tempDir, join } = await import("@tauri-apps/api/path");
     const { openPath } = await import("@tauri-apps/plugin-opener");
     await openPath(await join(await tempDir(), target));

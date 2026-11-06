@@ -49,7 +49,7 @@ def _add_missing_columns() -> list[str]:
 
 def init_db() -> None:
     """Create the missing tables and append the missing columns."""
-    from core import models  # noqa: F401  (register models on Base before create_all)
+    from core import models  # noqa: F401
     db_existed = paths.DB_FILE.exists()
     before = set(inspect(engine).get_table_names())
     Base.metadata.create_all(engine)

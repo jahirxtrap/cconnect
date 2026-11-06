@@ -9,7 +9,6 @@ from core.config import PUBLIC_ACCESS_TOKEN
 from core.responses import api_response
 from services import agent_mcp, pages
 
-# Open so the mobile app can probe connectivity before it has a token.
 _OPEN_PATHS = frozenset({"/api/health", "/api/agents/browse"})
 _OPEN_PREFIXES = (f"{agent_mcp.PATH}/", f"{pages.PATH}/")
 

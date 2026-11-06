@@ -2,6 +2,7 @@ import { tick } from "svelte";
 import type { ApiRetry } from "$lib/data/apiRetry";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { serverStatus } from "$lib/data/serverStatus.svelte";
+import { MILLIS_PER_SECOND } from "$lib/data/time";
 import {
   componentValues,
   emptyInteraction,
@@ -9,11 +10,13 @@ import {
   message as newMessage,
   VALUE_SEPARATOR,
   type ChatMessage,
+  type CompactData,
   type ComponentElement,
   type ComponentType,
   type ConnectionState,
   type InteractionData,
   type InteractionOption,
+  type InteractionRequest,
   type QueuedMessage,
   type Role,
   type TodoItem,
@@ -24,6 +27,7 @@ import { emptyModState, type ModState } from "$lib/data/modModels";
 import {
   isBusyActivity,
   projectKeyOf,
+  sessionInfo,
   sessionLabel,
   type ChatCategory,
   type ProjectInfo,
@@ -54,6 +58,55 @@ const componentDefaults = (blocks: ComponentElement[]): Record<string, string> =
       return [];
     }),
   );
+
+type EventOf<K extends ServerEvent["type"]> = Extract<ServerEvent, { type: K }>;
+
+const shownComponent = (event: EventOf<"component">): InteractionData => ({
+  ...emptyInteraction("shown", "component"),
+  title: event.title,
+  titleKey: event.titleKey,
+  icon: event.icon,
+  blocks: event.blocks,
+});
+
+const requestedInteraction = (event: InteractionRequest): InteractionData => ({
+  ...emptyInteraction(event.requestId, event.kind),
+  options: event.options,
+  title: event.title,
+  titleKey: event.titleKey,
+  icon: event.icon,
+  blocks: event.blocks,
+  submitLabel: event.submitLabel,
+  submitKey: event.submitKey,
+  dismiss: event.dismiss,
+  present: event.present,
+  variant: event.variant,
+  mod: event.mod,
+  values: componentDefaults(event.blocks),
+});
+
+const toolFields = (event: EventOf<"tool_use">): Partial<ChatMessage> => ({
+  text: event.input ?? "",
+  toolName: event.name,
+  toolMcp: event.mcp,
+  toolUseId: event.id,
+  result: event.result,
+});
+
+const fileChangeFields = (event: EventOf<"file_change">): Partial<ChatMessage> => ({
+  toolUseId: event.id,
+  toolName: event.tool,
+  path: event.path,
+  diffLines: event.diffLines,
+  labelOnly: event.labelOnly,
+});
+
+const compactOf = ({ trigger, preTokens, postTokens, summary }: CompactData): CompactData => ({
+  trigger,
+  preTokens,
+  postTokens,
+  summary,
+});
 
 interface Effective {
   simple: boolean;
@@ -145,7 +198,6 @@ const optionNotificationLabel = (option: InteractionOption): string | null => {
 const MESSAGE_TAIL_CAP = 500;
 const MESSAGE_INITIAL_CAP = 100;
 const HISTORY_LIMIT = 100;
-const MILLIS_PER_SECOND = 1000;
 
 
 interface AttachmentBase {
@@ -442,19 +494,12 @@ export class ChatState {
     this.cwd = context.cwd || this.defaultCwd;
     this.#initial =
       context.sessionId && context.projectKey && !this.agent
-        ? {
+        ? sessionInfo({
             sessionId: context.sessionId,
             projectKey: context.projectKey,
             path: context.cwd || null,
-            lastActive: null,
-            size: 0,
-            preview: null,
-            title: null,
             color: context.color ?? null,
-            activity: null,
-            resident: false,
-            rewind: null,
-          }
+          })
         : null;
     this.transcriptLoading = this.#initial !== null || (this.agent !== null && context.sessionId !== null);
     this.#loadOverrides(context.overrides);
@@ -702,8 +747,7 @@ export class ChatState {
 
     if (silent) {
       const compacting = body === COMPACT_COMMAND || body.startsWith(`${COMPACT_COMMAND} `);
-      this.#assistantId = null;
-      this.#thinkingId = null;
+      this.#breakStream();
       this.#capFromTail(MESSAGE_INITIAL_CAP);
       this.streaming = true;
       this.compacting = compacting;
@@ -798,19 +842,14 @@ export class ChatState {
     const list = this.list;
     if (list && !list.sessions.some((item) => item.sessionId === sessionId)) {
       list.upsertSession(
-        {
+        sessionInfo({
           sessionId,
           projectKey: this.projectKey,
           path: this.cwd,
           lastActive: Date.now() / MILLIS_PER_SECOND,
-          size: 0,
           preview: this.messages.find((item) => item.role === "user")?.text.slice(0, PREVIEW_LENGTH) ?? null,
-          title: null,
           color: this.sessionColor,
-          activity: null,
-          resident: false,
-          rewind: null,
-        },
+        }),
         true,
       );
     }
@@ -908,13 +947,7 @@ export class ChatState {
             newMessage(this.#nextId++, "interaction", {
               timestamp: null,
               ephemeral: true,
-              interaction: {
-                ...emptyInteraction("shown", "component"),
-                title: event.title,
-                titleKey: event.titleKey,
-                icon: event.icon,
-                blocks: event.blocks,
-              },
+              interaction: shownComponent(event),
             }),
           ],
         });
@@ -940,17 +973,7 @@ export class ChatState {
               timestamp: null,
               toolName: event.toolName,
               toolUseId: event.toolUseId,
-              interaction: {
-                ...emptyInteraction(event.requestId, event.kind),
-                options: event.options,
-                title: event.title,
-                titleKey: event.titleKey,
-                icon: event.icon,
-                blocks: event.blocks,
-                submitLabel: event.submitLabel,
-                variant: event.variant,
-                values: componentDefaults(event.blocks),
-              },
+              interaction: { ...requestedInteraction(event), mod: null },
             }),
           ] });
         }
@@ -1085,21 +1108,7 @@ export class ChatState {
   restoreSession(sessionId: string, projectKey: string) {
     if (this.sessionId === sessionId) return;
     const known = this.list?.sessions.find((item) => item.sessionId === sessionId);
-    this.openSession(
-      known ?? {
-        sessionId,
-        projectKey,
-        path: null,
-        lastActive: null,
-        size: 0,
-        preview: null,
-        title: null,
-        color: null,
-        activity: null,
-        resident: false,
-        rewind: null,
-      },
-    );
+    this.openSession(known ?? sessionInfo({ sessionId, projectKey, path: null }));
   }
 
   loadOlder() {
@@ -1259,19 +1268,7 @@ export class ChatState {
   async #forkCurrent(upTo: string | null): Promise<SessionInfo | null> {
     const sessionId = this.sessionId;
     if (!sessionId || this.rewindBusy) return null;
-    const current: SessionInfo = this.listed ?? {
-      sessionId,
-      projectKey: this.#projectKey(),
-      path: this.cwd,
-      lastActive: null,
-      size: 0,
-      preview: null,
-      title: null,
-      color: null,
-      activity: null,
-      resident: false,
-      rewind: null,
-    };
+    const current = this.listed ?? sessionInfo({ sessionId, projectKey: this.#projectKey(), path: this.cwd });
     this.rewindBusy = true;
     const forked = await this.fork(current, upTo);
     this.rewindBusy = false;
@@ -1623,19 +1620,9 @@ export class ChatState {
     await this.restoreTrashed(item.sessionId);
     this.viewOnly = null;
     this.newSession();
-    this.openSession({
-      sessionId: item.sessionId,
-      projectKey: item.projectKey,
-      path: item.path,
-      lastActive: null,
-      size: 0,
-      preview: null,
-      title: item.title,
-      color: null,
-      activity: null,
-      resident: false,
-      rewind: null,
-    });
+    this.openSession(
+      sessionInfo({ sessionId: item.sessionId, projectKey: item.projectKey, path: item.path, title: item.title }),
+    );
   }
 
   async purgeViewOnly() {
@@ -1786,6 +1773,20 @@ export class ChatState {
     else this.#append(item);
   }
 
+  #breakStream() {
+    this.#assistantId = null;
+    this.#thinkingId = null;
+  }
+
+  #appendShown(item: ChatMessage, local: boolean | undefined) {
+    if (local) {
+      this.#appendLocal(item);
+      return;
+    }
+    this.#breakStream();
+    this.#append(item);
+  }
+
   #takeHeld(): ChatMessage[] {
     const held = this.#held;
     this.#held = [];
@@ -1870,8 +1871,7 @@ export class ChatState {
     this.transcriptLoading = false;
     this.transcriptPaging = false;
     this.transcriptExhausted = false;
-    this.#assistantId = null;
-    this.#thinkingId = null;
+    this.#breakStream();
     this.#sent.clear();
     this.#unacked.clear();
     this.#silent.clear();
@@ -1893,8 +1893,7 @@ export class ChatState {
     );
     this.#nextId = visible.length;
     this.expandedIds = {};
-    this.#assistantId = null;
-    this.#thinkingId = null;
+    this.#breakStream();
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
     this.#sent.clear();
@@ -1953,8 +1952,7 @@ export class ChatState {
     this.#nextId = visible.length;
     this.expandedIds = {};
     if (!keepLive) {
-      this.#assistantId = null;
-      this.#thinkingId = null;
+      this.#breakStream();
     }
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
@@ -2074,27 +2072,9 @@ export class ChatState {
         return [...children, newMessage(this.#nextId++, role, { text: event.text })];
       }
       case "tool_use":
-        return [
-          ...children,
-          newMessage(this.#nextId++, "tool", {
-            text: event.input ?? "",
-            toolName: event.name,
-            toolMcp: event.mcp,
-            toolUseId: event.id,
-            result: event.result,
-          }),
-        ];
+        return [...children, newMessage(this.#nextId++, "tool", toolFields(event))];
       case "file_change":
-        return [
-          ...children,
-          newMessage(this.#nextId++, "file_change", {
-            toolUseId: event.id,
-            toolName: event.tool,
-            path: event.path,
-            diffLines: event.diffLines,
-            labelOnly: event.labelOnly,
-          }),
-        ];
+        return [...children, newMessage(this.#nextId++, "file_change", fileChangeFields(event))];
       case "tool_result":
         return event.toolUseId && event.content !== null
           ? children.map((kid) => (kid.toolUseId === event.toolUseId ? { ...kid, result: event.content } : kid))
@@ -2146,8 +2126,7 @@ export class ChatState {
           this.messages = this.messages.map((item) => (item.id === messageId ? { ...item, text: body } : item));
         }
       } else {
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         if (!this.streaming) {
           this.#capFromTail(MESSAGE_INITIAL_CAP);
           this.streaming = true;
@@ -2300,8 +2279,7 @@ export class ChatState {
     this.compacting = false;
     this.streamStatus = null;
     this.pendingToolIds = [];
-    this.#assistantId = null;
-    this.#thinkingId = null;
+    this.#breakStream();
     this.#thinkingTokens = null;
   }
 
@@ -2379,8 +2357,7 @@ export class ChatState {
         break;
       case "thinking":
         if (event.labelOnly) {
-          this.#assistantId = null;
-          this.#thinkingId = null;
+          this.#breakStream();
           this.#append(
             newMessage(this.#nextId++, "thinking", { labelOnly: true, thinkingTokens: this.#thinkingTokens }),
           );
@@ -2399,70 +2376,36 @@ export class ChatState {
         }
         break;
       case "working":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         if (this.messages.at(-1)?.role !== "working") this.#append(newMessage(this.#nextId++, "working"));
         break;
       case "plan":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, "plan", { text: event.markdown }));
         break;
-      case "command": {
-        const message = newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true });
-        if (event.local) {
-          this.#appendLocal(message);
-          break;
-        }
-        this.#assistantId = null;
-        this.#thinkingId = null;
-        this.#append(message);
+      case "command":
+        this.#appendShown(newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true }), event.local);
         break;
-      }
-      case "component": {
-        const message = newMessage(this.#nextId++, "interaction", {
-          ephemeral: true,
-          interaction: {
-            ...emptyInteraction("shown", "component"),
-            title: event.title,
-            titleKey: event.titleKey,
-            icon: event.icon,
-            blocks: event.blocks,
-          },
-        });
-        if (event.local) {
-          this.#appendLocal(message);
-          break;
-        }
-        this.#assistantId = null;
-        this.#thinkingId = null;
-        this.#append(message);
+      case "component":
+        this.#appendShown(
+          newMessage(this.#nextId++, "interaction", { ephemeral: true, interaction: shownComponent(event) }),
+          event.local,
+        );
         break;
-      }
-      case "usage": {
-        const message = newMessage(this.#nextId++, "usage", { ephemeral: true, usage: event.usage });
-        if (event.local) {
-          this.#appendLocal(message);
-          break;
-        }
-        this.#assistantId = null;
-        this.#thinkingId = null;
-        this.#append(message);
+      case "usage":
+        this.#appendShown(newMessage(this.#nextId++, "usage", { ephemeral: true, usage: event.usage }), event.local);
         break;
-      }
       case "reloaded": {
         const text = reloadText(event);
         if (text) this.#appendLocal(newMessage(this.#nextId++, "info", { text, ephemeral: true }));
         break;
       }
       case "notification":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, "notification", { text: event.summary, result: event.status }));
         break;
       case "notice":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, "notice", { text: event.text, toolName: event.name, result: event.level }));
         break;
       case "mods":
@@ -2495,18 +2438,15 @@ export class ChatState {
         break;
       case "session_message":
       case "plugin_message":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, event.type, { text: event.text, toolName: event.name }));
         break;
       case "agent_report":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, "agent_report", { text: event.text, toolName: event.name }));
         break;
       case "agent":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(
           newMessage(this.#nextId++, "agent", {
             text: event.description ?? "",
@@ -2553,8 +2493,7 @@ export class ChatState {
         break;
       }
       case "hook_failed":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(
           newMessage(this.#nextId++, "api_error", {
             text: [t("HOOK_FAILED", event.name ?? "hook"), event.text].filter(Boolean).join("\n"),
@@ -2563,18 +2502,8 @@ export class ChatState {
         );
         break;
       case "tool_use":
-        this.#assistantId = null;
-        this.#thinkingId = null;
-        this.#append(
-          newMessage(this.#nextId++, "tool", {
-            text: event.input ?? "",
-            toolName: event.name,
-            toolMcp: event.mcp,
-            toolUseId: event.id,
-            result: event.result,
-            toolMs: event.ms,
-          }),
-        );
+        this.#breakStream();
+        this.#append(newMessage(this.#nextId++, "tool", { ...toolFields(event), toolMs: event.ms }));
         if (event.id) this.pendingToolIds = [...this.pendingToolIds, event.id];
         break;
       case "tool_result":
@@ -2595,21 +2524,11 @@ export class ChatState {
         }
         break;
       case "file_change":
-        this.#assistantId = null;
-        this.#thinkingId = null;
-        this.#append(
-          newMessage(this.#nextId++, "file_change", {
-            toolUseId: event.id,
-            toolName: event.tool,
-            path: event.path,
-            diffLines: event.diffLines,
-            labelOnly: event.labelOnly,
-          }),
-        );
+        this.#breakStream();
+        this.#append(newMessage(this.#nextId++, "file_change", fileChangeFields(event)));
         break;
       case "shared":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, "shared", { toolUseId: event.id, files: event.files }));
         break;
       case "compacting":
@@ -2641,8 +2560,7 @@ export class ChatState {
           visible.map((item, index) => this.#fromSession(item, index, sessionId, this.projectKey)),
         );
         this.#nextId = visible.length;
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.expandedIds = {};
         this.oldestLoadedIndex = event.startIndex;
         this.transcriptExhausted = !event.hasMore;
@@ -2651,8 +2569,7 @@ export class ChatState {
         break;
       }
       case "stop":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#append(newMessage(this.#nextId++, "api_error", { text: agentStopText(event.reason), result: event.severity }));
         break;
       case "terminal_opened":
@@ -2661,18 +2578,8 @@ export class ChatState {
         });
         break;
       case "compact":
-        this.#assistantId = null;
-        this.#thinkingId = null;
-        this.messages = [
-          newMessage(this.#nextId++, "compact", {
-            compact: {
-              trigger: event.trigger,
-              preTokens: event.preTokens,
-              postTokens: event.postTokens,
-              summary: event.summary,
-            },
-          }),
-        ];
+        this.#breakStream();
+        this.messages = [newMessage(this.#nextId++, "compact", { compact: compactOf(event) })];
         this.compacting = false;
         this.#history = [];
         this.oldestLoadedIndex = 0;
@@ -2681,17 +2588,7 @@ export class ChatState {
         break;
       case "compact_summary":
         this.messages = this.messages.map((item) =>
-          item.role === "compact" && item.compact
-            ? {
-                ...item,
-                compact: {
-                  trigger: event.trigger,
-                  preTokens: event.preTokens,
-                  postTokens: event.postTokens,
-                  summary: event.summary,
-                },
-              }
-            : item,
+          item.role === "compact" && item.compact ? { ...item, compact: compactOf(event) } : item,
         );
         break;
       case "todos":
@@ -2746,8 +2643,7 @@ export class ChatState {
         this.#bindSession(event.sessionId);
         break;
       case "result":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#bindSession(event.sessionId ?? this.sessionId);
         break;
       case "done":
@@ -2790,8 +2686,7 @@ export class ChatState {
         break;
       case "interrupted":
         this.#interrupting = false;
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.messages = this.messages.filter(
           (item) => !(item.role === "interaction" && item.interaction && isPending(item.interaction)),
         );
@@ -2811,30 +2706,14 @@ export class ChatState {
         break;
       }
       case "api_error":
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.streamStatus = null;
         this.#append(newMessage(this.#nextId++, "api_error", { text: event.message, result: event.severity }));
         break;
       case "interaction_request":
         if (!this.messages.some((item) => item.interaction?.requestId === event.requestId)) {
-          this.#assistantId = null;
-          this.#thinkingId = null;
-          const data: InteractionData = {
-            ...emptyInteraction(event.requestId, event.kind),
-            options: event.options,
-            title: event.title,
-            titleKey: event.titleKey,
-            icon: event.icon,
-            blocks: event.blocks,
-            submitLabel: event.submitLabel,
-            submitKey: event.submitKey,
-            dismiss: event.dismiss,
-            present: event.present,
-            variant: event.variant,
-            mod: event.mod,
-            values: componentDefaults(event.blocks),
-          };
+          this.#breakStream();
+          const data = requestedInteraction(event);
           if (event.mod) this.mods.seed("AskUserQuestion", event.mod.instanceId, event.mod.drawn);
           const toolUseId = event.toolUseId;
           this.messages = [
@@ -2893,8 +2772,7 @@ export class ChatState {
         this.#settling = null;
         this.transcriptLoading = false;
         this.#abandonPage();
-        this.#assistantId = null;
-        this.#thinkingId = null;
+        this.#breakStream();
         this.#sideAssistantId = null;
         this.connection = "disconnected";
         if (this.streaming || this.pendingToolIds.length) this.#cutChannel ??= this.#socket.channel;

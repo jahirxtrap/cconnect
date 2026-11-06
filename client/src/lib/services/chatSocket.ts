@@ -3,6 +3,7 @@ import {
   sharedFilesFrom,
   VALUE_SEPARATOR,
   type AgentRun,
+  type CompactData,
   type ComponentCondition,
   type ComponentConfirm,
   type ComponentElement,
@@ -11,6 +12,7 @@ import {
   type DiffLine,
   type InteractionMod,
   type InteractionOption,
+  type InteractionRequest,
   type QueuedMessage,
   type SharedFile,
   type TodoItem,
@@ -38,11 +40,10 @@ import {
 } from "$lib/data/modModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { describeSocket, nativeSockets, onSocketTap, openSocket } from "$lib/platform/androidSocket";
-import { onWake } from "$lib/platform/wake";
 import type { TerminalInfo } from "./terminalApi";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
 import { toCommands, type CommandOption, type CommandWire } from "./capabilitiesApi";
-import { backoffFor, CONNECT_TIMEOUT_MS } from "./socket";
+import { Redial } from "./socket";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
 
 export type ServerEvent =
@@ -86,14 +87,8 @@ export type ServerEvent =
   | { type: "compacting" }
   | { type: "compacting_ended" }
   | { type: "status"; kind: string; retry: ApiRetry | null }
-  | { type: "compact"; trigger: string | null; preTokens: number | null; postTokens: number | null; summary: string }
-  | {
-      type: "compact_summary";
-      trigger: string | null;
-      preTokens: number | null;
-      postTokens: number | null;
-      summary: string;
-    }
+  | ({ type: "compact" } & CompactData)
+  | ({ type: "compact_summary" } & CompactData)
   | { type: "ask_text"; text: string }
   | { type: "ask_working" }
   | { type: "ask_session"; sessionId: string }
@@ -172,26 +167,13 @@ export type ServerEvent =
       hasMore: boolean;
     }
   | { type: "tail"; items: Record<string, unknown>[] }
-  | {
+  | ({
       type: "interaction_request";
       replay: boolean;
-      requestId: string;
-      kind: string;
       toolName: string | null;
       toolUseId: string | null;
       input: string | null;
-      title: string | null;
-      titleKey: string | null;
-      icon: string | null;
-      options: InteractionOption[];
-      blocks: ComponentElement[];
-      submitLabel: string | null;
-      submitKey: string | null;
-      dismiss: ComponentOption | null;
-      present: string | null;
-      variant: string | null;
-      mod: InteractionMod | null;
-    }
+    } & InteractionRequest)
   | {
       type: "interaction_resolved";
       requestId: string;
@@ -409,11 +391,7 @@ export const toElement = (raw: Wire): ComponentElement[] => {
 export class ChatSocket {
   #socket: WebSocket | null = null;
   #generation = 0;
-  #closed = true;
-  #attempts = 0;
-  #timer: ReturnType<typeof setTimeout> | null = null;
-  #handshake: ReturnType<typeof setTimeout> | null = null;
-  #stopWake: (() => void) | null = null;
+  #redial = new Redial(() => this.#open(), (stale) => this.#onWake(stale));
 
   #heartbeat: ReturnType<typeof setInterval> | null = null;
   #lastSeen = 0;
@@ -438,21 +416,15 @@ export class ChatSocket {
   }
 
   connect() {
-    this.#closed = false;
-    this.#attempts = 0;
-    this.#clearTimer();
-    this.#stopWake ??= onWake((stale) => this.#onWake(stale));
-    this.#open();
+    this.#redial.start();
   }
 
   #onWake(stale: boolean) {
-    if (this.#closed) return;
     if ((nativeSockets() || !stale) && this.#socket?.readyState === WebSocket.OPEN) {
       this.#lastSeen = Date.now();
       return;
     }
-    this.#attempts = 0;
-    this.#clearTimer();
+    this.#redial.restart();
     this.#open(true);
   }
 
@@ -481,12 +453,8 @@ export class ChatSocket {
   }
 
   close() {
-    this.#closed = true;
+    this.#redial.stop();
     this.#stopHeartbeat();
-    this.#stopWake?.();
-    this.#stopWake = null;
-    this.#clearTimer();
-    this.#clearHandshake();
     this.#generation++;
     this.#socket?.close(1000);
     this.#socket = null;
@@ -668,28 +636,14 @@ export class ChatSocket {
       socket.send(frame);
       return true;
     }
-    if (!this.#closed && socket?.readyState !== WebSocket.CONNECTING && this.#timer === null) {
-      this.#clearTimer();
-      this.#open();
-    }
+    if (!this.#redial.closed && socket?.readyState !== WebSocket.CONNECTING && !this.#redial.waiting) this.#open();
     return false;
-  }
-
-  #clearTimer() {
-    if (this.#timer !== null) clearTimeout(this.#timer);
-    this.#timer = null;
-  }
-
-  #clearHandshake() {
-    if (this.#handshake !== null) clearTimeout(this.#handshake);
-    this.#handshake = null;
   }
 
   #open(resumed = false) {
     const url = socketUrlOf(this.profile(), "/chat/ws");
     if (!url) return;
     const generation = ++this.#generation;
-    this.#clearHandshake();
     this.#socket?.close();
     this.onEvent(false, null, { type: "connecting", resumed });
     const socket = openSocket(url, true, this.agent());
@@ -697,17 +651,15 @@ export class ChatSocket {
     describeSocket(socket, this.#subject);
     onSocketTap(socket, () => this.onTap());
 
-    this.#handshake = setTimeout(() => {
-      this.#handshake = null;
-      if (generation !== this.#generation || socket.readyState === WebSocket.OPEN) return;
+    this.#redial.dialing(socket, () => {
+      if (generation !== this.#generation) return;
       socket.close();
       this.#drop("failed");
-    }, CONNECT_TIMEOUT_MS);
+    });
 
     socket.onopen = () => {
       if (generation !== this.#generation) return;
-      this.#attempts = 0;
-      this.#clearHandshake();
+      this.#redial.reached();
       this.#startHeartbeat();
       this.onEvent(false, null, { type: "open" });
     };
@@ -726,15 +678,9 @@ export class ChatSocket {
 
   #drop(reason: string) {
     this.#stopHeartbeat();
-    this.#clearHandshake();
+    this.#redial.cancelDial();
     this.onEvent(false, null, { type: "closed", reason });
-    if (this.#closed || this.#timer !== null) return;
-    const backoff = backoffFor(this.#attempts);
-    this.#attempts++;
-    this.#timer = setTimeout(() => {
-      this.#timer = null;
-      if (!this.#closed) this.#open();
-    }, backoff);
+    this.#redial.later();
   }
 
   #parse(raw: string) {

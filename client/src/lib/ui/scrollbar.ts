@@ -1,4 +1,5 @@
 import { isTouch } from "$lib/platform";
+import { followPointer } from "./followPointer";
 
 export const borderWidth = (node: HTMLElement) => {
   const style = getComputedStyle(node);
@@ -119,7 +120,7 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     if (max <= 1 || (isTouch && !touchIndicator)) {
       thumb.style.opacity = "0";
       thumb.style.transform = "";
-      thumb.style.width = "0px";
+      thumb.style.width = "0";
       node.style.cursor = "";
       node.style.paddingBottom = basePadding ? `${basePadding}px` : "";
       return;
@@ -191,11 +192,10 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     schedule();
   };
 
+  let unfollow = () => {};
   const onDragEnd = () => {
     dragging = false;
-    window.removeEventListener("pointermove", onDragMove);
-    window.removeEventListener("pointerup", onDragEnd);
-    window.removeEventListener("pointercancel", onDragEnd);
+    unfollow();
     schedule();
   };
 
@@ -212,9 +212,8 @@ export function hscrollbar(node: HTMLElement, options: ScrollbarOptions = {}) {
     grab = local >= offset && local <= offset + size ? local - offset : size / 2;
     dragging = true;
     scrollTo(event.clientX);
-    window.addEventListener("pointermove", onDragMove);
-    window.addEventListener("pointerup", onDragEnd);
-    window.addEventListener("pointercancel", onDragEnd);
+    unfollow();
+    unfollow = followPointer(onDragMove, onDragEnd, false);
     schedule();
   };
 

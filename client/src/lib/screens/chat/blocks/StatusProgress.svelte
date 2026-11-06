@@ -3,6 +3,7 @@
   import Clock3 from "@lucide/svelte/icons/clock-3";
   import { retryReason, type ApiRetry } from "$lib/data/apiRetry";
   import { formatDuration, joined } from "$lib/data/format";
+  import { MILLIS_PER_SECOND } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import NoticeCard from "./NoticeCard.svelte";
@@ -15,7 +16,6 @@
 
   const { kind, retry = null }: Props = $props();
 
-  const MILLIS_PER_SECOND = 1000;
 
   let now = $state(Date.now());
 

@@ -32,7 +32,9 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   (env), `display` (separator and joining, shared with the app), `settings_defs` + `db` +
   `settings_store` (SQLite KV), `cli_manager`, `sdk`, `process_job` (on Windows, the job
   object that takes the agents' processes down with the server), `responses` (**the**
-  envelope: `{success, status, message, data}`).
+  envelope: `{success, status, message, data}`), `ws` (**the** socket handshake:
+  `accept_authorized`, `opening_message` for a socket that opens with a message, and
+  `stream_watch` for a hub's snapshots).
 - `core/packs/` — the built-in packs and `schema.json` / `builtin.json`, the pack format. The
   client build and the Tauri compile read them too, and so does `core/scripts/page_icon.js`
   (the page icon both browsers report), so all of them ship in the wheel.
@@ -83,8 +85,9 @@ except `/api/health` and the two routes an agent's own process calls on loopback
 of its connection instead: `/api/agents/browse` (the `BROWSER` helper,
 `core/scripts/browse.py`, which still opens the page on the PC and hands the URL to the agent's
 card) and `/api/mcp/agent/<token>`, plus the files of a registered page, `/api/pages/<id>/…`,
-whose random id is the token: an iframe cannot send headers. The WS handshake checks the same
-header via `ws_bearer_ok`.
+whose random id is the token: an iframe cannot send headers. Every WS handshake checks the same
+header through `core/ws.accept_authorized`, which closes before accepting, so a socket without it
+is refused at the HTTP layer (403).
 
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to

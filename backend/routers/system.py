@@ -9,8 +9,7 @@ from core import paths
 from core.access import key_matches
 from core.config import RESTART_EXIT_CODE
 from core.responses import api_response
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import accept_authorized, send_event
 from services import directories, live_sessions, processes, repo, system_monitor, system_watch
 
 router = APIRouter(tags=["system"])
@@ -85,10 +84,8 @@ def list_dirs(
 
 @router.websocket("/system/ws")
 async def system_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
+    if not await accept_authorized(ws):
         return
-    await ws.accept()
     queue = system_watch.hub.subscribe()
     try:
         while True:

@@ -16,7 +16,6 @@
 
   const { onKey }: Props = $props();
 
-  // ESC = 0x1b; arrows = ESC + "[A/B/C/D"; Ctrl+letter = letter - 64.
   const SOFT_KEYS: Array<{ label?: string; icon?: IconSource; title: string; bytes: number[] }> = [
     { label: "Esc", title: "Esc", bytes: [0x1b] },
     { label: "Tab", title: "Tab", bytes: [0x09] },

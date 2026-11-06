@@ -43,8 +43,11 @@ request with it went through, as the terminal does.
 - **Reuse the toolkit.** `PopupMenu`, `MenuSub`, `MenuItem`, `InputField`, `ListRow`,
   `CompactDialog`, `ConfirmDialog`, `CardPanel`, `ScrollCard`, `FloatDock`, `TabPager`,
   `ZoomPane`, `DropOverlay`, `MarkdownText`, `CodeBlock`, `SelectionDot`, `scrollbar`,
-  `gridHeight`, `fileDrop`, `keepFocus`, `menuSurface`, `sharedFileActions`. New screens
-  compose these; forking a variant is how the two apps drift.
+  `gridHeight`, `fileDrop`, `keepFocus`, `menuSurface`, `sharedFileActions`, `followPointer`,
+  `ListDrag` (the press, autoscroll and nearest drop behind `RowDrag` and `CategoryDrag`). New
+  screens compose these; forking a variant is how the two apps drift. The same goes for data:
+  time units come from `data/time.ts`, a blank `SessionInfo` from `sessionInfo`, per-environment
+  snapshots from `EnvironmentSlots`, and a socket's retries from `Redial` (`services/socket.ts`).
 - **Tailwind is concatenated by hand — there is no twMerge.** Two conflicting utilities both
   end up in `class`, and the winner is whatever CSS order decides. Resolve conflicts with a
   prop or a conditional, never by appending another class.

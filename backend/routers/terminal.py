@@ -7,8 +7,7 @@ from fastapi import APIRouter, Body, Header, WebSocket, WebSocketDisconnect
 
 from core.access import key_matches
 from core.responses import api_response
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import opening_message, refuse, send_event
 from services import terminal
 
 router = APIRouter(tags=["terminal"])
@@ -53,20 +52,12 @@ def close_session(session_id: str, x_security_key: str = Header("")):
 
 @router.websocket("/terminal/sessions/{session_id}/ws")
 async def terminal_ws(ws: WebSocket, session_id: str):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
+    opening = await opening_message(ws)
+    if opening is None:
         return
-    await ws.accept()
-    try:
-        opening = await ws.receive_json()
-    except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
-        return
-    if not isinstance(opening, dict) or not _unlocked(str(opening.get("key") or "")):
-        await ws.close(code=1008)
-        return
-    term = terminal.get(session_id)
+    term = terminal.get(session_id) if _unlocked(str(opening.get("key") or "")) else None
     if term is None:
-        await ws.close(code=1008)
+        await refuse(ws)
         return
 
     scrollback, queue = term.attach(int(opening.get("cols") or 0), int(opening.get("rows") or 0))

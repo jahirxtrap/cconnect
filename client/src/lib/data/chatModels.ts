@@ -151,17 +151,13 @@ export interface ComponentElement {
   blocks: ComponentElement[];
 }
 
-export interface InteractionData {
+export interface InteractionRequest {
   requestId: string;
   kind: string;
   options: InteractionOption[];
   title: string | null;
   titleKey: string | null;
   icon: string | null;
-  resolved: string | null;
-  submitted: boolean;
-  declined: boolean;
-  activePage: number;
   blocks: ComponentElement[];
   submitLabel: string | null;
   submitKey: string | null;
@@ -169,6 +165,13 @@ export interface InteractionData {
   present: string | null;
   variant: string | null;
   mod: InteractionMod | null;
+}
+
+export interface InteractionData extends InteractionRequest {
+  resolved: string | null;
+  submitted: boolean;
+  declined: boolean;
+  activePage: number;
   dismissedBy: string | null;
   values: Record<string, string>;
 }

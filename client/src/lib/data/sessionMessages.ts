@@ -5,38 +5,36 @@ import {
   emptyInteraction,
   sharedFilesFrom,
   VALUE_SEPARATOR,
-  type AgentResult,
-  type AgentRun,
-  type CompactData,
-  type DiffLine,
+  type ChatMessage,
   type InteractionData,
   type Role,
-  type SharedFile,
 } from "./chatModels";
 
-export interface SessionMessage {
+type MessageFields =
+  | "role"
+  | "text"
+  | "path"
+  | "interaction"
+  | "diffLines"
+  | "files"
+  | "compact"
+  | "agentRun"
+  | "agentResult"
+  | "thinkingTokens"
+  | "toolMs"
+  | "labelOnly"
+  | "result"
+  | "images"
+  | "timestamp"
+  | "toolUseId"
+  | "uuid";
+
+export interface SessionMessage extends Pick<ChatMessage, MessageFields> {
   type: string | null;
-  role: Role;
-  text: string;
   name: string | null;
   mcp: boolean;
-  path: string | null;
-  interaction: InteractionData | null;
-  diffLines: DiffLine[] | null;
-  files: SharedFile[] | null;
-  compact: CompactData | null;
-  agentRun: AgentRun | null;
-  agentResult: AgentResult | null;
-  thinkingTokens: number | null;
-  toolMs: number | null;
   index: number;
-  labelOnly: boolean;
-  result: string | null;
-  images: string[] | null;
-  timestamp: number | null;
   parent: string | null;
-  toolUseId: string | null;
-  uuid: string | null;
 }
 
 type Wire = Record<string, unknown>;

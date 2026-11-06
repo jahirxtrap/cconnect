@@ -11,8 +11,7 @@ import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from loguru import logger
 
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import accept_authorized, send_event
 from services.chat_list import hub
 
 router = APIRouter(tags=["List"])
@@ -20,10 +19,8 @@ router = APIRouter(tags=["List"])
 
 @router.websocket("/list/ws")
 async def list_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
+    if not await accept_authorized(ws):
         return
-    await ws.accept()
     queue = hub.subscribe()
 
     async def pump():

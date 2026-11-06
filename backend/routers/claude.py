@@ -30,8 +30,8 @@ class PromptBody(BaseModel):
 
 
 class PluginActionBody(BaseModel):
-    action: str  # install | uninstall | enable | disable | update
-    plugin: str  # name@marketplace
+    action: str
+    plugin: str
 
 
 class PluginOptionsBody(BaseModel):
@@ -54,8 +54,8 @@ class SkillInstallBody(BaseModel):
 
 
 class MarketplaceActionBody(BaseModel):
-    action: str  # add | remove | update
-    target: str  # source for add, name otherwise
+    action: str
+    target: str
 
 
 class McpAddBody(BaseModel):

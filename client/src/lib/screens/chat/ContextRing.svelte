@@ -11,6 +11,7 @@
     usageRatio,
   } from "$lib/data/format";
   import type { PromptCache } from "$lib/data/promptCache";
+  import { MILLIS_PER_MINUTE, MILLIS_PER_SECOND } from "$lib/data/time";
   import { ALERT_PERCENT, limitTone, usageWindowLabel, type LimitTone, type LimitWindow } from "$lib/data/usageWindows";
   import { isTouch } from "$lib/platform";
   import { t } from "$lib/i18n/index.svelte";
@@ -39,8 +40,6 @@
   const HALF = 2;
   const PERCENT = 100;
   const ALERT_RATIO = ALERT_PERCENT / PERCENT;
-  const MILLIS_PER_SECOND = 1000;
-  const MILLIS_PER_MINUTE = 60_000;
 
   let touchTip = $state<{ x: number; top: number; bottom: number } | null>(null);
   let trigger = $state<HTMLElement | null>(null);

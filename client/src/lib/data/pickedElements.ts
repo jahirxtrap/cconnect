@@ -1,5 +1,13 @@
 export type ElementSource = "device" | "server";
 
+export interface ElementPick {
+  selector: string;
+  text: string;
+  html: string;
+  width: number;
+  height: number;
+}
+
 export interface PickedElement {
   source: ElementSource;
   url: string;

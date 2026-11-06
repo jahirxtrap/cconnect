@@ -1,6 +1,6 @@
 <script lang="ts">
   import { formatSize, joined } from "$lib/data/format";
-  import { formatLogTime } from "$lib/data/time";
+  import { formatLogTime, MILLIS_PER_SECOND } from "$lib/data/time";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { osIcon } from "$lib/design/osIcons";
   import { plural, t } from "$lib/i18n/index.svelte";
@@ -23,7 +23,6 @@
   const pane = inPane();
 
   const FOLLOW_SLACK_PX = 24;
-  const MILLIS_PER_SECOND = 1000;
   const LOW_BATTERY = 20;
   const INSET = "px-(--page-inset) pb-(--page-inset)";
   const CARD_CLASS = "rounded-lg bg-card p-3.5";

@@ -156,7 +156,6 @@ class MainActivity : TauriActivity() {
     shareAttempts = 0
   }
 
-  /** The web view only takes it once the app registered its hook, which lags a cold start. */
   private fun deliverShare() {
     val (hook, arguments) = pendingCall ?: return
     val view = content ?: return

@@ -1,10 +1,11 @@
 """WebSocket frames: orjson instead of the stdlib encoder Starlette's send_json uses."""
 
 import asyncio
+import json
 from typing import Any, Callable, Optional, Protocol
 
 import orjson
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, status
 from fastapi.encoders import jsonable_encoder
 from loguru import logger
 
@@ -21,15 +22,40 @@ async def send_event(ws: WebSocket, payload: Any) -> None:
     await ws.send_text(orjson.dumps(payload, default=jsonable_encoder).decode())
 
 
+async def refuse(ws: WebSocket) -> None:
+    await ws.close(code=status.WS_1008_POLICY_VIOLATION)
+
+
+async def accept_authorized(ws: WebSocket) -> bool:
+    """Accept the socket when it carries the bearer, and reject its handshake otherwise."""
+    if not ws_bearer_ok(ws):
+        await refuse(ws)
+        return False
+    await ws.accept()
+    return True
+
+
+async def opening_message(ws: WebSocket) -> Optional[dict]:
+    """The first message of an accepted socket, or None once the socket is closed."""
+    if not await accept_authorized(ws):
+        return None
+    try:
+        opening = await ws.receive_json()
+    except (WebSocketDisconnect, RuntimeError, json.JSONDecodeError):
+        return None
+    if not isinstance(opening, dict):
+        await refuse(ws)
+        return None
+    return opening
+
+
 async def stream_watch(
     ws: WebSocket,
     hub: WatchHub,
     on_message: Optional[Callable[[asyncio.Queue, dict], None]] = None,
 ) -> None:
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
+    if not await accept_authorized(ws):
         return
-    await ws.accept()
     queue = hub.subscribe()
 
     async def pump():

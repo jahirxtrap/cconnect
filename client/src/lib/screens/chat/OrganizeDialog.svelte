@@ -22,6 +22,7 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ProjectPathDialog from "./ProjectPathDialog.svelte";
   import TrashDialog from "./TrashDialog.svelte";
+  import { followPointer } from "$lib/ui/followPointer";
   import { DRAG_PRESS_MS } from "$lib/ui/press";
   import { SECTION_LABEL_CLASS } from "$lib/ui/sectionLabel";
   import type { ChatState } from "./state.svelte";
@@ -132,10 +133,7 @@
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     const detach = () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
-      window.removeEventListener("blur", onUp);
+      unfollow();
       if (frame !== null) cancelAnimationFrame(frame);
       frame = null;
       if (timer !== null) clearTimeout(timer);
@@ -172,10 +170,7 @@
       dragDy = 0;
     };
 
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
-    window.addEventListener("blur", onUp);
+    const unfollow = followPointer(onMove, onUp, true);
     if (event.pointerType === "touch") timer = setTimeout(begin, DRAG_PRESS_MS);
     else begin();
   };

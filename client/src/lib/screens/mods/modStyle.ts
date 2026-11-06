@@ -33,17 +33,21 @@ const EDGES: [Edge, string, Axis][] = [
 
 const even = (width: string) => ({ top: width, right: width, bottom: width, left: width });
 
+const THIN = "var(--hairline)";
+const BOLD = "var(--mod-border-bold)";
+const DOUBLE = "var(--mod-border-double)";
+
 const BORDERS: Record<string, Border> = {
-  single: { width: even("1px"), style: "solid", radius: "var(--radius-xs)" },
-  round: { width: even("1px"), style: "solid", radius: "var(--radius-md)" },
-  bold: { width: even("2px"), style: "solid", radius: "var(--radius-xs)" },
-  double: { width: even("3px"), style: "double", radius: "var(--radius-xs)" },
-  singleDouble: { width: { top: "1px", bottom: "1px", left: "3px", right: "3px" }, style: "solid", radius: "var(--radius-xs)" },
-  doubleSingle: { width: { top: "3px", bottom: "3px", left: "1px", right: "1px" }, style: "solid", radius: "var(--radius-xs)" },
-  classic: { width: even("1px"), style: "solid", radius: "0" },
-  arrow: { width: even("1px"), style: "solid", radius: "0" },
-  dashed: { width: even("1px"), style: "dashed", radius: "var(--radius-xs)" },
-  quote: { width: { left: "3px" }, style: "solid", radius: "0" },
+  single: { width: even(THIN), style: "solid", radius: "var(--radius-xs)" },
+  round: { width: even(THIN), style: "solid", radius: "var(--radius-md)" },
+  bold: { width: even(BOLD), style: "solid", radius: "var(--radius-xs)" },
+  double: { width: even(DOUBLE), style: "double", radius: "var(--radius-xs)" },
+  singleDouble: { width: { top: THIN, bottom: THIN, left: DOUBLE, right: DOUBLE }, style: "solid", radius: "var(--radius-xs)" },
+  doubleSingle: { width: { top: DOUBLE, bottom: DOUBLE, left: THIN, right: THIN }, style: "solid", radius: "var(--radius-xs)" },
+  classic: { width: even(THIN), style: "solid", radius: "0" },
+  arrow: { width: even(THIN), style: "solid", radius: "0" },
+  dashed: { width: even(THIN), style: "dashed", radius: "var(--radius-xs)" },
+  quote: { width: { left: DOUBLE }, style: "solid", radius: "0" },
 };
 
 const KEYWORDS: [string, string][] = [

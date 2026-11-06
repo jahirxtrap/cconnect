@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { decodeBase64 } from "$lib/data/base64";
+import type { ElementPick } from "$lib/data/pickedElements";
 import { settings } from "$lib/data/settings.svelte";
 import { isDesktop, systemName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
@@ -37,14 +38,6 @@ interface PageState {
   loading?: boolean | null;
   canGoBack?: boolean | null;
   canGoForward?: boolean | null;
-}
-
-export interface DevicePick {
-  selector: string;
-  text: string;
-  html: string;
-  width: number;
-  height: number;
 }
 
 interface Preset {
@@ -189,7 +182,7 @@ class DeviceBrowser {
   blocked = $state<Record<string, number>>({});
   shield = $state<ShieldState>({ ready: false, updated: null });
   readonly active = $derived(this.tabs.find((tab) => tab.id === this.activeId) ?? null);
-  onPicked: ((url: string, pick: DevicePick) => void) | null = null;
+  onPicked: ((url: string, pick: ElementPick) => void) | null = null;
   onKey: ((keys: string) => void) | null = null;
   onFocus: (() => void) | null = null;
   onPull: ((distance: number, done: boolean) => void) | null = null;
@@ -221,7 +214,7 @@ class DeviceBrowser {
     browserListen<{ id: string; picking: boolean }>("browser-picking", (state) => {
       if (state.id === this.activeId) this.picking = state.picking;
     });
-    browserListen<DevicePick & { id: string }>("browser-picked", (pick) => {
+    browserListen<ElementPick & { id: string }>("browser-picked", (pick) => {
       const tab = this.tabs.find((item) => item.id === pick.id);
       if (tab) this.onPicked?.(tab.url, pick);
     });
@@ -350,7 +343,7 @@ class DeviceBrowser {
       returnByValue: true,
     });
     const body = described?.result?.value;
-    if (typeof body === "string") this.onPicked?.(tab.url, JSON.parse(body) as DevicePick);
+    if (typeof body === "string") this.onPicked?.(tab.url, JSON.parse(body) as ElementPick);
   }
 
   scroll(spot: Spot, deltaX: number, deltaY: number) {

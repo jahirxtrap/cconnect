@@ -456,7 +456,6 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
             name = (getattr(block, "name", None) or "").strip()
             raw_input = getattr(block, "input", None)
             if name == "AskUserQuestion":
-                # Surfaced as an interaction block; don't render the tool_use itself.
                 bid = getattr(block, "id", None)
                 if bid:
                     hidden.add(bid)
@@ -483,7 +482,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                     "status": raw_input.get("status"),
                 })
             elif name in _FILE_EDIT_TOOLS:
-                event = _file_change_event(block, raw_input, hidden)  # also marks the edit's result hidden
+                event = _file_change_event(block, raw_input, hidden)
                 mode = vis["file_change"]
                 if event is not None and mode == "off":
                     _mark_working(events, vis)
@@ -601,7 +600,6 @@ def _build_can_use_tool(
     return _can_use_tool
 
 
-# A no-op PreToolUse hook keeps the prompt stream open while can_use_tool awaits the user.
 async def _keep_stream_open(input_data, tool_use_id, context):
     return {"continue_": True}
 
@@ -839,8 +837,6 @@ async def run_prompt(
         RateLimitEvent,
         StreamEvent,
         UserMessage,
-        PermissionResultAllow,
-        PermissionResultDeny,
         HookMatcher,
     )
 
@@ -993,7 +989,7 @@ async def run_prompt(
                 "type": "dequeued",
                 "ids": [chip["id"]] if chip.get("id") else [],
                 "text": chip.get("sent") or "",
-                "consumed": 0,  # the transcript pass still settles the count
+                "consumed": 0,
                 "ts": chip.get("ts"),
             }]
         return []
@@ -1084,6 +1080,12 @@ async def run_prompt(
                 chip["announced"] = True
         return events
 
+    def _answer_started() -> list[dict]:
+        nonlocal awaiting_cycle
+        events = _announce_next() if awaiting_cycle else []
+        awaiting_cycle = False
+        return events + _flush_users(current_sid)
+
     async def _prompt_stream():
         if not adopt:
             yield {"type": "user", "message": {"role": "user", "content": content}}
@@ -1108,7 +1110,7 @@ async def run_prompt(
 
     hidden_tool_ids: set[str] = set()
     tool_started: dict[str, float] = {}
-    awaiting_cycle = True  # the next answer that starts belongs to the next message we handed over
+    awaiting_cycle = True
     context_tokens: Optional[int] = None
     request_started = time.time()
     cache_ttl: Optional[int] = None
@@ -1164,11 +1166,7 @@ async def run_prompt(
                     if isinstance(idx, int):
                         first_chunk_pending.add(idx)
                     if not parent:
-                        if awaiting_cycle:
-                            awaiting_cycle = False
-                            for ev in _announce_next():
-                                yield ev
-                        for ev in _flush_users(current_sid):
+                        for ev in _answer_started():
                             yield ev
                 if isinstance(raw, dict) and raw.get("type") == "content_block_stop" and isinstance(idx, int):
                     held = streamed_text.pop(idx, "")[streamed_sent.pop(idx, 0):]
@@ -1197,11 +1195,7 @@ async def run_prompt(
                     yield event
             elif isinstance(message, AssistantMessage):
                 if not parent:
-                    if awaiting_cycle:
-                        awaiting_cycle = False
-                        for ev in _announce_next():
-                            yield ev
-                    for ev in _flush_users(current_sid):
+                    for ev in _answer_started():
                         yield ev
                 _err = getattr(message, "error", None)
                 if _err and not parent:

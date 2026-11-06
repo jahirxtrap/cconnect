@@ -29,6 +29,7 @@ except ImportError:
 
 COMPRESS_FORMATS = {"zip": ".zip", "7z": ".7z", "rar": ".rar", "tar.gz": ".tar.gz", "tar.xz": ".tar.xz"}
 _ARCHIVE_SUFFIXES = (".zip", ".7z", ".rar", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
+_CHUNK_BYTES = 64 * 1024
 
 
 def _base() -> Path:
@@ -428,28 +429,43 @@ def compress_entries(relpaths: list[str], fmt: str = "zip", name: Optional[str] 
     return str(target.relative_to(_base().resolve())).replace("\\", "/")
 
 
+def _member_path(name: str) -> str:
+    return name.replace("\\", "/").strip("/")
+
+
+def _tar_path(name: str) -> str:
+    return name.lstrip("./").strip("/")
+
+
+def _open_zip(src: Path, kind: str):
+    if kind == "rar" and rarfile is None:
+        raise ValueError("rar support is not installed")
+    return (zipfile.ZipFile if kind == "zip" else rarfile.RarFile)(src)
+
+
+def _open_7z(src: Path):
+    if py7zr is None:
+        raise ValueError("7z support is not installed")
+    return py7zr.SevenZipFile(src)
+
+
 def _archive_members(src: Path, kind: str) -> list[tuple[str, bool, int, float]]:
     members: list[tuple[str, bool, int, float]] = []
     if kind == "zip" or kind == "rar":
-        if kind == "rar" and rarfile is None:
-            raise ValueError("rar support is not installed")
-        opener = zipfile.ZipFile if kind == "zip" else rarfile.RarFile
-        with opener(src) as archive:
+        with _open_zip(src, kind) as archive:
             for info in archive.infolist():
                 mtime = time.mktime(info.date_time + (0, 0, -1)) if info.date_time else 0.0
-                members.append((info.filename.replace("\\", "/").strip("/"), info.is_dir(), info.file_size or 0, mtime))
+                members.append((_member_path(info.filename), info.is_dir(), info.file_size or 0, mtime))
     elif kind == "tar":
         with tarfile.open(src) as archive:
             for info in archive.getmembers():
                 if info.isfile() or info.isdir():
-                    members.append((info.name.lstrip("./").strip("/"), info.isdir(), info.size, float(info.mtime)))
+                    members.append((_tar_path(info.name), info.isdir(), info.size, float(info.mtime)))
     elif kind == "7z":
-        if py7zr is None:
-            raise ValueError("7z support is not installed")
-        with py7zr.SevenZipFile(src) as archive:
+        with _open_7z(src) as archive:
             for info in archive.list():
                 mtime = info.creationtime.timestamp() if info.creationtime else 0.0
-                members.append((info.filename.replace("\\", "/").strip("/"), info.is_directory, info.uncompressed or 0, mtime))
+                members.append((_member_path(info.filename), info.is_directory, info.uncompressed or 0, mtime))
     return [m for m in members if m[0]]
 
 
@@ -499,23 +515,22 @@ def archive_member_stream_at(src: Path, inner: str):
 
     def chunks():
         if kind == "zip" or kind == "rar":
-            opener = zipfile.ZipFile if kind == "zip" else rarfile.RarFile
-            with opener(src) as archive:
-                inner_name = next(i.filename for i in archive.infolist() if i.filename.replace("\\", "/").strip("/") == target)
+            with _open_zip(src, kind) as archive:
+                inner_name = next(i.filename for i in archive.infolist() if _member_path(i.filename) == target)
                 with archive.open(inner_name) as fh:
-                    while chunk := fh.read(64 * 1024):
+                    while chunk := fh.read(_CHUNK_BYTES):
                         yield chunk
         elif kind == "tar":
             with tarfile.open(src) as archive:
-                info = next(i for i in archive.getmembers() if i.name.lstrip("./").strip("/") == target)
+                info = next(i for i in archive.getmembers() if _tar_path(i.name) == target)
                 fh = archive.extractfile(info)
-                while chunk := fh.read(64 * 1024):
+                while chunk := fh.read(_CHUNK_BYTES):
                     yield chunk
         else:
-            with py7zr.SevenZipFile(src) as archive:
-                inner_name = next(i.filename for i in archive.list() if i.filename.replace("\\", "/").strip("/") == target)
+            with _open_7z(src) as archive:
+                inner_name = next(i.filename for i in archive.list() if _member_path(i.filename) == target)
                 buffer = archive.read([inner_name])[inner_name]
-                while chunk := buffer.read(64 * 1024):
+                while chunk := buffer.read(_CHUNK_BYTES):
                     yield chunk
 
     return chunks(), Path(target).name, match[2] or None
@@ -569,26 +584,21 @@ def extract_entry(
             shutil.copyfileobj(fh, o)
 
     if kind == "zip" or kind == "rar":
-        if kind == "rar" and rarfile is None:
-            raise ValueError("rar support is not installed")
-        opener = zipfile.ZipFile if kind == "zip" else rarfile.RarFile
-        with opener(src) as archive:
+        with _open_zip(src, kind) as archive:
             for info in archive.infolist():
-                path = info.filename.replace("\\", "/").strip("/")
+                path = _member_path(info.filename)
                 if path and wanted(path):
                     place(path, info.is_dir(), lambda i=info: archive.open(i))
     elif kind == "tar":
         with tarfile.open(src) as archive:
             for info in archive.getmembers():
-                path = info.name.lstrip("./").strip("/")
+                path = _tar_path(info.name)
                 if path and wanted(path) and (info.isfile() or info.isdir()):
                     place(path, info.isdir(), lambda i=info: archive.extractfile(i))
     else:
-        if py7zr is None:
-            raise ValueError("7z support is not installed")
-        with py7zr.SevenZipFile(src) as archive:
+        with _open_7z(src) as archive:
             names = [i.filename for i in archive.list()]
-            targets = [n for n in names if wanted(n.replace("\\", "/").strip("/"))] if selected else None
+            targets = [n for n in names if wanted(_member_path(n))] if selected else None
             with tempfile.TemporaryDirectory(dir=str(dest_dir)) as tmp:
                 if targets is None:
                     archive.extractall(path=tmp)

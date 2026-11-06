@@ -1,3 +1,4 @@
+import type { ElementPick } from "$lib/data/pickedElements";
 import { http } from "./http";
 import { ReconnectingSocket } from "./socket";
 
@@ -25,19 +26,11 @@ export interface BrowserState {
   picking: boolean;
 }
 
-export interface BrowserPick {
-  selector: string;
-  text: string;
-  html: string;
-  width: number;
-  height: number;
-}
-
 export interface BrowserHooks {
   onFrame: (bitmap: ImageBitmap) => void;
   onState: (state: BrowserState) => void;
   onConnected: (value: boolean) => void;
-  onPicked: (pick: BrowserPick) => void;
+  onPicked: (pick: ElementPick) => void;
   onCursor: (shape: string) => void;
   onEditing: (active: boolean, tapped: boolean) => void;
   onClipboard: (text: string) => void;
@@ -101,7 +94,7 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
     },
     onMessage: (data) => {
       if (data.type === "picked") {
-        hooks.onPicked(data as unknown as BrowserPick);
+        hooks.onPicked(data as unknown as ElementPick);
         return;
       }
       if (data.type === "cursor") {

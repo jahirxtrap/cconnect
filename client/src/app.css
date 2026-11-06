@@ -636,9 +636,6 @@ a > .md-link-icon:last-child {
   background: var(--c-surface-variant);
   border-radius: var(--radius-sm);
   padding: 1px 3px;
-  /* Inherited, like Compose: a zero line-height lets the mono metrics set the line box, so a
-     line holding inline code ends up shorter than the rest and off the pixel grid. The pill is
-     painted from the content box, so it looks the same. */
   line-height: inherit;
 }
 

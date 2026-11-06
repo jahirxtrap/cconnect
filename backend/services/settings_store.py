@@ -53,7 +53,6 @@ def get(key: str) -> Any:
     return _overrides[key] if key in _overrides else SETTINGS[key].default
 
 
-# Chat item type -> its visibility setting key. Types not listed are always shown.
 _VISIBILITY = {
     "thinking": "show_thinking",
     "tool_use": "show_tool_use",
@@ -93,7 +92,7 @@ def set(key: str, value: Any) -> None:
             raise ValueError(f"{key} expects {defn.type.__name__}")
         if defn.allowed is not None and value not in defn.allowed:
             raise ValueError(f"{key} must be one of {defn.allowed}")
-    encoded = _encode(value)  # None -> real SQL NULL, never the string "null"
+    encoded = _encode(value)
     with Session() as s:
         row = s.get(Setting, key)
         if row is None:

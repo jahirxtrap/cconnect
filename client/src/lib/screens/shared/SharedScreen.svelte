@@ -40,7 +40,7 @@
     type FileKind,
   } from "$lib/data/previewKind";
   import { settings } from "$lib/data/settings.svelte";
-  import { formatDateShort } from "$lib/data/time";
+  import { formatDateShort, MILLIS_PER_SECOND } from "$lib/data/time";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { transfers } from "$lib/data/transfers.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
@@ -131,7 +131,6 @@
   const narrow = $derived(width < COMPACT_WIDTH);
 
   const SEARCH_DELAY_MS = 300;
-  const MILLIS_PER_SECOND = 1000;
   const SLIDE_MS = 150;
   const EDGE_ZONE = 96;
   const EDGE_STEP = 24;

@@ -278,7 +278,7 @@ class RewindBody(BaseModel):
     project: str
     user_message_id: str
     rewind_id: str
-    mode: str  # "both" (code + conversation) | "conversation"
+    mode: str
 
 
 def _session_cwd(project: str, session_id: str) -> str:

@@ -95,7 +95,6 @@ export const exportSettings = async (options: BackupOptions = {}): Promise<strin
         chat_background: { selected: chatBackground.selected, effects: chatBackground.saved },
         ...Object.fromEntries(THEME_KINDS.map((kind) => [`theme_${kind}`, theme.themeIds[kind]])),
         ...Object.fromEntries(FONT_KINDS.map((kind) => [`font_${kind}`, theme.fonts[kind]])),
-        // The Compose client stores "" for "follow the system".
         language: i18n.locale === "system" ? "" : i18n.locale,
         ...Object.fromEntries(BACKED_UP.map(({ key }) => [key, settings.exported(key)])),
         visibility: settings.visibility,

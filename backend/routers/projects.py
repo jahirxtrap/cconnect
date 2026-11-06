@@ -10,8 +10,7 @@ from loguru import logger
 
 from core.access import key_matches
 from core.responses import api_response, file_response
-from core.ws import send_event
-from middleware.public_auth import ws_bearer_ok
+from core.ws import accept_authorized, send_event
 from services import project_files, project_watch
 
 router = APIRouter()
@@ -54,10 +53,8 @@ def project_diff(project_key: str, path: str):
 
 @router.websocket("/projects/ws")
 async def projects_ws(ws: WebSocket):
-    if not ws_bearer_ok(ws):
-        await ws.close(code=1008)
+    if not await accept_authorized(ws):
         return
-    await ws.accept()
     queue = project_watch.hub.subscribe()
 
     async def pump():
