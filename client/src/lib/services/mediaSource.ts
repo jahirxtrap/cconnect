@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauri } from "$lib/platform";
 import { backend, tokenOf, withToken } from "./backend.svelte";
 import { fileHeaders } from "./projectFilesApi";
-import { awaitSharedFile } from "./sharedArrival.svelte";
+import { awaitSharedFile, followSharedFile } from "./sharedArrival.svelte";
 
 export interface SourceOptions {
   url: string;
@@ -92,16 +92,48 @@ export const sourceAction = <O extends SourceOptions, T>(
   acquire: (url: string, options: O) => Promise<T>,
   place: (value: T) => Promise<void> | void,
   discard: (value: T) => void,
+  prepare?: (value: T) => Promise<void>,
 ) => {
   let held: T | null = null;
   let token = 0;
   let waiting: (() => void) | null = null;
+  let following: (() => void) | null = null;
 
   const release = () => {
     if (held !== null) discard(held);
     held = null;
     waiting?.();
     waiting = null;
+    following?.();
+    following = null;
+  };
+
+  const refresh = async (source: string, ready: (value: T) => Promise<void>) => {
+    const attempt = ++token;
+    let value: T;
+    try {
+      value = await acquire(source, options);
+    } catch {
+      return;
+    }
+    try {
+      await ready(value);
+    } catch {
+      discard(value);
+      return;
+    }
+    if (attempt !== token) {
+      discard(value);
+      return;
+    }
+    const previous = held;
+    held = value;
+    await Promise.resolve(place(value)).catch(() => undefined);
+    if (previous !== null) discard(previous);
+  };
+
+  const follow = (source: string) => {
+    if (prepare) following = followSharedFile(source, () => void refresh(source, prepare));
   };
 
   const apply = async () => {
@@ -120,6 +152,7 @@ export const sourceAction = <O extends SourceOptions, T>(
         await place(value);
         if (attempt !== token) return;
         options.onload?.();
+        follow(source);
         return;
       } catch (error) {
         if (attempt !== token) return;
@@ -172,6 +205,12 @@ export function servedSrc(node: HTMLMediaElement | HTMLIFrameElement, options: S
   );
 }
 
+const decoded = (served: ServedFile) => {
+  const next = new Image();
+  next.src = served.src;
+  return next.decode();
+};
+
 export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
   return sourceAction(
     options,
@@ -182,6 +221,7 @@ export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
       return done;
     },
     closeServed,
+    decoded,
   );
 }
 

@@ -1,7 +1,7 @@
 <script lang="ts">
   import Eraser from "@lucide/svelte/icons/eraser";
-  import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import { tick } from "svelte";
+  import { QUICK_CHAT_ICON } from "$lib/app/screens";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { t } from "$lib/i18n/index.svelte";
@@ -172,7 +172,7 @@
       <PanelHandle />
     </div>
     <div class="flex items-center gap-2 px-(--page-inset) pt-0.5 pb-1.5">
-      <MessagesSquare size={16} class="shrink-0 text-accent" />
+      <QUICK_CHAT_ICON size={16} class="shrink-0 text-accent" />
       <p class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">{t("QUICK_CHAT")}</p>
       <TooltipIconButton label={t("CLEAR")} enabled={messages.length > 0} onclick={onClear} class="size-7">
         <Eraser />

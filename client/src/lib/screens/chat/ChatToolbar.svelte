@@ -1,8 +1,8 @@
 <script lang="ts">
   import Gauge from "@lucide/svelte/icons/gauge";
-  import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Radio from "@lucide/svelte/icons/radio";
   import Sparkles from "@lucide/svelte/icons/sparkles";
+  import { QUICK_CHAT_ICON } from "$lib/app/screens";
   import { joined } from "$lib/data/format";
   import type { PromptCache } from "$lib/data/promptCache";
   import type { LimitWindow } from "$lib/data/usageWindows";
@@ -146,7 +146,7 @@
 
 <div class="flex h-full min-w-0 flex-1 items-stretch">
 <ToolbarToggle label={t("QUICK_CHAT")} pressed={quickChatActive} class="{CHIP_SLOT} pr-1.5 pl-0.5" onclick={onQuickChat}>
-  <MessagesSquare size={CHIP_ICON_SIZE} class="text-accent" />
+  <QUICK_CHAT_ICON size={CHIP_ICON_SIZE} class="text-accent" />
 </ToolbarToggle>
 
 <div

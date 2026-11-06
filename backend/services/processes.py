@@ -18,6 +18,7 @@ STOPPED = "stopped"
 LOCKED = "locked"
 UNKNOWN = "unknown"
 QUICK_CHAT = "quick_chat"
+SHELL = "shell"
 _CORES = psutil.cpu_count() or 1
 _EXE = ".exe"
 _SHELLS = frozenset({"bash", "sh", "zsh", "dash", "fish"})
@@ -214,6 +215,7 @@ def _part(root: psutil.Process, usages: list[dict]) -> dict:
         "memory": _sum(usages, "memory"),
         "started": usages[0]["started"],
         "count": len(usages),
+        "role": SHELL if name == _SHELL_LABEL else None,
     }
 
 

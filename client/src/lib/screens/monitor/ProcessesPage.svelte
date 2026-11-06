@@ -2,7 +2,7 @@
   import Cpu from "@lucide/svelte/icons/cpu";
   import Power from "@lucide/svelte/icons/power";
   import Server from "@lucide/svelte/icons/server";
-  import { PANE_VIEWS } from "$lib/app/screens";
+  import { PANE_VIEWS, QUICK_CHAT_ICON } from "$lib/app/screens";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { KeyGate } from "$lib/data/keyGate.svelte";
   import { formatDecimal, formatSize, joined } from "$lib/data/format";
@@ -17,6 +17,7 @@
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
+  import { toolIcon } from "$lib/ui/toolIcons";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import {
     PROCESS_KINDS,
@@ -25,6 +26,7 @@
     type ProcessesSnapshot,
     type ProcessKind,
     type ProcessPart,
+    type ProcessRole,
     type ProcessUsage,
     type SystemInfo,
   } from "$lib/services/systemApi";
@@ -53,6 +55,8 @@
   };
 
   const OWN_ICONS: Partial<Record<ProcessKind, IconSource>> = { server: Server };
+
+  const OTHER_ICON: IconSource = Cpu;
 
   const LABELS: Record<ProcessKind, string> = {
     server: "SETTINGS_SERVER",
@@ -99,7 +103,7 @@
   const ownMemory = $derived(Math.min(locked ? total("memory") : snapshot.memory, info.memoryUsed));
 
   const iconOf = (kind: ProcessKind): IconSource =>
-    OWN_ICONS[kind] ?? PANE_VIEWS.find((view) => view.kind === VIEWS[kind])?.icon ?? Cpu;
+    OWN_ICONS[kind] ?? PANE_VIEWS.find((view) => view.kind === VIEWS[kind])?.icon ?? OTHER_ICON;
 
   const titleOf = (item: ProcessEntry) => {
     if (item.kind === "server") return t("APP_NAME");
@@ -120,6 +124,14 @@
     item.parts.length ? item.parts : item.processes.map((entry) => ({ ...entry, detail: null, count: 1, role: null }));
 
   const partTitle = (part: ProcessPart) => (part.role === "quick_chat" ? t("QUICK_CHAT") : part.name);
+
+  const ROLE_ICONS: Record<NonNullable<ProcessRole>, IconSource> = {
+    quick_chat: QUICK_CHAT_ICON,
+    shell: toolIcon("Bash", false),
+  };
+
+  const partIcon = (item: ProcessEntry, part: ProcessPart): IconSource =>
+    part.role ? ROLE_ICONS[part.role] : part.pid === item.pid ? iconOf(item.kind) : OTHER_ICON;
 
   const partSubtitle = (part: ProcessPart) =>
     joined(part.detail, part.count > 1 ? plural("PROCESSES_COUNT", part.count) : `PID ${part.pid}`);
@@ -163,7 +175,7 @@
   </div>
 
   {#if !processes.length}
-    <EmptyState icon={Cpu} text={t("NO_PROCESSES")} class="py-10" />
+    <EmptyState icon={OTHER_ICON} text={t("NO_PROCESSES")} class="py-10" />
   {/if}
 
   {#each groups as group (group.kind)}
@@ -188,7 +200,7 @@
         </ListRow>
         {#if expanded[item.pid]}
           {#each partsOf(item) as part (part.pid)}
-            <ListRow title={partTitle(part)} subtitle={partSubtitle(part)} padding={CHILD_PADDING}>
+            <ListRow icon={partIcon(item, part)} title={partTitle(part)} subtitle={partSubtitle(part)} padding={CHILD_PADDING}>
               {#snippet trailing()}
                 {@render usage(part)}
               {/snippet}

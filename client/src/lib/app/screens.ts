@@ -4,6 +4,7 @@ import Compass from "@lucide/svelte/icons/compass";
 import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
 import FolderTree from "@lucide/svelte/icons/folder-tree";
 import MessageSquareText from "@lucide/svelte/icons/message-square-text";
+import MessagesSquare from "@lucide/svelte/icons/messages-square";
 import Network from "@lucide/svelte/icons/network";
 import NotepadText from "@lucide/svelte/icons/notepad-text";
 import Puzzle from "@lucide/svelte/icons/puzzle";
@@ -83,6 +84,8 @@ export const screenFor = (kind: RightKind) =>
 export type PaneView = Pick<ScreenEntry, "kind" | "label" | "icon">;
 
 export const CHAT_VIEW: PaneView = { kind: "chat", label: "CHAT", icon: MessageSquareText };
+
+export const QUICK_CHAT_ICON: IconSource = MessagesSquare;
 
 export const PANE_VIEWS: PaneView[] = [CHAT_VIEW, ...SCREENS];
 
