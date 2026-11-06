@@ -115,7 +115,6 @@ export interface ServerUpdate {
   behind: number;
   ahead: number;
   dirty: boolean;
-  reloads: boolean;
 }
 
 export interface SystemHandlers {
@@ -213,7 +212,6 @@ const parseUpdate = (raw: Wire): ServerUpdate => ({
   behind: raw.behind ?? 0,
   ahead: raw.ahead ?? 0,
   dirty: raw.dirty === true,
-  reloads: raw.reloads === true,
 });
 
 const parseLog = (raw: Wire): LogEntry => ({

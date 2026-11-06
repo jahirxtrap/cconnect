@@ -620,12 +620,11 @@ fn kill_tree(child: &mut Child) {
 pub fn shutdown(state: &LocalServerState) {
     let mut inner = state.inner.lock().unwrap();
     let port = inner.info.port;
-    if let Some(mut child) = inner.child.take() {
-        kill_tree(&mut child);
-    }
+    let child = inner.child.take();
     inner.info = LocalServerInfo::default();
     drop(inner);
-    if port != 0 {
+    if let Some(mut child) = child {
+        kill_tree(&mut child);
         wait_port(port, false, STOP_ATTEMPTS);
     }
 }

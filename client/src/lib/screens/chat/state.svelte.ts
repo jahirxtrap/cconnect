@@ -245,7 +245,7 @@ export class ChatState {
   compacting = $state(false);
   streamStatus = $state<string | null>(null);
   apiRetry = $state<ApiRetry | null>(null);
-  activity = $state<string | null>(null);
+  activity = $state<string | null | undefined>(undefined);
   resident = $state(false);
   todos = $state<TodoItem[]>([]);
   contextTokens = $state<number | null>(null);
@@ -387,7 +387,7 @@ export class ChatState {
   readonly defaultCwd = $derived(this.environment?.directory ?? "");
   readonly list = $derived(chatListFor(this.environment));
   readonly listed = $derived(this.list?.sessions.find((session) => session.sessionId === this.sessionId) ?? null);
-  readonly liveActivity = $derived(this.activity ?? this.listed?.activity ?? null);
+  readonly liveActivity = $derived(this.activity === undefined ? (this.listed?.activity ?? null) : this.activity);
   readonly listedRewind = $derived(this.list?.loading === false ? (this.listed?.rewind ?? null) : undefined);
   readonly busy = $derived(this.streaming || isBusyActivity(this.liveActivity));
   readonly historyUnavailable = $derived(this.list === null || serverStatus.unavailable);
@@ -1007,7 +1007,7 @@ export class ChatState {
     this.#resetTranscript();
     this.streaming = false;
     this.compacting = false;
-    this.activity = null;
+    this.activity = undefined;
     this.resident = false;
     this.streamStatus = null;
     this.#socket.resetResume();
@@ -1032,7 +1032,7 @@ export class ChatState {
     this.sessionId = sessionId;
     this.streaming = false;
     this.compacting = false;
-    this.activity = null;
+    this.activity = undefined;
     this.streamStatus = null;
     this.transcriptLoading = true;
     this.#startSession(sessionId);
@@ -1091,7 +1091,7 @@ export class ChatState {
       this.todos = [];
       this.queue = [];
       this.compacting = false;
-      this.activity = null;
+      this.activity = undefined;
       this.resident = false;
       this.streamStatus = null;
       this.transcriptLoading = this.messages.length === 0;

@@ -115,7 +115,7 @@ export class ReorderDrag {
       if (up instanceof PointerEvent && up.pointerId !== event.pointerId) return;
       detach();
       if (!started) {
-        this.onTap(id);
+        if (up.type === "pointerup") this.#cards.get(id)?.addEventListener("click", () => this.onTap(id), { once: true });
         return;
       }
       const from = this.#indexOf(id);

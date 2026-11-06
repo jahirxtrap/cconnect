@@ -53,14 +53,14 @@ class ServerStatus {
   );
 
   readonly notices = $derived.by<CompatNotice[]>(() => {
-    if (!this.reachable) return [];
-    if (this.unauthorized) return [tokenOf(backend.active) ? "token_rejected" : "unauthorized"];
+    const release: CompatNotice[] = this.releaseNotice ? ["update_available"] : [];
+    if (!this.reachable) return release;
+    if (this.unauthorized) return [tokenOf(backend.active) ? "token_rejected" : "unauthorized", ...release];
     const notices: CompatNotice[] = [];
     if (this.appOutdated) notices.push("app_outdated");
     if (this.serverOutdated) notices.push("server_outdated");
     if (this.cliOutdated) notices.push("cli_outdated");
-    if (this.releaseNotice) notices.push("update_available");
-    return notices;
+    return [...notices, ...release];
   });
 
   skipRelease() {

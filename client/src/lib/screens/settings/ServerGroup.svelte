@@ -70,7 +70,7 @@
   );
 
   const applyUpdate = async () => {
-    if (!repo?.changed || repo.reloads) return;
+    if (!repo?.changed) return;
     if (packaged && managedHere) localServer.restart();
     else await systemApi.restart();
   };
