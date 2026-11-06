@@ -4,6 +4,7 @@ can see them."""
 
 import base64
 import io
+from math import ceil
 from pathlib import Path
 
 from services import shared as shared_service
@@ -16,14 +17,17 @@ def is_image(name: str) -> bool:
     return Path(name).suffix.lower() in _IMAGE_EXTENSIONS
 
 
-def encode_image(path: Path) -> tuple[str, str] | None:
+def shrunk(path: Path, limit: int, cover: bool = False, stills_only: bool = False) -> tuple[str, bytes] | None:
     try:
         from PIL import Image
         with Image.open(path) as img:
+            if stills_only and getattr(img, "is_animated", False):
+                return None
             img.load()
             has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
-            if max(img.size) > _MAX_DIMENSION:
-                img.thumbnail((_MAX_DIMENSION, _MAX_DIMENSION))
+            side = min(img.size) if cover else max(img.size)
+            if side > limit:
+                img.thumbnail((ceil(img.width * limit / side), ceil(img.height * limit / side)))
             buf = io.BytesIO()
             if has_alpha:
                 img.save(buf, format="PNG")
@@ -31,9 +35,14 @@ def encode_image(path: Path) -> tuple[str, str] | None:
             else:
                 img.convert("RGB").save(buf, format="JPEG", quality=85)
                 media = "image/jpeg"
-            return media, base64.b64encode(buf.getvalue()).decode("ascii")
+            return media, buf.getvalue()
     except Exception:
         return None
+
+
+def encode_image(path: Path) -> tuple[str, str] | None:
+    encoded = shrunk(path, _MAX_DIMENSION)
+    return (encoded[0], base64.b64encode(encoded[1]).decode("ascii")) if encoded else None
 
 
 def compose_prompt(text: str, relpaths: list[str]) -> tuple[str, list[dict]]:

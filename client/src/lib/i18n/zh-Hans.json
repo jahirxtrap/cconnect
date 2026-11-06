@@ -75,6 +75,8 @@
   "CHANGED_FILES": "已更改的文件",
   "NEXT_CHANGE": "下一处更改",
   "PREVIOUS_CHANGE": "上一处更改",
+  "NEXT_FILE": "下一个文件",
+  "PREVIOUS_FILE": "上一个文件",
   "NO_CHANGES": "暂无更改",
   "NOT_A_REPOSITORY": "不是 Git 仓库",
   "UNLOCK": "解锁",

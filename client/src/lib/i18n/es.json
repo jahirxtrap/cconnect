@@ -75,6 +75,8 @@
   "CHANGED_FILES": "Archivos con cambios",
   "NEXT_CHANGE": "Cambio siguiente",
   "PREVIOUS_CHANGE": "Cambio anterior",
+  "NEXT_FILE": "Archivo siguiente",
+  "PREVIOUS_FILE": "Archivo anterior",
   "NO_CHANGES": "Sin cambios",
   "NOT_A_REPOSITORY": "No es un repositorio git",
   "UNLOCK": "Desbloquear",

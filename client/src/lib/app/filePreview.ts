@@ -14,6 +14,12 @@ export const openFilePreview = (request: PreviewRequest) => {
   panes.showPreview();
 };
 
+export const showGalleryItem = (index: number) => {
+  const gallery = navigation.preview?.gallery;
+  const item = gallery?.[index];
+  if (gallery && item) navigation.preview = { ...item, gallery };
+};
+
 export const closeFilePreview = () => {
   if (navigation.previewPane) {
     navigation.endPreview();

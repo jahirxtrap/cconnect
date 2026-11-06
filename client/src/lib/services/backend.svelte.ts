@@ -1,4 +1,5 @@
 import type { AuthKind } from "$lib/data/auth";
+import { withQuery } from "$lib/data/url";
 import { isTauri } from "$lib/platform";
 import { secureStore } from "$lib/platform/secureStorage";
 import { store } from "$lib/platform/storage";
@@ -76,7 +77,7 @@ export const tokenOf = (profile: Profile) => (profile?.authKind === "bearer" ? p
 
 export const withToken = (url: string, profile: Profile) => {
   const token = tokenOf(profile);
-  return token ? `${url}${url.includes("?") ? "&" : "?"}token=${encodeURIComponent(token)}` : url;
+  return token ? withQuery(url, "token", token) : url;
 };
 
 export const socketUrlOf = (profile: Profile, path: string) =>

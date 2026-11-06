@@ -75,6 +75,8 @@
   "CHANGED_FILES": "Изменённые файлы",
   "NEXT_CHANGE": "Следующее изменение",
   "PREVIOUS_CHANGE": "Предыдущее изменение",
+  "NEXT_FILE": "Следующий файл",
+  "PREVIOUS_FILE": "Предыдущий файл",
   "NO_CHANGES": "Нет изменений",
   "NOT_A_REPOSITORY": "Это не репозиторий Git",
   "UNLOCK": "Разблокировать",

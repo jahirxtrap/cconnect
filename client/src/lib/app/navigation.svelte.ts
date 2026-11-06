@@ -38,6 +38,8 @@ export interface PreviewRequest {
   kind?: PreviewKind | null;
   onDelete: (() => void) | null;
   links?: PreviewLinks | null;
+  poster?: string | null;
+  gallery?: PreviewRequest[] | null;
 }
 
 const WEB_BLOCKED: Route[] = ["/terminal", "/browser", "/project"];

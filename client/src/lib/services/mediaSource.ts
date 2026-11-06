@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { withQuery } from "$lib/data/url";
 import { isTauri } from "$lib/platform";
 import { backend, tokenOf, withToken } from "./backend.svelte";
 import { fileHeaders } from "./projectFilesApi";
@@ -15,7 +16,11 @@ export interface SourceOptions {
 type Sourced = HTMLImageElement | HTMLMediaElement | HTMLIFrameElement | HTMLEmbedElement;
 
 export const fetchFile = (url: string, init: RequestInit = {}, extra: Record<string, string> = {}) =>
-  fetch(url, { ...init, cache: "no-cache", headers: { ...fileHeaders(url, backend.sharedProfileOf(url)), ...extra } });
+  fetch(url, { ...init, cache: "no-cache", headers: { ...fileHeaders(url, backend.sharedProfileOf(url)), ...extra } }).catch(
+    (error: unknown) => {
+      throw error instanceof TypeError ? new UnreachableFile(url) : error;
+    },
+  );
 
 const NOT_FOUND = 404;
 const RANGE_NOT_SATISFIABLE = 416;
@@ -25,6 +30,10 @@ const AUTHORIZATION = "Authorization";
 const IMAGE_FAILED = "image failed to load";
 
 export class MissingFile extends Error {}
+
+export class UnreachableFile extends Error {}
+
+export const arrivesLater = (error: unknown) => error instanceof MissingFile || error instanceof UnreachableFile;
 
 export const fetchBlob = async (url: string) => {
   const response = await fetchFile(url);
@@ -50,28 +59,64 @@ const probeFile = async (url: string) => {
   return VERSION_HEADERS.map((name) => response.headers.get(name)).find(Boolean) ?? crypto.randomUUID();
 };
 
-const versioned = (url: string, version: string) =>
-  `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(version)}`;
+const versioned = (url: string, version: string) => withQuery(url, "v", version);
+
+export const sizedImage = (url: string, pixels: number) => withQuery(url, "size", pixels);
+
+type Freshness = "same" | "changed" | "gone";
+
+const SAME: Promise<Freshness> = Promise.resolve("same");
+
+const versions = new Map<string, string>();
+
+const recheck = (url: string, known: string): Promise<Freshness> =>
+  probeFile(url).then(
+    (version): Freshness => {
+      versions.set(url, version);
+      return version === known ? "same" : "changed";
+    },
+    (error: unknown): Freshness => {
+      if (!(error instanceof MissingFile)) return "same";
+      versions.delete(url);
+      return "gone";
+    },
+  );
+
+const versionOf = async (url: string, fresh: boolean) => {
+  const known = fresh ? undefined : versions.get(url);
+  if (known) return { version: known, freshness: recheck(url, known) };
+  const version = await probeFile(url);
+  versions.set(url, version);
+  return { version, freshness: SAME };
+};
 
 export interface ServedFile {
   src: string;
   close: () => void;
+  freshness: Promise<Freshness>;
 }
 
-export const serveFile = async (url: string): Promise<ServedFile> => {
+export const serveFile = async (url: string, fresh = true): Promise<ServedFile> => {
   const profile = backend.sharedProfileOf(url);
   const headers = fileHeaders(url, profile);
   const unsent = Object.keys(headers).filter((name) => !(name === AUTHORIZATION && tokenOf(profile)));
   if (!isTauri && unsent.length) {
     const src = await fetchObjectUrl(url);
-    return { src, close: () => revoke(src) };
+    return { src, close: () => revoke(src), freshness: SAME };
   }
-  const target = versioned(url, await probeFile(url));
-  if (!isTauri) return { src: withToken(target, profile), close: () => undefined };
+  const { version, freshness } = await versionOf(url, fresh);
+  const target = versioned(url, version);
+  if (!isTauri) return { src: withToken(target, profile), close: () => undefined, freshness };
   const id = crypto.randomUUID();
   const src = await invoke<string>("media_open", { id, url: target, headers });
-  return { src, close: () => void invoke("media_close", { id }).catch(() => undefined) };
+  return { src, close: () => void invoke("media_close", { id }).catch(() => undefined), freshness };
 };
+
+const serveRecalled = (url: string, _options: SourceOptions, fresh: boolean) => serveFile(url, fresh);
+
+const freshnessOf = (served: ServedFile) => served.freshness;
+
+const settled = async () => undefined;
 
 const closeServed = (served: ServedFile) => served.close();
 
@@ -89,10 +134,11 @@ const loaded = (node: HTMLImageElement) =>
 
 export const sourceAction = <O extends SourceOptions, T>(
   options: O,
-  acquire: (url: string, options: O) => Promise<T>,
+  acquire: (url: string, options: O, fresh: boolean) => Promise<T>,
   place: (value: T) => Promise<void> | void,
   discard: (value: T) => void,
   prepare?: (value: T) => Promise<void>,
+  freshness?: (value: T) => Promise<Freshness>,
 ) => {
   let held: T | null = null;
   let token = 0;
@@ -112,7 +158,7 @@ export const sourceAction = <O extends SourceOptions, T>(
     const attempt = ++token;
     let value: T;
     try {
-      value = await acquire(source, options);
+      value = await acquire(source, options, true);
     } catch {
       return;
     }
@@ -140,10 +186,10 @@ export const sourceAction = <O extends SourceOptions, T>(
     const attempt = ++token;
     release();
     const sources = [options.url, options.fallback].filter(Boolean) as string[];
-    let missing = false;
+    let later = false;
     for (const source of sources) {
       try {
-        const value = await acquire(source, options);
+        const value = await acquire(source, options, false);
         if (attempt !== token) {
           discard(value);
           return;
@@ -153,18 +199,23 @@ export const sourceAction = <O extends SourceOptions, T>(
         if (attempt !== token) return;
         options.onload?.();
         follow(source);
+        void freshness?.(value).then((state) => {
+          if (attempt !== token || state === "same") return;
+          if (state === "gone") void apply();
+          else void refresh(source, prepare ?? settled);
+        });
         return;
       } catch (error) {
         if (attempt !== token) return;
         if (held !== null) discard(held);
         held = null;
-        missing ||= error instanceof MissingFile;
+        later ||= arrivesLater(error);
         continue;
       }
     }
     if (attempt !== token) return;
     options.onerror?.();
-    if (missing) waiting = awaitSharedFile(options.url, () => void apply());
+    if (later) waiting = awaitSharedFile(options.url, () => void apply());
   };
 
   void apply();
@@ -197,11 +248,13 @@ export function mediaSrc(node: Sourced, options: SourceOptions) {
 export function servedSrc(node: HTMLMediaElement | HTMLIFrameElement, options: SourceOptions) {
   return sourceAction(
     options,
-    serveFile,
+    serveRecalled,
     (served) => {
       node.src = served.src;
     },
     closeServed,
+    undefined,
+    freshnessOf,
   );
 }
 
@@ -214,7 +267,7 @@ const decoded = (served: ServedFile) => {
 export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
   return sourceAction(
     options,
-    serveFile,
+    serveRecalled,
     (served) => {
       const done = loaded(node);
       node.src = served.src;
@@ -222,6 +275,7 @@ export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
     },
     closeServed,
     decoded,
+    freshnessOf,
   );
 }
 

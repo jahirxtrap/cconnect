@@ -42,6 +42,10 @@ export interface SharedFile {
   url: string;
 }
 
+export interface GalleryFile extends SharedFile {
+  poster?: string | null;
+}
+
 export interface CompactData {
   trigger: string | null;
   preTokens: number | null;

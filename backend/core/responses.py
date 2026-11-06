@@ -1,6 +1,7 @@
 """Standardized API response helpers."""
 
 import os
+from email.utils import formatdate
 from http import HTTPStatus
 from math import ceil
 from pathlib import Path
@@ -13,6 +14,11 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.staticfiles import NotModifiedResponse
 
 FILE_HEADERS = {"Content-Encoding": "identity", "Cache-Control": "no-cache"}
+
+
+def image_response(media_type: str, data: bytes, source: Path) -> Response:
+    modified = formatdate(os.stat(source).st_mtime, usegmt=True)
+    return Response(data, media_type=media_type, headers={**FILE_HEADERS, "Last-Modified": modified})
 
 
 def file_response(request: Request, path: Path, **options: Any) -> Response:

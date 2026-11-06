@@ -9,6 +9,7 @@
   import MessageSquareWarning from "@lucide/svelte/icons/message-square-warning";
   import OctagonAlert from "@lucide/svelte/icons/octagon-alert";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
+  import type { GalleryFile } from "$lib/data/chatModels";
   import { isArchive, visibleName } from "$lib/data/format";
   import { isInstallLink } from "$lib/data/installRequest";
   import { t } from "$lib/i18n/index.svelte";
@@ -28,7 +29,7 @@
 
   interface Props {
     text: string;
-    onSharedLink?: ((url: string, filename: string) => void) | null;
+    onSharedLink?: ((url: string, filename: string, gallery?: GalleryFile[]) => void) | null;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
     onSuggest?: SuggestionPicker | null;
     linkTarget?: ((href: string) => (() => void) | null) | null;
@@ -71,11 +72,11 @@
     }
   };
 
-  const open = (url: string, filename = filenameOf(url)) => {
+  const open = (url: string, filename = filenameOf(url), gallery?: GalleryFile[]) => {
     const target = linkTarget?.(url);
     if (target) target();
     else if (isInstallLink(url)) installOffers.offerLink(url);
-    else if (onSharedLink && shared(url)) onSharedLink(url, filename);
+    else if (onSharedLink && shared(url)) onSharedLink(url, filename, gallery?.filter((file) => shared(file.url)));
     else externalLink = url;
   };
 

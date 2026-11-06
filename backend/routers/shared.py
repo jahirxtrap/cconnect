@@ -4,18 +4,21 @@ import asyncio
 from typing import Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Header, HTTPException, Request, WebSocket
+from fastapi import APIRouter, Header, HTTPException, Query, Request, WebSocket
 from fastapi.responses import StreamingResponse
 from starlette.requests import ClientDisconnect
 from pydantic import BaseModel
 
 from core.access import key_matches
-from core.responses import api_response, file_response
+from core.responses import api_response, file_response, image_response
 from core.ws import stream_watch
+from services import attachments
 from services import shared as shared_service
 from services.shared_watch import hub as watch_hub
 
 router = APIRouter(tags=["Shared"])
+
+_THUMBNAIL_LIMIT = 1024
 
 
 def _watch_message(queue: asyncio.Queue, msg: dict):
@@ -212,13 +215,16 @@ async def upload_shared(path: str, request: Request, policy: Literal["keep", "re
 
 
 @router.get("/shared/{path:path}")
-def download_shared(path: str, request: Request):
+def download_shared(path: str, request: Request, size: int | None = Query(None, ge=1, le=_THUMBNAIL_LIMIT)):
     try:
         resolved = shared_service.resolve_file(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
+    small = attachments.shrunk(resolved, size, cover=True, stills_only=True) if size and attachments.is_image(resolved.name) else None
+    if small:
+        return image_response(*small, resolved)
     return file_response(
         request,
         resolved,

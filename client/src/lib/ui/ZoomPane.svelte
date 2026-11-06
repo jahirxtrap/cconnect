@@ -4,11 +4,12 @@
   interface Props {
     minScale?: number;
     maxScale?: number;
+    active?: boolean;
     class?: string;
     children: Snippet;
   }
 
-  const { minScale = 1, maxScale = 6, class: className = "", children }: Props = $props();
+  const { minScale = 1, maxScale = 6, active = true, class: className = "", children }: Props = $props();
 
   const DOUBLE_TAP_SCALE = 2.5;
   const WHEEL_STEP = 0.0015;
@@ -32,6 +33,10 @@
     offsetX = 0;
     offsetY = 0;
   };
+
+  $effect(() => {
+    if (!active) reset();
+  });
 
   const spread = () => {
     const [first, second] = [...points.values()];
@@ -101,7 +106,7 @@
     dragY = event.clientY;
   };
 
-  const onPointerUp = (event: PointerEvent) => {
+  const release = (event: PointerEvent) => {
     points.delete(event.pointerId);
     regrip();
   };
@@ -120,11 +125,11 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   bind:this={host}
-  class="relative overflow-hidden {scale > minScale ? 'touch-none' : 'touch-pan-y'} {className}"
+  class="relative overflow-hidden {scale > minScale ? 'touch-none' : 'touch-pan-x touch-pan-y'} {className}"
   onpointerdown={onPointerDown}
   onpointermove={onPointerMove}
-  onpointerup={onPointerUp}
-  onpointercancel={onPointerUp}
+  onpointerup={release}
+  onpointercancel={release}
   onwheel={onWheel}
   ondblclick={onDoubleClick}
 >

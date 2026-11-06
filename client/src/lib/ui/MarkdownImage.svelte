@@ -2,20 +2,25 @@
   import ImageOff from "@lucide/svelte/icons/image-off";
   import { visibleName } from "$lib/data/format";
   import { isVideo } from "$lib/data/previewKind";
-  import { imageSrc, servedSrc } from "$lib/services/mediaSource";
+  import { imageSrc, posterSrc, servedSrc } from "$lib/services/mediaSource";
   import CenteredProgress from "./CenteredProgress.svelte";
+  import ExpandButton from "./ExpandButton.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
+  import { nearView } from "./nearView";
 
   interface Props {
     url: string;
     alt: string;
+    poster?: string;
     onOpen: (url: string, filename: string) => void;
     compact?: boolean;
   }
 
-  const { url, alt, onOpen, compact = false }: Props = $props();
+  const { url, alt, poster, onOpen, compact = false }: Props = $props();
 
-  let state = $state<"loading" | "ready" | "error">("loading");
+  let status = $state<"loading" | "ready" | "error">("loading");
+  let player = $state<HTMLVideoElement | null>(null);
+  let near = $state(false);
 
   const resolved = $derived(url);
 
@@ -32,14 +37,30 @@
 </script>
 
 <div
+  use:nearView={() => (near = true)}
   class="relative flex aspect-4/3 max-w-full shrink items-center justify-center overflow-hidden {MEDIA_FRAME_CLASS} select-none {compact
     ? 'h-40'
     : 'h-70'} {video ? 'bg-black' : 'bg-card'}"
 >
   {#if video}
-    <!-- svelte-ignore a11y_media_has_caption -->
-    <video use:servedSrc={{ url: resolved }} controls class="max-h-full max-w-full object-contain"></video>
-  {:else if state === "error"}
+    {#if near}
+      <!-- svelte-ignore a11y_media_has_caption -->
+      <video
+        bind:this={player}
+        use:servedSrc={{ url: resolved }}
+        use:posterSrc={poster}
+        controls
+        class="max-h-full max-w-full object-contain"
+      ></video>
+    {/if}
+    <ExpandButton
+      label={filename}
+      onclick={() => {
+        player?.pause();
+        onOpen(resolved, filename);
+      }}
+    />
+  {:else if status === "error"}
     <button
       type="button"
       onclick={() => onOpen(resolved, filename)}
@@ -49,7 +70,7 @@
       <ImageOff size={18} class="shrink-0" />
       <span class="line-clamp-2 text-center text-body-sm">{alt || resolved}</span>
     </button>
-  {:else if state === "loading"}
+  {:else if status === "loading" && near}
     <CenteredProgress class="pointer-events-none absolute inset-0" size={24} />
   {/if}
   {#if !video}
@@ -58,18 +79,20 @@
       onclick={() => onOpen(resolved, filename)}
       data-shared={resolved}
       aria-label={alt || filename}
-      class="flex size-full cursor-pointer items-center justify-center {state === 'error' ? 'hidden' : ''}"
+      class="flex size-full cursor-pointer items-center justify-center {status === 'error' ? 'hidden' : ''}"
     >
-      <img
-        use:imageSrc={{
-          url: resolved,
-          onload: () => (state = "ready"),
-          onerror: () => (state = "error"),
-        }}
-        alt={alt || ""}
-        draggable="false"
-        class="max-h-full max-w-full object-contain"
-      />
+      {#if near}
+        <img
+          use:imageSrc={{
+            url: resolved,
+            onload: () => (status = "ready"),
+            onerror: () => (status = "error"),
+          }}
+          alt={alt || ""}
+          draggable="false"
+          class="max-h-full max-w-full object-contain"
+        />
+      {/if}
     </button>
   {/if}
 </div>

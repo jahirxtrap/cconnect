@@ -75,6 +75,8 @@
   "CHANGED_FILES": "変更されたファイル",
   "NEXT_CHANGE": "次の変更",
   "PREVIOUS_CHANGE": "前の変更",
+  "NEXT_FILE": "次のファイル",
+  "PREVIOUS_FILE": "前のファイル",
   "NO_CHANGES": "変更はありません",
   "NOT_A_REPOSITORY": "Git リポジトリではありません",
   "UNLOCK": "ロック解除",

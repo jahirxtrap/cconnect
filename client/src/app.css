@@ -272,6 +272,7 @@ html.scanning .qr-overlay {
     border: 1px solid transparent;
     outline: 1px solid var(--c-outline-variant);
     outline-offset: -1px;
+    overflow-anchor: none;
   }
 }
 

@@ -3,6 +3,7 @@
   import { activeScope } from "$lib/app/activeScope.svelte";
   import CommandPalette from "$lib/app/CommandPalette.svelte";
   import { commandPalette } from "$lib/app/paletteState.svelte";
+  import { showGalleryItem } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
@@ -181,6 +182,8 @@
     forcedKind={request.kind}
     onDelete={request.onDelete}
     links={request.links}
+    gallery={request.gallery}
+    onPick={showGalleryItem}
     onClose={() => navigation.closePreview()}
   />
 {/if}

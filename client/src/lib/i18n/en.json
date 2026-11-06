@@ -75,6 +75,8 @@
   "CHANGED_FILES": "Changed files",
   "NEXT_CHANGE": "Next change",
   "PREVIOUS_CHANGE": "Previous change",
+  "NEXT_FILE": "Next file",
+  "PREVIOUS_FILE": "Previous file",
   "NO_CHANGES": "No changes",
   "NOT_A_REPOSITORY": "Not a git repository",
   "UNLOCK": "Unlock",

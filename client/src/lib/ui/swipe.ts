@@ -1,7 +1,7 @@
 const SLOP = 10;
 const DISMISS_RATIO = 0.35;
 const MIN_DISMISS = 80;
-const EXIT_MS = 180;
+export const SWIPE_MS = 180;
 
 export interface SwipeDismissOptions {
   onDismiss: () => void;
@@ -16,7 +16,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
   let pointer: number | null = null;
 
   const paint = (value: number, animate = false) => {
-    node.style.transition = animate ? `transform ${EXIT_MS}ms ease-out, opacity ${EXIT_MS}ms ease-out` : "";
+    node.style.transition = animate ? `transform ${SWIPE_MS}ms ease-out, opacity ${SWIPE_MS}ms ease-out` : "";
     node.style.transform = value ? `translateX(${value}px)` : "";
     node.style.opacity = value ? `${Math.max(0, 1 - Math.abs(value) / node.offsetWidth)}` : "";
   };
@@ -61,7 +61,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
       return;
     }
     paint(target, true);
-    setTimeout(dismiss, EXIT_MS);
+    setTimeout(dismiss, SWIPE_MS);
   };
 
   const onClick = (event: MouseEvent) => {

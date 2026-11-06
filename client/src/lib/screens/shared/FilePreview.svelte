@@ -11,10 +11,11 @@
   import Trash from "@lucide/svelte/icons/trash";
   import Type from "@lucide/svelte/icons/type";
   import type { Snippet } from "svelte";
-  import type { PreviewLinks } from "$lib/app/navigation.svelte";
+  import type { PreviewLinks, PreviewRequest } from "$lib/app/navigation.svelte";
   import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
   import { wikiLinks } from "$lib/markdown/render";
   import { settings } from "$lib/data/settings.svelte";
+  import { fallbackOf, revised, withoutFallback } from "$lib/data/url";
   import { t } from "$lib/i18n/index.svelte";
   import { fetchFile, imageSrc, servedSrc } from "$lib/services/mediaSource";
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
@@ -45,7 +46,10 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import PageFrame from "$lib/ui/PageFrame.svelte";
+  import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
+  import GallerySlide, { GALLERY_KINDS } from "./GallerySlide.svelte";
+  import GalleryStrip from "./GalleryStrip.svelte";
   import PdfView from "./PdfView.svelte";
 
   interface Props {
@@ -66,6 +70,8 @@
     revision?: number;
     forcedKind?: PreviewKind | null;
     links?: PreviewLinks | null;
+    gallery?: PreviewRequest[] | null;
+    onPick?: ((index: number) => void) | null;
   }
 
   interface Shown {
@@ -96,6 +102,8 @@
     revision = 0,
     forcedKind = null,
     links = null,
+    gallery = null,
+    onPick = null,
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
@@ -140,11 +148,26 @@
 
   const BODY_CLASS = "flex min-h-0 flex-1 flex-col";
   const FRAME_CLASS = `${BODY_CLASS} overflow-hidden rounded-panel`;
-  const PANE_FRAME_CLASS = `${FRAME_CLASS} mx-(--page-inset) mb-(--page-inset)`;
+  const PANE_SIDES_CLASS = `${FRAME_CLASS} mx-(--page-inset)`;
+  const PANE_FRAME_CLASS = `${PANE_SIDES_CLASS} mb-(--page-inset)`;
   const TEXT_SCROLL_CLASS = `${TEXT_VIEWPORT_CLASS} selectable min-h-0 flex-1`;
 
   const kind = $derived(forcedKind ?? previewKindOf(filename));
-  const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : embedded ? PANE_FRAME_CLASS : FRAME_CLASS);
+  const strip = $derived(
+    gallery && gallery.length > 1 && onPick
+      ? { items: gallery, onPick, index: gallery.findIndex((item) => item.url === url) }
+      : null,
+  );
+
+  const pickPage = (index: number) => {
+    if (strip && index !== strip.index && index >= 0 && index < strip.items.length) strip.onPick(index);
+  };
+
+  const stepGallery = (step: number) => {
+    if (strip) pickPage(strip.index + step);
+  };
+  const paneClass = $derived(strip ? PANE_SIDES_CLASS : PANE_FRAME_CLASS);
+  const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : embedded ? paneClass : FRAME_CLASS);
   const binary = $derived(shown !== null && shown.body.includes(NUL));
   const prose = $derived(shown !== null && previewKindOf(shown.name) === "markdown" && formatted);
   const lined = $derived(readsAsText(kind) && !failed && shown !== null && !binary && !prose);
@@ -165,13 +188,10 @@
         ? null
         : () => void sharedApi.absolutePaths([relative]).then((paths) => paths && copyText(paths[0]))),
   );
-  const base = $derived(url.split("?fb=")[0]);
+  const base = $derived(withoutFallback(url));
   const stamp = $derived(version + revision);
-  const source = $derived(stamp > 0 ? `${base}${base.includes("?") ? "&" : "?"}cb=${stamp}` : base);
-  const fallback = $derived.by(() => {
-    const encoded = url.split("?fb=")[1];
-    return encoded ? decodeURIComponent(encoded) : null;
-  });
+  const source = $derived(revised(base, stamp));
+  const fallback = $derived(fallbackOf(url));
 
   $effect(() => {
     const target = source;
@@ -196,6 +216,12 @@
     shown = { ...arrived, added, removed, current, anchor };
   });
 
+  $effect(() => {
+    void url;
+    loaded = false;
+    failed = false;
+    version = 0;
+  });
 
   $effect(() => {
     const path = relative;
@@ -371,12 +397,38 @@
   {/if}
 {/snippet}
 
+{#snippet content()}
+  <div class={bodyClass}>
+    {#if strip}
+      <TabPager selected={strip.index} onSelect={pickPage} class="min-h-0 flex-1">
+        {#each strip.items as item, position (position)}
+          {@const near = Math.abs(position - strip.index) <= 1}
+          <div class="{TAB_PAGE_CLASS} min-h-0 snap-always">
+            {#if position === strip.index && !GALLERY_KINDS.includes(kind)}
+              {#key url}
+                {@render body()}
+              {/key}
+            {:else if near}
+              <GallerySlide {item} active={position === strip.index} revision={position === strip.index ? stamp : 0} />
+            {/if}
+          </div>
+        {/each}
+      </TabPager>
+    {:else}
+      {#key url}
+        {@render body()}
+      {/key}
+    {/if}
+  </div>
+  {#if strip}
+    <GalleryStrip items={strip.items} index={strip.index} onStep={stepGallery} onPick={strip.onPick} />
+  {/if}
+{/snippet}
+
 {#if embedded}
   <div class="flex h-full min-h-0 flex-col bg-background text-on-surface">
     <PaneHeader title={filename} onBack={onClose} actions={toolbar} />
-    <div class={bodyClass}>
-      {@render body()}
-    </div>
+    {@render content()}
   </div>
 {:else}
   <div class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface">
@@ -387,9 +439,7 @@
         </TooltipIconButton>
       {/snippet}
     </AppTopBar>
-    <div class={bodyClass}>
-      {@render body()}
-    </div>
+    {@render content()}
   </div>
 {/if}
 

@@ -1,23 +1,23 @@
 <script lang="ts">
   import ChevronLeft from "@lucide/svelte/icons/chevron-left";
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
-  import Maximize2 from "@lucide/svelte/icons/maximize-2";
-  import { isVideo } from "$lib/data/previewKind";
+  import type { GalleryFile } from "$lib/data/chatModels";
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
-  import { posterSrc, servedSrc } from "$lib/services/mediaSource";
+  import { servedSrc } from "$lib/services/mediaSource";
   import { awaitSharedFile } from "$lib/services/sharedArrival.svelte";
   import InstallCards from "$lib/screens/install/InstallCards.svelte";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import PageFrame from "./PageFrame.svelte";
   import CardPanel from "./CardPanel.svelte";
+  import ExpandButton from "./ExpandButton.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
-  import { ROUND_BUTTON_CLASS } from "./roundButton";
+  import { ROUND_ARROW_CLASS } from "./roundButton";
   import SuggestionChips from "./SuggestionChips.svelte";
 
   interface Props {
     data: CconnectBlock;
-    onOpen: (url: string, filename: string) => void;
+    onOpen: (url: string, filename: string, gallery?: GalleryFile[]) => void;
     compact?: boolean;
     onSuggest?: SuggestionPicker | null;
   }
@@ -26,7 +26,7 @@
 
   const MEDIA_HEIGHT = $derived(compact ? "h-48" : "h-96");
   const DOC_HEIGHT = $derived(compact ? "14rem" : "32rem");
-  const ARROW_CLASS = `${ROUND_BUTTON_CLASS} pointer-events-auto bg-surface-variant text-on-surface disabled:cursor-default disabled:opacity-50`;
+  const ARROW_CLASS = `${ROUND_ARROW_CLASS} pointer-events-auto`;
   const IMAGE_WIDTH = $derived(compact ? "13.333rem" : "23.333rem");
   const PEEK = "2.5rem";
   const RAIL_WIDTH = $derived(`min(100%, calc(${IMAGE_WIDTH} + ${PEEK} * 2))`);
@@ -35,6 +35,12 @@
     const clean = url.split(/[?#]/)[0];
     return decodeURIComponent(clean.slice(clean.lastIndexOf("/") + 1)) || clean;
   };
+
+  const openInGallery = $derived.by(() => {
+    if (data.type !== "gallery" || data.items.length < 2) return onOpen;
+    const gallery = data.items.map((item) => ({ url: item.url, name: fileName(item.url), poster: item.poster }));
+    return (url: string, filename: string) => onOpen(url, filename, gallery);
+  });
 
   let track = $state<HTMLDivElement | null>(null);
   let page = $state(0);
@@ -68,32 +74,11 @@
 </script>
 
 {#snippet expand(url: string)}
-  <button
-    type="button"
-    onclick={() => onOpen(url, fileName(url))}
-    aria-label={fileName(url)}
-    class="absolute top-2 right-2 z-10 inline-flex size-8 cursor-pointer items-center justify-center rounded-full bg-float text-on-surface shadow-float opacity-90 transition-opacity hover:opacity-100"
-  >
-    <Maximize2 size={16} />
-  </button>
+  <ExpandButton label={fileName(url)} onclick={() => onOpen(url, fileName(url))} />
 {/snippet}
 
 {#snippet media(item: { url: string; alt?: string; poster?: string })}
-  {#if isVideo(item.url)}
-    <div
-      class="flex aspect-4/3 max-w-full {compact ? 'h-40' : 'h-70'} items-center justify-center overflow-hidden {MEDIA_FRAME_CLASS} bg-black"
-    >
-      <!-- svelte-ignore a11y_media_has_caption -->
-      <video
-        use:servedSrc={{ url: item.url }}
-        use:posterSrc={item.poster}
-        controls
-        class="max-h-full max-w-full object-contain"
-      ></video>
-    </div>
-  {:else}
-    <MarkdownImage url={item.url} alt={item.alt ?? ""} {onOpen} {compact} />
-  {/if}
+  <MarkdownImage url={item.url} alt={item.alt ?? ""} poster={item.poster} onOpen={openInGallery} {compact} />
 {/snippet}
 
 {#if data.type === "gallery"}

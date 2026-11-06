@@ -9,11 +9,11 @@
   import Trash from "@lucide/svelte/icons/trash";
   import { untrack, type Snippet } from "svelte";
   import { openFilePreview } from "$lib/app/filePreview";
-  import { navigation } from "$lib/app/navigation.svelte";
+  import { navigation, type PreviewRequest } from "$lib/app/navigation.svelte";
   import { screenFor } from "$lib/app/screens";
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { agentUp } from "$lib/data/agentModels";
-  import { type ChatMessage, type InteractionData } from "$lib/data/chatModels";
+  import { type ChatMessage, type GalleryFile, type InteractionData } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { liveLimits } from "$lib/data/liveLimits.svelte";
   import { projectNameOf, sessionIdPreview } from "$lib/data/models";
@@ -181,7 +181,12 @@
     return onNativePaste((files) => canAttach && !dialogOpen && chat.addAttachments(files));
   });
 
-  const openShared = (url: string, filename: string) => {
+  const sharedPreview = (url: string, name: string): PreviewRequest => {
+    const relative = relativeFromUrl(url);
+    return { url, name, onDelete: relative ? () => void chat.shared.remove(relative) : null };
+  };
+
+  const openShared = (url: string, filename: string, gallery?: GalleryFile[]) => {
     if (isPackFile(filename)) {
       offerShared(url, filename);
       return;
@@ -190,11 +195,12 @@
       sharedLink = { url, filename };
       return;
     }
-    const relative = relativeFromUrl(url);
     openFilePreview({
-      url,
-      name: filename,
-      onDelete: relative ? () => void chat.shared.remove(relative) : null,
+      ...sharedPreview(url, filename),
+      gallery:
+        gallery && gallery.length > 1
+          ? gallery.map((file) => ({ ...sharedPreview(file.url, file.name), poster: file.poster }))
+          : null,
     });
   };
 

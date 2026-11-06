@@ -9,7 +9,7 @@
 </script>
 
 <script lang="ts">
-  import { closeFilePreview, expandFilePreview } from "$lib/app/filePreview";
+  import { closeFilePreview, expandFilePreview, showGalleryItem } from "$lib/app/filePreview";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import ProjectDiffView from "$lib/screens/project/ProjectDiffView.svelte";
@@ -34,6 +34,8 @@
       forcedKind={request.kind}
       onDelete={request.onDelete}
       links={request.links}
+      gallery={request.gallery}
+      onPick={showGalleryItem}
       onClose={closeFilePreview}
       onExpand={expandFilePreview}
     />

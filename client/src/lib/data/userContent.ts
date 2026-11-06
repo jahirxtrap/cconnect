@@ -1,5 +1,6 @@
 import { previewKindOf } from "./previewKind";
 import { splitElements, type PickedElement } from "./pickedElements";
+import { withFallback } from "./url";
 import type { Profile } from "$lib/services/backend.svelte";
 import { downloadUrl } from "$lib/services/sharedApi";
 import type { ChatMessage } from "./chatModels";
@@ -64,7 +65,7 @@ export const userContent = (
           if (previewKindOf(name) === "image") {
             const fallback = images[imageIndex];
             imageIndex++;
-            media.push({ path, url: fallback ? `${url}?fb=${encodeURIComponent(fallback)}` : url, name });
+            media.push({ path, url: withFallback(url, fallback), name });
           } else {
             files.push({ path, url, name });
           }

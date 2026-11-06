@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { closeFilePreview, expandFilePreview } from "$lib/app/filePreview";
+  import { closeFilePreview, expandFilePreview, showGalleryItem } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { claudeRefresh } from "$lib/data/claudeRefresh.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -181,6 +181,8 @@
             forcedKind={request.kind}
             onDelete={request.onDelete}
             links={request.links}
+            gallery={request.gallery}
+            onPick={showGalleryItem}
             onClose={closeFilePreview}
             onExpand={expandFilePreview}
           />

@@ -24,6 +24,7 @@
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import Slider from "$lib/ui/Slider.svelte";
+  import { TILE_FRAME_CLASS, TILE_IDLE_CLASS, TILE_LINE_CLASS, TILE_SELECTED_CLASS } from "$lib/ui/tile";
   import { BACKGROUND_STYLE_LABELS, backgroundLabel } from "./settingsValues";
 
   interface Props {
@@ -47,8 +48,7 @@
     { field: "x", label: "BACKGROUND_X" },
     { field: "y", label: "BACKGROUND_Y" },
   ] as const;
-  const TILE_CLASS = "relative aspect-[3/4] w-full overflow-hidden rounded-lg border bg-background";
-  const TILE_IDLE_CLASS = "border-outline-variant enabled:hover:border-outline";
+  const TILE_CLASS = `${TILE_FRAME_CLASS} aspect-[3/4] w-full`;
   const TILE_GRID_CLASS = "grid grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-2";
 
   let selected = $state(untrack(() => chatBackground.current));
@@ -87,17 +87,13 @@
 
 {#snippet tile(id: string, caption: string | null)}
   <div class="flex min-w-0 flex-col gap-1">
-    <Pressable
-      title={backgroundLabel(id)}
-      hover={false}
-      onclick={() => (selected = id)}
-      class="{TILE_CLASS} {selected === id ? 'border-accent-ring' : TILE_IDLE_CLASS}"
-    >
+    <Pressable title={backgroundLabel(id)} hover={false} onclick={() => (selected = id)} class={TILE_CLASS}>
       {#if id === NO_BACKGROUND}
         <X size={20} class="absolute inset-0 m-auto text-on-surface-variant" />
       {:else}
         <ChatBackdrop {id} effects={effectsOf(id)} />
       {/if}
+      <span class="{TILE_LINE_CLASS} {selected === id ? TILE_SELECTED_CLASS : TILE_IDLE_CLASS}"></span>
     </Pressable>
     {#if caption}
       <p class="truncate text-center text-caption text-on-surface-variant">{caption}</p>
@@ -152,9 +148,10 @@
             title={t("UPLOAD")}
             hover={false}
             onclick={() => picker?.click()}
-            class="{TILE_CLASS} border-dashed text-on-surface-variant {TILE_IDLE_CLASS}"
+            class="{TILE_CLASS} text-on-surface-variant"
           >
             <Plus size={20} class="absolute inset-0 m-auto" />
+            <span class="{TILE_LINE_CLASS} border-dashed {TILE_IDLE_CLASS}"></span>
           </Pressable>
           <p class="truncate text-center text-caption text-on-surface-variant">{t("UPLOAD")}</p>
         </div>

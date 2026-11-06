@@ -3,7 +3,7 @@
   import type { PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
   import "pdfjs-dist/web/pdf_viewer.css";
   import { openExternal } from "$lib/platform";
-  import { MissingFile, serveFile, type ServedFile } from "$lib/services/mediaSource";
+  import { arrivesLater, serveFile, type ServedFile } from "$lib/services/mediaSource";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
 
   interface Props {
@@ -251,7 +251,7 @@
     };
 
     open().catch((error) => {
-      if (!cancelled) onerror(error instanceof MissingFile);
+      if (!cancelled) onerror(arrivesLater(error));
     });
 
     return () => {
