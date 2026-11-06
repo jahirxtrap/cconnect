@@ -227,7 +227,7 @@ def _format_tool_input(inp: Any) -> str:
 
 
 def _display_tool_name(name: str) -> str:
-    """MCP tools arrive as ``mcp__<server>__<tool>``; show ``<server>: <tool>``.
+    """MCP tools arrive as ``mcp__<server>__<tool>``; show ``<server title>: <tool>``.
     Empty falls back to "Tool"."""
     name = (name or "").strip()
     if not name:
@@ -235,7 +235,7 @@ def _display_tool_name(name: str) -> str:
     if name.startswith(_MCP_PREFIX):
         server, sep, tool = name[len(_MCP_PREFIX):].partition("__")
         if sep and tool:
-            return f"{server}: {tool}"
+            return f"{claude_assets.mcp_tool_labels().get(server, server)}: {tool}"
     return name
 
 

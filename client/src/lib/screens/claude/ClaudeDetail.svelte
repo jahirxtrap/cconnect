@@ -5,6 +5,7 @@
   import Store from "@lucide/svelte/icons/store";
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
+  import { MCP_USER_SOURCE } from "$lib/services/claudeApi";
   import type { IconSource } from "$lib/ui/icons";
 
   export const CLAUDE_KINDS = [
@@ -49,6 +50,17 @@
   };
 
   export const STATUS_PAGE = "https://status.claude.com";
+
+  const CLAUDEAI_CONNECTORS = "https://claude.ai/customize/connectors";
+
+  const MCP_SOURCE_LABELS: Record<string, string> = {
+    [MCP_USER_SOURCE]: "MCP_SOURCE_USER",
+    project: "PROJECT",
+    local: "MCP_SOURCE_LOCAL",
+    plugin: "PLUGINS",
+  };
+
+  const MCP_SOURCE_ORDER = Object.keys(MCP_SOURCE_LABELS);
 </script>
 
 <script lang="ts">
@@ -74,6 +86,7 @@
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import {
     claudeApi,
+    MCP_NEEDS_AUTH,
     pluginKey,
     type ActionResult,
     type CatalogPlugin,
@@ -208,7 +221,7 @@
       : kind === "skills"
         ? skillSheet?.name
         : kind === "mcp"
-          ? mcpMenu?.name
+          ? mcpMenu?.label
           : kind === "marketplaces"
             ? marketMenu?.name
             : undefined,
@@ -231,7 +244,7 @@
   const load = async () => {
     if (kind === "plugins" || kind === "marketplaces") extensions = await claudeApi.extensions();
     else if (kind === "skills") skills = await claudeApi.skills();
-    else if (kind === "mcp") mcpServers = await claudeApi.mcp();
+    else if (kind === "mcp") mcpServers = await claudeApi.mcp(chat.workingPath);
     else if (kind === "memories") memories = await claudeApi.memories(memoriesProject);
     else if (kind === "status") service = await claudeApi.status();
     loaded = true;
@@ -261,7 +274,8 @@
           (item) => item.name === pluginMenu?.name && item.marketplace === pluginMenu?.marketplace,
         ) ?? null)
       : null;
-    mcpMenu = mcpMenu ? (mcpServers?.find((item) => item.name === mcpMenu?.name) ?? null) : null;
+    const shownMcp = mcpMenu;
+    mcpMenu = shownMcp ? (mcpServers?.find((item) => mcpKey(item) === mcpKey(shownMcp)) ?? null) : null;
     marketMenu = marketMenu ? (extensions?.marketplaces.find((item) => item.name === marketMenu?.name) ?? null) : null;
   };
 
@@ -369,7 +383,38 @@
     (skills ?? []).filter((skill) => matches(skill.name, skill.description, skill.pluginName)),
   );
 
-  const filteredMcp = $derived((mcpServers ?? []).filter((server) => matches(server.name, server.detail)));
+  let mcpFilter = $state<string | null>(null);
+
+  const mcpKey = (server: McpServer) => `${server.source}/${server.name}`;
+
+  const mcpSourceLabel = (source: string) => (MCP_SOURCE_LABELS[source] ? t(MCP_SOURCE_LABELS[source]) : source);
+
+  const mcpProblem = (server: McpServer) => (server.status === MCP_NEEDS_AUTH ? t("MCP_SIGN_IN_NEEDED") : null);
+
+  const mcpRank = (source: string) => {
+    const rank = MCP_SOURCE_ORDER.indexOf(source);
+    return rank < 0 ? MCP_SOURCE_ORDER.length : rank;
+  };
+
+  const mcpFilters = $derived.by((): { source: string | null; label: string; count: number }[] => {
+    const list = mcpServers ?? [];
+    const sources = [...new Set(list.map((server) => server.source))].sort((a, b) => mcpRank(a) - mcpRank(b));
+    return [
+      { source: null, label: t("ALL"), count: list.length },
+      ...sources.map((source) => ({
+        source,
+        label: mcpSourceLabel(source),
+        count: list.filter((server) => server.source === source).length,
+      })),
+    ];
+  });
+
+  const filteredMcp = $derived(
+    (mcpServers ?? []).filter(
+      (server) =>
+        (mcpFilter === null || server.source === mcpFilter) && matches(server.label, server.name, server.detail),
+    ),
+  );
 
   const filteredMarkets = $derived(
     (extensions?.marketplaces ?? []).filter((market) => matches(market.name, market.repo)),
@@ -389,7 +434,9 @@
     ),
   );
 
-  const filtering = $derived(!!needle || (kind === "plugins" && pluginFilter.kind !== "all"));
+  const filtering = $derived(
+    !!needle || (kind === "plugins" && pluginFilter.kind !== "all") || (kind === "mcp" && mcpFilter !== null),
+  );
 
   const failed = $derived(
     loaded &&
@@ -428,7 +475,7 @@
         skillSheet = filteredSkills[0] ?? null;
     } else if (kind === "mcp") {
       const current = mcpMenu;
-      if (!current || !filteredMcp.some((server) => server.name === current.name)) mcpMenu = filteredMcp[0] ?? null;
+      if (!current || !filteredMcp.some((server) => mcpKey(server) === mcpKey(current))) mcpMenu = filteredMcp[0] ?? null;
     } else if (kind === "marketplaces") {
       const current = marketMenu;
       if (!current || !filteredMarkets.some((market) => market.name === current.name))
@@ -535,6 +582,17 @@
               />
             {/each}
           </div>
+        {:else if kind === "mcp" && loaded}
+          <div class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-1.5">
+            {#each mcpFilters as item (item.source ?? "")}
+              <SelectChip
+                label={item.label}
+                count={item.count}
+                selected={item.source === mcpFilter}
+                onclick={() => (mcpFilter = item.source)}
+              />
+            {/each}
+          </div>
         {/if}
         <div class="flex-1"></div>
         <div class="flex shrink-0 items-center">{@render headerActions()}</div>
@@ -570,6 +628,9 @@
         <Plus />
       </TooltipIconButton>
     {:else if kind === "mcp"}
+      <TooltipIconButton label={t("MCP_MANAGE_CLAUDEAI")} onclick={() => openExternal(CLAUDEAI_CONNECTORS)}>
+        <ExternalLink />
+      </TooltipIconButton>
       <TooltipIconButton
         label={t("ADD")}
         onclick={() => {
@@ -669,13 +730,14 @@
                 />
               {/each}
             {:else if kind === "mcp"}
-              {#each filteredMcp as server (server.name)}
+              {#each filteredMcp as server (mcpKey(server))}
                 <ClaudeCard
-                  title={server.name}
+                  title={server.label}
+                  tag={mcpProblem(server)}
                   enabled={server.enabled}
-                  source={server.type}
+                  source={joined(mcpSourceLabel(server.source), server.type)}
                   description={server.detail}
-                  selected={sidePanel && mcpMenu?.name === server.name}
+                  selected={sidePanel && !!mcpMenu && mcpKey(mcpMenu) === mcpKey(server)}
                   onclick={() => (mcpMenu = server)}
                 />
               {/each}
@@ -775,10 +837,10 @@
           </ListRow>
         {/each}
       {:else if kind === "mcp"}
-        {#each filteredMcp as server (server.name)}
+        {#each filteredMcp as server (mcpKey(server))}
           <ListRow
-            title={server.name}
-            subtitle={joined(server.type, server.detail)}
+            title={server.label}
+            subtitle={joined(mcpProblem(server), mcpSourceLabel(server.source), server.type, server.detail)}
             onclick={() => (mcpMenu = server)}
           >
             {#snippet trailing()}
@@ -1252,14 +1314,16 @@
 {/if}
 
 {#snippet mcpSwitch(server: McpServer)}
-  <CompactSwitch
-    checked={server.enabled}
-    enabled={!busy}
-    onCheckedChange={() => {
-      dialogBusy = "toggle";
-      void runAction(() => claudeApi.mcpToggle(server.name, !server.enabled));
-    }}
-  />
+  {#if server.source === MCP_USER_SOURCE}
+    <CompactSwitch
+      checked={server.enabled}
+      enabled={!busy}
+      onCheckedChange={() => {
+        dialogBusy = "toggle";
+        void runAction(() => claudeApi.mcpToggle(server.name, !server.enabled));
+      }}
+    />
+  {/if}
 {/snippet}
 
 {#snippet mcpBody(server: McpServer)}
@@ -1273,19 +1337,21 @@
     <LinearProgress />
   {/if}
   <div class="mt-auto flex flex-col gap-2.5">
-    <ActionButton
-      text={t("DELETE")}
-      enabled={!busy}
-      danger
-      onclick={() => (confirmMcpRemove = server)}
-      class="w-full"
-    />
+    {#if server.source === MCP_USER_SOURCE}
+      <ActionButton
+        text={t("DELETE")}
+        enabled={!busy}
+        danger
+        onclick={() => (confirmMcpRemove = server)}
+        class="w-full"
+      />
+    {/if}
   </div>
 {/snippet}
 
 {#if mcpMenu && !sidePanel}
   {@const server = mcpMenu}
-  <CompactDialog title={server.name} onDismiss={() => { cancelAction(); mcpMenu = null; }}>
+  <CompactDialog title={server.label} onDismiss={() => { cancelAction(); mcpMenu = null; }}>
     {#snippet titleTrailing()}
       {@render mcpSwitch(server)}
     {/snippet}

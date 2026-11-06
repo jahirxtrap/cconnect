@@ -73,10 +73,17 @@ export interface Skill {
 
 export interface McpServer {
   name: string;
+  label: string;
   type: string | null;
   detail: string | null;
   enabled: boolean;
+  source: string;
+  status: string | null;
 }
+
+export const MCP_USER_SOURCE = "user";
+
+export const MCP_NEEDS_AUTH = "needs-auth";
 
 export interface CatalogPlugin {
   name: string;
@@ -310,16 +317,19 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return `${base}/claude/skills/file?skill=${encodeURIComponent(skillId)}${pluginPart}&file=${encodeURIComponent(file)}`;
   },
 
-  async mcp(): Promise<McpServer[] | null> {
-    const data = await client.get<Wire[]>("/claude/mcp");
+  async mcp(cwd: string | null = null): Promise<McpServer[] | null> {
+    const data = await client.get<Wire[]>("/claude/mcp", cwd ? { cwd } : undefined);
     if (!Array.isArray(data)) return null;
     return data
       .filter((item) => item.name)
       .map((item) => ({
         name: item.name,
+        label: item.label || item.name,
         type: item.type ?? null,
         detail: item.detail ?? null,
         enabled: item.enabled !== false,
+        source: item.source || MCP_USER_SOURCE,
+        status: item.status ?? null,
       }));
   },
 

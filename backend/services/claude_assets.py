@@ -2,10 +2,13 @@
 plus the user prompt (USER.md) appended after the system context (CCONNECT.md)."""
 
 import json
+import os
 import re
 from pathlib import Path
 
 from core import paths
+from core.config import DEFAULT_CWD
+from core.display import joined
 from services import claude_manage, cli_settings
 
 _CLAUDE_DIR = Path.home() / ".claude"
@@ -16,6 +19,18 @@ _CHAT_MODS_DIR = _CLAUDE_DIR / "dev-mods"
 _MANIFEST = Path(".claude-plugin") / "plugin.json"
 _HOOKS_FILE = "hooks/hooks.json"
 _PROJECT_KEY_RE = re.compile(r"^[A-Za-z0-9-]+$")
+_CLAUDE_JSON = Path.home() / ".claude.json"
+_SETTINGS_FILE = _CLAUDE_DIR / "settings.json"
+_INSTALLED_PLUGINS = _CLAUDE_DIR / "plugins" / "installed_plugins.json"
+_MCP_USER_SOURCE = "user"
+_MCP_NEEDS_AUTH = "needs-auth"
+_MCP_FILE = ".mcp.json"
+_MCP_AUTH_CACHE = _CLAUDE_DIR / "mcp-needs-auth-cache.json"
+_MCP_TOOL_CHARS = re.compile(r"[^A-Za-z0-9_-]")
+_CLAUDEAI_CONNECTED = "claudeAiMcpEverConnected"
+_CLAUDEAI_PREFIX = "claude.ai "
+
+_tool_labels: tuple[tuple[float, ...], dict[str, str]] = ((), {})
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
 
@@ -89,7 +104,7 @@ def _read_json(path: Path) -> dict:
 
 
 def _enabled_plugins() -> dict:
-    data = _read_json(_CLAUDE_DIR / "settings.json").get("enabledPlugins")
+    data = _read_json(_SETTINGS_FILE).get("enabledPlugins")
     return data if isinstance(data, dict) else {}
 
 
@@ -180,7 +195,7 @@ def _local_plugins(taken: set[str], enabled: dict) -> list[dict]:
 
 
 def list_plugins() -> list[dict]:
-    installed = _read_json(_CLAUDE_DIR / "plugins" / "installed_plugins.json").get("plugins", {})
+    installed = _read_json(_INSTALLED_PLUGINS).get("plugins", {})
     enabled = _enabled_plugins()
     descriptions: dict[str, dict[str, str]] = {}
     items = []
@@ -208,7 +223,7 @@ def plugin_root(plugin: str) -> Path | None:
     name, _, marketplace = plugin.partition("@")
     if marketplace == LOCAL_MARKETPLACE:
         return next((Path(item["install_path"]) for item in _local_plugins(set(), {}) if item["name"] == name), None)
-    installs = _read_json(_CLAUDE_DIR / "plugins" / "installed_plugins.json").get("plugins", {}).get(plugin)
+    installs = _read_json(_INSTALLED_PLUGINS).get("plugins", {}).get(plugin)
     path = installs[0].get("installPath") if isinstance(installs, list) and installs else None
     return Path(path) if path else None
 
@@ -425,20 +440,86 @@ def delete_memory(scope: str, project_key: str, name: str) -> bool:
     return True
 
 
-def list_mcp_servers() -> list[dict]:
-    servers = _read_json(Path.home() / ".claude.json").get("mcpServers", {})
-    items = []
+def _mcp_entry(name: str, label: str, cfg: dict, enabled: bool, source: str, needs_auth: set[str]) -> dict:
+    kind = cfg.get("type") or ("http" if cfg.get("url") else "stdio")
+    detail = cfg.get("url") or " ".join([cfg.get("command", ""), *cfg.get("args", [])]).strip()
+    return {
+        "name": name,
+        "label": label,
+        "type": kind,
+        "detail": detail or None,
+        "enabled": enabled,
+        "source": source,
+        "status": _MCP_NEEDS_AUTH if name in needs_auth else None,
+    }
 
-    def entry(name, cfg, enabled):
-        kind = cfg.get("type") or ("http" if cfg.get("url") else "stdio")
-        detail = cfg.get("url") or " ".join([cfg.get("command", ""), *cfg.get("args", [])]).strip()
-        return {"name": name, "type": kind, "detail": detail or None, "enabled": enabled}
 
-    for name, cfg in servers.items():
-        if isinstance(cfg, dict):
-            items.append(entry(name, cfg, True))
+def _mcp_map(servers: object) -> dict:
+    return {name: cfg for name, cfg in servers.items() if isinstance(cfg, dict)} if isinstance(servers, dict) else {}
+
+
+def _plugin_mcp(root: Path) -> dict:
+    declared = read_manifest(root).get("mcpServers")
+    if isinstance(declared, dict):
+        return _mcp_map(declared)
+    data = _read_json(root / (declared if isinstance(declared, str) else _MCP_FILE))
+    return _mcp_map(data.get("mcpServers", data))
+
+
+def _same_folder(first: str, second: str) -> bool:
+    return os.path.normcase(os.path.normpath(first)) == os.path.normcase(os.path.normpath(second))
+
+
+def _declared_mcp(folder: str) -> list[tuple[str, str, dict, bool, str]]:
+    config = _read_json(_CLAUDE_JSON)
+    projects = config.get("projects")
+    local = next(
+        (entry for key, entry in projects.items() if isinstance(entry, dict) and _same_folder(key, folder)),
+        {},
+    ) if isinstance(projects, dict) else {}
+    skipped = local.get("disabledMcpjsonServers") or []
+    return [
+        *((name, name, cfg, True, _MCP_USER_SOURCE) for name, cfg in _mcp_map(config.get("mcpServers")).items()),
+        *((name, name, cfg, True, "local") for name, cfg in _mcp_map(local.get("mcpServers")).items()),
+        *(
+            (name, name, cfg, name not in skipped, "project")
+            for name, cfg in _mcp_map(_read_json(Path(folder) / _MCP_FILE).get("mcpServers")).items()
+        ),
+        *(
+            (f"plugin:{plugin['name']}:{name}", name if name == plugin["name"] else joined(plugin["name"], name), cfg, True, "plugin")
+            for plugin in list_plugins()
+            if plugin["enabled"] and plugin["install_path"]
+            for name, cfg in _plugin_mcp(Path(plugin["install_path"])).items()
+        ),
+    ]
+
+
+def list_mcp_servers(cwd: str | None = None) -> list[dict]:
+    folder = cwd if cwd and Path(cwd).is_dir() else DEFAULT_CWD
+    needs_auth = set(_read_json(_MCP_AUTH_CACHE))
+    items = [_mcp_entry(*server, needs_auth) for server in _declared_mcp(folder)]
     for name, cfg in claude_manage.disabled_mcp_servers().items():
         if isinstance(cfg, dict) and not any(i["name"] == name for i in items):
-            items.append(entry(name, cfg, False))
+            items.append(_mcp_entry(name, name, cfg, False, _MCP_USER_SOURCE, needs_auth))
     items.sort(key=lambda s: (not s["enabled"], s["name"]))
     return items
+
+
+def _modified(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
+def mcp_tool_labels() -> dict[str, str]:
+    global _tool_labels
+    version = tuple(_modified(path) for path in (_CLAUDE_JSON, _INSTALLED_PLUGINS, _SETTINGS_FILE))
+    if _tool_labels[0] != version:
+        connectors = _read_json(_CLAUDE_JSON).get(_CLAUDEAI_CONNECTED)
+        labels = {_MCP_TOOL_CHARS.sub("_", name): label for name, label, *_ in _declared_mcp(DEFAULT_CWD)}
+        for name in connectors if isinstance(connectors, list) else []:
+            if isinstance(name, str):
+                labels[_MCP_TOOL_CHARS.sub("_", name)] = name.removeprefix(_CLAUDEAI_PREFIX)
+        _tool_labels = (version, labels)
+    return _tool_labels[1]

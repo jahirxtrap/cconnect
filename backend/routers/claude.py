@@ -227,8 +227,8 @@ async def install_skill(body: SkillInstallBody):
 
 
 @router.get("/claude/mcp")
-def get_mcp():
-    return api_response(data=claude_assets.list_mcp_servers())
+def get_mcp(cwd: str | None = None):
+    return api_response(data=claude_assets.list_mcp_servers(cwd))
 
 
 @router.post("/claude/mcp")
