@@ -2,7 +2,7 @@ import { isDesktop } from "$lib/platform";
 
 const OPENED_EVENT = "opened-links";
 
-type Host = { __cconnectLink?: (link: string) => void };
+type Host = { __cconnectOpenLink?: (link: string) => void };
 
 const openedOnDesktop = async (handle: (link: string) => void) => {
   const [{ invoke }, { listen }] = await Promise.all([import("@tauri-apps/api/core"), import("@tauri-apps/api/event")]);
@@ -12,6 +12,6 @@ const openedOnDesktop = async (handle: (link: string) => void) => {
 };
 
 export const listenOpenedLinks = (handle: (link: string) => void) => {
-  (window as unknown as Host).__cconnectLink = handle;
+  (window as unknown as Host).__cconnectOpenLink = handle;
   if (isDesktop) void openedOnDesktop(handle);
 };

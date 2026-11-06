@@ -298,7 +298,7 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
     if subtype == "thinking_tokens" and vis["thinking"] != "off" and vis.get("tokens"):
         tokens = data.get("estimated_tokens")
         return [{"type": "thinking_tokens", "tokens": tokens}] if isinstance(tokens, int) else []
-    if subtype == "hook_response" and data.get("outcome") != "success":
+    if subtype == "hook_response" and data.get("outcome") == "error":
         return [{
             "type": "hook_failed",
             "name": data.get("hook_name"),

@@ -240,7 +240,8 @@ Cursor's `mcp/install` link and the chat's `install` block all go through the on
 `installRequest.ts`, which rejects anything malformed. A link reaches the app from a message
 (`MarkdownText`), from the system on the desktop (`opened.rs`, the same path as an opened
 `.ccpack`; the bundler registers the scheme, so `tauri dev` cannot test it) and on Android
-(`MainActivity` hands it to `window.__cconnectLink`). The web app only takes them inside the
+(`MainActivity` hands it to `window.__cconnectOpenLink`; `__cconnectLink` is the native socket's,
+`BackgroundLink.kt`). The web app only takes them inside the
 chat. Everything ends in `InstallDialog`, which shows what runs, lets the user pick the
 environment and installs through its own `createHttp` for it, since the global `claudeApi`
 always talks to the active one; a pack goes to `packOffers.offerRemote` instead, with the
