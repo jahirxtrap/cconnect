@@ -35,7 +35,10 @@ export interface GitResult {
   ok: boolean;
   output: string;
   head?: string;
+  forbidden?: boolean;
 }
+
+const FORBIDDEN = 403;
 
 export interface CommitRequest {
   repo: string;
@@ -75,6 +78,11 @@ const parseResult = (raw: Wire | null): GitResult => ({
 });
 
 const gitBase = (projectKey: string) => `/git/${encodeURIComponent(projectKey)}`;
+
+const write = async (client: HttpClient, path: string, body: unknown): Promise<GitResult> => {
+  const answer = await client.call<Wire>("POST", path, undefined, body);
+  return { ...parseResult(answer.data), forbidden: answer.status === FORBIDDEN };
+};
 
 export const createGitApi = (client: HttpClient) => ({
   async repos(projectKey: string): Promise<GitRepo[] | null> {
@@ -117,20 +125,20 @@ export const createGitApi = (client: HttpClient) => ({
     return data?.message ?? "";
   },
 
-  async commit(projectKey: string, request: CommitRequest): Promise<GitResult> {
-    return parseResult(await client.post<Wire>(`${gitBase(projectKey)}/commit`, request));
+  commit(projectKey: string, request: CommitRequest): Promise<GitResult> {
+    return write(client, `${gitBase(projectKey)}/commit`, request);
   },
 
-  async revert(projectKey: string, repo: string, paths: string[]): Promise<GitResult> {
-    return parseResult(await client.post<Wire>(`${gitBase(projectKey)}/revert`, { repo, paths }));
+  revert(projectKey: string, repo: string, paths: string[]): Promise<GitResult> {
+    return write(client, `${gitBase(projectKey)}/revert`, { repo, paths });
   },
 
-  async pull(projectKey: string, repo: string): Promise<GitResult> {
-    return parseResult(await client.post<Wire>(`${gitBase(projectKey)}/pull`, { repo }));
+  pull(projectKey: string, repo: string): Promise<GitResult> {
+    return write(client, `${gitBase(projectKey)}/pull`, { repo });
   },
 
-  async push(projectKey: string, repo: string, force = false, upstream = false): Promise<GitResult> {
-    return parseResult(await client.post<Wire>(`${gitBase(projectKey)}/push`, { repo, force, upstream }));
+  push(projectKey: string, repo: string, force = false, upstream = false): Promise<GitResult> {
+    return write(client, `${gitBase(projectKey)}/push`, { repo, force, upstream });
   },
 });
 

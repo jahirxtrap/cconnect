@@ -11,16 +11,15 @@ its own.
 - **Caddy** (or nginx, or any reverse proxy) — the `expose caddy` mode. Unlike
   the rest of this list it isn't a binary you install and forget: it's a service
   you configure and leave running, and CConnect never starts or stops it.
-- **git** — the Claude screen clones plugin marketplaces with it. The backend
-  never calls it directly; the CLI does, which is why it's easy to miss.
-- **unrar** and **rar** — reading and writing `.rar` in the file manager, one
-  binary each. On Windows, WinRAR provides both and the backend finds them under
-  `Program Files` without touching `PATH`; on Debian and Ubuntu they're the
-  `unrar` and `rar` packages (`unrar-free` is a limited reimplementation and
-  chokes on recent archives); on macOS, Homebrew's `rar` formula covers both.
-  Every other format the file manager offers works out of the box.
-- **Ookla speedtest** — the speed test in Monitor → Network, which otherwise
-  reports the CLI as unavailable.
+- **git** — the Claude screen clones plugin marketplaces with it, and Project
+  files shows a repository's changes, diffs and commits through it. Without it
+  that view says git is missing on the server.
+- **rar** — compressing to `.rar` in the file manager. On Windows, WinRAR
+  provides it and the backend finds it under `Program Files` without touching
+  `PATH`; on Debian and Ubuntu it's the `rar` package; on macOS, Homebrew's
+  `rar` formula. Opening and extracting `.rar` needs nothing: the backend reads
+  them through the 7-Zip binary its `py7zz` dependency ships, and every other
+  format the file manager offers works out of the box.
 - **Node.js** — the ACP agents the catalog ships as npm packages. Python ones
   install with **uv** when it is on the `PATH`, which also fetches the Python
   version they ask for, and with pip otherwise; binaries need neither.

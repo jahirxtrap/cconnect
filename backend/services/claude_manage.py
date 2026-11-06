@@ -336,7 +336,7 @@ def mcp_remove(name: str) -> dict:
     store = _disabled_store()
     if name in store:
         store.pop(name)
-        paths.MCP_DISABLED_FILE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+        files.write_json(paths.MCP_DISABLED_FILE, store)
         return {"ok": True, "message": ""}
     return _shared(_run(["mcp", "remove", name]))
 
@@ -363,7 +363,7 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
         result = _run(["mcp", "add-json", "-s", "user", name, json.dumps(cfg)])
         if result["ok"]:
             store.pop(name, None)
-            paths.MCP_DISABLED_FILE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+            files.write_json(paths.MCP_DISABLED_FILE, store)
         return _shared(result)
     try:
         servers = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8")).get("mcpServers", {})
@@ -375,5 +375,5 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
     result = _run(["mcp", "remove", name])
     if result["ok"]:
         store[name] = cfg
-        paths.MCP_DISABLED_FILE.write_text(json.dumps(store, indent=2), encoding="utf-8")
+        files.write_json(paths.MCP_DISABLED_FILE, store)
     return _shared(result)

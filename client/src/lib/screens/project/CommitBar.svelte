@@ -9,7 +9,7 @@
   import { joined } from "$lib/data/format";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
-  import { gitApi, type GitIdentity, type GitRepo } from "$lib/services/gitApi";
+  import { gitApi, type GitIdentity, type GitRepo, type GitResult } from "$lib/services/gitApi";
   import Button from "$lib/ui/Button.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
@@ -96,13 +96,13 @@
     });
   });
 
-  const guard = async (name: string, action: () => Promise<{ ok: boolean; output: string }>) => {
+  const guard = async (name: string, action: () => Promise<GitResult>) => {
     running = name;
     failure = "";
     const result = await action();
     running = "";
     if (result.ok) onDone();
-    else failure = result.output || t("GIT_FAILED");
+    else failure = result.forbidden ? t("SECURITY_KEY_REJECTED") : result.output || t("GIT_FAILED");
     return result.ok;
   };
 

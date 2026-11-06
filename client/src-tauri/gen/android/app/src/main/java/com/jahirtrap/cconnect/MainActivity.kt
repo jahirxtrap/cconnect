@@ -40,7 +40,7 @@ class MainActivity : TauriActivity() {
   override val handleBackNavigation = false
 
   private lateinit var downloads: Downloads
-  private val installer by lazy { Installer(this) }
+  private val installer by lazy { Installer(this) { content } }
   private val dictation by lazy { Dictation(this) { content } }
   private val narrator = lazy { Speech(this) { content } }
   private var pendingSave: Triple<String, String, String>? = null
@@ -102,7 +102,7 @@ class MainActivity : TauriActivity() {
     dropWebViewExperiments()
     enableEdgeToEdge()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
-    downloads = Downloads(this) { url, filename, headers ->
+    downloads = Downloads(this, { content }) { url, filename, headers ->
       pendingSave = Triple(url, filename, headers)
       createDocument.launch(filename)
     }

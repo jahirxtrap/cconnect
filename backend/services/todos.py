@@ -10,6 +10,7 @@ import json
 from loguru import logger
 
 from core import paths
+from services import files
 
 _MAX_SESSIONS = 50
 
@@ -29,7 +30,7 @@ def _load() -> dict[str, list[dict]]:
 
 def _save() -> None:
     try:
-        paths.TODOS_FILE.write_text(json.dumps(_load(), ensure_ascii=False), encoding="utf-8")
+        files.write_json(paths.TODOS_FILE, _load())
     except OSError:
         logger.warning("could not persist session todos")
 

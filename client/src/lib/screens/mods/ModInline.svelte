@@ -43,6 +43,8 @@
   const columns = $derived(grid.columns);
   const shown = $derived(drawing?.props ?? props);
   const site = $derived({ component, instanceId });
+  const sent = $derived(JSON.stringify($state.snapshot(props)));
+  const surface = $derived(mods.state.surface);
 
   provideGrid(() => grid);
 
@@ -58,8 +60,8 @@
   });
 
   $effect(() => {
-    if (!seen || !columns || !mods.state.surface) return;
-    return mods.mount({ component, instanceId, props: $state.snapshot(props), columns, rows: 1, offset: 0 });
+    if (!seen || !columns || !surface) return;
+    return mods.mount({ component, instanceId, props: JSON.parse(sent), columns, rows: 1, offset: 0 });
   });
 </script>
 

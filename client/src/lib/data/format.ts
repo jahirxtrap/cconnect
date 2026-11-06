@@ -1,4 +1,4 @@
-import { i18n, plural } from "$lib/i18n/index.svelte";
+import { localized, plural } from "$lib/i18n/index.svelte";
 import { MILLIS_PER_MINUTE, MILLIS_PER_SECOND } from "./time";
 
 const SIZE_UNITS = ["KB", "MB", "GB", "TB"];
@@ -35,22 +35,19 @@ export const formatTokens = (value: number): string => {
 
 type DurationUnit = "millisecond" | "second" | "minute";
 
-const unitFormats = new Map<string, Intl.NumberFormat>();
+export const formatUnit = (value: number, unit: DurationUnit, decimals = 0): string =>
+  localized(
+    `unit:${unit}:${decimals}`,
+    (locale) =>
+      new Intl.NumberFormat(locale, { style: "unit", unit, unitDisplay: "short", maximumFractionDigits: decimals }),
+  ).format(value);
 
-const formatUnit = (value: number, unit: DurationUnit, decimals = 0): string => {
-  const key = `${i18n.resolved}:${unit}:${decimals}`;
-  let format = unitFormats.get(key);
-  if (!format) {
-    format = new Intl.NumberFormat(i18n.resolved, {
-      style: "unit",
-      unit,
-      unitDisplay: "short",
-      maximumFractionDigits: decimals,
-    });
-    unitFormats.set(key, format);
-  }
-  return format.format(value);
-};
+const collator = (key: string, options: Intl.CollatorOptions) =>
+  localized(`collator:${key}`, (locale) => new Intl.Collator(locale, options));
+
+export const compareText = (a: string, b: string): number => collator("text", {}).compare(a, b);
+
+export const compareNames = (a: string, b: string): number => collator("name", { sensitivity: "base" }).compare(a, b);
 
 export const formatDuration = (millis: number): string => {
   if (millis < MILLIS_PER_SECOND) return formatUnit(Math.round(millis), "millisecond");
@@ -70,7 +67,8 @@ export const formatDays = (days: number): string => {
   return parts.join(" ");
 };
 
-export const formatList = (items: readonly string[]): string => new Intl.ListFormat().format(items);
+export const formatList = (items: readonly string[]): string =>
+  localized("list", (locale) => new Intl.ListFormat(locale)).format(items);
 
 export const linesOf = (text: string): string[] =>
   text
@@ -83,7 +81,10 @@ const MASK_LENGTH = 12;
 export const masked = (length = MASK_LENGTH): string => "•".repeat(Math.min(length, MASK_LENGTH));
 
 export const formatDecimal = (value: number, decimals: number, minimum = decimals): string =>
-  value.toLocaleString(undefined, { minimumFractionDigits: minimum, maximumFractionDigits: decimals });
+  localized(
+    `decimal:${decimals}:${minimum}`,
+    (locale) => new Intl.NumberFormat(locale, { minimumFractionDigits: minimum, maximumFractionDigits: decimals }),
+  ).format(value);
 
 export const formatSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -102,7 +103,9 @@ export const usageRatio = (used: number, limit: number): number =>
 export const formatPercent = (ratio: number): string => `${Math.round(ratio * PERCENT)}%`;
 
 export const formatCurrency = (amount: number, currency: string): string =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency }).format(amount);
+  localized(`currency:${currency}`, (locale) => new Intl.NumberFormat(locale, { style: "currency", currency })).format(
+    amount,
+  );
 
 export const formatUsage = (used: number, limit: number, unit: (value: number) => string): string =>
   joined(`${unit(used)} / ${unit(limit)}`, formatPercent(usageRatio(used, limit)));

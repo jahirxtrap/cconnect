@@ -53,6 +53,7 @@ export class AgentSessionList {
       const current = chat();
       return current?.agent && current.environment ? agentSessionsFor(current.environment, current.agent, folder()) : null;
     });
+    $effect(() => this.watch?.watch());
     this.sessions = $derived(this.watch?.sessions ?? null);
     this.failed = $derived(this.watch?.failed ?? false);
     this.signedOut = $derived(this.watch?.signedOut ?? false);

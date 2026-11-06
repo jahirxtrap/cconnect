@@ -103,6 +103,8 @@ BROWSER_DEBUG_PORT = int(os.environ.get("BROWSER_DEBUG_PORT", "9333"))
 BROWSER_HEADLESS = os.environ.get("BROWSER_HEADLESS", "1") not in ("0", "false", "False")
 BROWSER_QUALITY = max(20, min(95, int(os.environ.get("BROWSER_QUALITY", "70"))))
 
+CONTRACT_CHECK = os.environ.get("CCONNECT_CONTRACT_CHECK") == "1"
+
 __all__ = [
     "PORT",
     "SERVER_VERSION",
@@ -123,4 +125,5 @@ __all__ = [
     "BROWSER_DEBUG_PORT",
     "BROWSER_HEADLESS",
     "BROWSER_QUALITY",
+    "CONTRACT_CHECK",
 ]

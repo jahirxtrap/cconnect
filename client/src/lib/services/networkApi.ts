@@ -50,7 +50,7 @@ export interface SpeedtestResult {
 export interface SpeedtestHandlers {
   onProgress: (stage: string, progress: number) => void;
   onResult: (result: SpeedtestResult) => void;
-  onFailed: (message: string) => void;
+  onFailed: (message: string | null) => void;
 }
 
 type Wire = Record<string, any>;
@@ -135,12 +135,19 @@ export const createNetworkApi = (client: HttpClient, profile: () => Profile) => 
     return (await client.post("/network/auth", { password })) !== null;
   },
 
-  async job(id: string): Promise<NetworkJob | null> {
-    const data = await client.get<Wire>(`/network/job/${id}`);
+  async settledJob(id: string): Promise<NetworkJob | null> {
+    const data = await client.get<Wire>(`/network/job/${id}`, { settled: true });
     return data && parseJob(data);
   },
 
   speedtest(handlers: SpeedtestHandlers): ReconnectingSocket {
+    let ended = false;
+    const end = (report: () => void) => {
+      if (ended) return;
+      ended = true;
+      socket.close();
+      report();
+    };
     const socket = new ReconnectingSocket(
       "/network/speedtest/ws",
       {
@@ -148,18 +155,21 @@ export const createNetworkApi = (client: HttpClient, profile: () => Profile) => 
           if (message.type === "progress") {
             handlers.onProgress((message.stage as string) ?? "", (message.progress as number) ?? 0);
           } else if (message.type === "result") {
-            handlers.onResult({
-              download: (message.download as number) ?? null,
-              upload: (message.upload as number) ?? null,
-              ping: (message.ping as number) ?? null,
-              jitter: (message.jitter as number) ?? null,
-              server: (message.server as string) ?? null,
-              isp: (message.isp as string) ?? null,
-            });
+            end(() =>
+              handlers.onResult({
+                download: (message.download as number) ?? null,
+                upload: (message.upload as number) ?? null,
+                ping: (message.ping as number) ?? null,
+                jitter: (message.jitter as number) ?? null,
+                server: (message.server as string) ?? null,
+                isp: (message.isp as string) ?? null,
+              }),
+            );
           } else if (message.type === "error") {
-            handlers.onFailed((message.message as string) ?? "");
+            end(() => handlers.onFailed((message.message as string) || null));
           }
         },
+        onDrop: () => end(() => handlers.onFailed(null)),
       },
       profile,
     );

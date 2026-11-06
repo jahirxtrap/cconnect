@@ -5,7 +5,7 @@ from email.utils import formatdate
 from http import HTTPStatus
 from math import ceil
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 import orjson
 from fastapi import Request
@@ -16,15 +16,38 @@ from starlette.staticfiles import NotModifiedResponse
 FILE_HEADERS = {"Content-Encoding": "identity", "Cache-Control": "no-cache"}
 
 
-def image_response(media_type: str, data: bytes, source: Path) -> Response:
-    modified = formatdate(os.stat(source).st_mtime, usegmt=True)
-    return Response(data, media_type=media_type, headers={**FILE_HEADERS, "Last-Modified": modified})
+def _held(request: Request, etag: str) -> bool:
+    return etag in [tag.strip(" W/") for tag in request.headers.get("if-none-match", "").split(",")]
+
+
+Render = Callable[[], Optional[tuple[str, bytes]]]
+
+
+def _rendered(request: Request, headers: dict[str, str], render: Render) -> Optional[Response]:
+    if _held(request, headers["ETag"]):
+        return NotModifiedResponse(headers)
+    made = render()
+    if made is None:
+        return None
+    media_type, data = made
+    return Response(data, media_type=media_type, headers=headers)
+
+
+def derived_response(request: Request, source: Path, variant: str, render: Render) -> Optional[Response]:
+    """A file made from `source`, answered 304 without making it again while the browser holds this version; None when it cannot be made."""
+    stat = os.stat(source)
+    etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}-{variant}"'
+    return _rendered(request, {**FILE_HEADERS, "ETag": etag, "Last-Modified": formatdate(stat.st_mtime, usegmt=True)}, render)
+
+
+def fixed_response(request: Request, name: str, render: Render) -> Optional[Response]:
+    """Content that never changes under its name, answered 304 without reading it while the browser holds it."""
+    return _rendered(request, {**FILE_HEADERS, "ETag": f'"{name}"'}, render)
 
 
 def file_response(request: Request, path: Path, **options: Any) -> Response:
     response = FileResponse(path, stat_result=os.stat(path), headers=FILE_HEADERS, **options)
-    held = request.headers.get("if-none-match", "")
-    if response.headers["etag"] in [tag.strip(" W/") for tag in held.split(",")]:
+    if _held(request, response.headers["etag"]):
         return NotModifiedResponse(response.headers)
     return response
 

@@ -1,5 +1,8 @@
+import { Recent } from "$lib/data/recent";
 import type { GitRepo } from "$lib/services/gitApi";
 import type { ProjectEntry } from "$lib/services/projectFilesApi";
+
+const REMEMBERED = 20;
 
 export interface ProjectPosition {
   children: Record<string, ProjectEntry[]>;
@@ -12,7 +15,7 @@ export interface ProjectPosition {
   locked: boolean;
 }
 
-const positions = new Map<string, ProjectPosition>();
+const positions = new Recent<string, ProjectPosition>(REMEMBERED);
 
 export const recallProject = (slot: string): ProjectPosition | undefined => positions.get(slot);
 

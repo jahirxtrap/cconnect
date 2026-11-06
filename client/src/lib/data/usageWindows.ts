@@ -1,4 +1,5 @@
 import { t } from "$lib/i18n/index.svelte";
+import { list as listOf, number as numberOf, text as textOf, type Wire } from "./wire";
 
 export const ALERT_PERCENT = 90;
 
@@ -68,15 +69,6 @@ export const usageErrorText = (usage: Usage | null): string | null => {
   const key = usage.reason ? USAGE_REASONS[usage.reason] : undefined;
   return key ? t(key) : usage.error;
 };
-
-type Wire = Record<string, unknown>;
-
-const textOf = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
-
-const numberOf = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
-
-const listOf = (raw: Wire, key: string): Wire[] =>
-  Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is Wire => !!item && typeof item === "object") : [];
 
 export const usageOf = (data: Wire): Usage => ({
   plan: textOf(data, "plan"),

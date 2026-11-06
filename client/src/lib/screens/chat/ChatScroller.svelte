@@ -124,8 +124,8 @@
     let block: HTMLElement | null = null;
     for (let node = edge === undefined ? null : firstVisible(); node; node = node.nextElementSibling as HTMLElement | null) {
       const candidate = node.querySelector<HTMLElement>("[data-block]");
+      if ((candidate ?? node).getBoundingClientRect().top - (edge ?? 0) >= 0) break;
       if (!candidate) continue;
-      if (candidate.getBoundingClientRect().top - (edge ?? 0) >= 0) break;
       if (!candidate.querySelector("[data-block-body]")) continue;
       row = node;
       block = candidate;

@@ -165,8 +165,8 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
     return data ? usageOf(data) : null;
   },
 
-  async status(force = false): Promise<ServiceStatus | null> {
-    const data = await client.get<Wire>("/claude/status", force ? { force: true } : undefined);
+  async status(): Promise<ServiceStatus | null> {
+    const data = await client.get<Wire>("/claude/status");
     if (!data) return null;
     return {
       indicator: data.indicator ?? "none",

@@ -79,6 +79,7 @@
   "PREVIOUS_FILE": "Предыдущий файл",
   "NO_CHANGES": "Нет изменений",
   "NOT_A_REPOSITORY": "Это не репозиторий Git",
+  "GIT_MISSING": "Git не установлен на сервере",
   "UNLOCK": "Разблокировать",
   "GIT_COMMIT": "Commit",
   "GIT_COMMIT_PUSH": "Commit и push",

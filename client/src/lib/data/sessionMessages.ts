@@ -9,6 +9,7 @@ import {
   type InteractionData,
   type Role,
 } from "./chatModels";
+import { list, number, text, type Wire } from "./wire";
 
 type MessageFields =
   | "role"
@@ -36,12 +37,6 @@ export interface SessionMessage extends Pick<ChatMessage, MessageFields> {
   index: number;
   parent: string | null;
 }
-
-type Wire = Record<string, unknown>;
-
-const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
-const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
-const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
 
 const ROLES: Record<string, Role> = {
   thinking: "thinking",
@@ -122,7 +117,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
   const images = list(raw, "images")
     .map((image) => {
       const uuid = text(image, "uuid");
-      const index = int(image, "index");
+      const index = number(image, "index");
       return uuid !== null && index !== null ? `${uuid}/${index}` : null;
     })
     .filter((image): image is string => image !== null);
@@ -147,13 +142,13 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
       type === "compact"
         ? {
             trigger: text(raw, "trigger"),
-            preTokens: int(raw, "pre_tokens"),
-            postTokens: int(raw, "post_tokens"),
+            preTokens: number(raw, "pre_tokens"),
+            postTokens: number(raw, "post_tokens"),
             summary: text(raw, "summary") ?? "",
           }
         : null,
-    thinkingTokens: type === "thinking" ? int(raw, "tokens") : null,
-    toolMs: int(raw, "ms"),
+    thinkingTokens: type === "thinking" ? number(raw, "tokens") : null,
+    toolMs: number(raw, "ms"),
     agentRun: type === "agent" ? agentRunOf(raw) : null,
     agentResult: (() => {
       const done = raw.agent_result;
@@ -161,16 +156,16 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
       const fields = done as Wire;
       return {
         status: text(fields, "status"),
-        durationMs: int(fields, "duration_ms"),
-        tokens: int(fields, "tokens"),
-        toolUses: int(fields, "tool_uses"),
+        durationMs: number(fields, "duration_ms"),
+        tokens: number(fields, "tokens"),
+        toolUses: number(fields, "tool_uses"),
       };
     })(),
-    index: int(raw, "index") ?? -1,
+    index: number(raw, "index") ?? -1,
     labelOnly: raw.label === true,
     result: text(raw, RESULT_FIELD[type ?? ""] ?? "result"),
     images: images.length ? images : null,
-    timestamp: int(raw, "ts"),
+    timestamp: number(raw, "ts"),
     parent: text(raw, "parent"),
     toolUseId: text(raw, "id"),
     uuid: text(raw, "uuid"),

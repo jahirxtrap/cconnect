@@ -1,6 +1,9 @@
+import { Recent } from "$lib/data/recent";
 import type { SharedEntry } from "$lib/services/sharedApi";
 
-const listings = new Map<string, SharedEntry[]>();
+const REMEMBERED = 50;
+
+const listings = new Recent<string, SharedEntry[]>(REMEMBERED);
 
 export const recallShared = (slot: string): SharedEntry[] | undefined => listings.get(slot);
 

@@ -2,12 +2,10 @@
 
 import shutil
 from pathlib import Path
-from typing import Optional
 from urllib.parse import quote
 
 from claude_agent_sdk import tool
 
-from core import paths
 from core.config import SHARED_SCHEME
 from services import sessions, shared, shared_links
 
@@ -62,6 +60,10 @@ def listing(args: dict, project_key: str) -> list[dict]:
             shown = shared_links.visible_name(shown)
         entries.append({"name": shown, "url": _link(project_key, shared_links.link_name(shown) if linked else shown)})
     return entries
+
+
+def needs_key(name: str, args: dict) -> bool:
+    return name == TOOL and args.get("link") is True
 
 
 def _text(message: str) -> dict:

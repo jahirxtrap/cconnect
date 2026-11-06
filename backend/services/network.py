@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import ctypes
 import json
 import re
 import subprocess
 import sys
 import time
 import uuid
-from typing import Callable, Optional
+from contextlib import AsyncExitStack, asynccontextmanager, suppress
+from typing import AsyncIterator, Callable, Optional
 
 import psutil
+from loguru import logger
 
 from core import paths
+from services import files
 
 _WINDOWS = sys.platform == "win32"
 _LINUX = sys.platform.startswith("linux")
@@ -23,14 +27,87 @@ WIRED_CONTROL = _LINUX
 
 _PROBE_URLS = ("http://www.gstatic.com/generate_204", "http://detectportal.firefox.com/success.txt")
 _SETTLE_TIMEOUT = 25.0
-_WATCHDOG_INTERVAL = 5.0
 _OFFLINE_GRACE = 45.0
+_JOB_DEADLINE = 4 * _SETTLE_TIMEOUT
 _SSID_RE = re.compile(r"^\s*SSID\s+\d+\s*:\s*(.*)$")
 _PERCENT_RE = re.compile(r"(\d{1,3})\s*%")
 
 _sudo_password: Optional[str] = None
 _jobs: dict[str, dict] = {}
+_settled: dict[str, asyncio.Event] = {}
 _rates: dict[str, tuple[float, int, int]] = {}
+
+
+class _ConnectivityHint(ctypes.Structure):
+    _fields_ = [
+        ("level", ctypes.c_int),
+        ("cost", ctypes.c_int),
+        ("approaching_data_limit", ctypes.c_ubyte),
+        ("over_data_limit", ctypes.c_ubyte),
+        ("roaming", ctypes.c_ubyte),
+    ]
+
+
+if _WINDOWS:
+    from ctypes import wintypes
+
+    _HINT_CALLBACK = ctypes.WINFUNCTYPE(None, ctypes.c_void_p, _ConnectivityHint)
+
+
+def _hint_api():
+    library = ctypes.WinDLL("iphlpapi")
+    register = library.NotifyNetworkConnectivityHintChange
+    register.argtypes = [_HINT_CALLBACK, ctypes.c_void_p, wintypes.BOOLEAN, ctypes.POINTER(wintypes.HANDLE)]
+    register.restype = wintypes.ULONG
+    cancel = library.CancelMibChangeNotify2
+    cancel.argtypes = [wintypes.HANDLE]
+    return register, cancel
+
+
+@asynccontextmanager
+async def _windows_changes(queue: asyncio.Queue) -> AsyncIterator[None]:
+    loop = asyncio.get_running_loop()
+    register, cancel = _hint_api()
+    callback = _HINT_CALLBACK(lambda _context, _hint: loop.call_soon_threadsafe(queue.put_nowait, None))
+    handle = wintypes.HANDLE()
+    if register(callback, None, False, ctypes.byref(handle)) != 0:
+        raise OSError("connectivity notifications refused")
+    try:
+        yield
+    finally:
+        cancel(handle)
+
+
+@asynccontextmanager
+async def _linux_changes(queue: asyncio.Queue) -> AsyncIterator[None]:
+    process = await asyncio.create_subprocess_exec(
+        "nmcli", "monitor", stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+    )
+
+    async def pump() -> None:
+        async for _ in process.stdout:
+            queue.put_nowait(None)
+
+    reader = asyncio.create_task(pump())
+    try:
+        yield
+    finally:
+        reader.cancel()
+        if process.returncode is None:
+            process.kill()
+        await process.wait()
+
+
+@asynccontextmanager
+async def connectivity_changes() -> AsyncIterator[asyncio.Queue]:
+    """A queue that gets an item each time the system reports a change in the host's connectivity."""
+    queue: asyncio.Queue = asyncio.Queue()
+    async with AsyncExitStack() as stack:
+        try:
+            await stack.enter_async_context(_windows_changes(queue) if _WINDOWS else _linux_changes(queue))
+        except (OSError, AttributeError) as exc:
+            logger.error(f"network changes cannot be followed, so a lost connection is only noticed when asked: {exc}")
+        yield queue
 
 
 def set_sudo_password(password: Optional[str]) -> None:
@@ -423,9 +500,10 @@ def _restore_state(state: dict) -> None:
 
 def _persist_good(state: dict) -> None:
     try:
-        paths.NETWORK_STATE_FILE.write_text(json.dumps(state), encoding="utf-8")
+        files.write_json(paths.NETWORK_STATE_FILE, state)
     except OSError:
-        pass
+        return
+    watchdog.arm()
 
 
 def last_good_state() -> Optional[dict]:
@@ -435,16 +513,35 @@ def last_good_state() -> Optional[dict]:
         return None
 
 
+async def _next_change(changes: asyncio.Queue, timeout: Optional[float]) -> None:
+    try:
+        await asyncio.wait_for(changes.get(), timeout)
+    except asyncio.TimeoutError:
+        return
+
+
 async def _wait_online(timeout: float) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if await asyncio.to_thread(online):
-            return True
-        await asyncio.sleep(2)
-    return False
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    async with connectivity_changes() as changes:
+        while not await asyncio.to_thread(online):
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return False
+            await _next_change(changes, remaining)
+    return True
 
 
 def job(job_id: str) -> Optional[dict]:
+    return _jobs.get(job_id)
+
+
+async def settled_job(job_id: str) -> Optional[dict]:
+    """The job once it is no longer running, or as it stands when the longest a job takes runs out."""
+    settled = _settled.get(job_id)
+    if settled is not None:
+        with suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(settled.wait(), _JOB_DEADLINE)
     return _jobs.get(job_id)
 
 
@@ -470,6 +567,7 @@ async def run_guarded(action: str, apply_fn: Callable[[], dict], *, kind: str = 
         return {"id": job_id, "status": "blocked", "message": blocked}
     before = await asyncio.to_thread(capture_state)
     _jobs[job_id] = {"id": job_id, "action": action, "status": "running", "started": time.time()}
+    _settled[job_id] = asyncio.Event()
 
     async def _task() -> None:
         try:
@@ -486,49 +584,64 @@ async def run_guarded(action: str, apply_fn: Callable[[], dict], *, kind: str = 
             _jobs[job_id] |= {"status": "rolled_back", "recovered": recovered}
         except Exception as exc:
             _jobs[job_id] |= {"status": "failed", "message": str(exc)}
+        finally:
+            _settled[job_id].set()
+            watchdog.recheck()
 
     asyncio.get_running_loop().create_task(_task())
     return _jobs[job_id]
 
 
+def _switching() -> bool:
+    return any(entry.get("status") == "running" for entry in _jobs.values())
+
+
 class NetworkWatchdog:
     def __init__(self) -> None:
         self._task: Optional[asyncio.Task] = None
-        self._offline_since: Optional[float] = None
+        self._changes: Optional[asyncio.Queue] = None
 
     async def start(self) -> None:
-        if self._task is not None or not SUPPORTED:
-            return
-        self._task = asyncio.get_running_loop().create_task(self._loop())
+        if last_good_state() is not None:
+            self.arm()
+
+    def arm(self) -> None:
+        if SUPPORTED and (self._task is None or self._task.done()):
+            self._task = asyncio.get_running_loop().create_task(self._watch())
+
+    def recheck(self) -> None:
+        if self._changes is not None:
+            self._changes.put_nowait(None)
 
     def stop(self) -> None:
         if self._task is not None:
             self._task.cancel()
             self._task = None
 
-    async def _loop(self) -> None:
-        while True:
+    async def _watch(self) -> None:
+        loop = asyncio.get_running_loop()
+        offline_since: Optional[float] = None
+        async with connectivity_changes() as changes:
+            self._changes = changes
             try:
-                await asyncio.sleep(_WATCHDOG_INTERVAL)
-                if any(j.get("status") == "running" for j in _jobs.values()):
-                    continue
-                if await asyncio.to_thread(online):
-                    self._offline_since = None
-                    continue
-                now = time.monotonic()
-                if self._offline_since is None:
-                    self._offline_since = now
-                    continue
-                if now - self._offline_since < _OFFLINE_GRACE:
-                    continue
-                self._offline_since = None
-                state = last_good_state()
-                if state:
-                    await asyncio.to_thread(_restore_state, state)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                continue
+                while True:
+                    wait = None
+                    if _switching() or await asyncio.to_thread(online):
+                        offline_since = None
+                    else:
+                        offline_since = loop.time() if offline_since is None else offline_since
+                        wait = _OFFLINE_GRACE - (loop.time() - offline_since)
+                        if wait <= 0:
+                            offline_since, wait = None, None
+                            state = last_good_state()
+                            if state:
+                                await asyncio.to_thread(_restore_state, state)
+                            continue
+                    await _next_change(changes, wait)
+            except Exception as exc:
+                logger.error(f"network watchdog stopped, a lost connection is no longer rolled back: {type(exc).__name__}: {exc}")
+            finally:
+                self._changes = None
 
 
 watchdog = NetworkWatchdog()

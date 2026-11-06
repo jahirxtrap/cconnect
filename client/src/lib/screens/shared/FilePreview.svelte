@@ -203,12 +203,19 @@
       return;
     }
     failed = false;
+    let active = true;
     void fetchFile(target)
       .then(async (response) => {
         if (!response.ok) throw new Error(String(response.status));
-        arrived = { base: requested, name, body: await response.text() };
+        const body = await response.text();
+        if (active) arrived = { base: requested, name, body };
       })
-      .catch(() => (failed = true));
+      .catch(() => {
+        if (active) failed = true;
+      });
+    return () => {
+      active = false;
+    };
   });
 
   $effect(() => {

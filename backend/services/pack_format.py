@@ -14,14 +14,14 @@ MANIFEST: str = SCHEMA["manifest"]
 EXTENSION: str = SCHEMA["extension"]
 MIME: str = SCHEMA["mime"]
 
-_COLOR = re.compile(r"^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
-_LOCAL_ID = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_FONT_STYLE = re.compile(r"^[a-z ]*$", re.IGNORECASE)
-_MANIFEST_FIELDS = {"schema", "id", "name", "version", "author", "contributors", "description", "preview", "use"}
-_THEME_FIELDS = {"name", "kind", "extends", "accent", "syntax", "colors"}
-_TERMINAL_FIELDS = {"name", "colors"}
-_ACCENT_FIELDS = {"id", "name", "color"}
-_BACKGROUND_FIELDS = {"name", "fit", *SCHEMA["backgroundEffects"]}
+_COLOR = re.compile(SCHEMA["patterns"]["color"])
+_LOCAL_ID = re.compile(SCHEMA["patterns"]["localId"])
+_FONT_STYLE = re.compile(SCHEMA["patterns"]["fontStyle"])
+_MANIFEST_FIELDS = set(SCHEMA["fields"]["manifest"])
+_THEME_FIELDS = set(SCHEMA["fields"]["theme"])
+_TERMINAL_FIELDS = set(SCHEMA["fields"]["terminal"])
+_ACCENT_FIELDS = set(SCHEMA["fields"]["accent"])
+_BACKGROUND_FIELDS = {*SCHEMA["fields"]["background"], *SCHEMA["backgroundEffects"]}
 _ACCENTS_FILE = "accents.json"
 _FONT_DEPTH = 4
 
@@ -133,7 +133,7 @@ def _text(fields: dict, key: str, path: str, required: bool = False):
 
 
 def _color(value, path: str, key: str):
-    if not isinstance(value, str) or not _COLOR.match(value):
+    if not isinstance(value, str) or not _COLOR.fullmatch(value):
         raise PackFormatError("color", path, key, str(value))
 
 
@@ -176,7 +176,7 @@ def _manifest(archive: _Archive) -> dict:
         raise PackFormatError("schema", str(schema))
     name = _text(fields, "name", MANIFEST, required=True)
     pack_id = _text(fields, "id", MANIFEST) or slug(name)
-    if not _LOCAL_ID.match(pack_id):
+    if not _LOCAL_ID.fullmatch(pack_id):
         raise PackFormatError("field", MANIFEST, "id")
     if pack_id in BUILTIN_IDS:
         raise PackFormatError("reserved", pack_id)
@@ -250,7 +250,7 @@ def _syntax_colors(value, path: str, key: str):
         return
     for field, entry in value.items():
         if field == "fontStyle":
-            if not isinstance(entry, str) or not _FONT_STYLE.match(entry):
+            if not isinstance(entry, str) or not _FONT_STYLE.fullmatch(entry):
                 raise PackFormatError("field", path, f"{key}.{field}")
         elif isinstance(entry, str):
             _color(entry, path, f"{key}.{field}")
@@ -284,7 +284,7 @@ def _accents(archive: _Archive) -> set[str]:
         _only(entry, _ACCENT_FIELDS, path)
         name = _text(entry, "name", path, required=True)
         local = _text(entry, "id", path) or slug(name)
-        if not _LOCAL_ID.match(local):
+        if not _LOCAL_ID.fullmatch(local):
             raise PackFormatError("field", path, "id")
         if local in seen:
             raise PackFormatError("duplicate", path)

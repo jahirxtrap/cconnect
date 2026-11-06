@@ -56,13 +56,14 @@ export interface CapabilitiesDefaults {
   account: string;
 }
 
-export interface Capabilities {
+export interface Capabilities extends VersionInfo {
   permissionModes: LabeledOption[];
   models: ModelOption[];
   subagentEfforts: string[];
   requestLimit: number | null;
-  sharedScheme: string;
   packSchema: number | null;
+  git: boolean;
+  videoStills: boolean;
   outputStyles: string[];
   fastMode: FastMode;
   colors: string[];
@@ -70,10 +71,6 @@ export interface Capabilities {
   accounts: AccountOption[];
   mcpTools: McpTool[];
   defaults: CapabilitiesDefaults;
-  serverVersion: string | null;
-  supportedApp: string | null;
-  cliVersion: string | null;
-  supportedCli: string | null;
 }
 
 export interface VersionInfo {
@@ -81,6 +78,7 @@ export interface VersionInfo {
   supportedApp: string | null;
   cliVersion: string | null;
   supportedCli: string | null;
+  sharedScheme: string;
   gated: boolean;
   authorized: boolean;
 }
@@ -90,6 +88,7 @@ interface VersionWire {
   supported_app?: string;
   cli_version?: string;
   supported_cli?: string;
+  shared_scheme?: string;
   exposure?: { gated?: boolean; authorized?: boolean };
 }
 
@@ -118,8 +117,9 @@ interface CapabilitiesWire extends VersionWire {
   models?: ModelWire[];
   subagent_efforts?: string[];
   request_limit?: number;
-  shared_scheme?: string;
   pack_schema?: number;
+  git?: boolean;
+  video_stills?: boolean;
   output_styles?: string[];
   fast_mode?: { state?: string; disabled_reason?: string | null };
   colors?: string[];
@@ -134,6 +134,7 @@ const toVersion = (data: VersionWire): VersionInfo => ({
   supportedApp: data.supported_app ?? null,
   cliVersion: data.cli_version ?? null,
   supportedCli: data.supported_cli ?? null,
+  sharedScheme: data.shared_scheme ?? "",
   gated: data.exposure?.gated === true,
   authorized: data.exposure?.authorized !== false,
 });
@@ -208,8 +209,9 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
         })),
       subagentEfforts: data.subagent_efforts ?? [],
       requestLimit: data.request_limit ?? null,
-      sharedScheme: data.shared_scheme ?? "",
       packSchema: data.pack_schema ?? null,
+      git: data.git !== false,
+      videoStills: data.video_stills === true,
       outputStyles: data.output_styles ?? [],
       fastMode: {
         state: data.fast_mode?.state ?? "off",

@@ -79,6 +79,7 @@
   "PREVIOUS_FILE": "上一个文件",
   "NO_CHANGES": "暂无更改",
   "NOT_A_REPOSITORY": "不是 Git 仓库",
+  "GIT_MISSING": "服务器上未安装 Git",
   "UNLOCK": "解锁",
   "GIT_COMMIT": "提交",
   "GIT_COMMIT_PUSH": "提交并推送",

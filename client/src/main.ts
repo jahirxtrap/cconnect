@@ -1,5 +1,6 @@
 import { mount } from "svelte";
 import { theme } from "$lib/design/theme.svelte";
+import { i18n } from "$lib/i18n/index.svelte";
 import { polyfillFieldSizing } from "$lib/platform/fieldSizing";
 import { trackPressFeedback } from "$lib/platform/pressFeedback";
 import { registerServiceWorker, webApp } from "$lib/platform/pwa.svelte";
@@ -58,7 +59,7 @@ trackPressFeedback();
 registerServiceWorker();
 webApp.listen();
 
-await secureStore.load(SECURE_KEYS);
+await Promise.all([secureStore.load(SECURE_KEYS), i18n.load()]);
 const { default: App } = await import("./App.svelte");
 
 export default mount(App, { target: document.getElementById("app")! });

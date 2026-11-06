@@ -1,5 +1,6 @@
 <script lang="ts">
   import Folder from "@lucide/svelte/icons/folder";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { cliApi, type CliInfo } from "$lib/services/cliApi";
   import { cliSourceLabel } from "$lib/screens/settings/settingsValues";
@@ -41,6 +42,7 @@
     const result = await cliApi.setSource(source, customPath.trim() || null);
     saving = false;
     if (result) onChanged(result);
+    void serverStatus.refresh();
   };
 
   const update = async () => {
@@ -49,6 +51,7 @@
     const result = await cliApi.status();
     updating = false;
     if (result) onChanged(result);
+    void serverStatus.refresh();
   };
 
   $effect(() => {

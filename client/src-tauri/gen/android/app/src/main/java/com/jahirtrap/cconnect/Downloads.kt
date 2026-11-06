@@ -10,6 +10,7 @@ import android.provider.MediaStore
 import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
+import android.webkit.WebView
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import java.io.File
@@ -23,16 +24,21 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val BUFFER_SIZE = 64 * 1024
 
-private class Progress {
+private class Progress(val id: String) {
     @Volatile var bytes = 0L
     @Volatile var total = 0L
     @Volatile var status = "active"
     @Volatile var cancelled = false
+    var shown = -1
 }
 
 private const val SAVED_LIMIT = 50
 
-class Downloads(private val activity: Activity, private val onSaveAs: (String, String, String) -> Unit) {
+class Downloads(
+    private val activity: Activity,
+    private val webView: () -> WebView?,
+    private val onSaveAs: (String, String, String) -> Unit,
+) {
     private val workers = Executors.newCachedThreadPool()
     private val transfers = ConcurrentHashMap<String, Progress>()
     private val saved = ConcurrentHashMap<String, String>()
@@ -41,12 +47,14 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
     @JavascriptInterface
     fun enqueue(url: String, filename: String, headersJson: String): String {
         val id = counter.incrementAndGet().toString()
-        val progress = Progress()
+        val progress = Progress(id)
         transfers[id] = progress
         workers.execute {
             val target = runCatching { copyToDownloads(url, filename, headersJson, progress) }.getOrNull()
             if (target != null) remember(id, target)
             progress.status = if (target != null) "done" else "failed"
+            transfers.remove(id)
+            report(progress)
         }
         return id
     }
@@ -58,15 +66,18 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
     }
 
     @JavascriptInterface
-    fun status(id: String): String {
-        val progress = transfers[id] ?: return state("failed", 0, 0)
-        if (progress.status != "active") transfers.remove(id)
-        return state(progress.status, progress.bytes, progress.total)
-    }
-
-    @JavascriptInterface
     fun cancel(id: String) {
         transfers.remove(id)?.cancelled = true
+    }
+
+    private fun report(progress: Progress) {
+        val percent = transferPercent(progress.bytes, progress.total)
+        if (progress.status == "active" && percent == progress.shown) return
+        progress.shown = percent
+        val payload = transferState(progress.status, progress.bytes, progress.total).put("id", progress.id)
+        activity.runOnUiThread {
+            webView()?.evaluateJavascript("window.__cconnectDownload && window.__cconnectDownload($payload)", null)
+        }
     }
 
     @JavascriptInterface
@@ -170,6 +181,7 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
             if (read < 0) break
             out.write(buffer, 0, read)
             progress.bytes += read
+            report(progress)
         }
     }
 
@@ -236,9 +248,6 @@ class Downloads(private val activity: Activity, private val onSaveAs: (String, S
         file.outputStream().use(copy)
         file.absolutePath
     }.getOrNull()
-
-    private fun state(status: String, bytes: Long, total: Long) =
-        JSONObject().put("status", status).put("bytes", bytes).put("total", total).toString()
 
     private fun headersOf(json: String): Map<String, String> = runCatching {
         val parsed = JSONObject(json)

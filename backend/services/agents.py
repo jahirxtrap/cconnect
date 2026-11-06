@@ -19,7 +19,7 @@ import httpx
 
 from core import packages, paths
 from core.slugs import slug
-from services import agent_registry
+from services import agent_registry, files
 
 REGISTRY = "registry"
 CUSTOM = "custom"
@@ -101,8 +101,7 @@ def load() -> list[dict]:
 
 def _save(entries: list[dict]) -> list[dict]:
     unique = list({entry["id"]: entry for entry in entries}.values())
-    paths.AGENTS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    paths.AGENTS_FILE.write_text(json.dumps(unique, ensure_ascii=False, indent=2), encoding="utf-8")
+    files.write_json(paths.AGENTS_FILE, unique)
     return unique
 
 

@@ -7,6 +7,7 @@ import re
 import shutil
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Optional
@@ -15,7 +16,7 @@ import orjson
 
 from core import data_migration, paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import delegate_runs, delegates, mods, prompt_cache, tool_calls, visibility
+from services import claude_assets, delegate_runs, delegates, mods, prompt_cache, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
@@ -38,6 +39,12 @@ _TASK_TOOLS = (b"TaskCreate", b"TaskUpdate")
 _request_totals: dict[str, tuple[int, int, int]] = {}
 _task_scans: dict[str, tuple[int, dict, dict, bool]] = {}
 _task_lock = threading.Lock()
+_NORMALIZED_KEPT = 8
+_normalized: "OrderedDict[tuple, tuple[tuple, list[dict], list[str]]]" = OrderedDict()
+_normalized_lock = threading.Lock()
+_CONVERSATIONS_KEPT = 2
+_conversations: "OrderedDict[str, tuple[int, list[list[dict]]]]" = OrderedDict()
+_conversation_lock = threading.Lock()
 
 
 def _base() -> Path:
@@ -206,34 +213,24 @@ def transcript_stamp(project_key: str, session_id: str) -> Optional[tuple[int, i
     return (stat.st_mtime_ns, stat.st_size)
 
 
-def _tail_entries(project_key: str, session_id: str, trashed: bool) -> list[dict]:
+_TAIL_WINDOW = 128 * 1024
+
+
+def tail_entries(project_key: str, session_id: str, trashed: bool = False) -> list[dict]:
     try:
         file = _session_file(project_key, session_id, trashed)
-    except ValueError:
-        return []
-    if not file.is_file():
-        return []
-    try:
         with file.open("rb") as fh:
-            fh.seek(0, 2)
-            size = fh.tell()
-            fh.seek(max(0, size - 131072))
-            chunk = fh.read().decode("utf-8", errors="ignore")
-    except OSError:
+            size = fh.seek(0, 2)
+            fh.seek(max(0, size - _TAIL_WINDOW))
+            chunk = fh.read()
+    except (ValueError, OSError):
         return []
-    entries = []
-    for line in chunk.splitlines():
-        try:
-            entry = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(entry, dict):
-            entries.append(entry)
-    return entries
+    entries = (_parse(line) for line in chunk.splitlines() if line.strip())
+    return [entry for entry in entries if isinstance(entry, dict)]
 
 
-def last_context_tokens(project_key: str, session_id: str, trashed: bool = False) -> Optional[int]:
-    for entry in reversed(_tail_entries(project_key, session_id, trashed)):
+def context_tokens_in(entries: list[dict]) -> Optional[int]:
+    for entry in reversed(entries):
         msg = entry.get("message")
         usage = msg.get("usage") if isinstance(msg, dict) else None
         if isinstance(usage, dict):
@@ -241,15 +238,11 @@ def last_context_tokens(project_key: str, session_id: str, trashed: bool = False
     return None
 
 
-def last_prompt_cache(project_key: str, session_id: str, trashed: bool = False) -> Optional[dict]:
-    return prompt_cache.from_entries(_tail_entries(project_key, session_id, trashed))
-
-
 def _block_media_bytes(block: Any) -> int:
     if not isinstance(block, dict):
         return 0
     if block.get("type") in _MEDIA_TYPES:
-        return len(json.dumps(block))
+        return len(orjson.dumps(block))
     if block.get("type") == "tool_result" and isinstance(block.get("content"), list):
         return sum(_block_media_bytes(item) for item in block["content"])
     return 0
@@ -263,7 +256,7 @@ def _entry_weight(entry: dict) -> tuple[int, int]:
     if isinstance(content, str):
         return len(content), 0
     if isinstance(content, list):
-        return len(json.dumps(content)), sum(_block_media_bytes(block) for block in content)
+        return len(orjson.dumps(content)), sum(_block_media_bytes(block) for block in content)
     return 0, 0
 
 
@@ -318,12 +311,10 @@ def user_messages_since(project_key: str, session_id: str, offset: int) -> tuple
                 if not raw.endswith(b"\n"):
                     break
                 offset += len(raw)
-                if b'"type":"user"' not in raw and b'"queued_command"' not in raw:
+                if b'"type":"user"' not in raw and b'"queued_command"' not in raw or b'"type":"tool_result"' in raw:
                     continue
-                try:
-                    row = _user_row(json.loads(raw))
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    continue
+                entry = _parse(raw)
+                row = _user_row(entry) if isinstance(entry, dict) else None
                 if row is not None:
                     out.append(row)
     except (ValueError, OSError):
@@ -421,12 +412,9 @@ def _meta_entries(path: Path):
                 tail = tail.partition(b"\n")[2]
     for raw in head.splitlines() + tail.splitlines():
         line = raw.strip()
-        if not line:
-            continue
-        try:
-            yield json.loads(line)
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            continue
+        entry = _parse(line) if line else None
+        if entry is not None:
+            yield entry
 
 
 def _session_meta(path: Path) -> tuple[Optional[str], Optional[str], Optional[str], Optional[str], Optional[str], bool]:
@@ -578,7 +566,7 @@ async def auto_generate_title(project_key: str, session_id: str, account: str = 
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return None
-    transcript = _transcript_for_title(file)
+    transcript = await asyncio.to_thread(_transcript_for_title, file)
     if not transcript:
         return None
     from services.chat_list import hub
@@ -697,11 +685,17 @@ def _rewrite_cwd(source: Path, target: Path, cwd: str) -> None:
                 dst.write(line)
 
 
-def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional[str]:
+async def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional[str]:
     """Move a session to the project that owns `target_cwd`, returning the new project key."""
     from services.live_sessions import registry
 
-    target_cwd = (target_cwd or "").strip()
+    live = registry.get_by_session(session_id)
+    if live is not None and live.running:
+        raise RuntimeError("a turn is running in this session")
+    return await asyncio.to_thread(_move_transcript, project_key, session_id, (target_cwd or "").strip())
+
+
+def _move_transcript(project_key: str, session_id: str, target_cwd: str) -> Optional[str]:
     if not target_cwd:
         raise ValueError("target cwd is required")
     target_key = project_key_for(target_cwd)
@@ -710,9 +704,6 @@ def move_session(project_key: str, session_id: str, target_cwd: str) -> Optional
     source = _session_file(project_key, session_id)
     if not source.is_file():
         return None
-    live = registry.get_by_session(session_id)
-    if live is not None and live.running:
-        raise RuntimeError("a turn is running in this session")
     target_dir = _project_dir(target_key)
     target_dir.mkdir(parents=True, exist_ok=True)
     target = _session_file(target_key, session_id)
@@ -908,15 +899,25 @@ def conversation(cwd: str, session_id: str) -> list[dict]:
         return []
     if not file.is_file():
         return []
-    segments: list[list[dict]] = [[]]
-    for entry in _iter_lines(file):
-        skeleton = _skeleton(entry)
-        row = _conversation_row(entry)
-        if row is not None:
-            skeleton["row"] = row
-        if skeleton.get("type") == "system" and skeleton.get("subtype") == "compact_boundary":
-            segments.append([])
-        segments[-1].append(skeleton)
+    key = str(file)
+    with _conversation_lock:
+        offset, segments = _conversations.pop(key, (0, [[]]))
+        if offset > file.stat().st_size:
+            offset, segments = 0, [[]]
+        for raw, offset in _complete_lines(file, offset):
+            entry = _parse(raw.strip())
+            if not isinstance(entry, dict):
+                continue
+            skeleton = _skeleton(entry)
+            row = _conversation_row(entry)
+            if row is not None:
+                skeleton["row"] = row
+            if skeleton.get("type") == "system" and skeleton.get("subtype") == "compact_boundary":
+                segments.append([])
+            segments[-1].append(skeleton)
+        _conversations[key] = (offset, segments)
+        while len(_conversations) > _CONVERSATIONS_KEPT:
+            _conversations.popitem(last=False)
     return [
         skeleton["row"]
         for segment in segments
@@ -1293,13 +1294,13 @@ def _subagent_file(session_dir: Path, agent_id: str) -> Optional[Path]:
     return flat if flat.is_file() else next(base.rglob(name), None)
 
 
-def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict) -> list[dict]:
+def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls: list[str]) -> list[dict]:
     from services.claude_runtime import (
         _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
         _tool_naming, _flatten_result_content,
     )
     entries = [entry for entry in _iter_lines(sub_file) if entry.get("type") in _TRAVELLING_TYPES]
-    tool_calls.remember_entries(entries)
+    calls.extend(tool_calls.remember_entries(entries))
     sub_ms = _tool_durations(entries)
     sub_results: dict[str, object] = {}
     for entry in entries:
@@ -1541,6 +1542,34 @@ def _interrupt_mark(message: dict) -> bool:
     return message.get("type") == "interrupted" and not message.get("parent")
 
 
+def _folder_stamp(folder: Path) -> tuple[int, int]:
+    newest, count = 0, 0
+    for root, _folders, names in os.walk(folder):
+        for name in names:
+            try:
+                newest = max(newest, os.stat(os.path.join(root, name)).st_mtime_ns)
+            except OSError:
+                continue
+            count += 1
+    return newest, count
+
+
+def _normalized_stamp(file: Path, session_id: str) -> tuple:
+    """Everything a normalized transcript is built from: the transcript, its subagents, its delegations, a pending rewind and the names it shows."""
+    from services import rewind
+
+    stat = file.stat()
+    return (
+        stat.st_mtime_ns,
+        stat.st_size,
+        _folder_stamp(file.parent / session_id),
+        delegate_runs.stamp(session_id),
+        rewind.get_pending(session_id),
+        tuple(sorted(claude_assets.mcp_tool_labels().items())),
+        delegates.names(),
+    )
+
+
 def get_session_messages(
     project_key: str,
     session_id: str,
@@ -1550,8 +1579,25 @@ def get_session_messages(
     file = _session_file(project_key, session_id, trashed)
     if not file.is_file():
         return []
+    key = (str(file), json.dumps(visibility.resolve(prefs), sort_keys=True))
+    stamp = _normalized_stamp(file, session_id)
+    with _normalized_lock:
+        known = _normalized.get(key)
+        if known is not None and known[0] == stamp and tool_calls.knows(known[2]):
+            _normalized.move_to_end(key)
+            return known[1]
+    items, calls = _normalize(file, project_key, session_id, prefs)
+    with _normalized_lock:
+        _normalized[key] = (stamp, items, calls)
+        _normalized.move_to_end(key)
+        while len(_normalized) > _NORMALIZED_KEPT:
+            _normalized.popitem(last=False)
+    return items
+
+
+def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None) -> tuple[list[dict], list[str]]:
     entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
-    tool_calls.remember_entries(entries)
+    calls = tool_calls.remember_entries(entries)
     queued_user_texts: set[str] = set()
     real_user_texts: set[str] = set()
 
@@ -1844,7 +1890,7 @@ def get_session_messages(
                         aid = agent_files.get(bid or "")
                         sub_file = _subagent_file(file.parent / session_id, aid) if aid else None
                         if sub_file is not None:
-                            for child in _subagent_blocks(sub_file, bid, vis):
+                            for child in _subagent_blocks(sub_file, bid, vis, calls):
                                 messages.append(child)
                     continue
                 if name == delegates.TOOL_ID and isinstance(inp, dict):
@@ -1911,7 +1957,7 @@ def get_session_messages(
                     messages.append({"type": "shared", "files": packs_tool.exported(pack_id, project_key)})
         if user_images:
             messages.append({"type": "text", "role": role, "text": "", "images": user_images})
-    return messages
+    return messages, calls
 
 
 def get_message_image(

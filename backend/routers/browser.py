@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+from contextlib import suppress
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -94,17 +95,26 @@ async def browser_ws(ws: WebSocket):
             await send_event(ws, {"type": "error", "reason": str(exc)})
         await send_event(ws, {"type": "state", **session.status()})
 
-    pump = asyncio.create_task(outgoing())
-    if watching:
-        await watch(opening)
-    else:
-        await send_event(ws, {"type": "state", **session.status()})
+    async def follow(wanted: bool):
+        try:
+            await (session.watch() if wanted else session.unwatch())
+        except (RuntimeError, OSError) as exc:
+            await send_event(ws, {"type": "error", "reason": str(exc)})
 
+    pump = asyncio.create_task(outgoing())
     try:
+        if watching:
+            await follow(True)
+            await watch(opening)
+        else:
+            await send_event(ws, {"type": "state", **session.status()})
         while True:
             payload = await ws.receive_json()
             if payload.get("type") == "watch":
-                watching = payload.get("enabled") is True
+                wanted = payload.get("enabled") is True
+                if wanted != watching:
+                    await follow(wanted)
+                watching = wanted
                 if watching:
                     await watch(payload)
                 continue
@@ -118,3 +128,6 @@ async def browser_ws(ws: WebSocket):
     finally:
         pump.cancel()
         session.unsubscribe(queue)
+        if watching:
+            with suppress(RuntimeError, OSError):
+                await session.unwatch()

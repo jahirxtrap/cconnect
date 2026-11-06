@@ -6,6 +6,7 @@ import { androidDownloads, trackAndroidDownload } from "$lib/platform/androidDow
 import { copyText } from "$lib/platform/clipboard";
 import { backend } from "./backend.svelte";
 import { fetchFile } from "./mediaSource";
+import { HTML_TYPE, pageSandbox } from "./pageSource";
 import { fileHeaders } from "./projectFilesApi";
 
 export interface SharedItem {
@@ -56,7 +57,7 @@ const askSavePath = async (filename: string): Promise<string | null> => {
   return typeof target === "string" ? target : null;
 };
 
-const saveBlob =async (blob: Blob, filename: string): Promise<string | null> => {
+const saveBlob = async (blob: Blob, filename: string): Promise<string | null> => {
   if (!isTauri) {
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
@@ -326,9 +327,23 @@ export const openTransfer = async (saved: string, url: string, filename: string)
   await openSharedExternally(url, filename);
 };
 
+const SCRIPTABLE_TYPES = ["text/html", "application/xhtml+xml", "image/svg+xml", "text/xml", "application/xml"];
+
+const externalTab = (filename: string, blob: Blob): string => {
+  const content = URL.createObjectURL(blob);
+  if (!SCRIPTABLE_TYPES.includes(blob.type.split(";")[0].trim().toLowerCase())) return content;
+  const page = document.implementation.createHTMLDocument(filename);
+  const frame = page.createElement("iframe");
+  frame.src = content;
+  frame.setAttribute("style", "position: fixed; inset: 0; width: 100%; height: 100%; border: 0");
+  frame.setAttribute("sandbox", pageSandbox);
+  page.body.append(frame);
+  return URL.createObjectURL(new Blob([`<!doctype html>${page.documentElement.outerHTML}`], { type: HTML_TYPE }));
+};
+
 const openData = async (filename: string, blob: Blob): Promise<boolean> => {
   if (!isTauri) {
-    window.open(URL.createObjectURL(blob), "_blank", "noopener");
+    window.open(externalTab(filename, blob), "_blank", "noopener");
     return true;
   }
   try {

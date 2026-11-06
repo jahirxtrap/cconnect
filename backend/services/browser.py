@@ -347,6 +347,7 @@ class BrowserSession:
         self._forward = False
         self._agent = ""
         self._icons: set[asyncio.Task] = set()
+        self._watchers = 0
 
     @property
     def running(self) -> bool:
@@ -395,6 +396,18 @@ class BrowserSession:
 
     def unsubscribe(self, queue: asyncio.Queue):
         self._subscribers.discard(queue)
+
+    async def watch(self):
+        self._watchers += 1
+        if self._watchers == 1 and self.running:
+            async with self._lock:
+                await self._start_stream()
+
+    async def unwatch(self):
+        self._watchers -= 1
+        if not self._watchers and self.running:
+            async with self._lock:
+                await self._stop_stream()
 
     async def ensure(self, width: int, height: int, scale: float):
         async with self._lock:
@@ -750,6 +763,8 @@ class BrowserSession:
             return
         raster_width, raster_height, metrics = self._metrics()
         await self._cdp.call("Emulation.setDeviceMetricsOverride", metrics, page)
+        if not self._watchers:
+            return
         await self._cdp.call(
             "Page.startScreencast",
             {
@@ -787,6 +802,8 @@ class BrowserSession:
         return (read.get("result") or {}).get("value") or ""
 
     async def _kick(self):
+        if not self._watchers:
+            return
         frame = await self.shot()
         if frame:
             self._publish(("frame", frame))

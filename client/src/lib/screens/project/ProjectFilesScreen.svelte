@@ -15,7 +15,7 @@
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { isArchive, joined } from "$lib/data/format";
+  import { compareText, isArchive, joined } from "$lib/data/format";
   import { openFilePreview } from "$lib/app/filePreview";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
@@ -51,6 +51,7 @@
   import { PANE_TOP_CLASS } from "$lib/screens/chat/paneChrome";
   import { inPane, usePaneTail } from "$lib/screens/chat/paneSurface";
   import { panelProject } from "$lib/screens/chat/panelProject.svelte";
+  import { serverSettings } from "$lib/data/serverSettings.svelte";
 
   interface Props {
     instant?: boolean;
@@ -84,6 +85,8 @@
   const projects = $derived(list?.visibleProjects ?? []);
 
   let children = $state<Record<string, ProjectEntry[]>>({});
+  let listingRun = 0;
+  const listingRuns: Record<string, number> = {};
   let expanded = $state<Record<string, boolean>>({});
   let searching = $state(false);
   let query = $state("");
@@ -102,6 +105,9 @@
   let gitTick = $state(0);
   let picked = $state<Record<string, boolean>>({});
 
+  const gitMissing = $derived(serverSettings.capabilitiesFor(backend.active)?.git === false);
+
+  $effect(() => serverSettings.ensure());
   const repoList = $derived(repos ?? []);
   const activeRepo = $derived(
     repoList.find((item) => item.path === repoRoot) ?? (repoList.length === 1 ? repoList[0] : null),
@@ -134,7 +140,7 @@
     [...repoList].sort(
       (first, second) =>
         Number((repoCounts[second.path] ?? 0) > 0) - Number((repoCounts[first.path] ?? 0) > 0) ||
-        first.name.localeCompare(second.name),
+        compareText(first.name, second.name),
     ),
   );
 
@@ -517,7 +523,7 @@
     const key = projectKey;
     const environment = backend.activeId;
     const burst = watch.burst;
-    const known = untrack(() => Object.keys(children));
+    const known = untrack(() => Object.keys(children)).filter((path) => !insideArchive(path) && !isArchive(path));
     if (!key) {
       loading = false;
       return;
@@ -529,11 +535,14 @@
         : listed.filter((path) => burst.paths.some((changed) => folderOf(changed) === path));
     if (!targets.length) return;
     loading = !known.length;
+    const run = ++listingRun;
+    for (const path of targets) listingRuns[path] = run;
     void Promise.all(
       targets.map((path) => projectFilesApi.tree(key, path).then((listing) => [path, listing] as const)),
-    ).then((loaded) => {
+    ).then((arrived) => {
       if (projectKey !== key || backend.activeId !== environment) return;
       loading = false;
+      const loaded = arrived.filter(([path]) => listingRuns[path] === run);
       const root = loaded.find(([path]) => path === "")?.[1];
       children = {
         ...children,
@@ -622,7 +631,7 @@
     const key = projectKey;
     const burst = watch.burst;
     const stamp = `${key}|${gitTick}`;
-    if (!showChanged) {
+    if (!showChanged || gitMissing) {
       synced = "";
       repos = null;
       return;
@@ -950,6 +959,8 @@
       {:else}
         <EmptyState icon={FolderClosed} text={t("NO_PROJECTS")} class="min-h-0 flex-1" />
       {/if}
+    {:else if showChanged && gitMissing}
+      <EmptyState icon={FolderGit2} text={t("GIT_MISSING")} class="min-h-0 flex-1" />
     {:else if showChanged && repos === null}
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if showChanged && !activeRepo}

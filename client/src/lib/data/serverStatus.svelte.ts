@@ -5,11 +5,9 @@ import { compareVersions, satisfies } from "./compat";
 import { settings } from "./settings.svelte";
 import { isTauri } from "$lib/platform";
 import { onWake } from "$lib/platform/wake";
-import { backend, tokenOf } from "$lib/services/backend.svelte";
+import { backend, profileKey, tokenOf } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type VersionInfo } from "$lib/services/capabilitiesApi";
 import { latestRelease, type Release } from "$lib/services/githubApi";
-
-const POLL_MS = 30_000;
 
 export type CompatNotice =
   | "app_outdated"
@@ -32,10 +30,13 @@ class ServerStatus {
 
   #releaseRequested = false;
   #request = 0;
+  #listed = $state(false);
+  #onlineWaiters: (() => void)[] = [];
+  #offlineWaiters: (() => void)[] = [];
 
   readonly unauthorized = $derived(this.reachable && this.version?.gated === true && !this.version.authorized);
 
-  readonly online = $derived(this.reachable && !this.unauthorized);
+  readonly online = $derived((this.reachable || this.#listed) && !this.unauthorized);
 
   readonly link = $derived<ConnectionState>(
     this.online ? "connected" : this.checking || !this.answered ? "connecting" : "disconnected",
@@ -67,35 +68,55 @@ class ServerStatus {
     if (this.release) settings.skippedRelease = this.release.tag;
   }
 
+  whenOnline(): Promise<void> {
+    if (this.online) return Promise.resolve();
+    return new Promise((resolve) => this.#onlineWaiters.push(resolve));
+  }
+
+  whenOffline(): Promise<void> {
+    if (!this.online) return Promise.resolve();
+    return new Promise((resolve) => this.#offlineWaiters.push(resolve));
+  }
+
   start() {
     void this.checkRelease();
     $effect(() => {
-      void backend.baseUrl;
+      const waiters = this.online ? this.#onlineWaiters : this.#offlineWaiters;
+      for (const resolve of waiters.splice(0)) resolve();
+    });
+    $effect(() => {
+      void profileKey(backend.active);
       this.checking = true;
       this.answered = false;
       void this.refresh();
-      const timer = setInterval(() => void this.refresh(), POLL_MS);
-      const stopWake = onWake(() => {
+      return onWake(() => {
         this.checking = true;
         void this.refresh();
       });
-      return () => {
-        clearInterval(timer);
-        stopWake();
-      };
     });
 
     $effect(() => {
       const list = chatListFor(backend.active);
+      this.#listed = false;
       if (!list) return;
       let opened = false;
+      let lost = false;
       $effect(() => {
+        this.#listed = list.connected;
         if (list.connected) {
           opened = true;
+          lost = false;
           void this.refresh();
           return;
         }
-        if (opened) this.reachable = false;
+        void list.drops;
+        if (!opened) return;
+        if (!lost) {
+          lost = true;
+          this.reachable = false;
+          this.checking = true;
+        }
+        void this.refresh();
       });
     });
   }
@@ -115,7 +136,9 @@ class ServerStatus {
 
   async refresh() {
     const request = ++this.#request;
+    const profile = backend.active;
     const version = await capabilitiesApi.versionInfo();
+    if (version) backend.rememberScheme(profile, version.sharedScheme);
     if (request !== this.#request) return;
     this.version = version;
     this.reachable = version !== null;

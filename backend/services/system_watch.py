@@ -1,18 +1,20 @@
-"""One sampler of machine metrics shared by every connection, replayed from a ring buffer on subscribe."""
+"""One sampler of machine metrics shared by every connection, replayed from a ring buffer on subscribe, with the log pushed as it is written."""
 
 import asyncio
 import threading
-import time
-from typing import Optional
+from typing import Callable, Optional
 
 from services import processes, system_monitor
 
 _SNAPSHOT_INTERVAL = 2.0
 _FIRST_WINDOW = 0.5
-_LOG_TAIL_INTERVAL = 0.5
 _OWNERS_WAIT = 1.0
 _HISTORY_CAP = 90
 _LOG_CAP = 300
+
+
+def _log_key(entry: dict) -> tuple:
+    return entry.get("ts"), entry.get("pid"), entry.get("message")
 
 
 class SystemWatchHub:
@@ -24,7 +26,7 @@ class SystemWatchHub:
         self._history: list[dict] = []
         self._logs: list[dict] = []
         self._processes: Optional[dict] = None
-        self._offset = 0
+        self._unfollow: Optional[Callable[[], None]] = None
 
     async def start(self):
         self._loop = asyncio.get_running_loop()
@@ -34,9 +36,12 @@ class SystemWatchHub:
             running, self._running = self._running, None
         if running is not None:
             running.set()
+        self._stop_following()
 
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()
+        if self._unfollow is None:
+            self._follow()
         with self._lock:
             self._subscribers.add(queue)
             replay = {"type": "history", "items": list(self._history), "logs": list(self._logs)}
@@ -61,17 +66,29 @@ class SystemWatchHub:
                 self._processes = None
         if running is not None:
             running.set()
+            self._stop_following()
+
+    def _follow(self):
+        with self._lock:
+            self._logs = []
+        self._unfollow = system_monitor.follow_logs(self._push_log)
+        written = system_monitor.logs()["items"]
+        with self._lock:
+            arrived = {_log_key(entry) for entry in self._logs}
+            self._logs = [entry for entry in written if _log_key(entry) not in arrived] + self._logs
+            del self._logs[:-_LOG_CAP]
+
+    def _stop_following(self):
+        unfollow, self._unfollow = self._unfollow, None
+        if unfollow is not None:
+            unfollow()
 
     def _sample_loop(self, stopped: threading.Event):
         system_monitor.prime_cpu()
-        next_snapshot = time.monotonic() + _FIRST_WINDOW
-        while not stopped.is_set():
-            now = time.monotonic()
-            if now >= next_snapshot:
-                next_snapshot = now + _SNAPSHOT_INTERVAL
-                self._push_snapshot()
-            self._push_logs()
-            stopped.wait(_LOG_TAIL_INTERVAL)
+        wait = _FIRST_WINDOW
+        while not stopped.wait(wait):
+            self._push_snapshot()
+            wait = _SNAPSHOT_INTERVAL
 
     def _push_snapshot(self):
         try:
@@ -98,23 +115,15 @@ class SystemWatchHub:
             self._processes = event
         self._broadcast(event)
 
-    def _push_logs(self):
-        try:
-            chunk = system_monitor.logs(self._offset)
-        except Exception:
-            return
-        self._offset = chunk["offset"]
-        items = chunk["items"]
-        if not items:
-            return
+    def _push_log(self, entry: dict):
         with self._lock:
-            self._logs.extend(items)
+            self._logs.append(entry)
             del self._logs[:-_LOG_CAP]
-        self._broadcast({"type": "logs", "items": items})
+        self._broadcast({"type": "logs", "items": [entry]})
 
     def _broadcast(self, event: dict):
         loop = self._loop
-        if loop is None:
+        if loop is None or loop.is_closed():
             return
         with self._lock:
             targets = list(self._subscribers)

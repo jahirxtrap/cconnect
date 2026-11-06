@@ -16,23 +16,12 @@ from pydantic import BaseModel, ValidationError
 
 from core import paths
 from core.access import key_matches
-from core.config import DEFAULT_CWD, permission_modes, resolve_permission_mode
+from core.config import CONTRACT_CHECK, DEFAULT_CWD, permission_modes, resolve_permission_mode
 from core.responses import api_response
-from core.ws import accept_authorized, send_event
+from core.ws import SocketWriter, accept_authorized
 from mcps import terminal as terminal_mcp
-from schemas.chat import (
-    AgentLoginMessage,
-    ModActionMessage,
-    ModAnswerMessage,
-    ModClientModuleMessage,
-    ModRenderMessage,
-    PromptMessage,
-    SetGenerationMessage,
-    SetOptionMessage,
-    SetPermissionMessage,
-    SetVisibilityMessage,
-    StartMessage,
-)
+from schemas.chat import ChatMessage, ModRenderMessage
+from schemas.chat_events import CHAT_EVENT
 from services import accounts
 from services import agent_sessions
 from services import blocks
@@ -43,7 +32,7 @@ from services import sessions as sessions_service
 from services import settings_store, visibility
 from services import todos as todos_store
 from services.claude_runtime import run_prompt
-from services.event_rows import page_start, visible_rows
+from services.event_rows import page, visible_rows
 from services.live_sessions import registry
 
 router = APIRouter(tags=["Chat"])
@@ -336,9 +325,9 @@ async def _run_usage(send, account: str | None = None, capabilities=None, locale
         if USAGE in (capabilities or ()):
             await send({"type": "usage", **await usage_data(account, language=locale), "local": True})
         elif COMPONENTS in (capabilities or ()):
-            await send({"type": "component", "blocks": await usage_blocks(account), "local": True})
+            await send({"type": "component", "blocks": await usage_blocks(account, locale), "local": True})
         else:
-            await send({"type": "command", "markdown": await usage_markdown(account), "local": True})
+            await send({"type": "command", "markdown": await usage_markdown(account, locale), "local": True})
     except Exception as exc:
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
 
@@ -369,18 +358,40 @@ async def _send_mod_reply(send, session, rid: int, work):
     await send({"type": "mod_reply", "rid": rid, "answer": answer, "channel": session.channel})
 
 
+def _rejected(raw, reason: str) -> dict:
+    request = raw.get("type") if isinstance(raw, dict) else None
+    return {"type": "rejected", "request": request if isinstance(request, str) else None, "message": reason}
+
+
+def _invalid(exc: ValidationError) -> str:
+    return "; ".join(f"{'.'.join(str(part) for part in error['loc']) or 'message'}: {error['msg']}" for error in exc.errors())
+
+
+async def _send_tasks(send, session):
+    tasks = await asyncio.to_thread(
+        sessions_service.session_tasks,
+        session.state.session_id,
+        sessions_service.project_key_for(session.state.cwd or ""),
+    )
+    if session.running:
+        return
+    for task in tasks:
+        await send({"type": "task", **task})
+    remembered = todos_store.load(session.state.session_id)
+    if not tasks and remembered:
+        await send({"type": "todos", "items": remembered})
+
+
+
 @router.websocket("/chat/ws")
 async def chat_ws(ws: WebSocket):
     if not await accept_authorized(ws):
         return
-    send_lock = asyncio.Lock()
+    writer = SocketWriter(ws, CHAT_EVENT if CONTRACT_CHECK else None)
+    send = writer.send
     session = None
     side_session = None
     bg_tasks: set = set()
-
-    async def send(payload: dict):
-        async with send_lock:
-            await send_event(ws, payload)
 
     seen = {"prefs": visibility.defaults(), "capabilities": []}
     sink = visibility.sink_for(send, seen)
@@ -395,16 +406,18 @@ async def chat_ws(ws: WebSocket):
             try:
                 raw = await ws.receive_json()
             except json.JSONDecodeError:
-                await send({"type": "error", "message": "invalid JSON"})
+                await send(_rejected(None, "invalid JSON"))
                 continue
-            mtype = raw.get("type")
+            try:
+                msg = ChatMessage.validate_python(raw)
+            except ValidationError as exc:
+                await send(_rejected(raw, _invalid(exc)))
+                if isinstance(raw, dict) and raw.get("type") == "mod_render" and session is not None:
+                    await send({"type": "mod_tree", "rid": raw.get("rid"), "tree": None, "channel": session.channel})
+                continue
+            mtype = msg.type
 
             if mtype == "start":
-                try:
-                    msg = StartMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 seen["prefs"] = visibility.resolve(msg.visibility.model_dump() if msg.visibility else None)
                 seen["capabilities"] = terminal_mcp.authorize(msg.capabilities, msg.security_key)
                 existing = registry.get(msg.channel) if msg.channel else None
@@ -432,7 +445,7 @@ async def chat_ws(ws: WebSocket):
                     spawn(session.open_agent(msg.resume))
                 else:
                     state = _Session()
-                    resumed_cwd = sessions_service.find_session_cwd(msg.resume) if msg.resume else None
+                    resumed_cwd = await asyncio.to_thread(sessions_service.find_session_cwd, msg.resume) if msg.resume else None
                     state.cwd = resumed_cwd or msg.cwd or DEFAULT_CWD
                     requested = msg.permission_mode or settings_store.get("permission_mode")
                     state.permission_mode = resolve_permission_mode(requested)
@@ -471,37 +484,21 @@ async def chat_ws(ws: WebSocket):
                     session.wake_agent()
                     if not session.running and session.agent.todos:
                         await send({"type": "todos", "items": session.agent.todos})
-                elif not session.running and session.state.session_id:
-                    tasks = await asyncio.to_thread(
-                        sessions_service.session_tasks,
-                        session.state.session_id,
-                        sessions_service.project_key_for(session.state.cwd or ""),
-                    )
-                    for t in tasks:
-                        await send({"type": "task", **t})
-                    remembered = todos_store.load(session.state.session_id)
-                    if not tasks and remembered:
-                        await send({"type": "todos", "items": remembered})
                 await send({"type": "attached"})
-                side_channel = raw.get("side_channel")
-                side_resume = raw.get("side_resume")
-                existing_side = registry.get(side_channel) if side_channel else None
-                if existing_side is None and side_resume:
-                    existing_side = registry.get_by_session(side_resume)
+                if session.agent is None and not session.running and session.state.session_id:
+                    spawn(_send_tasks(send, session))
+                existing_side = registry.get(msg.side_channel) if msg.side_channel else None
+                if existing_side is None and msg.side_resume:
+                    existing_side = registry.get_by_session(msg.side_resume)
                 if existing_side is not None:
                     side_session = existing_side
-                    await side_session.attach(send, last_seq=raw.get("side_last_seq") or 0)
-                elif not side_channel:
+                    await side_session.attach(send, last_seq=msg.side_last_seq)
+                elif not msg.side_channel:
                     side_session = None
 
             elif mtype == "prompt":
                 if session is None:
                     await send({"type": "error", "message": "send 'start' first"})
-                    continue
-                try:
-                    msg = PromptMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
                     continue
                 target = registry.get(msg.channel) if msg.channel and msg.channel != session.channel else session
                 if target is None:
@@ -515,16 +512,10 @@ async def chat_ws(ws: WebSocket):
                     await target.enqueue(msg.id, msg.text, msg.attachments)
 
             elif mtype == "unqueue":
-                mid = raw.get("id")
-                if session is not None and isinstance(mid, str):
-                    await session.cancel_queued(mid)
+                if session is not None:
+                    await session.cancel_queued(msg.id)
 
             elif mtype == "set_generation":
-                try:
-                    msg = SetGenerationMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None:
                     if msg.cwd is not None and session.state.session_id is None:
                         session.state.cwd = msg.cwd or DEFAULT_CWD
@@ -539,13 +530,8 @@ async def chat_ws(ws: WebSocket):
                         session.state.account = msg.account
 
             elif mtype == "set_permission_mode":
-                try:
-                    msg = SetPermissionMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if msg.mode not in permission_modes():
-                    await send({"type": "error", "message": f"invalid permission_mode: {msg.mode}"})
+                    await send(_rejected(raw, f"invalid permission_mode: {msg.mode}"))
                     continue
                 if session is not None:
                     session.state.permission_mode = msg.mode
@@ -553,20 +539,10 @@ async def chat_ws(ws: WebSocket):
                 await send({"type": "permission_mode", "mode": msg.mode})
 
             elif mtype == "set_option":
-                try:
-                    msg = SetOptionMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None and session.agent is not None:
                     spawn(session.agent.set_option(msg.id, msg.value))
 
             elif mtype == "agent_login":
-                try:
-                    msg = AgentLoginMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None and session.agent is not None:
                     spawn(session.agent.login(msg.method))
 
@@ -591,54 +567,29 @@ async def chat_ws(ws: WebSocket):
                     await session.release_resident()
 
             elif mtype == "mod_render":
-                try:
-                    msg = ModRenderMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None:
                     spawn(_send_mod_tree(send, session, msg))
 
             elif mtype == "mod_act":
-                try:
-                    msg = ModActionMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None:
                     work = session.mod_act(msg.action, msg.model_dump(exclude={"type", "action", "rid"}, exclude_unset=True))
                     spawn(work if msg.rid is None else _send_mod_reply(send, session, msg.rid, work))
 
             elif mtype == "mod_client_module":
-                try:
-                    msg = ModClientModuleMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None:
                     spawn(_send_mod_reply(send, session, msg.rid, session.mod_client_module(msg.plugin)))
 
             elif mtype == "mod_answer":
-                try:
-                    msg = ModAnswerMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 if session is not None:
                     session.answer_mod(msg.id, msg.answer)
 
             elif mtype == "set_visibility":
-                try:
-                    msg = SetVisibilityMessage(**raw)
-                except ValidationError as exc:
-                    await send({"type": "error", "message": exc.errors()})
-                    continue
                 seen["prefs"] = visibility.resolve(msg.model_dump(exclude={"type"}))
 
             elif mtype == "ask":
-                question = (raw.get("text") or "").strip()
+                question = msg.text.strip()
                 if question and session is not None:
-                    resume_id = raw.get("resume") if isinstance(raw.get("resume"), str) else None
+                    resume_id = msg.resume
                     if side_session is None:
                         side_state = _Session()
                         side_state.cwd = session.state.cwd
@@ -659,10 +610,10 @@ async def chat_ws(ws: WebSocket):
 
             elif mtype == "reload":
                 if session is not None:
-                    spawn(session.reload(raw.get("command")))
+                    spawn(session.reload(msg.command))
 
             elif mtype == "interrupt":
-                target = side_session if raw.get("lane") == "side" else session
+                target = side_session if msg.lane == "side" else session
                 if target is not None:
                     await target.interrupt()
                     if target is session:
@@ -671,59 +622,33 @@ async def chat_ws(ws: WebSocket):
                             await _start_turn(session, item["id"], item["text"], item["attachments"], seen["prefs"], seen["capabilities"])
 
             elif mtype == "stop_task":
-                tool_use_id = raw.get("id")
-                if session is not None and isinstance(tool_use_id, str):
-                    await session.stop_task(tool_use_id)
+                if session is not None:
+                    await session.stop_task(msg.id)
 
             elif mtype == "interaction_response":
-                rid = raw.get("id")
-                if isinstance(rid, str):
-                    payload = {
-                        "option_id": raw.get("option_id"),
-                        "free_text": raw.get("free_text"),
-                        "values": raw.get("values"),
-                        "chat": raw.get("chat"),
-                        "dismissed_by": raw.get("dismissed_by"),
-                    }
-                    for s in (session, side_session):
-                        if s is not None and s.resolve(rid, payload):
-                            await s.announce_resolved(
-                                rid,
-                                raw.get("option_id"),
-                                values=payload.get("values"),
-                                dismissed=bool(raw.get("chat")),
-                            )
-                            break
+                payload = msg.model_dump(include={"option_id", "free_text", "values", "chat", "dismissed_by"})
+                for s in (session, side_session):
+                    if s is not None and s.resolve(msg.id, payload):
+                        await s.announce_resolved(msg.id, msg.option_id, values=msg.values, dismissed=bool(msg.chat))
+                        break
 
             elif mtype == "load_history":
-                project = raw.get("project") or (session.state.cwd if session else DEFAULT_CWD)
-                sid = raw.get("session_id")
-                limit = raw.get("limit") or 200
-                before_index = raw.get("before_index")
-                if not isinstance(sid, str) or not isinstance(limit, int):
-                    await send({"type": "error", "message": "invalid load_history payload"})
-                    continue
-                if limit < 1 or limit > 500:
-                    await send({"type": "error", "message": "invalid limit"})
-                    continue
+                project = msg.project or (session.state.cwd if session else DEFAULT_CWD)
                 try:
-                    if session is not None and session.agent is not None and sid == session.agent.session_id:
+                    if session is not None and session.agent is not None and msg.session_id == session.agent.session_id:
                         items = visible_rows(session.agent.rows, seen["prefs"])
                     else:
-                        items = await asyncio.to_thread(sessions_service.get_session_messages, project, sid, seen["prefs"])
+                        items = await asyncio.to_thread(sessions_service.get_session_messages, project, msg.session_id, seen["prefs"])
                 except ValueError as exc:
-                    await send({"type": "error", "message": str(exc)})
+                    await send(_rejected(raw, str(exc)))
                     continue
                 if blocks.MEDIA_CAPABILITY not in seen["capabilities"]:
                     items = blocks.degrade_items(items)
-                total = len(items)
-                end = total if before_index is None else max(0, min(before_index, total))
-                start = page_start(items, end, limit)
-                slice_ = [dict(item, index=i) for i, item in enumerate(items[start:end], start=start)]
+                rows, start = page(items, msg.before_index, msg.limit)
                 await send({
                     "type": "history_chunk",
-                    "session_id": sid,
-                    "items": slice_,
+                    "session_id": msg.session_id,
+                    "items": rows,
                     "start_index": start,
                     "has_more": start > 0,
                 })
@@ -731,14 +656,12 @@ async def chat_ws(ws: WebSocket):
             elif mtype == "ping":
                 await send({"type": "pong"})
 
-            else:
-                await send({"type": "error", "message": f"unknown message type: {mtype}"})
-
     except WebSocketDisconnect:
         pass
     except Exception as exc:
         logger.error(f"chat_ws error: {type(exc).__name__}: {exc}")
     finally:
+        writer.close()
         if session is not None:
             await session.detach(sink)
         if side_session is not None:

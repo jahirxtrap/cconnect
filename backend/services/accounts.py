@@ -26,7 +26,7 @@ from loguru import logger
 
 from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import cli_settings, providers, sessions, settings_store
+from services import cli_settings, files, providers, sessions, settings_store
 
 _WINDOWS = sys.platform == "win32"
 
@@ -182,6 +182,15 @@ def _delegation(path: Path) -> dict:
     return {"delegate": meta.get("delegate") is True, "purpose": str(meta.get("purpose") or "")}
 
 
+def _account_dirs() -> list[Path]:
+    if not paths.ACCOUNTS_DIR.is_dir():
+        return []
+    return [
+        entry for entry in sorted(paths.ACCOUNTS_DIR.iterdir())
+        if entry.is_dir() and not entry.name.endswith(".lock") and config_dir(entry.name) is not None
+    ]
+
+
 def list_accounts() -> list[dict]:
     items = [{
         "id": PRIMARY_ID,
@@ -191,27 +200,25 @@ def list_accounts() -> list[dict]:
         "provider": None,
         **_delegation(primary_dir()),
     }]
-    if paths.ACCOUNTS_DIR.is_dir():
-        for entry in sorted(paths.ACCOUNTS_DIR.iterdir()):
-            if entry.is_dir() and not entry.name.endswith(".lock") and config_dir(entry.name) is not None:
-                provider = provider_for(entry.name)
-                items.append({
-                    "id": entry.name,
-                    "label": _label(entry, entry.name),
-                    "logged_in": bool(provider) or is_logged_in(entry.name),
-                    "primary": False,
-                    "provider": {
-                        "base_url": provider["base_url"],
-                        "model": provider["model"],
-                        "context_scope": providers.scope_for(provider.get("context_scope"))["id"],
-                    } if provider else None,
-                    **_delegation(entry),
-                })
+    for entry in _account_dirs():
+        provider = provider_for(entry.name)
+        items.append({
+            "id": entry.name,
+            "label": _label(entry, entry.name),
+            "logged_in": bool(provider) or is_logged_in(entry.name),
+            "primary": False,
+            "provider": {
+                "base_url": provider["base_url"],
+                "model": provider["model"],
+                "context_scope": providers.scope_for(provider.get("context_scope"))["id"],
+            } if provider else None,
+            **_delegation(entry),
+        })
     return items
 
 
 def known_ids() -> set[str]:
-    return {a["id"] for a in list_accounts()}
+    return {PRIMARY_ID, *(entry.name for entry in _account_dirs())}
 
 
 def default_account(known: Optional[set[str]] = None) -> str:
@@ -287,9 +294,8 @@ def link_shared_dirs(account_id: str) -> None:
 
 
 def link_all_shared_dirs() -> None:
-    for account in list_accounts():
-        if not account["primary"]:
-            link_shared_dirs(account["id"])
+    for entry in _account_dirs():
+        link_shared_dirs(entry.name)
 
 
 def _slug(label: str, taken: set[str]) -> str:
@@ -304,11 +310,11 @@ def _slug(label: str, taken: set[str]) -> str:
 
 
 def create(label: str) -> dict:
-    taken = {a["id"] for a in list_accounts()} | {marker.name.removesuffix(_DELETING) for marker in paths.ACCOUNTS_DIR.glob(f"*{_DELETING}")}
+    taken = known_ids() | {marker.name.removesuffix(_DELETING) for marker in paths.ACCOUNTS_DIR.glob(f"*{_DELETING}")}
     account_id = _slug(label, taken)
     path = paths.ACCOUNTS_DIR / account_id
     path.mkdir(parents=True, exist_ok=True)
-    (path / _META_FILE).write_text(json.dumps({"label": label.strip() or account_id}), encoding="utf-8")
+    files.write_json(path / _META_FILE, {"label": label.strip() or account_id})
     link_shared_dirs(account_id)
     primary = primary_dir()
     for name in _COPIED_FILES:
@@ -362,7 +368,7 @@ def _write_meta(account_id: str, changes: dict) -> bool:
     path = config_dir(account_id) if account_id != PRIMARY_ID else primary_dir()
     if path is None:
         return False
-    (path / _META_FILE).write_text(json.dumps({**_meta(path), **changes}), encoding="utf-8")
+    files.write_json(path / _META_FILE, {**_meta(path), **changes})
     return True
 
 
@@ -397,7 +403,7 @@ def update_provider(
     if path is None or not url or not provider_for(account_id):
         return False
     meta = {**_meta(path), "provider": _provider(url, model, auth, scope)}
-    (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
+    files.write_json(path / _META_FILE, meta)
     return True
 
 
@@ -414,9 +420,7 @@ def create_provider(
     account = create(label)
     path = paths.ACCOUNTS_DIR / account["id"]
     provider = _provider(url, model, auth, scope)
-    (path / _META_FILE).write_text(
-        json.dumps({"label": account["label"], "provider": provider}), encoding="utf-8"
-    )
+    files.write_json(path / _META_FILE, {"label": account["label"], "provider": provider})
     account["logged_in"] = True
     account["provider"] = {
         "base_url": url,
@@ -538,7 +542,7 @@ def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
     provider = _bundle_provider(payload)
     if provider:
         meta = {"label": account["label"], "provider": provider}
-        (path / _META_FILE).write_text(json.dumps(meta), encoding="utf-8")
+        files.write_json(path / _META_FILE, meta)
         account["provider"] = {"base_url": provider["base_url"], "model": provider.get("model", "")}
     account["logged_in"] = bool(provider) or is_logged_in(account["id"])
     return account
@@ -578,20 +582,19 @@ def sync_shared_config(account_id: str) -> None:
     path = config_dir(account_id)
     if path is None:
         return
-    files = (
+    shared = (
         _claude_json(None),
         primary_dir() / "settings.json",
         _claude_json(account_id),
         path / "settings.json",
     )
-    if _synced.get(account_id) == tuple(_mtime(item) for item in files):
+    if _synced.get(account_id) == tuple(_mtime(item) for item in shared):
         return
-    _merge_shared(files[0], files[2], _SHARED_KEYS)
-    _merge_shared(files[1], files[3], _SHARED_SETTINGS_KEYS)
-    _synced[account_id] = tuple(_mtime(item) for item in files)
+    _merge_shared(shared[0], shared[2], _SHARED_KEYS)
+    _merge_shared(shared[1], shared[3], _SHARED_SETTINGS_KEYS)
+    _synced[account_id] = tuple(_mtime(item) for item in shared)
 
 
 def sync_all_shared_config() -> None:
-    for account in list_accounts():
-        if not account["primary"]:
-            sync_shared_config(account["id"])
+    for entry in _account_dirs():
+        sync_shared_config(entry.name)

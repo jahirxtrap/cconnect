@@ -279,17 +279,13 @@ export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
   );
 }
 
-export function posterSrc(node: HTMLVideoElement, url: string | undefined) {
-  const source = sourceAction(
-    { url: url ?? "" },
+export function posterSrc(node: HTMLVideoElement, options: SourceOptions) {
+  return sourceAction(
+    options,
     (resolved) => fetchObjectUrl(resolved),
     (resolved) => {
       node.poster = resolved;
     },
     revoke,
   );
-  return {
-    update: (next: string | undefined) => source.update({ url: next ?? "" }),
-    destroy: source.destroy,
-  };
 }

@@ -479,6 +479,9 @@ export class ChatState {
   #interrupting = false;
   #pendingTrim: ((list: ChatMessage[]) => ChatMessage[]) | null = null;
   #uploadAbort: AbortController | null = null;
+  #opening = 0;
+  #loads = 0;
+  #reloads = 0;
   #history: string[] = [];
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
@@ -508,6 +511,8 @@ export class ChatState {
   }
 
   dispose() {
+    this.#opening++;
+    this.#uploadAbort?.abort();
     this.#socket.close();
     this.mods.reset();
   }
@@ -540,12 +545,14 @@ export class ChatState {
 
   #connect() {
     this.connection = "connecting";
-    void this.#openSocket();
+    void this.#openSocket(++this.#opening);
   }
 
-  async #openSocket() {
+  async #openSocket(opening: number) {
     await this.refreshServerInfo();
+    if (opening !== this.#opening) return;
     await this.#consumeInitialSession();
+    if (opening !== this.#opening) return;
     this.#socket.connect();
   }
 
@@ -557,7 +564,7 @@ export class ChatState {
       return;
     }
     const target = projectKey ? { ...initial, projectKey } : initial;
-    this.#initialConsumed = await this.#loadSessionInto(target);
+    if (await this.#loadSessionInto(target)) this.#initialConsumed = true;
   }
 
   #loadOverrides(overrides?: ChatOverrides) {
@@ -854,6 +861,7 @@ export class ChatState {
       );
     }
     this.sessionId = sessionId;
+    this.mods.nameTranscript(sessionId);
     if (born) this.#claimPendingCategory(sessionId);
     this.#promoteSide(sessionId);
   }
@@ -999,6 +1007,8 @@ export class ChatState {
   }
 
   newSession() {
+    this.#initialConsumed = true;
+    this.#loads++;
     this.viewOnly = null;
     this.pendingCategoryId = null;
     this.sessionId = null;
@@ -1076,10 +1086,18 @@ export class ChatState {
   }
 
   #freeze() {
-    if (this.#frozen === null && this.messages.length) this.#frozen = { messages: this.messages, ...this.#heldView() };
+    if (this.#frozen === null && this.messages.length) {
+      this.#frozen = { messages: $state.snapshot(this.messages), ...this.#heldView() };
+    }
+  }
+
+  #thaw() {
+    if (this.#frozen !== null) this.mods.showTranscript(this.sessionId);
+    this.#frozen = null;
   }
 
   async #openSession(session: SessionInfo) {
+    this.#initialConsumed = true;
     this.#socket.resetResume();
     this.#freeze();
     this.viewOnly = null;
@@ -1097,7 +1115,9 @@ export class ChatState {
       this.transcriptLoading = this.messages.length === 0;
       this.transcriptPaging = false;
     }
-    if (!(await this.#loadSessionInto(session))) {
+    const loaded = await this.#loadSessionInto(session);
+    if (loaded === null || session.sessionId !== this.sessionId) return;
+    if (!loaded) {
       this.#frozen = null;
       this.transcriptLoading = false;
       return;
@@ -1711,6 +1731,9 @@ export class ChatState {
       this.permissionMode = capabilities.defaults.permissionMode || this.permissionMode;
       this.model = capabilities.defaults.model || this.model;
       this.effort = capabilities.defaults.effort || this.effort;
+    } else if (!backend.schemeOf(this.environment)) {
+      const version = await this.#capabilities.versionInfo();
+      if (version) backend.rememberScheme(this.environment, version.sharedScheme);
     }
     const snapshot = await this.#settings.get();
     if (request !== this.#serverInfoRequest) return;
@@ -1854,6 +1877,7 @@ export class ChatState {
   }
 
   #resetTranscript() {
+    this.mods.showTranscript(null);
     this.messages = [];
     this.#held = [];
     this.#history = [];
@@ -1882,10 +1906,12 @@ export class ChatState {
     this.#frozen = null;
   }
 
-  async #loadSessionInto(session: SessionInfo): Promise<boolean> {
+  async #loadSessionInto(session: SessionInfo): Promise<boolean | null> {
     const project = session.projectKey;
     if (!project) return false;
+    const ticket = ++this.#loads;
     const page = await this.#sessions.messages(session.sessionId, project, HISTORY_PAGE, null, settings.visibility);
+    if (ticket !== this.#loads) return null;
     if (!page) return false;
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(
@@ -1905,6 +1931,7 @@ export class ChatState {
       this.cwd = session.path;
       this.onContextChange?.();
     }
+    if (this.#frozen === null) this.mods.showTranscript(session.sessionId);
     this.messages = loaded;
     this.sessionId = session.sessionId;
     this.projectKey = project;
@@ -1944,8 +1971,9 @@ export class ChatState {
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     if (!sessionId || !project) return;
+    const ticket = ++this.#reloads;
     const page = await this.#sessions.messages(sessionId, project, HISTORY_PAGE, null, settings.visibility);
-    if (!page) return;
+    if (!page || ticket !== this.#reloads || sessionId !== this.sessionId) return;
     const carried = keepLive ? this.messages.filter((item) => item.sourceIndex < 0) : [];
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
@@ -2085,11 +2113,9 @@ export class ChatState {
   }
 
   #onAgentChild(parent: string, event: ServerEvent) {
-    this.messages = this.messages.map((item) =>
-      item.role === "agent" && item.toolUseId === parent
-        ? { ...item, children: this.#childrenAfter(item.children, event) }
-        : item,
-    );
+    for (const item of this.messages) {
+      if (item.role === "agent" && item.toolUseId === parent) item.children = this.#childrenAfter(item.children, event);
+    }
 
     if (event.type === "tool_result" && event.toolUseId) {
       const toolUseId = event.toolUseId;
@@ -2212,9 +2238,8 @@ export class ChatState {
 
   #stream(currentId: number | null, role: Role, text: string): number {
     if (currentId !== null) {
-      this.messages = this.messages.map((item) =>
-        item.id === currentId ? { ...item, text: item.text + text } : item,
-      );
+      const current = this.messages.findLast((item) => item.id === currentId);
+      if (current) current.text += text;
       return currentId;
     }
     const id = this.#nextId++;
@@ -2223,14 +2248,11 @@ export class ChatState {
   }
 
   #updateInteraction(requestId: string, transform: (data: InteractionData) => InteractionData) {
-    const apply = (items: ChatMessage[]) =>
-      items.map((item) =>
-        item.interaction?.requestId === requestId ? { ...item, interaction: transform(item.interaction) } : item,
-      );
-    this.messages = apply(this.messages);
-    this.#sides = Object.fromEntries(
-      Object.entries(this.#sides).map(([key, side]) => [key, { ...side, messages: apply(side.messages) }]),
-    );
+    for (const items of [this.messages, ...Object.values(this.#sides).map((side) => side.messages)]) {
+      for (const item of items) {
+        if (item.interaction?.requestId === requestId) item.interaction = transform(item.interaction);
+      }
+    }
   }
 
   #componentHeadline(blocks: ComponentElement[]): string | null {
@@ -2351,6 +2373,9 @@ export class ChatState {
         this.#cutChannel = null;
         break;
       }
+      case "rejected":
+        if (event.request === "load_history") this.#abandonPage();
+        break;
       case "assistant_text":
         this.#thinkingId = null;
         this.#assistantId = this.#stream(this.#assistantId, "assistant", event.text);
@@ -2378,10 +2403,6 @@ export class ChatState {
       case "working":
         this.#breakStream();
         if (this.messages.at(-1)?.role !== "working") this.#append(newMessage(this.#nextId++, "working"));
-        break;
-      case "plan":
-        this.#breakStream();
-        this.#append(newMessage(this.#nextId++, "plan", { text: event.markdown }));
         break;
       case "command":
         this.#appendShown(newMessage(this.#nextId++, "assistant", { text: event.markdown, ephemeral: true }), event.local);
@@ -2679,7 +2700,7 @@ export class ChatState {
         void tick()
           .then(() => this.mods.whenDrawn())
           .then(() => {
-            this.#frozen = null;
+            this.#thaw();
             this.#settling = null;
             this.transcriptLoading = this.#awaitingHistory();
           });
@@ -2768,7 +2789,7 @@ export class ChatState {
       case "closed":
         this.#attaching = false;
         this.#arrivingMods = null;
-        this.#frozen = null;
+        this.#thaw();
         this.#settling = null;
         this.transcriptLoading = false;
         this.#abandonPage();

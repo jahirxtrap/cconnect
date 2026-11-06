@@ -10,11 +10,34 @@ from pathlib import Path
 from services import shared as shared_service
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
+_VIDEO_EXTENSIONS = {".mp4", ".webm", ".ogv", ".mov", ".mkv"}
 _MAX_DIMENSION = 1568
+_STILL_AT = 0.1
 
 
 def is_image(name: str) -> bool:
     return Path(name).suffix.lower() in _IMAGE_EXTENSIONS
+
+
+def is_video(name: str) -> bool:
+    return Path(name).suffix.lower() in _VIDEO_EXTENSIONS
+
+
+def _encoded(img, limit: int, cover: bool) -> tuple[str, bytes]:
+    side = min(img.size) if cover else max(img.size)
+    target = (ceil(img.width * limit / side), ceil(img.height * limit / side)) if side > limit else None
+    if target:
+        img.draft(None, target)
+    img.load()
+    has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+    if target:
+        img.thumbnail(target)
+    buf = io.BytesIO()
+    if has_alpha:
+        img.save(buf, format="PNG")
+        return "image/png", buf.getvalue()
+    img.convert("RGB").save(buf, format="JPEG", quality=85)
+    return "image/jpeg", buf.getvalue()
 
 
 def shrunk(path: Path, limit: int, cover: bool = False, stills_only: bool = False) -> tuple[str, bytes] | None:
@@ -23,19 +46,21 @@ def shrunk(path: Path, limit: int, cover: bool = False, stills_only: bool = Fals
         with Image.open(path) as img:
             if stills_only and getattr(img, "is_animated", False):
                 return None
-            img.load()
-            has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
-            side = min(img.size) if cover else max(img.size)
-            if side > limit:
-                img.thumbnail((ceil(img.width * limit / side), ceil(img.height * limit / side)))
-            buf = io.BytesIO()
-            if has_alpha:
-                img.save(buf, format="PNG")
-                media = "image/png"
-            else:
-                img.convert("RGB").save(buf, format="JPEG", quality=85)
-                media = "image/jpeg"
-            return media, buf.getvalue()
+            return _encoded(img, limit, cover)
+    except Exception:
+        return None
+
+
+def video_still(path: Path, limit: int) -> tuple[str, bytes] | None:
+    """A frame a tenth of the way into the video."""
+    try:
+        import av
+        with av.open(str(path)) as container:
+            stream = container.streams.video[0]
+            if stream.duration and stream.time_base:
+                container.seek(int(stream.duration * _STILL_AT), stream=stream)
+            frame = next(container.decode(stream), None)
+            return _encoded(frame.to_image(), limit, cover=True) if frame else None
     except Exception:
         return None
 

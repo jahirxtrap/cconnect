@@ -79,6 +79,7 @@
   "PREVIOUS_FILE": "前のファイル",
   "NO_CHANGES": "変更はありません",
   "NOT_A_REPOSITORY": "Git リポジトリではありません",
+  "GIT_MISSING": "サーバーに Git がインストールされていません",
   "UNLOCK": "ロック解除",
   "GIT_COMMIT": "コミット",
   "GIT_COMMIT_PUSH": "コミットしてプッシュ",

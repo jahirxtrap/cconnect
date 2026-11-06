@@ -19,7 +19,7 @@ interface Page {
 const SCHEME = "preview";
 const ISOLATED = "allow-scripts allow-forms allow-modals allow-downloads allow-popups allow-popups-to-escape-sandbox";
 const OWN_ORIGIN = `${ISOLATED} allow-same-origin`;
-const HTML_TYPE = "text/html;charset=utf-8";
+export const HTML_TYPE = "text/html;charset=utf-8";
 
 export const pageSandbox = ISOLATED;
 

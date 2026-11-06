@@ -1,5 +1,7 @@
 """Request models for the accounts router."""
 
+from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -36,10 +38,11 @@ class ProviderProbeRequest(BaseModel):
 
 class ProviderUpdateRequest(BaseModel):
     base_url: str
-    model: str = ""
+    model: Optional[str] = None
     auth: ProviderAuth = Field(default_factory=ProviderAuth)
     context_scope: str = ""
 
 
 class ProviderAccountRequest(ProviderUpdateRequest):
     label: str
+    model: str = ""

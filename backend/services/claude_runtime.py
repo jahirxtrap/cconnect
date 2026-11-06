@@ -15,7 +15,7 @@ from loguru import logger
 
 from core import cli_manager, paths
 from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
-from mcps import build_cconnect_server
+from mcps import build_cconnect_server, needs_key
 from mcps.media import block_types
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
@@ -627,23 +627,32 @@ def _cli_env(account_id: Optional[str]) -> dict[str, str]:
     return env
 
 
+def _denied(reason: str) -> dict:
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
 async def _block_background(input_data, tool_use_id, context):
     if persistent_sessions.enabled():
         return {}
     if ((input_data or {}).get("tool_input") or {}).get("run_in_background"):
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": _NO_BACKGROUND,
-            }
-        }
+        return _denied(_NO_BACKGROUND)
     return {}
 
 
 _NO_SECRETS = (
     "The CConnect server's own .env holds its credentials and is off limits. Ask the user for "
     "the value you need, or read the documented variable names in README.md instead."
+)
+
+_KEY_REQUIRED = (
+    "This needs the CConnect security key, and the message that started this turn came without it. "
+    "Ask the user to unlock it on the device they are writing from."
 )
 
 _OTHER_SHARED = (
@@ -707,29 +716,21 @@ async def _block_stale_shared(input_data, tool_use_id, context):
     data = input_data or {}
     folder = _stale_shared(data.get("tool_input"), data.get("cwd") or os.getcwd())
     if folder is not None:
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": _OTHER_SHARED.format(stale=folder, shared=paths.SHARED_DIR),
-            }
-        }
+        return _denied(_OTHER_SHARED.format(stale=folder, shared=paths.SHARED_DIR))
     return {}
 
 
 def _secrets_guard(unlocked: Callable[[], bool]):
-    """The server's own .env stays out of reach unless the chat carries the security key."""
+    """The server's own .env and the tools the security key guards stay out of reach unless the message carries the key."""
 
     async def guard(input_data, tool_use_id, context):
         data = input_data or {}
-        if not unlocked() and _mentions_env_file(data.get("tool_input"), data.get("cwd") or os.getcwd()):
-            return {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": _NO_SECRETS,
-                }
-            }
+        if unlocked():
+            return {}
+        if needs_key(data.get("tool_name") or "", data.get("tool_input")):
+            return _denied(_KEY_REQUIRED)
+        if _mentions_env_file(data.get("tool_input"), data.get("cwd") or os.getcwd()):
+            return _denied(_NO_SECRETS)
         return {}
 
     return guard
@@ -1279,7 +1280,9 @@ async def run_prompt(
             elif isinstance(message, SystemMessage):
                 subtype = getattr(message, "subtype", None)
                 data = getattr(message, "data", None)
-                if subtype == "api_retry" and isinstance(data, dict):
+                if subtype == "init" and isinstance(data, dict):
+                    cli_info.observe_init(account, data)
+                elif subtype == "api_retry" and isinstance(data, dict):
                     retrying = True
                     yield _retry_status(data)
                 elif subtype == "status":
@@ -1342,11 +1345,8 @@ async def run_prompt(
             resident.unbind()
 
 
-async def generate_title(transcript: str, account: Optional[str] = None) -> str:
-    """Ask a fast model for a short conversation title and return ONLY the text — the
-    caller does the actual rename. Runs in the isolated AI workspace, so its session
-    stays a plain SDK session under that project key (never normalized to "cli", never
-    recorded in history like a chat) and is filtered out of the app's history."""
+async def fast_reply(prompt: str, system_prompt: str, account: Optional[str]) -> str:
+    """A fast model's plain-text reply, without tools or MCP servers, from the isolated AI workspace."""
     from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage
 
     from services import accounts
@@ -1356,52 +1356,37 @@ async def generate_title(transcript: str, account: Optional[str] = None) -> str:
         cwd=str(paths.AI_WORKDIR),
         permission_mode="default",
         model=accounts.model_for(target, "haiku"),
-        system_prompt="You write conversation titles. Reply with ONLY the title: 3-6 words, in the conversation's language, capitalised like a sentence, no quotes, no trailing punctuation.",
+        system_prompt=system_prompt,
         setting_sources=[],
+        tools=[],
+        strict_mcp_config=True,
         cli_path=cli_manager.resolve_cli_path(),
         env=_cli_env(target),
     )
 
     parts: list[str] = []
     try:
-        async for message in query(prompt=f"Write a title for this conversation:\n\n{transcript}", options=options):
+        async for message in query(prompt=prompt, options=options):
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if type(block).__name__ == "TextBlock":
                         parts.append(getattr(block, "text", ""))
     except Exception as exc:
-        logger.error(f"generate_title failed: {type(exc).__name__}: {exc}")
+        logger.error(f"fast reply failed: {type(exc).__name__}: {exc}")
     return "".join(parts).strip()
 
 
-async def generate_commit_message(context: str, account: Optional[str] = None) -> str:
-    """Ask a fast model for a commit subject and return ONLY the text — the caller commits.
-    Runs in the isolated AI workspace, like generate_title."""
-    from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage
-
-    from services import accounts, claude_assets
-
-    target = accounts.resolve(account)
-    options = ClaudeAgentOptions(
-        cwd=str(paths.AI_WORKDIR),
-        permission_mode="default",
-        model=accounts.model_for(target, "haiku"),
-        system_prompt=claude_assets.commit_instructions(),
-        setting_sources=[],
-        cli_path=cli_manager.resolve_cli_path(),
-        env=_cli_env(target),
+async def generate_title(transcript: str, account: Optional[str] = None) -> str:
+    return await fast_reply(
+        f"Write a title for this conversation:\n\n{transcript}",
+        "You write conversation titles. Reply with ONLY the title: 3-6 words, in the conversation's language, capitalised like a sentence, no quotes, no trailing punctuation.",
+        account,
     )
 
-    parts: list[str] = []
-    try:
-        async for message in query(prompt=context, options=options):
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if type(block).__name__ == "TextBlock":
-                        parts.append(getattr(block, "text", ""))
-    except Exception as exc:
-        logger.error(f"generate_commit_message failed: {type(exc).__name__}: {exc}")
-    return "".join(parts).strip().splitlines()[0] if parts else ""
+
+async def generate_commit_message(context: str, account: Optional[str] = None) -> str:
+    reply = await fast_reply(context, claude_assets.commit_instructions(), account)
+    return reply.splitlines()[0] if reply else ""
 
 
 async def ask_side_question(

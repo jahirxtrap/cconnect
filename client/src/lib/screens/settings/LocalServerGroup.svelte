@@ -3,8 +3,11 @@
   import Power from "@lucide/svelte/icons/power";
   import Server from "@lucide/svelte/icons/server";
   import ServerCog from "@lucide/svelte/icons/server-cog";
+  import { chatListFor } from "$lib/data/chatList.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { onWake } from "$lib/platform/wake";
+  import { backend } from "$lib/services/backend.svelte";
   import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -15,8 +18,6 @@
   import LocalServerDialog from "./LocalServerDialog.svelte";
   import { useSettingsDialog } from "./useSettingsDialog.svelte";
   import { localServerValue } from "./settingsValues";
-
-  const PROBE_MS = 2000;
 
   let confirm = $state<"restart" | "stop" | null>(null);
   let dialog = $state(false);
@@ -43,9 +44,9 @@
   const summary = $derived(localServerValue() || null);
 
   $effect(() => {
+    void chatListFor(backend.active)?.connected;
     void localServer.refresh();
-    const probe = setInterval(() => void localServer.refresh(), PROBE_MS);
-    return () => clearInterval(probe);
+    return onWake(() => void localServer.refresh());
   });
 </script>
 

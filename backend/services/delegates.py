@@ -49,6 +49,13 @@ def _account_entry(ident: str) -> Optional[dict]:
     return next((item for item in accounts.list_accounts() if item["id"] == account), None)
 
 
+def names() -> tuple:
+    return (
+        tuple((agent["id"], agent.get("name")) for agent in agents.load()),
+        tuple((item["id"], item["label"], item["provider"] is not None) for item in accounts.list_accounts()),
+    )
+
+
 def _name_of(ident: str) -> Optional[str]:
     if ident.startswith(ACCOUNT_PREFIX):
         found = _account_entry(ident)

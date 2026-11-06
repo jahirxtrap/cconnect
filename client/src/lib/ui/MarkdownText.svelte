@@ -108,21 +108,23 @@
         held.delete(element);
       }
     };
-    const apply = () => {
-      prune(bars);
-      prune(images);
-      for (const scroller of node.querySelectorAll<HTMLElement>("table, pre")) {
+    const apply = (root: Element) => {
+      const within = <T extends Element>(selector: string): T[] => [
+        ...(root.matches(selector) ? [root as T] : []),
+        ...root.querySelectorAll<T>(selector),
+      ];
+      for (const scroller of within<HTMLElement>("table, pre")) {
         if (bars.has(scroller)) continue;
         bars.set(scroller, hscrollbar(scroller, { touchIndicator: true }));
       }
-      for (const image of fileUrl ? node.querySelectorAll<HTMLImageElement>(`img[${RELATIVE_SRC}]`) : []) {
+      for (const image of fileUrl ? within<HTMLImageElement>(`img[${RELATIVE_SRC}]`) : []) {
         const url = images.has(image) ? null : besideFile(fileUrl ?? "", image.getAttribute(RELATIVE_SRC) ?? "");
         if (url) images.set(image, imageSrc(image, { url }));
       }
       const sources = Array.from(icons?.querySelectorAll("svg") ?? []);
       if (!sources.length) return;
       const [file, archive, external, install, ...alerts] = sources;
-      for (const quote of node.querySelectorAll<HTMLElement>("blockquote.md-alert")) {
+      for (const quote of within<HTMLElement>("blockquote.md-alert")) {
         if (quote.dataset.decorated) continue;
         quote.dataset.decorated = "true";
         const kind = quote.dataset.alert ?? "note";
@@ -131,7 +133,7 @@
         title.append(alerts[ALERT_KINDS.indexOf(kind)].cloneNode(true), t(`ALERT_${kind.toUpperCase()}`));
         quote.prepend(title);
       }
-      for (const anchor of node.querySelectorAll("a")) {
+      for (const anchor of within<HTMLAnchorElement>("a")) {
         if (anchor.dataset.decorated) continue;
         anchor.dataset.decorated = "true";
         anchor.dataset.press = "off";
@@ -145,8 +147,16 @@
         else anchor.append(icon);
       }
     };
-    apply();
-    const observer = new MutationObserver(apply);
+    apply(node);
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => record.removedNodes.length)) {
+        prune(bars);
+        prune(images);
+      }
+      for (const record of records) {
+        for (const added of record.addedNodes) if (added instanceof Element) apply(added);
+      }
+    });
     observer.observe(node, { childList: true, subtree: true });
     return {
       destroy: () => {

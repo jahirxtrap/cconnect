@@ -79,6 +79,7 @@
   "PREVIOUS_FILE": "Previous file",
   "NO_CHANGES": "No changes",
   "NOT_A_REPOSITORY": "Not a git repository",
+  "GIT_MISSING": "Git is not installed on the server",
   "UNLOCK": "Unlock",
   "GIT_COMMIT": "Commit",
   "GIT_COMMIT_PUSH": "Commit and push",

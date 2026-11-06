@@ -1,8 +1,12 @@
 """Inbound WebSocket message models for the chat channel."""
 
-from typing import Any, Literal, Optional, Union
+from typing import Annotated, Any, Literal, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, TypeAdapter
+
+
+def _clamped(low: int, high: int) -> AfterValidator:
+    return AfterValidator(lambda value: min(max(value, low), high))
 
 
 class VisibilityPrefs(BaseModel):
@@ -37,6 +41,9 @@ class StartMessage(BaseModel):
     security_key: Optional[str] = None
     agent: Optional[str] = None
     locale: Optional[str] = None
+    side_channel: Optional[str] = None
+    side_resume: Optional[str] = None
+    side_last_seq: int = 0
 
 
 class PromptMessage(BaseModel):
@@ -64,6 +71,50 @@ class SetPermissionMessage(BaseModel):
 
 class InterruptMessage(BaseModel):
     type: Literal["interrupt"]
+    lane: Optional[str] = None
+
+
+class UnqueueMessage(BaseModel):
+    type: Literal["unqueue"]
+    id: str
+
+
+class StopTaskMessage(BaseModel):
+    type: Literal["stop_task"]
+    id: str
+
+
+class ReloadMessage(BaseModel):
+    type: Literal["reload"]
+    command: Optional[str] = None
+
+
+class AskMessage(BaseModel):
+    type: Literal["ask"]
+    text: str = ""
+    resume: Optional[str] = None
+
+
+class InteractionResponseMessage(BaseModel):
+    type: Literal["interaction_response"]
+    id: str
+    option_id: Optional[str] = None
+    free_text: Optional[str] = None
+    values: Any = None
+    chat: Any = None
+    dismissed_by: Optional[str] = None
+
+
+class LoadHistoryMessage(BaseModel):
+    type: Literal["load_history"]
+    session_id: str
+    project: Optional[str] = None
+    limit: int = Field(200, ge=1, le=500)
+    before_index: Optional[int] = None
+
+
+class SignalMessage(BaseModel):
+    type: Literal["ping", "usage", "history", "close_resident", "agent_login_cancel", "agent_logout", "agent_retry"]
 
 
 class SetOptionMessage(BaseModel):
@@ -98,8 +149,8 @@ class ModRenderMessage(BaseModel):
     component: ModComponent
     instance_id: str = Field(max_length=256)
     props: dict = Field(default_factory=dict)
-    columns: int = Field(80, ge=10, le=500)
-    rows: int = Field(24, ge=1, le=200)
+    columns: Annotated[int, _clamped(10, 500)] = 80
+    rows: Annotated[int, _clamped(1, 200)] = 24
     offset: int = Field(0, ge=0)
     rid: int = 0
 
@@ -182,3 +233,29 @@ class ModAnswerMessage(BaseModel):
     type: Literal["mod_answer"]
     id: str
     answer: dict = Field(default_factory=dict)
+
+
+ChatMessage = TypeAdapter(Annotated[
+    Union[
+        StartMessage,
+        PromptMessage,
+        UnqueueMessage,
+        SetGenerationMessage,
+        SetPermissionMessage,
+        SetOptionMessage,
+        AgentLoginMessage,
+        ModRenderMessage,
+        ModActionMessage,
+        ModClientModuleMessage,
+        ModAnswerMessage,
+        SetVisibilityMessage,
+        AskMessage,
+        ReloadMessage,
+        InterruptMessage,
+        StopTaskMessage,
+        InteractionResponseMessage,
+        LoadHistoryMessage,
+        SignalMessage,
+    ],
+    Field(discriminator="type"),
+])

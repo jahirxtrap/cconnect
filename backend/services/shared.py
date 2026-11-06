@@ -1,5 +1,7 @@
 """File serving from the shared drop folder (PC <-> phone), with subfolders."""
 
+import functools
+import os
 import shutil
 import subprocess
 import tarfile
@@ -10,22 +12,13 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 
+import py7zr
+import rarfile
+from py7zr.io import BytesIOFactory
+from py7zz.core import find_7z_binary
+
 from core import paths
 from services import files, shared_links
-
-try:
-    import py7zr
-except ImportError:
-    py7zr = None
-try:
-    import rarfile
-    if not shutil.which("unrar"):
-        for _cand in (r"C:\Program Files\WinRAR\UnRAR.exe", r"C:\Program Files (x86)\WinRAR\UnRAR.exe"):
-            if Path(_cand).exists():
-                rarfile.UNRAR_TOOL = _cand
-                break
-except ImportError:
-    rarfile = None
 
 COMPRESS_FORMATS = {"zip": ".zip", "7z": ".7z", "rar": ".rar", "tar.gz": ".tar.gz", "tar.xz": ".tar.xz"}
 _ARCHIVE_SUFFIXES = (".zip", ".7z", ".rar", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
@@ -357,13 +350,20 @@ def _rar_tool() -> Optional[str]:
 
 
 def capabilities() -> dict:
-    formats = ["zip"]
-    if py7zr is not None:
-        formats.append("7z")
+    formats = ["zip", "7z"]
     if _rar_tool() is not None:
         formats.append("rar")
     formats += ["tar.gz", "tar.xz"]
     return {"compress_formats": formats}
+
+
+@functools.cache
+def _rar_reader() -> None:
+    os.environ.setdefault("PY7ZZ_NO_AUTODOWNLOAD", "1")
+    with suppress(RuntimeError):
+        rarfile.SEVENZIP2_TOOL = find_7z_binary()
+    with suppress(rarfile.RarCannotExec):
+        rarfile.tool_setup(force=True)
 
 
 def _staged(src: Path, dest: Path) -> Path:
@@ -378,8 +378,6 @@ def _staged(src: Path, dest: Path) -> Path:
 def compress_entries(relpaths: list[str], fmt: str = "zip", name: Optional[str] = None) -> Optional[str]:
     if fmt not in COMPRESS_FORMATS:
         raise ValueError("unsupported format")
-    if fmt == "7z" and py7zr is None:
-        raise ValueError("7z support is not installed")
     if fmt == "rar" and _rar_tool() is None:
         raise ValueError("rar compression requires the rar CLI (RARLAB)")
     sources = [p for p in (_resolve(rel) for rel in relpaths) if p.exists() and p != _base().resolve()]
@@ -438,15 +436,10 @@ def _tar_path(name: str) -> str:
 
 
 def _open_zip(src: Path, kind: str):
-    if kind == "rar" and rarfile is None:
-        raise ValueError("rar support is not installed")
-    return (zipfile.ZipFile if kind == "zip" else rarfile.RarFile)(src)
-
-
-def _open_7z(src: Path):
-    if py7zr is None:
-        raise ValueError("7z support is not installed")
-    return py7zr.SevenZipFile(src)
+    if kind == "zip":
+        return zipfile.ZipFile(src)
+    _rar_reader()
+    return rarfile.RarFile(src)
 
 
 def _archive_members(src: Path, kind: str) -> list[tuple[str, bool, int, float]]:
@@ -462,7 +455,7 @@ def _archive_members(src: Path, kind: str) -> list[tuple[str, bool, int, float]]
                 if info.isfile() or info.isdir():
                     members.append((_tar_path(info.name), info.isdir(), info.size, float(info.mtime)))
     elif kind == "7z":
-        with _open_7z(src) as archive:
+        with py7zr.SevenZipFile(src) as archive:
             for info in archive.list():
                 mtime = info.creationtime.timestamp() if info.creationtime else 0.0
                 members.append((_member_path(info.filename), info.is_directory, info.uncompressed or 0, mtime))
@@ -527,9 +520,12 @@ def archive_member_stream_at(src: Path, inner: str):
                 while chunk := fh.read(_CHUNK_BYTES):
                     yield chunk
         else:
-            with _open_7z(src) as archive:
+            with py7zr.SevenZipFile(src) as archive:
                 inner_name = next(i.filename for i in archive.list() if _member_path(i.filename) == target)
-                buffer = archive.read([inner_name])[inner_name]
+                unpacked = BytesIOFactory(max(match[2], 1))
+                archive.extract(targets=[inner_name], factory=unpacked)
+                buffer = unpacked.products[inner_name]
+                buffer.seek(0)
                 while chunk := buffer.read(_CHUNK_BYTES):
                     yield chunk
 
@@ -596,7 +592,7 @@ def extract_entry(
                 if path and wanted(path) and (info.isfile() or info.isdir()):
                     place(path, info.isdir(), lambda i=info: archive.extractfile(i))
     else:
-        with _open_7z(src) as archive:
+        with py7zr.SevenZipFile(src) as archive:
             names = [i.filename for i in archive.list()]
             targets = [n for n in names if wanted(_member_path(n))] if selected else None
             with tempfile.TemporaryDirectory(dir=str(dest_dir)) as tmp:

@@ -2,17 +2,9 @@
 
 from __future__ import annotations
 
-import logging
-import time
-
 import httpx
 
-logger = logging.getLogger(__name__)
-
 _SUMMARY_URL = "https://status.claude.com/api/v2/summary.json"
-_TTL = 60.0
-_cache: dict | None = None
-_cache_at = 0.0
 
 
 async def _fetch() -> dict:
@@ -53,18 +45,8 @@ def _normalize(data: dict) -> dict:
     }
 
 
-async def service_status(force: bool = False) -> dict:
-    global _cache, _cache_at
-    now = time.monotonic()
-    if _cache is not None and not force and now - _cache_at < _TTL:
-        return _cache
+async def service_status() -> dict:
     try:
-        result = _normalize(await _fetch())
+        return _normalize(await _fetch())
     except (httpx.HTTPError, ValueError) as exc:
-        logger.debug(f"status fetch failed: {type(exc).__name__}: {exc}")
-        if _cache is not None:
-            return _cache
         return {"error": f"Couldn't fetch status: {type(exc).__name__}"}
-    _cache = result
-    _cache_at = now
-    return result

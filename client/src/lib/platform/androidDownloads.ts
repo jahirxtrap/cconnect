@@ -1,6 +1,7 @@
+import { followTransfer, type TransferState } from "./androidTransfers";
+
 interface AndroidDownloadsBridge {
   enqueue: (url: string, filename: string, headersJson: string) => string;
-  status: (id: string) => string;
   cancel: (id: string) => void;
   saveAs: (url: string, filename: string, headersJson: string) => void;
   share: (url: string, filename: string, headersJson: string) => void;
@@ -12,13 +13,11 @@ interface AndroidDownloadsBridge {
   openData: (filename: string, base64: string) => void;
 }
 
-interface DownloadState {
-  status: "active" | "done" | "failed";
-  bytes: number;
-  total: number;
-}
+const followed = new Map<string, (state: TransferState) => void>();
 
-const POLL_INTERVAL = 300;
+(window as unknown as { __cconnectDownload?: (state: TransferState & { id: string }) => void }).__cconnectDownload = (
+  state,
+) => followed.get(state.id)?.(state);
 
 export const androidDownloads = (): AndroidDownloadsBridge | undefined =>
   (window as unknown as { AndroidDownloads?: AndroidDownloadsBridge }).AndroidDownloads;
@@ -31,7 +30,7 @@ export const trackAndroidDownload = (
 ) =>
   new Promise<boolean>((resolve) => {
     const stop = (result: boolean) => {
-      clearInterval(timer);
+      followed.delete(id);
       signal.removeEventListener("abort", abort);
       resolve(result);
     };
@@ -39,17 +38,6 @@ export const trackAndroidDownload = (
       bridge.cancel(id);
       stop(false);
     };
-    const timer = setInterval(() => {
-      let state: DownloadState;
-      try {
-        state = JSON.parse(bridge.status(id)) as DownloadState;
-      } catch {
-        stop(false);
-        return;
-      }
-      if (state.total > 0) onProgress(Math.min(1, state.bytes / state.total));
-      if (state.status === "done") stop(true);
-      else if (state.status === "failed") stop(false);
-    }, POLL_INTERVAL);
+    followed.set(id, followTransfer(onProgress, stop));
     signal.addEventListener("abort", abort);
   });

@@ -79,6 +79,7 @@
   "PREVIOUS_FILE": "이전 파일",
   "NO_CHANGES": "변경 사항 없음",
   "NOT_A_REPOSITORY": "Git 저장소가 아닙니다",
+  "GIT_MISSING": "서버에 Git이 설치되어 있지 않습니다",
   "UNLOCK": "잠금 해제",
   "GIT_COMMIT": "커밋",
   "GIT_COMMIT_PUSH": "커밋 후 푸시",

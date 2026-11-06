@@ -72,6 +72,12 @@ def page_start(messages: list[dict], end: int, limit: int) -> int:
     return 0
 
 
+def page(messages: list[dict], before_index: int | None, limit: int) -> tuple[list[dict], int]:
+    end = len(messages) if before_index is None else max(0, min(before_index, len(messages)))
+    start = page_start(messages, end, limit)
+    return [dict(item, index=index) for index, item in enumerate(messages[start:end], start=start)], start
+
+
 def visible_rows(rows: list[dict], vis: dict, parent: str | None = None) -> list[dict]:
     """The rows as a client with these visibility settings reads them."""
     out: list[dict] = []

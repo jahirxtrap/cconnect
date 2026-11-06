@@ -10,7 +10,7 @@ from starlette.requests import ClientDisconnect
 from pydantic import BaseModel
 
 from core.access import key_matches
-from core.responses import api_response, file_response, image_response
+from core.responses import api_response, derived_response, file_response
 from core.ws import stream_watch
 from services import attachments
 from services import shared as shared_service
@@ -222,9 +222,15 @@ def download_shared(path: str, request: Request, size: int | None = Query(None, 
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    small = attachments.shrunk(resolved, size, cover=True, stills_only=True) if size and attachments.is_image(resolved.name) else None
-    if small:
-        return image_response(*small, resolved)
+    if size and attachments.is_image(resolved.name):
+        small = derived_response(request, resolved, f"{size}", lambda: attachments.shrunk(resolved, size, cover=True, stills_only=True))
+        if small is not None:
+            return small
+    if size and attachments.is_video(resolved.name):
+        still = derived_response(request, resolved, f"{size}", lambda: attachments.video_still(resolved, size))
+        if still is None:
+            raise HTTPException(status_code=404, detail="no still for this video")
+        return still
     return file_response(
         request,
         resolved,

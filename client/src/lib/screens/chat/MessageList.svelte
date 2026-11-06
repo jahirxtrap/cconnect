@@ -183,11 +183,14 @@
   const runs = $derived(mods?.state.surface ? toolRuns(visible) : []);
   const runOf = $derived(new Map(runs.flatMap((run) => run.members.map((id) => [id, run] as const))));
 
-  const runActive = (run: ToolRun) => {
-    if (!streaming) return false;
-    const last = visible.findIndex((item) => item.id === run.members.at(-1));
-    return visible.slice(last + 1).every((item) => item.role === "working" || item.role === "thinking");
-  };
+  const activeRun = $derived.by(() => {
+    const run = streaming ? runs.at(-1) : undefined;
+    if (!run) return null;
+    const last = visible.findLastIndex((item) => item.id === run.members.at(-1));
+    return visible.slice(last + 1).every((item) => item.role === "working" || item.role === "thinking") ? run.id : null;
+  });
+
+  const runActive = (run: ToolRun) => run.id === activeRun;
 
   const groupProps = (run: ToolRun) => ({
     calls: run.calls.map((call) => ({
@@ -296,7 +299,6 @@
   });
 
   $effect(() => {
-    void messages.at(-1)?.text;
     void messages.length;
     void compacting;
     void streamStatus;

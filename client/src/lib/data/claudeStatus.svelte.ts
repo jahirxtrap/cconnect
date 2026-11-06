@@ -70,8 +70,8 @@ class ClaudeStatus {
     return loads.track(this.#loadExtensions());
   }
 
-  loadService(force = false) {
-    return loads.track(this.#loadService(force));
+  loadService() {
+    return loads.track(this.#loadService());
   }
 
   loadUsage(force = false) {
@@ -114,10 +114,10 @@ class ClaudeStatus {
     this.mcpServers = mcpServers;
   }
 
-  async #loadService(force: boolean) {
+  async #loadService() {
     const at = this.#sync();
     this.loading = untrack(() => this.service) === null;
-    const value = backend.configured ? await claudeApi.status(force) : null;
+    const value = backend.configured ? await claudeApi.status() : null;
     if (at !== backend.activeId) return;
     this.service = value;
     this.loading = false;

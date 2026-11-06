@@ -72,6 +72,24 @@ pub struct LocalServerInfo {
 #[derive(Default)]
 pub struct LocalServerState {
     inner: Mutex<Inner>,
+    #[cfg(desktop)]
+    runtime: Mutex<Option<RuntimeWatch>>,
+    #[cfg(desktop)]
+    announcing: Mutex<Announcing>,
+}
+
+#[cfg(desktop)]
+struct RuntimeWatch {
+    folder: PathBuf,
+    config: LocalServerConfig,
+    _watcher: notify::RecommendedWatcher,
+}
+
+#[cfg(desktop)]
+#[derive(Default)]
+struct Announcing {
+    running: bool,
+    again: bool,
 }
 
 #[derive(Default)]
@@ -354,11 +372,77 @@ fn secret_in(line: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_string())
 }
 
+#[cfg(desktop)]
+fn follow_runtime(app: &AppHandle, state: &LocalServerState, config: &LocalServerConfig) {
+    use notify::Watcher;
+
+    let Some((runtime, _)) = data_paths(config) else {
+        return;
+    };
+    let (Some(folder), Some(name)) = (runtime.parent().map(Path::to_path_buf), runtime.file_name().map(|name| name.to_os_string())) else {
+        return;
+    };
+    let mut watch = state.runtime.lock().unwrap();
+    if let Some(current) = watch.as_mut().filter(|current| current.folder == folder) {
+        current.config = config.clone();
+        return;
+    }
+    *watch = None;
+    let handle = app.clone();
+    let Ok(mut watcher) = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
+        if event.is_ok_and(|event| event.paths.iter().any(|path| path.file_name() == Some(name.as_os_str()))) {
+            let handle = handle.clone();
+            std::thread::spawn(move || announce(&handle));
+        }
+    }) else {
+        return;
+    };
+    if watcher.watch(&folder, notify::RecursiveMode::NonRecursive).is_ok() {
+        *watch = Some(RuntimeWatch { folder, config: config.clone(), _watcher: watcher });
+    }
+}
+
+#[cfg(not(desktop))]
+fn follow_runtime(_: &AppHandle, _: &LocalServerState, _: &LocalServerConfig) {}
+
+#[cfg(desktop)]
+fn announce(app: &AppHandle) {
+    let state = app.state::<LocalServerState>();
+    {
+        let mut announcing = state.announcing.lock().unwrap();
+        if announcing.running {
+            announcing.again = true;
+            return;
+        }
+        announcing.running = true;
+    }
+    loop {
+        let config = state.runtime.lock().unwrap().as_ref().map(|watch| watch.config.clone());
+        if let Some(config) = config {
+            if data_paths(&config).is_some_and(|(runtime, _)| runtime.exists()) {
+                wait_port(resolve_port(&config), true, READY_ATTEMPTS);
+            }
+            emit(app, &status_of(&state, &config));
+        }
+        let mut announcing = state.announcing.lock().unwrap();
+        if !std::mem::take(&mut announcing.again) {
+            announcing.running = false;
+            return;
+        }
+    }
+}
+
 #[tauri::command(async)]
 pub fn local_server_status(
+    app: AppHandle,
     state: State<'_, LocalServerState>,
     config: LocalServerConfig,
 ) -> LocalServerInfo {
+    follow_runtime(&app, &state, &config);
+    status_of(&state, &config)
+}
+
+fn status_of(state: &LocalServerState, config: &LocalServerConfig) -> LocalServerInfo {
     let managed = {
         let mut inner = state.inner.lock().unwrap();
         if let Some(child) = inner.child.as_mut() {

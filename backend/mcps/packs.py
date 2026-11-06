@@ -82,6 +82,10 @@ INPUT = {
 }
 
 
+def needs_key(name: str, args: dict) -> bool:
+    return name == TOOL and args.get("action") == "remove"
+
+
 def _text(message: str) -> dict:
     return {"content": [{"type": "text", "text": message}]}
 

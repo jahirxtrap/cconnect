@@ -36,27 +36,36 @@ export const jsonSource = (paths: readonly string[], read: (path: string) => Uin
 
 export const openArchive = (data: Uint8Array): PackSource => {
   if (data.byteLength > MAX_PACK_BYTES) throw new PackError("size", MANIFEST, formatSize(MAX_PACK_BYTES));
-  let entries: Record<string, Uint8Array>;
+  let files: { name: string; path: string; size: number }[];
   try {
-    entries = unzipSync(data, {
+    const entries = unzipSync(data, {
       filter: (file) => {
         if (file.originalSize > MAX_FILE_BYTES) throw new PackError("size", file.name, formatSize(MAX_FILE_BYTES));
         return !file.name.endsWith("/");
       },
     });
+    files = Object.entries(entries).map(([name, bytes]) => ({ name, path: normalized(name), size: bytes.byteLength }));
   } catch (error) {
     throw error instanceof PackError ? error : new PackError("archive");
   }
-  const files = Object.entries(entries).map(([name, bytes]) => [normalized(name), bytes] as const);
-  const total = files.reduce((sum, [, bytes]) => sum + bytes.byteLength, 0);
+  const total = files.reduce((sum, file) => sum + file.size, 0);
   if (total > MAX_PACK_BYTES) throw new PackError("size", MANIFEST, formatSize(MAX_PACK_BYTES));
-  const unsafe = files.find(([path]) => path.startsWith("/") || path.split("/").some((part) => UNSAFE_SEGMENTS.has(part)));
-  if (unsafe) throw new PackError("format", unsafe[0]);
-  const root = strippedRoot(files.map(([path]) => path));
-  const contents = new Map(
-    files.filter(([path]) => path.startsWith(root)).map(([path, bytes]) => [path.slice(root.length), bytes] as const),
+  const unsafe = files.find(({ path }) => path.startsWith("/") || path.split("/").some((part) => UNSAFE_SEGMENTS.has(part)));
+  if (unsafe) throw new PackError("format", unsafe.path);
+  const root = strippedRoot(files.map(({ path }) => path));
+  const names = new Map(
+    files.filter(({ path }) => path.startsWith(root)).map(({ name, path }) => [path.slice(root.length), name] as const),
   );
-  return jsonSource([...contents.keys()], (path) => contents.get(path));
+  const read = (path: string): Uint8Array | undefined => {
+    const name = names.get(path);
+    if (name === undefined) return undefined;
+    try {
+      return unzipSync(data, { filter: (file) => file.name === name })[name];
+    } catch {
+      throw new PackError("archive");
+    }
+  };
+  return jsonSource([...names.keys()], read);
 };
 
 const isManifest = (path: string): boolean =>

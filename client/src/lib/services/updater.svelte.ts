@@ -67,8 +67,7 @@ class Updater {
         );
       }
       this.progress = 0;
-      bridge.start(url);
-      const done = await trackAndroidInstall(bridge, (value) => (this.progress = value));
+      const done = await trackAndroidInstall(bridge, url, (value) => (this.progress = value));
       this.progress = null;
       if (!done) {
         this.#clear();

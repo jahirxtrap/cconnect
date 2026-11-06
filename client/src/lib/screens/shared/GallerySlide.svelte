@@ -11,6 +11,7 @@
   import { fallbackOf, revised, withoutFallback } from "$lib/data/url";
   import { t } from "$lib/i18n/index.svelte";
   import { imageSrc, posterSrc, servedSrc, sizedImage } from "$lib/services/mediaSource";
+  import { videoStillOf } from "$lib/services/sharedApi";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
@@ -33,9 +34,8 @@
   let loaded = $state(false);
   let failed = $state(false);
 
-  const frame = $derived(
-    item.poster && height ? sizedImage(item.poster, Math.ceil(height * (devicePixelRatio.current ?? 1))) : null,
-  );
+  const still = $derived(item.poster ?? videoStillOf(base));
+  const frame = $derived(still && height ? sizedImage(still, Math.ceil(height * (devicePixelRatio.current ?? 1))) : null);
 
   $effect(() => {
     void source;
@@ -69,7 +69,7 @@
     <!-- svelte-ignore a11y_media_has_caption -->
     <video
       use:servedSrc={{ url: source }}
-      use:posterSrc={frame ?? undefined}
+      use:posterSrc={{ url: frame ?? "" }}
       controls
       class="min-h-0 flex-1 bg-black"
     ></video>

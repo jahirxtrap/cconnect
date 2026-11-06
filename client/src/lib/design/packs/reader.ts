@@ -15,11 +15,15 @@ import {
   BACKGROUND_FITS,
   BUILTIN_PACK_IDS,
   COLOR_KEYS,
+  COLOR_PATTERN as COLOR,
   EFFECT_RANGES,
   FONT_FORMATS,
   FONT_KINDS,
+  FONT_STYLE_PATTERN as FONT_STYLE,
   IMAGE_FORMATS,
+  LOCAL_ID_PATTERN as LOCAL_ID,
   MANIFEST,
+  PACK_FIELDS,
   PACK_SCHEMA,
   TERMINAL_KEYS,
   THEME_KINDS,
@@ -72,13 +76,6 @@ type Fields = Record<string, unknown>;
 
 type Entry = [path: string, local: string];
 
-const COLOR = /^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
-const LOCAL_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-const FONT_STYLE = /^[a-z ]*$/i;
-const MANIFEST_FIELDS = ["schema", "id", "name", "version", "author", "contributors", "description", "preview", "use"];
-const THEME_FIELDS = ["name", "kind", "extends", "accent", "syntax", "colors"];
-const TERMINAL_FIELDS = ["name", "colors"];
-const ACCENT_FIELDS = ["id", "name", "color"];
 const ACCENTS_FILE = "accents.json";
 
 export const slugOf = (name: string): string =>
@@ -144,7 +141,7 @@ const colorsOf = (fields: Fields, keys: readonly string[], path: string): Record
 const readInfo = (source: PackSource): PackInfo => {
   if (!source.paths.includes(MANIFEST)) throw new PackError("manifest", MANIFEST);
   const fields = fieldsAt(source, MANIFEST);
-  onlyFields(fields, MANIFEST_FIELDS, MANIFEST);
+  onlyFields(fields, PACK_FIELDS.manifest, MANIFEST);
   const schema = fields.schema;
   if (typeof schema !== "number" || !Number.isInteger(schema)) throw new PackError("field", MANIFEST, "schema");
   if (schema > PACK_SCHEMA) throw new PackError("schema", String(schema));
@@ -187,7 +184,7 @@ const entriesIn = (source: PackSource, folder: string): Entry[] => {
     });
 };
 
-const BACKGROUND_FIELDS = ["name", "fit", ...Object.keys(EFFECT_RANGES)];
+const BACKGROUND_FIELDS = [...PACK_FIELDS.background, ...Object.keys(EFFECT_RANGES)];
 
 const effectsOf = (fields: Fields, path: string): Partial<BackgroundEffects> => {
   const effects: Partial<BackgroundEffects> = {};
@@ -288,7 +285,7 @@ export const readPack = (source: PackSource, builtin: boolean, known: KnownIds):
 
   const themes = themeEntries.map(([path, local]): [string, ThemeFile] => {
     const fields = fieldsAt(source, path);
-    onlyFields(fields, THEME_FIELDS, path);
+    onlyFields(fields, PACK_FIELDS.theme, path);
     const kind = requiredText(fields, "kind", path);
     if (!THEME_KINDS.includes(kind as ThemeKind)) throw new PackError("field", path, "kind");
     const parent = textOf(fields, "extends", path);
@@ -319,7 +316,7 @@ export const readPack = (source: PackSource, builtin: boolean, known: KnownIds):
 
   const terminals = entriesIn(source, "terminal").map(([path, local]): PackTerminal => {
     const fields = fieldsAt(source, path);
-    onlyFields(fields, TERMINAL_FIELDS, path);
+    onlyFields(fields, PACK_FIELDS.terminal, path);
     return { id: qualify(local), pack, name: requiredText(fields, "name", path), colors: colorsOf(fields, TERMINAL_KEYS, path) };
   });
 
@@ -338,7 +335,7 @@ export const readPack = (source: PackSource, builtin: boolean, known: KnownIds):
   const accents = accentEntries.map((entry, index): PackAccent => {
     const path = `${ACCENTS_FILE}[${index}]`;
     if (!isFields(entry)) throw new PackError("json", path);
-    onlyFields(entry, ACCENT_FIELDS, path);
+    onlyFields(entry, PACK_FIELDS.accent, path);
     const name = requiredText(entry, "name", path);
     const local = textOf(entry, "id", path) ?? slugOf(name);
     if (!LOCAL_ID.test(local)) throw new PackError("field", path, "id");

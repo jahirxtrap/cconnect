@@ -7,7 +7,6 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
-from pathlib import Path
 
 import httpx
 
@@ -258,22 +257,23 @@ def _bar_block(win: dict) -> dict:
     return block
 
 
-async def usage_blocks(account: str | None = None) -> list[dict]:
-    data = await _fetch(account)
-    if "error" in data:
-        return [{"type": "text", "text": f"_{data['error']}._"}]
-    windows = _windows(data)
-    if not windows:
-        return [{"type": "text", "text": "_The server returned no usage data._"}]
+def bar_blocks(windows: list[dict]) -> list[dict]:
     return [_bar_block(win) for win in windows]
 
 
-async def usage_markdown(account: str | None = None) -> str:
-    """Fetch plan usage and render it as markdown with per-window utilization bars."""
-    data = await _fetch(account)
+async def usage_blocks(account: str | None = None, language: str | None = None) -> list[dict]:
+    data = await usage_data(account, language)
+    if "error" in data:
+        return [{"type": "text", "text": f"_{data['error']}._"}]
+    if not data["windows"]:
+        return [{"type": "text", "text": "_The server returned no usage data._"}]
+    return bar_blocks(data["windows"])
+
+
+async def usage_markdown(account: str | None = None, language: str | None = None) -> str:
+    data = await usage_data(account, language)
     if "error" in data:
         return f"_{data['error']}._"
-    rows = [_window_md(w) for w in _windows(data)]
-    if not rows:
+    if not data["windows"]:
         return "_The server returned no usage data._"
-    return "**Token usage**\n\n" + "\n\n".join(rows)
+    return "**Token usage**\n\n" + "\n\n".join(_window_md(win) for win in data["windows"])

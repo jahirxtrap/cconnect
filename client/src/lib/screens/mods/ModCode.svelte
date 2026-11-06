@@ -1,6 +1,6 @@
 <script lang="ts">
   import { theme } from "$lib/design/theme.svelte";
-  import { highlight, resolveLang } from "$lib/markdown/highlighter";
+  import { highlightLines, resolveLang } from "$lib/markdown/highlighter";
   import { DIFF_LINE, DIFF_SIGN, DIFF_SIGN_COLUMN } from "$lib/ui/diffTones";
 
   interface Props {
@@ -22,7 +22,6 @@
   }
 
   const HUNK = /^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
-  const LINE_BREAK = /<br\s*\/?>/;
   const TONES: Record<Row["tone"], string> = {
     ...DIFF_LINE,
     gap: "text-on-surface-variant",
@@ -86,8 +85,8 @@
     highlighted = null;
     if (!target) return;
     let active = true;
-    void highlight(body, target, syntax).then((html) => {
-      if (active) highlighted = html.split(LINE_BREAK);
+    void highlightLines(body, target, syntax).then((lines) => {
+      if (active) highlighted = lines;
     });
     return () => {
       active = false;

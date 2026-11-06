@@ -1,17 +1,17 @@
 """Live chat/project list updates over a dedicated WebSocket.
 
 A filesystem watcher (``watchfiles``, in its own thread, with a polling fallback when it
-fails) over the Claude projects directory keeps a lightweight in-memory snapshot of
-the session/project list. On any change it re-scans, reusing cached metadata for
-files whose (mtime, size) is unchanged, diffs against the snapshot and broadcasts
-only the per-item deltas to subscribed clients — so the app loads the list once and
-stays fresh without re-fetching everything.
+fails) over the top two levels of the Claude projects directory keeps a lightweight
+in-memory snapshot of the session/project list. A change re-scans only the project
+folders it touched, reusing cached metadata for files whose (mtime, size) is unchanged,
+diffs against the snapshot and broadcasts only the per-item deltas to subscribed
+clients, and tells whoever follows a transcript that it was written.
 """
 
 import asyncio
 import threading
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Iterable, Optional
 
 from loguru import logger
 from watchfiles import watch
@@ -23,6 +23,9 @@ from services import sessions as sessions_service
 
 _DEBOUNCE_MS = 500
 _POLL_SECONDS = 2.0
+_TRANSCRIPT = ".jsonl"
+
+Folder = tuple[Optional[dict], dict[str, dict], set[str]]
 
 
 def _session_sig(s: dict) -> tuple:
@@ -34,6 +37,26 @@ def _project_sig(p: dict) -> tuple:
     return (p.get("path"), p.get("name"), p.get("custom_name"), p.get("session_count"), p.get("last_active"))
 
 
+def _parts(base: Path, path: str) -> tuple[str, ...]:
+    try:
+        return Path(path).relative_to(base).parts
+    except ValueError:
+        return ()
+
+
+def _touched(changed: Iterable[tuple[str, ...]]) -> dict[str, Optional[set[str]]]:
+    """Per project folder, the transcripts a batch of changes wrote, or None when the folder itself came or went."""
+    touched: dict[str, Optional[set[str]]] = {}
+    for parts in changed:
+        if len(parts) == 1:
+            touched[parts[0]] = None
+            continue
+        names = touched.setdefault(parts[0], set())
+        if names is not None and parts[1].endswith(_TRANSCRIPT):
+            names.add(parts[1][: -len(_TRANSCRIPT)])
+    return touched
+
+
 class ChatListHub:
     def __init__(self):
         self._sessions: dict[str, dict] = {}
@@ -42,9 +65,12 @@ class ChatListHub:
         self._hidden: set[str] = set()
         self._projects: dict[str, dict] = {}
         self._sig_cache: dict[str, tuple] = {}
+        self._folders: dict[str, Folder] = {}
+        self._followers: set[Callable[[set[str]], None]] = set()
         self._subscribers: set[asyncio.Queue] = set()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
+        self._scanning = threading.Lock()
         self._stop = threading.Event()
         self._started = False
 
@@ -66,6 +92,11 @@ class ChatListHub:
 
     def unsubscribe(self, q: asyncio.Queue):
         self._subscribers.discard(q)
+
+    def follow_transcripts(self, written: Callable[[set[str]], None]) -> Callable[[], None]:
+        """Call `written` on the event loop with the ids of the transcripts each change wrote, until the returned call stops it."""
+        self._followers.add(written)
+        return lambda: self._followers.discard(written)
 
     def snapshot(self) -> dict:
         from services import categories
@@ -170,90 +201,125 @@ class ChatListHub:
         threading.Thread(target=self._watch_loop, name="chat-list-watch", daemon=True).start()
 
     def _watch_loop(self):
-        base = Path(CLAUDE_PROJECTS_DIR)
+        base = Path(CLAUDE_PROJECTS_DIR).resolve()
         if base.is_dir():
             try:
-                for _ in watch(
+                for changes in watch(
                     base,
-                    watch_filter=None,
+                    watch_filter=lambda _change, path: 0 < len(_parts(base, path)) <= 2,
                     debounce=_DEBOUNCE_MS,
                     stop_event=self._stop,
                     raise_interrupt=False,
                     ignore_permission_denied=True,
                 ):
-                    self._refresh(True)
+                    touched = _touched(_parts(base, path) for _change, path in changes)
+                    self._refresh(True, touched)
+                    self._tell_followers({name for names in touched.values() if names for name in names})
                 return
             except Exception as exc:
-                logger.info(f"chat_list: {base} cannot be watched ({exc}); falling back to polling")
+                logger.error(f"chat_list: {base} cannot be watched ({exc}); the list is read again every {_POLL_SECONDS:g} s")
         self._poll_loop()
 
     def _poll_loop(self):
         while not self._stop.wait(_POLL_SECONDS):
-            self._refresh(True)
+            with self._scanning:
+                before = {sid: cached[0] for sid, cached in self._sig_cache.items()}
+                self._rescan(True, None)
+                written = {sid for sid, cached in self._sig_cache.items() if before.get(sid) != cached[0]}
+            self._tell_followers(written)
 
-    def _scan(self) -> tuple[dict, dict]:
+    def _tell_followers(self, written: set[str]):
+        loop = self._loop
+        if loop is None or not written:
+            return
+        for follower in list(self._followers):
+            loop.call_soon_threadsafe(follower, written)
+
+    def _session_of(self, file: Path, pkey: str, live: set[str]) -> tuple[bool, Optional[dict]]:
+        try:
+            st = file.stat()
+        except OSError:
+            return False, None
+        sid = file.stem
+        sig = (st.st_mtime, st.st_size)
+        cached = self._sig_cache.get(sid)
+        if cached is not None and cached[0] == sig:
+            return True, cached[1]
+        cwd, preview, title, color, entrypoint, has_content = sessions_service._session_meta(file)
+        if (entrypoint != "cli" and sid not in live) or (not has_content and not title):
+            meta = None
+        else:
+            meta = {
+                "session_id": sid,
+                "project_key": pkey,
+                "path": cwd,
+                "last_active": st.st_mtime,
+                "size": st.st_size,
+                "preview": preview,
+                "title": title,
+                "color": color,
+            }
+        self._sig_cache[sid] = (sig, meta)
+        return True, meta
+
+    def _scan_folder(self, directory: Path, live: set[str], known: Optional[Folder], names: Optional[set[str]]) -> Folder:
+        pkey = directory.name
+        if known is None or names is None:
+            listed: dict[str, dict] = {}
+            found: set[str] = set()
+            files = list(directory.glob(f"*{_TRANSCRIPT}"))
+        else:
+            listed, found = dict(known[1]), set(known[2])
+            files = [directory / f"{name}{_TRANSCRIPT}" for name in names]
+        for file in files:
+            sid = file.stem
+            exists, meta = self._session_of(file, pkey, live)
+            listed.pop(sid, None)
+            found.discard(sid)
+            if exists:
+                found.add(sid)
+            if meta is not None:
+                listed[sid] = meta
+        newest = max(listed.values(), key=lambda meta: meta["last_active"], default=None)
+        if newest is None:
+            return None, listed, found
+        project = {
+            "project_key": pkey,
+            "path": newest["path"],
+            "name": sessions_service._project_name(newest["path"]),
+            "custom_name": False,
+            "session_count": len(listed),
+            "last_active": newest["last_active"],
+        }
+        return project, listed, found
+
+    def _scan(self, touched: Optional[dict[str, Optional[set[str]]]] = None) -> tuple[dict, dict]:
         from services.live_sessions import registry
 
         live = registry.live_session_ids()
         base = Path(CLAUDE_PROJECTS_DIR)
         projects: dict[str, dict] = {}
         sessions: dict[str, dict] = {}
-        seen: set[str] = set()
         if not base.is_dir():
             return projects, sessions
         ai_keys = sessions_service._AI_PROJECT_KEYS
+        folders: dict[str, Folder] = {}
         for directory in base.iterdir():
-            if not directory.is_dir() or directory.name in ai_keys:
-                continue
             pkey = directory.name
-            count = 0
-            newest_mtime: Optional[float] = None
-            newest_meta: Optional[dict] = None
-            for file in directory.glob("*.jsonl"):
-                try:
-                    st = file.stat()
-                except OSError:
-                    continue
-                sid = file.stem
-                seen.add(sid)
-                sig = (st.st_mtime, st.st_size)
-                cached = self._sig_cache.get(sid)
-                if cached is not None and cached[0] == sig:
-                    meta = cached[1]
-                else:
-                    cwd, preview, title, color, entrypoint, has_content = sessions_service._session_meta(file)
-                    if (entrypoint != "cli" and sid not in live) or (not has_content and not title):
-                        meta = None
-                    else:
-                        meta = {
-                            "session_id": sid,
-                            "project_key": pkey,
-                            "path": cwd,
-                            "last_active": st.st_mtime,
-                            "size": st.st_size,
-                            "preview": preview,
-                            "title": title,
-                            "color": color,
-                        }
-                    self._sig_cache[sid] = (sig, meta)
-                if meta is None:
-                    continue
-                count += 1
-                meta = self._with_activity(sid, sessions_service.with_pinned(sid, meta))
-                sessions[sid] = meta
-                if newest_mtime is None or st.st_mtime > newest_mtime:
-                    newest_mtime = st.st_mtime
-                    newest_meta = meta
-            if newest_meta is not None:
-                path = newest_meta["path"]
-                projects[pkey] = {
-                    "project_key": pkey,
-                    "path": path,
-                    "name": sessions_service._project_name(path),
-                    "custom_name": False,
-                    "session_count": count,
-                    "last_active": newest_mtime,
-                }
+            if pkey in ai_keys or not directory.is_dir():
+                continue
+            known = self._folders.get(pkey) if touched is not None else None
+            if known is not None and pkey not in touched:
+                folders[pkey] = known
+            else:
+                folders[pkey] = self._scan_folder(directory, live, known, touched.get(pkey) if touched else None)
+        self._folders = folders
+        seen = {sid for _project, _listed, found in folders.values() for sid in found}
+        for pkey, (project, listed, _found) in folders.items():
+            if project is not None:
+                projects[pkey] = dict(project)
+            for sid, meta in listed.items():
+                sessions[sid] = self._with_activity(sid, sessions_service.with_pinned(sid, meta))
         if len(self._sig_cache) > len(seen):
             self._sig_cache = {k: v for k, v in self._sig_cache.items() if k in seen}
         for key, meta in projects_service.snapshot().items():
@@ -272,12 +338,16 @@ class ChatListHub:
                 found["custom_name"] = True
         return projects, sessions
 
-    def _refresh(self, broadcast: bool):
+    def _refresh(self, broadcast: bool, touched: Optional[dict[str, Optional[set[str]]]] = None):
+        with self._scanning:
+            self._rescan(broadcast, touched)
+
+    def _rescan(self, broadcast: bool, touched: Optional[dict[str, Optional[set[str]]]]):
         from services import categories
         from services.live_sessions import registry
 
         try:
-            new_projects, new_sessions = self._scan()
+            new_projects, new_sessions = self._scan(touched)
         except Exception as exc:
             logger.debug(f"chat_list refresh failed: {type(exc).__name__}: {exc}")
             return

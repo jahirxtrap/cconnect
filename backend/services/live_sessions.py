@@ -26,9 +26,9 @@ from services import (
 
 OUTBOX_MAX = 5000
 
-STOP_GRACE = 15.0
+JOINED_KINDS = frozenset({"assistant_text", "thinking"})
 
-TAIL_POLL = 1.0
+STOP_GRACE = 15.0
 
 RELOADS = {"reload-plugins": "reload_plugins", "reload-skills": "reload_skills"}
 
@@ -37,6 +37,18 @@ RELOAD_COUNTS = {"plugins": "plugins", "commands": "commands", "agents": "agents
 AGENT_EVENTS = ("agent_state", "history")
 
 _CLOSE = object()
+
+
+def _joinable(last, stamped):
+    return (
+        last["type"] == stamped["type"]
+        and stamped["type"] in JOINED_KINDS
+        and last.get("parent") == stamped.get("parent")
+        and isinstance(last.get("text"), str)
+        and isinstance(stamped.get("text"), str)
+        and not last.get("label")
+        and not stamped.get("label")
+    )
 
 
 class LiveSession:
@@ -49,7 +61,9 @@ class LiveSession:
         self._pending = {}
         self._seq = 0
         self._committed_seq = 0
-        self._outbox = collections.deque(maxlen=OUTBOX_MAX)
+        self._outbox = collections.deque()
+        self._outbox_room = OUTBOX_MAX
+        self._joined = {}
         self._lock = asyncio.Lock()
         self._inbox = asyncio.Queue()
         self._queued = []
@@ -78,6 +92,7 @@ class LiveSession:
         self._cooldown = None
         self._ending = False
         self._tail = None
+        self._tail_wake = None
         self._tail_counts = {}
         self._tail_stamp = None
         self.shown_size = None
@@ -155,7 +170,7 @@ class LiveSession:
             replayed = set()
             for stamped in list(self._outbox):
                 if stamped["seq"] > floor and not (since_committed and self._in_transcript(stamped)):
-                    await self._send_one(sink, {**stamped, "replay": True})
+                    await self._send_one(sink, {**self._since(stamped, floor), "replay": True})
                     replayed.add(stamped["seq"])
             for entry in list(self._pending.values()):
                 event = entry.get("event")
@@ -171,6 +186,39 @@ class LiveSession:
         started = self._runs.get(stamped.get("parent"))
         return started is not None and started <= self._committed_seq
 
+    def _since(self, stamped, floor):
+        """A joined delta without the part a socket that saw up to `floor` already has."""
+        bounds = self._joined.get(stamped["seq"])
+        if not bounds or bounds[0][0] > floor:
+            return stamped
+        cut = max(end for seq, end in bounds if seq <= floor)
+        return {**stamped, "text": stamped["text"][cut:]}
+
+    def _keep(self, stamped):
+        self._outbox.append(stamped)
+        if len(self._outbox) <= self._outbox_room:
+            return
+        while len(self._outbox) > OUTBOX_MAX and self._outbox[0]["seq"] <= self._committed_seq:
+            self._joined.pop(self._outbox.popleft()["seq"], None)
+        if len(self._outbox) > OUTBOX_MAX:
+            self._outbox = self._joined_outbox()
+        self._outbox_room = max(OUTBOX_MAX, 2 * len(self._outbox))
+
+    def _joined_outbox(self):
+        """The outbox with each run of streamed text joined into one event that remembers where every part ended."""
+        joined = collections.deque()
+        for stamped in self._outbox:
+            last = joined[-1] if joined else None
+            if last is None or not _joinable(last, stamped):
+                joined.append(stamped)
+                continue
+            head = self._joined.pop(last["seq"], [(last["seq"], len(last["text"]))])
+            tail = self._joined.pop(stamped["seq"], [(stamped["seq"], len(stamped["text"]))])
+            offset = len(last["text"])
+            joined[-1] = {**stamped, "text": last["text"] + stamped["text"]}
+            self._joined[stamped["seq"]] = [*head, *((seq, offset + end) for seq, end in tail)]
+        return joined
+
     async def detach(self, sink):
         """Drop one socket. The worker keeps running — it is not cancelled,
         and pending permission waits are left intact. Other attached sockets keep
@@ -179,6 +227,7 @@ class LiveSession:
             self._sinks.pop(sink, None)
             self.used_at = time.monotonic()
         if not self._sinks:
+            self._wake_tail()
             self._schedule_cooldown()
 
     def _watch_transcript(self):
@@ -191,6 +240,7 @@ class LiveSession:
         self._tail_counts = {}
         self._tail_stamp = None
         self.shown_size = None
+        self._wake_tail()
 
     def _tail_groups(self):
         groups = {}
@@ -199,12 +249,21 @@ class LiveSession:
             groups.setdefault(json.dumps(prefs, sort_keys=True), (prefs, []))[1].append(sink)
         return groups
 
+    def _wake_tail(self, written=None):
+        if self._tail_wake is not None and (written is None or self.state.session_id in written):
+            self._tail_wake.set()
+
     async def _tail_loop(self):
         from services import sessions as sessions_service
+        from services.chat_list import hub
 
+        self._tail_wake = asyncio.Event()
+        self._tail_wake.set()
+        unfollow = hub.follow_transcripts(self._wake_tail)
         try:
             while self._sinks and self.resident_alive:
-                await asyncio.sleep(TAIL_POLL)
+                await self._tail_wake.wait()
+                self._tail_wake.clear()
                 if self.running or not self._sinks:
                     continue
                 sid, cwd = self.state.session_id, self.state.cwd
@@ -230,6 +289,9 @@ class LiveSession:
                         await self._send_one(sink, {"type": "tail", "items": fresh, "channel": self.channel})
         except asyncio.CancelledError:
             return
+        finally:
+            unfollow()
+            self._tail_wake = None
 
     async def resident(self, keep=False):
         """The standing client this chat writes to, created on demand while the mode is on, or the running one with ``keep``."""
@@ -256,6 +318,7 @@ class LiveSession:
         if not self.resident_alive:
             self._end_background()
             self._reassert_meta()
+            self._wake_tail()
         self._publish_activity(self.activity)
 
     async def rename(self, title):
@@ -415,7 +478,7 @@ class LiveSession:
             if kind == "todos":
                 todos_store.remember(self.state.session_id, event.get("items") or [])
             if kind != "command":
-                self._outbox.append(stamped)
+                self._keep(stamped)
             if kind in ("done", "interrupted"):
                 self._committed_seq = self._seq
                 self._turn_open = False

@@ -6,8 +6,8 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import androidx.core.content.FileProvider
-import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
@@ -16,7 +16,7 @@ import java.util.concurrent.Executors
 private const val BUFFER_SIZE = 64 * 1024
 private const val APK_MIME = "application/vnd.android.package-archive"
 
-class Installer(private val activity: Activity) {
+class Installer(private val activity: Activity, private val webView: () -> WebView?) {
     private val workers = Executors.newSingleThreadExecutor()
 
     @Volatile private var bytes = 0L
@@ -24,6 +24,7 @@ class Installer(private val activity: Activity) {
     @Volatile private var state = "idle"
     @Volatile private var target: File? = null
     @Volatile private var cancelled = false
+    private var shown = -1
 
     @JavascriptInterface
     fun start(url: String) {
@@ -32,20 +33,28 @@ class Installer(private val activity: Activity) {
         target = null
         cancelled = false
         state = "active"
+        shown = -1
         workers.execute {
             val file = runCatching { fetch(url) }.getOrNull()
             target = file
             state = if (file != null) "done" else "failed"
+            report()
         }
     }
 
     @JavascriptInterface
-    fun status(): String =
-        JSONObject().put("status", state).put("bytes", bytes).put("total", total).toString()
-
-    @JavascriptInterface
     fun cancel() {
         cancelled = true
+    }
+
+    private fun report() {
+        val percent = transferPercent(bytes, total)
+        if (state == "active" && percent == shown) return
+        shown = percent
+        val payload = transferState(state, bytes, total)
+        activity.runOnUiThread {
+            webView()?.evaluateJavascript("window.__cconnectInstall && window.__cconnectInstall($payload)", null)
+        }
     }
 
     @JavascriptInterface
@@ -103,6 +112,7 @@ class Installer(private val activity: Activity) {
                     if (read < 0) break
                     out.write(buffer, 0, read)
                     bytes += read
+                    report()
                 }
             }
         }

@@ -111,6 +111,18 @@
   "fontKinds": ["text", "mono", "symbols", "emoji"],
   "fontFormats": ["woff2", "woff", "ttf", "otf"],
   "imageFormats": ["png", "jpg", "jpeg", "webp", "gif", "avif", "svg"],
+  "patterns": {
+    "color": "#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})",
+    "localId": "[a-z0-9]+(?:-[a-z0-9]+)*",
+    "fontStyle": "[a-zA-Z ]*"
+  },
+  "fields": {
+    "manifest": ["schema", "id", "name", "version", "author", "contributors", "description", "preview", "use"],
+    "theme": ["name", "kind", "extends", "accent", "syntax", "colors"],
+    "terminal": ["name", "colors"],
+    "accent": ["id", "name", "color"],
+    "background": ["name", "fit"]
+  },
   "maxFileBytes": 524288000,
   "maxPackBytes": 524288000
 }

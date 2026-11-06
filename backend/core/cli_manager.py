@@ -4,6 +4,7 @@ The SDK defaults to its bundled claude.exe, which may lag the CLI the user alrea
 on PATH. This lets the phone point CConnect at the system CLI (newer, carries features
 like ultracode), a custom path, or the bundled one, and update the system CLI in place."""
 
+import os
 import platform
 import shutil
 import re
@@ -32,14 +33,27 @@ def get_custom_path() -> Optional[str]:
     return settings_store.get("cli_custom_path")
 
 
-def system_cli() -> Optional[str]:
-    """The CLI the user runs in their own terminal (PATH first, then known spots)."""
+_system_found: Optional[tuple[str, str]] = None
+
+
+def _search_system_cli() -> Optional[str]:
     if found := shutil.which("claude"):
         return found
     for path in _KNOWN_LOCATIONS:
         if path.exists() and path.is_file():
             return str(path)
     return None
+
+
+def system_cli() -> Optional[str]:
+    """The CLI the user runs in their own terminal (PATH first, then known spots), searched again once PATH or that file changes."""
+    global _system_found
+    search = os.environ.get("PATH", "")
+    if _system_found is not None and _system_found[0] == search and os.path.isfile(_system_found[1]):
+        return _system_found[1]
+    found = _search_system_cli()
+    _system_found = (search, found) if found else None
+    return found
 
 
 def bundled_version() -> Optional[str]:
@@ -74,24 +88,40 @@ def cli_version(path: Optional[str]) -> Optional[str]:
     return result.stdout.strip() or None
 
 
-_version_cache: Optional[tuple[Optional[str], Optional[str]]] = None
+_version_cache: Optional[tuple[tuple, Optional[str]]] = None
+
+
+def _stamp_of(path: Optional[str]) -> tuple:
+    if not path:
+        return ("bundled", bundled_version())
+    try:
+        stat = os.stat(path)
+    except OSError:
+        return (path, None)
+    return (path, stat.st_mtime_ns, stat.st_size)
+
+
+def cli_stamp() -> tuple:
+    return _stamp_of(resolve_cli_path())
 
 
 def active_version() -> Optional[str]:
     global _version_cache
     resolved = resolve_cli_path()
-    if _version_cache is not None and _version_cache[0] == resolved:
+    stamp = _stamp_of(resolved)
+    if _version_cache is not None and _version_cache[0] == stamp:
         return _version_cache[1]
     raw = cli_version(resolved) if resolved else bundled_version()
     match = re.search(r"\d+(?:\.\d+)+", raw or "")
     version = match.group() if match else None
-    _version_cache = (resolved, version)
+    _version_cache = (stamp, version)
     return version
 
 
 def invalidate_version_cache() -> None:
-    global _version_cache
+    global _version_cache, _system_found
     _version_cache = None
+    _system_found = None
 
 
 def _reported_version(output: Optional[str]) -> Optional[str]:

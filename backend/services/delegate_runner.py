@@ -126,7 +126,7 @@ def _account_options(destination: dict, turn: Turn, **extra):
 
 
 async def _model(destination: dict, task: str, turn: Turn) -> str:
-    options = _account_options(destination, turn, system_prompt=MODEL_PROMPT, setting_sources=[], tools=[])
+    options = _account_options(destination, turn, system_prompt=MODEL_PROMPT, setting_sources=[], tools=[], strict_mcp_config=True)
     return await _stream(options, task, turn.vis, turn.report)
 
 

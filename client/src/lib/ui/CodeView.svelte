@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { theme } from "$lib/design/theme.svelte";
-  import { highlight, resolveLang } from "$lib/markdown/highlighter";
+  import { VISIBLE_LINES, highlightSlices, resolveLang } from "$lib/markdown/highlighter";
   import { DIFF_LINE } from "./diffTones";
   import { viewportScrollbar } from "./scrollbar";
 
@@ -26,8 +27,6 @@
     class: className = "",
   }: Props = $props();
 
-  const LINE_BREAK = /<br\s*\/?>/;
-
   const NUMBERED =
     "pl-[calc(var(--gutter)+0.625rem)] before:absolute before:left-0 before:w-[var(--gutter)] " +
     "before:pr-2 before:text-right before:text-on-surface-variant before:content-[attr(data-line)]";
@@ -43,14 +42,14 @@
   const marking = $derived(new Set(current));
 
   let scroller = $state<HTMLDivElement | null>(null);
-  let highlighted = $state<string | null>(null);
+  let colored = $state<string[]>([]);
+  let coloredSource: string | null = null;
+  let coloredTheme: string | null = null;
   let sought: number | null = null;
 
   const source = $derived(text.replace(/\r\n?/g, "\n"));
 
-  const lines = $derived(
-    (highlighted === null ? source.split("\n") : highlighted.split(LINE_BREAK)).map(filled),
-  );
+  const lines = $derived(source.split("\n").map(filled));
 
   const trailing = $derived(
     Object.entries(removed)
@@ -60,20 +59,40 @@
 
   const gutter = $derived(`calc(${String(lines.length).length}ch + 1rem)`);
 
+  const uncolor = () => {
+    colored = [];
+    coloredSource = null;
+  };
+
   $effect(() => {
     const body = source;
     const target = language;
     const syntax = theme.syntax;
-    if (!target) {
-      highlighted = null;
-      return;
-    }
+    if (coloredSource !== body || !target) uncolor();
+    if (!target) return;
+    const slices = highlightSlices(body, target, syntax, (untrack(() => anchor) ?? 0) + VISIBLE_LINES);
     let active = true;
-    void highlight(body, target, syntax).then((result) => {
-      if (active) highlighted = result;
-    });
+    void (async () => {
+      let at = 0;
+      try {
+        for await (const slice of slices) {
+          if (!active) return;
+          const html = slice.map(filled);
+          if (coloredSource === body && coloredTheme === syntax) html.forEach((line, offset) => (colored[at + offset] = line));
+          else {
+            colored = html;
+            coloredSource = body;
+            coloredTheme = syntax;
+          }
+          at += html.length;
+        }
+      } catch {
+        if (active) uncolor();
+      }
+    })();
     return () => {
       active = false;
+      void slices.return(undefined);
     };
   });
 
@@ -114,7 +133,7 @@
         class="{LINE_CLASS} {here ? 'border-accent' : 'border-transparent'} {marked.has(number)
           ? DIFF_LINE.add
           : ''}"
-      >{#if highlighted === null}{line}{:else}{@html line}{/if}</div>
+      >{#if colored[index] === undefined}{line}{:else}{@html colored[index]}{/if}</div>
     {/each}
     {#each trailing as gone, at (at)}
       <div class="{LINE_CLASS} border-transparent {DIFF_LINE.del}">{filled(gone)}</div>

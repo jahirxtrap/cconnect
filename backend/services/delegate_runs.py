@@ -32,6 +32,14 @@ def running(session_id: str, tool_use_id: str) -> bool:
     return (session_id, tool_use_id) in _running
 
 
+def stamp(session_id: str) -> tuple:
+    """What a session's delegations show: the steps of those still running and the files of those that ended."""
+    live = tuple(sorted((tool_use_id, len(events)) for (owner, tool_use_id), events in list(_running.items()) if owner == session_id))
+    folder = _folder(session_id)
+    saved = tuple(sorted((file.name, file.stat().st_mtime_ns) for file in folder.glob("*.json"))) if folder is not None and folder.is_dir() else ()
+    return live, saved
+
+
 def save(session_id: str, tool_use_id: str) -> None:
     events = _running.pop((session_id, tool_use_id), None)
     file = _file(session_id, tool_use_id)

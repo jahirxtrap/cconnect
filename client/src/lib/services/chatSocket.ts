@@ -39,6 +39,8 @@ import {
   type ModState,
 } from "$lib/data/modModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
+import { flag, list, number, strings, text, type Wire } from "$lib/data/wire";
+import type * as Contract from "$lib/contract/chatEvents";
 import { describeSocket, nativeSockets, onSocketTap, openSocket } from "$lib/platform/androidSocket";
 import type { TerminalInfo } from "./terminalApi";
 import { backend, socketUrlOf, type Profile } from "./backend.svelte";
@@ -64,6 +66,7 @@ export type ServerEvent =
       resident: boolean;
       agent: string | null;
     }
+  | { type: "rejected"; request: string | null; message: string }
   | { type: "activity"; state: string | null; resident: boolean }
   | { type: "agent_state"; state: AgentState }
   | { type: "history"; items: Record<string, unknown>[]; startIndex: number; hasMore: boolean }
@@ -92,7 +95,6 @@ export type ServerEvent =
   | { type: "ask_text"; text: string }
   | { type: "ask_working" }
   | { type: "ask_session"; sessionId: string }
-  | { type: "ask_done" }
   | { type: "command"; markdown: string; local: boolean }
   | { type: "usage"; usage: Usage; local: boolean }
   | {
@@ -104,7 +106,6 @@ export type ServerEvent =
       local: boolean;
     }
   | ({ type: "reloaded" } & Reload)
-  | { type: "plan"; markdown: string }
   | ({
       type: "agent";
       id: string | null;
@@ -203,17 +204,8 @@ export interface GenerationPatch {
   cwd?: string;
 }
 
-type Wire = Record<string, unknown>;
-
 const PING_MS = 20_000;
 const STALE_MS = 45_000;
-
-const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
-const int = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
-const flag = (raw: Wire, key: string): boolean => raw[key] === true;
-const number = (raw: Wire, key: string): number | null =>
-  typeof raw[key] === "number" ? (raw[key] as number) : null;
-const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
 
 export const diffLinesOf = (raw: Wire): DiffLine[] =>
   list(raw, "diff_lines").map((line) => ({ kind: diffKindOf(text(line, "kind")), text: text(line, "text") ?? "" }));
@@ -233,24 +225,17 @@ export const agentFieldsOf = (raw: Wire) => ({
   description: text(raw, "description"),
   ...agentRunOf(raw),
 });
-const strings = (raw: Wire, key: string): string[] =>
-  Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
 
-const queuedItems = (raw: Wire, key = "queued"): QueuedMessage[] =>
-  list(raw, key)
-    .map((item) => ({
-      id: text(item, "id") ?? "",
-      text: text(item, "text") ?? "",
-      attachments: strings(item, "attachments"),
-      uploading: false,
-    }))
+const queuedOf = (items: Contract.QueuedItem[] | undefined): QueuedMessage[] =>
+  (items ?? [])
+    .map((item) => ({ id: item.id ?? "", text: item.text ?? "", attachments: item.attachments ?? [], uploading: false }))
     .filter((item) => item.id !== "");
 
-const toOption = (raw: Wire): InteractionOption => ({
-  id: text(raw, "id") ?? "",
-  label: text(raw, "label"),
-  description: text(raw, "description"),
-  preview: text(raw, "preview"),
+const toOption = (option: Contract.InteractionOption): InteractionOption => ({
+  id: option.id,
+  label: option.label ?? null,
+  description: option.description ?? null,
+  preview: option.preview ?? null,
 });
 
 const toInteractionMod = (raw: unknown): InteractionMod | null => {
@@ -690,34 +675,33 @@ export class ChatSocket {
     } catch {
       return;
     }
-
-    const kind = text(wire, "type");
-    if (kind === "pong") return;
-    if (kind === "ready") {
-      const channel = text(wire, "channel");
+    const event = wire as unknown as Contract.ChatEvent;
+    if (event.type === "pong") return;
+    if (event.type === "ready") {
+      const channel = event.channel ?? null;
       if (channel && channel !== this.#channel) {
         this.#channel = channel;
         this.#lastSeq = 0;
       }
       this.onEvent(false, null, {
         type: "ready",
-        sessionId: text(wire, "session_id"),
-        project: text(wire, "project"),
-        cwd: text(wire, "cwd"),
-        account: text(wire, "account"),
+        sessionId: event.session_id ?? null,
+        project: event.project ?? null,
+        cwd: event.cwd ?? null,
+        account: event.account ?? null,
         channel,
-        running: flag(wire, "running"),
-        resumed: flag(wire, "resumed"),
-        committedCount: int(wire, "committed_count"),
-        queued: queuedItems(wire),
-        activity: text(wire, "activity"),
-        resident: flag(wire, "resident"),
-        agent: text(wire, "agent"),
+        running: event.running === true,
+        resumed: event.resumed === true,
+        committedCount: event.committed_count ?? null,
+        queued: queuedOf(event.queued),
+        activity: event.activity ?? null,
+        resident: event.resident === true,
+        agent: event.agent ?? null,
       });
       return;
     }
 
-    const channel = text(wire, "channel");
+    const channel = event.channel ?? null;
     if (channel !== null && this.#channel === null) return;
     const side = channel !== null && channel !== this.#channel;
     if (side && channel !== this.#sideChannel) {
@@ -725,173 +709,165 @@ export class ChatSocket {
       this.#sideLastSeq = 0;
     }
 
-    const seq = int(wire, "seq");
+    const seq = event.seq ?? null;
     if (seq !== null) {
       const last = side ? this.#sideLastSeq : this.#lastSeq;
-      if (kind !== "interaction_request" && seq <= last) return;
+      if (event.type !== "interaction_request" && seq <= last) return;
       if (seq > last) {
         if (side) this.#sideLastSeq = seq;
         else this.#lastSeq = seq;
       }
     }
 
-    const event = this.#toEvent(kind, wire);
-    if (!event) return;
-    if (event.type === "ask_session") this.#sideResume = event.sessionId;
-    this.onEvent(side, text(wire, "parent"), event);
+    const mapped = this.#toEvent(event, wire);
+    if (!mapped) return;
+    if (mapped.type === "ask_session") this.#sideResume = mapped.sessionId;
+    this.onEvent(side, event.parent ?? null, mapped);
   }
 
-  #toEvent(kind: string | null, wire: Wire): ServerEvent | null {
-    switch (kind) {
+  #toEvent(event: Contract.ChatEvent, wire: Wire): ServerEvent | null {
+    switch (event.type) {
       case "assistant_text":
-        return { type: "assistant_text", text: text(wire, "text") ?? "" };
+        return { type: "assistant_text", text: event.text ?? "" };
       case "thinking":
-        return { type: "thinking", text: text(wire, "text") ?? "", labelOnly: flag(wire, "label") };
+        return { type: "thinking", text: event.text ?? "", labelOnly: event.label === true };
       case "working":
         return { type: "working" };
       case "tool_use":
         return {
           type: "tool_use",
-          id: text(wire, "id"),
-          name: text(wire, "name"),
-          mcp: wire.mcp === true,
-          input: text(wire, "input"),
-          result: text(wire, "result"),
-          ms: int(wire, "ms"),
+          id: event.id ?? null,
+          name: event.name ?? null,
+          mcp: event.mcp === true,
+          input: event.input ?? null,
+          result: event.result ?? null,
+          ms: event.ms ?? null,
         };
       case "tool_result":
         return {
           type: "tool_result",
-          toolUseId: text(wire, "tool_use_id"),
-          content: text(wire, "content"),
-          ms: int(wire, "ms"),
+          toolUseId: event.tool_use_id ?? null,
+          content: event.content ?? null,
+          ms: event.ms ?? null,
         };
       case "file_change":
         return {
           type: "file_change",
-          id: text(wire, "id"),
-          tool: text(wire, "name"),
-          path: text(wire, "path") ?? "",
+          id: event.id ?? null,
+          tool: event.name ?? null,
+          path: event.path ?? "",
           diffLines: diffLinesOf(wire),
-          labelOnly: flag(wire, "label"),
+          labelOnly: event.label === true,
         };
       case "shared":
-        return {
-          type: "shared",
-          id: text(wire, "id"),
-          files: sharedFilesFrom(wire.files),
-        };
+        return { type: "shared", id: event.id ?? null, files: sharedFilesFrom(event.files) };
       case "compacting":
         return { type: "compacting" };
       case "compacting_ended":
         return { type: "compacting_ended" };
       case "status": {
-        const attempt = int(wire, "attempt");
-        const delayMs = int(wire, "retry_delay_ms") ?? 0;
+        const attempt = event.attempt ?? null;
+        const delayMs = event.retry_delay_ms ?? 0;
         return {
           type: "status",
-          kind: text(wire, "kind") ?? "",
+          kind: event.kind ?? "",
           retry:
             attempt === null
               ? null
               : {
                   attempt,
-                  maxRetries: int(wire, "max_retries") ?? attempt,
+                  maxRetries: event.max_retries ?? attempt,
                   delayMs,
                   until: Date.now() + delayMs,
-                  error: text(wire, "error"),
-                  noResponse: typeof wire.no_response === "object" && wire.no_response !== null,
+                  error: event.error ?? null,
+                  noResponse: typeof event.no_response === "object" && event.no_response !== null,
                 },
         };
       }
       case "terminal_opened":
         return { type: "terminal_opened", session: wire as unknown as TerminalInfo };
-      case "activity": {
-        const state = text(wire, "state");
-        return { type: "activity", state: state === "idle" ? null : state, resident: flag(wire, "resident") };
-      }
+      case "activity":
+        return { type: "activity", state: event.state === "idle" ? null : event.state, resident: event.resident === true };
       case "agent_state":
         return { type: "agent_state", state: toAgentState(wire) };
       case "history":
         return {
           type: "history",
-          items: list(wire, "items"),
-          startIndex: int(wire, "start_index") ?? 0,
-          hasMore: flag(wire, "has_more"),
+          items: event.items ?? [],
+          startIndex: event.start_index ?? 0,
+          hasMore: event.has_more === true,
         };
       case "stop":
-        return { type: "stop", reason: text(wire, "reason"), severity: text(wire, "severity") };
+        return { type: "stop", reason: event.reason ?? null, severity: event.severity ?? null };
       case "compact":
       case "compact_summary":
         return {
-          type: kind,
-          trigger: text(wire, "trigger"),
-          preTokens: int(wire, "pre_tokens"),
-          postTokens: int(wire, "post_tokens"),
-          summary: text(wire, "summary") ?? "",
+          type: event.type,
+          trigger: event.trigger ?? null,
+          preTokens: event.pre_tokens ?? null,
+          postTokens: event.post_tokens ?? null,
+          summary: event.summary ?? "",
         };
       case "ask_text":
-        return { type: "ask_text", text: text(wire, "text") ?? "" };
+        return { type: "ask_text", text: event.text ?? "" };
       case "ask_working":
         return { type: "ask_working" };
       case "ask_session":
-        return { type: "ask_session", sessionId: text(wire, "session_id") ?? "" };
-      case "ask_done":
-        return { type: "ask_done" };
+        return { type: "ask_session", sessionId: event.session_id ?? "" };
       case "command":
-        return { type: "command", markdown: text(wire, "markdown") ?? "", local: wire.local === true };
+        return { type: "command", markdown: event.markdown ?? "", local: event.local === true };
       case "usage":
-        return { type: "usage", usage: usageOf(wire), local: wire.local === true };
+        return { type: "usage", usage: usageOf(wire), local: event.local === true };
       case "component":
         return {
           type: "component",
-          title: text(wire, "title"),
-          titleKey: text(wire, "title_key"),
-          icon: text(wire, "icon"),
-          blocks: list(wire, "blocks").flatMap(toElement),
-          local: wire.local === true,
+          title: event.title ?? null,
+          titleKey: event.title_key ?? null,
+          icon: event.icon ?? null,
+          blocks: (event.blocks ?? []).flatMap(toElement),
+          local: event.local === true,
         };
       case "reloaded":
         return {
           type: "reloaded",
-          command: text(wire, "command") ?? "",
-          resident: wire.resident === true,
-          failed: wire.failed === true,
-          plugins: int(wire, "plugins"),
-          commands: int(wire, "commands"),
-          agents: int(wire, "agents"),
-          mcpServers: int(wire, "mcp_servers"),
-          errors: int(wire, "errors") ?? 0,
+          command: event.command ?? "",
+          resident: event.resident === true,
+          failed: event.failed === true,
+          plugins: event.plugins ?? null,
+          commands: event.commands ?? null,
+          agents: event.agents ?? null,
+          mcpServers: event.mcp_servers ?? null,
+          errors: event.errors ?? 0,
         };
-      case "plan":
-        return { type: "plan", markdown: text(wire, "markdown") ?? "" };
+      case "rejected":
+        return { type: "rejected", request: event.request ?? null, message: event.message ?? "" };
       case "notification":
-        return { type: "notification", summary: text(wire, "text") ?? "", status: text(wire, "result") };
+        return { type: "notification", summary: event.text ?? "", status: event.result ?? null };
       case "notice":
-        return { type: "notice", name: text(wire, "name"), text: text(wire, "text") ?? "", level: text(wire, "level") };
+        return { type: "notice", name: event.name ?? null, text: event.text ?? "", level: event.level ?? null };
       case "mods":
         return { type: "mods", state: toModState(wire) };
       case "commands":
-        return { type: "commands", commands: toCommands(list(wire, "commands") as CommandWire[]) };
+        return { type: "commands", commands: toCommands((event.commands ?? []) as CommandWire[]) };
       case "mod_toast":
         return {
           type: "mod_toast",
-          plugin: text(wire, "plugin"),
-          text: text(wire, "text") ?? "",
-          timeoutMs: int(wire, "timeout_ms"),
+          plugin: event.plugin ?? null,
+          text: event.text ?? "",
+          timeoutMs: event.timeout_ms ?? null,
         };
       case "mod_invalidate":
-        return { type: "mod_invalidate", instances: toModSiteTargets(wire.instances) };
+        return { type: "mod_invalidate", instances: toModSiteTargets(event.instances) };
       case "mod_tree":
         return {
           type: "mod_tree",
-          rid: int(wire, "rid") ?? 0,
-          component: toModComponent(wire.component),
-          instanceId: text(wire, "instance_id") ?? "",
+          rid: event.rid ?? 0,
+          component: toModComponent(event.component),
+          instanceId: event.instance_id ?? "",
           drawn: toModDrawn(wire),
         };
       case "mod_reply":
-        return { type: "mod_reply", rid: int(wire, "rid") ?? 0, answer: wire.answer ?? null };
+        return { type: "mod_reply", rid: event.rid ?? 0, answer: event.answer ?? null };
       case "mod_request": {
         const request = toModRequest(wire);
         return request ? { type: "mod_request", request } : null;
@@ -899,139 +875,137 @@ export class ChatSocket {
       case "mod_focus":
         return {
           type: "mod_focus",
-          component: toModComponent(wire.component),
-          instanceId: text(wire, "instance_id") ?? "",
-          plugin: text(wire, "plugin") ?? "",
-          key: text(wire, "key") ?? "",
+          component: toModComponent(event.component),
+          instanceId: event.instance_id ?? "",
+          plugin: event.plugin ?? "",
+          key: event.key ?? "",
         };
       case "mod_scroll":
         return {
           type: "mod_scroll",
-          component: toModComponent(wire.component),
-          instanceId: text(wire, "instance_id") ?? "",
-          offset: int(wire, "offset") ?? 0,
-          followEnd: flag(wire, "follow_end"),
+          component: toModComponent(event.component),
+          instanceId: event.instance_id ?? "",
+          offset: event.offset ?? 0,
+          followEnd: event.follow_end === true,
         };
       case "session_message":
       case "plugin_message":
-        return { type: kind, name: text(wire, "name"), text: text(wire, "text") ?? "" };
+        return { type: event.type, name: event.name ?? null, text: event.text ?? "" };
       case "agent_report":
-        return { type: "agent_report", name: text(wire, "name"), text: text(wire, "text") ?? "" };
+        return { type: "agent_report", name: event.name ?? null, text: event.text ?? "" };
       case "queued":
-        return { type: "queued", id: text(wire, "id"), text: text(wire, "text") ?? "", replay: wire.replay === true };
+        return { type: "queued", id: event.id ?? null, text: event.text ?? "", replay: event.replay === true };
       case "queue":
-        return { type: "queue", items: queuedItems(wire, "items") };
+        return { type: "queue", items: queuedOf(event.items) };
       case "dequeued":
         return {
           type: "dequeued",
-          ids: (Array.isArray(wire.ids) ? (wire.ids as unknown[]) : []).filter(
-            (id): id is string => typeof id === "string",
-          ),
-          text: text(wire, "text"),
-          ts: typeof wire.ts === "number" ? wire.ts : null,
+          ids: (event.ids ?? []).filter((id): id is string => typeof id === "string"),
+          text: event.text ?? null,
+          ts: event.ts ?? null,
         };
       case "agent":
-        return { type: "agent", id: text(wire, "id"), ...agentFieldsOf(wire) };
+        return { type: "agent", id: event.id ?? null, ...agentFieldsOf(wire) };
       case "task_running":
-        return { type: "task_running", id: text(wire, "id"), description: text(wire, "description") };
+        return { type: "task_running", id: event.id ?? null, description: event.description ?? null };
       case "agent_result":
         return {
           type: "agent_result",
-          id: text(wire, "id"),
-          status: text(wire, "status"),
-          durationMs: int(wire, "duration_ms"),
-          tokens: int(wire, "tokens"),
-          toolUses: int(wire, "tool_uses"),
+          id: event.id ?? null,
+          status: event.status ?? null,
+          durationMs: event.duration_ms ?? null,
+          tokens: event.tokens ?? null,
+          toolUses: event.tool_uses ?? null,
         };
       case "thinking_tokens":
-        return { type: "thinking_tokens", tokens: int(wire, "tokens") ?? 0 };
+        return { type: "thinking_tokens", tokens: event.tokens ?? 0 };
       case "hook_failed":
-        return { type: "hook_failed", name: text(wire, "name"), text: text(wire, "text") ?? "" };
+        return { type: "hook_failed", name: event.name ?? null, text: event.text ?? "" };
       case "todos":
         return {
           type: "todos",
-          items: list(wire, "items").map((item) => ({
+          items: (event.items ?? []).map((item) => ({
             id: null,
-            content: text(item, "content") ?? "",
-            status: text(item, "status") ?? "pending",
-            activeForm: text(item, "active_form") ?? "",
+            content: item.content ?? "",
+            status: item.status ?? "pending",
+            activeForm: item.active_form ?? "",
           })),
         };
       case "task":
-        return { type: "task", id: text(wire, "id") ?? "", content: text(wire, "content"), status: text(wire, "status") };
+        return { type: "task", id: event.id ?? "", content: event.content ?? null, status: event.status ?? null };
       case "session_started":
-        return { type: "session_started", sessionId: text(wire, "session_id") };
+        return { type: "session_started", sessionId: event.session_id ?? null };
       case "result":
-        return { type: "result", sessionId: text(wire, "session_id") };
+        return { type: "result", sessionId: event.session_id ?? null };
       case "context":
         return {
           type: "context",
-          contextTokens: int(wire, "context_tokens"),
-          contextWindow: int(wire, "context_window"),
-          requestBytes: int(wire, "request_bytes"),
-          mediaBytes: int(wire, "media_bytes"),
+          contextTokens: event.context_tokens ?? null,
+          contextWindow: event.context_window ?? null,
+          requestBytes: event.request_bytes ?? null,
+          mediaBytes: event.media_bytes ?? null,
         };
       case "rate_limit":
         return {
           type: "rate_limit",
-          windows: list(wire, "windows").map((window) => ({
-            id: text(window, "id") ?? "",
-            percent: number(window, "percent") ?? 0,
-            severity: text(window, "severity"),
+          windows: (event.windows ?? []).map((window) => ({
+            id: window.id ?? "",
+            percent: window.percent ?? 0,
+            severity: window.severity ?? null,
           })),
         };
       case "cache":
-        return { type: "cache", cache: promptCacheOf(wire.cache) };
+        return { type: "cache", cache: promptCacheOf(event.cache) };
       case "anchor":
-        return typeof wire.uuid === "string" ? { type: "anchor", uuid: wire.uuid } : null;
+        return event.uuid ? { type: "anchor", uuid: event.uuid } : null;
       case "done":
-        return { type: "done", replay: wire.replay === true };
+        return { type: "done", replay: event.replay === true };
       case "interrupted":
         return { type: "interrupted" };
       case "attached":
         return { type: "attached" };
       case "error":
-        return { type: "error", message: text(wire, "message") ?? "error" };
+        return { type: "error", message: event.message ?? "error" };
       case "api_error":
-        return { type: "api_error", message: text(wire, "text") ?? "", severity: text(wire, "severity") };
+        return { type: "api_error", message: event.text ?? "", severity: event.severity ?? null };
       case "tail":
-        return { type: "tail", items: list(wire, "items") };
+        return { type: "tail", items: event.items ?? [] };
       case "history_chunk":
         return {
           type: "history_chunk",
-          sessionId: text(wire, "session_id") ?? "",
-          startIndex: int(wire, "start_index") ?? 0,
-          items: list(wire, "items"),
-          hasMore: wire.has_more === true || wire.has_more === "true",
+          sessionId: event.session_id ?? "",
+          startIndex: event.start_index ?? 0,
+          items: event.items ?? [],
+          hasMore: event.has_more === true,
         };
       case "interaction_request":
         return {
           type: "interaction_request",
-          replay: wire.replay === true,
-          requestId: text(wire, "id") ?? "",
-          kind: text(wire, "kind") ?? "permission",
-          toolName: text(wire, "tool_name"),
-          toolUseId: text(wire, "tool_use_id"),
-          input: text(wire, "input"),
-          title: text(wire, "title"),
-          titleKey: text(wire, "title_key"),
-          icon: text(wire, "icon"),
-          options: list(wire, "options").map(toOption),
-          blocks: list(wire, "blocks").flatMap(toElement),
-          submitLabel: text(wire, "submit"),
-          submitKey: text(wire, "submit_key"),
-          dismiss: toDismiss(wire.dismiss),
-          present: text(wire, "present"),
-          variant: text(wire, "variant"),
-          mod: toInteractionMod(wire.mod),
+          replay: event.replay === true,
+          requestId: event.id ?? "",
+          kind: event.kind ?? "permission",
+          toolName: event.tool_name ?? null,
+          toolUseId: event.tool_use_id ?? null,
+          input: event.input ?? null,
+          title: event.title ?? null,
+          titleKey: event.title_key ?? null,
+          icon: event.icon ?? null,
+          options: (event.options ?? []).map(toOption),
+          blocks: (event.blocks ?? []).flatMap(toElement),
+          submitLabel: event.submit ?? null,
+          submitKey: event.submit_key ?? null,
+          dismiss: toDismiss(event.dismiss),
+          present: event.present ?? null,
+          variant: event.variant ?? null,
+          mod: toInteractionMod(event.mod),
         };
       case "interaction_resolved":
         return {
           type: "interaction_resolved",
-          requestId: text(wire, "id") ?? "",
-          optionId: text(wire, "option_id"),
-          values: toValues(wire.values),
-          dismissed: flag(wire, "dismissed"),
+          requestId: event.id ?? "",
+          optionId: event.option_id ?? null,
+          values: toValues(event.values),
+          dismissed: event.dismissed === true,
         };
       default:
         return null;

@@ -74,6 +74,10 @@ CLOSE_SCHEMA = {
 }
 
 
+def needs_key(name: str, args: dict) -> bool:
+    return name.startswith(f"{CAPABILITY}_")
+
+
 def authorize(capabilities: list[str], key: Optional[str]) -> list[str]:
     """The capabilities a turn really gets: terminal only survives with the unlock key."""
     if CAPABILITY in capabilities and not key_matches(key or ""):

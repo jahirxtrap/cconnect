@@ -1,4 +1,5 @@
 import { securityKeys } from "$lib/data/securityKeys.svelte";
+import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { backend, baseUrlOf, type Profile } from "./backend.svelte";
 import { createHttp, http, type HttpClient } from "./http";
 
@@ -52,6 +53,14 @@ export const relativeFromUrl = (url: string, profile: Profile = backend.sharedPr
   const prefix = sharedPrefix(profile);
   if (!url.startsWith(prefix)) return null;
   return url.slice(prefix.length).split("?")[0].split("/").map(decodeSegment).join("/");
+};
+
+export const videoStillOf = (url: string): string | null | undefined => {
+  const profile = backend.sharedProfileOf(url);
+  if (relativeFromUrl(url, profile) === null) return null;
+  const capabilities = serverSettings.capabilitiesFor(profile);
+  if (capabilities === undefined) return profile?.id === backend.active?.id ? undefined : null;
+  return capabilities?.videoStills ? url : null;
 };
 
 export const sharedFolderUrl = (url: string, profile: Profile = backend.sharedProfileOf(url)): string | null => {

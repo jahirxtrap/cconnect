@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "svelte-check --tsgo --incremental --tsconfig ./tsconfig.json && vite build",
+    "contract": "json2ts -i ../backend/schemas/chat_events.json -o src/lib/contract/chatEvents.ts --bannerComment \"\"",
+    "build": "npm run contract && svelte-check --tsgo --incremental --tsconfig ./tsconfig.json && vite build",
     "preview": "vite preview",
-    "check": "svelte-check --tsgo --incremental --tsconfig ./tsconfig.json",
+    "check": "npm run contract && svelte-check --tsgo --incremental --tsconfig ./tsconfig.json",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -47,6 +48,7 @@
     "@types/markdown-it": "^14.2.0",
     "@types/node": "^26.6.6",
     "@typescript/native": "npm:typescript@^7.0.2",
+    "json-schema-to-typescript": "^16.0.0",
     "svelte": "^5.57.3",
     "svelte-check": "^4.7.8",
     "tailwindcss": "^4.3.4",

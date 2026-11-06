@@ -32,7 +32,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { projectNameOf } from "$lib/data/models";
-  import { formatSize, isArchive, visibleName } from "$lib/data/format";
+  import { compareNames, compareText, formatSize, isArchive, visibleName } from "$lib/data/format";
   import {
     FILE_KINDS,
     fileKindOf,
@@ -163,14 +163,14 @@
   let path = $state(initial?.path || tabs.state.historyProject || "");
   let archive = $state<string | null>(initial?.archive ?? null);
   let archiveDir = $state(initial?.archiveDir ?? "");
-  let entries = $state<SharedEntry[]>([]);
+  let entries = $state.raw<SharedEntry[]>([]);
   let loaded = $state(false);
   let selecting = $state(false);
   let selected = $state<string[]>([]);
   let transfer = $state<TransferOp | null>(null);
   let searching = $state(false);
   let searchQuery = $state("");
-  let searchResults = $state<SharedEntry[] | null>(null);
+  let searchResults = $state.raw<SharedEntry[] | null>(null);
   let sortField = $state<SortKey>(settings.sharedSortField as SortKey);
   let sortAscending = $state(settings.sharedSortAscending);
   let hiddenKinds = $state(new Set(settings.sharedHiddenKinds));
@@ -304,10 +304,10 @@
         return direction * ((a.isDir ? a.items : a.size) - (b.isDir ? b.items : b.size));
       }
       if (sortField === "type") {
-        const byType = extensionOf(a.name).localeCompare(extensionOf(b.name));
-        return direction * (byType || a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+        const byType = compareText(extensionOf(a.name), extensionOf(b.name));
+        return direction * (byType || compareText(a.name.toLowerCase(), b.name.toLowerCase()));
       }
-      return direction * a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+      return direction * compareNames(a.name, b.name);
     };
     return list.sort(compare);
   });
@@ -317,10 +317,11 @@
     return ordered.length === total ? "" : `${ordered.length}/${total}`;
   });
 
-  const selectedEntries = $derived(entries.filter((entry) => selected.includes(entry.file)));
+  const selectedSet = $derived(new Set(selected));
+  const selectedEntries = $derived(entries.filter((entry) => selectedSet.has(entry.file)));
   const single = $derived(selected.length === 1 ? (selectedEntries[0] ?? null) : null);
   const canShare = $derived(selectedEntries.length > 0 && selectedEntries.every((entry) => !entry.isDir));
-  const allSelected = $derived(ordered.length > 0 && ordered.every((entry) => selected.includes(entry.file)));
+  const allSelected = $derived(ordered.length > 0 && ordered.every((entry) => selectedSet.has(entry.file)));
   const transferAllowed = $derived(
     transfer !== null &&
       archive === null &&
@@ -346,7 +347,10 @@
       watcher.refresh();
       return;
     }
-    entries = (await sharedApi.archiveList(current, archiveDir)) ?? [];
+    const inside = archiveDir;
+    const members = (await sharedApi.archiveList(current, inside)) ?? [];
+    if (archive !== current || archiveDir !== inside) return;
+    entries = members;
     loaded = true;
   };
 
@@ -1034,11 +1038,11 @@
 {/snippet}
 
 {#snippet entryLine(entry: SharedEntry, index: number)}
-  {@const isSelected = selected.includes(entry.file)}
+  {@const isSelected = selectedSet.has(entry.file)}
   {@const dropping = dropTarget === entry.file}
   {@const Icon = iconOf(entry)}
   {@const corners = isSelected
-    ? joinedCorners(selected.includes(ordered[index - 1]?.file), selected.includes(ordered[index + 1]?.file))
+    ? joinedCorners(selectedSet.has(ordered[index - 1]?.file), selectedSet.has(ordered[index + 1]?.file))
     : joinedCorners(false, false)}
   <div data-row={index} data-name={entry.file} class="{corners} {rowTone(isSelected, dropping)}">
     <Pressable

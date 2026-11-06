@@ -1,17 +1,17 @@
 import { toAgentSession, type AgentSession, type AgentStatus } from "$lib/data/agentModels";
+import type { Wire } from "$lib/data/wire";
 import { profileKey, type Profile } from "./backend.svelte";
 import { ReconnectingSocket } from "./socket";
-
-type Wire = Record<string, unknown>;
 
 const SIGNED_OUT: AgentStatus = "auth";
 
 export class AgentSessionsWatch {
-  sessions = $state<AgentSession[] | null>(null);
+  sessions = $state.raw<AgentSession[] | null>(null);
   failed = $state(false);
   signedOut = $state(false);
 
   #socket: ReconnectingSocket;
+  #watchers = 0;
 
   constructor(
     profile: Profile,
@@ -26,7 +26,13 @@ export class AgentSessionsWatch {
       },
       () => profile,
     );
-    this.#socket.connect();
+  }
+
+  watch(): () => void {
+    if (this.#watchers++ === 0) this.#socket.connect();
+    return () => {
+      if (--this.#watchers === 0) this.#socket.close();
+    };
   }
 
   #apply(message: Wire) {

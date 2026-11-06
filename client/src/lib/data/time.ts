@@ -1,20 +1,17 @@
-export const formatClock = (millis: number): string =>
-  new Date(millis).toLocaleTimeString(undefined, { timeStyle: "short" });
+import { localized } from "$lib/i18n/index.svelte";
+
+const dates = (key: string, options: Intl.DateTimeFormatOptions) =>
+  localized(`date:${key}`, (locale) => new Intl.DateTimeFormat(locale, options));
+
+export const formatClock = (millis: number): string => dates("clock", { timeStyle: "short" }).format(millis);
 
 export const formatLogTime = (millis: number): string =>
-  new Date(millis).toLocaleTimeString([], { hour12: false });
+  dates("log", { hour: "numeric", minute: "numeric", second: "numeric", hour12: false }).format(millis);
 
 export const formatDateShort = (millis: number): string =>
-  new Date(millis).toLocaleString([], {
-    year: "2-digit",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  dates("short", { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(millis);
 
-export const formatDay = (millis: number): string =>
-  new Date(millis).toLocaleDateString(undefined, { dateStyle: "medium" });
+export const formatDay = (millis: number): string => dates("day", { dateStyle: "medium" }).format(millis);
 
 export const MILLIS_PER_SECOND = 1000;
 export const SECONDS_PER_MINUTE = 60;
@@ -24,6 +21,16 @@ export const HOURS_PER_DAY = 24;
 export const MILLIS_PER_MINUTE = SECONDS_PER_MINUTE * MILLIS_PER_SECOND;
 export const MILLIS_PER_HOUR = SECONDS_PER_HOUR * MILLIS_PER_SECOND;
 const MILLIS_PER_DAY = SECONDS_PER_DAY * MILLIS_PER_SECOND;
+
+const twoDigits = (value: number) => String(value).padStart(2, "0");
+
+export const formatMediaTime = (seconds: number): string => {
+  const whole = Math.round(seconds);
+  const hours = Math.floor(whole / SECONDS_PER_HOUR);
+  const minutes = Math.floor((whole % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
+  const rest = twoDigits(whole % SECONDS_PER_MINUTE);
+  return hours ? `${hours}:${twoDigits(minutes)}:${rest}` : `${minutes}:${rest}`;
+};
 
 export const dayIndex = (millis: number): number =>
   Math.trunc((millis - new Date(millis).getTimezoneOffset() * MILLIS_PER_MINUTE) / MILLIS_PER_DAY);
@@ -35,12 +42,13 @@ const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.
 export const formatRecent = (millis: number): string => {
   const days = dayIndex(Date.now()) - dayIndex(millis);
   if (days < 0 || days > RECENT_DAYS) return formatDateShort(millis);
-  const day = capitalized(new Intl.RelativeTimeFormat([], { numeric: "auto" }).format(-days, "day"));
+  const relative = localized("relative", (locale) => new Intl.RelativeTimeFormat(locale, { numeric: "auto" }));
+  const day = capitalized(relative.format(-days, "day"));
   return days === 0 ? `${day} ${formatClock(millis)}` : day;
 };
 
 export const formatDayTime = (millis: number): string =>
-  new Date(millis).toLocaleString([], { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  dates("weekday", { weekday: "short", hour: "2-digit", minute: "2-digit" }).format(millis);
 
 export const parseIsoMillis = (value: string): number | null => {
   const millis = Date.parse(value);

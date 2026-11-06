@@ -29,9 +29,14 @@
       return;
     }
     let active = true;
-    void highlight(body, language, syntax).then((result) => {
-      if (active) html = result;
-    });
+    highlight(body, language, syntax).then(
+      (result) => {
+        if (active) html = result;
+      },
+      () => {
+        if (active) html = null;
+      },
+    );
     return () => {
       active = false;
     };

@@ -2,14 +2,18 @@
 
 import asyncio
 import json
+from contextlib import suppress
 from typing import Any, Callable, Optional, Protocol
 
 import orjson
 from fastapi import WebSocket, WebSocketDisconnect, status
 from fastapi.encoders import jsonable_encoder
 from loguru import logger
+from pydantic import TypeAdapter, ValidationError
 
 from middleware.public_auth import ws_bearer_ok
+
+SEND_BACKLOG = 50_000
 
 
 class WatchHub(Protocol):
@@ -20,6 +24,39 @@ class WatchHub(Protocol):
 
 async def send_event(ws: WebSocket, payload: Any) -> None:
     await ws.send_text(orjson.dumps(payload, default=jsonable_encoder).decode())
+
+
+class SocketWriter:
+    """Sends in order without waiting on the network, and closes a socket a whole backlog behind."""
+
+    def __init__(self, ws: WebSocket, contract: Optional[TypeAdapter] = None):
+        self._ws = ws
+        self._contract = contract
+        self._queue: asyncio.Queue = asyncio.Queue(SEND_BACKLOG)
+        self._pump = asyncio.create_task(self._drain())
+
+    async def _drain(self) -> None:
+        with suppress(Exception):
+            while True:
+                await send_event(self._ws, await self._queue.get())
+
+    async def send(self, payload: Any) -> None:
+        if self._pump.done():
+            return
+        if self._contract is not None:
+            try:
+                self._contract.validate_python(payload)
+            except ValidationError as exc:
+                logger.error(f"event outside the contract: {payload.get('type')}: {exc}")
+        try:
+            self._queue.put_nowait(payload)
+        except asyncio.QueueFull:
+            self._pump.cancel()
+            with suppress(Exception):
+                await self._ws.close(code=status.WS_1013_TRY_AGAIN_LATER)
+
+    def close(self) -> None:
+        self._pump.cancel()
 
 
 async def refuse(ws: WebSocket) -> None:

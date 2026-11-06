@@ -4,7 +4,8 @@
   import Gauge from "@lucide/svelte/icons/gauge";
   import Globe from "@lucide/svelte/icons/globe";
   import Wifi from "@lucide/svelte/icons/wifi";
-  import { formatDecimal, joined } from "$lib/data/format";
+  import { formatDecimal, formatUnit, joined } from "$lib/data/format";
+  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import {
     networkApi,
@@ -38,8 +39,7 @@
   const MEGA = 1_000_000;
   const KILO = 1_000;
   const PERCENT = 100;
-  const JOB_POLL_MS = 2000;
-  const JOB_ATTEMPTS = 30;
+  const SETTLE_ATTEMPTS = 5;
 
   let networks = $state<WifiNetwork[]>([]);
   let scanning = $state(false);
@@ -59,9 +59,7 @@
     return `${formatDecimal(bitsPerSecond, 0)} b/s`;
   };
 
-  const formatMillis = (value: number | null) => (value === null ? "—" : `${formatDecimal(value, 1)} ms`);
-
-  const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const formatMillis = (value: number | null) => (value === null ? "—" : formatUnit(value, "millisecond", 1));
 
   const track = async (job: NetworkJob | null) => {
     if (!job) {
@@ -73,20 +71,14 @@
       return;
     }
     notice = null;
-    for (let attempt = 0; attempt < JOB_ATTEMPTS; attempt++) {
-      await wait(JOB_POLL_MS);
-      const current = await networkApi.job(job.id);
-      if (!current) continue;
-      if (current.status === "ok") return onReload();
-      if (current.status === "rolled_back") {
-        notice = t("NETWORK_ROLLED_BACK");
-        return onReload();
-      }
-      if (current.status === "failed") {
-        notice = current.message ?? t("NETWORK_ACTION_FAILED");
-        return onReload();
-      }
+    const settle = () => Promise.race([networkApi.settledJob(job.id), serverStatus.whenOffline().then(() => null)]);
+    let settled = await settle();
+    for (let attempt = 1; settled === null && attempt < SETTLE_ATTEMPTS; attempt++) {
+      await serverStatus.whenOnline();
+      settled = await settle();
     }
+    if (settled?.status === "rolled_back") notice = t("NETWORK_ROLLED_BACK");
+    else if (settled?.status === "failed") notice = settled.message ?? t("NETWORK_ACTION_FAILED");
     onReload();
   };
 
@@ -132,12 +124,14 @@
           : t("NETWORK_TESTING"),
   );
 
+  let speedtest: ReturnType<typeof networkApi.speedtest> | null = null;
+
   const startSpeedtest = () => {
     testing = true;
     result = null;
     testProgress = 0;
     testStage = "";
-    const socket = networkApi.speedtest({
+    speedtest = networkApi.speedtest({
       onProgress: (stage, progress) => {
         testStage = stage;
         testProgress = Math.min(1, Math.max(0, progress));
@@ -145,12 +139,10 @@
       onResult: (value) => {
         result = value;
         testing = false;
-        socket.close();
       },
       onFailed: (message) => {
-        notice = message;
+        notice = message ?? t("NETWORK_ACTION_FAILED");
         testing = false;
-        socket.close();
       },
     });
   };
@@ -158,6 +150,8 @@
   $effect(() => {
     void refreshScan();
   });
+
+  $effect(() => () => speedtest?.close());
 </script>
 
 <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">

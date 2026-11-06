@@ -76,7 +76,9 @@ def get_provider_account(account_id: str):
 @router.put("/accounts/{account_id}/provider")
 async def update_provider_account(account_id: str, payload: ProviderUpdateRequest):
     auth = payload.auth.model_dump()
-    model = payload.model.strip()
+    stored = accounts.provider_for(account_id)
+    kept = stored.get("model", "") if stored.get("base_url") == payload.base_url.strip().rstrip("/") else ""
+    model = (kept if payload.model is None else payload.model).strip()
     if not model and providers.pins_model(payload.base_url):
         found = await providers.models(payload.base_url, accounts.auth_headers(auth))
         model = found[0]["id"] if found else ""

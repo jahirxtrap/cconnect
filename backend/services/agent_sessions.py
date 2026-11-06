@@ -12,7 +12,7 @@ from urllib.parse import urlparse
 
 from core import paths
 from mcps.shared_files import listing
-from services import acp_events, agents, attachments, claude_runtime, elicitation, event_rows, providers, shared, terminal
+from services import acp_events, agents, attachments, claude_runtime, elicitation, event_rows, files, providers, shared, terminal
 from services.acp_peer import AUTH_REQUIRED, INVALID_PARAMS, METHOD_NOT_FOUND, RESOURCE_NOT_FOUND, AcpError
 from services.agent_connections import AgentConnection, pool
 from services.agent_mcp import AgentMcp
@@ -54,8 +54,7 @@ def _read(file: Path) -> dict:
 
 
 def _write(file: Path, stored: dict) -> None:
-    file.parent.mkdir(parents=True, exist_ok=True)
-    file.write_text(json.dumps(stored, ensure_ascii=False), encoding="utf-8")
+    files.write_json(file, stored)
 
 
 def _defaults() -> dict[str, dict]:

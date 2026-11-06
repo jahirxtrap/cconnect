@@ -135,84 +135,100 @@ TYPES = [
     "page", "group", "bar", "slider", "color", "path", "file",
 ]
 
+SHOW_TYPES = ["text", "bar", "preview", "page", "group"]
+
+SHOW_FIELDS = {"label", "value", "text", "color", "alert_above", "alert_below", "severity", "display", "open", "block"}
+
 COLORS = ["red", "orange", "yellow", "green", "cyan", "blue", "purple", "pink"]
 
 SEVERITIES = ["normal", "warning", "critical"]
 
-LEAF = {
-    "type": "object",
-    "properties": {
-        "type": {"type": "string", "enum": TYPES},
-        "id": {"type": "string", "description": "Required for every element that carries a value."},
-        "label": {"type": "string", "description": "Heading of the element."},
-        "value": {
-            "description": "Prefilled value: string for input, path and file, boolean for toggle,"
-            " 0-100 for bar, a number for slider, a colour name for color.",
-        },
-        "text": {"type": "string", "description": "text: its markdown. bar: the line under it."},
-        "color": {"type": "string", "enum": COLORS, "description": "bar: its colour. Accent by default."},
-        "alert_above": {"type": "number", "description": "bar: alert colour from this value up."},
-        "alert_below": {"type": "number", "description": "bar: alert colour from this value down."},
-        "severity": {
-            "type": "string",
-            "enum": SEVERITIES,
-            "description": "bar: how serious its value is, drawn in the theme's colour for it. Normal by default.",
-        },
-        "placeholder": {"type": "string"},
-        "multiline": {"type": "boolean"},
-        "lines": {"type": "integer", "description": "input: fixed height in lines. Implies multiline."},
-        "secret": {"type": "boolean", "description": "input: mask the text behind a reveal toggle."},
-        "format": {"type": "string", "enum": ["number"], "description": "input: the kind of value it takes."},
-        "display": {
-            "type": "string",
-            "enum": ["list", "dropdown", "bare"],
-            "description": (
-                "select: how the options are laid out, a list by default."
-                " slider, bar: \"bare\" drops the number and leaves the control on its own."
-            ),
-        },
-        "multiple": {"type": "boolean", "description": "select: checkboxes instead of radio. file: several files."},
-        "required": {"type": "boolean"},
-        "show_if": {**SHOW_IF, "description": "Show this element only while the condition holds."},
-        "min": {"type": "number", "description": "slider: lowest value, required. input number: lowest accepted."},
-        "max": {"type": "number", "description": "slider: highest value, required. input number: highest accepted."},
-        "step": {"type": "number", "description": "slider, input number: how much the value moves at a time."},
-        "min_length": {"type": "integer", "description": "input: shortest text accepted."},
-        "max_length": {"type": "integer", "description": "input: longest text accepted."},
-        "pattern": {"type": "string", "description": "input: regular expression the text has to match."},
-        "error": {"type": "string", "description": "The line the user reads while the value does not fit."},
-        "open": {"type": "boolean", "description": "group: start it open instead of closed."},
-        "pick": {"type": "string", "enum": ["file", "dir"], "description": "path: what to browse for. A folder by default."},
-        "start": {"type": "string", "description": "path: folder the browser opens in."},
-        "accept": {"type": "string", "description": "file: extensions to offer, like \".png,.pdf\"."},
-        "options": {"type": "array", "items": OPTION},
-        "block": {"type": "object", "description": "preview: the cconnect block payload."},
+FIELDS = {
+    "id": {"type": "string", "description": "Required for every element that carries a value."},
+    "label": {"type": "string", "description": "Heading of the element."},
+    "value": {
+        "description": "Prefilled value: string for input, path and file, boolean for toggle,"
+        " 0-100 for bar, a number for slider, a colour name for color.",
     },
-    "required": ["type"],
+    "text": {"type": "string", "description": "text: its markdown. bar: the line under it."},
+    "color": {"type": "string", "enum": COLORS, "description": "bar: its colour. Accent by default."},
+    "alert_above": {"type": "number", "description": "bar: alert colour from this value up."},
+    "alert_below": {"type": "number", "description": "bar: alert colour from this value down."},
+    "severity": {
+        "type": "string",
+        "enum": SEVERITIES,
+        "description": "bar: how serious its value is, drawn in the theme's colour for it. Normal by default.",
+    },
+    "placeholder": {"type": "string"},
+    "multiline": {"type": "boolean"},
+    "lines": {"type": "integer", "description": "input: fixed height in lines. Implies multiline."},
+    "secret": {"type": "boolean", "description": "input: mask the text behind a reveal toggle."},
+    "format": {"type": "string", "enum": ["number"], "description": "input: the kind of value it takes."},
+    "display": {
+        "type": "string",
+        "enum": ["list", "dropdown", "bare"],
+        "description": (
+            "select: how the options are laid out, a list by default."
+            " slider, bar: \"bare\" drops the number and leaves the control on its own."
+        ),
+    },
+    "multiple": {"type": "boolean", "description": "select: checkboxes instead of radio. file: several files."},
+    "required": {"type": "boolean"},
+    "show_if": {**SHOW_IF, "description": "Show this element only while the condition holds."},
+    "min": {"type": "number", "description": "slider: lowest value, required. input number: lowest accepted."},
+    "max": {"type": "number", "description": "slider: highest value, required. input number: highest accepted."},
+    "step": {"type": "number", "description": "slider, input number: how much the value moves at a time."},
+    "min_length": {"type": "integer", "description": "input: shortest text accepted."},
+    "max_length": {"type": "integer", "description": "input: longest text accepted."},
+    "pattern": {"type": "string", "description": "input: regular expression the text has to match."},
+    "error": {"type": "string", "description": "The line the user reads while the value does not fit."},
+    "open": {"type": "boolean", "description": "group: start it open instead of closed."},
+    "pick": {"type": "string", "enum": ["file", "dir"], "description": "path: what to browse for. A folder by default."},
+    "start": {"type": "string", "description": "path: folder the browser opens in."},
+    "accept": {"type": "string", "description": "file: extensions to offer, like \".png,.pdf\"."},
+    "options": {"type": "array", "items": OPTION},
+    "block": {"type": "object", "description": "preview: the cconnect block payload."},
 }
 
-NODE = {
-    "type": "object",
-    "properties": {
-        **LEAF["properties"],
-        "blocks": {"type": "array", "items": LEAF, "description": "group: the elements it holds."},
-    },
-    "required": ["type"],
-}
 
-ELEMENT = {
-    "type": "object",
-    "properties": {
-        **LEAF["properties"],
-        "blocks": {"type": "array", "items": NODE, "description": "page, group: the elements they hold."},
-    },
-    "required": ["type"],
-}
+def _blocks(types: list[str], fields: set[str] | None = None) -> dict:
+    leaf = {key: spec for key, spec in FIELDS.items() if fields is None or key in fields}
+    return {
+        "leaf": {
+            "type": "object",
+            "properties": {"type": {"type": "string", "enum": types}, **leaf},
+            "required": ["type"],
+        },
+        "node": {
+            "allOf": [{"$ref": "#/$defs/leaf"}],
+            "properties": {
+                "blocks": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/leaf"},
+                    "description": "group: the elements it holds.",
+                },
+            },
+        },
+        "element": {
+            "allOf": [{"$ref": "#/$defs/leaf"}],
+            "properties": {
+                "blocks": {
+                    "type": "array",
+                    "items": {"$ref": "#/$defs/node"},
+                    "description": "page, group: the elements they hold.",
+                },
+            },
+        },
+    }
+
+
+BLOCKS = {"type": "array", "items": {"$ref": "#/$defs/element"}, "description": "The elements, in order."}
 
 SHOW_SCHEMA = {
     "type": "object",
+    "$defs": _blocks(SHOW_TYPES, SHOW_FIELDS),
     "properties": {
-        "blocks": {"type": "array", "items": ELEMENT, "description": "The elements, in order."},
+        "blocks": BLOCKS,
         "title": {"type": "string", "description": "Heading of the block. Without it there is no heading at all."},
         "icon": {"type": "string", "enum": ICONS, "description": "Icon next to the title."},
         "block_id": {"type": "string", "description": "Reuse it to replace an earlier block instead of stacking."},
@@ -222,8 +238,9 @@ SHOW_SCHEMA = {
 
 SCHEMA = {
     "type": "object",
+    "$defs": _blocks(TYPES),
     "properties": {
-        "blocks": {"type": "array", "items": ELEMENT, "description": "The elements, in order."},
+        "blocks": BLOCKS,
         "title": {"type": "string", "description": "Heading of the form. Without it there is no heading at all."},
         "icon": {"type": "string", "enum": ICONS, "description": "Icon next to the title. A question mark by default."},
         "submit": {"type": "string", "description": "Label of the send button. Ignored if a buttons element is present."},

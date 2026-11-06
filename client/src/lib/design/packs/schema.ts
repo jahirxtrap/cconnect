@@ -43,6 +43,16 @@ export const FONT_FORMATS: readonly string[] = schema.fontFormats;
 
 export const IMAGE_FORMATS: readonly string[] = schema.imageFormats;
 
+const whole = (source: string): RegExp => new RegExp(`^(?:${source})$`);
+
+export const COLOR_PATTERN = whole(schema.patterns.color);
+
+export const LOCAL_ID_PATTERN = whole(schema.patterns.localId);
+
+export const FONT_STYLE_PATTERN = whole(schema.patterns.fontStyle);
+
+export const PACK_FIELDS: Readonly<Record<keyof typeof schema.fields, readonly string[]>> = schema.fields;
+
 export const MAX_FILE_BYTES: number = schema.maxFileBytes;
 
 export const MAX_PACK_BYTES: number = schema.maxPackBytes;

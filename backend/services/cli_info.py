@@ -1,8 +1,8 @@
-"""Cached snapshot of what the running CLI reports at handshake."""
+"""Snapshot of what the CLI reports at handshake, kept per account until the binary or the configuration it reads changes."""
 
 import asyncio
 import json
-import time
+from pathlib import Path
 from typing import Any, Optional
 
 from loguru import logger
@@ -10,10 +10,12 @@ from loguru import logger
 from core import cli_manager, paths
 from core.config import COMMANDS, DEFAULT_CWD, ULTRACODE_EFFORT
 
-_TTL_SECONDS = 300
+_CONFIG_FILES = ("settings.json", "settings.local.json", ".credentials.json", "plugins/installed_plugins.json")
+_CONFIG_FOLDERS = ("commands", "skills", "agents", "output-styles")
 
-_snapshots: dict[str, dict[str, Any]] = {}
-_fetched_at: dict[str, float] = {}
+_snapshots: dict[str, tuple[tuple, dict[str, Any]]] = {}
+_reading: dict[str, asyncio.Task] = {}
+_generation = 0
 _windows: dict[str, int] = {}
 _warm_tasks: set[asyncio.Task] = set()
 _provider_models: dict[str, list[dict]] = {}
@@ -58,14 +60,7 @@ def _options(model: Optional[str] = None, account: Optional[str] = None):
 async def _fetch(account: str) -> dict[str, Any]:
     from claude_agent_sdk import ClaudeSDKClient
 
-    from services import accounts, providers
-
-    provider = accounts.provider_for(account)
-    _provider_models[account] = (
-        await providers.models(provider["base_url"], accounts.auth_headers(provider.get("auth") or {}))
-        if provider
-        else []
-    )
+    await provider_models(account)
     async with ClaudeSDKClient(_options(account=account)) as client:
         return await client.get_server_info() or {}
 
@@ -112,21 +107,76 @@ def _schedule_warm(listed: list[dict], account: str) -> None:
     task.add_done_callback(_warm_tasks.discard)
 
 
-async def server_info(refresh: bool = False, account: Optional[str] = None) -> dict[str, Any]:
+def _stat(path: Path) -> Optional[tuple[int, int]]:
+    try:
+        found = path.stat()
+    except OSError:
+        return None
+    return (found.st_mtime_ns, found.st_size)
+
+
+def _folder_stamp(folder: Path) -> tuple:
+    return tuple(sorted((str(path), _stat(path)) for pattern in ("*.md", "*/*.md") for path in folder.glob(pattern)))
+
+
+def _stamp(target: str) -> tuple:
     from services import accounts
 
-    target = accounts.resolve(account) if account else accounts.default_account()
-    cached = _snapshots.get(target)
-    if not refresh and cached and time.monotonic() - _fetched_at.get(target, 0.0) < _TTL_SECONDS:
-        return cached
+    roots = (accounts.config_dir(target) or accounts.primary_dir(), Path(DEFAULT_CWD) / ".claude")
+    return (
+        cli_manager.cli_stamp(),
+        tuple(_stat(root / name) for root in roots for name in _CONFIG_FILES),
+        tuple(_folder_stamp(root / name) for root in roots for name in _CONFIG_FOLDERS),
+    )
+
+
+async def _read(target: str, generation: int) -> dict[str, Any]:
+    stamp = await asyncio.to_thread(_stamp, target)
     try:
-        _snapshots[target] = await _fetch(target)
-        _fetched_at[target] = time.monotonic()
+        info = await _fetch(target)
     except Exception as exc:
         logger.warning(f"CLI server info unavailable: {type(exc).__name__}: {exc}")
-    snapshot = _snapshots.get(target, {})
-    _schedule_warm(models(snapshot, target), target)
-    return snapshot
+        return _snapshots.get(target, ((), {}))[1]
+    if generation == _generation:
+        _snapshots[target] = (stamp, info)
+    _schedule_warm(models(info, target), target)
+    return info
+
+
+def _reread(target: str) -> asyncio.Task:
+    task = _reading.get(target)
+    if task is None or task.done():
+        task = _reading[target] = asyncio.create_task(_read(target, _generation))
+    return task
+
+
+def _target(account: Optional[str]) -> str:
+    from services import accounts
+
+    return accounts.resolve(account) if account else accounts.default_account()
+
+
+async def server_info(refresh: bool = False, account: Optional[str] = None) -> dict[str, Any]:
+    target = _target(account)
+    known = _snapshots.get(target)
+    if refresh or known is None or known[0] != await asyncio.to_thread(_stamp, target):
+        return await asyncio.shield(_reread(target))
+    return known[1]
+
+
+async def provider_models(account: Optional[str] = None) -> None:
+    from services import accounts, providers
+
+    target = _target(account)
+    provider = accounts.provider_for(target)
+    if provider:
+        _provider_models[target] = await providers.models(provider["base_url"], accounts.auth_headers(provider.get("auth") or {}))
+
+
+def observe_init(account: Optional[str], data: dict) -> None:
+    known = _snapshots.get(_target(account))
+    if known is not None and "fast_mode_state" in data:
+        known[1].update(fast_mode_state=data["fast_mode_state"], fast_mode_disabled_reason=data.get("fast_mode_disabled_reason"))
 
 
 async def refresh() -> None:
@@ -136,18 +186,21 @@ async def refresh() -> None:
 
 
 def refresh_later(account: Optional[str] = None) -> None:
-    """Read the CLI again in the background, serving the current snapshot until it answers."""
-    task = asyncio.create_task(server_info(refresh=True, account=account))
-    _warm_tasks.add(task)
-    task.add_done_callback(_warm_tasks.discard)
+    _reread(_target(account))
 
 
 def invalidate() -> None:
+    global _generation
+    _generation += 1
+    _reading.clear()
     _snapshots.clear()
-    _fetched_at.clear()
     _provider_models.clear()
     _windows.clear()
     load_windows()
+
+
+def _snapshot(account: Optional[str]) -> dict[str, Any]:
+    return (_snapshots.get(_target(account)) or ((), {}))[1]
 
 
 def _entries(info: dict[str, Any]) -> list[dict]:
@@ -174,18 +227,14 @@ def subagent_efforts(info: dict[str, Any]) -> list[str]:
 
 
 def effort_levels_for(model: Optional[str], account: Optional[str] = None) -> list[str]:
-    from services import accounts
-
-    target = accounts.resolve(account) if account else accounts.default_account()
-    listed = models(_snapshots.get(target) or {}, target)
+    target = _target(account)
+    listed = models(_snapshot(target), target)
     entry = next((item for item in listed if item["id"] == model), None)
     return entry["effort_levels"] if entry else []
 
 
 def _provider_entry(model: Optional[str], account: Optional[str] = None) -> Optional[dict]:
-    from services import accounts
-
-    listed = _provider_models.get(accounts.resolve(account) if account else accounts.default_account())
+    listed = _provider_models.get(_target(account))
     return next((item for item in listed or [] if item["id"] == model), None) if model else None
 
 
@@ -206,7 +255,7 @@ def models(info: dict[str, Any], account: Optional[str] = None) -> list[dict]:
     """The CLI's model lineup in the capabilities shape."""
     from services import accounts
 
-    resolved = accounts.resolve(account) if account else accounts.default_account()
+    resolved = _target(account)
     listed = _provider_models.get(resolved)
     if listed:
         levels = _cli_levels(info)

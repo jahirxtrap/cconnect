@@ -247,7 +247,7 @@ def make_tools(context: dict) -> list:
 
     @tool("usage", USAGE, {})
     async def usage(args):
-        from services.usage import CAPABILITY as USAGE, usage_blocks, usage_data, window_line
+        from services.usage import CAPABILITY as USAGE, bar_blocks, usage_data, window_line
 
         data = await usage_data(account, language=locale)
         if "error" in data:
@@ -256,7 +256,7 @@ def make_tools(context: dict) -> list:
         if emit is not None and USAGE in capabilities and windows:
             await emit({"type": "usage", **data})
         elif emit is not None and COMPONENTS in capabilities and windows:
-            await emit({"type": "component", "blocks": await usage_blocks(account)})
+            await emit({"type": "component", "blocks": bar_blocks(windows)})
         lines = [f"Plan: {data['plan']}"] if data.get("plan") else []
         lines += [window_line(win) for win in windows]
         return {"content": [{"type": "text", "text": "\n".join(lines) or "No usage data available."}]}

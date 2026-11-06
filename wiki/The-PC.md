@@ -26,8 +26,9 @@ asks for the security key.
 A **Network** tab manages the PC's connection from wherever you are: whether it
 really has internet (a captive portal counts as no), live upload/download, every
 interface with the one carrying traffic marked, the Wi-Fi networks in range with
-their signal, and an on-demand **speed test** through the Ookla CLI when it's
-installed.
+their signal, and an on-demand **speed test** against the nearest of Cloudflare's
+speed test servers, with nothing to install. Where Cloudflare can't be reached
+or is throttled, the test starts over on the nearest of M-Lab's ndt7 servers.
 
 You can also act on it — join another Wi-Fi network, turn the radio off, and on
 Linux bring a wired interface up or down. Since a wrong move over a remote link

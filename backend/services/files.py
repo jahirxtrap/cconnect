@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 
 def resolve(base: Path, relpath: str) -> Path:
@@ -13,11 +14,11 @@ def resolve(base: Path, relpath: str) -> Path:
     return target
 
 
-def write_json(path: Path, data: dict) -> None:
+def write_json(path: Path, data: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     staged = path.with_name(f".{path.name}.writing")
     try:
-        staged.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        staged.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
         os.replace(staged, path)
     except BaseException:
         staged.unlink(missing_ok=True)

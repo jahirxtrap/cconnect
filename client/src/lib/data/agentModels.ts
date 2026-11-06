@@ -2,6 +2,7 @@ import { t } from "$lib/i18n/index.svelte";
 import { toCommands, type CommandOption, type CommandWire } from "$lib/services/capabilitiesApi";
 import { linesOf } from "./format";
 import { MILLIS_PER_SECOND, parseIsoMillis } from "./time";
+import { flag, list, number, record, strings, text, type Wire } from "./wire";
 
 export type AgentStatus = "connecting" | "loading" | "ready" | "auth" | "error" | "closed";
 
@@ -140,18 +141,7 @@ export interface AgentFailure {
   detail: string;
 }
 
-type Wire = Record<string, unknown>;
-
 const STATUSES: AgentStatus[] = ["connecting", "loading", "ready", "auth", "error", "closed"];
-
-const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
-const number = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
-const flag = (raw: Wire, key: string): boolean => raw[key] === true;
-const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
-const record = (raw: Wire, key: string): Wire =>
-  raw[key] && typeof raw[key] === "object" && !Array.isArray(raw[key]) ? (raw[key] as Wire) : {};
-const strings = (raw: Wire, key: string): string[] =>
-  Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : [];
 
 const toChoice = (raw: Wire): AgentChoice => ({
   value: text(raw, "value") ?? "",

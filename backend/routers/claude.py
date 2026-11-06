@@ -21,8 +21,8 @@ async def get_usage(account: str | None = None, lang: str | None = None):
 
 
 @router.get("/claude/status")
-async def get_status(force: bool = False):
-    return api_response(data=await claude_status.service_status(force))
+async def get_status():
+    return api_response(data=await claude_status.service_status())
 
 
 class PromptBody(BaseModel):

@@ -158,6 +158,10 @@ jobs:
 
       - uses: astral-sh/setup-uv@v10.1.0
 
+      - name: Check the chat event contract
+        working-directory: backend
+        run: uv run python -m schemas.contract --check
+
       - name: Look up the published version
         id: backend
         run: |

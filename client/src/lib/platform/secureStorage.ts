@@ -1,8 +1,6 @@
 import { isTauri } from "./index";
 import { store } from "./storage";
 
-// Mirrors the Compose client, which keeps environments and SSH hosts encrypted
-// (DPAPI on Windows) and in plain text everywhere else.
 const PREFIX = "enc:v1:";
 
 class SecureStore {

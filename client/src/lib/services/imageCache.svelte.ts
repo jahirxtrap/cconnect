@@ -21,13 +21,14 @@ class ImageCache {
       .catch(() => this.#asked.delete(key));
   }
 
-  drop(prefix: string) {
+  drop(prefix: string, spared: ReadonlySet<string> = new Set()) {
+    const dropped = (key: string) => key.startsWith(prefix) && !spared.has(key);
     const kept: Record<string, string> = {};
     for (const [key, url] of Object.entries(this.#urls)) {
-      if (key.startsWith(prefix)) URL.revokeObjectURL(url);
+      if (dropped(key)) URL.revokeObjectURL(url);
       else kept[key] = url;
     }
-    for (const key of [...this.#asked]) if (key.startsWith(prefix)) this.#asked.delete(key);
+    for (const key of [...this.#asked]) if (dropped(key)) this.#asked.delete(key);
     this.#urls = kept;
   }
 }

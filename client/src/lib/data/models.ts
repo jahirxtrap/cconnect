@@ -1,3 +1,5 @@
+import { flag, number, text, type Wire } from "./wire";
+
 export interface ProjectInfo {
   projectKey: string;
   path: string | null;
@@ -50,48 +52,35 @@ export const sessionInfo = (
   ...known,
 });
 
-export interface SharedEntry {
-  name: string;
-  isDir: boolean;
-  size: number;
-  modified: number;
-  items: number;
-}
-
-type Wire = Record<string, unknown>;
-
-const text = (value: unknown): string | null => (typeof value === "string" ? value : null);
-const number = (value: unknown): number | null => (typeof value === "number" ? value : null);
-
 export const parseProject = (raw: Wire): ProjectInfo => ({
-  projectKey: text(raw.project_key) ?? "",
-  path: text(raw.path),
-  name: text(raw.name),
-  customName: raw.custom_name === true,
-  sessionCount: number(raw.session_count) ?? 0,
-  lastActive: number(raw.last_active),
+  projectKey: text(raw, "project_key") ?? "",
+  path: text(raw, "path"),
+  name: text(raw, "name"),
+  customName: flag(raw, "custom_name"),
+  sessionCount: number(raw, "session_count") ?? 0,
+  lastActive: number(raw, "last_active"),
 });
 
 export const parseSession = (raw: Wire): SessionInfo => ({
-  sessionId: text(raw.session_id) ?? "",
-  projectKey: text(raw.project_key),
-  path: text(raw.path),
-  lastActive: number(raw.last_active),
-  size: number(raw.size) ?? 0,
-  preview: text(raw.preview),
-  title: text(raw.title),
-  color: text(raw.color),
-  activity: text(raw.activity),
-  resident: raw.resident === true,
-  rewind: text(raw.rewind),
+  sessionId: text(raw, "session_id") ?? "",
+  projectKey: text(raw, "project_key"),
+  path: text(raw, "path"),
+  lastActive: number(raw, "last_active"),
+  size: number(raw, "size") ?? 0,
+  preview: text(raw, "preview"),
+  title: text(raw, "title"),
+  color: text(raw, "color"),
+  activity: text(raw, "activity"),
+  resident: flag(raw, "resident"),
+  rewind: text(raw, "rewind"),
 });
 
 export const parseCategory = (raw: Wire): ChatCategory => ({
-  id: text(raw.id) ?? "",
-  name: text(raw.name) ?? "",
-  position: number(raw.position) ?? 0,
-  color: text(raw.color),
-  projectKey: text(raw.project_key),
+  id: text(raw, "id") ?? "",
+  name: text(raw, "name") ?? "",
+  position: number(raw, "position") ?? 0,
+  color: text(raw, "color"),
+  projectKey: text(raw, "project_key"),
 });
 
 const PROJECT_KEY_SEPARATOR = /[^A-Za-z0-9]/g;
@@ -132,18 +121,10 @@ export const projectNameOf = (projects: ProjectInfo[], key: string, fallbackPath
 };
 
 export const parsePlacement = (raw: Wire): ChatPlacement => ({
-  sessionId: text(raw.session_id) ?? "",
-  categoryId: text(raw.category_id),
-  position: number(raw.position) ?? 0,
-  agent: text(raw.agent),
+  sessionId: text(raw, "session_id") ?? "",
+  categoryId: text(raw, "category_id"),
+  position: number(raw, "position") ?? 0,
+  agent: text(raw, "agent"),
 });
 
 export const placementKey = (agent: string | null, sessionId: string) => (agent ? `${agent}\n${sessionId}` : sessionId);
-
-export const parseSharedEntry = (raw: Wire): SharedEntry => ({
-  name: text(raw.name) ?? "",
-  isDir: raw.is_dir === true,
-  size: number(raw.size) ?? 0,
-  modified: number(raw.modified) ?? 0,
-  items: number(raw.items) ?? 0,
-});

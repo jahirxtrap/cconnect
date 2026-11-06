@@ -16,7 +16,7 @@ router = APIRouter(tags=["network"])
 async def get_network():
     if not network.SUPPORTED:
         return api_response(data={"supported": False})
-    return api_response(data={**await asyncio.to_thread(network.status), "speedtest": speedtest.available()})
+    return api_response(data={**await asyncio.to_thread(network.status), "speedtest": True})
 
 
 @router.get("/network/wifi")
@@ -72,8 +72,8 @@ async def set_auth(payload: SudoRequest):
 
 
 @router.get("/network/job/{job_id}")
-async def get_job(job_id: str):
-    job = network.job(job_id)
+async def get_job(job_id: str, settled: bool = False):
+    job = await network.settled_job(job_id) if settled else network.job(job_id)
     if job is None:
         return api_response(status=404)
     return api_response(data=job)

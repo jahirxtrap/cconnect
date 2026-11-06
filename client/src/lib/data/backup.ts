@@ -14,22 +14,14 @@ import { shortcuts } from "$lib/platform/shortcuts.svelte";
 import { settings, type VisibilityPrefs } from "./settings.svelte";
 import { BACKED_UP } from "./settingsRegistry";
 import { sshStore, type SshProfile } from "./sshStore.svelte";
+import { choice, list, number, text, type Wire } from "./wire";
 import { securityKeys } from "./securityKeys.svelte";
 
-// Shared with the Compose client: same keys so a backup moves between both apps.
 const APP = "cconnect";
 const FORMAT = 1;
 const DEFAULT_SSH_PORT = 22;
 const LEGACY_FONT_FIELDS: Partial<Record<FontKind, string>> = { emoji: "font_style" };
 
-type Wire = Record<string, unknown>;
-
-const text = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
-const flag = (raw: Wire, key: string): boolean | null =>
-  typeof raw[key] === "boolean" ? (raw[key] as boolean) : null;
-const number = (raw: Wire, key: string): number | null =>
-  typeof raw[key] === "number" ? (raw[key] as number) : null;
-const list = (raw: Wire, key: string): Wire[] => (Array.isArray(raw[key]) ? (raw[key] as Wire[]) : []);
 const texts = (raw: Wire, key: string): string[] | null =>
   Array.isArray(raw[key]) ? (raw[key] as unknown[]).filter((item): item is string => typeof item === "string") : null;
 const json = (raw: Wire, key: string): object | null =>
@@ -170,7 +162,7 @@ const applySettings = (values: Wire) => {
   const language = text(values, "language");
   if (language !== null) i18n.set((language || "system") as Locale);
 
-  const readers = { boolean: flag, number, string: text, strings: texts, json } as const;
+  const readers = { boolean: choice, number, string: text, strings: texts, json } as const;
   for (const { key, kind } of BACKED_UP) {
     const value = readers[kind](values, key);
     if (value !== null) settings.adopt(key, value);
@@ -203,7 +195,7 @@ const toEnvironment = (raw: Wire): EnvironmentProfile | null => {
     model: text(raw, "model") ?? "",
     effort: text(raw, "effort") ?? "",
     permissionMode: text(raw, "permission_mode") ?? "",
-    streaming: flag(raw, "streaming"),
+    streaming: choice(raw, "streaming"),
     accent: text(raw, "accent"),
   };
 };

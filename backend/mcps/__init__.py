@@ -15,8 +15,10 @@ from typing import Any, Iterable, Optional
 from mcps import components
 
 SETTING = "mcp_disabled"
+SERVER = "cconnect"
 
 _FIRST_SENTENCE = re.compile(r"\s*(.+?[.!?])(?:\s|$)", re.DOTALL)
+_TOOL_PREFIX = f"mcp__{SERVER}__"
 
 
 def _tool_name(tool: Any) -> str:
@@ -30,15 +32,26 @@ def _tool_summary(tool: Any) -> str:
     return " ".join((match.group(1) if match else text).split())
 
 
+def _modules() -> list[Any]:
+    return [importlib.import_module(f"{__name__}.{info.name}") for info in pkgutil.iter_modules(__path__)]
+
+
 def _discover(context: dict) -> list[tuple[Any, Any]]:
     """Every tool a turn with this context exposes, paired with the module providing it."""
     collected: list[tuple[Any, Any]] = []
-    for info in pkgutil.iter_modules(__path__):
-        module = importlib.import_module(f"{__name__}.{info.name}")
+    for module in _modules():
         make_tools = getattr(module, "make_tools", None)
         tools = make_tools(context) if make_tools else getattr(module, "tools", None)
         collected.extend((module, tool) for tool in tools or [])
     return collected
+
+
+def needs_key(tool: str, args: Any) -> bool:
+    if not tool.startswith(_TOOL_PREFIX):
+        return False
+    name = tool[len(_TOOL_PREFIX):]
+    given = args if isinstance(args, dict) else {}
+    return any(module.needs_key(name, given) for module in _modules() if hasattr(module, "needs_key"))
 
 
 def disabled_tools() -> set[str]:
@@ -85,4 +98,4 @@ def build_cconnect_server(
         for _module, tool in _discover(context or {})
         if _tool_name(tool) not in hidden and (wanted is None or _tool_name(tool) in wanted)
     ]
-    return {**create_sdk_mcp_server(name="cconnect", version="1.0.0", tools=collected), "alwaysLoad": True}
+    return {**create_sdk_mcp_server(name=SERVER, version="1.0.0", tools=collected), "alwaysLoad": True}

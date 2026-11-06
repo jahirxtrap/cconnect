@@ -3,7 +3,7 @@
 import hmac
 
 from fastapi import FastAPI, Request, WebSocket
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from core.config import PUBLIC_ACCESS_TOKEN
 from core.responses import api_response
@@ -39,16 +39,22 @@ def http_bearer_ok(request: Request) -> bool:
     )
 
 
-class PublicAuthMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        if PUBLIC_ACCESS_TOKEN is None:
-            return await call_next(request)
-        if request.url.path in _OPEN_PATHS or request.url.path.startswith(_OPEN_PREFIXES):
-            return await call_next(request)
-        if not http_bearer_ok(request):
-            return api_response(status=401)
+class PublicAuthMiddleware:
+    def __init__(self, app: ASGIApp):
+        self.app = app
 
-        return await call_next(request)
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path = scope.get("path", "")
+        if (
+            scope["type"] != "http"
+            or PUBLIC_ACCESS_TOKEN is None
+            or path in _OPEN_PATHS
+            or path.startswith(_OPEN_PREFIXES)
+            or http_bearer_ok(Request(scope))
+        ):
+            await self.app(scope, receive, send)
+            return
+        await api_response(status=401)(scope, receive, send)
 
 
 def register_public_auth_middleware(app: FastAPI):

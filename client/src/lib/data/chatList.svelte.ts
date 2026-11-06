@@ -10,7 +10,7 @@ import {
   type SessionInfo,
 } from "./models";
 import { settings } from "./settings.svelte";
-import { isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
+import { backend, isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
 import { createHttp } from "$lib/services/http";
 import { notifier } from "$lib/services/notifier.svelte";
 import { createSettingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
@@ -27,17 +27,18 @@ export const onSessionForgotten = (listener: (sessionId: string) => void) => {
 };
 
 export class ChatListStore {
-  projects = $state<ProjectInfo[]>([]);
+  projects = $state.raw<ProjectInfo[]>([]);
 
   readonly visibleProjects = $derived(
     this.projects.filter((item) => !settings.hiddenProjects.includes(item.projectKey)),
   );
 
-  sessions = $state<SessionInfo[]>([]);
+  sessions = $state.raw<SessionInfo[]>([]);
   categories = $state<ChatCategory[]>([]);
   placement = $state<Record<string, ChatPlacement>>({});
   loading = $state(true);
   connected = $state(false);
+  drops = $state(0);
 
   chatOrder = $state("auto");
   defaultCategory = $state("");
@@ -59,6 +60,7 @@ export class ChatListStore {
         onMessage: (message) => this.#apply(message),
         onDrop: () => {
           this.connected = false;
+          this.drops++;
           this.sessions = this.sessions.map((item) =>
             item.activity || item.resident ? { ...item, activity: null, resident: false } : item,
           );
@@ -74,6 +76,10 @@ export class ChatListStore {
       true,
     );
     this.#socket.connect();
+  }
+
+  close() {
+    this.#socket.close();
   }
 
   async #loadSettings() {
@@ -244,6 +250,17 @@ export class ChatListStore {
 }
 
 const stores = new Map<string, ChatListStore>();
+
+$effect.root(() => {
+  $effect(() => {
+    const saved = new Set(backend.environments.map(profileKey));
+    for (const [key, list] of stores) {
+      if (saved.has(key)) continue;
+      list.close();
+      stores.delete(key);
+    }
+  });
+});
 
 export const chatListFor = (profile: Profile): ChatListStore | null => {
   if (!isConfigured(profile)) return null;

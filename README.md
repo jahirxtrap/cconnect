@@ -147,10 +147,12 @@ Only the Claude Code CLI is required. Each of these adds something, and the serv
 
 - **Tailscale** — the tailnet and Funnel modes.
 - **Caddy**, or any reverse proxy — the `expose caddy` mode.
-- **git** — cloning plugin marketplaces.
-- **unrar** and **rar** — `.rar` archives in the file manager.
-- **Ookla speedtest** — the speed test in Monitor.
+- **git** — cloning plugin marketplaces, and the changes and commits in Project files.
+- **rar** (RARLAB) — compressing to `.rar` in the file manager. Opening and extracting `.rar`
+  needs nothing: the server reads them with the 7-Zip it ships.
 - **Node.js** — ACP agents shipped as npm packages.
+
+The speed test in Monitor, video thumbnails and `.7z` archives come with the server.
 
 ## Configuration
 

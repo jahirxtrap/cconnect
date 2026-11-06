@@ -11,6 +11,7 @@ from typing import Any, Optional
 from loguru import logger
 
 from core import cli_manager, paths
+from services import files
 
 _pending: dict[str, str] | None = None
 
@@ -28,7 +29,7 @@ def _load() -> dict[str, str]:
 
 def _save() -> None:
     try:
-        paths.REWIND_FILE.write_text(json.dumps(_load(), ensure_ascii=False), encoding="utf-8")
+        files.write_json(paths.REWIND_FILE, _load())
     except OSError:
         logger.warning("could not persist pending rewinds")
 
@@ -60,6 +61,8 @@ async def _rewind_control(cwd: str, session_id: str, user_message_id: str, dry_r
         enable_file_checkpointing=True,
         cli_path=cli_manager.resolve_cli_path(),
         max_turns=1,
+        setting_sources=[],
+        strict_mcp_config=True,
     )
     async with ClaudeSDKClient(options) as client:
         response = await client._query._send_control_request(

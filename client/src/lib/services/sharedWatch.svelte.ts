@@ -3,7 +3,7 @@ import { parseEntry, type SharedEntry } from "./sharedApi";
 import { ReconnectingSocket } from "./socket";
 
 export class SharedWatch {
-  entries = $state<SharedEntry[] | null>(null);
+  entries = $state.raw<SharedEntry[] | null>(null);
 
   #socket: ReconnectingSocket;
   #path = "";

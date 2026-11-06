@@ -11,6 +11,15 @@ const RESOURCES_PAGE = "RESOURCES";
 
 const append = (history: number[], value: number) => [...history, value].slice(-HISTORY_CAP);
 
+const sameLog = (a: LogEntry, b: LogEntry) => a.ts === b.ts && a.level === b.level && a.message === b.message;
+
+function joinLogs(shown: LogEntry[], replayed: LogEntry[]): LogEntry[] {
+  const last = shown.at(-1);
+  if (!last || !replayed.length) return (last ? shown : replayed).slice(-LOG_CAP);
+  const seen = replayed.findLastIndex((entry) => sameLog(entry, last));
+  return (seen < 0 ? replayed : [...shown, ...replayed.slice(seen + 1)]).slice(-LOG_CAP);
+}
+
 interface MonitorSnapshot {
   info: SystemInfo | null;
   gpu: GpuInfo | null;
@@ -106,7 +115,8 @@ class Monitor {
     this.reloadNetwork();
     this.#socket = systemApi.stream({
       onHistory: (samples, logs) => {
-        if (!this.logs.length) this.logs = logs.slice(-LOG_CAP);
+        this.logs = joinLogs(this.logs, logs);
+        this.logRevision++;
         if (!samples.length) return;
         if (this.cpuHistory.length) {
           this.#absorb(samples[samples.length - 1]);

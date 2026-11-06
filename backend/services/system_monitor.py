@@ -1,8 +1,4 @@
-"""PC resource usage snapshots and a shared on-disk server log for the monitor screen.
-
-Logs go to a JSONL file (one per server run) instead of process memory so that
-multi-worker runs still expose every worker's output through any of them.
-"""
+"""PC resource usage snapshots and the server log for the monitor screen, kept in a JSONL file per run and handed to listeners as it is written."""
 
 import json
 import logging
@@ -14,6 +10,7 @@ import time
 from contextlib import suppress
 from functools import lru_cache
 from pathlib import Path
+from typing import Callable
 
 import psutil
 from loguru import logger
@@ -22,6 +19,7 @@ from core import paths
 
 _READ_CAP = 64 * 1024
 _capture_installed = False
+_listeners: set[Callable[[dict], None]] = set()
 _HIDDEN = "***"
 _SECRET_PARAMS = (
     "token",
@@ -57,6 +55,12 @@ def reset_log_file() -> None:
     paths.SERVER_LOG_FILE.write_text("", encoding="utf-8")
 
 
+def follow_logs(listener: Callable[[dict], None]) -> Callable[[], None]:
+    """Hand every log entry to `listener` as it is written, from whichever thread wrote it, until the returned call stops it."""
+    _listeners.add(listener)
+    return lambda: _listeners.discard(listener)
+
+
 def _sink(message) -> None:
     record = message.record
     entry = {
@@ -70,6 +74,8 @@ def _sink(message) -> None:
             fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
     except OSError:
         pass
+    for listener in list(_listeners):
+        listener(entry)
 
 
 class _InterceptHandler(logging.Handler):

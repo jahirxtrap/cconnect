@@ -1,5 +1,6 @@
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
+import { text as textOf, type Wire } from "$lib/data/wire";
 import { backend, withToken } from "./backend.svelte";
 import { createHttp, type HttpResult } from "./http";
 import { imageCache } from "./imageCache.svelte";
@@ -16,10 +17,6 @@ export interface ServerPack {
   file: string;
   modified: number;
 }
-
-type Wire = Record<string, unknown>;
-
-const textOf = (raw: Wire, key: string): string | null => (typeof raw[key] === "string" ? (raw[key] as string) : null);
 
 const toPack = (raw: Wire): ServerPack | null => {
   const id = textOf(raw, "id");
@@ -59,14 +56,19 @@ class ServerPacks {
   #apply(message: Wire) {
     if (message.type !== "snapshot") return;
     this.entries = ((message.packs as Wire[] | undefined) ?? []).flatMap((raw) => toPack(raw) ?? []);
+    imageCache.drop(this.#previews, new Set(this.entries.map((pack) => this.previewKey(pack))));
   }
 
   urlOf(pack: ServerPack, suffix = ""): string {
     return withToken(`${backend.baseUrl}/packs/${encodeURIComponent(pack.file)}${suffix}`, backend.active);
   }
 
+  get #previews(): string {
+    return `${backend.baseUrl}/packs/`;
+  }
+
   previewKey(pack: ServerPack): string {
-    return `${backend.baseUrl}/packs/${pack.file}?v=${pack.modified}`;
+    return `${this.#previews}${pack.file}?v=${pack.modified}`;
   }
 
   loadPreview(pack: ServerPack) {

@@ -3,19 +3,19 @@
 import asyncio
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from core.config import COLORS
-from core.responses import api_response
+from core.responses import api_response, fixed_response
 from services import categories as categories_service
 from services import chat_list
 from services import projects as projects_service
+from services import prompt_cache
 from services import trash as trash_service
 from services import rewind as rewind_service
 from services import sessions as sessions_service
-from services.event_rows import page_start
+from services.event_rows import page
 from services.live_sessions import registry
 
 router = APIRouter(tags=["Sessions"])
@@ -216,7 +216,7 @@ async def rename_session(session_id: str, body: RenameBody):
 @router.post("/sessions/{session_id}/move")
 async def move_session(session_id: str, body: MoveBody):
     try:
-        target_key = sessions_service.move_session(body.project, session_id, body.cwd)
+        target_key = await sessions_service.move_session(body.project, session_id, body.cwd)
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except ValueError as exc:
@@ -318,15 +318,18 @@ async def rewind_session(session_id: str, body: RewindBody):
 
 
 @router.get("/sessions/{session_id}/images/{message_uuid}/{index}")
-def get_session_image(session_id: str, message_uuid: str, index: int, project: str, trashed: bool = False):
+def get_session_image(request: Request, session_id: str, message_uuid: str, index: int, project: str, trashed: bool = False):
     try:
-        result = sessions_service.get_message_image(project, session_id, message_uuid, index, trashed)
+        answer = fixed_response(
+            request,
+            f"{session_id}-{message_uuid}-{index}",
+            lambda: sessions_service.get_message_image(project, session_id, message_uuid, index, trashed),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    if result is None:
+    if answer is None:
         raise HTTPException(status_code=404, detail="image not found")
-    media, data = result
-    return Response(content=data, media_type=media)
+    return answer
 
 
 @router.get("/sessions/{session_id}/messages")
@@ -363,18 +366,16 @@ def get_session_messages(
     cut = None if trashed else registry.committed_cut(session_id)
     if cut is not None:
         items = items[:sessions_service.committed_index(items, *cut)]
-    total = len(items)
-    end = total if before_index is None else max(0, min(before_index, total))
-    start = page_start(items, end, limit)
-    slice_ = [dict(item, index=i) for i, item in enumerate(items[start:end], start=start)]
+    rows, start = page(items, before_index, limit)
     weight = sessions_service.request_weight(project, session_id, trashed) or (None, None)
+    tail = sessions_service.tail_entries(project, session_id, trashed)
     return api_response(data={
-        "items": slice_,
-        "total": total,
+        "items": rows,
+        "total": len(items),
         "start_index": start,
         "has_more": start > 0,
-        "context_tokens": sessions_service.last_context_tokens(project, session_id, trashed),
-        "cache": sessions_service.last_prompt_cache(project, session_id, trashed),
+        "context_tokens": sessions_service.context_tokens_in(tail),
+        "cache": prompt_cache.from_entries(tail),
         "request_bytes": weight[0],
         "media_bytes": weight[1],
         "prompts": None if before_index is not None else sessions_service.user_prompts(items),

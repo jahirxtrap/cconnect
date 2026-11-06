@@ -63,6 +63,15 @@ type Hooked = "probing" | boolean;
 
 const keyOf = (component: ModComponent, instanceId: string) => `${component}:${instanceId}`;
 
+const LASTING_SITES: ModComponent[] = ["Pane", "AbovePrompt", "SessionMode", "PromptHint", "Spinner", "AskUserQuestion"];
+
+const PER_TURN_SITES: ModComponent[] = ["Spinner"];
+
+const lastingKey = (key: string) => LASTING_SITES.some((component) => key.startsWith(`${component}:`));
+
+const lastingOnly = <T>(record: Record<string, T>): Record<string, T> =>
+  Object.fromEntries(Object.entries(record).filter(([key]) => lastingKey(key)));
+
 const lastButton = (node: ModChild, hotkey: string): ModNode | null => {
   if (typeof node === "string") return null;
   let found = node.type === "Button" && node.press && node.props.hotkey === hotkey ? node : null;
@@ -110,6 +119,7 @@ export class ModSurface {
   #toastId = 0;
   #seq = 0;
   #stale = false;
+  #transcript: string | null = null;
 
   constructor(private readonly port: ModPort) {
     this.clients = new ModClients(this);
@@ -155,7 +165,7 @@ export class ModSurface {
     return () => {
       if (this.#mounted.get(key) !== site) return;
       this.#mounted.delete(key);
-      this.#signatures.delete(key);
+      if (PER_TURN_SITES.includes(site.component)) this.#signatures.delete(key);
       this.#waiting.get(site.component)?.delete(key);
     };
   }
@@ -228,12 +238,28 @@ export class ModSurface {
       for (const site of sites) {
         const key = keyOf(site.component, site.instanceId);
         if (this.#mounted.has(key)) this.#request(key);
+        else this.#signatures.delete(key);
       }
       return;
     }
     this.#hooked.clear();
     this.#waiting.clear();
+    for (const key of [...this.#signatures.keys()]) if (!this.#mounted.has(key)) this.#signatures.delete(key);
     for (const key of this.#mounted.keys()) this.#request(key);
+  }
+
+  showTranscript(sessionId: string | null) {
+    if (sessionId === this.#transcript) return;
+    this.#transcript = sessionId;
+    const rows = Object.keys(this.#drawn).filter((key) => !lastingKey(key));
+    if (!rows.length) return;
+    this.#drawn = lastingOnly(this.#drawn);
+    this.#drawnColumns = lastingOnly(this.#drawnColumns);
+    for (const key of rows) this.#signatures.delete(key);
+  }
+
+  nameTranscript(sessionId: string) {
+    this.#transcript ??= sessionId;
   }
 
   seed(component: ModComponent, instanceId: string, drawn: ModDrawn) {
@@ -332,6 +358,7 @@ export class ModSurface {
   reset() {
     this.rebind();
     this.#stale = false;
+    this.#transcript = null;
     this.#drawn = {};
     this.clients.reset();
     this.state = emptyModState();
