@@ -14,10 +14,12 @@ reconnects on its own.
 ### Processes
 
 A **Processes** tab lists what CConnect runs on the machine — the server, each
-chat's Claude process with its MCP servers, the ACP agents, the terminals and the
+chat with everything it launched (its Claude process, MCP servers, Bash commands
+and quick chat, each with its own memory), the ACP agents, the terminals and the
 browser — with their CPU and memory, under a bar of how much of the machine is
-CConnect's. Chats, agents, terminals and the browser stop from there after a
-confirmation; a terminal also asks for the security key.
+CConnect's. With a project locked, it lists that project's. Chats, agents,
+terminals and the browser stop from there after a confirmation; a terminal also
+asks for the security key.
 
 ### Network
 
