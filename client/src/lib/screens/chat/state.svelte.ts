@@ -1407,6 +1407,10 @@ export class ChatState {
     this.accountOverride = account;
   }
 
+  #adoptAccount(account: string | null) {
+    if (!this.agent && account && account !== this.effectiveAccount) this.#storeAccount(account);
+  }
+
   setStreamTokens(value: string) {
     const next = value === "" ? null : value === "on";
     this.onOverrides?.({ streaming: next });
@@ -2381,7 +2385,7 @@ export class ChatState {
           };
         }
         this.#applyQueueSnapshot(event.queued);
-        if (!this.agent && event.account && event.account !== this.effectiveAccount) this.#storeAccount(event.account);
+        this.#adoptAccount(event.account);
         void this.refreshServerInfo();
         this.#pumpQueue();
         if (this.#cutChannel !== null && event.channel !== this.#cutChannel && !event.resumed && !event.running) {
@@ -2585,6 +2589,7 @@ export class ChatState {
       case "activity":
         this.activity = event.state;
         this.resident = event.resident;
+        if (isBusyActivity(event.state)) this.#adoptAccount(event.account);
         break;
       case "agent_state":
         this.agentState = event.state;

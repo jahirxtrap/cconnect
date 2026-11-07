@@ -67,7 +67,7 @@ export type ServerEvent =
       agent: string | null;
     }
   | { type: "rejected"; request: string | null; message: string }
-  | { type: "activity"; state: string | null; resident: boolean }
+  | { type: "activity"; state: string | null; resident: boolean; account: string | null }
   | { type: "agent_state"; state: AgentState }
   | { type: "history"; items: Record<string, unknown>[]; startIndex: number; hasMore: boolean }
   | { type: "stop"; reason: string | null; severity: string | null }
@@ -787,7 +787,12 @@ export class ChatSocket {
       case "terminal_opened":
         return { type: "terminal_opened", session: wire as unknown as TerminalInfo };
       case "activity":
-        return { type: "activity", state: event.state === "idle" ? null : event.state, resident: event.resident === true };
+        return {
+          type: "activity",
+          state: event.state === "idle" ? null : event.state,
+          resident: event.resident === true,
+          account: event.account ?? null,
+        };
       case "agent_state":
         return { type: "agent_state", state: toAgentState(wire) };
       case "history":

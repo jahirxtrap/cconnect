@@ -119,6 +119,7 @@ export interface Activity {
   type: "activity";
   state: string;
   resident: boolean;
+  account?: string | null;
 }
 export interface AgentState {
   seq?: number | null;

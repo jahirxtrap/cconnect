@@ -57,6 +57,17 @@
         },
         "resident": {
           "type": "boolean"
+        },
+        "account": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

@@ -98,6 +98,7 @@ class Activity(Event):
     type: Literal["activity"]
     state: str
     resident: bool
+    account: Optional[str] = None
 
 
 class AgentState(Event):

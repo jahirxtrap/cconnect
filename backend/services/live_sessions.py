@@ -663,7 +663,13 @@ class LiveSession:
             pass
 
     async def _send_activity(self, activity, resident):
-        payload = {"type": "activity", "state": activity or "idle", "resident": resident, "channel": self.channel}
+        payload = {
+            "type": "activity",
+            "state": activity or "idle",
+            "resident": resident,
+            "account": None if self.agent is not None else accounts.resolve(self.state.account),
+            "channel": self.channel,
+        }
         for sink in list(self._sinks):
             await self._send_one(sink, payload)
 
