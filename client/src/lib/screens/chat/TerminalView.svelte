@@ -201,6 +201,16 @@
   {/if}
 {/snippet}
 
+{#snippet unlockAction()}
+  <ActionButton
+    text={t("UNLOCK")}
+    onclick={() => {
+      rejected = false;
+      unlocking = true;
+    }}
+  />
+{/snippet}
+
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   class="relative flex min-h-0 flex-1 flex-col"
@@ -251,20 +261,9 @@
         loading={unlocked === null}
         icon={SquareTerminal}
         text={unlocked ? t("NO_TERMINALS") : t("TERMINAL_LOCKED")}
+        action={unlocked === false ? unlockAction : undefined}
         class="absolute inset-0"
-      >
-        {#snippet action()}
-          {#if unlocked === false}
-            <ActionButton
-              text={t("UNLOCK")}
-              onclick={() => {
-                rejected = false;
-                unlocking = true;
-              }}
-            />
-          {/if}
-        {/snippet}
-      </EmptyState>
+      />
     {/if}
   </div>
 

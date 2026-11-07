@@ -18,6 +18,7 @@
   import NoticeCard from "$lib/ui/NoticeCard.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
+  import { screenCover } from "$lib/ui/screenCover.svelte";
   import { settling } from "$lib/ui/settling.svelte";
   import AgentList from "$lib/screens/agents/AgentList.svelte";
   import ChatView from "./ChatView.svelte";
@@ -43,6 +44,10 @@
   const paneLayer = $derived(layout.mobile && panes.overlaid);
   let paneOpened = $state(false);
   const paneKept = $derived(paneOpened && layout.mobile && panes.kind !== panes.centerKind);
+
+  let paneSheet = $state<HTMLElement | null>(null);
+
+  $effect(() => (paneLayer && paneSheet ? screenCover.hold(paneSheet) : undefined));
   const centerGroup = $derived(panes.groupAt("center"));
   const shownTab = $derived(layout.mobile && !paneLayer ? panes.focusedTab : panes.tabAt("center"));
 
@@ -253,6 +258,7 @@
 
 {#if paneKept}
   <div
+    bind:this={paneSheet}
     class="safe-area fixed inset-x-0 top-0 z-40 bg-background {paneLayer ? '' : 'invisible'}"
     style="height: calc(100% - var(--keyboard, 0px)); {rightAccent}"
     inert={!paneLayer}

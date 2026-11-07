@@ -25,16 +25,18 @@
 {#if loading}
   <CenteredProgress class={className} />
 {:else}
-  <div class="flex flex-col items-center justify-center gap-2 px-6 py-4 text-center {className}">
+  <div class="flex flex-col items-center justify-center gap-3 px-6 py-4 text-center {className}">
     {#if IconComponent}
-      <IconTile icon={IconComponent} class="mb-1" />
+      <IconTile icon={IconComponent} />
     {/if}
-    <p class={IconComponent ? "text-label-lg text-on-surface" : "text-body-md text-on-surface-variant"}>{text}</p>
-    {#if detail}
-      <p class="text-body-md text-on-surface-variant">{detail}</p>
-    {/if}
+    <div class="flex flex-col items-center gap-1">
+      <p class={IconComponent ? "text-label-lg text-on-surface" : "text-body-md text-on-surface-variant"}>{text}</p>
+      {#if detail}
+        <p class="text-body-md text-on-surface-variant">{detail}</p>
+      {/if}
+    </div>
     {#if action}
-      <div class="mt-2 flex flex-wrap justify-center gap-2">{@render action()}</div>
+      <div class="flex flex-wrap justify-center gap-2">{@render action()}</div>
     {/if}
   </div>
 {/if}

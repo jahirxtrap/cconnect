@@ -4,6 +4,7 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { dismissMenus, menusOpen } from "./MenuScrim.svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
+  import { screenCover } from "./screenCover.svelte";
 
   interface Props {
     open: boolean;
@@ -23,6 +24,8 @@
 
   let offset = $state(0);
   let dragging = $state(false);
+  let sheet = $state<HTMLElement | null>(null);
+  let covering = $state(false);
 
   let startX = 0;
   let startY = 0;
@@ -138,6 +141,19 @@
   });
 
   $effect(() => {
+    if (onScreen) {
+      covering = true;
+      return;
+    }
+    if (!sheet) return;
+    void Promise.all(sheet.getAnimations().map((animation) => animation.finished.catch(() => undefined))).then(() => {
+      if (!onScreen) covering = false;
+    });
+  });
+
+  $effect(() => (covering && sheet ? screenCover.hold(sheet) : undefined));
+
+  $effect(() => {
     if (!open) return;
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     return pushDismiss(onDismiss, { modal: false });
@@ -154,6 +170,7 @@
   ></div>
 {/if}
 <aside
+  bind:this={sheet}
   class="fixed inset-y-0 left-0 z-40 overflow-hidden rounded-r-2xl bg-surface {onScreen
     ? ''
     : 'invisible'} {dragging ? '' : 'transition-[transform,visibility] duration-200'}"
