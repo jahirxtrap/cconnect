@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional
 
 from loguru import logger
-from watchfiles import watch
+from watchfiles import Change, watch
 
 from core import paths
 from services import project_files
@@ -20,6 +20,7 @@ from services import project_files
 _DEBOUNCE_MS = 400
 _MAX_PATHS = 200
 _GIT_INTERNALS = {"index", "HEAD"}
+_STRUCTURE = {Change.added, Change.deleted}
 
 
 def _inside(root: Path, path: str) -> str:
@@ -29,7 +30,7 @@ def _inside(root: Path, path: str) -> str:
         return ""
 
 
-def _relevant(path: str) -> bool:
+def _tracked(path: str) -> bool:
     """Ignored paths are noise, and the backend writes plenty of it inside its own project."""
     target = Path(path)
     if target.is_relative_to(paths.DATA_DIR):
@@ -47,6 +48,15 @@ def _relevant(path: str) -> bool:
     except ValueError:
         return True
     return folder in ("", ".") or f"{folder}/" in index
+
+
+def _folders(root: Path, appeared: list[str]) -> list[str]:
+    found: dict[str, str] = {}
+    for path in appeared:
+        inside = _inside(root, path)
+        if inside and ".git" not in inside.split("/"):
+            found.setdefault(inside.rpartition("/")[0], inside)
+    return sorted(found.values())[:_MAX_PATHS]
 
 
 class ProjectWatchHub:
@@ -131,16 +141,18 @@ class ProjectWatchHub:
                 raise_interrupt=False,
                 ignore_permission_denied=True,
             ):
-                self._publish(project_key, root, [path for _, path in changes if _relevant(path)])
+                tracked = [path for _, path in changes if _tracked(path)]
+                appeared = [path for change, path in changes if change in _STRUCTURE and not _tracked(path)]
+                self._publish(project_key, root, tracked, _folders(root, appeared))
         except Exception as exc:
             logger.info(f"project_watch: {root} cannot be watched ({exc}); the tree needs a refresh")
 
-    def _publish(self, project_key: str, root: Path, changed: list[str]):
-        if not changed:
+    def _publish(self, project_key: str, root: Path, changed: list[str], folders: list[str]):
+        if not changed and not folders:
             return
         inside = {_inside(root, path) for path in changed}
         truncated = "" in inside or len(inside) > _MAX_PATHS
-        touched = sorted(path for path in inside if path)[:_MAX_PATHS]
+        touched = sorted({*(path for path in inside if path), *folders})[: _MAX_PATHS * 2]
         project_files.invalidate(None if truncated else [root / path for path in touched])
         loop = self._loop
         if loop is None:
