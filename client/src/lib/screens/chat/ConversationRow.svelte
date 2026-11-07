@@ -71,6 +71,8 @@
     [onRename, onAutoRename, onColor, onOpenNewTab, onOpenRight, onFork, onMove, onPlace, onDelete].some(Boolean),
   );
 
+  const holdMenu = $derived(sortable || !actionable ? undefined : () => (menu = true));
+
   const SPINNERS: Record<string, string> = {
     renaming: "text-purple",
     compacting: "text-blue",
@@ -119,7 +121,8 @@
   </span>
   <Pressable
     onclick={onOpen}
-    onlongclick={sortable || !actionable ? undefined : () => (menu = true)}
+    onlongclick={holdMenu}
+    oncontextmenu={holdMenu}
     hover={false}
     class="min-w-0 flex-1 truncate py-1.5 text-body-md {selected ? 'text-on-surface' : 'text-on-surface-variant'}"
   >

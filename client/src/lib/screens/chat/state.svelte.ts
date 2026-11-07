@@ -425,6 +425,8 @@ export class ChatState {
     serverStatus.link === "connected" ? this.connection : serverStatus.link,
   );
   readonly connected = $derived(this.connection === "connected");
+  switching = $state(false);
+  #switchStarted = false;
   #settling = $state<HeldView | null>(null);
   #snapshot = $derived(this.#frozen ?? this.#settling);
   readonly queueView = $derived(this.#snapshot?.queue ?? this.queue);
@@ -526,6 +528,7 @@ export class ChatState {
   selectEnvironment(id: string) {
     if (id === this.environmentId) return;
     this.environmentId = id;
+    this.#endSwitch();
     backend.select(id);
     this.cwd = this.defaultCwd;
     this.onContextChange?.();
@@ -1009,6 +1012,7 @@ export class ChatState {
   newSession() {
     this.#initialConsumed = true;
     this.#loads++;
+    this.#endSwitch();
     this.viewOnly = null;
     this.pendingCategoryId = null;
     this.sessionId = null;
@@ -1103,6 +1107,7 @@ export class ChatState {
     this.viewOnly = null;
     this.pendingCategoryId = null;
     if (session.sessionId !== this.sessionId) {
+      this.#beginSwitch();
       this.sessionId = session.sessionId;
       this.projectKey = session.projectKey ?? this.projectKey;
       this.sessionColor = session.color;
@@ -1118,6 +1123,7 @@ export class ChatState {
     const loaded = await this.#loadSessionInto(session);
     if (loaded === null || session.sessionId !== this.sessionId) return;
     if (!loaded) {
+      this.#endSwitch();
       this.#frozen = null;
       this.transcriptLoading = false;
       return;
@@ -1762,7 +1768,18 @@ export class ChatState {
     this.capabilitiesReady = true;
   }
 
+  #beginSwitch() {
+    this.switching = true;
+    this.#switchStarted = false;
+  }
+
+  #endSwitch() {
+    this.switching = false;
+    this.#switchStarted = false;
+  }
+
   #startSession(resume: string | null) {
+    if (this.switching) this.#switchStarted = true;
     this.#freeze();
     if (this.#frozen === null && resume) this.transcriptLoading = true;
     this.#socket.sendStart({
@@ -2060,7 +2077,7 @@ export class ChatState {
   }
 
   #pumpQueue() {
-    if (this.connection !== "connected") return;
+    if (this.connection !== "connected" || this.switching) return;
     for (const item of this.queue) {
       if (item.uploading || this.#sent.has(item.id)) continue;
       if (this.#socket.sendPrompt(item.text, item.attachments, item.id)) {
@@ -2332,6 +2349,7 @@ export class ChatState {
       case "ready": {
         if (this.#frozen === null) this.#settling = this.#heldView();
         void this.#consumeInitialSession(event.project);
+        if (this.#switchStarted) this.#endSwitch();
         this.connection = "connected";
         this.mods.rebind();
         this.#attaching = true;

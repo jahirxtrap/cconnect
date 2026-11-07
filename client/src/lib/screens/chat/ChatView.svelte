@@ -210,7 +210,8 @@
   const idle = $derived(chat.link === "connected" && !chat.transcriptLoading && !busy);
   const running = $derived(chat.backgroundView.length > 0);
   const blocked = $derived(
-    chat.link === "disconnected" ||
+    chat.switching ||
+      chat.link === "disconnected" ||
       chat.link === "connecting" ||
       (chat.agent
         ? chat.agentState?.status !== "ready"
