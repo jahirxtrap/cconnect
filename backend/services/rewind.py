@@ -5,49 +5,35 @@ conversation restores via ``--resume-session-at`` on the NEXT turn (it branches 
 same transcript), so the chosen anchor stays pending here until that turn runs.
 """
 
-import json
 from typing import Any, Optional
 
 from loguru import logger
 
-from core import cli_manager, paths
-from services import files
-
-_pending: dict[str, str] | None = None
-
-
-def _load() -> dict[str, str]:
-    global _pending
-    if _pending is None:
-        try:
-            data = json.loads(paths.REWIND_FILE.read_text(encoding="utf-8"))
-            _pending = {k: v for k, v in data.items() if isinstance(v, str)} if isinstance(data, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            _pending = {}
-    return _pending
-
-
-def _save() -> None:
-    try:
-        files.write_json(paths.REWIND_FILE, _load())
-    except OSError:
-        logger.warning("could not persist pending rewinds")
+from core import cli_manager
+from core.db import Session
+from core.models import PendingRewind
 
 
 def get_pending(session_id: Optional[str]) -> Optional[str]:
     if not session_id:
         return None
-    return _load().get(session_id)
+    with Session() as session:
+        row = session.get(PendingRewind, session_id)
+    return row.anchor_uuid if row is not None else None
 
 
 def set_pending(session_id: str, anchor_uuid: str) -> None:
-    _load()[session_id] = anchor_uuid
-    _save()
+    with Session() as session:
+        session.merge(PendingRewind(session_id=session_id, anchor_uuid=anchor_uuid))
+        session.commit()
 
 
 def clear_pending(session_id: Optional[str]) -> None:
-    if session_id and _load().pop(session_id, None) is not None:
-        _save()
+    if not session_id:
+        return
+    with Session() as session:
+        session.query(PendingRewind).filter(PendingRewind.session_id == session_id).delete()
+        session.commit()
 
 
 async def _rewind_control(cwd: str, session_id: str, user_message_id: str, dry_run: bool) -> dict[str, Any]:

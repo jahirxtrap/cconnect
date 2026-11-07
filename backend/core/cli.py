@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 import psutil
 import qrcode
 
-from core import cli_manager, data_migration, paths, release, sdk
+from core import cli_manager, paths, release, sdk
 from core.config import PORT, RESTART_EXIT_CODE
 from services import agent_registry, repo, system_monitor
 
@@ -38,7 +38,7 @@ _STOP_TIMEOUT = 10
 _POLL_SECONDS = 0.5
 _MODULE = "core.cli"
 _APP = "core.app:app"
-_COMMANDS = ("run", "expose", "stop", "restart", "status", "logs", "doctor", "update", "migrate", "key")
+_COMMANDS = ("run", "expose", "stop", "restart", "status", "logs", "doctor", "update", "key")
 _TOP_FLAGS = ("-h", "--help", "-v", "--version")
 
 
@@ -465,12 +465,6 @@ def _command_parser() -> argparse.ArgumentParser:
 
     commands.add_parser("update", help="Upgrade this install to the latest release.")
 
-    migrate = commands.add_parser("migrate", help="Copy a previous data folder into this one.")
-    migrate.add_argument("source", nargs="?", default="",
-                         help="The old data folder. Found on its own from inside a checkout.")
-    migrate.add_argument("--force", action="store_true",
-                         help="Overwrite what this data folder already holds.")
-
     key = commands.add_parser("key", help="Print the key that unlocks the terminal and ignored files.")
     key.add_argument("--rotate", action="store_true",
                      help="Replace the existing key instead of printing it.")
@@ -604,44 +598,10 @@ def _update() -> None:
         print("  The server that is running keeps the old version until it restarts.\n")
 
 
-def _data_dir_in(place: Path) -> Path | None:
-    for candidate in (place, place / "data", place / "backend" / "data"):
-        if (candidate / "config").is_dir():
-            return candidate.resolve()
-    return None
-
-
-def _migrate(source: str, force: bool) -> None:
-    place = Path(source).expanduser() if source else Path.cwd()
-    origin = _data_dir_in(place)
-    if origin is None:
-        _abort(f"no data folder at {place}, at {place / 'data'} or at {place / 'backend' / 'data'}")
-        return
-    if origin == paths.DATA_DIR:
-        _abort(f"{origin} is already where the data lives.")
-    if _running_pid() is not None or _runtime():
-        _abort("stop the backend before copying its data.")
-    if paths.DB_FILE.exists() and not force:
-        _abort(f"{paths.DATA_DIR} already holds a database. Pass --force to replace what is there.")
-    taken = data_migration.adopt(origin, force)
-    _print_rows([
-        ("From", str(origin)),
-        ("Into", str(paths.DATA_DIR)),
-        ("Copied", f"{len(taken)} files" if taken else "nothing new"),
-    ])
-
-
 def main():
     args = _parse(sys.argv[1:])
     port = args.port or PORT
     os.environ["PORT"] = str(port)
-
-    try:
-        moved = data_migration.migrate()
-    except OSError as exc:
-        _abort(f"could not move the old data files into {paths.DATA_DIR}: {exc}")
-    if moved:
-        print(f"Moved into {paths.DATA_DIR}: {', '.join(moved)}")
 
     if args.command == "key":
         _print_security_key(_ensure_security_key(args.rotate), qr=True)
@@ -667,10 +627,6 @@ def main():
 
     if args.command == "update":
         _update()
-        return
-
-    if args.command == "migrate":
-        _migrate(args.source, args.force)
         return
 
     if args.command == "stop":

@@ -2,14 +2,28 @@
 so the store caches them in memory and only hits the DB on writes and at startup —
 keeping reads off the event loop without an async driver."""
 
+import hashlib
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Optional
+
+from alembic import command
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from loguru import logger
-from sqlalchemy import create_engine, event, inspect
+from sqlalchemy import Connection, String, column, create_engine, event, insert, select, table
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.types import TypeDecorator
 
 from core import paths
 
 engine = create_engine(f"sqlite:///{paths.DB_FILE}", echo=False)
 Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+NOW = "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
+
+_applied = table("schema_migrations", column("revision"), column("checksum"))
 
 
 @event.listens_for(engine, "connect")
@@ -25,42 +39,47 @@ class Base(DeclarativeBase):
     pass
 
 
-def _add_missing_columns() -> list[str]:
-    """Append the columns the models declare and the table is missing."""
-    inspector = inspect(engine)
-    tables = set(inspector.get_table_names())
-    added: list[str] = []
-    with engine.begin() as conn:
-        for table in Base.metadata.sorted_tables:
-            if table.name not in tables:
-                continue
-            existing = {column["name"] for column in inspector.get_columns(table.name)}
-            for column in table.columns:
-                if column.name in existing:
-                    continue
-                if not column.nullable and column.server_default is None:
-                    logger.warning(f"Cannot add {table.name}.{column.name}: it is NOT NULL without a default")
-                    continue
-                declaration = f"{column.name} {column.type.compile(engine.dialect)}"
-                conn.exec_driver_sql(f"ALTER TABLE {table.name} ADD COLUMN {declaration}")
-                added.append(f"{table.name}.{column.name}")
-    return added
+class Timestamp(TypeDecorator):
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value: Optional[datetime], dialect: Any) -> Optional[str]:
+        if value is None:
+            return None
+        moment = value.astimezone(timezone.utc)
+        return f"{moment:%Y-%m-%dT%H:%M:%S}.{moment.microsecond // 1000:03d}Z"
+
+    def process_result_value(self, value: Optional[str], dialect: Any) -> Optional[datetime]:
+        return None if value is None else datetime.fromisoformat(value)
+
+
+def _config(connection: Connection) -> Config:
+    config = Config()
+    config.set_main_option("script_location", str(paths.MIGRATIONS_DIR))
+    config.attributes["connection"] = connection
+    return config
+
+
+def _checksum(source: str) -> str:
+    return hashlib.sha256(Path(source).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
+def _hold_to_source(connection: Connection, scripts: ScriptDirectory, current: Optional[str]) -> None:
+    recorded = dict(connection.execute(select(_applied.c.revision, _applied.c.checksum)).all())
+    for script in scripts.iterate_revisions(current, "base") if current else ():
+        checksum = _checksum(script.path)
+        if script.revision not in recorded:
+            connection.execute(insert(_applied).values(revision=script.revision, checksum=checksum))
+        elif recorded[script.revision] != checksum:
+            logger.error(f"Migration {script.revision} changed after it was applied to {paths.DB_FILE.name}")
 
 
 def init_db() -> None:
-    """Create the missing tables and append the missing columns."""
-    from core import models  # noqa: F401
-    db_existed = paths.DB_FILE.exists()
-    before = set(inspect(engine).get_table_names())
-    Base.metadata.create_all(engine)
-    after = set(inspect(engine).get_table_names())
-    created = sorted(after - before)
-    columns = _add_missing_columns()
-    if not db_existed:
-        logger.info(f"Created database {paths.DB_FILE.name} with tables: {', '.join(sorted(after))}")
-    elif created:
-        logger.info(f"Added new tables to {paths.DB_FILE.name}: {', '.join(created)}")
-    else:
-        logger.info(f"Database {paths.DB_FILE.name} ready ({len(after)} tables).")
-    if columns:
-        logger.info(f"Added new columns to {paths.DB_FILE.name}: {', '.join(columns)}")
+    """Bring the schema to the latest migration and hold every applied one to the source it ran from."""
+    paths.DB_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with engine.begin() as connection:
+        config = _config(connection)
+        command.upgrade(config, "head")
+        current = MigrationContext.configure(connection).get_current_revision()
+        _hold_to_source(connection, ScriptDirectory.from_config(config), current)
+    logger.info(f"Database {paths.DB_FILE.name} ready at migration {current}.")

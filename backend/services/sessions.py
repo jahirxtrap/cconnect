@@ -14,7 +14,7 @@ from typing import Any, Optional
 
 import orjson
 
-from core import data_migration, paths
+from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
 from services import claude_assets, delegate_runs, delegates, mods, prompt_cache, tool_calls, visibility
 from services.api_errors import api_error
@@ -72,10 +72,7 @@ def project_key_for(cwd: str) -> str:
     return project_key_for_directory(cwd) if cwd else ""
 
 
-_AI_PROJECT_KEYS = {
-    project_key_for(str(path))
-    for path in (paths.AI_WORKDIR, data_migration.LEGACY_AI_WORKDIR)
-}
+_AI_PROJECT_KEYS = {project_key_for(str(paths.AI_WORKDIR))}
 
 
 def _open_transcript(path: Path, mode: str):

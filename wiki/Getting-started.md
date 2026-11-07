@@ -36,7 +36,6 @@ behind **More info** in the SmartScreen notice. Only the first time.
 | `cconnect doctor` | Check the Claude CLI, the SDK, Node.js, Tailscale and the port |
 | `cconnect -v` | Print the version |
 | `cconnect update` | Upgrade to the latest release |
-| `cconnect migrate <folder>` | Copy a previous data folder into this one |
 | `cconnect key` | Print the security key, `--rotate` to replace it |
 
 ## Run the backend from the desktop app

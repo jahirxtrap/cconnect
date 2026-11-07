@@ -4,15 +4,18 @@ schema — the setting's type/default/description live in core.settings_defs, no
 Column comments document intent (SQLite ignores them at the DB level, but they travel with
 the model and apply on engines that support comments, e.g. Postgres)."""
 
-from typing import Optional
+from datetime import datetime
+from typing import Any, Optional
 
+from sqlalchemy import JSON, text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from core.db import Base
+from core.db import NOW, Base, Timestamp
 
 
 class SessionCategory(Base):
     __tablename__ = "session_categories"
+    __table_args__ = {"comment": "Groups the user sorts chats into in the chat list"}
 
     id: Mapped[str] = mapped_column(
         primary_key=True,
@@ -43,6 +46,7 @@ class _InCategory:
 
 class SessionPlacement(_InCategory, Base):
     __tablename__ = "session_placement"
+    __table_args__ = {"comment": "Where each Claude chat sits in the chat list: its category and manual position"}
 
     session_id: Mapped[str] = mapped_column(
         primary_key=True,
@@ -55,6 +59,7 @@ class SessionPlacement(_InCategory, Base):
 
 class AgentSessionPlacement(_InCategory, Base):
     __tablename__ = "agent_session_placement"
+    __table_args__ = {"comment": "Where each ACP agent chat sits in the chat list: its category and manual position"}
 
     agent: Mapped[str] = mapped_column(
         primary_key=True,
@@ -71,6 +76,7 @@ class AgentSessionPlacement(_InCategory, Base):
 
 class TrashedSession(Base):
     __tablename__ = "trashed_sessions"
+    __table_args__ = {"comment": "Chats deleted into the trash, with what restoring each one needs"}
 
     session_id: Mapped[str] = mapped_column(
         primary_key=True,
@@ -87,8 +93,9 @@ class TrashedSession(Base):
         nullable=True,
         comment="Working directory it belonged to, shown next to the title",
     )
-    deleted_at: Mapped[float] = mapped_column(
-        comment="Epoch seconds it was thrown away; the trash itself never expires",
+    deleted_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        comment="When it was thrown away, in UTC; the trash itself never expires",
     )
     category_id: Mapped[Optional[str]] = mapped_column(
         nullable=True,
@@ -102,6 +109,7 @@ class TrashedSession(Base):
 
 class ProjectMeta(Base):
     __tablename__ = "project_meta"
+    __table_args__ = {"comment": "Projects the chat list knows, with the name the user gave them"}
 
     project_key: Mapped[str] = mapped_column(
         primary_key=True,
@@ -118,6 +126,7 @@ class ProjectMeta(Base):
 
 class Setting(Base):
     __tablename__ = "settings"
+    __table_args__ = {"comment": "The server's settings the user changed; the rest take the code's defaults"}
 
     key: Mapped[str] = mapped_column(
         primary_key=True,
@@ -130,4 +139,270 @@ class Setting(Base):
     description: Mapped[str] = mapped_column(
         default="",
         comment="Human-readable description of the setting, synced from the code registry",
+    )
+
+
+class DatabaseConnection(Base):
+    __tablename__ = "database_connections"
+    __table_args__ = {"comment": "Connections of the Databases panel; their passwords never leave the server"}
+
+    id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Slug of the name the connection was created with, used in the app's routes",
+    )
+    name: Mapped[str] = mapped_column(
+        comment="Name the panel shows",
+    )
+    engine: Mapped[str] = mapped_column(
+        comment="Engine id from core/databases/engines.json, or custom for a SQLAlchemy URL",
+    )
+    host: Mapped[str] = mapped_column(
+        comment="Server a server engine connects to; empty for files and URLs",
+    )
+    port: Mapped[Optional[int]] = mapped_column(
+        nullable=True,
+        comment="Its port; NULL takes the engine's default",
+    )
+    database_name: Mapped[str] = mapped_column(
+        comment="Database a server engine opens; empty lists every database the server holds",
+    )
+    username: Mapped[str] = mapped_column(
+        comment="User a server engine signs in as",
+    )
+    password: Mapped[str] = mapped_column(
+        comment="Its password, also the one taken out of a typed URL; the app only learns whether there is one",
+    )
+    path: Mapped[str] = mapped_column(
+        comment="Database file on the server, for file engines",
+    )
+    url: Mapped[str] = mapped_column(
+        comment="SQLAlchemy URL of a custom connection, kept without its password",
+    )
+    packages: Mapped[list[str]] = mapped_column(
+        JSON,
+        comment="pip packages the driver of a custom connection needs",
+    )
+    options: Mapped[dict[str, str]] = mapped_column(
+        JSON,
+        comment="Query parameters of a server engine's URL, such as Snowflake's warehouse",
+    )
+    read_only: Mapped[bool] = mapped_column(
+        comment="Every query runs in a transaction that is rolled back and rows cannot be edited",
+    )
+    ssh_host: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Machine the SSH tunnel goes through; NULL connects directly",
+    )
+    ssh_port: Mapped[Optional[int]] = mapped_column(
+        nullable=True,
+        comment="Its SSH port; NULL takes 22",
+    )
+    ssh_user: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="User the tunnel signs in as",
+    )
+    ssh_key: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Private key file on the server; empty leaves it to the ssh agent",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When it was added, in UTC; the panel lists connections in this order",
+    )
+
+
+class Agent(Base):
+    __tablename__ = "agents"
+    __table_args__ = {"comment": "Agents the server talks to, installed from the ACP catalog or added by hand"}
+
+    id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Catalog id, or the slug of the name for an agent added by hand",
+    )
+    name: Mapped[str] = mapped_column(
+        comment="Name the app shows",
+    )
+    source: Mapped[str] = mapped_column(
+        comment="registry for the official catalog, custom for one added by hand",
+    )
+    protocol: Mapped[str] = mapped_column(
+        comment="acp for an Agent Client Protocol server, command for a CLI that takes one task",
+    )
+    description: Mapped[str] = mapped_column(
+        comment="The catalog's description; empty for an agent added by hand",
+    )
+    purpose: Mapped[str] = mapped_column(
+        comment="What the user says it is good at, which Claude reads when delegating",
+    )
+    version: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Catalog version installed; NULL for an agent added by hand",
+    )
+    kind: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="How the catalog ships it: binary, python or npm; NULL for an agent added by hand",
+    )
+    program: Mapped[str] = mapped_column(
+        comment="Executable it runs, by name on the PATH or by full path",
+    )
+    args: Mapped[list[str]] = mapped_column(
+        JSON,
+        comment="Arguments while it may only read",
+    )
+    edit_args: Mapped[list[str]] = mapped_column(
+        JSON,
+        comment="Arguments while it may also edit files; empty reuses args",
+    )
+    bypass_args: Mapped[list[str]] = mapped_column(
+        JSON,
+        comment="Arguments while it may act without asking; empty reuses args",
+    )
+    model_args: Mapped[list[str]] = mapped_column(
+        JSON,
+        comment="Arguments that pick a model, with {model} where it goes",
+    )
+    env: Mapped[dict[str, str]] = mapped_column(
+        JSON,
+        comment="Environment the catalog sets",
+    )
+    user_env: Mapped[dict[str, str]] = mapped_column(
+        JSON,
+        comment="Environment the user adds; reading or changing it takes the security key",
+    )
+    enabled: Mapped[bool] = mapped_column(
+        comment="Shown in ACP agents and offered to Claude as a destination",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When it was added, in UTC; agents are listed in this order",
+    )
+
+
+class DisabledMcpServer(Base):
+    __tablename__ = "disabled_mcp_servers"
+    __table_args__ = {"comment": "MCP servers the user turned off, taken out of the CLI's config until turned on again"}
+
+    name: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Server name as the CLI knows it",
+    )
+    config: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        comment="Its entry from ~/.claude.json, written back when it is enabled",
+    )
+
+
+class PendingRewind(Base):
+    __tablename__ = "pending_rewinds"
+    __table_args__ = {"comment": "Conversations rewound in the app that the CLI branches on their next turn"}
+
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Transcript id of the chat",
+    )
+    anchor_uuid: Mapped[str] = mapped_column(
+        comment="Transcript entry the next turn resumes at",
+    )
+
+
+class SessionTodos(Base):
+    __tablename__ = "session_todos"
+    __table_args__ = {"comment": "Last task list of each chat, which the transcript does not keep"}
+
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Transcript id of the chat",
+    )
+    items: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON,
+        comment="The TodoWrite items as the CLI last sent them",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When the list last changed, in UTC; only the most recent lists are kept",
+    )
+
+
+class AgentKnownSession(Base):
+    __tablename__ = "agent_known_sessions"
+    __table_args__ = {"comment": "Sessions of agents that cannot list their own, so their chats can be reopened"}
+
+    agent: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="ACP agent the session runs on",
+    )
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Session id the agent gave the chat",
+    )
+    cwd: Mapped[str] = mapped_column(
+        comment="Folder the session works in; the list only shows the folder's own",
+    )
+    added_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When the server last created or forked it, in UTC; the newest come first",
+    )
+
+
+class AgentSessionTitle(Base):
+    __tablename__ = "agent_session_titles"
+    __table_args__ = {"comment": "Titles the user gave agent chats, which ACP has no request to set"}
+
+    agent: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="ACP agent the session runs on",
+    )
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Session id the agent gave the chat",
+    )
+    title: Mapped[str] = mapped_column(
+        comment="Title that wins over the agent's own in the list and in the chat",
+    )
+
+
+class AgentDefaults(Base):
+    __tablename__ = "agent_defaults"
+    __table_args__ = {"comment": "What an agent offered last time, so a new chat shows it before the agent answers"}
+
+    agent: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="ACP agent id",
+    )
+    options: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="Its configuration options with the values last chosen",
+    )
+    commands: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="Its slash commands",
+    )
+
+
+class DelegateRun(Base):
+    __tablename__ = "delegate_runs"
+    __table_args__ = {"comment": "Steps of each finished delegation, shown under its tool call in the chat"}
+
+    session_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Transcript id of the chat that delegated",
+    )
+    tool_use_id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="The delegate tool call the steps belong to",
+    )
+    rows: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON,
+        comment="The destination's steps as history rows",
+    )
+    saved_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When the run ended and its steps were saved, in UTC",
     )

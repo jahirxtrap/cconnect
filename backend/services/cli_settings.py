@@ -23,7 +23,6 @@ class CliSettingDef:
     minimum: Optional[int] = None
     maximum: Optional[int] = None
     unset_by: Any = None
-    replaces: Optional[str] = None
 
 
 SETTINGS: dict[str, CliSettingDef] = {
@@ -73,7 +72,6 @@ SETTINGS: dict[str, CliSettingDef] = {
         type=bool,
         description="Add the Co-Authored-By trailer to the commits and pull requests Claude writes",
         unset_by=True,
-        replaces="includeCoAuthoredBy",
     ),
     "session_upload": CliSettingDef(
         json_key="autoUploadSessions",
@@ -98,7 +96,7 @@ SETTINGS: dict[str, CliSettingDef] = {
 
 
 def json_keys() -> tuple[str, ...]:
-    return tuple(key for defn in SETTINGS.values() for key in (defn.json_key, defn.replaces) if key)
+    return tuple(defn.json_key for defn in SETTINGS.values())
 
 
 def lookup(data: dict, key: str) -> Any:
@@ -231,17 +229,3 @@ def set(key: str, value: Any) -> None:
 def reset() -> None:
     for key in SETTINGS:
         set(key, None)
-
-
-def migrate() -> None:
-    """Move a setting the CLI renamed onto its current key."""
-    data = _read()
-    moved = [defn for defn in SETTINGS.values() if defn.replaces and lookup(data, defn.replaces) is not None]
-    if not moved:
-        return
-    for defn in moved:
-        value = lookup(data, defn.replaces)
-        discard(data, defn.replaces)
-        if lookup(data, defn.json_key) is None and _valid(value, defn.type) and value != defn.unset_by:
-            assign(data, defn.json_key, value)
-    _write(data)

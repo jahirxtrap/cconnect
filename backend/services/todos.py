@@ -5,60 +5,45 @@ record of it, so a chat reopened after the turn ended has nothing to show. The
 list is remembered here as it is emitted and replayed when the session resumes.
 """
 
-import json
-
-from loguru import logger
-
-from core import paths
-from services import files
+from core.db import Session
+from core.models import SessionTodos
 
 _MAX_SESSIONS = 50
-
-_todos: dict[str, list[dict]] | None = None
-
-
-def _load() -> dict[str, list[dict]]:
-    global _todos
-    if _todos is None:
-        try:
-            data = json.loads(paths.TODOS_FILE.read_text(encoding="utf-8"))
-            _todos = {k: v for k, v in data.items() if isinstance(v, list)} if isinstance(data, dict) else {}
-        except (OSError, json.JSONDecodeError):
-            _todos = {}
-    return _todos
-
-
-def _save() -> None:
-    try:
-        files.write_json(paths.TODOS_FILE, _load())
-    except OSError:
-        logger.warning("could not persist session todos")
 
 
 def remember(session_id: str | None, items: list[dict]) -> None:
     if not session_id:
         return
-    store = _load()
-    store.pop(session_id, None)
-    if items:
-        store[session_id] = items
-    for stale in list(store)[:-_MAX_SESSIONS]:
-        store.pop(stale, None)
-    _save()
+    with Session() as session:
+        row = session.get(SessionTodos, session_id)
+        if not items:
+            if row is not None:
+                session.delete(row)
+        elif row is None:
+            session.add(SessionTodos(session_id=session_id, items=items))
+        else:
+            row.items = items
+        session.flush()
+        stale = session.query(SessionTodos.session_id).order_by(SessionTodos.updated_at.desc()).offset(_MAX_SESSIONS)
+        session.query(SessionTodos).filter(SessionTodos.session_id.in_(stale.scalar_subquery())).delete(synchronize_session=False)
+        session.commit()
 
 
 def load(session_id: str | None) -> list[dict]:
     """Empty once every task is done: nothing left to resume."""
     if not session_id:
         return []
-    items = _load().get(session_id, [])
+    with Session() as session:
+        row = session.get(SessionTodos, session_id)
+    items = row.items if row is not None else []
     if items and all(item.get("status") == "completed" for item in items):
         return []
     return items
 
 
 def forget(session_id: str | None) -> None:
-    if not session_id or session_id not in _load():
+    if not session_id:
         return
-    _load().pop(session_id, None)
-    _save()
+    with Session() as session:
+        session.query(SessionTodos).filter(SessionTodos.session_id == session_id).delete()
+        session.commit()

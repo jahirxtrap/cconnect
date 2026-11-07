@@ -2,7 +2,6 @@
 
 import asyncio
 import hashlib
-import json
 import mimetypes
 import os
 import shutil
@@ -10,9 +9,10 @@ from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Optional
 from urllib.parse import urlparse
 
-from core import paths
+from core.db import Session
+from core.models import AgentDefaults, AgentKnownSession, AgentSessionTitle
 from mcps.shared_files import listing
-from services import acp_events, agents, attachments, claude_runtime, elicitation, event_rows, files, providers, shared, terminal
+from services import acp_events, agents, attachments, claude_runtime, elicitation, event_rows, providers, shared, terminal
 from services.acp_peer import AUTH_REQUIRED, INVALID_PARAMS, METHOD_NOT_FOUND, RESOURCE_NOT_FOUND, AcpError
 from services.agent_connections import AgentConnection, pool
 from services.agent_mcp import AgentMcp
@@ -45,61 +45,54 @@ def _present(capabilities: dict, key: str) -> bool:
     return capabilities.get(key) is not None
 
 
-def _read(file: Path) -> dict:
-    try:
-        stored = json.loads(file.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-    return stored if isinstance(stored, dict) else {}
-
-
-def _write(file: Path, stored: dict) -> None:
-    files.write_json(file, stored)
-
-
-def _defaults() -> dict[str, dict]:
-    return _read(paths.AGENT_DEFAULTS_FILE)
+def _defaults(agent_id: str) -> Optional[AgentDefaults]:
+    with Session() as session:
+        return session.get(AgentDefaults, agent_id)
 
 
 def _remember(agent_id: str, **fields: list[dict]) -> None:
-    stored = _defaults()
-    stored[agent_id] = {**stored.get(agent_id, {}), **fields}
-    _write(paths.AGENT_DEFAULTS_FILE, stored)
+    with Session() as session:
+        row = session.get(AgentDefaults, agent_id) or AgentDefaults(agent=agent_id)
+        for field, value in fields.items():
+            setattr(row, field, value)
+        session.merge(row)
+        session.commit()
 
 
 def _known(agent_id: str) -> dict[str, str]:
-    known = _read(paths.AGENT_SESSIONS_FILE).get(agent_id)
-    return {str(session_id): str(cwd) for session_id, cwd in known.items()} if isinstance(known, dict) else {}
+    with Session() as session:
+        rows = session.query(AgentKnownSession).filter(AgentKnownSession.agent == agent_id).order_by(AgentKnownSession.added_at.desc())
+        return {row.session_id: row.cwd for row in rows}
 
 
-def _set_known(agent_id: str, known: dict[str, str]) -> None:
-    stored = _read(paths.AGENT_SESSIONS_FILE)
-    stored[agent_id] = known
-    _write(paths.AGENT_SESSIONS_FILE, stored)
-
-
-def _without(agent_id: str, session_id: str) -> dict[str, str]:
-    return {known: cwd for known, cwd in _known(agent_id).items() if known != session_id}
+def _drop_known(agent_id: str, session_id: str) -> None:
+    with Session() as session:
+        session.query(AgentKnownSession).filter(AgentKnownSession.agent == agent_id, AgentKnownSession.session_id == session_id).delete()
+        session.commit()
 
 
 def _titles(agent_id: str) -> dict[str, str]:
-    titles = _read(paths.AGENT_TITLES_FILE).get(agent_id)
-    return {str(session_id): str(title) for session_id, title in titles.items()} if isinstance(titles, dict) else {}
+    with Session() as session:
+        return {row.session_id: row.title for row in session.query(AgentSessionTitle).filter(AgentSessionTitle.agent == agent_id)}
 
 
 def _name(agent_id: str, session_id: str, title: Optional[str]) -> None:
     """Keep the title the user gave a session, or drop it when `title` is None."""
-    stored = _read(paths.AGENT_TITLES_FILE)
-    titles = {known: kept for known, kept in _titles(agent_id).items() if known != session_id}
-    if title:
-        titles[session_id] = title
-    stored[agent_id] = titles
-    _write(paths.AGENT_TITLES_FILE, stored)
+    with Session() as session:
+        if title:
+            session.merge(AgentSessionTitle(agent=agent_id, session_id=session_id, title=title))
+        else:
+            session.query(AgentSessionTitle).filter(AgentSessionTitle.agent == agent_id, AgentSessionTitle.session_id == session_id).delete()
+        session.commit()
 
 
 def _keep_id(connection: AgentConnection, agent_id: str, session_id: str, cwd: str) -> None:
-    if session_id and not _present(connection.session_capabilities, "list"):
-        _set_known(agent_id, {session_id: cwd, **_without(agent_id, session_id)})
+    if not session_id or _present(connection.session_capabilities, "list"):
+        return
+    _drop_known(agent_id, session_id)
+    with Session() as session:
+        session.add(AgentKnownSession(agent=agent_id, session_id=session_id, cwd=cwd))
+        session.commit()
 
 
 def _choices(options: list) -> list[dict]:
@@ -315,11 +308,11 @@ class AgentSession:
         return (self.connection is not None and self.connection.alive) or pool.find(self.agent_id, self.cwd) is not None
 
     def _recall(self) -> bool:
-        remembered = _defaults().get(self.agent_id) or {}
-        if not isinstance(remembered.get("options"), list):
+        remembered = _defaults(self.agent_id)
+        if remembered is None or not isinstance(remembered.options, list):
             return False
-        self.options = [{**option, "current": self._chosen.get(option["id"], option.get("current"))} for option in remembered["options"]]
-        self.commands = remembered.get("commands") or []
+        self.options = [{**option, "current": self._chosen.get(option["id"], option.get("current"))} for option in remembered.options]
+        self.commands = remembered.commands or []
         return True
 
     async def _context(self, connection: AgentConnection) -> dict:
@@ -835,10 +828,8 @@ async def forget(agent_id: str, cwd: str, session_id: str) -> None:
             await connection.call("session/delete", {"sessionId": session_id})
     finally:
         pool.give(connection)
-    if session_id in _known(agent_id):
-        _set_known(agent_id, _without(agent_id, session_id))
-    if session_id in _titles(agent_id):
-        _name(agent_id, session_id, None)
+    _drop_known(agent_id, session_id)
+    _name(agent_id, session_id, None)
     watch.changed(agent_id, cwd)
 
 

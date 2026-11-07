@@ -18,8 +18,10 @@ from urllib.parse import urlparse
 import httpx
 
 from core import packages, paths
+from core.db import Session
+from core.models import Agent, AgentDefaults, AgentKnownSession, AgentSessionTitle
 from core.slugs import slug, unique
-from services import agent_registry, files
+from services import agent_registry
 
 REGISTRY = "registry"
 CUSTOM = "custom"
@@ -91,25 +93,27 @@ def clean(raw: Any) -> Optional[dict]:
     }
 
 
+FIELDS = ("id", "name", "source", "protocol", "description", "purpose", "version", "kind", "program", *ARG_LISTS, "env", "user_env", "enabled")
+
+
 def load() -> list[dict]:
-    try:
-        raw = json.loads(paths.AGENTS_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    return [entry for entry in map(clean, raw if isinstance(raw, list) else []) if entry]
-
-
-def _save(entries: list[dict]) -> list[dict]:
-    unique = list({entry["id"]: entry for entry in entries}.values())
-    files.write_json(paths.AGENTS_FILE, unique)
-    return unique
+    with Session() as session:
+        rows = session.query(Agent).order_by(Agent.created_at).all()
+    return [entry for entry in (clean({field: getattr(row, field) for field in FIELDS}) for row in rows) if entry]
 
 
 def _upsert(entry: dict) -> dict:
     cleaned = clean(entry)
     if cleaned is None:
         raise AgentError(INSTALL_FAILED, "the agent entry is incomplete")
-    _save([*(item for item in load() if item["id"] != cleaned["id"]), cleaned])
+    with Session() as session:
+        row = session.get(Agent, cleaned["id"])
+        if row is None:
+            session.add(Agent(**cleaned))
+        else:
+            for field, value in cleaned.items():
+                setattr(row, field, value)
+        session.commit()
     return cleaned
 
 
@@ -371,25 +375,10 @@ def remove(agent_id: str) -> Optional[dict]:
     found = find(agent_id)
     if found is None:
         return None
-    _save([entry for entry in load() if entry["id"] != agent_id])
+    with Session() as session:
+        session.query(Agent).filter(Agent.id == agent_id).delete()
+        for model in (AgentDefaults, AgentKnownSession, AgentSessionTitle):
+            session.query(model).filter(model.agent == agent_id).delete()
+        session.commit()
     shutil.rmtree(folder(agent_id), ignore_errors=True)
     return found
-
-
-def adopt(entry: dict, protocol: str) -> None:
-    """Take in an agent added by hand somewhere else, keeping its id while it is free."""
-    if not entry.get("command") or not entry.get("name"):
-        return
-    taken = find(str(entry.get("id") or ""))
-    if taken is not None and taken["program"] == entry["command"]:
-        return
-    _upsert({
-        **{key: entry.get(key) for key in ARG_LISTS},
-        "id": entry["id"] if taken is None and entry.get("id") else _unique(entry["name"]),
-        "name": entry["name"],
-        "source": CUSTOM,
-        "protocol": protocol,
-        "purpose": entry.get("description") or "",
-        "program": entry["command"],
-        "enabled": entry.get("enabled") is not False,
-    })

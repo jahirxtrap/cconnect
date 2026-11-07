@@ -33,7 +33,7 @@ database file extensions (`backend/core/databases/engines.json`).
                                     │
                                     ├──> ~/.claude/projects   (sessions on disk)
                                     ├──> ~/.claude            (plugins, MCP, skills, memories)
-                                    └──> the data folder      (settings, accounts, shared, packs, trash)
+                                    └──> the data folder      (cconnect.db, accounts, shared, packs, trash)
 ```
 
 The data folder is `backend/data` in a checkout and `~/.cconnect/data` once the package is
@@ -93,5 +93,5 @@ cd client  && npm run dev
    database `COMMENT`s, where it is mandatory.
 3. **English** for code, docstrings and docs; user-facing strings live in the i18n files.
 4. **No secrets in the repo** — `.env`, `key.properties`, `keystore.jks` and
-   `backend/data/` (settings, accounts and your own prompts) are gitignored.
+   `backend/data/` (the database, accounts and your own prompts) are gitignored.
 5. **Read before acting** — check the existing conventions and helpers before adding new ones.

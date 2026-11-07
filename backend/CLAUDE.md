@@ -19,7 +19,7 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `core.app:app`; it lives inside the package so an installed wheel carries it.
 - `core/cli.py` — the `cconnect` command and the supervisor: launches uvicorn as a child
   and relaunches it on a restart request. Subcommands `run / expose / stop / restart /
-  status / logs / doctor / update / migrate / key`, plus `-v` and `--port`, with the
+  status / logs / doctor / update / key`, plus `-v` and `--port`, with the
   launcher's original flags still accepted. `run.py` at
   the backend root is the three-line entry a checkout (and the desktop app) calls.
   uvicorn always runs one worker: every registry lives in the process's memory, so a second
@@ -29,8 +29,9 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `stdin=DEVNULL`, or Windows deadlocks on the inherited pipe.
 - `core/` — `paths` (**the** path table: every file the backend owns, plus `INSTALLED`,
   which decides where the data folder is), `release` (the version contract), `config`
-  (env), `display` (separator and joining, shared with the app), `settings_defs` + `db` +
-  `settings_store` (SQLite KV), `cli_manager`, `sdk`, `process_job` (on Windows, the job
+  (env), `display` (separator and joining, shared with the app), `db` + `models` + `migrations/`
+  (the SQLite store; see *Database*), `settings_defs` + `settings_store` (the settings it keeps),
+  `cli_manager`, `sdk`, `process_job` (on Windows, the job
   object that takes the agents' processes down with the server), `responses` (**the**
   envelope: `{success, status, message, data}`), `ws` (**the** socket handshake:
   `accept_authorized`, `opening_message` for a socket that opens with a message, and
@@ -65,7 +66,7 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   and a large project froze the server when that ran on the event loop), `pages` (an HTML page served with the folder around it, so its
   styles, scripts and images load), `processes` (what the server runs, matched to its chat,
   agent, terminal or browser, and stopped the way that screen stops it), `databases` (the
-  connections in `DATABASES_FILE`, whose passwords never reach the app, and one engine per
+  connections in `database_connections`, whose passwords never reach the app, and one engine per
   connection), `database_engines` (**the** engine table: dialect, driver distributions installed on
   demand, read-only preludes, timeout, binary literal and hidden schemas), `database_tunnels`
   (SSH tunnels through the system's `ssh`), `database_data` (browsing, paging, SQL, row edits and
@@ -161,9 +162,9 @@ the plan usage's names follow), `prompt`, `unqueue`,
 (status, options, commands, sign-in methods) and `history` (its rows, paged like a transcript)
 outside the seq'd stream. Those rows come from the agent itself, replayed by `session/load`:
 the server stores no agent messages, only the session ids of agents without `session/list`
-(`AGENT_SESSIONS_FILE`) and the titles the user gives sessions (`AGENT_TITLES_FILE`), which ACP
+(`agent_known_sessions`) and the titles the user gives sessions (`agent_session_titles`), which ACP
 has no request for and which win over the agent's in the list and in `agent_state`. A new agent chat creates its session with the first message once the
-agent's options are remembered (`AGENT_DEFAULTS_FILE`); delegation creates it at once
+agent's options are remembered (`agent_defaults`); delegation creates it at once
 (`create_now`).
 
 Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
@@ -281,10 +282,34 @@ and the mods' `ui_*` requests, on both kinds of chat: `serve` wraps a persistent
 form and the answer back into `accept` / `decline` / `cancel`, the same mapping an ACP agent's
 `elicitation/create` goes through.
 
+## Database
+
+Everything the server keeps as records lives in `data/config/cconnect.db` (SQLite in WAL), never in a
+loose JSON file rewritten whole: settings, chat placement and categories, the trash, database
+connections, agents and their chats' state, disabled MCP servers, pending rewinds, task lists and the
+steps of each delegation. Files are only for what is not a record: prompts edited by hand, packs, the
+CLI's account folders, caches, logs and the process files (`.runtime`, `.detached.*`).
+
+- **The migrations are the schema.** `core/migrations/versions/` holds them, each with a working
+  `downgrade()`; `init_db()` runs them to `head` on every start. A new one is scaffolded from
+  `backend/` with `alembic revision -m "<what>"` and written by hand: nothing is generated from the
+  models, and `create_all` is never called. `core/models.py` mirrors the result, and a change to
+  one is a change to the other.
+- **Applied migrations are held to their source.** `schema_migrations` keeps the SHA-256 of each
+  one as it ran, and a start that finds the file changed logs it. While developing a migration is
+  fixed in place (downgrade, edit, upgrade, then the whole set from scratch on a throwaway
+  database); once released it is immutable and changes go forward in a new one.
+- **Every table and column carries an English comment**, in the migration and in the model.
+- **Timestamps are UTC instants** stored as ISO 8601 text (`Timestamp`, the same form `NOW`
+  writes as a column default), so they sort as they read. The API still answers epoch seconds
+  where it did.
+- **Derived values come from the database.** Triggers, all of them listed here:
+  `session_todos_touched` stamps `session_todos.updated_at` whenever `items` changes.
+
 ## Settings and visibility
 
 Model, effort, permission mode, streaming, CLI source and per-block visibility live in the
-SQLite KV store and are **backend-owned**, so every client shares one config.
+`settings` table of `cconnect.db` and are **backend-owned**, so every client shares one config.
 `show_thinking` / `show_tool_use` / `show_file_change` / `show_compact` take
 `full | label | off` and are applied identically on the live stream and on resume. `label`
 strips a tool's result, never an agent's subtasks: those still arrive, with their `parent`.

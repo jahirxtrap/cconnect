@@ -12,13 +12,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from core import data_migration, paths
+from core import paths
 from core.config import PORT
 from core.db import init_db
 from core.rate_limit import limiter
 from core.responses import api_response
 from core.sdk import ensure_sdk_installed, ensure_subscription_auth
-from services import agent_mcp, cli_settings, settings_store, system_monitor
+from services import agent_mcp, settings_store, system_monitor
 from middleware.error_handler import register_error_handlers
 from middleware.public_auth import register_public_auth_middleware
 from middleware.security import register_security_middleware
@@ -27,12 +27,8 @@ import routers as routers_pkg
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    data_migration.migrate()
     init_db()
     settings_store.load()
-    cli_settings.migrate()
-    from services import delegates
-    delegates.migrate()
     from services import accounts
     await asyncio.to_thread(accounts.purge_forgotten)
     await asyncio.to_thread(accounts.link_all_shared_dirs)

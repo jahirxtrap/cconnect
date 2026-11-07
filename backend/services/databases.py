@@ -1,5 +1,4 @@
 import hashlib
-import json
 import threading
 from pathlib import Path
 from typing import Any, NamedTuple, Optional
@@ -9,9 +8,10 @@ from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.exc import ArgumentError, SQLAlchemyError
 from sqlalchemy.pool import NullPool
 
-from core import paths
+from core.db import Session
+from core.models import DatabaseConnection
 from core.slugs import slug, unique
-from services import database_engines, database_tunnels, files, project_files, shared
+from services import database_engines, database_tunnels, project_files, shared
 
 FIELDS = ("name", "engine", "host", "port", "database", "user", "password", "path", "url", "packages", "options", "read_only", "ssh")
 FALLBACK_ID = "database"
@@ -117,30 +117,68 @@ def clean(raw: Any) -> Optional[dict]:
     return entry
 
 
+def _entry(row: DatabaseConnection) -> Optional[dict]:
+    ssh = {"host": row.ssh_host, "port": row.ssh_port, "user": row.ssh_user, "key": row.ssh_key} if row.ssh_host else None
+    return clean({
+        "id": row.id,
+        "name": row.name,
+        "engine": row.engine,
+        "host": row.host,
+        "port": row.port,
+        "database": row.database_name,
+        "user": row.username,
+        "password": row.password,
+        "path": row.path,
+        "url": row.url,
+        "packages": row.packages,
+        "options": row.options,
+        "read_only": row.read_only,
+        "ssh": ssh,
+    })
+
+
+def _columns(entry: dict) -> dict:
+    ssh = entry["ssh"] or {}
+    return {
+        "name": entry["name"],
+        "engine": entry["engine"],
+        "host": entry["host"],
+        "port": entry["port"],
+        "database_name": entry["database"],
+        "username": entry["user"],
+        "password": entry["password"],
+        "path": entry["path"],
+        "url": entry["url"],
+        "packages": entry["packages"],
+        "options": entry["options"],
+        "read_only": entry["read_only"],
+        "ssh_host": ssh.get("host"),
+        "ssh_port": ssh.get("port"),
+        "ssh_user": ssh.get("user"),
+        "ssh_key": ssh.get("key"),
+    }
+
+
 def load() -> list[dict]:
-    try:
-        raw = json.loads(paths.DATABASES_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
-    return [entry for entry in map(clean, raw if isinstance(raw, list) else []) if entry]
-
-
-def _save(entries: list[dict]) -> None:
-    files.write_json(paths.DATABASES_FILE, entries)
+    with Session() as session:
+        rows = session.query(DatabaseConnection).order_by(DatabaseConnection.created_at).all()
+    return [entry for entry in map(_entry, rows) if entry]
 
 
 _files: dict[str, dict] = {}
 
 
 def _saved(connection_id: str) -> Optional[dict]:
-    return next((entry for entry in load() if entry["id"] == connection_id), None)
+    with Session() as session:
+        row = session.get(DatabaseConnection, connection_id)
+    return _entry(row) if row is not None else None
 
 
 def find(connection_id: str) -> Optional[dict]:
     return _saved(connection_id) or _files.get(connection_id)
 
 
-def _required(found: Optional[dict], connection_id: str) -> dict:
+def _required(found: Any, connection_id: str) -> Any:
     if found is None:
         raise DatabaseError(MISSING, connection_id)
     return found
@@ -199,22 +237,29 @@ def _merged(fields: dict, current: Optional[dict] = None) -> dict:
 
 
 def create(fields: dict) -> dict:
-    taken = {entry["id"] for entry in load()}
-    entry = _merged({**fields, "id": unique(slug(_text(fields.get("name"))) or FALLBACK_ID, taken)})
-    _save([*load(), entry])
+    with Session() as session:
+        taken = {ident for (ident,) in session.query(DatabaseConnection.id)}
+        entry = _merged({**fields, "id": unique(slug(_text(fields.get("name"))) or FALLBACK_ID, taken)})
+        session.add(DatabaseConnection(id=entry["id"], **_columns(entry)))
+        session.commit()
     return entry
 
 
 def update(connection_id: str, fields: dict) -> dict:
-    entry = _merged(fields, _required(_saved(connection_id), connection_id))
-    _save([entry if item["id"] == connection_id else item for item in load()])
+    with Session() as session:
+        row = _required(session.get(DatabaseConnection, connection_id), connection_id)
+        entry = _merged(fields, _required(_entry(row), connection_id))
+        for column, value in _columns(entry).items():
+            setattr(row, column, value)
+        session.commit()
     close(connection_id)
     return entry
 
 
 def remove(connection_id: str) -> None:
-    _required(_saved(connection_id), connection_id)
-    _save([item for item in load() if item["id"] != connection_id])
+    with Session() as session:
+        session.delete(_required(session.get(DatabaseConnection, connection_id), connection_id))
+        session.commit()
     close(connection_id)
 
 

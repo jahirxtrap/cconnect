@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 
 from core import cli_manager, paths
+from core.db import Session
+from core.models import DisabledMcpServer
 from services import accounts, claude_assets, cli_settings, files, git
 
 _PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "update"})
@@ -333,37 +335,39 @@ def mcp_add_config(name: str, config: dict) -> dict:
 def mcp_remove(name: str) -> dict:
     if not name:
         return {"ok": False, "message": "name is required"}
-    store = _disabled_store()
-    if name in store:
-        store.pop(name)
-        files.write_json(paths.MCP_DISABLED_FILE, store)
+    if _enable(name):
         return {"ok": True, "message": ""}
     return _shared(_run(["mcp", "remove", name]))
 
 
-def _disabled_store() -> dict:
-    try:
-        return json.loads(paths.MCP_DISABLED_FILE.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
 def disabled_mcp_servers() -> dict:
-    return _disabled_store()
+    with Session() as session:
+        return {row.name: row.config for row in session.query(DisabledMcpServer).order_by(DisabledMcpServer.name)}
+
+
+def _enable(name: str) -> bool:
+    with Session() as session:
+        removed = session.query(DisabledMcpServer).filter(DisabledMcpServer.name == name).delete()
+        session.commit()
+    return removed > 0
+
+
+def _disable(name: str, config: dict) -> None:
+    with Session() as session:
+        session.merge(DisabledMcpServer(name=name, config=config))
+        session.commit()
 
 
 def mcp_set_enabled(name: str, enabled: bool) -> dict:
     if not name:
         return {"ok": False, "message": "name is required"}
-    store = _disabled_store()
     if enabled:
-        cfg = store.get(name)
+        cfg = disabled_mcp_servers().get(name)
         if cfg is None:
             return {"ok": False, "message": "server is not disabled"}
         result = _run(["mcp", "add-json", "-s", "user", name, json.dumps(cfg)])
         if result["ok"]:
-            store.pop(name, None)
-            files.write_json(paths.MCP_DISABLED_FILE, store)
+            _enable(name)
         return _shared(result)
     try:
         servers = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8")).get("mcpServers", {})
@@ -374,6 +378,5 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
         return {"ok": False, "message": "server not found"}
     result = _run(["mcp", "remove", name])
     if result["ok"]:
-        store[name] = cfg
-        files.write_json(paths.MCP_DISABLED_FILE, store)
+        _disable(name, cfg)
     return _shared(result)

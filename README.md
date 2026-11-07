@@ -57,7 +57,6 @@ once: **More info** on Windows, **Privacy & Security → Open anyway** on macOS.
 | `cconnect doctor` | Check the Claude CLI, the SDK, Node.js, Tailscale and the port |
 | `cconnect -v` | Print the version |
 | `cconnect update` | Upgrade to the latest release |
-| `cconnect migrate <folder>` | Copy a previous data folder into this one |
 | `cconnect key` | Print the security key, `--rotate` to replace it |
 
 </details>
@@ -175,8 +174,8 @@ Everything the backend reads comes from environment variables, taken from the pr
 | Variable | Default | What it does |
 |---|---|---|
 | `PORT` | `8723` | Port the backend binds to |
-| `CCONNECT_DATA_DIR` | `~/.cconnect/data` | Everything the backend owns on disk and would carry to another machine — settings, accounts, your prompts, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
-| `CCONNECT_CACHE_DIR` | `~/.cconnect/cache` | What it can rebuild on its own, beside the data folder rather than inside it, so a migration never drags it along |
+| `CCONNECT_DATA_DIR` | `~/.cconnect/data` | Everything the backend owns on disk and would carry to another machine — its database (settings, agents, database connections and what it keeps of your chats), accounts, your prompts, logs, the shared folder and the trash. Point it at another drive and the whole tree moves with it |
+| `CCONNECT_CACHE_DIR` | `~/.cconnect/cache` | What it can rebuild on its own, beside the data folder rather than inside it, so copying the data folder never drags it along |
 | `CCONNECT_SHARED_DIR` | `<data>/shared` | The drop folder on its own. Point two backends at the same one and both serve the same files |
 | `CLAUDE_PROJECTS_DIR` | `~/.claude/projects` | Where Claude Code keeps its sessions |
 | `DEFAULT_CWD` | your home folder | Directory a chat starts in when neither the app nor the connection picks one |

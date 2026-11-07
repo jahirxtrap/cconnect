@@ -1,7 +1,7 @@
 """Deleted chats kept aside instead of removed, when the `trash_enabled` setting says so."""
 
 import shutil
-import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +27,7 @@ def _dict(row: TrashedSession) -> dict:
         "project_key": row.project_key,
         "title": row.title,
         "path": row.path,
-        "deleted_at": row.deleted_at,
+        "deleted_at": row.deleted_at.timestamp(),
     }
 
 
@@ -62,13 +62,13 @@ def store(
     with Session() as s:
         row = s.get(TrashedSession, session_id)
         if row is None:
-            row = TrashedSession(session_id=session_id, project_key=project_key, title=title, path=path, deleted_at=time.time())
+            row = TrashedSession(session_id=session_id, project_key=project_key, title=title, path=path, deleted_at=datetime.now(timezone.utc))
             s.add(row)
         else:
             row.project_key = project_key
             row.title = title
             row.path = path
-            row.deleted_at = time.time()
+            row.deleted_at = datetime.now(timezone.utc)
         row.category_id = category_id
         row.position = position
         s.commit()

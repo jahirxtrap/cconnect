@@ -1,9 +1,7 @@
 """What a chat can hand a task to: the agents and the accounts the user offers Claude."""
 
-import json
 from typing import Any, Optional
 
-from core import paths
 from services import accounts, agents
 
 TOOL = "delegate"
@@ -12,8 +10,6 @@ TASK_TOKEN = "{task}"
 MODEL_TOKEN = "{model}"
 ACCOUNT = "account"
 ACCOUNT_PREFIX = "account:"
-LEGACY_PROTOCOLS = {"acp": agents.ACP, "command": agents.COMMAND}
-LEGACY_ACCOUNT_KINDS = ("model", "claude")
 
 
 def _agent(agent: dict) -> dict:
@@ -87,24 +83,3 @@ def account_of(raw_input: Any) -> Optional[dict]:
     ident = _destination(raw_input)
     found = _account_entry(ident) if ident.startswith(ACCOUNT_PREFIX) else None
     return {"provider": found["provider"] is not None} if found else None
-
-
-def migrate() -> None:
-    """Move the destinations registered before agents and accounts held them."""
-    try:
-        raw = json.loads(paths.DELEGATES_FILE.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return
-    known = {account["id"]: account for account in accounts.list_accounts()}
-    for entry in raw if isinstance(raw, list) else []:
-        if not isinstance(entry, dict):
-            continue
-        kind = entry.get("kind")
-        if kind in LEGACY_PROTOCOLS:
-            agents.adopt(entry, LEGACY_PROTOCOLS[kind])
-        elif kind in LEGACY_ACCOUNT_KINDS:
-            account = known[accounts.resolve(entry.get("account"), set(known))]
-            account["delegate"] = account["delegate"] or entry.get("enabled") is not False
-            account["purpose"] = account["purpose"] or str(entry.get("description") or "")
-            accounts.set_delegation(account["id"], account["delegate"], account["purpose"])
-    paths.DELEGATES_FILE.unlink(missing_ok=True)
