@@ -74,8 +74,9 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   instead (never deleted — emptied). `{{SHARED_URL}}` resolves to `config.SHARED_SCHEME`
   (`cconnect://shared`) and never to a host: the prompt is fixed when the CLI session is
   created, so an address baked into it is stale the moment the app changes environment.
-  `/api/capabilities` publishes the scheme as `shared_scheme` and the app swaps it for the
-  server it is talking to, which is the only side that knows.
+  `/api/health` and `/api/capabilities` publish the scheme as `shared_scheme` and the app swaps
+  it for the server it is talking to, which is the only side that knows. Health never waits on
+  the CLI, so a chat's files still resolve when capabilities fail.
 
 ## Auth
 
@@ -93,7 +94,8 @@ is refused at the HTTP layer (403).
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
 Claude — the shells, the files git ignores, every git write, deleting a pack from the
 server's library and an agent's environment variables. It also lifts the PreToolUse hook that
-keeps Claude off the server's own `paths.ENV_FILE`: the chat sends the key with every `prompt`
+keeps Claude off the server's own `paths.ENV_FILE` and off the cconnect tools that reach the same
+things (the terminal, removing a pack, linking a file): the chat sends the key with every `prompt`
 and the hook asks the live session on each call. It only gates while the Bearer gate is on (`gated()`), so a plain local
 run is open. Each route checks it for itself; there is no middleware for it, and a read that
 the panel needs before it can ask for anything (`repos`) is deliberately outside it.
@@ -159,7 +161,13 @@ agent's options are remembered (`AGENT_DEFAULTS_FILE`); delegation creates it at
 
 Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
 the app adopts it, and only `set_generation` changes it. A tab that had not loaded its
-account yet used to send the default on reconnect and restart the CLI on it.
+account yet used to send the default on reconnect and restart the CLI on it. Model, effort and
+permission mode are the tab's own: a change answers only the socket that sent it.
+
+Every event the server sends is typed in `schemas/chat_events.py`. `python -m schemas.contract`
+writes `schemas/chat_events.json`, which the app's `npm run check` turns into its own types; the
+release workflow runs it with `--check`, and `CCONNECT_CONTRACT_CHECK=1` validates each event as
+it is sent.
 
 Server → client, all seq'd per session except the control ones (`ready`, `permission_mode`,
 `history_chunk`, `usage`, `ask_*`, `activity`) and the mods ones:
@@ -277,7 +285,9 @@ strips a tool's result, never an agent's subtasks: those still arrive, with thei
 ## MCP server (`mcps/`)
 
 Tools auto-register: each module exposes `tools = [...]`, or `make_tools(context)` when the
-tool needs the running turn (returning `[]` removes it from that turn — the safest gate).
+tool needs the running turn (returning `[]` removes it from that turn — the safest gate). A
+module whose tools reach what the security key guards declares `needs_key(name, args)`, and the
+PreToolUse hook denies those calls when the message came without the key.
 Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own messages, numbered,
 before a compaction too, without the tool calls), `session_info`, `show_component`,
 `ask_component`, `share_files`, `packs` (writes a pack into the server's library),

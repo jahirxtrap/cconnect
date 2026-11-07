@@ -351,7 +351,7 @@ adb logcat -b crash -d          # startup crashes only show here; the main buffe
 ## Build
 
 ```bash
-npm run check     # svelte-check — the verification to run; must end 0 errors 0 warnings
+npm run check     # contract types from the backend, then svelte-check; must end 0 errors 0 warnings
 npm run dev       # vite on :1420
 npm run build     # svelte-check + vite build
 npm run tauri dev | build
