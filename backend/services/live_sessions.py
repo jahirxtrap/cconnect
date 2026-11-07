@@ -1067,6 +1067,16 @@ class SessionRegistry:
                 return session
         return None
 
+    async def quiet(self, session_id):
+        session = self.get_by_session(session_id)
+        if session is None:
+            return True
+        if session.working:
+            return False
+        if session.resident_alive:
+            await session.release_resident()
+        return True
+
     async def end_session(self, session_id):
         for channel, session in list(self._sessions.items()):
             if session.state.session_id != session_id:

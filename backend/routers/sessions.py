@@ -259,6 +259,8 @@ class ForkBody(BaseModel):
 
 @router.post("/sessions/{session_id}/fork")
 async def fork_session(session_id: str, body: ForkBody):
+    if not await registry.quiet(session_id):
+        raise HTTPException(status_code=409, detail="session is working")
     try:
         forked = await asyncio.to_thread(sessions_service.fork_session, body.project, session_id, body.up_to, body.title)
     except (ValueError, FileNotFoundError) as exc:

@@ -223,7 +223,7 @@
   let forkingReply = $state<ChatMessage | null>(null);
 
   const replyCommands = $derived(
-    chat.agent || chat.viewOnly || chat.sessionId === null
+    chat.agent || chat.viewOnly || chat.sessionId === null || !idle || running
       ? null
       : { fork: (reply: ChatMessage) => (forkingReply = reply) },
   );
