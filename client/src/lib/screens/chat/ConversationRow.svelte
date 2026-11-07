@@ -39,6 +39,7 @@
     onNewCategory?: () => void;
     projects?: ProjectInfo[];
     currentProjectKey?: string | null;
+    sortable?: boolean;
   }
 
   const {
@@ -63,6 +64,7 @@
     onNewCategory = () => {},
     projects = [],
     currentProjectKey = null,
+    sortable = false,
   }: Props = $props();
 
   const actionable = $derived(
@@ -117,6 +119,7 @@
   </span>
   <Pressable
     onclick={onOpen}
+    onlongclick={sortable || !actionable ? undefined : () => (menu = true)}
     hover={false}
     class="min-w-0 flex-1 truncate py-1.5 text-body-md {selected ? 'text-on-surface' : 'text-on-surface-variant'}"
   >

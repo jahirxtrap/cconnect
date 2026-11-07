@@ -48,8 +48,9 @@
     onNewIn={(categoryId) => list.newIn(categoryId)}
     {fallback}
   >
-    {#snippet row(session)}
+    {#snippet row(session, sortable)}
       <ConversationRow
+        {sortable}
         title={sessionTitle(session)}
         selected={session.sessionId === chat.sessionId}
         activity={session.activity}

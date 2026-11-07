@@ -22,7 +22,7 @@
     scrollKey?: unknown;
     onMove: (key: string, categoryId: string | null, index: number | null, order: string[]) => void;
     onNewIn: (categoryId: string) => void;
-    row: Snippet<[T]>;
+    row: Snippet<[T, boolean]>;
     fallback: Snippet;
   }
 
@@ -68,6 +68,11 @@
   });
 
   const shownGroups = $derived<Group[]>(searching ? [{ category: null, items }] : groups);
+
+  const sortable = $derived(
+    !searching &&
+      (chat.chatOrder === "manual" || categories.some((category) => !chat.isCategoryHidden(category.id))),
+  );
 
   let list = $state<HTMLDivElement | null>(null);
   const drag = new RowDrag();
@@ -205,7 +210,7 @@
             class="relative {dragged || carried ? 'z-10' : ''} {drag.active || categoryDrag.active
               ? 'pointer-events-none'
               : ''}"
-            onpointerdown={(event) => !searching && startDrag(event, item, index)}
+            onpointerdown={(event) => sortable && startDrag(event, item, index)}
           >
           <div
             class={dragged
@@ -224,7 +229,7 @@
               ? 'none'
               : 'transform 160ms cubic-bezier(0.2, 0, 0, 1)'}"
           >
-            {@render row(item)}
+            {@render row(item, sortable)}
           </div>
           </div>
         {/each}

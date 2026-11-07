@@ -74,8 +74,9 @@
     onAfterSelect();
   }}
 >
-  {#snippet row(session)}
+  {#snippet row(session, sortable)}
     <ConversationRow
+      {sortable}
       title={sessionLabel(session)}
       selected={navigation.route === "/" && session.sessionId === chat.sessionId}
       color={sessionColorOf(session.color) ?? null}
