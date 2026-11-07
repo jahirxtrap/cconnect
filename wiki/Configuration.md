@@ -23,6 +23,11 @@ its own.
 - **Node.js** — the ACP agents the catalog ships as npm packages. Python ones
   install with **uv** when it is on the `PATH`, which also fetches the Python
   version they ask for, and with pip otherwise; binaries need neither.
+- **ssh** — the OpenSSH client opens the tunnel of a database connection that
+  only another machine can reach. It signs in with a key or an agent, never a
+  password. The database drivers themselves are Python packages the Databases
+  panel installs into the server's own environment when a connection needs one,
+  holding the server's own packages at their versions.
 
 ## Configuration
 
@@ -45,7 +50,7 @@ plain local run.
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `expose caddy`. `--public-host` on the command line wins over it |
 | `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `cconnect` when it exposes the server, so you rarely write it yourself |
-| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `cconnect key --rotate` replaces it. It is the only gate |
+| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables, saving database connections, editing their rows or running SQL that writes, and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `cconnect key --rotate` replaces it. It is the only gate |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
 | `BROWSER_HEADLESS` | `1` | Runs it without a window; set `0` to watch the real browser on the server |

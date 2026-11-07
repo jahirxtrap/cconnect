@@ -31,6 +31,7 @@
     autoselect?: boolean;
     numeric?: boolean;
     url?: boolean;
+    mono?: boolean;
     enterKeyHint?: HTMLInputAttributes["enterkeyhint"];
     enabled?: boolean;
     readonly?: boolean;
@@ -57,6 +58,7 @@
     autoselect = false,
     numeric = false,
     url = false,
+    mono = false,
     enterKeyHint,
     enabled = true,
     readonly = false,
@@ -126,7 +128,7 @@
           {onkeydown}
           oninput={handle}
           style={actionsReserve}
-          class={FIELD_INPUT_CLASS}
+          class="{FIELD_INPUT_CLASS} {mono ? 'font-mono' : ''}"
         />
       {/key}
     {:else}
@@ -149,7 +151,7 @@
           style="min-height: {minLines * LINE_HEIGHT}px{maxLines
             ? `; max-height: ${maxLines * LINE_HEIGHT}px`
             : ''}"
-          class="{FIELD_INPUT_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'}"
+          class="{FIELD_INPUT_CLASS} field-auto no-scrollbar resize-none {maxLines ? '' : 'max-h-80'} {mono ? 'font-mono' : ''}"
         ></textarea>
       </div>
     {/if}

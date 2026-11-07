@@ -1,6 +1,5 @@
 import { t } from "$lib/i18n/index.svelte";
 import { toCommands, type CommandOption, type CommandWire } from "$lib/services/capabilitiesApi";
-import { linesOf } from "./format";
 import { MILLIS_PER_SECOND, parseIsoMillis } from "./time";
 import { flag, list, number, record, strings, text, type Wire } from "./wire";
 
@@ -294,18 +293,6 @@ export const agentReasonText = (reason: string | null): string | null =>
 
 export const agentFailureText = (failure: AgentFailure): string =>
   [agentReasonText(failure.reason), failure.detail].filter(Boolean).join("\n");
-
-export const envText = (env: Record<string, string>): string =>
-  Object.entries(env)
-    .map(([name, value]) => `${name}=${value}`)
-    .join("\n");
-
-export const envOf = (text: string): Record<string, string> =>
-  Object.fromEntries(
-    linesOf(text)
-      .filter((line) => line.includes("="))
-      .map((line) => [line.slice(0, line.indexOf("=")).trim(), line.slice(line.indexOf("=") + 1)]),
-  );
 
 const STOP_KEYS: Record<string, string> = {
   max_tokens: "AGENT_STOP_MAX_TOKENS",

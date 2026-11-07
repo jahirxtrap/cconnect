@@ -4,13 +4,11 @@
   import {
     AGENT_PROTOCOLS,
     agentFailureText,
-    envOf,
-    envText,
     type AgentFailure,
     type AgentProtocol,
     type InstalledAgent,
   } from "$lib/data/agentModels";
-  import { joined, linesOf, masked } from "$lib/data/format";
+  import { joined, linesOf, masked, pairsOf, pairsText } from "$lib/data/format";
   import { keyRefused, type KeyGate } from "$lib/data/keyGate.svelte";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -82,7 +80,7 @@
     const result = ask ? await gate.run((key) => api.env(id, key)) : await api.env(id, securityKeys.current);
     locked = keyRefused(result);
     if (result.ok) {
-      loadedEnv = envText(result.value);
+      loadedEnv = pairsText(result.value);
       env = loadedEnv;
     } else if (!locked) report(result.failure);
   };
@@ -116,7 +114,7 @@
       bypass_args: target.bypassArgs,
       model_args: target.modelArgs,
     }),
-    ...(env !== null && env !== loadedEnv ? { env: envOf(env) } : {}),
+    ...(env !== null && env !== loadedEnv ? { env: pairsOf(env) } : {}),
     ...(enabled !== target.enabled ? { enabled } : {}),
   });
 
@@ -125,7 +123,7 @@
     failed = null;
     const result = agent
       ? await gate.run((key) => api.update(agent.id, changes(agent), key))
-      : await gate.run((key) => api.add({ ...fields(), env: envOf(env ?? "") }, key));
+      : await gate.run((key) => api.add({ ...fields(), env: pairsOf(env ?? "") }, key));
     saving = false;
     if (!result.ok) {
       if (!keyRefused(result)) report(result.failure);

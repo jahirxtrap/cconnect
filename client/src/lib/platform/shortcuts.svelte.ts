@@ -3,7 +3,7 @@ import { SvelteMap } from "svelte/reactivity";
 import { isTauri, isTouch, systemName } from "./index";
 import { store } from "./storage";
 
-export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project" | "mods";
+export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project" | "databases" | "mods";
 
 export interface ShortcutDef {
   id: string;
@@ -92,6 +92,7 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "project.changes", label: "SHORTCUT_PROJECT_CHANGES", scope: "project", keys: "Mod+KeyG" },
   { id: "project.commit", label: "SHORTCUT_PROJECT_COMMIT", scope: "project", keys: "Mod+KeyJ" },
   { id: "project.selectAll", label: "SHORTCUT_PROJECT_SELECT_ALL", scope: "project", keys: "Mod+KeyA" },
+  { id: "databases.run", label: "RUN", scope: "databases", keys: "Mod+Enter" },
   { id: "shared.selectAll", label: "SHORTCUT_SHARED_SELECT_ALL", scope: "shared", keys: "Mod+KeyA" },
   { id: "shared.copy", label: "SHORTCUT_SHARED_COPY", scope: "shared", keys: "Mod+KeyC" },
   { id: "shared.cut", label: "SHORTCUT_SHARED_CUT", scope: "shared", keys: "Mod+KeyX" },

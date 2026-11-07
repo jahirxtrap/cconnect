@@ -26,6 +26,7 @@ from loguru import logger
 
 from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
+from core.slugs import unique
 from services import cli_settings, files, providers, sessions, settings_store
 
 _WINDOWS = sys.platform == "win32"
@@ -302,11 +303,7 @@ def _slug(label: str, taken: set[str]) -> str:
     base = _ID_RE.sub("-", label.strip().lower()).strip("-") or "account"
     if base == PRIMARY_ID:
         base = f"{base}-1"
-    candidate, index = base, 2
-    while candidate in taken:
-        candidate = f"{base}-{index}"
-        index += 1
-    return candidate
+    return unique(base, taken)
 
 
 def create(label: str) -> dict:

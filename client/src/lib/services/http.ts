@@ -15,6 +15,19 @@ export interface HttpResult<T> {
   data: T | null;
 }
 
+export type Outcome<T, F> =
+  | { ok: true; status: number; value: T; failure: null }
+  | { ok: false; status: number; value: null; failure: F | null };
+
+export const outcomeOf = <T, F, W = Record<string, unknown>>(
+  result: HttpResult<W>,
+  parse: (data: W) => T,
+  failure: (raw: unknown) => F | null,
+): Outcome<T, F> =>
+  result.ok
+    ? { ok: true, status: result.status, value: parse(result.data ?? ({} as W)), failure: null }
+    : { ok: false, status: result.status, value: null, failure: failure(result.data) };
+
 export interface HttpClient {
   call: <T>(method: string, path: string, query?: Query, body?: unknown) => Promise<HttpResult<T>>;
   get: <T>(path: string, query?: Query) => Promise<T | null>;

@@ -16,7 +16,7 @@ src/
     ├── i18n/               # one JSON per locale — every user-facing string
     ├── markdown/           # the Markdown renderer and its cconnect blocks
     ├── platform/           # isTouch, layout, desktop, fieldSizing polyfill
-    ├── screens/            # chat/, agents/, shared/, project/, claude/, mods/, packs/, browser/, monitor/, settings/, terminal/, notes/
+    ├── screens/            # chat/, agents/, shared/, project/, databases/, claude/, mods/, packs/, browser/, monitor/, settings/, terminal/, notes/
     ├── services/           # backend clients: chatSocket, sessionsApi, sharedApi, claudeApi…
     └── ui/                 # the shared toolkit
 src-tauri/                  # Rust side + gen/android (committed)
@@ -113,7 +113,9 @@ One component owns the viewport; the chat list (`MessageList`) and the quick cha
 
 Chat and Agents can sit in either panel, each with its own tabs (`tabs` for Claude,
 `agentTabs` for ACP); the tools are single-instance, so placing one where the other panel
-has it swaps them. The pane a tool goes with (`contextRole`) gives it the environment `focus`
+has it swaps them. A view added to `DEFAULT_PANE_BAR` also lands in a bar the user
+customized, after the view it follows by default, unless the user already placed it
+(`withNewDefaults`). The pane a tool goes with (`contextRole`) gives it the environment `focus`
 selects, the folder the terminal opens in and the project Project files follows
 (`contextChat.workingPath`). The list on the left follows the focused pane (`list`).
 
@@ -122,6 +124,26 @@ from before the change, and keeps the dependencies of that run: bits-ui's toolti
 reads `disabled` on destroy, which reaches `list` through the side list's props. A `list` that
 branched on the focused pane lost `kind` that way and stopped updating, so it reads all of its
 inputs before deciding. A shared derived that leaves state stuck is checked for the same.
+
+## Databases (`screens/databases/`)
+
+A table, a view or a connection's SQL console opens like a project file, and both share one slot:
+`app/viewer.svelte.ts` holds the open project file and the open database object, and opening one
+closes the other. `panes.viewed` says which of them is open, `busyRole` puts it in the other pane
+while the centre view is on (`PanelPreview`), and otherwise it covers its own pane with the same
+expand button. The tree, the console drafts and what each node loaded live in
+`services/databases.svelte.ts`, per environment, so they survive the pane remounting. The tree
+derives the loads it is missing (`pending`) and an effect starts them; a load marks its node
+before awaiting, so the effect never asks twice, and `forget` (refresh, a write in the console,
+an edited connection) is all it takes to reload what is expanded. Every change goes through a
+`KeyGate`, which only asks for the key on a 403.
+
+`DatabaseTree` is the only tree. The panel roots it at the connections; a database file's preview
+(`DatabaseFile`, which `FilePreview` shows when `previewKind` answers `database`) shows the file's
+console and objects, and opens a table over the preview instead of in the shared slot. Every call
+takes a `DatabaseScope`: a connection without a database answers its schemas with the server's
+`databases`, and the tree loads one only once it is expanded. The file extensions come from the
+backend's `engines.json`, imported at build time.
 
 ## Mods (`screens/mods/`)
 

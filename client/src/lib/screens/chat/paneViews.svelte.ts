@@ -27,6 +27,13 @@ const placed = (list: RightKind[], kind: RightKind, index: number) => {
 
 const without = (list: RightKind[], kind: RightKind) => list.filter((item) => item !== kind);
 
+const withNewDefaults = (bar: RightKind[], menu: RightKind[]) =>
+  DEFAULT_PANE_BAR.reduce((list, kind, index) => {
+    if (list.includes(kind) || menu.includes(kind)) return list;
+    const after = DEFAULT_PANE_BAR.slice(0, index).findLast((item) => list.includes(item));
+    return placed(list, kind, after ? list.indexOf(after) + 1 : list.length);
+  }, bar);
+
 const inside = (element: HTMLElement | null, x: number, y: number) => {
   const box = element?.getBoundingClientRect();
   return !!box && x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
@@ -38,7 +45,7 @@ const before = (nodes: NodeListOf<HTMLElement> | undefined, at: (box: DOMRect) =
 class PaneOrder {
   readonly #order = $derived.by(() => {
     const custom = settings.paneBar.length > 0 || settings.paneMenu.length > 0;
-    const bar = known(custom ? settings.paneBar : DEFAULT_PANE_BAR);
+    const bar = custom ? withNewDefaults(known(settings.paneBar), known(settings.paneMenu)) : known(DEFAULT_PANE_BAR);
     const rest = known([...(custom ? settings.paneMenu : []), ...PANE_VIEWS.map((view) => view.kind)]);
     return { bar, menu: rest.filter((kind) => !bar.includes(kind)) };
   });

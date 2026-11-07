@@ -11,7 +11,8 @@ the Claude install itself (CLI, plugins, marketplaces, MCP servers, skills, memo
 from `cconnect://install` links and the cards Claude offers), a file manager over the shared
 folder, an explorer of the project that shows its git diff and commits it, a browser that
 opens pages on the device or on the PC, a PC monitor with the processes the server runs, an
-SSH client and notes, with themes, fonts and chat backgrounds installed from `.ccpack`
+SSH client, notes and database connections (a paged grid, row edits and a SQL console, with
+drivers installed on demand), with themes, fonts and chat backgrounds installed from `.ccpack`
 packs, in ten languages.
 
 **Monorepo with two modules that must stay in sync:**
@@ -22,7 +23,8 @@ packs, in ten languages.
   See `client/CLAUDE.md`.
 
 The client also builds from backend files: the pack format and the built-in packs
-(`backend/core/packs/`) and the page icon script (`backend/core/scripts/page_icon.js`).
+(`backend/core/packs/`), the page icon script (`backend/core/scripts/page_icon.js`) and the
+database file extensions (`backend/core/databases/engines.json`).
 
 ## Architecture
 

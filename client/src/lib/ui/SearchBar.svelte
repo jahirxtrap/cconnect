@@ -6,12 +6,14 @@
   import Search from "@lucide/svelte/icons/search";
   import X from "@lucide/svelte/icons/x";
   import { t } from "$lib/i18n/index.svelte";
+  import type { IconSource } from "./icons";
   import TooltipIconButton from "./TooltipIconButton.svelte";
 
   interface Props {
     value: string;
     oninput: (value: string) => void;
     placeholder: string;
+    icon?: IconSource;
     autofocus?: boolean;
     large?: boolean;
     onkeydown?: (event: KeyboardEvent) => void;
@@ -23,6 +25,7 @@
     value,
     oninput,
     placeholder,
+    icon: Icon = Search,
     autofocus = false,
     large = false,
     onkeydown,
@@ -42,7 +45,7 @@
 <div
   class="flex {large ? 'h-9' : 'h-8'} min-w-0 items-center gap-2 rounded-md bg-surface-variant pr-1 pl-2.5 {className}"
 >
-  <Search size={16} class="shrink-0 text-faint" />
+  <Icon size={16} class="shrink-0 text-faint" />
   <input
     bind:this={field}
     {value}

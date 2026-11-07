@@ -1,11 +1,10 @@
 <script lang="ts" module>
   import { navigation } from "$lib/app/navigation.svelte";
-  import { opened } from "$lib/screens/project/openFile.svelte";
   import { panes } from "./panes.svelte";
   import type { PaneRole } from "./tabs.svelte";
 
   export const previewFills = (role: PaneRole) =>
-    panes.busyRole === role && (panes.previewing ? navigation.preview !== null : !!(opened.project && opened.path));
+    panes.busyRole === role && (panes.previewing ? navigation.preview !== null : panes.viewed !== null);
 </script>
 
 <script lang="ts">
@@ -13,7 +12,8 @@
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import ProjectDiffView from "$lib/screens/project/ProjectDiffView.svelte";
-  import { closeProjectFile } from "$lib/screens/project/openFile.svelte";
+  import { closeDatabaseObject, closeProjectFile, opened, openedObject } from "$lib/app/viewer.svelte";
+  import DatabaseObjectView from "$lib/screens/databases/DatabaseObjectView.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import PaneSurface from "./PaneSurface.svelte";
 
@@ -51,6 +51,19 @@
       embedded={!opened.full}
       onExpand={opened.full ? null : () => (opened.full = true)}
       onClose={closeProjectFile}
+    />
+  </PaneSurface>
+{:else if openedObject.connection}
+  <PaneSurface {role}>
+    <DatabaseObjectView
+      connection={openedObject.connection}
+      database={openedObject.database}
+      schema={openedObject.schema}
+      name={openedObject.name}
+      kind={openedObject.kind}
+      embedded={!openedObject.full}
+      onExpand={openedObject.full ? null : () => (openedObject.full = true)}
+      onClose={closeDatabaseObject}
     />
   </PaneSurface>
 {/if}

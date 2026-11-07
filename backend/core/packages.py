@@ -15,11 +15,18 @@ def uv_tool() -> str:
     return shutil.which("uv") or ""
 
 
-def install_command(package: str) -> list[str]:
+def install_command(*requirements: str) -> list[str]:
     uv = uv_tool()
     if uv:
-        return [uv, "pip", "install", "--python", sys.executable, "-U", package]
-    return [sys.executable, "-m", "pip", "install", "-U", package]
+        return [uv, "pip", "install", "--python", sys.executable, "-U", *requirements]
+    return [sys.executable, "-m", "pip", "install", "-U", *requirements]
+
+
+def uninstall_command(*distributions: str) -> list[str]:
+    uv = uv_tool()
+    if uv:
+        return [uv, "pip", "uninstall", "--python", sys.executable, *distributions]
+    return [sys.executable, "-m", "pip", "uninstall", "-y", *distributions]
 
 
 def upgrade_command(distribution: str) -> list[str]:

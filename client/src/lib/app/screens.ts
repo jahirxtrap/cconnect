@@ -1,6 +1,7 @@
 import Activity from "@lucide/svelte/icons/activity";
 import BotMessageSquare from "@lucide/svelte/icons/bot-message-square";
 import Compass from "@lucide/svelte/icons/compass";
+import Database from "@lucide/svelte/icons/database";
 import FolderSymlink from "@lucide/svelte/icons/folder-symlink";
 import FolderTree from "@lucide/svelte/icons/folder-tree";
 import MessageSquareText from "@lucide/svelte/icons/message-square-text";
@@ -70,9 +71,16 @@ export const SCREENS: ScreenEntry[] = [
     open: () => panes.show("agents"),
     paneOnly: true,
   },
+  {
+    kind: "databases",
+    label: "DATABASES",
+    icon: Database,
+    open: () => panes.show("databases"),
+    paneOnly: true,
+  },
 ];
 
-export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods", "agents"];
+export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods", "agents", "databases"];
 
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),

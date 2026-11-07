@@ -1,10 +1,11 @@
+import catalog from "../../../../backend/core/databases/engines.json";
 import { isPackFile } from "$lib/design/packs/schema";
 import { resolveLang } from "$lib/markdown/highlighter";
 import { isArchive } from "./format";
 
-export type PreviewKind = "image" | "markdown" | "html" | "text" | "pdf" | "video" | "audio";
+export type PreviewKind = "image" | "markdown" | "html" | "text" | "pdf" | "video" | "audio" | "database";
 
-export type FileKind = "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "archive" | "pack" | "text";
+export type FileKind = "image" | "video" | "audio" | "pdf" | "markdown" | "code" | "database" | "archive" | "pack" | "text";
 
 export const FILE_KINDS: FileKind[] = [
   "image",
@@ -13,12 +14,19 @@ export const FILE_KINDS: FileKind[] = [
   "pdf",
   "markdown",
   "code",
+  "database",
   "archive",
   "pack",
   "text",
 ];
 
 const MARKDOWN_EXTENSIONS = ["md", "markdown"];
+
+const DATABASE_EXTENSIONS = new Set<string>(
+  catalog.engines.flatMap((engine): string[] => ("extensions" in engine ? (engine.extensions ?? []) : [])),
+);
+
+export const isDatabaseFile = (filename: string): boolean => DATABASE_EXTENSIONS.has(extensionOf(filename));
 
 const MIME_BY_EXTENSION: Record<string, string> = {
   html: "text/html",
@@ -66,6 +74,7 @@ export const guessMimeType = (filename: string): string | null =>
 
 export const previewKindOf = (filename: string): PreviewKind => {
   if (MARKDOWN_EXTENSIONS.includes(extensionOf(filename))) return "markdown";
+  if (isDatabaseFile(filename)) return "database";
   const mime = guessMimeType(filename);
   if (mime === "text/html") return "html";
   if (mime === "application/pdf") return "pdf";
@@ -75,20 +84,20 @@ export const previewKindOf = (filename: string): PreviewKind => {
   return "text";
 };
 
-const RENDERED_KINDS: PreviewKind[] = ["image", "video", "audio", "pdf", "html"];
+const RENDERED_KINDS: PreviewKind[] = ["image", "video", "audio", "pdf", "html", "database"];
 
 export const isVideo = (filename: string): boolean => previewKindOf(filename) === "video";
 
 export const readsAsText = (kind: PreviewKind): boolean => !RENDERED_KINDS.includes(kind);
 
 export const isPreviewable = (filename: string): boolean =>
-  MARKDOWN_EXTENSIONS.includes(extensionOf(filename)) || guessMimeType(filename) !== null;
+  MARKDOWN_EXTENSIONS.includes(extensionOf(filename)) || isDatabaseFile(filename) || guessMimeType(filename) !== null;
 
 export const fileKindOf = (filename: string): FileKind => {
   if (isPackFile(filename)) return "pack";
   if (isArchive(filename)) return "archive";
   const kind = previewKindOf(filename);
-  if (kind === "markdown" || kind === "pdf" || kind === "image" || kind === "video" || kind === "audio") {
+  if (kind === "markdown" || kind === "pdf" || kind === "image" || kind === "video" || kind === "audio" || kind === "database") {
     return kind;
   }
   return kind === "html" || resolveLang(extensionOf(filename)) !== null ? "code" : "text";

@@ -4,7 +4,7 @@ import { settings } from "$lib/data/settings.svelte";
 import { layout } from "$lib/platform/layout.svelte";
 import type { ClaudeKind } from "$lib/screens/claude/ClaudeDetail.svelte";
 import { agentTabs } from "$lib/screens/agents/agentTabs.svelte";
-import { closeProjectFile, opened } from "$lib/screens/project/openFile.svelte";
+import { closeDatabaseObject, closeProjectFile, opened, openedObject } from "$lib/app/viewer.svelte";
 import { backend } from "$lib/services/backend.svelte";
 import { readFocusedPane, readRightLocation, tabs, type PaneRole } from "./tabs.svelte";
 
@@ -18,7 +18,8 @@ export type RightKind =
   | "project"
   | "browser"
   | "mods"
-  | "agents";
+  | "agents"
+  | "databases";
 
 const KINDS: RightKind[] = [
   "terminal",
@@ -31,6 +32,7 @@ const KINDS: RightKind[] = [
   "browser",
   "mods",
   "agents",
+  "databases",
 ];
 
 const DEFAULT_TOOL: RightKind = "terminal";
@@ -41,7 +43,11 @@ const AGENTS: RightKind = "agents";
 
 const BOTH_PANES: RightKind[] = [CHAT, AGENTS];
 
-const FILE_VIEWS: RightKind[] = ["project", "shared"];
+const PROJECT: RightKind = "project";
+
+const DATABASES: RightKind = "databases";
+
+const FILE_VIEWS: RightKind[] = [PROJECT, "shared"];
 
 const SCOPE: Record<RightKind, Pane> = {
   terminal: "terminal",
@@ -54,6 +60,7 @@ const SCOPE: Record<RightKind, Pane> = {
   browser: "browser",
   mods: "mods",
   agents: "chat",
+  databases: "chat",
 };
 
 interface StoredRight {
@@ -121,7 +128,11 @@ class Panes {
     tabs.right.find((tab) => tab.id === this.rightTabId) ?? tabs.right[0] ?? null,
   );
 
-  readonly viewing = $derived(this.previewing || opened.path !== null);
+  readonly viewed = $derived<RightKind | null>(
+    opened.path !== null ? PROJECT : openedObject.connection !== null ? DATABASES : null,
+  );
+
+  readonly viewing = $derived(this.previewing || this.viewed !== null);
 
   readonly target = $derived<PaneRole>(
     this.groupAt(this.focused) ?? this.groupAt(otherPane(this.focused)) ?? "center",
@@ -176,7 +187,7 @@ class Panes {
 
   readonly busyRole = $derived.by((): PaneRole | null => {
     if (layout.mobile || !this.centerView || !this.viewing) return null;
-    return otherPane(this.previewing ? this.filesRole : (this.roleOf("project") ?? "right"));
+    return otherPane(this.previewing ? this.filesRole : ((this.viewed && this.roleOf(this.viewed)) ?? "right"));
   });
 
   readonly centerBusy = $derived(this.busyRole === "center");
@@ -326,7 +337,8 @@ class Panes {
     if (this.viewAt(other) === kind && !BOTH_PANES.includes(kind)) this.#place(other, this.viewAt(role));
     this.#place(role, kind);
     if (role === "right") this.open = true;
-    if (!this.shows("project")) closeProjectFile();
+    if (!this.shows(PROJECT)) closeProjectFile();
+    if (!this.shows(DATABASES)) closeDatabaseObject();
     this.#settleChats();
     this.focus(role);
     this.commit();

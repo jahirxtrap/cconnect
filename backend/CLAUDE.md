@@ -64,7 +64,12 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `chat_list` does (on Linux starting it walks the whole tree, one inotify watch per folder,
   and a large project froze the server when that ran on the event loop), `pages` (an HTML page served with the folder around it, so its
   styles, scripts and images load), `processes` (what the server runs, matched to its chat,
-  agent, terminal or browser, and stopped the way that screen stops it).
+  agent, terminal or browser, and stopped the way that screen stops it), `databases` (the
+  connections in `DATABASES_FILE`, whose passwords never reach the app, and one engine per
+  connection), `database_engines` (**the** engine table: dialect, driver distributions installed on
+  demand, read-only preludes, timeout, binary literal and hidden schemas), `database_tunnels`
+  (SSH tunnels through the system's `ssh`), `database_data` (browsing, paging, SQL, row edits and
+  exports to `shared/databases/<id>/`).
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
 - `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
   substituted per request), `BLOCKS.md`, `BROWSER.md`, `INSTALL.md` (the install cards,
@@ -93,7 +98,8 @@ is refused at the HTTP layer (403).
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
 Claude — the shells, the files git ignores, every git write, deleting a pack from the
-server's library and an agent's environment variables. It also lifts the PreToolUse hook that
+server's library, an agent's environment variables, and saving, testing or deleting a database
+connection, editing its rows or running SQL that writes. It also lifts the PreToolUse hook that
 keeps Claude off the server's own `paths.ENV_FILE` and off the cconnect tools that reach the same
 things (the terminal, removing a pack, linking a file): the chat sends the key with every `prompt`
 and the hook asks the live session on each call. It only gates while the Bearer gate is on (`gated()`), so a plain local
@@ -125,7 +131,8 @@ Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessi
 category and manual order, kept in `agent_session_placement` beside Claude's; reading or
 changing their environment variables takes the security key), `/api/packs/*` (the server's pack library and its
 previews; deleting from it takes the security key; `fetch` downloads a pack link, https only,
-and hands it back without keeping it). Live streams: `WS /api/chat/ws`,
+and hands it back without keeping it), `/api/databases/*` (connections, their drivers, schemas,
+objects and tables, a page of rows, SQL, row edits and exports; see *Databases* below). Live streams: `WS /api/chat/ws`,
 `WS /api/list/ws` (chat/project list), `WS /api/agents/ws` (an agent's chats: `watch`
 names the agent and the folder, the server pushes `sessions` snapshots and `activity`
 changes), `WS /api/system/ws`, `WS /api/shared/ws`,
@@ -292,7 +299,10 @@ Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own message
 before a compaction too, without the tool calls), `session_info`, `show_component`,
 `ask_component`, `share_files`, `packs` (writes a pack into the server's library),
 `delegate` (runs a task on a destination, or registers one), `reload` (persistent chats
-only), and the browser and terminal tools behind their settings.
+only), `db_connections` / `db_schema` / `db_query` / `db_execute` / `db_manage` (always offered, so
+Claude can create the first connection; `db_query` refuses anything that writes, and
+`db_execute` and the connection changes of `db_manage` need the key), and the
+browser and terminal tools behind their settings.
 
 `ask_component` and `show_component` share one element list (`mcps/components.py`). The
 contract is flat: every value travels as a string, an `id` means the element carries a
@@ -310,6 +320,63 @@ the single table of what the app renders inline.
 5. The validation (`componentMissing` / `missing`) if it can be required.
 6. `en.json` if it brings text of its own, and the other catalogs with it (a key they lack
    falls back to English).
+
+## Databases
+
+The engines are data: `core/databases/engines.json` lists every one a connection can use (its
+SQLAlchemy dialect, the pip packages of its driver, default port, read-only preludes, timeout,
+binary literal, hidden schemas and the options its URL usually takes), with `defaults` and
+`extends` so the PostgreSQL and MySQL families inherit their driver and rules.
+`database_engines` only loads it. Three forms: `file` (a path), `server` (host, port, database,
+user, password and `options`, the URL's query) and `url`, the `custom` engine: any SQLAlchemy URL
+plus the pip packages its driver needs, which borrows the catalog's rules for its backend
+(`spec_of`) and loses its password to the connection's own field when saved.
+
+- **A driver install never moves the server's own packages.** `install_packages` pins every
+  requirement of the `cconnect` distribution at its installed version, so a dialect that needs
+  another SQLAlchemy resolves to an older release of itself or fails with the resolver's reason.
+  Dialects whose every release pins an older SQLAlchemy are left out of the catalog; databases
+  that speak PostgreSQL's or MySQL's protocol use those dialects instead.
+- **The drivers dialog lists packages, not engines.** Engines with the same `packages` share one
+  driver (`driver_of`): uninstalling it closes all of their engines and keeps only the
+  distributions another installed driver still needs.
+- **A connection that names no database lists the server's.** The catalog's `databases` query
+  lists them and `home` is where such a connection lands (PostgreSQL's `postgres`). Every data
+  call takes a `Scope`, the connection and one of those databases, and each scope gets an engine
+  of its own; a listing that fails falls back to the schemas of the home database.
+- **A database file opens without a connection.** `open_file` resolves a file of the shared
+  folder or of a project (a project's ignored files only with the key), takes the engine from
+  the file's header (`signature`; the `extensions` only decide for an empty file) and keeps the
+  entry in memory under a `file:` id. File engines use `NullPool`, so the server holds no lock on
+  the file between queries. The client reads the same `extensions` at build time.
+
+Every SQL statement goes through `database_data`, and nothing there trusts the client:
+
+- **Reads and writes are told apart by sqlglot, failing closed.** The text is split on the
+  tokenizer's semicolons, and a statement only reads when it parses as SELECT, a set operation,
+  DESCRIBE, SHOW, EXPLAIN of a read or a PRAGMA without `=`. Anything else, or anything that does
+  not parse, writes, and writing takes the key. A read runs in a transaction that is always rolled
+  back, after the engine's read-only preludes (`PRAGMA query_only`, `SET TRANSACTION READ ONLY`).
+- **The WHERE filter** is wrapped as `SELECT * FROM t WHERE …` and must be one reading statement;
+  its colons are escaped so `text()` takes no bind parameters, and it closes on a newline so a
+  trailing `--` cannot swallow the ORDER BY and LIMIT.
+- **Every query has a deadline.** The engine's own statement timeout where it has one, and a
+  timer that calls the DBAPI's `cancel` / `interrupt` otherwise; the error then says how long it ran.
+- **Optional reflection runs in a session of its own** (`_probe`). A failed statement aborts the
+  rest of the transaction in PostgreSQL and DuckDB, so a missing comment or foreign key lookup
+  used to fail the whole table.
+- **duckdb-engine cannot reflect under SQLAlchemy 2.1**: it reuses PostgreSQL's column and primary
+  key queries, which now read `pg_collation` and `REGCLASS`. The engine table carries DuckDB's
+  own `columns` and `primary_key` queries over `duckdb_columns()` / `duckdb_constraints()`, and
+  declared types become SQLAlchemy types through sqlglot (`declared_type`). Tables are rebuilt from
+  columns and primary key for every engine instead of autoloaded.
+- **A driver counts as installed when its distributions are on disk**
+  (`importlib.metadata`), not when the module can be found: an uninstalled module stays in
+  `sys.modules` until the server restarts.
+- Values leave as JSON-safe cells (`cell`): integers past 2^53, decimals, dates and UUIDs as text,
+  binary as a short hex preview. Exports keep the full values: CSV with a BOM, and SQL inserts
+  rendered by each column's own literal processor, binary through the engine's `binary`
+  template.
 
 ## Configuration
 

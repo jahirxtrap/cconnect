@@ -103,10 +103,18 @@ with the tailnet mode or a public one.
 ### Files and code
 
 - **Shared files.** A file manager over the server's shared folder: upload with progress, organize,
-  and preview images, video, audio, PDF, Markdown, code and HTML. What Claude writes there arrives
-  as a link in the chat.
+  and preview images, video, audio, PDF, Markdown, code, HTML and SQLite or DuckDB databases. What
+  Claude writes there arrives as a link in the chat.
 - **Project files.** Browse the chat's project with git colours and each change painted on its
   lines, then commit, pull and push from the same panel.
+- **Databases.** Over fifty engines (SQLite, PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, DuckDB,
+  Snowflake, BigQuery, ClickHouse, Databricks and the rest of SQLAlchemy's dialects) plus any
+  SQLAlchemy URL, through an SSH tunnel when only another machine reaches them, with each driver
+  installed from the app. A connection without a database lists every database on the server and
+  loads one only when it is opened, and a database file in the shared folder or a project opens in
+  its preview. Tables open in a paged grid with sorting and a WHERE filter, rows are edited in a
+  form, a SQL console runs anything else, and all of it exports to CSV or SQL. Claude reads them,
+  creates and manages connections, and changes data only with the security key.
 - **Notes.** A Markdown editor with formatting, search and syntax highlighting.
 
 ### The PC
@@ -151,6 +159,8 @@ Only the Claude Code CLI is required. Each of these adds something, and the serv
 - **rar** (RARLAB) — compressing to `.rar` in the file manager. Opening and extracting `.rar`
   needs nothing: the server reads them with the 7-Zip it ships.
 - **Node.js** — ACP agents shipped as npm packages.
+- **ssh**, the OpenSSH client: the tunnel of a database connection that only another machine can
+  reach.
 
 The speed test in Monitor, video thumbnails and `.7z` archives come with the server.
 
@@ -177,7 +187,7 @@ Everything the backend reads comes from environment variables, taken from the pr
 | `PUBLIC_ACCESS_TOKEN` | — | Bearer token for `expose`; generated and saved on first use. Only honoured while an expose mode is active, so a leftover token never locks down a local run |
 | `PUBLIC_HOSTNAME` | — | Hostname your proxy serves, for `expose caddy`. `--public-host` on the command line wins over it |
 | `PUBLIC_URL` | — | Public address the backend reports in `/api/health`. Set by `cconnect` when it exposes the server, so you rarely write it yourself |
-| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `cconnect key --rotate` replaces it. It is the only gate |
+| `SECURITY_KEY` | — | Unlocks the terminal, the files git ignores, committing from the project panel, deleting a pack from the server, an ACP agent's environment variables, saving database connections, editing their rows or running SQL that writes, and Claude reading or editing the server's own `.env`. Generated and saved on first start, then printed on every start; `cconnect key --rotate` replaces it. It is the only gate |
 | `BROWSER_EXECUTABLE` | autodetected | Chromium the browser pane drives. Falls back to Chrome, Chromium or Edge, whichever is installed |
 | `BROWSER_DEBUG_PORT` | `9333` | Remote debugging port it is launched with |
 | `BROWSER_HEADLESS` | `1` | Runs it without a window; set `0` to watch the real browser on the server |

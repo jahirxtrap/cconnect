@@ -10,6 +10,7 @@
   import ClaudeSections from "$lib/screens/claude/ClaudeSections.svelte";
   import BrowserView from "$lib/screens/browser/BrowserView.svelte";
   import AgentsView from "$lib/screens/agents/AgentsView.svelte";
+  import DatabasesView from "$lib/screens/databases/DatabasesView.svelte";
   import ModsView from "$lib/screens/mods/ModsView.svelte";
   import MonitorActions from "$lib/screens/monitor/MonitorActions.svelte";
   import MonitorContent from "$lib/screens/monitor/MonitorContent.svelte";
@@ -140,6 +141,8 @@
         <BrowserView {focused} />
       {:else if view === "mods"}
         <ModsView chat={panes.focusedChat} />
+      {:else if view === "databases"}
+        <DatabasesView elsewhere={centerView} />
       {:else if view === "agents"}
         <AgentsView
           {focused}

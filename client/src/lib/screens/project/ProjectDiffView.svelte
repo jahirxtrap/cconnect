@@ -155,6 +155,7 @@
 <FilePreview
   url={projectFileUrl(projectKey, path)}
   filename={path.split("/").at(-1) ?? path}
+  databaseFile={{ project: projectKey, path }}
   {embedded}
   menuItems={fileMenu}
   onCopyPath={() => void copyText(absolute)}

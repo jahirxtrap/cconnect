@@ -9,7 +9,7 @@ pages cover every part of it in detail.
 | [[Getting started]] | Installing the server and the apps, starting the server from the desktop app, connecting, and the web app |
 | [[Run modes]] | Serving locally, on your tailnet, through a Tailscale Funnel, behind your own proxy, or detached |
 | [[Chat]] | Everything in the conversation, and keeping several chats open in tabs and panels |
-| [[Files and projects]] | The shared folder, the project explorer with git, and notes |
+| [[Files and projects]] | The shared folder, the project explorer with git, databases, and notes |
 | [[Claude Code]] | Managing the Claude Code install, accounts, model providers, mods, ACP agents and delegation |
 | [[The PC]] | The monitor with its processes and network tabs, the browser, the terminal and the SSH client |
 | [[Personalization]] | Themes and packs, settings, staying current and the Discord status |

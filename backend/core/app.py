@@ -58,8 +58,9 @@ async def lifespan(app: FastAPI):
     project_watch.hub.stop()
     system_watch.hub.stop()
     network.watchdog.stop()
-    from services import live_sessions
+    from services import databases, live_sessions
     await live_sessions.close_processes()
+    await asyncio.to_thread(databases.close_all)
     paths.RUNTIME_FILE.unlink(missing_ok=True)
 
 

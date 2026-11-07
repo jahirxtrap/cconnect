@@ -45,7 +45,7 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CommitBar from "./CommitBar.svelte";
   import ProjectDiffView, { diffCounts } from "./ProjectDiffView.svelte";
-  import { closeProjectFile, opened, openProjectFile } from "./openFile.svelte";
+  import { closeProjectFile, opened, openProjectFile } from "$lib/app/viewer.svelte";
   import { projectDiffs } from "./projectDiffs.svelte";
   import ProjectSelector from "$lib/screens/chat/ProjectSelector.svelte";
   import { PANE_TOP_CLASS } from "$lib/screens/chat/paneChrome";

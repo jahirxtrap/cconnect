@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 import httpx
 
 from core import packages, paths
-from core.slugs import slug
+from core.slugs import slug, unique
 from services import agent_registry, files
 
 REGISTRY = "registry"
@@ -345,12 +345,7 @@ def install(agent_id: str) -> dict:
 
 
 def _unique(name: str) -> str:
-    base = slug(name) or CUSTOM
-    taken = {entry["id"] for entry in load()}
-    ident, number = base, 2
-    while ident in taken:
-        ident, number = f"{base}-{number}", number + 1
-    return ident
+    return unique(slug(name) or CUSTOM, {entry["id"] for entry in load()})
 
 
 def add(fields: dict) -> dict:

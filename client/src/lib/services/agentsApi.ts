@@ -10,7 +10,7 @@ import {
 } from "$lib/data/agentModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { baseUrlOf, withToken, type Profile } from "./backend.svelte";
-import { createHttp, type HttpResult } from "./http";
+import { createHttp, outcomeOf, type HttpResult, type Outcome } from "./http";
 import type { TerminalInfo } from "./terminalApi";
 
 type Wire = Record<string, unknown>;
@@ -39,14 +39,8 @@ export interface AgentChanges extends Partial<CustomAgentFields> {
   enabled?: boolean;
 }
 
-export type Outcome<T> =
-  | { ok: true; status: number; value: T; failure: null }
-  | { ok: false; status: number; value: null; failure: AgentFailure | null };
-
-const outcome = <T>(result: HttpResult<Wire>, parse: (data: Wire) => T): Outcome<T> =>
-  result.ok
-    ? { ok: true, status: result.status, value: parse(result.data ?? {}), failure: null }
-    : { ok: false, status: result.status, value: null, failure: toAgentFailure(result.data) };
+const outcome = <T>(result: HttpResult<Wire>, parse: (data: Wire) => T): Outcome<T, AgentFailure> =>
+  outcomeOf(result, parse, toAgentFailure);
 
 const segment = (id: string) => encodeURIComponent(id);
 
@@ -60,7 +54,7 @@ export const createAgentsApi = (profile: () => Profile) => {
       return data ? { agents: (data.agents ?? []).map(toInstalledAgent), node: data.node === true } : null;
     },
 
-    async catalog(): Promise<Outcome<CatalogAgent[]>> {
+    async catalog(): Promise<Outcome<CatalogAgent[], AgentFailure>> {
       return outcome(await client.call<Wire>("GET", "/agents/catalog"), (data) =>
         ((data.agents as Wire[] | undefined) ?? []).map(toCatalogAgent),
       );

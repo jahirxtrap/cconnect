@@ -12,6 +12,7 @@
   import Type from "@lucide/svelte/icons/type";
   import type { Snippet } from "svelte";
   import type { PreviewLinks, PreviewRequest } from "$lib/app/navigation.svelte";
+  import type { DatabaseFileSource } from "$lib/data/databaseModels";
   import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
   import { wikiLinks } from "$lib/markdown/render";
   import { settings } from "$lib/data/settings.svelte";
@@ -21,6 +22,7 @@
   import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
+  import DatabaseFile from "$lib/screens/databases/DatabaseFile.svelte";
   import { isMobile } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { paneRole } from "$lib/screens/chat/paneSurface";
@@ -72,6 +74,7 @@
     links?: PreviewLinks | null;
     gallery?: PreviewRequest[] | null;
     onPick?: ((index: number) => void) | null;
+    databaseFile?: DatabaseFileSource | null;
   }
 
   interface Shown {
@@ -104,6 +107,7 @@
     links = null,
     gallery = null,
     onPick = null,
+    databaseFile = null,
   }: Props = $props();
 
   const NUL = String.fromCharCode(0);
@@ -167,11 +171,12 @@
     if (strip) pickPage(strip.index + step);
   };
   const paneClass = $derived(strip ? PANE_SIDES_CLASS : PANE_FRAME_CLASS);
-  const bodyClass = $derived(readsAsText(kind) ? BODY_CLASS : embedded ? paneClass : FRAME_CLASS);
+  const bodyClass = $derived(readsAsText(kind) || kind === "database" ? BODY_CLASS : embedded ? paneClass : FRAME_CLASS);
   const binary = $derived(shown !== null && shown.body.includes(NUL));
   const prose = $derived(shown !== null && previewKindOf(shown.name) === "markdown" && formatted);
   const lined = $derived(readsAsText(kind) && !failed && shown !== null && !binary && !prose);
   const relative = $derived(relativeFromUrl(url));
+  const databaseSource = $derived(databaseFile ?? (relative === null ? null : { project: null, path: relative }));
 
   const attach = $derived.by(() => {
     const path = relative;
@@ -363,6 +368,12 @@
     {:else}
       <PdfView url={source} onerror={() => (failed = true)} />
     {/if}
+  {:else if kind === "database"}
+    {#if databaseSource}
+      <DatabaseFile source={databaseSource} {filename} {embedded} revision={stamp} {onExpand} />
+    {:else}
+      <EmptyState icon={fileIcon(filename)} text={t("FILE_BINARY")} class="flex-1" />
+    {/if}
   {:else if kind === "html"}
     <PageFrame
       url={source}
@@ -433,7 +444,7 @@
 {/snippet}
 
 {#if embedded}
-  <div class="flex h-full min-h-0 flex-col bg-background text-on-surface">
+  <div class="relative flex h-full min-h-0 flex-col bg-background text-on-surface">
     <PaneHeader title={filename} onBack={onClose} actions={toolbar} />
     {@render content()}
   </div>

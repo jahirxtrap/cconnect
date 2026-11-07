@@ -2,6 +2,7 @@ import Ban from "@lucide/svelte/icons/ban";
 import File from "@lucide/svelte/icons/file";
 import FileArchive from "@lucide/svelte/icons/file-archive";
 import FileCode from "@lucide/svelte/icons/file-code";
+import FileDatabase from "@lucide/svelte/icons/file-database";
 import FileImage from "@lucide/svelte/icons/file-image";
 import FileMusic from "@lucide/svelte/icons/file-music";
 import FileText from "@lucide/svelte/icons/file-text";
@@ -23,6 +24,7 @@ const KIND_ICONS: Record<FileKind, IconSource> = {
   pdf: FileText,
   markdown: FileType,
   code: FileCode,
+  database: FileDatabase,
   archive: FileArchive,
   pack: Package,
   text: File,
@@ -35,6 +37,7 @@ const KIND_LABELS: Record<FileKind, string> = {
   pdf: "KIND_PDF",
   markdown: "KIND_MARKDOWN",
   code: "KIND_CODE",
+  database: "KIND_DATABASE",
   archive: "KIND_ARCHIVE",
   pack: "KIND_PACK",
   text: "KIND_TEXT",

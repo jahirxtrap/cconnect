@@ -31,11 +31,12 @@
     shared: "SCOPE_SHARED",
     browser: "BROWSER",
     project: "PROJECT_FILES",
+    databases: "DATABASES",
     mods: "MODS",
     global: "SCOPE_GENERAL",
   };
 
-  const ORDER: ShortcutScope[] = ["chat", "terminal", "mods", "shared", "browser", "project", "global"];
+  const ORDER: ShortcutScope[] = ["chat", "terminal", "mods", "shared", "browser", "project", "databases", "global"];
 
   const MODIFIER_CODES = [
     "ControlLeft",

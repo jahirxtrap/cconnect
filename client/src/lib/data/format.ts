@@ -76,6 +76,18 @@ export const linesOf = (text: string): string[] =>
     .map((line) => line.trim())
     .filter(Boolean);
 
+export const pairsText = (pairs: Record<string, string>): string =>
+  Object.entries(pairs)
+    .map(([name, value]) => `${name}=${value}`)
+    .join("\n");
+
+export const pairsOf = (text: string): Record<string, string> =>
+  Object.fromEntries(
+    linesOf(text)
+      .filter((line) => line.includes("="))
+      .map((line) => [line.slice(0, line.indexOf("=")).trim(), line.slice(line.indexOf("=") + 1)]),
+  );
+
 const MASK_LENGTH = 12;
 
 export const masked = (length = MASK_LENGTH): string => "•".repeat(Math.min(length, MASK_LENGTH));
