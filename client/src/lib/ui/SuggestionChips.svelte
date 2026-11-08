@@ -26,7 +26,7 @@
       {:else}
         <CornerDownRight size={14} class="shrink-0 text-accent" />
       {/if}
-      <span class="line-clamp-2 min-w-0">{item.text}</span>
+      <span class="min-w-0">{item.text}</span>
     </button>
   {/each}
 </div>
