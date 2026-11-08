@@ -11,6 +11,7 @@
     icon?: IconSource;
     leading?: Snippet<[string]>;
     summary?: string;
+    summaryTail?: boolean;
     stat?: string | null;
     meta?: Snippet;
     labelOnly?: boolean;
@@ -25,6 +26,7 @@
     icon: IconComponent,
     leading,
     summary = "",
+    summaryTail = false,
     stat = null,
     meta,
     labelOnly = false,
@@ -52,10 +54,17 @@
   {:else if IconComponent}
     <IconComponent class="{GLYPH} {colors.icon}" />
   {/if}
-  <span class="min-w-0 flex-1 truncate text-block {summary ? colors.preview : colors.label}"
-    ><span class={colors.label}>{label}</span>{#if summary}<span class="ml-2 {colors.preview}">{summary}</span
-      >{/if}</span
-  >
+  {#if summary && summaryTail}
+    <span class="flex min-w-0 flex-1 text-block">
+      <span class="shrink-0 {colors.label}">{label}</span>
+      <span class="ml-2 min-w-0 truncate text-left [direction:rtl] {colors.preview}"><bdi>{summary}</bdi></span>
+    </span>
+  {:else}
+    <span class="min-w-0 flex-1 truncate text-block {summary ? colors.preview : colors.label}"
+      ><span class={colors.label}>{label}</span>{#if summary}<span class="ml-2 {colors.preview}">{summary}</span
+        >{/if}</span
+    >
+  {/if}
   {#if meta}
     <span class="flex shrink-0 items-center gap-2 text-body-sm group-data-[stuck]/head:hidden">{@render meta()}</span>
   {/if}

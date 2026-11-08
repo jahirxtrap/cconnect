@@ -88,16 +88,13 @@
     />
   {/each}
   <MenuItem
+    icon={Plus}
     text={t("ADD_PROJECT")}
     onclick={() => {
       adding = true;
       open = false;
     }}
-  >
-    {#snippet trailing()}
-      <Plus size={16} class="shrink-0 text-on-surface-variant" />
-    {/snippet}
-  </MenuItem>
+  />
 </PopupMenu>
 {/if}
 

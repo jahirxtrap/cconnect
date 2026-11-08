@@ -5,7 +5,7 @@
   import { PANE_VIEWS, QUICK_CHAT_ICON } from "$lib/app/screens";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { KeyGate } from "$lib/data/keyGate.svelte";
-  import { formatDecimal, formatSize, joined } from "$lib/data/format";
+  import { formatDecimal, formatSeconds, formatSize, joined } from "$lib/data/format";
   import { MILLIS_PER_SECOND } from "$lib/data/time";
   import { projectNameOf } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
@@ -15,6 +15,7 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import type { IconSource } from "$lib/ui/icons";
   import ListRow from "$lib/ui/ListRow.svelte";
+  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -31,7 +32,6 @@
     type ProcessUsage,
     type SystemInfo,
   } from "$lib/services/systemApi";
-  import { formatUptime } from "./monitor.svelte";
   import UsageSplit from "./UsageSplit.svelte";
 
   interface Props {
@@ -116,7 +116,7 @@
     joined(
       item.detail,
       item.activity && ACTIVITIES[item.activity] ? t(ACTIVITIES[item.activity]) : null,
-      formatUptime(Math.max(0, now - item.started)),
+      formatSeconds(now - item.started),
       item.processes.length > 1 ? plural("PROCESSES_COUNT", item.processes.length) : null,
     );
 
@@ -136,6 +136,8 @@
   const partSubtitle = (part: ProcessPart) =>
     joined(part.detail, part.count > 1 ? plural("PROCESSES_COUNT", part.count) : `PID ${part.pid}`);
 
+  const expandable = (item: ProcessEntry) => partsOf(item).length > 1;
+
   const toggle = (pid: number) => (expanded = { ...expanded, [pid]: !expanded[pid] });
 
   const stop = async (item: ProcessEntry) => {
@@ -154,7 +156,7 @@
   </div>
 {/snippet}
 
-<div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
+<div use:viewportScrollbar use:dockArea class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
   <div class="flex flex-col gap-3.5 {CARD_CLASS}">
     <UsageSplit
       title="CPU"
@@ -185,7 +187,7 @@
           icon={iconOf(item.kind)}
           title={titleOf(item)}
           subtitle={subtitleOf(item)}
-          onclick={partsOf(item).length > 1 ? () => toggle(item.pid) : undefined}
+          onclick={expandable(item) ? () => toggle(item.pid) : undefined}
         >
           {#snippet trailing()}
             <div class="flex items-center gap-2">
@@ -198,7 +200,7 @@
             </div>
           {/snippet}
         </ListRow>
-        {#if expanded[item.pid]}
+        {#if expanded[item.pid] && expandable(item)}
           {#each partsOf(item) as part (part.pid)}
             <ListRow icon={partIcon(item, part)} title={partTitle(part)} subtitle={partSubtitle(part)} padding={CHILD_PADDING}>
               {#snippet trailing()}

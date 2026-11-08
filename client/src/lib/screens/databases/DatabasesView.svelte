@@ -4,7 +4,7 @@
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plug from "@lucide/svelte/icons/plug";
   import Plus from "@lucide/svelte/icons/plus";
-  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
+  import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import SquareCode from "@lucide/svelte/icons/square-code";
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { untrack } from "svelte";
@@ -143,7 +143,7 @@
     <Plug />
   </TooltipIconButton>
   <TooltipIconButton label={t("REFRESH")} enabled={!!listed} onclick={() => void refreshAll()}>
-    <RefreshCw />
+    <RotateCw />
   </TooltipIconButton>
 {/snippet}
 
@@ -166,7 +166,7 @@
       {/snippet}
       <MenuItem icon={SquareCode} text={t("DATABASE_NEW_CONSOLE")} onclick={() => openConsole(connection)} />
       <MenuItem icon={Pencil} text={t("EDIT")} onclick={() => (editing = connection)} />
-      <MenuItem icon={RefreshCw} text={t("REFRESH")} onclick={() => databases.forget(profile, connection.id)} />
+      <MenuItem icon={RotateCw} text={t("REFRESH")} onclick={() => databases.forget(profile, connection.id)} />
       <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => (removing = connection)} />
     </PopupMenu>
   </div>

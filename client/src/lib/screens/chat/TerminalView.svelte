@@ -2,7 +2,7 @@
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Network from "@lucide/svelte/icons/network";
-  import Settings2 from "@lucide/svelte/icons/settings-2";
+  import Settings from "@lucide/svelte/icons/settings";
   import SquareTerminal from "@lucide/svelte/icons/square-terminal";
   import { tick } from "svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
@@ -196,7 +196,7 @@
           {/each}
         </MenuSub>
       {/if}
-      <MenuItem icon={Settings2} text={t("MANAGE_SSH_HOSTS")} onclick={() => (managing = true)} />
+      <MenuItem icon={Settings} text={t("MANAGE_SSH_HOSTS")} onclick={() => (managing = true)} />
     </PopupMenu>
   {/if}
 {/snippet}

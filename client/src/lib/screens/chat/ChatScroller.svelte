@@ -3,6 +3,7 @@
   import { tick, type Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { keepFocus } from "$lib/ui/keepFocus";
+  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { LOAD_MORE_PX } from "$lib/ui/paging";
   import { scrollbarWidth, viewportScrollbar } from "$lib/ui/scrollbar";
   import { provideStickyHeads } from "./blocks/stickyHeads";
@@ -12,6 +13,7 @@
     verticalScrollbar?: number;
     hasContent?: boolean;
     bottomInset?: number;
+    dock?: boolean;
     onScroll?: ((top: number) => void) | null;
     onNearTop?: (() => void) | null;
     onMove?: (() => void) | null;
@@ -23,6 +25,7 @@
     verticalScrollbar = $bindable(0),
     hasContent = true,
     bottomInset = 0,
+    dock = false,
     onScroll = null,
     onNearTop = null,
     onMove = null,
@@ -198,6 +201,7 @@
     bind:this={container}
     {onscroll}
     use:viewportScrollbar
+    use:dockArea={dock}
     class="selectable rounded-viewport isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
   >
     <div bind:this={content} class="shrink-0">

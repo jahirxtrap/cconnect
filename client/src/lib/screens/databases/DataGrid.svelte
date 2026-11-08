@@ -4,6 +4,7 @@
   import KeyRound from "@lucide/svelte/icons/key-round";
   import { cellText, type CellValue, type ColumnKind } from "$lib/data/databaseModels";
   import { formatDecimal } from "$lib/data/format";
+  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
 
   interface Props {
@@ -16,6 +17,7 @@
     descending?: boolean;
     onSort?: ((column: string) => void) | null;
     onRow?: ((index: number) => void) | null;
+    dock?: boolean;
   }
 
   const {
@@ -28,6 +30,7 @@
     descending = false,
     onSort = null,
     onRow = null,
+    dock = false,
   }: Props = $props();
 
   const NUMERIC: ColumnKind[] = ["integer", "number"];
@@ -40,6 +43,7 @@
 
 <div
   use:viewportScrollbar
+  use:dockArea={dock}
   class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-auto [--viewport-inset:0px] {onRow ? 'select-none' : 'selectable'}"
 >
   <table class="min-w-full border-separate border-spacing-0 text-body-sm">

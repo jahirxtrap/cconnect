@@ -207,6 +207,9 @@ const inlineSegments = (token: Token): Segment[] => {
   return result;
 };
 
+const holdsImage = (token: Token): boolean =>
+  token.type === "inline" && (token.children ?? []).some((child) => child.type === "image");
+
 const merged = (list: Segment[], joinHtml = true): Segment[] =>
   list.reduce<Segment[]>((acc, segment) => {
     const last = acc[acc.length - 1];
@@ -262,7 +265,7 @@ const fromTokens = (tokens: Token[], flavor: MarkdownFlavor, level = 0): Segment
     if (LIST_OPEN.has(token.type) && token.level === level) {
       const end = closing(tokens, index);
       const inner = tokens.slice(index + 1, end);
-      if (inner.some((item) => item.type === "fence")) {
+      if (inner.some((item) => item.type === "fence" || (flavor === "chat" && holdsImage(item)))) {
         flush();
         result.push(listSegment(token, inner, flavor));
         index = end;

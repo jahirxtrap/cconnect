@@ -424,6 +424,22 @@ def _build_file_diff(name: str, raw_input: dict, path: str) -> list[dict[str, st
     return []
 
 
+def _errored(block: Any) -> dict[str, bool]:
+    errored = block.get("is_error") if isinstance(block, dict) else getattr(block, "is_error", None)
+    return {"is_error": True} if errored is True else {}
+
+
+def _notebook_cell(name: str, raw_input: dict) -> dict[str, str]:
+    if name != "NotebookEdit":
+        return {}
+    cell = raw_input.get("cell_id")
+    mode = raw_input.get("edit_mode")
+    return {
+        **({"cell_id": cell} if isinstance(cell, str) and cell else {}),
+        "edit_mode": mode if isinstance(mode, str) and mode else "replace",
+    }
+
+
 def _file_change_event(block: Any, raw_input: Any, hidden: set[str]) -> dict | None:
     if not isinstance(raw_input, dict):
         return None
@@ -435,7 +451,10 @@ def _file_change_event(block: Any, raw_input: Any, hidden: set[str]) -> dict | N
     bid = getattr(block, "id", None)
     if bid:
         hidden.add(bid)
-    return {"type": "file_change", "id": bid, "name": name, "path": path, "diff_lines": diff_lines}
+    return {
+        "type": "file_change", "id": bid, "name": name, "path": path, "diff_lines": diff_lines,
+        **_notebook_cell(name, raw_input),
+    }
 
 
 def _mark_working(events: list[dict], vis: dict) -> None:
@@ -508,7 +527,10 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                     _mark_working(events, vis)
                 if event is not None and mode != "off":
                     if mode == "label":
-                        event = {"type": "file_change", "id": event.get("id"), "name": event.get("name"), "path": event.get("path"), "label": True}
+                        event = {
+                            "type": "file_change", "id": event.get("id"), "name": event.get("name"),
+                            "path": event.get("path"), "label": True, **_notebook_cell(name, raw_input),
+                        }
                     events.append(event)
             elif name == _SHARE_RULE:
                 bid = getattr(block, "id", None)
@@ -533,7 +555,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
             if mode == "off":
                 _mark_working(events, vis)
                 continue
-            ev = {"type": "tool_result", "tool_use_id": tuid}
+            ev = {"type": "tool_result", "tool_use_id": tuid, **_errored(block)}
             if mode == "full":
                 ev["content"] = _flatten_result_content(getattr(block, "content", None)).strip()
                 ev.update(_result_view(tuid, ev["content"]))
@@ -1292,7 +1314,7 @@ async def run_prompt(
                     tu_mode = _result_mode(tuid, vis())
                     if tu_mode == "off" or (tuid and tuid in hidden_tool_ids):
                         continue
-                    ev = {"type": "tool_result", "tool_use_id": tuid}
+                    ev = {"type": "tool_result", "tool_use_id": tuid, **_errored(block)}
                     began = tool_started.pop(tuid, None)
                     if began is not None and vis().get("timings"):
                         ev["ms"] = int((loop.time() - began) * 1000)

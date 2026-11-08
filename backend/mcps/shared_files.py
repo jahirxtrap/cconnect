@@ -52,9 +52,9 @@ def listing(args: dict, project_key: str) -> list[dict]:
     """The files a call hands over, read from its arguments alone."""
     wanted = [str(item) for item in (args.get("paths") or []) if str(item).strip()]
     rename = (args.get("name") or "").strip() if len(wanted) == 1 else ""
-    linked = args.get("link") is True
     entries = []
     for item in wanted:
+        linked = args.get("link") is True and not shared.inside(Path(item))
         shown = rename or Path(item).name
         if linked:
             shown = shared_links.visible_name(shown)
@@ -90,7 +90,7 @@ def make_tools(context: dict) -> list:
                 source = Path(cwd, source)
             if not source.is_file():
                 return reply(f"{source} is not a file that exists.")
-            if linked:
+            if linked and not shared.inside(source):
                 shared.create_link(str(source), project_key, handed["name"], replace=True)
                 continue
             target = folder / handed["name"]

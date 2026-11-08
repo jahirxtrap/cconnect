@@ -15,6 +15,7 @@
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
+  import { layout } from "$lib/platform/layout.svelte";
   import { useAgents } from "$lib/services/agents.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { isLocalProfile, localServer } from "$lib/services/localServer.svelte";
@@ -24,6 +25,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
+  import PreferenceSelect from "$lib/ui/PreferenceSelect.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
@@ -132,6 +134,11 @@
     await serverSettings.update(patch);
   };
 
+  const permissionOptions = $derived(
+    (capabilities?.permissionModes ?? []).map((item) => ({ value: item.id, label: item.label })),
+  );
+  const accountOptions = $derived((capabilities?.accounts ?? []).map((item) => ({ value: item.id, label: item.label })));
+
   $effect(() => {
     void backend.activeId;
     void tabs.state.connected;
@@ -171,13 +178,25 @@
     onclick={() => (dialog = "agents")}
   />
 
-  <PreferenceRow
-    icon={Shield}
-    title={t("PERMISSIONS")}
-    summary={rowSummary("permissions")}
-    enabled={ready}
-    onclick={() => (dialog = "permissions")}
-  />
+  {#if layout.mobile}
+    <PreferenceRow
+      icon={Shield}
+      title={t("PERMISSIONS")}
+      summary={rowSummary("permissions")}
+      enabled={ready}
+      onclick={() => (dialog = "permissions")}
+    />
+  {:else}
+    <PreferenceSelect
+      icon={Shield}
+      title={t("PERMISSIONS")}
+      options={permissionOptions}
+      selected={snapshot?.permissionMode ?? ""}
+      onSelect={(value) => void apply({ permission_mode: value })}
+      enabled={ready && !!snapshot}
+      flash={highlight.is("permissions")}
+    />
+  {/if}
 
   <PreferenceRow
     icon={Lock}
@@ -228,13 +247,25 @@
   {/if}
 
   {#if (capabilities?.accounts.length ?? 0) > 1}
-    <PreferenceRow
-      icon={CircleUser}
-      title={t("ACCOUNT")}
-      summary={rowSummary("account")}
-      enabled={ready}
-      onclick={() => (dialog = "account")}
-    />
+    {#if layout.mobile}
+      <PreferenceRow
+        icon={CircleUser}
+        title={t("ACCOUNT")}
+        summary={rowSummary("account")}
+        enabled={ready}
+        onclick={() => (dialog = "account")}
+      />
+    {:else}
+      <PreferenceSelect
+        icon={CircleUser}
+        title={t("ACCOUNT")}
+        options={accountOptions}
+        selected={snapshot?.account ?? ""}
+        onSelect={(value) => void apply({ account: value })}
+        enabled={ready && !!snapshot}
+        flash={highlight.is("account")}
+      />
+    {/if}
   {/if}
 
   <div class="{PREFERENCE_ROW_CLASS} {ready ? '' : 'opacity-40'} {flash ? 'flash-highlight' : ''}">
@@ -327,7 +358,7 @@
 {:else if dialog === "permissions" && snapshot}
   <SelectDialog
     title={t("PERMISSION_MODE")}
-    options={(capabilities?.permissionModes ?? []).map((item) => ({ value: item.id, label: item.label }))}
+    options={permissionOptions}
     selected={snapshot.permissionMode}
     onSelect={(value) => void apply({ permission_mode: value })}
     onDismiss={() => (dialog = null)}
@@ -390,7 +421,7 @@
 {:else if dialog === "account" && snapshot}
   <SelectDialog
     title={t("ACCOUNT")}
-    options={(capabilities?.accounts ?? []).map((item) => ({ value: item.id, label: item.label }))}
+    options={accountOptions}
     selected={snapshot.account}
     onSelect={(value) => void apply({ account: value })}
     onDismiss={() => (dialog = null)}

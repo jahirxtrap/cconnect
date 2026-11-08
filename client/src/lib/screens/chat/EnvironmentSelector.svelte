@@ -103,7 +103,7 @@
       {@const look = link === "connected" ? null : LINK_LOOKS[link]}
       <MenuItem
         text={environment.name}
-        description={joined(address(environment), look && link === "disconnected" ? t(look.text) : null)}
+        description={address(environment)}
         selected={environment.id === profile?.id}
         onclick={() => pick(environment.id)}
       >

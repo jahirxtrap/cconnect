@@ -27,7 +27,7 @@
   import { useServerPacks } from "$lib/services/serverPacks.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
-  import MenuSelect from "$lib/ui/MenuSelect.svelte";
+  import PreferenceSelect from "$lib/ui/PreferenceSelect.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
@@ -131,16 +131,14 @@
       onclick={() => (dialog = "language")}
     />
   {:else}
-    <PreferenceRow icon={Languages} title={t("LANGUAGE")} flash={highlight.is("language")}>
-      {#snippet trailing()}
-        <MenuSelect
-          label={t("LANGUAGE")}
-          options={locales}
-          selected={i18n.locale}
-          onSelect={(value) => i18n.set(value as Locale)}
-        />
-      {/snippet}
-    </PreferenceRow>
+    <PreferenceSelect
+      icon={Languages}
+      title={t("LANGUAGE")}
+      options={locales}
+      selected={i18n.locale}
+      onSelect={(value) => i18n.set(value as Locale)}
+      flash={highlight.is("language")}
+    />
   {/if}
   <PreferenceRow
     icon={Type}

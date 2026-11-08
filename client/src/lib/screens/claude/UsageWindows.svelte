@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { formatPercent } from "$lib/data/format";
-  import { formatDayTime, HOURS_PER_DAY, MILLIS_PER_HOUR, MILLIS_PER_MINUTE, parseIsoMillis } from "$lib/data/time";
+  import { formatPercent, formatSeconds } from "$lib/data/format";
+  import { formatDayTime, MILLIS_PER_DAY, MILLIS_PER_SECOND, parseIsoMillis } from "$lib/data/time";
   import { severityTone, usageTitle, type UsageWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
   import CollapsibleSection from "$lib/ui/CollapsibleSection.svelte";
@@ -20,11 +20,7 @@
     if (millis === null) return "—";
     const remaining = millis - Date.now();
     if (remaining <= 0) return "—";
-    if (remaining < HOURS_PER_DAY * MILLIS_PER_HOUR) {
-      const hours = Math.floor(remaining / MILLIS_PER_HOUR);
-      const minutes = Math.floor((remaining % MILLIS_PER_HOUR) / MILLIS_PER_MINUTE);
-      return t("RESETS_IN", hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`);
-    }
+    if (remaining < MILLIS_PER_DAY) return t("RESETS_IN", formatSeconds(remaining / MILLIS_PER_SECOND));
     return t("RESETS_ON", formatDayTime(millis));
   };
 

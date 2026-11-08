@@ -1,5 +1,14 @@
 import { localized, plural } from "$lib/i18n/index.svelte";
-import { MILLIS_PER_MINUTE, MILLIS_PER_SECOND } from "./time";
+import {
+  DAYS_PER_YEAR,
+  MILLIS_PER_DAY,
+  MILLIS_PER_HOUR,
+  MILLIS_PER_MINUTE,
+  MILLIS_PER_MONTH,
+  MILLIS_PER_SECOND,
+  MILLIS_PER_YEAR,
+  SECONDS_PER_MINUTE,
+} from "./time";
 
 const SIZE_UNITS = ["KB", "MB", "GB", "TB"];
 
@@ -23,7 +32,6 @@ export const joined = (...parts: (string | number | false | null | undefined)[])
 
 const THOUSAND = 1000;
 const MILLION = 1_000_000;
-const DAYS_IN_YEAR = 365;
 const PERCENT = 100;
 
 export const formatTokens = (value: number): string => {
@@ -33,9 +41,18 @@ export const formatTokens = (value: number): string => {
   return `${Math.round(value / (MILLION / 10)) / 10}M`;
 };
 
-type DurationUnit = "millisecond" | "second" | "minute";
+type MeasureUnit = "millisecond" | "second" | "minute" | "hour" | "day" | "month" | "year" | "celsius";
 
-export const formatUnit = (value: number, unit: DurationUnit, decimals = 0): string =>
+const SPANS: { unit: MeasureUnit; millis: number }[] = [
+  { unit: "year", millis: MILLIS_PER_YEAR },
+  { unit: "month", millis: MILLIS_PER_MONTH },
+  { unit: "day", millis: MILLIS_PER_DAY },
+  { unit: "hour", millis: MILLIS_PER_HOUR },
+  { unit: "minute", millis: MILLIS_PER_MINUTE },
+  { unit: "second", millis: MILLIS_PER_SECOND },
+];
+
+export const formatUnit = (value: number, unit: MeasureUnit, decimals = 0): string =>
   localized(
     `unit:${unit}:${decimals}`,
     (locale) =>
@@ -52,15 +69,22 @@ export const compareNames = (a: string, b: string): number => collator("name", {
 export const formatDuration = (millis: number): string => {
   if (millis < MILLIS_PER_SECOND) return formatUnit(Math.round(millis), "millisecond");
   if (millis < MILLIS_PER_MINUTE) return formatUnit(millis / MILLIS_PER_SECOND, "second", 1);
-  const minutes = Math.floor(millis / MILLIS_PER_MINUTE);
-  const seconds = Math.round((millis % MILLIS_PER_MINUTE) / MILLIS_PER_SECOND);
-  const whole = formatUnit(minutes, "minute");
-  return seconds > 0 ? `${whole} ${formatUnit(seconds, "second")}` : whole;
+  const top = SPANS.findIndex((span) => millis >= span.millis);
+  const major = SPANS[top];
+  const minor = SPANS[top + 1];
+  const whole = formatUnit(Math.floor(millis / major.millis), major.unit);
+  const rest = Math.floor((millis % major.millis) / minor.millis);
+  return rest > 0 ? `${whole} ${formatUnit(rest, minor.unit)}` : whole;
+};
+
+export const formatSeconds = (seconds: number): string => {
+  const whole = Math.max(0, Math.floor(seconds));
+  return whole < SECONDS_PER_MINUTE ? formatUnit(whole, "second") : formatDuration(whole * MILLIS_PER_SECOND);
 };
 
 export const formatDays = (days: number): string => {
-  const years = Math.floor(days / DAYS_IN_YEAR);
-  const rest = days % DAYS_IN_YEAR;
+  const years = Math.floor(days / DAYS_PER_YEAR);
+  const rest = days % DAYS_PER_YEAR;
   const parts: string[] = [];
   if (years) parts.push(plural("DURATION_YEARS", years));
   if (rest || !years) parts.push(plural("DURATION_DAYS", rest));

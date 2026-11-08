@@ -129,6 +129,9 @@
   --text-headline: 20px;
   --text-headline--line-height: 28px;
   --text-headline--font-weight: 600;
+  --text-metric: 28px;
+  --text-metric--line-height: 32px;
+  --text-metric--font-weight: 600;
 
   --font-sans: var(--family-text), var(--family-symbols), sans-serif, var(--family-emoji);
   --font-mono: var(--family-mono), var(--family-symbols), monospace, var(--family-emoji);

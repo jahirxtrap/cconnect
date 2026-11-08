@@ -8,7 +8,7 @@
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
   import Play from "@lucide/svelte/icons/play";
   import Plus from "@lucide/svelte/icons/plus";
-  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
+  import RotateCw from "@lucide/svelte/icons/rotate-cw";
   import Table2 from "@lucide/svelte/icons/table-2";
   import { untrack } from "svelte";
   import type { DatabaseObjectKind } from "$lib/app/viewer.svelte";
@@ -273,7 +273,7 @@
     </TooltipIconButton>
   {:else}
     <TooltipIconButton label={t("REFRESH")} enabled={!loading} onclick={reload}>
-      <RefreshCw />
+      <RotateCw />
     </TooltipIconButton>
     <TooltipIconButton label={t("DATABASE_STRUCTURE")} active={showInfo} enabled={!!info} onclick={() => (showInfo = !showInfo)}>
       <Info />
@@ -305,6 +305,14 @@
 {/snippet}
 
 {#snippet tableBody()}
+  {#if showInfo && info}
+    <TableInfoPanel {info} />
+  {:else}
+    {@render tableRows()}
+  {/if}
+{/snippet}
+
+{#snippet tableRows()}
   <div class={BODY_CLASS}>
     <SearchBar
       icon={ListFilter}
@@ -314,9 +322,6 @@
       onkeydown={onWhereKey}
       class="shrink-0"
     />
-    {#if showInfo && info}
-      <TableInfoPanel {info} />
-    {/if}
     <div class={CARD_CLASS}>
       {#if loading || exporting}
         <LinearProgress class="absolute inset-x-0 top-0 z-30" />
@@ -341,6 +346,7 @@
           {descending}
           onSort={sortBy}
           onRow={info ? (index) => (editing = index) : null}
+          dock
         />
       {/if}
     </div>
@@ -378,7 +384,7 @@
       {#if failure}
         <ErrorText text={failure} class="p-3" />
       {:else if result?.rows && result.columns}
-        <DataGrid columns={result.columns} rows={result.rows} />
+        <DataGrid columns={result.columns} rows={result.rows} dock />
       {:else if result}
         <EmptyState icon={Check} text={summary} class="min-h-0 flex-1" />
       {:else}

@@ -1347,14 +1347,15 @@ def _subagent_file(session_dir: Path, agent_id: str) -> Optional[Path]:
 def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls: list[str]) -> list[dict]:
     from mcps import databases as database_tools
     from services.claude_runtime import (
-        _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
-        _tool_naming, _flatten_result_content,
+        _FILE_EDIT_TOOLS, _build_file_diff, _errored, _format_tool_input,
+        _notebook_cell, _tool_naming, _flatten_result_content,
     )
     lines = [line for line in _located_lines(sub_file) if line[2].get("type") in _TRAVELLING_TYPES]
     calls.extend(tool_calls.remember_entries(str(sub_file), lines))
     entries = [entry for _, _, entry in lines]
     sub_ms = _tool_durations(entries)
     sub_results: dict[str, object] = {}
+    sub_errors: dict[str, dict] = {}
     for entry in entries:
         content = (entry.get("message") or {}).get("content")
         if isinstance(content, list):
@@ -1363,6 +1364,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
                     tuid = block.get("tool_use_id")
                     if isinstance(tuid, str):
                         sub_results[tuid] = block.get("content")
+                        sub_errors[tuid] = _errored(block)
     out: list[dict] = []
     for entry in entries:
         message = entry.get("message", {})
@@ -1397,16 +1399,20 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
                     if vis["file_change"] == "off":
                         _working(out, vis)
                         continue
+                    cell = _notebook_cell(name, inp)
                     if vis["file_change"] == "label":
-                        out.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, "parent": parent_id})
+                        out.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, "parent": parent_id, **cell})
                         continue
-                    out.append({"type": "file_change", "name": name, "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id})
+                    out.append({"type": "file_change", "name": name, "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id, **cell})
                     continue
             shown = database_tools.tool_mode(name, vis["tool_use"])
             if shown == "off":
                 _working(out, vis)
                 continue
-            ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id, **database_tools.query_view(name, inp)}
+            ev = {
+                "type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id,
+                **database_tools.query_view(name, inp), **sub_errors.get(bid or "", {}),
+            }
             took = sub_ms.get(bid or "") if vis.get("timings") else None
             if took is not None:
                 ev["ms"] = took
@@ -1733,7 +1739,10 @@ def _normalize(
             for b in c:
                 if isinstance(b, dict) and b.get("type") == "text":
                     _register_user_text(b.get("text") or "", real=True)
+    from services.claude_runtime import _errored
+
     tool_result_by_id: dict[str, object] = {}
+    tool_errors: dict[str, dict] = {}
     tool_ms = _tool_durations(entries)
     agent_files: dict[str, str] = {}
     agent_results: dict[str, dict] = {}
@@ -1755,6 +1764,7 @@ def _normalize(
                 tuid = block.get("tool_use_id")
                 if isinstance(tuid, str):
                     tool_result_by_id[tuid] = block.get("content")
+                    tool_errors[tuid] = _errored(block)
                     if isinstance(aid, str) and aid:
                         agent_files[tuid] = aid
                         agent_results[tuid] = tur
@@ -1890,7 +1900,7 @@ def _normalize(
                     messages.append(item)
             elif btype == "tool_use":
                 from mcps import databases as database_tools, packs as packs_tool, shared_files
-                from services.claude_runtime import _FILE_EDIT_TOOLS, _PACKS_RULE, _SHARE_RULE, _agent_event, _agent_input, _build_file_diff, _flatten_result_content, _format_tool_input, _tool_naming
+                from services.claude_runtime import _FILE_EDIT_TOOLS, _PACKS_RULE, _SHARE_RULE, _agent_event, _agent_input, _build_file_diff, _flatten_result_content, _format_tool_input, _notebook_cell, _tool_naming
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
@@ -2027,8 +2037,9 @@ def _normalize(
                         if vis["file_change"] == "off":
                             _working(messages, vis)
                             continue
+                        cell = _notebook_cell(name, inp)
                         if vis["file_change"] == "label":
-                            messages.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True})
+                            messages.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, **cell})
                             continue
                         messages.append({
                             "type": "file_change",
@@ -2036,6 +2047,7 @@ def _normalize(
                             "path": path,
                             "diff_lines": _build_file_diff(name, inp, path),
                             "id": bid,
+                            **cell,
                         })
                         continue
                 pack_id = str(inp.get("id") or "").strip() if isinstance(inp, dict) else ""
@@ -2044,7 +2056,10 @@ def _normalize(
                 if shown == "off":
                     _working(messages, vis)
                 else:
-                    ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, **database_tools.query_view(name, inp)}
+                    ev = {
+                        "type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid,
+                        **database_tools.query_view(name, inp), **tool_errors.get(bid or "", {}),
+                    }
                     took = tool_ms.get(bid or "") if vis.get("timings") else None
                     if took is not None:
                         ev["ms"] = took

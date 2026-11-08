@@ -239,6 +239,9 @@ def _cpu_name() -> str | None:
     return None
 
 
+_BATTERY_LIFETIME_UNKNOWN = 0xFFFFFFFF
+
+
 def _battery() -> dict | None:
     try:
         battery = psutil.sensors_battery()
@@ -247,7 +250,12 @@ def _battery() -> dict | None:
     if battery is None:
         return None
     left = battery.secsleft
-    if left in (psutil.POWER_TIME_UNLIMITED, psutil.POWER_TIME_UNKNOWN) or left is None or left < 0:
+    if (
+        left in (psutil.POWER_TIME_UNLIMITED, psutil.POWER_TIME_UNKNOWN)
+        or left is None
+        or left < 0
+        or left >= _BATTERY_LIFETIME_UNKNOWN
+    ):
         left = None
     return {
         "percent": round(battery.percent, 1),

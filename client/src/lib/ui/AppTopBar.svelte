@@ -102,8 +102,8 @@
                 ? 'text-on-surface'
                 : 'text-on-surface-variant'}"
             >
-              <span class="group-hover/status:hidden">{line}</span>
-              <span class="hidden group-hover/status:inline">{id.label}</span>
+              <span class={feedback.copied ? "hidden" : "group-hover/status:hidden group-active/status:hidden"}>{line}</span>
+              <span class={feedback.copied ? "" : "hidden group-hover/status:inline group-active/status:inline"}>{id.label}</span>
             </button>
           {:else}
             <p class={SUBTITLE_CLASS}>{line}</p>

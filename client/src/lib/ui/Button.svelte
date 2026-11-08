@@ -4,6 +4,7 @@
 
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { NEUTRAL_PRESS_CLASS } from "./press";
 
   type Variant = "filled" | "destructive" | "outlined" | "danger" | "ghost" | "accent";
 
@@ -24,7 +25,7 @@
     outlined: `text-on-surface ${OUTLINE_CLASS} enabled:hover:bg-hover`,
     danger: `text-red ${OUTLINE_CLASS} enabled:hover:bg-hover`,
     ghost: "text-on-surface enabled:hover:bg-hover",
-    accent: "text-accent enabled:hover:bg-accent-soft",
+    accent: `text-accent enabled:hover:bg-hover ${NEUTRAL_PRESS_CLASS}`,
   };
 </script>
 

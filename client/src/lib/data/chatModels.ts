@@ -40,6 +40,11 @@ export interface DiffLine {
   text: string;
 }
 
+export interface NotebookCell {
+  cellId: string | null;
+  editMode: string;
+}
+
 export interface SharedFile {
   name: string;
   url: string;
@@ -238,6 +243,7 @@ export interface ChatMessage {
   interaction: InteractionData | null;
   path: string | null;
   diffLines: DiffLine[] | null;
+  notebookCell: NotebookCell | null;
   files: SharedFile[] | null;
   query: QueryCall | null;
   statements: QueryStatement[] | null;
@@ -246,6 +252,7 @@ export interface ChatMessage {
   agentResult: AgentResult | null;
   thinkingTokens: number | null;
   toolMs: number | null;
+  toolFailed: boolean;
   sourceIndex: number;
   labelOnly: boolean;
   result: string | null;
@@ -335,6 +342,11 @@ export const statementsOf = (raw: Wire): QueryStatement[] | null =>
 
 export const diffKindOf = (value: string | null | undefined): DiffKind =>
   value === "header" || value === "hunk" || value === "add" || value === "del" ? value : "ctx";
+
+export const notebookCellOf = (raw: Wire): NotebookCell | null => {
+  const editMode = text(raw, "edit_mode");
+  return editMode ? { cellId: text(raw, "cell_id"), editMode } : null;
+};
 
 const NESTED = new Set<ComponentType>(["page", "group"]);
 
@@ -462,6 +474,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   interaction: null,
   path: null,
   diffLines: null,
+  notebookCell: null,
   files: null,
   query: null,
   statements: null,
@@ -470,6 +483,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   agentResult: null,
   thinkingTokens: null,
   toolMs: null,
+  toolFailed: false,
   sourceIndex: -1,
   labelOnly: false,
   result: null,

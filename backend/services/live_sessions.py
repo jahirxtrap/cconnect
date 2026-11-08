@@ -484,7 +484,7 @@ class LiveSession:
                 await self._send(self._loose_notice(event))
                 return None
             self._seq += 1
-            stamped = {**event, "seq": self._seq, "channel": self.channel}
+            stamped = {**event, "seq": self._seq, "ts": event.get("ts") or int(time.time() * 1000), "channel": self.channel}
             if kind == "todos":
                 todos_store.remember(self.state.session_id, event.get("items") or [])
             if kind != "command":

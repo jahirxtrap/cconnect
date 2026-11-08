@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { isTouch } from "$lib/platform";
+  import { dockArea } from "./dockArea.svelte";
   import { PullState } from "./pull.svelte";
   import PullIndicator from "./PullIndicator.svelte";
   import { viewportScrollbar } from "./scrollbar";
@@ -94,6 +95,7 @@
     bind:this={scroller}
     use:touches
     use:viewportScrollbar
+    use:dockArea
     {onscroll}
     {onscrollend}
     class="rounded-viewport h-full overflow-y-auto {className}"

@@ -297,9 +297,20 @@
     });
   };
 
-  const matches = (command: CommandOption, token: string) =>
-    command.name.toLowerCase().includes(token) ||
-    command.aliases.some((alias) => alias.toLowerCase().includes(token));
+  const matchedAlias = (command: CommandOption, token: string) => {
+    if (command.name.toLowerCase().includes(token)) return null;
+    const aliases = command.aliases.filter((alias) => alias.toLowerCase().includes(token));
+    return aliases.find((alias) => alias.toLowerCase().startsWith(token)) ?? aliases[0] ?? null;
+  };
+
+  const matchRank = (command: CommandOption, token: string) => {
+    const name = command.name.toLowerCase();
+    if (name.startsWith(token)) return 0;
+    const alias = matchedAlias(command, token)?.toLowerCase();
+    if (alias?.startsWith(token)) return 1;
+    if (name.includes(token)) return 2;
+    return alias ? 3 : null;
+  };
 
   const resolve = (text: string) => {
     const body = text.trim();
@@ -328,7 +339,12 @@
     if (!commandsReady) return [];
     if (argumentFor) return [argumentFor];
     if (typed === null) return [];
-    return commands.filter((command) => matches(command, typed.toLowerCase()));
+    const token = typed.toLowerCase();
+    return commands
+      .map((command) => ({ command, rank: matchRank(command, token) }))
+      .filter((match): match is { command: CommandOption; rank: number } => match.rank !== null)
+      .sort((left, right) => left.rank - right.rank)
+      .map(({ command }) => command);
   });
 
   type Entry = { command: CommandOption; row: null } | { command: null; row: ModCompletionRow };
@@ -514,10 +530,12 @@
           >
             {#if entry.command}
               {@const command = entry.command}
+              {@const alias = typed === null ? null : matchedAlias(command, typed.toLowerCase())}
               <span class="w-full truncate text-body-md {command.argumentHint ? 'text-on-surface-variant' : ''}">
                 <span class={command.argumentHint ? "text-on-surface" : ""}
                   >/{command.name}</span
-                >{#if command.argumentHint}&nbsp;{command.argumentHint}{/if}
+                >{#if alias}<span class="text-on-surface-variant">&nbsp;({alias})</span
+                  >{/if}{#if command.argumentHint}&nbsp;{command.argumentHint}{/if}
               </span>
               {#if command.description}
                 <span class="w-full truncate text-body-sm text-on-surface-variant">{command.description}</span>

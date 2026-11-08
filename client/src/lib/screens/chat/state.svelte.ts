@@ -101,6 +101,7 @@ const fileChangeFields = (event: EventOf<"file_change">): Partial<ChatMessage> =
   toolName: event.tool,
   path: event.path,
   diffLines: event.diffLines,
+  notebookCell: event.notebookCell,
   labelOnly: event.labelOnly,
 });
 
@@ -460,7 +461,7 @@ export class ChatState {
   readonly claude = createClaudeApi(this.#http, () => this.environment);
   readonly shared = createSharedApi(this.#http);
   #socket = new ChatSocket(
-    (side, parent, event) => this.#onEvent(side, parent, event),
+    (side, parent, event, at) => this.#onEvent(side, parent, event, at),
     () => this.environment,
     () => (this.agent ? this.agentName : ""),
     () => notifier.activate(this),
@@ -474,6 +475,7 @@ export class ChatState {
   modsState = $state<"loading" | "off" | "needs_persistent" | "ready">("loading");
   #nextId = 1;
   #assistantId: number | null = null;
+  #eventAt = Date.now();
   #held: ChatMessage[] = [];
   #thinkingId: number | null = null;
   #thinkingTokens: number | null = null;
@@ -2086,6 +2088,7 @@ export class ChatState {
         path: item.path,
         interaction: item.interaction,
         diffLines: item.diffLines,
+        notebookCell: item.notebookCell,
         files: item.files,
         query: item.query,
         statements: item.statements,
@@ -2094,6 +2097,7 @@ export class ChatState {
         agentResult: item.agentResult,
         thinkingTokens: item.thinkingTokens,
         toolMs: item.toolMs,
+        toolFailed: item.toolFailed,
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
         result: item.result,
@@ -2159,18 +2163,25 @@ export class ChatState {
           return [...children, newMessage(this.#nextId++, "thinking", { labelOnly: true })];
         }
         if (!event.text) return children;
-        if (last?.role === role && !last.labelOnly) return [...children.slice(0, -1), { ...last, text: last.text + event.text }];
-        return [...children, newMessage(this.#nextId++, role, { text: event.text })];
+        if (last?.role === role && !last.labelOnly) {
+          return [...children.slice(0, -1), { ...last, text: last.text + event.text, timestamp: this.#eventAt }];
+        }
+        return [...children, newMessage(this.#nextId++, role, { text: event.text, timestamp: this.#eventAt })];
       }
       case "tool_use":
         return [...children, newMessage(this.#nextId++, "tool", toolFields(event))];
       case "file_change":
         return [...children, newMessage(this.#nextId++, "file_change", fileChangeFields(event))];
       case "tool_result":
-        return event.toolUseId && event.content !== null
+        return event.toolUseId && (event.content !== null || event.failed)
           ? children.map((kid) =>
               kid.toolUseId === event.toolUseId
-                ? { ...kid, result: event.content, statements: event.statements ?? kid.statements }
+                ? {
+                    ...kid,
+                    result: event.content ?? kid.result,
+                    statements: event.statements ?? kid.statements,
+                    toolFailed: event.failed || kid.toolFailed,
+                  }
                 : kid,
             )
           : children;
@@ -2291,11 +2302,14 @@ export class ChatState {
   #stream(currentId: number | null, role: Role, text: string): number {
     if (currentId !== null) {
       const current = this.messages.findLast((item) => item.id === currentId);
-      if (current) current.text += text;
+      if (current) {
+        current.text += text;
+        current.timestamp = this.#eventAt;
+      }
       return currentId;
     }
     const id = this.#nextId++;
-    this.#append(newMessage(id, role, { text }));
+    this.#append(newMessage(id, role, { text, timestamp: this.#eventAt }));
     return id;
   }
 
@@ -2357,7 +2371,8 @@ export class ChatState {
     this.#thinkingTokens = null;
   }
 
-  #onEvent(side: boolean, parent: string | null, event: ServerEvent) {
+  #onEvent(side: boolean, parent: string | null, event: ServerEvent, at = Date.now()) {
+    this.#eventAt = at;
     if (side) {
       this.#onSideEvent(event);
       return;
@@ -2596,7 +2611,7 @@ export class ChatState {
         if (event.toolUseId) {
           const toolUseId = event.toolUseId;
           this.pendingToolIds = this.pendingToolIds.filter((id) => id !== toolUseId);
-          if (event.content !== null || event.ms !== null) {
+          if (event.content !== null || event.ms !== null || event.failed) {
             this.messages = this.messages.map((item) =>
               item.toolUseId === toolUseId
                 ? {
@@ -2604,6 +2619,7 @@ export class ChatState {
                     result: event.content ?? item.result,
                     statements: event.statements ?? item.statements,
                     toolMs: event.ms ?? item.toolMs,
+                    toolFailed: event.failed || item.toolFailed,
                   }
                 : item,
             );

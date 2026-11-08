@@ -13,6 +13,7 @@ class Shape(BaseModel):
 
 class Event(Shape):
     seq: Optional[int] = None
+    ts: Optional[int] = None
     channel: Optional[str] = None
     parent: Optional[str] = None
     replay: Optional[bool] = None
@@ -217,6 +218,7 @@ class ToolResult(Event):
     tool_use_id: Optional[str] = None
     content: Optional[str] = None
     ms: Optional[int] = None
+    is_error: Optional[bool] = None
     statements: Optional[list[QueryStatement]] = None
 
 
@@ -227,6 +229,8 @@ class FileChange(Event):
     path: str
     diff_lines: list[DiffLine] = []
     label: Optional[bool] = None
+    cell_id: Optional[str] = None
+    edit_mode: Optional[str] = None
 
 
 class Shared(Event):
@@ -551,7 +555,6 @@ class Queued(Event):
     type: Literal["queued"]
     id: Optional[str] = None
     text: str
-    ts: Optional[int] = None
 
 
 class Queue(Event):
@@ -564,7 +567,6 @@ class Dequeued(Event):
     ids: list[Optional[str]]
     text: Optional[str] = None
     consumed: int = 0
-    ts: Optional[int] = None
 
 
 class HistoryChunk(Event):

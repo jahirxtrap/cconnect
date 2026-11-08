@@ -362,6 +362,7 @@
   bind:follow
   hasContent={visible.length > 0}
   {bottomInset}
+  dock
   onScroll={onScrollTop}
   onNearTop={onLoadOlder}
 >

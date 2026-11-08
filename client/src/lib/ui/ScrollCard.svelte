@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import type { HTMLAttributes } from "svelte/elements";
+  import { dockArea } from "./dockArea.svelte";
   import { CARD_SCROLL_CLASS, viewportScrollbar } from "./scrollbar";
   import { rememberScroll } from "./scrollMemory";
 
@@ -8,6 +9,7 @@
     scroller?: HTMLDivElement | null;
     memory?: string | null;
     frame?: string;
+    dock?: boolean;
     children: Snippet;
   }
 
@@ -15,6 +17,7 @@
     scroller = $bindable(null),
     memory = null,
     frame = "",
+    dock = false,
     class: className = "",
     children,
     ...rest
@@ -26,7 +29,7 @@
 </script>
 
 <div class="flex min-h-0 flex-col overflow-hidden bg-card {frame}">
-  <div bind:this={scroller} use:viewportScrollbar {...rest} class="{CARD_SCROLL_CLASS} {className}">
+  <div bind:this={scroller} use:viewportScrollbar use:dockArea={dock} {...rest} class="{CARD_SCROLL_CLASS} {className}">
     {@render children()}
   </div>
 </div>

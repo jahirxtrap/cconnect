@@ -78,13 +78,18 @@ def list_entries(relpath: str = "") -> list[dict]:
 
 
 def resolve_file(relpath: str) -> Optional[Path]:
-    """A file by the name it shows: a reference answers to its name with or without `.ccref`."""
+    """A file by the name it shows: a reference answers to its name with or without `.ccref`, and a broken one is missing."""
     path = _resolve(relpath)
     if not path.is_file() and not shared_links.is_link(path.name):
         path = path.with_name(shared_links.link_name(path.name))
     if not path.is_file():
         return None
-    return content_path(path)
+    content = content_path(path)
+    return None if shared_links.is_link(content.name) else content
+
+
+def inside(path: Path) -> bool:
+    return path.expanduser().resolve().is_relative_to(_base().resolve())
 
 
 def visible_of(relpath: str) -> str:
@@ -100,6 +105,8 @@ def create_link(source: str, dest: str = "", name: str = "", replace: bool = Fal
     origin = Path(source).expanduser()
     if not origin.is_file():
         raise ValueError("no such file")
+    if inside(origin):
+        return origin.resolve().relative_to(_base().resolve()).as_posix()
     dest_dir = _resolve(dest)
     dest_dir.mkdir(parents=True, exist_ok=True)
     if not dest_dir.is_dir():

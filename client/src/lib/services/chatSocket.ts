@@ -1,5 +1,6 @@
 import {
   diffKindOf,
+  notebookCellOf,
   queryOf,
   sharedFilesFrom,
   statementsOf,
@@ -16,6 +17,7 @@ import {
   type InteractionMod,
   type InteractionOption,
   type InteractionRequest,
+  type NotebookCell,
   type QueryCall,
   type QueryStatement,
   type QueuedMessage,
@@ -98,8 +100,17 @@ export type ServerEvent =
       content: string | null;
       ms: number | null;
       statements: QueryStatement[] | null;
+      failed: boolean;
     }
-  | { type: "file_change"; id: string | null; tool: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
+  | {
+      type: "file_change";
+      id: string | null;
+      tool: string | null;
+      path: string;
+      diffLines: DiffLine[];
+      labelOnly: boolean;
+      notebookCell: NotebookCell | null;
+    }
   | { type: "shared"; id: string | null; files: SharedFile[] }
   | { type: "compacting" }
   | { type: "compacting_ended" }
@@ -405,7 +416,7 @@ export class ChatSocket {
   #subject = "";
 
   constructor(
-    private readonly onEvent: (side: boolean, parent: string | null, event: ServerEvent) => void,
+    private readonly onEvent: (side: boolean, parent: string | null, event: ServerEvent, at?: number) => void,
     private readonly profile: () => Profile = () => backend.active,
     private readonly agent: () => string = () => "",
     private readonly onTap: () => void = () => {},
@@ -743,7 +754,7 @@ export class ChatSocket {
     const mapped = this.#toEvent(event, wire);
     if (!mapped) return;
     if (mapped.type === "ask_session") this.#sideResume = mapped.sessionId;
-    this.onEvent(side, event.parent ?? null, mapped);
+    this.onEvent(side, event.parent ?? null, mapped, event.ts ?? undefined);
   }
 
   #toEvent(event: Contract.ChatEvent, wire: Wire): ServerEvent | null {
@@ -773,6 +784,7 @@ export class ChatSocket {
           content: event.content ?? null,
           ms: event.ms ?? null,
           statements: statementsOf(wire),
+          failed: event.is_error === true,
         };
       case "file_change":
         return {
@@ -782,6 +794,7 @@ export class ChatSocket {
           path: event.path ?? "",
           diffLines: diffLinesOf(wire),
           labelOnly: event.label === true,
+          notebookCell: notebookCellOf(wire),
         };
       case "shared":
         return { type: "shared", id: event.id ?? null, files: sharedFilesFrom(event.files) };

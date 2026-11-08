@@ -47,9 +47,6 @@ export const scrollableAbove = (from: Element | null) => {
   return null;
 };
 
-export const scrollableUnder = (x: number, y: number) =>
-  scrollableAbove(document.elementFromPoint(x, y));
-
 export interface ScrollbarOptions {
   touchIndicator?: boolean;
   wheel?: boolean;

@@ -3,6 +3,7 @@
   import { joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
+  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import ColumnsTable from "./ColumnsTable.svelte";
@@ -14,8 +15,12 @@
   const { info }: Props = $props();
 </script>
 
-<div class="flex max-h-[40%] shrink-0 flex-col overflow-hidden rounded-panel bg-card">
-  <div use:viewportScrollbar class="rounded-viewport scrollbar-thin selectable min-h-0 overflow-auto px-2 pb-2 [--viewport-inset:0px]">
+<div
+  use:viewportScrollbar
+  use:dockArea
+  class="rounded-viewport selectable min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)"
+>
+  <div class="scrollbar-thin overflow-x-auto rounded-panel bg-card px-2 pb-2">
     {#if info.comment}
       <p class="px-1 pb-1 text-body-sm text-on-surface-variant">{info.comment}</p>
     {/if}

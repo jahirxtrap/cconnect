@@ -5,7 +5,7 @@
   import { shortcuts } from "$lib/platform/shortcuts.svelte";
   import { keyboardNavigation } from "./keyboardNavigation.svelte";
   import { TOOLTIP_CLASS } from "./menuSurface";
-  import { LONG_PRESS_MS } from "./press";
+  import { LONG_PRESS_MS, NEUTRAL_PRESS_CLASS } from "./press";
   import TouchTip from "./TouchTip.svelte";
 
   interface Props {
@@ -36,7 +36,6 @@
 
   const BASE_CLASS =
     "no-callout inline-flex shrink-0 cursor-pointer touch-manipulation items-center justify-center rounded-full transition-colors select-none disabled:cursor-default disabled:opacity-40";
-  const NEUTRAL_PRESS_CLASS = "[--press-color:var(--c-on-surface-variant)]";
   const ACTIVE_CLASS = `text-accent enabled:hover:bg-hover ${NEUTRAL_PRESS_CLASS}`;
   const SELECTED_CLASS = `bg-surface-variant text-accent ${NEUTRAL_PRESS_CLASS}`;
   const IDLE_CLASS = "text-on-surface-variant enabled:hover:bg-hover enabled:hover:text-on-surface";

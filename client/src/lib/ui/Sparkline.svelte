@@ -25,7 +25,7 @@
   });
 </script>
 
-<div class="overflow-hidden rounded-panel bg-surface-variant {className}">
+<div class="overflow-hidden {className}">
   {#if path}
     <svg
       viewBox="0 0 {VIEW_WIDTH} {VIEW_HEIGHT}"

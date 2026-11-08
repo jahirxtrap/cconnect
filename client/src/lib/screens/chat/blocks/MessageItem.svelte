@@ -185,6 +185,7 @@
       input={typeof props.input === "string" ? props.input : message.text}
       result={typeof props.output === "string" ? props.output : message.result}
       took={message.toolMs}
+      failed={message.toolFailed}
       {running}
       {expanded}
       {onToggle}
@@ -198,6 +199,7 @@
     path={typeof props.path === "string" ? props.path : (message.path ?? "")}
     tool={message.toolName}
     diffLines={Array.isArray(props.diff_lines) ? diffLinesOf(props) : (message.diffLines ?? [])}
+    cell={message.notebookCell}
     labelOnly={message.labelOnly || labelMode}
     {expanded}
     {onToggle}

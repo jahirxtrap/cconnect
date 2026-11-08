@@ -1,6 +1,8 @@
 export const PRESSABLE =
   "button, a, [role='button'], [role='menuitem'], [role='menuitemradio'], [role='tab']";
 
+export const NEUTRAL_PRESS_CLASS = "[--press-color:var(--c-on-surface-variant)]";
+
 export const TAP_TIMEOUT_MS = 100;
 
 export const PRESS_HOLD_MS = 225;

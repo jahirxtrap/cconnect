@@ -1,6 +1,8 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
   import ArrowDownUp from "@lucide/svelte/icons/arrow-down-up";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import CircleX from "@lucide/svelte/icons/circle-x";
   import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
   import { copyText } from "$lib/platform/clipboard";
@@ -89,7 +91,9 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
-  import ScrollCard from "$lib/ui/ScrollCard.svelte";
+  import { dockArea } from "$lib/ui/dockArea.svelte";
+  import { viewportScrollbar } from "$lib/ui/scrollbar";
+  import { rememberScroll } from "$lib/ui/scrollMemory";
   import { joinedCorners } from "$lib/ui/joinedCorners";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
@@ -136,6 +140,9 @@
   const EDGE_STEP = 24;
   const WIDE_WIDTH = 800;
   const SORT_KEYS: SortKey[] = ["name", "date", "type", "size"];
+  const SIZE_COLUMN = "w-24 shrink-0 justify-end text-right";
+  const DATE_COLUMN = "w-36 shrink-0";
+  const ICON_SIZE = 18;
   const SORT_LABELS: Record<SortKey, string> = {
     name: "SORT_NAME",
     date: "SORT_DATE",
@@ -588,6 +595,11 @@
     settings.sharedSortAscending = sortAscending;
   };
 
+  const sortBy = (field: SortKey) => {
+    if (field === sortField) toggleSortDirection();
+    else selectSort(field);
+  };
+
   const toggleKind = (kind: FileKind) => {
     const next = new Set(hiddenKinds);
     if (next.has(kind)) next.delete(kind);
@@ -856,6 +868,10 @@
   });
 
   $effect(() => {
+    if (list) return rememberScroll(list, `shared|${slot}`);
+  });
+
+  $effect(() => {
     const element = list;
     if (!element) return;
     const block = (event: TouchEvent) => {
@@ -1049,23 +1065,59 @@
       onclick={() => openEntry(entry)}
       oncontextmenu={() => contextSelect(entry)}
       hover={!isSelected && !dropping}
-      class="flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-1.5"
+      class="flex w-full items-center gap-3 rounded-md px-3 py-1.5 {wide ? 'min-h-10' : 'min-h-12'}"
     >
       {#if selecting}
         <SelectionDot selected={isSelected} />
       {/if}
-      <Icon size={18} class="shrink-0 text-on-surface-variant" />
+      <Icon size={ICON_SIZE} class="shrink-0 text-on-surface-variant" />
       <span class="flex min-w-0 flex-1 flex-col">
         <span class="truncate text-body-md">{entryLabel(child(entry.file), entry.name)}</span>
         {#if entry.link}
           {@render linkNote(entry, "")}
-        {:else}
+        {:else if !wide}
           <span class="truncate text-caption text-faint">{subtitleOf(entry)}</span>
         {/if}
       </span>
-      <span class="shrink-0 text-caption text-faint">{detailOf(entry)}</span>
+      {#if wide}
+        <span class="{SIZE_COLUMN} text-body-sm text-on-surface-variant">{detailOf(entry)}</span>
+        <span class="{DATE_COLUMN} truncate text-body-sm text-on-surface-variant">{dateOf(entry)}</span>
+      {:else}
+        <span class="shrink-0 text-caption text-faint">{detailOf(entry)}</span>
+      {/if}
     </Pressable>
   </div>
+{/snippet}
+
+{#snippet columnsHead()}
+  <div class="sticky top-0 z-10 flex h-8 items-center gap-3 bg-card px-3 text-label-md text-on-surface-variant select-none">
+    {#if selecting}
+      <span class="invisible"><SelectionDot selected={false} /></span>
+    {/if}
+    <span class="shrink-0" style="width: {ICON_SIZE}px"></span>
+    {@render column("name", "min-w-0 flex-1")}
+    {@render column("size", SIZE_COLUMN)}
+    {@render column("date", DATE_COLUMN)}
+  </div>
+{/snippet}
+
+{#snippet column(field: SortKey, className: string)}
+  <button
+    type="button"
+    onclick={() => sortBy(field)}
+    class="flex cursor-pointer items-center gap-1 transition-colors hover:text-on-surface {field === sortField
+      ? 'text-on-surface'
+      : ''} {className}"
+  >
+    <span class="truncate">{t(SORT_LABELS[field])}</span>
+    {#if field === sortField}
+      {#if sortAscending}
+        <ChevronUp size={14} class="shrink-0" />
+      {:else}
+        <ChevronDown size={14} class="shrink-0" />
+      {/if}
+    {/if}
+  </button>
 {/snippet}
 
 {#snippet selectionItems()}
@@ -1219,35 +1271,46 @@
       onNavigate={navigateTo}
     />
 
-    <div class="flex min-h-0 flex-1 gap-4 px-(--page-inset) pb-(--page-inset)">
-      <div class="flex min-w-0 flex-1 flex-col">
-        {#if serverStatus.unavailable}
+    <div class="flex min-h-0 flex-1 flex-col">
+      {#if serverStatus.unavailable}
+        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset) pb-(--page-inset)">
           <ServerUnavailable class="flex-1" />
-        {:else if ordered.length}
-          <ScrollCard
-            bind:scroller={list}
-            memory={`shared|${slot}`}
-            onpointerdown={onPointerDown}
-            onpointermove={onPointerMove}
-            onpointerup={onPointerUp}
-            onpointercancel={endGesture}
-            onclickcapture={onClickCapture}
-            frame="rounded-lg"
-            class={marking || dragging ? "touch-none select-none" : ""}
-          >
+        </div>
+      {:else if ordered.length}
+        <div
+          bind:this={list}
+          use:viewportScrollbar
+          use:dockArea
+          role="presentation"
+          onpointerdown={onPointerDown}
+          onpointermove={onPointerMove}
+          onpointerup={onPointerUp}
+          onpointercancel={endGesture}
+          onclickcapture={onClickCapture}
+          class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset) {marking ||
+          dragging
+            ? 'touch-none select-none'
+            : ''}"
+        >
+          <div class="flex flex-col rounded-lg bg-card p-1">
+            {#if wide}
+              {@render columnsHead()}
+            {/if}
             {#each ordered as entry, index (entry.file)}
               {@render entryLine(entry, index)}
             {/each}
-          </ScrollCard>
-        {:else}
+          </div>
+        </div>
+      {:else}
+        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset) pb-(--page-inset)">
           <EmptyState
             loading={!loaded}
             icon={querying ? NO_RESULTS_ICON : FolderOpen}
             text={t(querying ? "NO_RESULTS" : "NO_FILES")}
             class="flex-1"
           />
-        {/if}
-      </div>
+        </div>
+      {/if}
     </div>
 
     {#if transfer}

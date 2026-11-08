@@ -3,6 +3,7 @@ import { agentStopText } from "./agentModels";
 import {
   diffKindOf,
   emptyInteraction,
+  notebookCellOf,
   queryOf,
   sharedFilesFrom,
   statementsOf,
@@ -19,6 +20,7 @@ type MessageFields =
   | "path"
   | "interaction"
   | "diffLines"
+  | "notebookCell"
   | "files"
   | "query"
   | "statements"
@@ -27,6 +29,7 @@ type MessageFields =
   | "agentResult"
   | "thinkingTokens"
   | "toolMs"
+  | "toolFailed"
   | "labelOnly"
   | "result"
   | "images"
@@ -141,6 +144,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
             text: text(line, "text") ?? "",
           }))
         : null,
+    notebookCell: type === "file_change" ? notebookCellOf(raw) : null,
     files: type === "shared" ? sharedFilesFrom(raw.files) : null,
     query: queryOf(raw),
     statements: statementsOf(raw),
@@ -155,6 +159,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
         : null,
     thinkingTokens: type === "thinking" ? number(raw, "tokens") : null,
     toolMs: number(raw, "ms"),
+    toolFailed: raw.is_error === true,
     agentRun: type === "agent" ? agentRunOf(raw) : null,
     agentResult: (() => {
       const done = raw.agent_result;
@@ -178,12 +183,11 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
   };
 };
 
-const VISIBLE_ROLES: Role[] = ["tool", "working", "interrupted"];
+const VISIBLE_ROLES: Role[] = ["tool", "file_change", "working", "interrupted"];
 
 export const isVisible = (item: SessionMessage): boolean =>
   !!item.text.trim() ||
   item.interaction !== null ||
-  !!item.diffLines?.length ||
   !!item.files?.length ||
   item.compact !== null ||
   item.labelOnly ||

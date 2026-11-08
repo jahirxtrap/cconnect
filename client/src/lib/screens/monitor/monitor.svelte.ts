@@ -1,6 +1,5 @@
 import { EnvironmentSlots } from "$lib/data/environmentSlots";
 import { serverStatus } from "$lib/data/serverStatus.svelte";
-import { SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE } from "$lib/data/time";
 import { backend } from "$lib/services/backend.svelte";
 import { networkApi, type NetworkStatus } from "$lib/services/networkApi";
 import { systemApi, type GpuInfo, type LogEntry, type ProcessesSnapshot, type SystemInfo } from "$lib/services/systemApi";
@@ -11,20 +10,26 @@ const RESOURCES_PAGE = "RESOURCES";
 
 const append = (history: number[], value: number) => [...history, value].slice(-HISTORY_CAP);
 
+type ShownLog = LogEntry & { id: number };
+
+let nextLogId = 0;
+
+const numbered = (items: LogEntry[]): ShownLog[] => items.map((entry) => ({ ...entry, id: nextLogId++ }));
+
 const sameLog = (a: LogEntry, b: LogEntry) => a.ts === b.ts && a.level === b.level && a.message === b.message;
 
-function joinLogs(shown: LogEntry[], replayed: LogEntry[]): LogEntry[] {
+function joinLogs(shown: ShownLog[], replayed: LogEntry[]): ShownLog[] {
   const last = shown.at(-1);
-  if (!last || !replayed.length) return (last ? shown : replayed).slice(-LOG_CAP);
+  if (!last || !replayed.length) return (last ? shown : numbered(replayed)).slice(-LOG_CAP);
   const seen = replayed.findLastIndex((entry) => sameLog(entry, last));
-  return (seen < 0 ? replayed : [...shown, ...replayed.slice(seen + 1)]).slice(-LOG_CAP);
+  return (seen < 0 ? numbered(replayed) : [...shown, ...numbered(replayed.slice(seen + 1))]).slice(-LOG_CAP);
 }
 
 interface MonitorSnapshot {
   info: SystemInfo | null;
   gpu: GpuInfo | null;
   network: NetworkStatus | null;
-  logs: LogEntry[];
+  logs: ShownLog[];
   processes: ProcessesSnapshot | null;
   cpuHistory: number[];
   gpuHistory: number[];
@@ -44,17 +49,6 @@ const blank: MonitorSnapshot = {
   vramHistory: [],
 };
 
-
-export const formatUptime = (seconds: number) => {
-  const total = Math.floor(seconds);
-  const days = Math.floor(total / SECONDS_PER_DAY);
-  const hours = Math.floor((total % SECONDS_PER_DAY) / SECONDS_PER_HOUR);
-  const minutes = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m`;
-};
-
 class Monitor {
   readonly historyCap = HISTORY_CAP;
 
@@ -67,7 +61,7 @@ class Monitor {
   gpuHistory = $state<number[]>([]);
   memHistory = $state<number[]>([]);
   vramHistory = $state<number[]>([]);
-  logs = $state<LogEntry[]>([]);
+  logs = $state<ShownLog[]>([]);
   network = $state<NetworkStatus | null>(null);
   processes = $state<ProcessesSnapshot | null>(null);
   logRevision = $state(0);
@@ -129,7 +123,7 @@ class Monitor {
         this.#absorb(snapshot);
       },
       onLogs: (items) => {
-        this.logs = [...this.logs, ...items].slice(-LOG_CAP);
+        this.logs = [...this.logs, ...numbered(items)].slice(-LOG_CAP);
         this.logRevision++;
       },
       onProcesses: (snapshot) => (this.processes = snapshot),

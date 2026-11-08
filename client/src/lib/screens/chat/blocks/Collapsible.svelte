@@ -12,6 +12,7 @@
     icon?: IconSource;
     leading?: Snippet<[string]>;
     preview?: string | null;
+    previewTail?: boolean;
     stat?: string | null;
     meta?: Snippet;
     labelOnly?: boolean;
@@ -28,6 +29,7 @@
     icon: IconComponent,
     leading,
     preview = null,
+    previewTail = false,
     stat = null,
     meta,
     labelOnly = false,
@@ -66,6 +68,7 @@
       icon={IconComponent}
       {leading}
       {summary}
+      summaryTail={previewTail}
       {stat}
       {meta}
       {labelOnly}

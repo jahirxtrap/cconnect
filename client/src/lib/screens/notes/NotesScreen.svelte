@@ -72,7 +72,7 @@
 
   {#if split && (notes.listed.length || notes.searching)}
     <div
-      class="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-4 px-(--page-inset) pb-(--page-inset)"
+      class="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-(--pane-gap) px-(--page-inset) pb-(--page-inset)"
     >
       <NotesList column selectedId={shown?.id ?? null} onOpen={select} />
       {#if shown}

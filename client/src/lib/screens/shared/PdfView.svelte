@@ -266,7 +266,7 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div
     bind:this={container}
-    class="scrollbar-thin absolute inset-0 touch-pan-x touch-pan-y overscroll-contain {zoomed
+    class="absolute inset-0 touch-pan-x touch-pan-y overscroll-contain {zoomed
       ? 'overflow-auto'
       : 'overflow-x-hidden overflow-y-auto'}"
     onpointerdown={onPointerDown}

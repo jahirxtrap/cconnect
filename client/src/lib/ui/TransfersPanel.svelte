@@ -11,6 +11,7 @@
   import { isDesktop, isTauri } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { dragSaved, openTransfer } from "$lib/services/sharedFiles";
+  import { dockSpot } from "./dockArea.svelte";
   import FloatDock from "./FloatDock.svelte";
   import { FLOAT_HEAD_CLASS, FLOAT_PANEL_WIDTH, FLOAT_SURFACE_CLASS, MENU_SCROLL_CLASS } from "./menuSurface";
   import ProgressRing from "./ProgressRing.svelte";
@@ -29,7 +30,7 @@
   };
 
   $effect(() => {
-    layout.transfersInset = items.length ? panelHeight + layout.menuPadding.bottom + layout.bottomInset : 0;
+    layout.transfersInset = items.length ? panelHeight + dockSpot.bottom : 0;
     return () => (layout.transfersInset = 0);
   });
 </script>
@@ -41,7 +42,7 @@
       class="menu-surface pointer-events-auto overflow-hidden {FLOAT_PANEL_WIDTH} {FLOAT_SURFACE_CLASS}"
     >
       <div class={FLOAT_HEAD_CLASS}>
-        <p class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
+        <p class="min-w-0 flex-1 truncate pr-1 text-label-lg text-on-surface-variant">
           {running ? t("TRANSFERS_ACTIVE", `${done + 1}`, `${items.length}`) : t("TRANSFERS_DONE")}
         </p>
         <TooltipIconButton

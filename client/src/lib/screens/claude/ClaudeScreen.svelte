@@ -17,11 +17,12 @@
   import { settingsApi } from "$lib/services/settingsApi";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
+  import ChoiceMenu from "$lib/ui/ChoiceMenu.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
   import { rem } from "$lib/ui/rem";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
-  import SelectDialog from "$lib/ui/SelectDialog.svelte";
+  import { scrollbarWidth } from "$lib/ui/scrollbar";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ClaudeDetail, {
     CLAUDE_KINDS,
@@ -37,8 +38,6 @@
 
   const GENERAL = "general";
 
-  let envOpen = $state(false);
-  let accountOpen = $state(false);
   let query = $state("");
   let width = $state(0);
   let deficit = $state(0);
@@ -62,9 +61,11 @@
   const SECTION_GAP_REM = 1;
   const MAX_COLUMNS = 4;
   let sectionsWidth = $state(0);
+  let sectionsScroller = $state<HTMLDivElement | null>(null);
+  const columnsWidth = $derived(sectionsWidth + (sectionsScroller ? scrollbarWidth(sectionsScroller) : 0));
   const columns = $derived(
     tabbed
-      ? Math.max(1, Math.min(MAX_COLUMNS, Math.floor((sectionsWidth / rem() + SECTION_GAP_REM) / (SECTION_REM + SECTION_GAP_REM))))
+      ? Math.max(1, Math.min(MAX_COLUMNS, Math.floor((columnsWidth / rem() + SECTION_GAP_REM) / (SECTION_REM + SECTION_GAP_REM))))
       : 1,
   );
 
@@ -124,13 +125,22 @@
 
 {#snippet sharedActions()}
   {#if loggedAccounts.length > 1}
-    <TooltipIconButton label={t("ACCOUNT")} onclick={() => (accountOpen = true)}>
-      <CircleUser />
-    </TooltipIconButton>
+    <ChoiceMenu
+      label={t("ACCOUNT")}
+      icon={CircleUser}
+      options={loggedAccounts.map((account) => ({ value: account.id, label: account.label }))}
+      selected={accountsStore.defaultId}
+      onSelect={(id) => void settingsApi.update({ account: id }).then(() => void refresh())}
+    />
   {/if}
-  <TooltipIconButton label={t("ENVIRONMENT")} enabled={!settings.environmentLocked} onclick={() => (envOpen = true)}>
-    <Server />
-  </TooltipIconButton>
+  <ChoiceMenu
+    label={t("ENVIRONMENT")}
+    icon={Server}
+    enabled={!settings.environmentLocked}
+    options={environmentOptions()}
+    selected={chat.environmentId ?? ""}
+    onSelect={(id) => chat.selectEnvironment(id)}
+  />
   {#if !isTouch}
     <ClaudeActions />
   {/if}
@@ -138,10 +148,10 @@
 
 {#snippet sections()}
   <PullToRefresh
+    bind:scroller={sectionsScroller}
     {refreshing}
     onRefresh={() => void refresh()}
     memory={CLAUDE_MEMORY}
-    class="[scrollbar-gutter:stable]"
   >
     <div class="px-(--page-inset) pb-(--page-inset)">
       <div bind:clientWidth={sectionsWidth}>
@@ -211,25 +221,3 @@
     {@render sections()}
   {/if}
 </div>
-
-{#if envOpen}
-  <SelectDialog
-    title={t("ENVIRONMENT")}
-    options={environmentOptions()}
-    selected={chat.environmentId ?? ""}
-    onSelect={(id) => chat.selectEnvironment(id)}
-    onDismiss={() => (envOpen = false)}
-  />
-{/if}
-
-{#if accountOpen}
-  <SelectDialog
-    title={t("ACCOUNT")}
-    options={loggedAccounts.map((account) => ({ value: account.id, label: account.label }))}
-    selected={accountsStore.defaultId}
-    onSelect={(id) => {
-      void settingsApi.update({ account: id }).then(() => void refresh());
-    }}
-    onDismiss={() => (accountOpen = false)}
-  />
-{/if}

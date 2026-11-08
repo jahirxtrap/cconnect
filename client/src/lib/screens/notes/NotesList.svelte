@@ -6,6 +6,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import { scrollMemory } from "$lib/ui/scrollMemory";
   import SearchBar from "$lib/ui/SearchBar.svelte";
@@ -45,7 +46,7 @@
 {#snippet row(note: Note)}
   {@const preview = notePreview(note.body)}
   <div
-    class="group relative shrink-0 rounded-panel transition-colors {note.id === selectedId
+    class="group relative shrink-0 rounded-panel hover:transition-colors {note.id === selectedId
       ? 'bg-surface-variant'
       : 'hover:bg-hover'}"
   >
@@ -83,16 +84,21 @@
 {/snippet}
 
 {#if column}
-  <div use:viewportScrollbar class="rounded-viewport scrollbar-thin flex min-h-0 flex-col gap-1 overflow-y-auto [--viewport-inset:0px]">
-    {#each listed as note (note.id)}
-      {@render row(note)}
-    {:else}
-      <EmptyState
-        icon={notes.searching ? NO_RESULTS_ICON : NotepadText}
-        text={t(notes.searching ? "NO_RESULTS" : "NOTES_EMPTY")}
-        class="flex-1"
-      />
-    {/each}
+  <div class="flex min-h-0 flex-col overflow-hidden rounded-xl bg-card">
+    <div
+      use:viewportScrollbar
+      class="rounded-viewport flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1 [--viewport-inset:0px]"
+    >
+      {#each listed as note (note.id)}
+        {@render row(note)}
+      {:else}
+        <EmptyState
+          icon={notes.searching ? NO_RESULTS_ICON : NotepadText}
+          text={t(notes.searching ? "NO_RESULTS" : "NOTES_EMPTY")}
+          class="flex-1"
+        />
+      {/each}
+    </div>
   </div>
 {:else}
   {#if notes.searching}
@@ -116,8 +122,9 @@
   {:else if notes.cards}
     <div
       use:viewportScrollbar
+      use:dockArea
       use:scrollMemory={"notes|cards"}
-      class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-y-auto {INSET}"
+      class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}"
     >
       <div class="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
         {#each listed as note (note.id)}
@@ -128,8 +135,9 @@
   {:else}
     <div
       use:viewportScrollbar
+      use:dockArea
       use:scrollMemory={"notes|rows"}
-      class="rounded-viewport scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}"
+      class="rounded-viewport flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}"
     >
       {#each listed as note (note.id)}
         {@render row(note)}

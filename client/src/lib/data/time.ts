@@ -17,10 +17,13 @@ export const MILLIS_PER_SECOND = 1000;
 export const SECONDS_PER_MINUTE = 60;
 export const SECONDS_PER_HOUR = 3_600;
 export const SECONDS_PER_DAY = 86_400;
-export const HOURS_PER_DAY = 24;
 export const MILLIS_PER_MINUTE = SECONDS_PER_MINUTE * MILLIS_PER_SECOND;
 export const MILLIS_PER_HOUR = SECONDS_PER_HOUR * MILLIS_PER_SECOND;
-const MILLIS_PER_DAY = SECONDS_PER_DAY * MILLIS_PER_SECOND;
+export const MILLIS_PER_DAY = SECONDS_PER_DAY * MILLIS_PER_SECOND;
+export const DAYS_PER_YEAR = 365;
+const MONTHS_PER_YEAR = 12;
+export const MILLIS_PER_YEAR = DAYS_PER_YEAR * MILLIS_PER_DAY;
+export const MILLIS_PER_MONTH = MILLIS_PER_YEAR / MONTHS_PER_YEAR;
 
 const twoDigits = (value: number) => String(value).padStart(2, "0");
 

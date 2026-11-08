@@ -70,6 +70,7 @@ export type ChatEvent =
 
 export interface Ready {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -98,6 +99,7 @@ export interface QueuedItem {
 }
 export interface PermissionMode {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -106,6 +108,7 @@ export interface PermissionMode {
 }
 export interface Rejected {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -115,6 +118,7 @@ export interface Rejected {
 }
 export interface Activity {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -125,6 +129,7 @@ export interface Activity {
 }
 export interface AgentState {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -166,6 +171,7 @@ export interface AgentState {
 }
 export interface History {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -178,6 +184,7 @@ export interface History {
 }
 export interface Stop {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -187,6 +194,7 @@ export interface Stop {
 }
 export interface TerminalOpened {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -205,6 +213,7 @@ export interface TerminalOpened {
 }
 export interface AssistantText {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -213,6 +222,7 @@ export interface AssistantText {
 }
 export interface Thinking {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -222,6 +232,7 @@ export interface Thinking {
 }
 export interface Working {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -229,6 +240,7 @@ export interface Working {
 }
 export interface ToolUse {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -275,6 +287,7 @@ export interface QueryEffect {
 }
 export interface ToolResult {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -282,10 +295,12 @@ export interface ToolResult {
   tool_use_id?: string | null;
   content?: string | null;
   ms?: number | null;
+  is_error?: boolean | null;
   statements?: QueryStatement[] | null;
 }
 export interface FileChange {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -295,6 +310,8 @@ export interface FileChange {
   path: string;
   diff_lines?: DiffLine[];
   label?: boolean | null;
+  cell_id?: string | null;
+  edit_mode?: string | null;
 }
 export interface DiffLine {
   kind: string;
@@ -302,6 +319,7 @@ export interface DiffLine {
 }
 export interface Shared {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -315,6 +333,7 @@ export interface SharedFile {
 }
 export interface Compacting {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -322,6 +341,7 @@ export interface Compacting {
 }
 export interface CompactingEnded {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -329,6 +349,7 @@ export interface CompactingEnded {
 }
 export interface Status {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -343,6 +364,7 @@ export interface Status {
 }
 export interface Compact {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -355,6 +377,7 @@ export interface Compact {
 }
 export interface CompactSummary {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -367,6 +390,7 @@ export interface CompactSummary {
 }
 export interface AskText {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -375,6 +399,7 @@ export interface AskText {
 }
 export interface AskWorking {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -382,6 +407,7 @@ export interface AskWorking {
 }
 export interface AskSession {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -390,6 +416,7 @@ export interface AskSession {
 }
 export interface Command {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -399,6 +426,7 @@ export interface Command {
 }
 export interface Usage {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -415,6 +443,7 @@ export interface Usage {
 }
 export interface SessionInfo {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -430,6 +459,7 @@ export interface SessionInfo {
 }
 export interface Component {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -445,6 +475,7 @@ export interface Component {
 }
 export interface Reloaded {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -461,6 +492,7 @@ export interface Reloaded {
 }
 export interface Agent {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -478,6 +510,7 @@ export interface AgentAccount {
 }
 export interface TaskRunning {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -488,6 +521,7 @@ export interface TaskRunning {
 }
 export interface AgentResult {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -500,6 +534,7 @@ export interface AgentResult {
 }
 export interface ThinkingTokens {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -508,6 +543,7 @@ export interface ThinkingTokens {
 }
 export interface HookFailed {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -518,6 +554,7 @@ export interface HookFailed {
 }
 export interface Notification {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -527,6 +564,7 @@ export interface Notification {
 }
 export interface Notice {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -538,6 +576,7 @@ export interface Notice {
 }
 export interface Mods {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -560,6 +599,7 @@ export interface StatusLine {
 }
 export interface Commands {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -570,6 +610,7 @@ export interface Commands {
 }
 export interface ModToast {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -580,6 +621,7 @@ export interface ModToast {
 }
 export interface ModInvalidate {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -592,6 +634,7 @@ export interface ModInvalidate {
 }
 export interface ModTree {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -612,6 +655,7 @@ export interface ModTree {
 }
 export interface ModReply {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -621,6 +665,7 @@ export interface ModReply {
 }
 export interface ModRequest {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -633,6 +678,7 @@ export interface ModRequest {
 }
 export interface ModFocus {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -644,6 +690,7 @@ export interface ModFocus {
 }
 export interface ModScroll {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -655,6 +702,7 @@ export interface ModScroll {
 }
 export interface SessionMessage {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -664,6 +712,7 @@ export interface SessionMessage {
 }
 export interface PluginMessage {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -673,6 +722,7 @@ export interface PluginMessage {
 }
 export interface AgentReport {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -682,6 +732,7 @@ export interface AgentReport {
 }
 export interface Todos {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -695,6 +746,7 @@ export interface TodoItem {
 }
 export interface Task {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -705,6 +757,7 @@ export interface Task {
 }
 export interface SessionStarted {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -713,6 +766,7 @@ export interface SessionStarted {
 }
 export interface Result {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -723,6 +777,7 @@ export interface Result {
 }
 export interface Context {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -734,6 +789,7 @@ export interface Context {
 }
 export interface RateLimit {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -748,6 +804,7 @@ export interface LimitWindow {
 }
 export interface Cache {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -758,6 +815,7 @@ export interface Cache {
 }
 export interface Anchor {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -766,6 +824,7 @@ export interface Anchor {
 }
 export interface Done {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -773,6 +832,7 @@ export interface Done {
 }
 export interface Interrupted {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -780,6 +840,7 @@ export interface Interrupted {
 }
 export interface Attached {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -787,6 +848,7 @@ export interface Attached {
 }
 export interface Error {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -795,6 +857,7 @@ export interface Error {
 }
 export interface ApiError {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -804,16 +867,17 @@ export interface ApiError {
 }
 export interface Queued {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
   type: "queued";
   id?: string | null;
   text: string;
-  ts?: number | null;
 }
 export interface Queue {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -822,6 +886,7 @@ export interface Queue {
 }
 export interface Dequeued {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -829,10 +894,10 @@ export interface Dequeued {
   ids: (string | null)[];
   text?: string | null;
   consumed?: number;
-  ts?: number | null;
 }
 export interface HistoryChunk {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -847,6 +912,7 @@ export interface HistoryChunk {
 }
 export interface Tail {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -857,6 +923,7 @@ export interface Tail {
 }
 export interface InteractionRequest {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -896,6 +963,7 @@ export interface InteractionOption {
 }
 export interface InteractionResolved {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
@@ -907,6 +975,7 @@ export interface InteractionResolved {
 }
 export interface Pong {
   seq?: number | null;
+  ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import CircleX from "@lucide/svelte/icons/circle-x";
   import type { Snippet } from "svelte";
   import { formatDuration } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
@@ -13,6 +14,7 @@
     result: string | null;
     running: boolean;
     took?: number | null;
+    failed?: boolean;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
     resultView?: Snippet<[string]>;
@@ -25,15 +27,19 @@
     result,
     running,
     took = null,
+    failed = false,
     expanded = null,
     onToggle = null,
     resultView,
   }: Props = $props();
 
   const SLOW_MS = 1000;
-  const FIELD_PREFIX = /^[\w-]+:\s*/;
+  const FIELD_PREFIX = /^([\w-]+):\s*/;
+  const PATH_FIELDS = new Set(["file_path", "path", "notebook_path"]);
 
-  const headline = $derived((input.split("\n").find((line) => line.trim()) ?? "").replace(FIELD_PREFIX, ""));
+  const firstLine = $derived(input.split("\n").find((line) => line.trim()) ?? "");
+  const headline = $derived(firstLine.replace(FIELD_PREFIX, ""));
+  const headlinePath = $derived(PATH_FIELDS.has(firstLine.match(FIELD_PREFIX)?.[1] ?? ""));
 
   const empty = $derived(!input.trim() && !result?.trim());
   const elapsed = $derived(took !== null && took >= SLOW_MS ? formatDuration(took) : null);
@@ -43,7 +49,9 @@
   label={name ?? t("TOOLS")}
   icon={toolIcon(name, mcp)}
   preview={headline}
+  previewTail={headlinePath}
   stat={running ? null : elapsed}
+  meta={failed ? failedMark : undefined}
   labelOnly={empty}
   {running}
   {expanded}
@@ -62,3 +70,7 @@
     </div>
   {/if}
 </Collapsible>
+
+{#snippet failedMark()}
+  <CircleX size={14} class="text-red" role="img" aria-label={t("TOOL_FAILED")} />
+{/snippet}

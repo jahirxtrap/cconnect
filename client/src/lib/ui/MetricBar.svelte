@@ -1,6 +1,7 @@
 <script lang="ts">
   import { formatDecimal } from "$lib/data/format";
   import { ALERT_PERCENT, type LimitTone } from "$lib/data/usageWindows";
+  import type { IconSource } from "./icons";
   import LinearProgress from "./LinearProgress.svelte";
 
   interface Props {
@@ -11,6 +12,8 @@
     tone?: LimitTone | null;
     color?: string | null;
     showValue?: boolean;
+    icon?: IconSource;
+    inline?: boolean;
     class?: string;
   }
 
@@ -22,6 +25,8 @@
     tone = null,
     color = null,
     showValue = true,
+    icon: IconComponent,
+    inline = false,
     class: className = "",
   }: Props = $props();
 
@@ -34,13 +39,21 @@
 
 <div class="w-full {className}">
   {#if heading}
-    <div class="flex items-center">
-      <div class="min-w-0 flex-1">
-        {#if title}
-          <p class="text-item-title">{title}</p>
-          <p class="truncate text-body-sm text-on-surface-variant">{subtitle}</p>
-        {/if}
-      </div>
+    <div class="flex items-center gap-2">
+      {#if IconComponent}
+        <IconComponent size={16} class="shrink-0 text-on-surface-variant" />
+      {/if}
+      {#if inline}
+        <p class="shrink-0 text-item-title">{title}</p>
+        <p class="min-w-0 flex-1 truncate text-body-sm text-on-surface-variant">{subtitle}</p>
+      {:else}
+        <div class="min-w-0 flex-1">
+          {#if title}
+            <p class="text-item-title">{title}</p>
+            <p class="truncate text-body-sm text-on-surface-variant">{subtitle}</p>
+          {/if}
+        </div>
+      {/if}
       {#if showValue}
         <p class="ml-3 shrink-0 text-body-md">{formatDecimal(percent, 1)}%</p>
       {/if}

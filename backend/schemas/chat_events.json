@@ -15,6 +15,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -82,6 +93,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -240,6 +262,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -303,6 +336,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -416,6 +460,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -661,6 +716,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -713,6 +779,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -796,6 +873,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -848,6 +936,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -920,6 +1019,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -968,6 +1078,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -1040,6 +1161,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1088,6 +1220,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -1158,6 +1301,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -1241,6 +1395,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1297,6 +1462,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -1420,6 +1596,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1533,6 +1720,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1591,6 +1789,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1639,6 +1848,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -1770,6 +1990,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1872,6 +2103,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -1936,17 +2178,6 @@
         "consumed": {
           "default": 0,
           "type": "integer"
-        },
-        "ts": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         }
       },
       "required": [
@@ -1977,6 +2208,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2045,6 +2287,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -2097,6 +2350,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2186,6 +2450,28 @@
             }
           ],
           "default": null
+        },
+        "cell_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "edit_mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -2199,6 +2485,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2273,6 +2570,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2362,6 +2670,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2503,6 +2822,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2754,6 +3084,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -2832,6 +3173,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -2922,6 +3274,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -3034,6 +3397,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3107,6 +3481,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3163,6 +3548,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -3272,6 +3668,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3367,6 +3774,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3441,6 +3859,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -3589,6 +4018,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3707,6 +4147,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3802,6 +4253,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3875,6 +4337,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -3927,6 +4400,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -4000,6 +4484,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -4285,6 +4780,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -4350,6 +4856,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -4400,17 +4917,6 @@
         },
         "text": {
           "type": "string"
-        },
-        "ts": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         }
       },
       "required": [
@@ -4507,6 +5013,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -4562,6 +5079,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -4730,6 +5258,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -4793,6 +5332,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -4946,6 +5496,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -5027,6 +5588,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -5183,6 +5755,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -5256,6 +5839,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -5315,6 +5909,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -5408,6 +6013,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -5563,6 +6179,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -5643,6 +6270,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -5699,6 +6337,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -5793,6 +6442,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -5874,6 +6534,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -6049,6 +6720,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -6119,6 +6801,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -6219,6 +6912,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -6274,6 +6978,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -6354,6 +7069,17 @@
           ],
           "default": null
         },
+        "is_error": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "statements": {
           "anyOf": [
             {
@@ -6379,6 +7105,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
@@ -6538,6 +7275,17 @@
           ],
           "default": null
         },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "channel": {
           "anyOf": [
             {
@@ -6645,6 +7393,17 @@
       "additionalProperties": false,
       "properties": {
         "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
           "anyOf": [
             {
               "type": "integer"
