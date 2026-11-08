@@ -1023,7 +1023,7 @@
   {@render moreMenu()}
 {/snippet}
 
-{#snippet headerControls()}
+{#snippet headerSearch()}
   {#if archive === null}
     <SearchBar value={searchQuery} oninput={search} placeholder={t("SEARCH")} class={HEADER_SEARCH_CLASS} />
   {/if}
@@ -1182,7 +1182,7 @@
     <AppTopBar
       title={t("SHARED")}
       server
-      controls={wide ? headerControls : undefined}
+      search={wide ? headerSearch : undefined}
       actions={browseActions}
     >
       {#snippet navigationIcon()}

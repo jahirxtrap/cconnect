@@ -70,6 +70,7 @@
   import Plus from "@lucide/svelte/icons/plus";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import RotateCw from "@lucide/svelte/icons/rotate-cw";
+  import Search from "@lucide/svelte/icons/search";
   import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { inPane } from "$lib/screens/chat/paneSurface";
@@ -177,7 +178,8 @@
   let reloadHeld = $state(false);
 
   let memoriesProject = $state<string | null>(null);
-  let skillQuery = $state("");
+  let ownQuery = $state("");
+  let searching = $state(false);
   let skillSheet = $state<Skill | null>(null);
   let skillFiles = $state<string[] | null>(null);
 
@@ -343,7 +345,12 @@
     void runAction(() => claudeApi.addLocalPlugin(path));
   };
 
-  const needle = $derived((embedded ? query : skillQuery).trim());
+  const needle = $derived((embedded ? query : ownQuery).trim());
+
+  const search = (open: boolean) => {
+    searching = open;
+    if (!open) ownQuery = "";
+  };
 
   const matches = (...fields: (string | null | undefined)[]) =>
     !needle || fields.some((field) => matchesLabel(field, needle));
@@ -619,6 +626,11 @@
   {/if}
 
   {#snippet headerActions()}
+    {#if !embedded && kind !== "status"}
+      <TooltipIconButton label={t("SEARCH")} active={searching} onclick={() => search(!searching)}>
+        <Search />
+      </TooltipIconButton>
+    {/if}
     {#if kind === "plugins"}
       <TooltipIconButton label={t("INSTALL")} onclick={browse}>
         <Plus />
@@ -674,12 +686,14 @@
     </div>
   {/if}
 
-  {#if kind === "skills" && loaded && !embedded}
+  {#if searching && !embedded && kind !== "status"}
     <div class="px-(--page-inset) pb-2">
       <SearchBar
-        value={skillQuery}
-        oninput={(value) => (skillQuery = value)}
+        value={ownQuery}
+        oninput={(value) => (ownQuery = value)}
         placeholder={t("SEARCH")}
+        autofocus
+        onClose={() => search(false)}
       />
     </div>
   {/if}

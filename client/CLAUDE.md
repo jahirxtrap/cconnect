@@ -48,6 +48,9 @@ request with it went through, as the terminal does.
   screens compose these; forking a variant is how the two apps drift. The same goes for data:
   time units come from `data/time.ts`, a blank `SessionInfo` from `sessionInfo`, per-environment
   snapshots from `EnvironmentSlots`, and a socket's retries from `Redial` (`services/socket.ts`).
+- `AppTopBar`'s strip of controls scrolls inside a rounded clip (`SCROLL_ROW_CLASS`), which cuts
+  the corners of anything wider placed in it: a search field goes in its `search` slot, outside
+  the strip, opened from a toolbar icon as in Notes.
 - **Tailwind is concatenated by hand — there is no twMerge.** Two conflicting utilities both
   end up in `class`, and the winner is whatever CSS order decides. Resolve conflicts with a
   prop or a conditional, never by appending another class.
@@ -302,6 +305,11 @@ classes and only `text-align` in `style`. A relative image there moves to `data-
 and loads beside the file through `imageSrc`, never against the app's origin. Tailwind's
 preflight makes every `img` a block, which breaks `<p align="center">`, so `.markdown-document
 img` puts it back inline.
+
+A list that holds a fenced block becomes a `list` segment that `MarkdownText` draws itself, so the
+block gets `CodeBlock` (header and copy) like a top-level one, labelled `text` when it names no
+language. The `list_markers` rule keeps each item's marker, and `.li-marker` sets it beside
+whatever the item starts with.
 
 ## PDF (`screens/shared/PdfView.svelte`)
 

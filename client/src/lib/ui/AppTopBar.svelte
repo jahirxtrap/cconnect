@@ -20,6 +20,7 @@
     contained?: boolean;
     navigationIcon?: Snippet;
     subtitleLeading?: Snippet;
+    search?: Snippet;
     controls?: Snippet;
     actions?: Snippet;
     deficit?: number;
@@ -33,6 +34,7 @@
     contained = false,
     navigationIcon,
     subtitleLeading,
+    search,
     controls,
     actions,
     deficit = $bindable(0),
@@ -86,8 +88,9 @@
       {/if}
     </div>
     <div class="min-w-0 flex-1"></div>
-    {#if controls || actions}
+    {#if search || controls || actions}
       <div class="flex min-w-0 items-center gap-2">
+        {@render search?.()}
         {#if controls}
           <div bind:this={strip} class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-2">
             {@render controls()}

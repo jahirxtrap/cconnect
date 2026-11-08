@@ -582,14 +582,14 @@ textarea:placeholder-shown::selection {
   list-style: none;
 }
 
-.markdown li > p:first-of-type {
-  display: inline;
+.markdown li {
+  position: relative;
 }
 
 .markdown .li-marker {
-  display: inline-block;
+  position: absolute;
+  inset-inline-start: -20px;
   min-width: 20px;
-  margin-inline-start: -20px;
   font-variant-numeric: tabular-nums;
 }
 

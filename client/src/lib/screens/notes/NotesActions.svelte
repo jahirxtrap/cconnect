@@ -6,7 +6,6 @@
   import Type from "@lucide/svelte/icons/type";
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
-  import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import NoteMenu from "./NoteMenu.svelte";
   import { notes, type Note } from "./notes.svelte";
@@ -21,11 +20,6 @@
   const { note, wide = false, onNew, onClosed }: Props = $props();
 
   let menu = $state(false);
-
-  const find = (value: string) => {
-    notes.query = value;
-    notes.searching = value.length > 0;
-  };
 </script>
 
 {#snippet create()}
@@ -44,7 +38,6 @@
   </TooltipIconButton>
   <NoteMenu {note} open={menu} onOpenChange={(open) => (menu = open)} onDeleted={onClosed} />
 {:else if wide}
-  <SearchBar value={notes.query} oninput={find} placeholder={t("SEARCH_NOTES")} class={HEADER_SEARCH_CLASS} />
   {@render create()}
 {:else}
   <TooltipIconButton label={t("SEARCH")} active={notes.searching} onclick={() => notes.search(!notes.searching)}>

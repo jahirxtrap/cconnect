@@ -9,12 +9,19 @@ export interface MarkdownImage {
   alt: string;
 }
 
+export interface ListItem {
+  marker: string;
+  className: string;
+  children: Segment[];
+}
+
 export type Segment =
   | { kind: "html"; html: string }
   | { kind: "code"; code: string; lang: string | null }
   | { kind: "images"; items: MarkdownImage[] }
   | { kind: "block"; data: CconnectBlock }
-  | { kind: "details"; summary: string; children: Segment[] };
+  | { kind: "details"; summary: string; children: Segment[] }
+  | { kind: "list"; ordered: boolean; items: ListItem[] };
 
 const DETAILS_RE = /<details\b[^>]*>([\s\S]*?)<\/details>/i;
 const SUMMARY_RE = /<summary\b[^>]*>([\s\S]*?)<\/summary>/i;
@@ -25,8 +32,10 @@ const ITEM_LOOKAHEAD = 3;
 const ALERT_LOOKAHEAD = 2;
 
 const BULLETS = ["•", "◦", "▪"];
-let bulletDepth = 0;
-const counters: number[] = [];
+const LIST_OPEN = new Set(["bullet_list_open", "ordered_list_open"]);
+const LIST_CLOSE = new Set(["bullet_list_close", "ordered_list_close"]);
+
+const markerOf = (token: Token): string => String(token.meta?.marker ?? "");
 
 const engine = (html: boolean, breaks: boolean) => {
   const instance = new MarkdownIt({ html, linkify: true, breaks });
@@ -46,6 +55,32 @@ const engine = (html: boolean, breaks: boolean) => {
     return true;
   });
 
+  instance.core.ruler.push("list_markers", (state) => {
+    const lists: { ordered: boolean; next: number }[] = [];
+    let bullets = 0;
+    for (const token of state.tokens) {
+      if (token.type === "ordered_list_open") lists.push({ ordered: true, next: Number(token.attrGet("start") ?? 1) });
+      else if (token.type === "bullet_list_open") {
+        lists.push({ ordered: false, next: 0 });
+        bullets++;
+      } else if (LIST_CLOSE.has(token.type)) {
+        if (lists.pop()?.ordered === false) bullets--;
+      } else if (token.type === "list_item_open") {
+        const list = lists[lists.length - 1];
+        const classes = String(token.attrGet("class") ?? "");
+        const marker = classes.includes("task-done")
+          ? "☑"
+          : classes.includes("task")
+            ? "☐"
+            : list?.ordered
+              ? `${list.next++}.`
+              : BULLETS[Math.min(Math.max(bullets, 1) - 1, BULLETS.length - 1)];
+        token.meta = { ...token.meta, marker };
+      }
+    }
+    return true;
+  });
+
   instance.core.ruler.push("github_alerts", (state) => {
     const tokens = state.tokens;
     tokens.forEach((token, index) => {
@@ -62,38 +97,8 @@ const engine = (html: boolean, breaks: boolean) => {
     return true;
   });
 
-  instance.renderer.rules.ordered_list_open = (tokens, index, options, _env, self) => {
-    counters.push(Number(tokens[index].attrGet("start") ?? 1));
-    return self.renderToken(tokens, index, options);
-  };
-
-  instance.renderer.rules.ordered_list_close = (tokens, index, options, _env, self) => {
-    counters.pop();
-    return self.renderToken(tokens, index, options);
-  };
-
-  instance.renderer.rules.bullet_list_open = (tokens, index, options, _env, self) => {
-    bulletDepth++;
-    return self.renderToken(tokens, index, options);
-  };
-
-  instance.renderer.rules.bullet_list_close = (tokens, index, options, _env, self) => {
-    bulletDepth--;
-    return self.renderToken(tokens, index, options);
-  };
-
-  instance.renderer.rules.list_item_open = (tokens, index, options, _env, self) => {
-    const token = tokens[index];
-    const classes = String(token.attrGet("class") ?? "");
-    const marker = classes.includes("task-done")
-      ? "☑"
-      : classes.includes("task")
-        ? "☐"
-        : token.markup === "." || token.markup === ")"
-          ? `${counters.length ? counters[counters.length - 1]++ : 1}.`
-          : BULLETS[Math.min(Math.max(bulletDepth, 1) - 1, BULLETS.length - 1)];
-    return `${self.renderToken(tokens, index, options)}<span class="li-marker">${marker}&nbsp;</span>`;
-  };
+  instance.renderer.rules.list_item_open = (tokens, index, options, _env, self) =>
+    `${self.renderToken(tokens, index, options)}<span class="li-marker">${markerOf(tokens[index])}&nbsp;</span>`;
 
   return instance;
 };
@@ -211,7 +216,30 @@ const merged = (list: Segment[], joinHtml = true): Segment[] =>
     return acc;
   }, []);
 
-const fromTokens = (tokens: Token[], flavor: MarkdownFlavor): Segment[] => {
+const closing = (tokens: Token[], index: number): number => {
+  const { type, level } = tokens[index];
+  const close = type.replace(/_open$/, "_close");
+  for (let at = index + 1; at < tokens.length; at++) if (tokens[at].type === close && tokens[at].level === level) return at;
+  return tokens.length;
+};
+
+const listSegment = (open: Token, inner: Token[], flavor: MarkdownFlavor): Segment => {
+  const items: ListItem[] = [];
+  for (let at = 0; at < inner.length; at++) {
+    const token = inner[at];
+    if (token.type !== "list_item_open" || token.level !== open.level + 1) continue;
+    const end = closing(inner, at);
+    items.push({
+      marker: markerOf(token),
+      className: String(token.attrGet("class") ?? ""),
+      children: fromTokens(inner.slice(at + 1, end), flavor, token.level + 1),
+    });
+    at = end;
+  }
+  return { kind: "list", ordered: open.type === "ordered_list_open", items };
+};
+
+const fromTokens = (tokens: Token[], flavor: MarkdownFlavor, level = 0): Segment[] => {
   const result: Segment[] = [];
   const renderer = ENGINES[flavor];
   let buffer: Token[] = [];
@@ -224,14 +252,24 @@ const fromTokens = (tokens: Token[], flavor: MarkdownFlavor): Segment[] => {
 
   for (let index = 0; index < tokens.length; index++) {
     const token = tokens[index];
-    if (token.type === "fence" && token.level === 0) {
+    if (token.type === "fence" && token.level === level) {
       flush();
       const lang = token.info.trim().split(/\s+/)[0] || null;
       const block = lang === CCONNECT_LANG ? parseCconnectBlock(token.content) : null;
       result.push(block ? { kind: "block", data: block } : { kind: "code", code: token.content, lang });
       continue;
     }
-    const inline = token.type === "paragraph_open" && token.level === 0 ? tokens[index + 1] : undefined;
+    if (LIST_OPEN.has(token.type) && token.level === level) {
+      const end = closing(tokens, index);
+      const inner = tokens.slice(index + 1, end);
+      if (inner.some((item) => item.type === "fence")) {
+        flush();
+        result.push(listSegment(token, inner, flavor));
+        index = end;
+        continue;
+      }
+    }
+    const inline = token.type === "paragraph_open" && token.level === level ? tokens[index + 1] : undefined;
     const images = flavor === "chat" && inline?.type === "inline" ? inlineSegments(inline) : [];
     if (images.length) {
       flush();

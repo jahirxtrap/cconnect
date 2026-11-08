@@ -216,6 +216,17 @@
           {@render blocks(part.children)}
         </div>
       </details>
+    {:else if part.kind === "list"}
+      <svelte:element this={part.ordered ? "ol" : "ul"} class="chat-gap flex flex-col">
+        {#each part.items as item, at (at)}
+          <li class={item.className}>
+            <span class="li-marker">{item.marker}&nbsp;</span>
+            <div class="chat-gap flex min-w-0 flex-col">
+              {@render blocks(item.children)}
+            </div>
+          </li>
+        {/each}
+      </svelte:element>
     {:else}
       {@html part.html}
     {/if}

@@ -5,6 +5,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
+  import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import NotesActions from "./NotesActions.svelte";
   import NotesEditor from "./NotesEditor.svelte";
@@ -30,6 +31,11 @@
 
   const create = () => select(notes.create());
 
+  const searchFor = (value: string) => {
+    notes.query = value;
+    notes.searching = value.length > 0;
+  };
+
   $effect(() =>
     navigation.intercept(() => {
       if (!editing) return false;
@@ -43,6 +49,10 @@
   });
 </script>
 
+{#snippet headerSearch()}
+  <SearchBar value={notes.query} oninput={searchFor} placeholder={t("SEARCH_NOTES")} class={HEADER_SEARCH_CLASS} />
+{/snippet}
+
 {#snippet headerActions()}
   <NotesActions note={editing} wide={split} onNew={create} onClosed={close} />
 {/snippet}
@@ -50,8 +60,8 @@
 <div bind:clientWidth={width} class="flex h-full flex-col">
   <AppTopBar
     title={editing ? noteTitle(editing) || t("NOTE_UNTITLED") : t("NOTES")}
-    controls={split ? headerActions : undefined}
-    actions={split ? undefined : headerActions}
+    search={split ? headerSearch : undefined}
+    actions={headerActions}
   >
     {#snippet navigationIcon()}
       <TooltipIconButton label={t("BACK")} onclick={() => (editing ? close() : navigation.back())}>

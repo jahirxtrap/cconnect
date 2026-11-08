@@ -67,7 +67,7 @@
     class="flex items-center pr-0.5 pl-2.5"
     style="padding-top: var(--chat-pad-xs)"
   >
-    <span class="flex-1 text-label-md text-on-surface-variant select-none">{lang || "code"}</span>
+    <span class="flex-1 text-label-md text-on-surface-variant select-none">{lang || "text"}</span>
     <button
       type="button"
       onclick={copy}

@@ -165,12 +165,14 @@
           <ArrowLeft />
         </TooltipIconButton>
       {/snippet}
-      {#snippet controls()}
+      {#snippet search()}
         {#if searchFits}
           <div class="flex {HEADER_SEARCH_CLASS} min-w-40 shrink {searchable ? '' : 'invisible'}">
             <SearchBar value={query} oninput={(value) => (query = value)} placeholder={t("SEARCH")} class="flex-1" />
           </div>
         {/if}
+      {/snippet}
+      {#snippet controls()}
         <SegmentedButtons
           options={[t("SETTINGS_GENERAL"), ...CLAUDE_KINDS.map((kind) => t(CLAUDE_TABS[kind]))]}
           selected={detail ? tabIds.indexOf(detail) : 0}

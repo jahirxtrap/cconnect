@@ -82,7 +82,7 @@
         <ArrowLeft />
       </TooltipIconButton>
     {/snippet}
-    {#snippet controls()}
+    {#snippet search()}
       <SearchBar value={page.query} oninput={page.search} placeholder={t("SETTINGS_SEARCH")} class={HEADER_SEARCH_CLASS} />
     {/snippet}
     {#snippet actions()}
