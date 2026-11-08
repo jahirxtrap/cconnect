@@ -109,11 +109,24 @@ and a `.db` that is no database shows as a binary file. The server opens the fil
 for each query and closes it after, so it can still be moved or deleted while it
 is open.
 
-The security key gates every change: saving or deleting a connection, testing
-one, editing rows, any SQL that writes and installing a custom URL's packages.
-Reading needs nothing. Claude gets the same panel as tools: it reads schemas and
-runs queries on its own, installs the drivers a connection needs, and with the
-key creates, edits, tests and deletes connections and runs SQL that writes.
+On a public server the security key opens the panel the way it opens the
+terminal: without it the saved connections and the drivers stay locked behind
+**Unlock**, for reading as much as for writing. A database file follows the rule
+of the file it is: free in the shared folder, and the key only for the files a
+project's git ignores; writing to it still takes the key.
+
+Claude gets the same panel as four tools, offered only in turns sent with the
+key: it lists the connections and looks inside them, runs queries, whose
+statements answer one by one with their first 50 rows and page on from there,
+runs SQL that writes, creating and dropping databases included, creates, edits,
+tests and deletes connections, installs and uninstalls drivers, opens a database
+file and exports a table or a query to the shared folder, handed over in the
+chat. Each query shows in the chat as a block with the connection, its SQL and what
+each statement did: the rows it read, the rows it inserted, updated or deleted, or
+the columns of the table it created or changed. The block shows whatever the tool
+setting says, like shared files. Each table it touched ends the block as a chip
+that opens it in Databases, and a query that only reads goes to the panel's
+console with **Open SQL console**.
 
 ## Notes
 

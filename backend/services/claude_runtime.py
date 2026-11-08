@@ -16,6 +16,7 @@ from loguru import logger
 from core import cli_manager, paths
 from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server, needs_key
+from mcps import databases as database_tools
 from mcps.media import block_types
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
@@ -241,6 +242,19 @@ def _display_tool_name(name: str) -> str:
 
 def _tool_naming(name: str) -> dict:
     return {"name": _display_tool_name(name), "mcp": (name or "").startswith(_MCP_PREFIX)}
+
+
+def _called(tool_use_id: Any) -> dict:
+    return tool_calls.recall(tool_use_id) or {}
+
+
+def _result_mode(tool_use_id: Any, vis: dict) -> str:
+    return database_tools.tool_mode(str(_called(tool_use_id).get("tool") or ""), vis["tool_use"])
+
+
+def _result_view(tool_use_id: Any, content: str) -> dict:
+    call = _called(tool_use_id)
+    return database_tools.result_view(str(call.get("tool") or ""), content, call.get("input"))
 
 
 _FENCE_LINE = re.compile(r"^```", re.MULTILINE)
@@ -495,7 +509,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 if bid:
                     hidden.add(bid)
             elif not name.startswith("Task"):
-                if vis["tool_use"] == "off":
+                if database_tools.tool_mode(name, vis["tool_use"]) == "off":
                     _mark_working(events, vis)
                     continue
                 events.append({
@@ -503,18 +517,20 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                     "id": getattr(block, "id", None),
                     **_tool_naming(name),
                     "input": _format_tool_input(raw_input),
+                    **database_tools.query_view(name, raw_input),
                 })
         elif kind == "ToolResultBlock":
             tuid = getattr(block, "tool_use_id", None)
             if tuid and tuid in hidden:
                 continue
-            mode = vis["tool_use"]
+            mode = _result_mode(tuid, vis)
             if mode == "off":
                 _mark_working(events, vis)
                 continue
             ev = {"type": "tool_result", "tool_use_id": tuid}
             if mode == "full":
                 ev["content"] = _flatten_result_content(getattr(block, "content", None)).strip()
+                ev.update(_result_view(tuid, ev["content"]))
             events.append(ev)
     return events
 
@@ -956,6 +972,7 @@ async def run_prompt(
             "style": overrides.get("outputStyle"),
             "instructions": overrides.get("pluginConfigs"),
             "mods": mods.enabled(),
+            "capabilities": sorted(capabilities or ()),
         }
         if resident.connected and (resident.mark != mark or resume_at or fork):
             await resident.close()
@@ -1256,23 +1273,23 @@ async def run_prompt(
                         errored=bool(getattr(_b, "is_error", False)),
                         output=getattr(message, "tool_use_result", None) if len(results) == 1 else None,
                     )
-                tu_mode = vis()["tool_use"]
-                if tu_mode != "off":
-                    for block in getattr(message, "content", None) or []:
-                        if type(block).__name__ != "ToolResultBlock":
-                            continue
-                        tuid = getattr(block, "tool_use_id", None)
-                        if tuid and tuid in hidden_tool_ids:
-                            continue
-                        ev = {"type": "tool_result", "tool_use_id": tuid}
-                        began = tool_started.pop(tuid, None)
-                        if began is not None and vis().get("timings"):
-                            ev["ms"] = int((loop.time() - began) * 1000)
-                        if tu_mode == "full":
-                            ev["content"] = _flatten_result_content(getattr(block, "content", None))
-                        if parent:
-                            ev["parent"] = parent
-                        yield ev
+                for block in getattr(message, "content", None) or []:
+                    if type(block).__name__ != "ToolResultBlock":
+                        continue
+                    tuid = getattr(block, "tool_use_id", None)
+                    tu_mode = _result_mode(tuid, vis())
+                    if tu_mode == "off" or (tuid and tuid in hidden_tool_ids):
+                        continue
+                    ev = {"type": "tool_result", "tool_use_id": tuid}
+                    began = tool_started.pop(tuid, None)
+                    if began is not None and vis().get("timings"):
+                        ev["ms"] = int((loop.time() - began) * 1000)
+                    if tu_mode == "full":
+                        ev["content"] = _flatten_result_content(getattr(block, "content", None))
+                        ev.update(_result_view(tuid, ev["content"]))
+                    if parent:
+                        ev["parent"] = parent
+                    yield ev
                 for event in _task_events_from_result(getattr(message, "tool_use_result", None)):
                     if parent:
                         event["parent"] = parent

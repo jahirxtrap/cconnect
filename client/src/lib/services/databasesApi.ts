@@ -51,14 +51,18 @@ const pathOf = (data: Wire) => (typeof data.path === "string" ? data.path : "");
 const enginesOf = (data: Wire) => list(data, "engines").map(toDatabaseEngine);
 
 export const createDatabasesApi = (profile: () => Profile) => {
-  const client = createHttp(profile);
+  const client = createHttp(profile, () => securityKeys.headersFor(profile()));
   const keyed = (key: string) => createHttp(profile, () => securityKeys.headers(key));
   const base = (id: string) => `/databases/${segment(id)}`;
   const database = (scope: DatabaseScope) => scope.database ?? undefined;
 
   return {
-    async list() {
-      return outcome(await client.call<Wire>("GET", "/databases"), toDatabaseList);
+    async catalog() {
+      return outcome(await client.call<Wire>("GET", "/databases/engines"), toDatabaseList);
+    },
+
+    async connections(key: string) {
+      return outcome(await keyed(key).call<Wire>("GET", "/databases"), (data) => list(data, "connections").map(toDatabaseConnection));
     },
 
     async add(fields: ConnectionFields, key: string) {
@@ -79,16 +83,16 @@ export const createDatabasesApi = (profile: () => Profile) => {
       );
     },
 
-    async install(engine: string) {
-      return outcome(await client.call<Wire>("POST", `/databases/engines/${segment(engine)}/install`, undefined, {}), enginesOf);
+    async install(engine: string, key: string) {
+      return outcome(await keyed(key).call<Wire>("POST", `/databases/engines/${segment(engine)}/install`, undefined, {}), enginesOf);
     },
 
     async installPackages(packages: string[], key: string) {
       return outcome(await keyed(key).call<Wire>("POST", "/databases/packages", undefined, { packages }), enginesOf);
     },
 
-    async uninstall(engine: string) {
-      return outcome(await client.call<Wire>("DELETE", `/databases/engines/${segment(engine)}`), enginesOf);
+    async uninstall(engine: string, key: string) {
+      return outcome(await keyed(key).call<Wire>("DELETE", `/databases/engines/${segment(engine)}`), enginesOf);
     },
 
     async openFile(source: DatabaseFileSource, key: string) {

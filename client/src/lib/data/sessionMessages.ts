@@ -3,7 +3,9 @@ import { agentStopText } from "./agentModels";
 import {
   diffKindOf,
   emptyInteraction,
+  queryOf,
   sharedFilesFrom,
+  statementsOf,
   VALUE_SEPARATOR,
   type ChatMessage,
   type InteractionData,
@@ -18,6 +20,8 @@ type MessageFields =
   | "interaction"
   | "diffLines"
   | "files"
+  | "query"
+  | "statements"
   | "compact"
   | "agentRun"
   | "agentResult"
@@ -138,6 +142,8 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
           }))
         : null,
     files: type === "shared" ? sharedFilesFrom(raw.files) : null,
+    query: queryOf(raw),
+    statements: statementsOf(raw),
     compact:
       type === "compact"
         ? {

@@ -15,11 +15,10 @@ from loguru import logger
 from pydantic import BaseModel, ValidationError
 
 from core import paths
-from core.access import key_matches
+from core.access import authorize, key_matches
 from core.config import CONTRACT_CHECK, DEFAULT_CWD, permission_modes, resolve_permission_mode
 from core.responses import api_response
 from core.ws import SocketWriter, accept_authorized
-from mcps import terminal as terminal_mcp
 from schemas.chat import ChatMessage, ModRenderMessage
 from schemas.chat_events import CHAT_EVENT
 from services import accounts
@@ -393,7 +392,7 @@ async def chat_ws(ws: WebSocket):
     side_session = None
     bg_tasks: set = set()
 
-    seen = {"prefs": visibility.defaults(), "capabilities": []}
+    seen = {"prefs": visibility.defaults(), "offered": [], "capabilities": []}
     sink = visibility.sink_for(send, seen)
 
     def spawn(coro):
@@ -419,7 +418,8 @@ async def chat_ws(ws: WebSocket):
 
             if mtype == "start":
                 seen["prefs"] = visibility.resolve(msg.visibility.model_dump() if msg.visibility else None)
-                seen["capabilities"] = terminal_mcp.authorize(msg.capabilities, msg.security_key)
+                seen["offered"] = msg.capabilities
+                seen["capabilities"] = authorize(msg.capabilities, msg.security_key)
                 existing = registry.get(msg.channel) if msg.channel else None
                 by_session = None
                 if existing is None and msg.resume:
@@ -504,6 +504,7 @@ async def chat_ws(ws: WebSocket):
                 if target is None:
                     continue
                 target.unlocked = key_matches(msg.security_key or "")
+                seen["capabilities"] = authorize(seen["offered"], msg.security_key)
                 if target.running:
                     await target.enqueue(msg.id, msg.text, msg.attachments)
                 elif msg.id and target.already_consumed(msg.id):

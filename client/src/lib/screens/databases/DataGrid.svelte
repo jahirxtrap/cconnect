@@ -32,13 +32,16 @@
 
   const NUMERIC: ColumnKind[] = ["integer", "number"];
   const CELL_CLASS = "max-w-80 truncate border-b border-outline-variant px-2 py-1.5";
-  const HEAD_CLASS = "sticky top-0 border-b border-outline-variant bg-card px-2 py-1.5 text-left font-semibold";
-  const NUMBER_CLASS = "sticky left-0 border-b border-outline-variant bg-card px-2 py-1.5 text-right text-faint";
+  const HEAD_CLASS = "sticky top-0 border-b border-outline-variant bg-card px-2 py-1.5 text-left font-semibold select-none";
+  const NUMBER_CLASS = "sticky left-0 border-b border-outline-variant bg-card px-2 py-1.5 text-right text-faint select-none";
 
   const alignOf = (column: string) => (NUMERIC.includes(kinds[column]) ? "text-right" : "");
 </script>
 
-<div use:viewportScrollbar class="rounded-viewport scrollbar-thin selectable min-h-0 flex-1 overflow-auto [--viewport-inset:0px]">
+<div
+  use:viewportScrollbar
+  class="rounded-viewport scrollbar-thin min-h-0 flex-1 overflow-auto [--viewport-inset:0px] {onRow ? 'select-none' : 'selectable'}"
+>
   <table class="min-w-full border-separate border-spacing-0 text-body-sm">
     <thead>
       <tr>

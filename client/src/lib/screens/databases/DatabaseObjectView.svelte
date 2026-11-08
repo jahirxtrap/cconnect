@@ -16,6 +16,7 @@
     databaseFailureText,
     EXPORT_FORMATS,
     qualifiedName,
+    statementSummary,
     type ColumnKind,
     type DatabaseFailure,
     type DatabaseScope,
@@ -26,7 +27,7 @@
   } from "$lib/data/databaseModels";
   import { formatDecimal, formatDuration, joined } from "$lib/data/format";
   import { KeyGate, keyRefused } from "$lib/data/keyGate.svelte";
-  import { plural, t } from "$lib/i18n/index.svelte";
+  import { t } from "$lib/i18n/index.svelte";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
@@ -99,10 +100,10 @@
   let exportMenu = $state(false);
   let exporting = $state(false);
   let running = $state(false);
-  let sql = $state("");
   let run = 0;
 
   const draft = $derived(databases.draftOf(profile, scope));
+  const sql = $derived(draft.sql);
   const result = $derived(draft.result);
   const kinds = $derived(Object.fromEntries((info?.columns ?? []).map((column) => [column.name, column.kind])) as Record<string, ColumnKind>);
   const query = $derived<TableQuery>({ schema, name, sort, descending, where });
@@ -160,7 +161,6 @@
       whereDraft = "";
       editing = null;
       adding = false;
-      sql = databases.draftOf(profile, scope).sql;
       if (kind !== "console") void load();
     });
   });
@@ -210,10 +210,7 @@
     await download(await api.exportQuery(scope, draft.ran));
   };
 
-  const setSql = (value: string) => {
-    sql = value;
-    databases.saveDraft(profile, scope, { sql: value });
-  };
+  const setSql = (value: string) => databases.saveDraft(profile, scope, { sql: value });
 
   const execute = async () => {
     const text = sql.trim();
@@ -253,13 +250,14 @@
     applyWhere(whereDraft);
   };
 
-  const summary = $derived.by(() => {
-    if (!result) return "";
-    const elapsed = formatDuration(result.elapsed);
-    if (result.rows) return joined(plural("DATABASE_ROWS_COUNT", result.rows.length, formatDecimal(result.rows.length, 0)), elapsed);
-    if (result.affected === null) return joined(t("DATABASE_EXECUTED"), elapsed);
-    return joined(plural("DATABASE_ROWS_AFFECTED", result.affected, formatDecimal(result.affected, 0)), elapsed);
-  });
+  const summary = $derived(
+    result
+      ? joined(
+          statementSummary(result.wrote && result.affected !== null ? null : (result.rows?.length ?? null), result.affected),
+          formatDuration(result.elapsed),
+        )
+      : "",
+  );
 </script>
 
 {#snippet toolbar()}

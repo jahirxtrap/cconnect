@@ -12,6 +12,7 @@
   import { closeDatabaseObject, openDatabaseObject, openedObject } from "$lib/app/viewer.svelte";
   import { databaseFailureText, type DatabaseConnection } from "$lib/data/databaseModels";
   import { KeyGate, keyRefused } from "$lib/data/keyGate.svelte";
+  import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
@@ -54,9 +55,12 @@
   let removing = $state<DatabaseConnection | null>(null);
   let menuId = $state<string | null>(null);
   let failed = $state<string | null>(null);
+  let unlocking = $state(false);
+  let rejected = $state(false);
 
   const profile = $derived(backend.active);
   const listed = $derived(databases.listOf(profile));
+  const locked = $derived(databases.locked(profile));
   const connections = $derived(listed?.connections ?? []);
   const expandable = $derived(!layout.mobile);
   const fullObject = $derived(openedObject.full && expandable);
@@ -108,6 +112,23 @@
     databases.forget(profile, connection.id);
   };
 
+  const askKey = () => {
+    rejected = false;
+    unlocking = true;
+  };
+
+  const unlocked = (action: () => void) => () => (locked ? askKey() : action());
+
+  const unlock = async (key: string) => {
+    if (!(await databases.refresh(profile, key))) {
+      rejected = true;
+      return;
+    }
+    securityKeys.set(key);
+    unlocking = false;
+    rejected = false;
+  };
+
   const openConsole = (connection: DatabaseConnection) => {
     menuId = null;
     openDatabaseObject({ connection: connection.id, database: null, schema: null, name: "", kind: "console" });
@@ -115,15 +136,19 @@
 </script>
 
 {#snippet headerActions()}
-  <TooltipIconButton label={t("DATABASE_ADD_CONNECTION")} onclick={() => (adding = true)}>
+  <TooltipIconButton label={t("DATABASE_ADD_CONNECTION")} onclick={unlocked(() => (adding = true))}>
     <Plus />
   </TooltipIconButton>
-  <TooltipIconButton label={t("DATABASE_DRIVERS")} onclick={() => (managing = true)}>
+  <TooltipIconButton label={t("DATABASE_DRIVERS")} onclick={unlocked(() => (managing = true))}>
     <Plug />
   </TooltipIconButton>
   <TooltipIconButton label={t("REFRESH")} enabled={!!listed} onclick={() => void refreshAll()}>
     <RefreshCw />
   </TooltipIconButton>
+{/snippet}
+
+{#snippet unlockAction()}
+  <ActionButton text={t("UNLOCK")} onclick={askKey} />
 {/snippet}
 
 {#snippet connectionMenu(connection: DatabaseConnection)}
@@ -159,6 +184,8 @@
       <CenteredProgress class="min-h-0 flex-1" />
     {:else if !listed}
       <ConnectionError class="min-h-0 flex-1" />
+    {:else if locked}
+      <EmptyState icon={Database} text={t("DATABASES_LOCKED")} action={unlockAction} class="min-h-0 flex-1" />
     {:else if !connections.length}
       <EmptyState icon={Database} text={t("DATABASES_NONE")} class="min-h-0 flex-1">
         {#snippet action()}
@@ -208,7 +235,7 @@
 {/if}
 
 {#if managing}
-  <DriversDialog onDismiss={() => (managing = false)} />
+  <DriversDialog {gate} onDismiss={() => (managing = false)} />
 {/if}
 
 {#if removing}
@@ -225,4 +252,16 @@
 
 {#if gate.asking}
   <SecurityKeyDialog rejected={gate.rejected} onConfirm={(key) => gate.confirm(key)} onDismiss={() => gate.dismiss()} />
+{/if}
+
+{#if unlocking}
+  <SecurityKeyDialog
+    title={t("DATABASES_LOCKED")}
+    {rejected}
+    onConfirm={(key) => void unlock(key)}
+    onDismiss={() => {
+      unlocking = false;
+      rejected = false;
+    }}
+  />
 {/if}

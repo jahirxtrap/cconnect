@@ -135,8 +135,28 @@ expand button. The tree, the console drafts and what each node loaded live in
 `services/databases.svelte.ts`, per environment, so they survive the pane remounting. The tree
 derives the loads it is missing (`pending`) and an effect starts them; a load marks its node
 before awaiting, so the effect never asks twice, and `forget` (refresh, a write in the console,
-an edited connection) is all it takes to reload what is expanded. Every change goes through a
-`KeyGate`, which only asks for the key on a 403.
+an edited connection) is all it takes to reload what is expanded. On a gated server the saved
+connections need the key even to be listed: `refresh` reads the engine catalog, which is public,
+and the connections with the stored key, and a 403 leaves the panel `locked`, drawn like the
+terminal's locked state with Unlock. The data calls send the stored key on their own, and every
+change goes through a `KeyGate`, which only asks for the key on a 403. The console's text is its
+draft (`draftOf(...).sql`), so whatever writes the draft shows in an open console.
+
+`db_query` and `db_execute` reach the chat as tool rows carrying `query` and `statements`, always
+whole like shared files, and `MessageItem` draws them with `QueryBlock` instead of `ToolBlock`, under
+the same `ToolUse` mod site: the connection and database, the SQL, and for each statement what it
+did, in words and in data: the rows a SELECT read, the rows an INSERT, UPDATE or DELETE touched (in a
+`DataGrid`), or the columns a CREATE or ALTER left (`ColumnsTable`, shared with the structure panel),
+each of the three, the SQL too (`CodeBlock`'s `capped`), held to one height (`CAPPED_HEIGHT`) and
+scrolled inside. Its head takes the Databases screen's own icon (`screenFor("databases")`) and the
+`action` tone, the one every block CConnect draws for a feature of its own takes (shared files, the
+plan), while Claude Code's own work (tools, file changes, agents) stays `process`. The actions end the
+block the way the shared block's do: a `Chip` for each table or view the batch touched and did not
+drop, which opens it in Databases, and for a query that only reads a small outlined **Open SQL
+console**, which writes the SQL into the console's draft. Both need a saved connection
+(`query.saved`) of the server the panel shows. A `DataGrid` never lets its header or row numbers be
+selected, and its cells only when a row does not open on click (the chat and the console, not a
+table in the panel, whose row dialog holds the values).
 
 `DatabaseTree` is the only tree. The panel roots it at the connections; a database file's preview
 (`DatabaseFile`, which `FilePreview` shows when `previewKind` answers `database`) shows the file's

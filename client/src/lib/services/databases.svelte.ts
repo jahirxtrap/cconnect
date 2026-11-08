@@ -11,6 +11,7 @@ import {
   type QueryResult,
 } from "$lib/data/databaseModels";
 import { keyRefused, type KeyGate } from "$lib/data/keyGate.svelte";
+import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { backend, type Profile } from "./backend.svelte";
 import { createDatabasesApi, type DatabaseOutcome } from "./databasesApi";
 
@@ -36,6 +37,7 @@ const scopeSlot = (profile: Profile, scope: DatabaseScope, ...parts: (string | n
 class Databases {
   #lists = $state<Record<string, DatabaseList>>({});
   #failed = $state<Record<string, boolean>>({});
+  #locked = $state<Record<string, boolean>>({});
   #files = $state<Record<string, DatabaseConnection>>({});
   #schemas = $state<Record<string, Loaded<DatabaseSchemas>>>({});
   #objects = $state<Record<string, Loaded<DatabaseObjects>>>({});
@@ -50,6 +52,10 @@ class Databases {
     return profile ? this.#failed[profile.id] === true : false;
   }
 
+  locked(profile: Profile): boolean {
+    return profile ? this.#locked[profile.id] === true : false;
+  }
+
   find(profile: Profile, id: string | null): DatabaseConnection | null {
     if (!id) return null;
     return this.listOf(profile)?.connections.find((connection) => connection.id === id) ?? this.#files[slotOf(profile, id)] ?? null;
@@ -59,12 +65,17 @@ class Databases {
     return this.listOf(profile)?.engines.find((engine) => engine.id === id) ?? null;
   }
 
-  async refresh(profile: Profile = backend.active) {
-    if (!profile) return;
+  async refresh(profile: Profile = backend.active, key = securityKeys.keyFor(profile)): Promise<boolean> {
+    if (!profile) return false;
     untrack(() => (this.#failed = { ...this.#failed, [profile.id]: false }));
-    const result = await createDatabasesApi(() => profile).list();
-    if (result.ok) this.#lists = { ...this.#lists, [profile.id]: result.value };
-    this.#failed = { ...this.#failed, [profile.id]: !result.ok };
+    const api = createDatabasesApi(() => profile);
+    const [catalog, saved] = await Promise.all([api.catalog(), api.connections(key)]);
+    const refused = keyRefused(saved);
+    const answered = catalog.ok && (saved.ok || refused);
+    if (answered) this.#lists = { ...this.#lists, [profile.id]: { ...catalog.value, connections: saved.value ?? [] } };
+    this.#locked = { ...this.#locked, [profile.id]: refused };
+    this.#failed = { ...this.#failed, [profile.id]: !answered };
+    return !refused;
   }
 
   adoptEngines(profile: Profile, engines: DatabaseEngine[]) {
@@ -78,9 +89,9 @@ class Databases {
 
   async installDriver(profile: Profile, connection: DatabaseConnection, gate: KeyGate): Promise<string | null> {
     const api = createDatabasesApi(() => profile);
-    const result = connection.url
-      ? await gate.run((key) => api.installPackages(connection.packages, key))
-      : await api.install(connection.engine);
+    const result = await gate.run((key) =>
+      connection.url ? api.installPackages(connection.packages, key) : api.install(connection.engine, key),
+    );
     if (result.ok) this.adoptEngines(profile, result.value);
     this.forget(profile, connection.id);
     return result.ok || keyRefused(result) ? null : databaseFailureText(result.failure);

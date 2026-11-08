@@ -91,6 +91,8 @@ const toolFields = (event: EventOf<"tool_use">): Partial<ChatMessage> => ({
   toolMcp: event.mcp,
   toolUseId: event.id,
   result: event.result,
+  query: event.query,
+  statements: event.statements,
 });
 
 const fileChangeFields = (event: EventOf<"file_change">): Partial<ChatMessage> => ({
@@ -2047,6 +2049,8 @@ export class ChatState {
         interaction: item.interaction,
         diffLines: item.diffLines,
         files: item.files,
+        query: item.query,
+        statements: item.statements,
         compact: item.compact,
         agentRun: item.agentRun,
         agentResult: item.agentResult,
@@ -2126,7 +2130,11 @@ export class ChatState {
         return [...children, newMessage(this.#nextId++, "file_change", fileChangeFields(event))];
       case "tool_result":
         return event.toolUseId && event.content !== null
-          ? children.map((kid) => (kid.toolUseId === event.toolUseId ? { ...kid, result: event.content } : kid))
+          ? children.map((kid) =>
+              kid.toolUseId === event.toolUseId
+                ? { ...kid, result: event.content, statements: event.statements ?? kid.statements }
+                : kid,
+            )
           : children;
       default:
         return children;
@@ -2559,6 +2567,7 @@ export class ChatState {
                 ? {
                     ...item,
                     result: event.content ?? item.result,
+                    statements: event.statements ?? item.statements,
                     toolMs: event.ms ?? item.toolMs,
                   }
                 : item,

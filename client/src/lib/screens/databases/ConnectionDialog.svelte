@@ -120,7 +120,7 @@
 
   const install = async () => {
     begin();
-    const result = form === "url" ? await gate.run((key) => api.installPackages(wanted, key)) : await api.install(engine);
+    const result = await gate.run((key) => (form === "url" ? api.installPackages(wanted, key) : api.install(engine, key)));
     busy = false;
     if (result.ok) {
       missingDriver = false;

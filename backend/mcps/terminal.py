@@ -1,10 +1,7 @@
 """Shells on the machine running the backend, for the clients that can show them."""
 
-from typing import Optional
-
 from claude_agent_sdk import tool
 
-from core.access import key_matches
 from services import terminal
 
 CAPABILITY = "terminal"
@@ -76,13 +73,6 @@ CLOSE_SCHEMA = {
 
 def needs_key(name: str, args: dict) -> bool:
     return name.startswith(f"{CAPABILITY}_")
-
-
-def authorize(capabilities: list[str], key: Optional[str]) -> list[str]:
-    """The capabilities a turn really gets: terminal only survives with the unlock key."""
-    if CAPABILITY in capabilities and not key_matches(key or ""):
-        return [item for item in capabilities if item != CAPABILITY]
-    return list(capabilities)
 
 
 def _text(body: str) -> dict:

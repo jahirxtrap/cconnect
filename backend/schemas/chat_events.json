@@ -4021,6 +4021,223 @@
       "title": "Pong",
       "type": "object"
     },
+    "QueryCall": {
+      "additionalProperties": false,
+      "properties": {
+        "connection": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "database": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sql": {
+          "type": "string"
+        },
+        "writes": {
+          "type": "boolean"
+        },
+        "saved": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "connection",
+        "name",
+        "sql",
+        "writes",
+        "saved"
+      ],
+      "title": "QueryCall",
+      "type": "object"
+    },
+    "QueryColumn": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "primary_key": {
+          "type": "boolean"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "auto": {
+          "type": "boolean"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "type",
+        "primary_key",
+        "nullable",
+        "auto"
+      ],
+      "title": "QueryColumn",
+      "type": "object"
+    },
+    "QueryEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "enum": [
+            "inserted",
+            "updated",
+            "deleted",
+            "created",
+            "altered",
+            "dropped"
+          ],
+          "type": "string"
+        },
+        "object": {
+          "type": "string"
+        },
+        "schema": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "object",
+        "name"
+      ],
+      "title": "QueryEffect",
+      "type": "object"
+    },
+    "QueryStatement": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "rows",
+            "changed",
+            "structure",
+            "done"
+          ],
+          "type": "string"
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rows": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "affected": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "more": {
+          "default": false,
+          "type": "boolean"
+        },
+        "structure": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/QueryColumn"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryEffect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "QueryStatement",
+      "type": "object"
+    },
     "Queue": {
       "additionalProperties": false,
       "properties": {
@@ -5953,6 +6170,20 @@
             }
           ],
           "default": null
+        },
+        "statements": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/QueryStatement"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
@@ -6071,6 +6302,31 @@
           "anyOf": [
             {
               "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "query": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/QueryCall"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "statements": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/QueryStatement"
+              },
+              "type": "array"
             },
             {
               "type": "null"

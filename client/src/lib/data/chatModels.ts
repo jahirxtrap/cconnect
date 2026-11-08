@@ -1,5 +1,7 @@
+import type { ColumnShape } from "./databaseModels";
 import type { ModDrawn } from "./modModels";
 import type { Usage } from "./usageWindows";
+import { flag, list, number, record, strings, text, type Wire } from "./wire";
 
 export type Role =
   | "user"
@@ -40,6 +42,34 @@ export interface DiffLine {
 export interface SharedFile {
   name: string;
   url: string;
+}
+
+export interface QueryCall {
+  connection: string;
+  name: string;
+  database: string | null;
+  sql: string;
+  writes: boolean;
+  saved: boolean;
+}
+
+export type StatementKind = "rows" | "changed" | "structure" | "done";
+
+export interface StatementEffect {
+  action: string;
+  object: string;
+  schema: string | null;
+  name: string;
+}
+
+export interface QueryStatement {
+  kind: StatementKind;
+  columns: string[] | null;
+  rows: (string | null)[][] | null;
+  affected: number | null;
+  more: boolean;
+  structure: ColumnShape[] | null;
+  effect: StatementEffect | null;
 }
 
 export interface GalleryFile extends SharedFile {
@@ -197,6 +227,8 @@ export interface ChatMessage {
   path: string | null;
   diffLines: DiffLine[] | null;
   files: SharedFile[] | null;
+  query: QueryCall | null;
+  statements: QueryStatement[] | null;
   compact: CompactData | null;
   agentRun: AgentRun | null;
   agentResult: AgentResult | null;
@@ -239,6 +271,53 @@ export const sharedFilesFrom = (value: unknown): SharedFile[] =>
     .map((item) => (item && typeof item === "object" ? (item as Record<string, unknown>) : {}))
     .map((item) => ({ name: String(item.name ?? ""), url: String(item.url ?? "") }))
     .filter((file) => file.name !== "" && file.url !== "");
+
+export const queryOf = (raw: Wire): QueryCall | null => {
+  const call = record(raw, "query");
+  const sql = text(call, "sql");
+  return sql === null
+    ? null
+    : {
+        connection: text(call, "connection") ?? "",
+        name: text(call, "name") ?? "",
+        database: text(call, "database"),
+        sql,
+        writes: flag(call, "writes"),
+        saved: flag(call, "saved"),
+      };
+};
+
+const cellsOf = (row: unknown): (string | null)[] =>
+  Array.isArray(row) ? row.map((cell) => (typeof cell === "string" ? cell : null)) : [];
+
+const STATEMENT_KINDS: StatementKind[] = ["rows", "changed", "structure", "done"];
+
+const statementColumnOf = (raw: Wire): ColumnShape => ({
+  name: text(raw, "name") ?? "",
+  type: text(raw, "type") ?? "",
+  primaryKey: flag(raw, "primary_key"),
+  nullable: flag(raw, "nullable"),
+  auto: flag(raw, "auto"),
+  default: text(raw, "default"),
+});
+
+const effectOf = (raw: Wire): StatementEffect | null => {
+  const action = text(raw, "action");
+  return action ? { action, object: text(raw, "object") ?? "", schema: text(raw, "schema"), name: text(raw, "name") ?? "" } : null;
+};
+
+export const statementsOf = (raw: Wire): QueryStatement[] | null =>
+  Array.isArray(raw.statements)
+    ? list(raw, "statements").map((item) => ({
+        kind: STATEMENT_KINDS.find((kind) => kind === item.kind) ?? "done",
+        columns: Array.isArray(item.columns) ? strings(item, "columns") : null,
+        rows: Array.isArray(item.rows) ? item.rows.map(cellsOf) : null,
+        affected: number(item, "affected"),
+        more: flag(item, "more"),
+        structure: Array.isArray(item.structure) ? list(item, "structure").map(statementColumnOf) : null,
+        effect: effectOf(record(item, "effect")),
+      }))
+    : null;
 
 export const diffKindOf = (value: string | null | undefined): DiffKind =>
   value === "header" || value === "hunk" || value === "add" || value === "del" ? value : "ctx";
@@ -370,6 +449,8 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   path: null,
   diffLines: null,
   files: null,
+  query: null,
+  statements: null,
   compact: null,
   agentRun: null,
   agentResult: null,

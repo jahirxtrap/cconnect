@@ -99,13 +99,17 @@ is refused at the HTTP layer (403).
 `SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
 the `X-Security-Key` header and guards what belongs to the **machine** rather than to
 Claude — the shells, the files git ignores, every git write, deleting a pack from the
-server's library, an agent's environment variables, and saving, testing or deleting a database
-connection, editing its rows or running SQL that writes. It also lifts the PreToolUse hook that
+server's library, an agent's environment variables, and the saved database connections: listing
+them, reading what they hold, installing or removing a driver and anything that writes (a database
+file follows the rule of the file it is). It also lifts the PreToolUse hook that
 keeps Claude off the server's own `paths.ENV_FILE` and off the cconnect tools that reach the same
-things (the terminal, removing a pack, linking a file): the chat sends the key with every `prompt`
-and the hook asks the live session on each call. It only gates while the Bearer gate is on (`gated()`), so a plain local
+things (the terminal, removing a pack, linking a file, the database tools): the chat sends the key
+with every `prompt` and the hook asks the live session on each call. A turn sent without it
+loses the `terminal` and `databases` capabilities (`core/access.authorize`, run again on every
+`prompt` with that prompt's key), so those tools are not even offered; the persistent CLI's `mark`
+carries the capabilities, so unlocking mid-chat restarts it with them. It only gates while the Bearer gate is on (`gated()`), so a plain local
 run is open. Each route checks it for itself; there is no middleware for it, and a read that
-the panel needs before it can ask for anything (`repos`) is deliberately outside it.
+the panel needs before it can ask for anything (`repos`, `databases/engines`) is deliberately outside it.
 
 `--expose tailnet` is the one exposure that skips both the token and `CCONNECT_AUTH_ACTIVE`:
 `tailscale serve` answers only inside the tailnet, so it is the local mode with HTTPS on top.
@@ -184,7 +188,7 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 |---|---|
 | `assistant_text` / `thinking` / `todos` / `task` | streamed content and indicators |
 | `anchor` | the transcript uuid of a top-level reply with text, which forking from that reply goes up to |
-| `tool_use` / `tool_result` | `file_change` replaces them for Edit/Write/MultiEdit/NotebookEdit, with the diff already classified |
+| `tool_use` / `tool_result` | `file_change` replaces them for Edit/Write/MultiEdit/NotebookEdit, with the diff already classified; `db_query` and `db_execute` add `query` (the connection, its name, the database, the SQL, `saved`) and, with the result, `statements` read back from it (`mcps/databases.statements_of`), each with its `kind` and `effect`, which the app draws as its query block. Like shared files, those two always arrive whole, whatever `show_tool_use` says (`mcps/databases.tool_mode`, and the socket filter lets an event with `query` or `statements` through) |
 | `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
 | `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase |
 | `context` | context size; see below |
@@ -257,7 +261,7 @@ chats holding a process, persistent CLIs and ACP agents together, and `registry.
 releases the least recently used idle ones past it; the live session releases its own
 `session_grace` seconds (300 by default) after the last socket detaches, once nothing runs in the background (`working` counts the
 tasks the CLI reported). A turn whose options differ from the ones the CLI started with
-(`mark`: model, effort, permission mode, mods) closes it and starts a fresh one, and so does
+(`mark`: model, effort, permission mode, mods, capabilities) closes it and starts a fresh one, and so does
 another account, since the account is the CLI's config folder and credentials. Stopping or
 restarting the server closes the persistent CLIs and the agents' processes first
 (`live_sessions.close_processes`). When the CLI
@@ -324,9 +328,8 @@ Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own message
 before a compaction too, without the tool calls), `session_info`, `show_component`,
 `ask_component`, `share_files`, `packs` (writes a pack into the server's library),
 `delegate` (runs a task on a destination, or registers one), `reload` (persistent chats
-only), `db_connections` / `db_schema` / `db_query` / `db_execute` / `db_manage` (always offered, so
-Claude can create the first connection; `db_query` refuses anything that writes, and
-`db_execute` and the connection changes of `db_manage` need the key), and the
+only), `db_inspect` / `db_query` / `db_execute` / `db_manage` (only in turns with the `databases`
+capability, which needs the key; `db_query` refuses anything that writes), and the
 browser and terminal tools behind their settings.
 
 `ask_component` and `show_component` share one element list (`mcps/components.py`). The
@@ -377,6 +380,23 @@ plus the pip packages its driver needs, which borrows the catalog's rules for it
 
 Every SQL statement goes through `database_data`, and nothing there trusts the client:
 
+- **Every statement answers on its own** (`results`), and the flat fields keep describing the
+  last result set for the console. Each one says what it did (`kind`: `rows`, `changed`,
+  `structure` or `done`, plus `effect`, the action and the object read from its SQL by sqlglot):
+  an INSERT, UPDATE or DELETE brings back the rows it touched where the engine's `returning` allows
+  it (`clause` appends `RETURNING *`; `cte`, the PostgreSQL family, wraps it as
+  `WITH … SELECT … LIMIT`, so a change of millions of rows still ships only the first ones and its
+  total from a window count), and a CREATE or ALTER of a table or view is followed by its
+  reflected columns. A batch holding a statement no transaction admits (CREATE or
+  DROP DATABASE, VACUUM, CREATE INDEX CONCURRENTLY…, `OUTSIDE_TRANSACTION`) runs in autocommit and
+  cannot be undone; before it runs, the server closes its own pooled sessions on the connection's
+  other databases (`release_others`), which DROP DATABASE would otherwise count as users.
+- **Claude's tools answer in text, not JSON** (`mcps/databases.render`): a header per statement
+  (`[1] 50 rows, more from offset 50`, `[2] 120 rows inserted into items, 50 shown`,
+  `[3] created table items, 3 columns`, `[4] dropped table old`, `[5] done`), the columns and rows
+  tab-separated with `\\`, `\t`, `\n` and `\r` escaped, NULL as `\N`, cells cut at 200 characters,
+  50 rows by default with `limit` and `offset`. `statements_of` reads it back for the query block, so
+  the two change together.
 - **Reads and writes are told apart by sqlglot, failing closed.** The text is split on the
   tokenizer's semicolons, and a statement only reads when it parses as SELECT, a set operation,
   DESCRIBE, SHOW, EXPLAIN of a read or a PRAGMA without `=`. Anything else, or anything that does

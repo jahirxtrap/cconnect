@@ -37,6 +37,7 @@
   import InteractionBlock from "./InteractionBlock.svelte";
   import NoticeCard from "./NoticeCard.svelte";
   import PlanBlock from "./PlanBlock.svelte";
+  import QueryBlock from "./QueryBlock.svelte";
   import ReplyActions, { type ReplyHandlers } from "./ReplyActions.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
@@ -167,17 +168,28 @@
 {/snippet}
 
 {#snippet toolRow(props: Record<string, unknown>)}
-  <ToolBlock
-    name={typeof props.tool === "string" ? props.tool : message.toolName}
-    mcp={message.toolMcp}
-    input={typeof props.input === "string" ? props.input : message.text}
-    result={typeof props.output === "string" ? props.output : message.result}
-    took={message.toolMs}
-    {running}
-    {expanded}
-    {onToggle}
-    resultView={toolResult}
-  />
+  {#if message.query}
+    <QueryBlock
+      query={message.query}
+      statements={message.statements}
+      result={typeof props.output === "string" ? props.output : message.result}
+      {running}
+      {expanded}
+      {onToggle}
+    />
+  {:else}
+    <ToolBlock
+      name={typeof props.tool === "string" ? props.tool : message.toolName}
+      mcp={message.toolMcp}
+      input={typeof props.input === "string" ? props.input : message.text}
+      result={typeof props.output === "string" ? props.output : message.result}
+      took={message.toolMs}
+      {running}
+      {expanded}
+      {onToggle}
+      resultView={toolResult}
+    />
+  {/if}
 {/snippet}
 
 {#snippet fileChangeRow(props: Record<string, unknown>)}
@@ -410,7 +422,7 @@
       <MarkdownText text={message.text} dense class={fromPlugin ? "text-on-surface-variant" : ""} />
     </Collapsible>
   {:else if message.role === "usage" && message.usage}
-    <div class="w-full px-(--page-inset)">
+    <div class="w-full px-(--page-inset) select-none">
       <CardPanel>
         {#if message.usage.error !== null || !message.usage.windows.length}
           <p class="text-body-md text-on-surface-variant">{usageErrorText(message.usage) ?? t("NO_USAGE_DATA")}</p>

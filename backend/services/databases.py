@@ -1,7 +1,7 @@
 import hashlib
 import threading
 from pathlib import Path
-from typing import Any, NamedTuple, Optional
+from typing import Any, Callable, NamedTuple, Optional
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import URL, Engine, make_url
@@ -26,10 +26,11 @@ CONNECT_FAILED = "connect"
 
 
 class DatabaseError(Exception):
-    def __init__(self, reason: str, detail: str = ""):
+    def __init__(self, reason: str, detail: str = "", statement: Optional[int] = None):
         super().__init__(detail or reason)
         self.reason = reason
         self.detail = detail
+        self.statement = statement
 
 
 class Scope(NamedTuple):
@@ -195,6 +196,20 @@ def _located(project: Optional[str], relpath: str, unlocked: bool) -> Optional[P
     return project_files.resolve_file(root, relpath, unlocked) if root else None
 
 
+def is_file(connection_id: str) -> bool:
+    return connection_id.startswith(FILE_PREFIX)
+
+
+def open_path(found: Path) -> dict:
+    target = found.resolve()
+    if not target.is_file():
+        raise DatabaseError(MISSING, str(found))
+    digest = hashlib.sha256(str(target).encode("utf-8")).hexdigest()[:FILE_ID_LENGTH]
+    entry = clean({"id": f"{FILE_PREFIX}{digest}", "name": target.name, "engine": database_engines.file_engine(target), "path": str(target)})
+    _files[entry["id"]] = entry
+    return entry
+
+
 def open_file(project: Optional[str], relpath: str, unlocked: bool) -> dict:
     try:
         found = _located(project, relpath, unlocked)
@@ -202,11 +217,7 @@ def open_file(project: Optional[str], relpath: str, unlocked: bool) -> dict:
         raise DatabaseError(INVALID, relpath) from exc
     if found is None:
         raise DatabaseError(MISSING, relpath)
-    target = found.resolve()
-    digest = hashlib.sha256(str(target).encode("utf-8")).hexdigest()[:FILE_ID_LENGTH]
-    entry = clean({"id": f"{FILE_PREFIX}{digest}", "name": target.name, "engine": database_engines.file_engine(target), "path": str(target)})
-    _files[entry["id"]] = entry
-    return entry
+    return open_path(found)
 
 
 def listed(entry: dict) -> dict:
@@ -321,25 +332,31 @@ def engine_for(scope: Scope) -> tuple[Engine, dict]:
     return held[0], entry
 
 
-def close(connection_id: str) -> None:
+def _release(matches: Callable[[tuple[str, str]], bool]) -> None:
     with _lock:
-        held = [_engines.pop(slot) for slot in [slot for slot in _engines if slot[0] == connection_id]]
+        held = [_engines.pop(slot) for slot in [slot for slot in _engines if matches(slot)]]
     for item in held:
         _dispose(item)
 
 
-def close_engine(engine: str) -> None:
-    for entry in load():
-        if entry["engine"] == engine:
+def close(connection_id: str) -> None:
+    _release(lambda slot: slot[0] == connection_id)
+
+
+def release_others(scope: Scope) -> None:
+    _release(lambda slot: slot[0] == scope.connection and slot[1] != (scope.database or ""))
+
+
+def uninstall_driver(engine: str) -> None:
+    shared = set(database_engines.driver_of(engine))
+    for entry in [*load(), *_files.values()]:
+        if entry["engine"] in shared:
             close(entry["id"])
+    database_engines.uninstall(engine)
 
 
 def close_all() -> None:
-    with _lock:
-        held = list(_engines.values())
-        _engines.clear()
-    for item in held:
-        _dispose(item)
+    _release(lambda slot: True)
 
 
 def test(fields: dict, connection_id: Optional[str] = None) -> dict:

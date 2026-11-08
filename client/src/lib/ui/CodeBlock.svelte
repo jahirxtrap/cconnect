@@ -1,17 +1,25 @@
+<script lang="ts" module>
+  export const CAPPED_HEIGHT = "max-h-72";
+</script>
+
 <script lang="ts">
   import Check from "@lucide/svelte/icons/check";
   import Copy from "@lucide/svelte/icons/copy";
   import { theme } from "$lib/design/theme.svelte";
   import { copyText } from "$lib/platform/clipboard";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
-  import { hscrollbar } from "./scrollbar";
+  import { hscrollbar, TEXT_VIEWPORT_CLASS, viewportScrollbar } from "./scrollbar";
 
   interface Props {
     code: string;
     lang?: string | null;
+    capped?: boolean;
   }
 
-  const { code, lang }: Props = $props();
+  const { code, lang, capped = false }: Props = $props();
+
+  const PRE_CLASS = "px-2.5 py-2 font-mono text-body-sm";
+  const LINE_STYLE = "line-height: var(--chat-line-code)";
 
   const COPIED_MS = 1000;
 
@@ -73,10 +81,17 @@
       {/if}
     </button>
   </div>
-  <pre
-    use:hscrollbar={{ touchIndicator: true }}
-    style="line-height: var(--chat-line-code)"
-    class="no-scrollbar overflow-x-auto px-2.5 py-2 font-mono text-body-sm"><code
-      >{#if html}{@html html}{:else}{body}{/if}</code
-    ></pre>
+  {#if capped}
+    <pre
+      use:viewportScrollbar
+      style={LINE_STYLE}
+      class="{TEXT_VIEWPORT_CLASS} scrollbar-thin {CAPPED_HEIGHT} overflow-auto {PRE_CLASS}">{@render source()}</pre>
+  {:else}
+    <pre
+      use:hscrollbar={{ touchIndicator: true }}
+      style={LINE_STYLE}
+      class="no-scrollbar overflow-x-auto {PRE_CLASS}">{@render source()}</pre>
+  {/if}
 </div>
+
+{#snippet source()}<code>{#if html}{@html html}{:else}{body}{/if}</code>{/snippet}

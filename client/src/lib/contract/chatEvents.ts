@@ -237,6 +237,39 @@ export interface ToolUse {
   input?: string | null;
   result?: string | null;
   ms?: number | null;
+  query?: QueryCall | null;
+  statements?: QueryStatement[] | null;
+}
+export interface QueryCall {
+  connection: string;
+  name: string;
+  database?: string | null;
+  sql: string;
+  writes: boolean;
+  saved: boolean;
+}
+export interface QueryStatement {
+  kind: "rows" | "changed" | "structure" | "done";
+  columns?: string[] | null;
+  rows?: (string | null)[][] | null;
+  affected?: number | null;
+  more?: boolean;
+  structure?: QueryColumn[] | null;
+  effect?: QueryEffect | null;
+}
+export interface QueryColumn {
+  name: string;
+  type: string;
+  primary_key: boolean;
+  nullable: boolean;
+  auto: boolean;
+  default?: string | null;
+}
+export interface QueryEffect {
+  action: "inserted" | "updated" | "deleted" | "created" | "altered" | "dropped";
+  object: string;
+  schema?: string | null;
+  name: string;
 }
 export interface ToolResult {
   seq?: number | null;
@@ -247,6 +280,7 @@ export interface ToolResult {
   tool_use_id?: string | null;
   content?: string | null;
   ms?: number | null;
+  statements?: QueryStatement[] | null;
 }
 export interface FileChange {
   seq?: number | null;

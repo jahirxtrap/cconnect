@@ -8,6 +8,7 @@ export const CLIENT_CAPABILITIES = [
   "components",
   "usage",
   "terminal",
+  "databases",
   "browser",
   "install",
 ];

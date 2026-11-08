@@ -22,7 +22,8 @@
     "hidden_schemas": ["information_schema", "INFORMATION_SCHEMA"],
     "options": [],
     "extensions": [],
-    "signature": null
+    "signature": null,
+    "returning": null
   },
   "engines": [
     {
@@ -37,7 +38,8 @@
       "read_write": ["PRAGMA query_only = OFF"],
       "hidden_schemas": [],
       "extensions": ["db", "sqlite", "sqlite3", "db3", "s3db", "sl3", "sqlitedb", "sdb", "gpkg", "mbtiles"],
-      "signature": {"offset": 0, "text": "SQLite format 3"}
+      "signature": {"offset": 0, "text": "SQLite format 3"},
+      "returning": "clause"
     },
     {
       "id": "postgresql",
@@ -53,7 +55,8 @@
       "read_only": ["SET TRANSACTION READ ONLY"],
       "timeout": "SET LOCAL statement_timeout = {milliseconds}",
       "binary": "decode('{hex}', 'hex')",
-      "hidden_schemas": ["information_schema", "pg_catalog", "pg_toast"]
+      "hidden_schemas": ["information_schema", "pg_catalog", "pg_toast"],
+      "returning": "cte"
     },
     {
       "id": "mysql",
@@ -117,12 +120,13 @@
       "binary": "unhex('{hex}')",
       "hidden_schemas": ["information_schema", "pg_catalog", "system.information_schema", "system.main", "system.pg_catalog", "temp.information_schema", "temp.main", "temp.pg_catalog"],
       "extensions": ["duckdb", "ddb"],
-      "signature": {"offset": 8, "text": "DUCK"}
+      "signature": {"offset": 8, "text": "DUCK"},
+      "returning": "clause"
     },
-    {"id": "aurora_dsql", "extends": "postgresql", "label": "Amazon Aurora DSQL", "dialect": "auroradsql+psycopg", "packages": ["aurora-dsql-sqlalchemy", "psycopg[binary]"], "distributions": ["aurora-dsql-sqlalchemy", "psycopg"]},
+    {"id": "aurora_dsql", "extends": "postgresql", "label": "Amazon Aurora DSQL", "dialect": "auroradsql+psycopg", "packages": ["aurora-dsql-sqlalchemy", "psycopg[binary]"], "distributions": ["aurora-dsql-sqlalchemy", "psycopg"], "returning": null},
     {"id": "athena", "label": "Amazon Athena", "dialect": "awsathena+rest", "packages": ["pyathena[sqlalchemy]"], "distributions": ["pyathena"], "port": 443, "sqlglot": "athena", "options": ["s3_staging_dir", "work_group"]},
     {"id": "dynamodb", "label": "Amazon DynamoDB", "dialect": "dynamodb", "packages": ["pydynamodb"], "distributions": ["pydynamodb"], "port": 443, "options": ["region_name"]},
-    {"id": "redshift", "extends": "postgresql", "label": "Amazon Redshift", "home": "dev", "dialect": "redshift+psycopg2", "packages": ["sqlalchemy-redshift", "psycopg2-binary"], "distributions": ["sqlalchemy-redshift", "psycopg2-binary"], "port": 5439, "sqlglot": "redshift", "timeout": null},
+    {"id": "redshift", "extends": "postgresql", "label": "Amazon Redshift", "home": "dev", "dialect": "redshift+psycopg2", "packages": ["sqlalchemy-redshift", "psycopg2-binary"], "distributions": ["sqlalchemy-redshift", "psycopg2-binary"], "port": 5439, "sqlglot": "redshift", "timeout": null, "returning": null},
     {"id": "drill", "label": "Apache Drill", "dialect": "drill+sadrill", "packages": ["sqlalchemy-drill"], "distributions": ["sqlalchemy-drill"], "port": 8047, "sqlglot": "drill"},
     {"id": "druid", "label": "Apache Druid", "dialect": "druid", "packages": ["pydruid[sqlalchemy]"], "distributions": ["pydruid"], "port": 8082, "sqlglot": "druid"},
     {"id": "hive", "label": "Apache Hive", "dialect": "hive", "packages": ["pyhive[hive_pure_sasl]"], "distributions": ["pyhive"], "port": 10000, "sqlglot": "hive"},
@@ -144,13 +148,13 @@
     {"id": "db2", "label": "IBM Db2", "dialect": "db2+ibm_db", "packages": ["ibm-db-sa", "ibm_db"], "distributions": ["ibm-db-sa", "ibm_db"], "port": 50000, "hidden_schemas": ["SYSCAT", "SYSIBM", "SYSIBMADM", "SYSSTAT", "SYSTOOLS", "SYSPROC", "SYSFUN", "NULLID", "SQLJ"]},
     {"id": "iris", "label": "InterSystems IRIS", "dialect": "iris", "packages": ["sqlalchemy-iris"], "distributions": ["sqlalchemy-iris"], "port": 1972},
     {"id": "libsql", "label": "libSQL / Turso", "dialect": "sqlite+libsql", "packages": ["sqlalchemy-libsql"], "distributions": ["sqlalchemy-libsql"], "sqlglot": "sqlite", "hidden_schemas": [], "options": ["authToken", "secure"]},
-    {"id": "materialize", "extends": "postgresql", "label": "Materialize", "home": "materialize", "port": 6875, "sqlglot": "materialize", "read_only": [], "timeout": null, "hidden_schemas": ["information_schema", "pg_catalog", "mz_catalog", "mz_internal", "mz_introspection", "mz_unsafe"]},
+    {"id": "materialize", "extends": "postgresql", "label": "Materialize", "home": "materialize", "port": 6875, "sqlglot": "materialize", "read_only": [], "timeout": null, "hidden_schemas": ["information_schema", "pg_catalog", "mz_catalog", "mz_internal", "mz_introspection", "mz_unsafe"], "returning": null},
     {"id": "mimer", "label": "Mimer SQL", "dialect": "mimer", "packages": ["sqlalchemy-mimer"], "distributions": ["sqlalchemy-mimer"], "port": 1360},
     {"id": "monetdb", "label": "MonetDB", "dialect": "monetdb", "packages": ["sqlalchemy-monetdb"], "distributions": ["sqlalchemy-monetdb"], "port": 50000, "hidden_schemas": ["sys", "tmp", "json", "profiler", "logging", "information_schema"]},
     {"id": "mongodb", "label": "MongoDB", "dialect": "mongodb", "packages": ["pymongosql"], "distributions": ["pymongosql"], "port": 27017},
     {"id": "oceanbase", "extends": "mysql", "label": "OceanBase", "port": 2881, "timeout": null, "hidden_schemas": ["information_schema", "mysql", "oceanbase", "LBACSYS", "ORAAUDITOR"]},
-    {"id": "questdb", "extends": "postgresql", "label": "QuestDB", "home": "qdb", "port": 8812, "read_only": [], "timeout": null},
-    {"id": "risingwave", "extends": "postgresql", "label": "RisingWave", "home": "dev", "port": 4566, "sqlglot": "risingwave", "read_only": [], "timeout": null, "hidden_schemas": ["information_schema", "pg_catalog", "rw_catalog"]},
+    {"id": "questdb", "extends": "postgresql", "label": "QuestDB", "home": "qdb", "port": 8812, "read_only": [], "timeout": null, "returning": null},
+    {"id": "risingwave", "extends": "postgresql", "label": "RisingWave", "home": "dev", "port": 4566, "sqlglot": "risingwave", "read_only": [], "timeout": null, "hidden_schemas": ["information_schema", "pg_catalog", "rw_catalog"], "returning": null},
     {"id": "hana", "label": "SAP HANA", "dialect": "hana+hdbcli", "packages": ["sqlalchemy-hana"], "distributions": ["sqlalchemy-hana", "hdbcli"], "port": 30015, "hidden_schemas": ["SYS", "_SYS_BIC", "_SYS_BI", "_SYS_REPO", "_SYS_STATISTICS", "_SYS_XS"]},
     {"id": "sybase", "label": "SAP ASE (Sybase)", "dialect": "sybase+pyodbc", "packages": ["sqlalchemy-sybase", "pyodbc"], "distributions": ["sqlalchemy-sybase", "pyodbc"], "port": 5000, "sqlglot": "tsql"},
     {"id": "singlestore", "extends": "mysql", "label": "SingleStore", "dialect": "singlestoredb", "packages": ["sqlalchemy-singlestoredb"], "distributions": ["sqlalchemy-singlestoredb", "singlestoredb"], "connect_timeout": null, "read_only": [], "timeout": null, "hidden_schemas": ["information_schema", "cluster", "memsql"]},

@@ -1,4 +1,5 @@
-import { t } from "$lib/i18n/index.svelte";
+import { plural, t } from "$lib/i18n/index.svelte";
+import { formatDecimal } from "./format";
 import { flag, list, number, record, strings, text, type Wire } from "./wire";
 
 export type CellValue = string | number | boolean | null | CellValue[] | { [key: string]: CellValue };
@@ -98,6 +99,10 @@ export interface TableColumn {
   comment: string | null;
   options: string[];
 }
+
+export type ColumnShape = Pick<TableColumn, "name" | "type" | "primaryKey" | "nullable" | "auto" | "default"> & {
+  comment?: string | null;
+};
 
 export interface ForeignKey {
   columns: string[];
@@ -298,6 +303,12 @@ export const databaseFailureText = (failure: DatabaseFailure | null): string => 
   const key = REASON_KEYS[failure.reason];
   const reason = key ? t(key, failure.detail) : null;
   return [reason, WITHOUT_DETAIL.has(failure.reason) ? "" : failure.detail].filter(Boolean).join("\n");
+};
+
+export const statementSummary = (rows: number | null, affected: number | null): string => {
+  if (rows !== null) return plural("DATABASE_ROWS_COUNT", rows, formatDecimal(rows, 0));
+  if (affected === null) return t("DATABASE_EXECUTED");
+  return plural("DATABASE_ROWS_AFFECTED", affected, formatDecimal(affected, 0));
 };
 
 export const cellText = (value: CellValue): string =>

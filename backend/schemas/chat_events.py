@@ -38,6 +38,41 @@ class SharedFile(Shape):
     url: str
 
 
+class QueryCall(Shape):
+    connection: str
+    name: str
+    database: Optional[str] = None
+    sql: str
+    writes: bool
+    saved: bool
+
+
+class QueryColumn(Shape):
+    name: str
+    type: str
+    primary_key: bool
+    nullable: bool
+    auto: bool
+    default: Optional[str] = None
+
+
+class QueryEffect(Shape):
+    action: Literal["inserted", "updated", "deleted", "created", "altered", "dropped"]
+    object: str
+    schema_name: Optional[str] = Field(default=None, alias="schema")
+    name: str
+
+
+class QueryStatement(Shape):
+    kind: Literal["rows", "changed", "structure", "done"]
+    columns: Optional[list[str]] = None
+    rows: Optional[list[list[Optional[str]]]] = None
+    affected: Optional[int] = None
+    more: bool = False
+    structure: Optional[list[QueryColumn]] = None
+    effect: Optional[QueryEffect] = None
+
+
 class TodoItem(Shape):
     content: str
     status: str
@@ -172,6 +207,8 @@ class ToolUse(Event):
     input: Optional[str] = None
     result: Optional[str] = None
     ms: Optional[int] = None
+    query: Optional[QueryCall] = None
+    statements: Optional[list[QueryStatement]] = None
 
 
 class ToolResult(Event):
@@ -179,6 +216,7 @@ class ToolResult(Event):
     tool_use_id: Optional[str] = None
     content: Optional[str] = None
     ms: Optional[int] = None
+    statements: Optional[list[QueryStatement]] = None
 
 
 class FileChange(Event):

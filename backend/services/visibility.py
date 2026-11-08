@@ -108,6 +108,10 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
         carry["thinking"] = True
         return event
 
+    if kind in ("tool_use", "tool_result") and (event.get("query") or event.get("statements") is not None):
+        _reset(carry)
+        return event
+
     if kind in ("tool_use", "tool_result", "agent"):
         mode = prefs["tool_use"]
         if mode == "off":

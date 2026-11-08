@@ -1292,6 +1292,7 @@ def _subagent_file(session_dir: Path, agent_id: str) -> Optional[Path]:
 
 
 def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls: list[str]) -> list[dict]:
+    from mcps import databases as database_tools
     from services.claude_runtime import (
         _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
         _tool_naming, _flatten_result_content,
@@ -1347,17 +1348,19 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
                         continue
                     out.append({"type": "file_change", "name": name, "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id})
                     continue
-            if vis["tool_use"] == "off":
+            shown = database_tools.tool_mode(name, vis["tool_use"])
+            if shown == "off":
                 _working(out, vis)
                 continue
-            ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id}
+            ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, "parent": parent_id, **database_tools.query_view(name, inp)}
             took = sub_ms.get(bid or "") if vis.get("timings") else None
             if took is not None:
                 ev["ms"] = took
-            if vis["tool_use"] == "full":
+            if shown == "full":
                 result = _flatten_result_content(sub_results.get(bid or "")).strip()
                 if result:
                     ev["result"] = result
+                    ev.update(database_tools.result_view(name, result, inp))
             out.append(ev)
     return out
 
@@ -1787,7 +1790,7 @@ def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None
                 if item:
                     messages.append(item)
             elif btype == "tool_use":
-                from mcps import packs as packs_tool, shared_files
+                from mcps import databases as database_tools, packs as packs_tool, shared_files
                 from services.claude_runtime import _FILE_EDIT_TOOLS, _PACKS_RULE, _SHARE_RULE, _agent_event, _agent_input, _build_file_diff, _flatten_result_content, _format_tool_input, _tool_naming
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
@@ -1938,20 +1941,25 @@ def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None
                         continue
                 pack_id = str(inp.get("id") or "").strip() if isinstance(inp, dict) else ""
                 exported = name == _PACKS_RULE and inp.get("action") == "export" and pack_id
-                if vis["tool_use"] == "off":
+                shown = database_tools.tool_mode(name, vis["tool_use"])
+                if shown == "off":
                     _working(messages, vis)
                 else:
-                    ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid}
+                    ev = {"type": "tool_use", **_tool_naming(name), "text": _format_tool_input(inp), "id": bid, **database_tools.query_view(name, inp)}
                     took = tool_ms.get(bid or "") if vis.get("timings") else None
                     if took is not None:
                         ev["ms"] = took
-                    if vis["tool_use"] == "full":
+                    if shown == "full":
                         result = _flatten_result_content(tool_result_by_id.get(bid or "")).strip()
                         if result:
                             ev["result"] = result
+                            ev.update(database_tools.result_view(name, result, inp))
                     messages.append(ev)
                 if exported:
                     messages.append({"type": "shared", "files": packs_tool.exported(pack_id, project_key)})
+                handed_export = database_tools.exported(name, inp, _flatten_result_content(tool_result_by_id.get(bid or "")), project_key)
+                if handed_export:
+                    messages.append({"type": "shared", "files": handed_export})
         if user_images:
             messages.append({"type": "text", "role": role, "text": "", "images": user_images})
     return messages, calls

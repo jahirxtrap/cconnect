@@ -43,11 +43,30 @@ TRUTHY = ("true", "1", "t", "yes")
 COLON = ":"
 ESCAPED_COLON = "\\:"
 
+SKIP_CHUNK = 1000
+OUTSIDE_TRANSACTION = re.compile(
+    r"^\s*(CREATE\s+DATABASE|DROP\s+DATABASE|ALTER\s+DATABASE|ALTER\s+SYSTEM|VACUUM|REINDEX"
+    r"|CREATE\s+(UNIQUE\s+)?INDEX\s+CONCURRENTLY|DROP\s+INDEX\s+CONCURRENTLY|CREATE\s+TABLESPACE|DROP\s+TABLESPACE)\b",
+    re.IGNORECASE,
+)
+
 READ_COMMANDS = ("EXPLAIN", "SHOW", "DESCRIBE", "DESC")
 EXPLAIN_OPTIONS = re.compile(r"^\s*(\([^)]*\)|ANALYZE|ANALYSE|VERBOSE|QUERY\s+PLAN|FORMAT\s+\w+)\b", re.IGNORECASE)
 READ_TREES = (exp.Select, exp.SetOperation, exp.Describe, exp.Show)
 WRITE_NODES = (exp.Insert, exp.Update, exp.Delete, exp.Merge, exp.Create, exp.Drop, exp.Alter, exp.TruncateTable, exp.Into)
 NO_PARAMETERS = {"no_parameters": True}
+CHANGES = {exp.Insert: "inserted", exp.Update: "updated", exp.Delete: "deleted"}
+DEFINITIONS = {exp.Create: "created", exp.Alter: "altered", exp.Drop: "dropped"}
+SHAPED = ("table", "view")
+SHAPING = ("created", "altered")
+CHANGED_ALIAS = "cconnect_changed"
+TOTAL_ALIAS = "cconnect_total"
+RETURNING_CTE = "cte"
+
+ROWS = "rows"
+CHANGED = "changed"
+STRUCTURE = "structure"
+DONE = "done"
 
 QUERY_FAILED = "query"
 TIMEOUT = "timeout"
@@ -115,6 +134,8 @@ def kind_of(sqltype: Any) -> str:
 
 
 def _type_text(sqltype: Any) -> str:
+    if isinstance(sqltype, types.NullType):
+        return ""
     try:
         return str(sqltype)
     except Exception:
@@ -190,10 +211,16 @@ def statements(sql: str, dialect: str) -> list[str]:
     return [part.strip() for part in parts if part.strip()]
 
 
-def reads(statement: str, dialect: str) -> bool:
+def _parsed(statement: str, dialect: str) -> Optional[exp.Expression]:
     try:
-        tree = sqlglot.parse_one(statement, read=dialect)
+        return sqlglot.parse_one(statement, read=dialect)
     except (ParseError, TokenError):
+        return None
+
+
+def reads(statement: str, dialect: str) -> bool:
+    tree = _parsed(statement, dialect)
+    if tree is None:
         return False
     if isinstance(tree, exp.Command):
         name = tree.name.upper()
@@ -206,6 +233,25 @@ def reads(statement: str, dialect: str) -> bool:
     if isinstance(tree, exp.Pragma):
         return "=" not in statement
     return isinstance(tree, READ_TREES) and tree.find(*WRITE_NODES) is None
+
+
+def _effect_of(tree: Optional[exp.Expression]) -> Optional[dict]:
+    action = CHANGES.get(type(tree)) or DEFINITIONS.get(type(tree))
+    if action is None:
+        return None
+    kind = "table" if type(tree) in CHANGES else str(tree.args.get("kind") or "").lower()
+    if isinstance(tree.this, exp.Index):
+        return {"action": action, "object": kind, "schema": None, "name": tree.this.name}
+    target = tree.this if isinstance(tree.this, exp.Table) else tree.find(exp.Table)
+    if target is None:
+        return {"action": action, "object": kind, "schema": None, "name": ""}
+    return {"action": action, "object": kind, "schema": target.db or None, "name": target.name}
+
+
+def effects(connection_id: str, sql: str) -> list[Optional[dict]]:
+    found = databases.find(connection_id)
+    dialect = database_engines.spec_of(found)["sqlglot"] if found else ""
+    return [_effect_of(_parsed(part, dialect)) for part in statements(sql, dialect)]
 
 
 def _interrupt(connection: Connection, fired: threading.Event) -> None:
@@ -225,10 +271,12 @@ def _restore(connection: Connection, restoring: list[str]) -> None:
 
 
 @contextmanager
-def _session(engine: Engine, entry: dict, write: bool, seconds: int = QUERY_SECONDS) -> Iterator[Connection]:
+def _session(engine: Engine, entry: dict, write: bool, seconds: int = QUERY_SECONDS, autocommit: bool = False) -> Iterator[Connection]:
     item = database_engines.spec_of(entry)
     try:
         opened = engine.connect()
+        if autocommit:
+            opened.execution_options(isolation_level="AUTOCOMMIT")
     except SQLAlchemyError as exc:
         raise databases.DatabaseError(databases.CONNECT_FAILED, databases.detail_of(exc)) from exc
     fired = threading.Event()
@@ -247,8 +295,10 @@ def _session(engine: Engine, entry: dict, write: bool, seconds: int = QUERY_SECO
                 connection.commit()
             else:
                 connection.rollback()
-        except databases.DatabaseError:
+        except databases.DatabaseError as exc:
             connection.rollback()
+            if fired.is_set():
+                raise databases.DatabaseError(TIMEOUT, str(seconds), exc.statement) from exc
             raise
         except SQLAlchemyError as exc:
             connection.rollback()
@@ -266,11 +316,11 @@ def _reading(scope: databases.Scope, seconds: int = QUERY_SECONDS):
     return _session(engine, entry, False, seconds)
 
 
-def _writing(scope: databases.Scope):
+def _writing(scope: databases.Scope, autocommit: bool = False):
     engine, entry = databases.engine_for(scope)
     if entry["read_only"]:
         raise databases.DatabaseError(READ_ONLY)
-    return _session(engine, entry, True)
+    return _session(engine, entry, True, autocommit=autocommit)
 
 
 def _databases(connection: Connection, item: dict) -> list[str]:
@@ -438,37 +488,131 @@ def rows(scope: databases.Scope, schema: Optional[str], name: str, page: int, si
         }
 
 
-def query(scope: databases.Scope, sql: str, write: bool) -> dict:
-    dialect = _dialect(scope)
+def outside_transaction(statement: str) -> bool:
+    return bool(OUTSIDE_TRANSACTION.match(statement))
+
+
+def _skip(result: Any, count: int) -> None:
+    while count > 0:
+        taken = len(result.fetchmany(min(count, SKIP_CHUNK)))
+        if not taken:
+            return
+        count -= taken
+
+
+def _counted(result: Any) -> Optional[int]:
+    return result.rowcount if result.rowcount is not None and result.rowcount >= 0 else None
+
+
+def _statement_result(result: Any, limit: int, offset: int, changes: bool) -> dict:
+    if not result.returns_rows:
+        return {"kind": CHANGED if changes else DONE, "columns": None, "rows": None, "more": False, "affected": _counted(result)}
+    _skip(result, offset)
+    fetched = result.fetchmany(limit + 1)
+    return {
+        "kind": CHANGED if changes else ROWS,
+        "columns": list(result.keys()),
+        "rows": [[cell(value) for value in row] for row in fetched[:limit]],
+        "more": len(fetched) > limit,
+        "affected": _counted(result) if changes else None,
+    }
+
+
+def _returning(tree: Optional[exp.Expression], item: dict) -> Optional[str]:
+    if type(tree) not in CHANGES or any(tree.args.get(key) for key in ("returning", "order", "limit")):
+        return None
+    return item["returning"]
+
+
+def _with_returning(statement: str, mode: str, limit: int) -> str:
+    changing = f"{statement}\nRETURNING *"
+    if mode != RETURNING_CTE:
+        return changing
+    return f"WITH {CHANGED_ALIAS} AS (\n{changing}\n) SELECT *, count(*) OVER () AS {TOTAL_ALIAS} FROM {CHANGED_ALIAS} LIMIT {limit + 1}"
+
+
+def _changed_result(result: Any, mode: str, limit: int) -> dict:
+    columns = list(result.keys())
+    kept: list[Any] = []
+    total = 0
+    if mode == RETURNING_CTE:
+        fetched = result.fetchall()
+        total = fetched[0][-1] if fetched else 0
+        columns = columns[:-1]
+        kept = [row[:-1] for row in fetched[:limit]]
+    else:
+        for row in result:
+            total += 1
+            if total <= limit:
+                kept.append(row)
+    return {
+        "kind": CHANGED,
+        "columns": columns,
+        "rows": [[cell(value) for value in row] for row in kept],
+        "more": total > limit,
+        "affected": total,
+    }
+
+
+def _structure(scope: databases.Scope, found: dict) -> Optional[list[dict]]:
+    try:
+        info = table(scope, found["schema"], found["name"])
+    except (databases.DatabaseError, SQLAlchemyError, NoSuchTableError):
+        return None
+    return [
+        {key: column[key] for key in ("name", "type", "primary_key", "nullable", "auto", "default")}
+        for column in info["columns"]
+    ]
+
+
+def _shaped(scope: databases.Scope, done: dict) -> dict:
+    found = done["effect"]
+    if not found or found["action"] not in SHAPING or found["object"] not in SHAPED:
+        return done
+    columns = _structure(scope, found)
+    return {**done, "kind": STRUCTURE, "structure": columns} if columns else done
+
+
+def query(scope: databases.Scope, sql: str, write: bool, limit: int = MAX_ROWS, offset: int = 0) -> dict:
+    item = database_engines.spec_of(databases.require(scope.connection))
+    dialect = item["sqlglot"]
     parts = statements(sql, dialect)
     if not parts:
         raise databases.DatabaseError(INVALID)
     reading = all(reads(part, dialect) for part in parts)
     if not reading and not write:
         raise databases.DatabaseError(WRITES)
+    limit = max(1, min(limit, MAX_ROWS))
+    offset = max(0, offset)
+    outside = not reading and any(map(outside_transaction, parts))
+    if outside:
+        databases.release_others(scope)
     started = time.monotonic()
-    columns: Optional[list[str]] = None
-    found: Optional[list[list[Any]]] = None
-    truncated = False
-    affected: Optional[int] = None
-    with (_reading(scope) if reading else _writing(scope)) as connection:
-        for part in parts:
-            result = connection.exec_driver_sql(part, execution_options=NO_PARAMETERS)
-            if result.returns_rows:
-                fetched = result.fetchmany(MAX_ROWS + 1)
-                truncated = len(fetched) > MAX_ROWS
-                columns = list(result.keys())
-                found = [[cell(value) for value in row] for row in fetched[:MAX_ROWS]]
-            elif result.rowcount is not None and result.rowcount >= 0:
-                affected = (affected or 0) + result.rowcount
+    results: list[dict] = []
+    with (_reading(scope) if reading else _writing(scope, outside)) as connection:
+        for index, part in enumerate(parts, 1):
+            tree = None if reading else _parsed(part, dialect)
+            mode = _returning(tree, item)
+            try:
+                result = connection.exec_driver_sql(_with_returning(part, mode, limit) if mode else part, execution_options=NO_PARAMETERS)
+                done = _changed_result(result, mode, limit) if mode else _statement_result(result, limit, offset, type(tree) in CHANGES)
+            except SQLAlchemyError as exc:
+                raise databases.DatabaseError(QUERY_FAILED, databases.detail_of(exc), index) from exc
+            results.append({**done, "effect": _effect_of(tree), "structure": None})
+    elapsed = round((time.monotonic() - started) * 1000)
+    results = [_shaped(scope, found) for found in results]
+    shown = next((found for found in reversed(results) if found["columns"] is not None), None)
+    counts = [found["affected"] for found in results if found["affected"] is not None]
     return {
-        "columns": columns,
-        "rows": found,
-        "truncated": truncated,
-        "affected": affected,
+        "results": results,
+        "columns": shown["columns"] if shown else None,
+        "rows": shown["rows"] if shown else None,
+        "truncated": bool(shown and shown["more"]),
+        "affected": sum(counts) if counts else None,
         "statements": len(parts),
         "wrote": not reading,
-        "elapsed": round((time.monotonic() - started) * 1000),
+        "transaction": not outside,
+        "elapsed": elapsed,
     }
 
 
@@ -512,14 +656,14 @@ def delete_row(scope: databases.Scope, schema: Optional[str], name: str, key: di
 
 
 def _file_safe(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", name)
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._-")
 
 
-def _export_file(entry: dict, base: str, extension: str) -> Path:
-    folder = shared.project_dir("") / EXPORTS_FOLDER / _file_safe(entry["id"])
+def _export_file(entry: dict, base: str, extension: str, folder: Optional[Path] = None) -> Path:
+    folder = folder or shared.project_dir("") / EXPORTS_FOLDER / _file_safe(entry["id"])
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return folder / f"{_file_safe(base)}-{stamp}.{extension}"
+    return folder / f"{_file_safe(base) or _file_safe(entry['id'])}-{stamp}.{extension}"
 
 
 def _relative(target: Path) -> str:
@@ -585,11 +729,20 @@ def _write_inserts(target: Path, engine: Engine, entry: dict, reflected: Table, 
             handle.write(f"INSERT INTO {name} ({columns}) VALUES ({values});\n")
 
 
-def export_table(scope: databases.Scope, schema: Optional[str], name: str, sort: Optional[str], descending: bool, where: str, format: str) -> str:
+def export_table(
+    scope: databases.Scope,
+    schema: Optional[str],
+    name: str,
+    sort: Optional[str],
+    descending: bool,
+    where: str,
+    format: str,
+    folder: Optional[Path] = None,
+) -> str:
     if format not in TABLE_FORMATS:
         raise databases.DatabaseError(INVALID, format)
     engine, entry = databases.engine_for(scope)
-    target = _export_file(entry, name, format)
+    target = _export_file(entry, name, format, folder)
     with _reading(scope, EXPORT_SECONDS) as connection:
         reflected = _reflect(scope, connection, schema, name)
         selected = _ordered(_filtered(scope, reflected, where), reflected, sort, descending)
@@ -601,13 +754,13 @@ def export_table(scope: databases.Scope, schema: Optional[str], name: str, sort:
     return _relative(target)
 
 
-def export_query(scope: databases.Scope, sql: str) -> str:
+def export_query(scope: databases.Scope, sql: str, folder: Optional[Path] = None) -> str:
     entry = databases.require(scope.connection)
     dialect = _dialect(scope)
     parts = statements(sql, dialect)
     if len(parts) != 1 or not reads(parts[0], dialect):
         raise databases.DatabaseError(INVALID)
-    target = _export_file(entry, scope.database or entry["name"], CSV)
+    target = _export_file(entry, scope.database or entry["name"], CSV, folder)
     with _reading(scope, EXPORT_SECONDS) as connection:
         result = connection.execution_options(stream_results=True).exec_driver_sql(parts[0], execution_options=NO_PARAMETERS)
         if not result.returns_rows:

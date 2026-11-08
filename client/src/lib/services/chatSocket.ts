@@ -1,6 +1,8 @@
 import {
   diffKindOf,
+  queryOf,
   sharedFilesFrom,
+  statementsOf,
   VALUE_SEPARATOR,
   type AgentRun,
   type CompactData,
@@ -13,6 +15,8 @@ import {
   type InteractionMod,
   type InteractionOption,
   type InteractionRequest,
+  type QueryCall,
+  type QueryStatement,
   type QueuedMessage,
   type SharedFile,
   type TodoItem,
@@ -83,8 +87,16 @@ export type ServerEvent =
       input: string | null;
       result: string | null;
       ms: number | null;
+      query: QueryCall | null;
+      statements: QueryStatement[] | null;
     }
-  | { type: "tool_result"; toolUseId: string | null; content: string | null; ms: number | null }
+  | {
+      type: "tool_result";
+      toolUseId: string | null;
+      content: string | null;
+      ms: number | null;
+      statements: QueryStatement[] | null;
+    }
   | { type: "file_change"; id: string | null; tool: string | null; path: string; diffLines: DiffLine[]; labelOnly: boolean }
   | { type: "shared"; id: string | null; files: SharedFile[] }
   | { type: "compacting" }
@@ -742,6 +754,8 @@ export class ChatSocket {
           input: event.input ?? null,
           result: event.result ?? null,
           ms: event.ms ?? null,
+          query: queryOf(wire),
+          statements: statementsOf(wire),
         };
       case "tool_result":
         return {
@@ -749,6 +763,7 @@ export class ChatSocket {
           toolUseId: event.tool_use_id ?? null,
           content: event.content ?? null,
           ms: event.ms ?? null,
+          statements: statementsOf(wire),
         };
       case "file_change":
         return {

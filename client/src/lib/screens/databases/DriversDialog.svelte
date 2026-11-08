@@ -3,6 +3,7 @@
   import Plug from "@lucide/svelte/icons/plug";
   import Trash from "@lucide/svelte/icons/trash";
   import { databaseFailureText, engineLabel, type DatabaseEngine } from "$lib/data/databaseModels";
+  import { keyRefused, type KeyGate } from "$lib/data/keyGate.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { databases } from "$lib/services/databases.svelte";
@@ -19,10 +20,11 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
+    gate: KeyGate;
     onDismiss: () => void;
   }
 
-  const { onDismiss }: Props = $props();
+  const { gate, onDismiss }: Props = $props();
 
   interface Driver {
     key: string;
@@ -55,18 +57,18 @@
   const installed = $derived(drivers.filter((driver) => driver.engine.installed));
   const offered = $derived(drivers.filter((driver) => !driver.engine.installed));
 
-  const act = async (action: () => Promise<DatabaseOutcome<DatabaseEngine[]>>) => {
+  const act = async (action: (key: string) => Promise<DatabaseOutcome<DatabaseEngine[]>>) => {
     busy = true;
     failed = null;
-    const result = await action();
+    const result = await gate.run(action);
     busy = false;
     if (result.ok) databases.adoptEngines(profile, result.value);
-    else failed = databaseFailureText(result.failure);
+    else if (!keyRefused(result)) failed = databaseFailureText(result.failure);
   };
 
   const uninstall = (driver: Driver) => {
     removing = null;
-    return act(() => api.uninstall(driver.engine.id));
+    return act((key) => api.uninstall(driver.engine.id, key));
   };
 </script>
 
@@ -102,7 +104,7 @@
     {#each offered as driver (driver.key)}
       <ListRow title={driver.title} subtitle={driver.engines} subtitleLines={2} leading={tile}>
         {#snippet trailing()}
-          <TooltipIconButton label={t("INSTALL")} enabled={!busy} onclick={() => void act(() => api.install(driver.engine.id))}>
+          <TooltipIconButton label={t("INSTALL")} enabled={!busy} onclick={() => void act((key) => api.install(driver.engine.id, key))}>
             <Download />
           </TooltipIconButton>
         {/snippet}
