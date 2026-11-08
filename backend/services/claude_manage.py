@@ -33,13 +33,6 @@ _SKILL_FILE = "SKILL.md"
 _CLONE_TIMEOUT = 120
 
 
-def _shared(result: dict) -> dict:
-    """Push a successful change out to the secondary accounts."""
-    if result.get("ok"):
-        accounts.sync_all_shared_config()
-    return result
-
-
 def _cli() -> str | None:
     return cli_manager.resolve_cli_path() or cli_manager.system_cli()
 
@@ -115,11 +108,11 @@ def plugin_action(action: str, plugin: str) -> dict:
     if action not in _PLUGIN_ACTIONS:
         return {"ok": False, "message": f"invalid action: {action}"}
     if action == "uninstall" and plugin.partition("@")[2] == claude_assets.LOCAL_MARKETPLACE:
-        return _shared(_remove_local(plugin))
+        return _remove_local(plugin)
     if action == "install":
-        return _shared(_run(["plugin", action, plugin]))
+        return _run(["plugin", action, plugin])
     flags, cwd = _plugin_place(plugin)
-    return _shared(_run(["plugin", action, plugin, *flags], cwd=cwd))
+    return _run(["plugin", action, plugin, *flags], cwd=cwd)
 
 
 def _review(folder: Path) -> dict | None:
@@ -179,7 +172,7 @@ def plugin_options(plugin: str) -> dict | None:
 
 def set_plugin_options(plugin: str, values: dict[str, str]) -> dict:
     cwd = _plugin_place(plugin)[1]
-    return _shared(_run(["plugin", "configure", "--values-stdin", plugin], cwd=cwd, stdin=json.dumps(values)))
+    return _run(["plugin", "configure", "--values-stdin", plugin], cwd=cwd, stdin=json.dumps(values))
 
 
 def add_local_plugin(source: str) -> dict:
@@ -199,7 +192,7 @@ def add_local_plugin(source: str) -> dict:
         shutil.copytree(folder, target, ignore=shutil.ignore_patterns(*_COPY_SKIPS))
     except OSError as exc:
         return {"ok": False, "message": str(exc)}
-    return _shared({"ok": True, "message": ""})
+    return {"ok": True, "message": ""}
 
 
 def _clone_url(source: str) -> str | None:
@@ -258,7 +251,7 @@ def install_skill(source: str, path: str, ref: str) -> dict:
         return {"ok": False, "message": str(exc)}
     finally:
         paths.remove_tree(scratch)
-    return _shared({"ok": True, "message": ""})
+    return {"ok": True, "message": ""}
 
 
 def _remove_local(plugin: str) -> dict:
@@ -280,7 +273,7 @@ def _remove_local(plugin: str) -> dict:
 def marketplace_action(action: str, target: str) -> dict:
     if action not in _MARKETPLACE_ACTIONS:
         return {"ok": False, "message": f"invalid action: {action}"}
-    return _shared(_run(["plugin", "marketplace", action, target]))
+    return _run(["plugin", "marketplace", action, target])
 
 
 def set_marketplace_auto_update(name: str, enabled: bool) -> dict:
@@ -293,7 +286,7 @@ def set_marketplace_auto_update(name: str, enabled: bool) -> dict:
         cli_settings.declare_auto_update(name, enabled)
     except OSError as exc:
         return {"ok": False, "message": str(exc)}
-    return _shared({"ok": True, "message": ""})
+    return {"ok": True, "message": ""}
 
 
 async def ensure_official_marketplace() -> None:
@@ -307,11 +300,11 @@ def _mcp_add(name: str, transport: str, target: str, args: list[str], env: list[
         return {"ok": False, "message": "name and command/url are required"}
     if transport in _MCP_REMOTE:
         flags = [arg for key, value in headers.items() for arg in ("--header", f"{key}: {value}")]
-        return _shared(_run(["mcp", "add", "-s", "user", "--transport", transport, name, target, *flags]))
+        return _run(["mcp", "add", "-s", "user", "--transport", transport, name, target, *flags])
     if not all(_ENV_ENTRY.match(entry) for entry in env):
         return {"ok": False, "message": "environment variables go one per line as KEY=value"}
     flags = [arg for entry in env for arg in ("-e", entry)]
-    return _shared(_run(["mcp", "add", "-s", "user", name, *flags, "--", target, *args]))
+    return _run(["mcp", "add", "-s", "user", name, *flags, "--", target, *args])
 
 
 def mcp_add(
@@ -337,7 +330,7 @@ def mcp_remove(name: str) -> dict:
         return {"ok": False, "message": "name is required"}
     if _enable(name):
         return {"ok": True, "message": ""}
-    return _shared(_run(["mcp", "remove", name]))
+    return _run(["mcp", "remove", name])
 
 
 def disabled_mcp_servers() -> dict:
@@ -368,7 +361,7 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
         result = _run(["mcp", "add-json", "-s", "user", name, json.dumps(cfg)])
         if result["ok"]:
             _enable(name)
-        return _shared(result)
+        return result
     try:
         servers = json.loads((Path.home() / ".claude.json").read_text(encoding="utf-8")).get("mcpServers", {})
     except (OSError, json.JSONDecodeError):
@@ -379,4 +372,4 @@ def mcp_set_enabled(name: str, enabled: bool) -> dict:
     result = _run(["mcp", "remove", name])
     if result["ok"]:
         _disable(name, cfg)
-    return _shared(result)
+    return result

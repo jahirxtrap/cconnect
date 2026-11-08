@@ -95,10 +95,6 @@ SETTINGS: dict[str, CliSettingDef] = {
 }
 
 
-def json_keys() -> tuple[str, ...]:
-    return tuple(defn.json_key for defn in SETTINGS.values())
-
-
 def lookup(data: dict, key: str) -> Any:
     *parents, leaf = key.split(".")
     for part in parents:
@@ -204,8 +200,6 @@ def describe() -> dict[str, dict]:
 
 
 def set(key: str, value: Any) -> None:
-    from services import accounts
-
     if key not in SETTINGS:
         raise KeyError(key)
     defn = SETTINGS[key]
@@ -223,7 +217,6 @@ def set(key: str, value: Any) -> None:
     elif value is None or _valid(lookup(data, defn.json_key), defn.type):
         discard(data, defn.json_key)
     _write(data)
-    accounts.sync_all_shared_config()
 
 
 def reset() -> None:

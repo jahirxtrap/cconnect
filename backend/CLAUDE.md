@@ -47,7 +47,11 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   does not answer), `elicitation` (an MCP form as the chat's form and back), `sessions` (transcripts, checkpoints, images), `chat_list`,
   `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
   `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
-  `usage`, `accounts`, `shared`, `git_ops` (the commit panel, on top of the single runner in
+  `usage`, `accounts` (an account is only its credentials: the CLI runs on the primary config
+  with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account's folder, so MCP servers, plugins,
+  settings and history are one for all, and only signing in uses that folder as the whole config,
+  so the identity lands there; older folders still hold links into the primary, and `purge`
+  detaches every link before removing one, or refuses), `shared`, `git_ops` (the commit panel, on top of the single runner in
   `services/git`, one lock per repository), `browser` (the server's Chromium, started only
   while a socket watches one of its tabs), `agents` / `agent_registry` (the ACP agents installed
   from the official catalog or added by hand), `agent_connections` / `agent_sessions` /
@@ -276,7 +280,7 @@ releases the least recently used idle ones past it; the live session releases it
 `session_grace` seconds (300 by default) after the last socket detaches, once nothing runs in the background (`working` counts the
 tasks the CLI reported). A turn whose options differ from the ones the CLI started with
 (`mark`: model, effort, permission mode, mods, capabilities) closes it and starts a fresh one, and so does
-another account, since the account is the CLI's config folder and credentials. Stopping or
+another account, since the account is the CLI's credentials. Stopping or
 restarting the server closes the persistent CLIs and the agents' processes first
 (`live_sessions.close_processes`). When the CLI
 starts a turn on its own, a mod sending a prompt or a background task finishing,

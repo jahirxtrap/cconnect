@@ -64,7 +64,7 @@ class _LoginSession:
         if not executable:
             raise RuntimeError("claude CLI not found")
         env = dict(os.environ)
-        env.update(accounts.env_for(self.account_id))
+        env.update(accounts.login_env(self.account_id))
         env["BROWSER"] = "echo"
         args = [executable, "auth", "login", "--claudeai"]
         if _WINDOWS:

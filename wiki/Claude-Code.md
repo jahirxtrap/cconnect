@@ -32,10 +32,10 @@ it on whatever device you like, approve the account there and paste the code
 back. Nothing is typed on the server, and each account keeps its own
 credentials, refreshed by the CLI as usual.
 
-What they share is everything you'd want in common — the same conversation
-history, plugins and skills — so switching accounts only changes who pays for
-the turn, not what you see. MCP servers are copied over when the account is
-created, and can be re-synced later.
+Everything else is one configuration for all of them — conversation history,
+MCP servers, plugins, skills, settings and memories — so something added while
+using one account is there for every other, and switching accounts only changes
+who pays for the turn, not what you see.
 
 Pick the account per chat from the composer bar, or set the server-wide default
 from the Claude screen's header (the usage shown there follows it, and its

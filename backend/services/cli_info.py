@@ -119,10 +119,10 @@ def _folder_stamp(folder: Path) -> tuple:
     return tuple(sorted((str(path), _stat(path)) for pattern in ("*.md", "*/*.md") for path in folder.glob(pattern)))
 
 
-def _stamp(target: str) -> tuple:
+def _stamp() -> tuple:
     from services import accounts
 
-    roots = (accounts.config_dir(target) or accounts.primary_dir(), Path(DEFAULT_CWD) / ".claude")
+    roots = (accounts.primary_dir(), Path(DEFAULT_CWD) / ".claude")
     return (
         cli_manager.cli_stamp(),
         tuple(_stat(root / name) for root in roots for name in _CONFIG_FILES),
@@ -131,7 +131,7 @@ def _stamp(target: str) -> tuple:
 
 
 async def _read(target: str, generation: int) -> dict[str, Any]:
-    stamp = await asyncio.to_thread(_stamp, target)
+    stamp = await asyncio.to_thread(_stamp)
     try:
         info = await _fetch(target)
     except Exception as exc:
@@ -159,7 +159,7 @@ def _target(account: Optional[str]) -> str:
 async def server_info(refresh: bool = False, account: Optional[str] = None) -> dict[str, Any]:
     target = _target(account)
     known = _snapshots.get(target)
-    if refresh or known is None or known[0] != await asyncio.to_thread(_stamp, target):
+    if refresh or known is None or known[0] != await asyncio.to_thread(_stamp):
         return await asyncio.shield(_reread(target))
     return known[1]
 

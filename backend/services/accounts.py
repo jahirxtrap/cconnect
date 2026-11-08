@@ -1,35 +1,21 @@
-"""Claude accounts: isolated credentials over a shared history, plugins and skills.
-
-Each account is a ``CLAUDE_CONFIG_DIR`` of its own, so the CLI keeps refreshing its
-credentials as usual. The directories that must stay common are linked back to the
-primary config dir instead of being copied.
-"""
-
 from __future__ import annotations
 
 import io
 import json
 import os
 import re
-import shutil
-import subprocess
 import zipfile
 
 import psutil
-import sys
 from base64 import b64encode
 from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 
-from loguru import logger
-
 from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
 from core.slugs import unique
-from services import cli_settings, files, providers, sessions, settings_store
-
-_WINDOWS = sys.platform == "win32"
+from services import files, providers, settings_store
 
 PRIMARY_ID = "default"
 PRIMARY_LABEL = "Default"
@@ -43,20 +29,15 @@ AUTH_HEADER = "header"
 
 _MODEL_ALIASES = ("SONNET", "OPUS", "HAIKU")
 
-_synced: dict[str, tuple[int, ...]] = {}
 _META_FILE = "account.json"
 _DELETING = ".deleting"
-_SHARED_DIRS = ("projects", "plugins", "skills")
-_COPIED_FILES = ("settings.json",)
 _ID_RE = re.compile(r"[^a-z0-9-]+")
 
 _CREDENTIALS_FILE = ".credentials.json"
 _IDENTITY_FILE = ".claude.json"
-_BUNDLE_FILES = (_CREDENTIALS_FILE, "settings.json", _IDENTITY_FILE, _META_FILE)
+_BUNDLE_FILES = (_CREDENTIALS_FILE, _IDENTITY_FILE, _META_FILE)
 _IDENTITY_KEYS = ("oauthAccount", "userID")
 
-_SHARED_KEYS = ("mcpServers",)
-_SHARED_SETTINGS_KEYS = ("enabledPlugins", "extraKnownMarketplaces", "pluginConfigs") + cli_settings.json_keys()
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 
 
@@ -65,7 +46,6 @@ def primary_dir() -> Path:
 
 
 def config_dir(account_id: Optional[str]) -> Optional[Path]:
-    """Config dir for an account, or None for the primary one (the CLI default)."""
     if not account_id or account_id == PRIMARY_ID:
         return None
     path = paths.ACCOUNTS_DIR / account_id
@@ -93,7 +73,6 @@ def context_scope(account_id: Optional[str]) -> dict:
 
 
 def model_for(account_id: Optional[str], alias: str) -> str:
-    """A Claude alias means nothing to a provider, which only serves its own models."""
     provider = provider_for(account_id)
     return (provider.get("model") or alias) if provider else alias
 
@@ -128,12 +107,8 @@ def _auth_env(auth: dict) -> dict[str, str]:
 
 
 def env_for(account_id: Optional[str]) -> dict[str, str]:
-    """Environment overrides to run the CLI as this account, with its shared config brought up to date."""
     path = config_dir(account_id)
-    if path is not None:
-        link_shared_dirs(account_id)
-        sync_shared_config(account_id)
-    env = {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
+    env = {"CLAUDE_SECURESTORAGE_CONFIG_DIR": str(path)} if path else {}
     provider = provider_for(account_id)
     if not provider:
         return env
@@ -144,6 +119,11 @@ def env_for(account_id: Optional[str]) -> dict[str, str]:
         for alias in _MODEL_ALIASES:
             env[f"ANTHROPIC_DEFAULT_{alias}_MODEL"] = fallback
     return env
+
+
+def login_env(account_id: Optional[str]) -> dict[str, str]:
+    path = config_dir(account_id)
+    return {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
 
 
 def credentials_path(account_id: Optional[str] = None) -> Path:
@@ -232,73 +212,6 @@ def resolve(account_id: Optional[str], known: Optional[set[str]] = None) -> str:
     return account_id if account_id in ids else default_account(ids)
 
 
-def _adopt(item: Path, destination: Path) -> bool:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        os.replace(item, destination)
-    except OSError:
-        try:
-            shutil.copy2(item, destination)
-        except OSError:
-            return False
-    return True
-
-
-def _merge_dir(source: Path, target: Path) -> tuple[list[Path], bool]:
-    adopted: list[Path] = []
-    merged = True
-    for item in source.rglob("*"):
-        if item.is_dir():
-            continue
-        destination = target / item.relative_to(source)
-        if destination.exists():
-            continue
-        if _adopt(item, destination):
-            adopted.append(destination)
-        else:
-            merged = False
-    return adopted, merged
-
-
-def _link_dir(source: Path, target: Path) -> None:
-    if paths.is_link(target):
-        if target.resolve() == source.resolve():
-            return
-        paths.unlink_dir(target)
-    elif target.is_dir():
-        adopted, merged = _merge_dir(target, source)
-        if not merged or not paths.remove_tree(target):
-            logger.warning(f"accounts: {target} could not be emptied to share {source}")
-            return
-        for path in adopted:
-            sessions.normalize_entrypoint(path)
-    source.mkdir(parents=True, exist_ok=True)
-    if _WINDOWS:
-        made = subprocess.run(
-            ["cmd", "/c", "mklink", "/J", str(target), str(source)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        if made.returncode != 0:
-            logger.warning(f"accounts: {target} could not be linked to {source}: {made.stderr.strip()}")
-    else:
-        target.symlink_to(source, target_is_directory=True)
-
-
-def link_shared_dirs(account_id: str) -> None:
-    path = config_dir(account_id)
-    if path is None:
-        return
-    primary = primary_dir()
-    for name in _SHARED_DIRS:
-        _link_dir(primary / name, path / name)
-
-
-def link_all_shared_dirs() -> None:
-    for entry in _account_dirs():
-        link_shared_dirs(entry.name)
-
-
 def _slug(label: str, taken: set[str]) -> str:
     base = _ID_RE.sub("-", label.strip().lower()).strip("-") or "account"
     if base == PRIMARY_ID:
@@ -312,18 +225,10 @@ def create(label: str) -> dict:
     path = paths.ACCOUNTS_DIR / account_id
     path.mkdir(parents=True, exist_ok=True)
     files.write_json(path / _META_FILE, {"label": label.strip() or account_id})
-    link_shared_dirs(account_id)
-    primary = primary_dir()
-    for name in _COPIED_FILES:
-        source = primary / name
-        if source.is_file():
-            shutil.copy2(source, path / name)
-    sync_shared_config(account_id)
     return {"id": account_id, "label": label, "logged_in": False, "primary": False, "provider": None}
 
 
 def forget(account_id: str) -> bool:
-    """Take an account out of every list at once; ``purge`` removes its folder once nothing holds it."""
     if config_dir(account_id) is None:
         return False
     _tombstone(account_id).touch()
@@ -335,8 +240,11 @@ def forget(account_id: str) -> bool:
 def purge(account_id: str) -> bool:
     path = paths.ACCOUNTS_DIR / account_id
     if path.is_dir():
-        for name in _SHARED_DIRS:
-            paths.unlink_dir(path / name)
+        for entry in path.iterdir():
+            if paths.is_link(entry):
+                paths.unlink_dir(entry)
+        if any(paths.is_link(entry) for entry in path.iterdir()):
+            return False
         _stop_processes_in(path)
         if not paths.remove_tree(path):
             return False
@@ -374,7 +282,6 @@ def rename(account_id: str, label: str) -> bool:
 
 
 def set_delegation(account_id: str, delegate: bool, purpose: str) -> bool:
-    """Whether Claude may hand this account a task, and what it is good for."""
     return _write_meta(account_id, {"delegate": delegate, "purpose": purpose.strip()})
 
 
@@ -442,8 +349,6 @@ def plan_name(account_id: Optional[str]) -> Optional[str]:
 
 
 def export_bundle(account_id: str) -> Optional[bytes]:
-    """Zip the credentials and the account's own config. History, caches, the
-    machine id and the linked projects/plugins/skills are all left out."""
     if account_id not in known_ids():
         return None
     credentials = credentials_path(account_id)
@@ -525,7 +430,6 @@ def _merge_identity(target: Path, raw: Optional[bytes]) -> None:
 
 
 def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
-    """Always lands on a new account, so importing never overwrites a live one."""
     payload = _read_bundle(data)
     if payload is None:
         return None
@@ -533,8 +437,6 @@ def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
     path = paths.ACCOUNTS_DIR / account["id"]
     if _CREDENTIALS_FILE in payload:
         (path / _CREDENTIALS_FILE).write_bytes(payload[_CREDENTIALS_FILE])
-    if "settings.json" in payload:
-        (path / "settings.json").write_bytes(payload["settings.json"])
     _merge_identity(path / _IDENTITY_FILE, payload.get(_IDENTITY_FILE))
     provider = _bundle_provider(payload)
     if provider:
@@ -543,55 +445,3 @@ def import_bundle(data: bytes, label: str = "") -> Optional[dict]:
         account["provider"] = {"base_url": provider["base_url"], "model": provider.get("model", "")}
     account["logged_in"] = bool(provider) or is_logged_in(account["id"])
     return account
-
-
-def _merge_shared(source: Path, target: Path, keys: tuple[str, ...]) -> None:
-    try:
-        primary = json.loads(source.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return
-    try:
-        current = json.loads(target.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        current = {}
-    before = {key: cli_settings.lookup(current, key) for key in keys}
-    for key in keys:
-        value = cli_settings.lookup(primary, key)
-        if value is None:
-            cli_settings.discard(current, key)
-        else:
-            cli_settings.assign(current, key, value)
-    if target.is_file() and before == {key: cli_settings.lookup(current, key) for key in keys}:
-        return
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(json.dumps(current, indent=2), encoding="utf-8")
-
-
-def _mtime(path: Path) -> int:
-    try:
-        return path.stat().st_mtime_ns
-    except OSError:
-        return 0
-
-
-def sync_shared_config(account_id: str) -> None:
-    """Overwrite this account's shared keys with the primary's, leaving the rest untouched."""
-    path = config_dir(account_id)
-    if path is None:
-        return
-    shared = (
-        _claude_json(None),
-        primary_dir() / "settings.json",
-        _claude_json(account_id),
-        path / "settings.json",
-    )
-    if _synced.get(account_id) == tuple(_mtime(item) for item in shared):
-        return
-    _merge_shared(shared[0], shared[2], _SHARED_KEYS)
-    _merge_shared(shared[1], shared[3], _SHARED_SETTINGS_KEYS)
-    _synced[account_id] = tuple(_mtime(item) for item in shared)
-
-
-def sync_all_shared_config() -> None:
-    for entry in _account_dirs():
-        sync_shared_config(entry.name)

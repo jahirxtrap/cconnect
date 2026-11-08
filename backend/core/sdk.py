@@ -4,7 +4,6 @@ import asyncio
 import importlib.metadata
 import os
 import subprocess
-import sys
 
 from loguru import logger
 
@@ -13,13 +12,14 @@ from core import packages
 SDK_PACKAGE = "claude-agent-sdk"
 SDK_MODULE = "claude_agent_sdk"
 SETTING = "sdk_auto_update"
+_INHERITED_AUTH = ("ANTHROPIC_API_KEY", "CLAUDE_SECURESTORAGE_CONFIG_DIR")
 
 
 def ensure_subscription_auth():
-    """Drop ANTHROPIC_API_KEY so the SDK falls back to the Claude Code CLI OAuth
-    (the user's subscription). An exported key silently wins and bills API credits."""
-    if os.environ.pop("ANTHROPIC_API_KEY", None):
-        logger.info("Removed ANTHROPIC_API_KEY from the process env; using subscription auth.")
+    """Drop the credentials the server inherits, so every CLI bills the account CConnect gives it."""
+    for name in _INHERITED_AUTH:
+        if os.environ.pop(name, None):
+            logger.info(f"Removed {name} from the process env; each CLI gets its account's own.")
 
 
 def installed_version() -> str | None:
