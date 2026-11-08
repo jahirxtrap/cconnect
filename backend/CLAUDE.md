@@ -79,7 +79,10 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `chat_list` does (on Linux starting it walks the whole tree, one inotify watch per folder,
   and a large project froze the server when that ran on the event loop), `pages` (an HTML page served with the folder around it, so its
   styles, scripts and images load), `processes` (what the server runs, matched to its chat,
-  agent, terminal or browser, and stopped the way that screen stops it), `databases` (the
+  agent, terminal or browser, and stopped the way that screen stops it), `mcp_lazy` (the local MCP
+  servers a chat's CLI reaches through the backend, each started on its first call; see *Local MCP
+  servers on demand*), `memory_pressure` (the system's low-memory signal, see *Persistent sessions and
+  mods*), `databases` (the
   connections in `database_connections`, whose passwords never reach the app, and one engine per
   connection), `database_engines` (**the** engine table: dialect, driver distributions installed on
   demand, read-only preludes, timeout, binary literal and hidden schemas), `database_tunnels`
@@ -103,10 +106,11 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 
 `PUBLIC_ACCESS_TOKEN` is honoured only when `CCONNECT_AUTH_ACTIVE=1`, so a token left in
 `.env` never locks down a plain local run. `PublicAuthMiddleware` gates every `/api/*`
-except `/api/health` and the two routes an agent's own process calls on loopback with a token
-of its connection instead: `/api/agents/browse` (the `BROWSER` helper,
+except `/api/health` and the routes a process the server started calls on loopback with a token
+of its own instead: `/api/agents/browse` (the `BROWSER` helper,
 `core/scripts/browse.py`, which still opens the page on the PC and hands the URL to the agent's
-card) and `/api/mcp/agent/<token>`, plus the files of a registered page, `/api/pages/<id>/…`,
+card), `/api/mcp/agent/<token>` and `/api/mcp/lazy/<token>` (a CLI's local MCP servers), plus the
+files of a registered page, `/api/pages/<id>/…`,
 whose random id is the token: an iframe cannot send headers. Every WS handshake checks the same
 header through `core/ws.accept_authorized`, which closes before accepting, so a socket without it
 is refused at the HTTP layer (403).
@@ -283,13 +287,15 @@ final `result` lands.
 
 ## Persistent sessions and mods
 
-With `persistent_sessions` on, a chat keeps its CLI between turns. `persistent_sessions.pool`
+With `persistent_sessions` on, the default, a chat keeps its CLI between turns. `persistent_sessions.pool`
 holds one `PersistentSession` per channel, a `ClaudeSDKClient` owned by its own task and
 keyed by cwd, the resolved account and scope. `session_limit` (10 by default) caps the
 chats holding a process, persistent CLIs and ACP agents together, and `registry.trim`
 releases the least recently used idle ones past it; the live session releases its own
 `session_grace` seconds (300 by default) after the last socket detaches, once nothing runs in the background (`working` counts the
-tasks the CLI reported). A turn whose options differ from the ones the CLI started with
+tasks the CLI reported). That grace is one timer, started when the last socket goes or, if work is still
+running then, when the work ends (`_schedule_cooldown` from the turn's end and each background task's);
+nothing checks on it in between. A turn whose options differ from the ones the CLI started with
 (`mark`: model, effort, permission mode, mods, capabilities) closes it and starts a fresh one, and so does
 another account, since the account is the CLI's credentials. Stopping or
 restarting the server closes the persistent CLIs and the agents' processes first
@@ -298,6 +304,16 @@ starts a turn on its own, a mod sending a prompt or a background task finishing,
 `own_turn` makes the live session adopt it so it streams like any other; an adopted turn
 keeps the running CLI (`resident(keep=True)`) and never reshapes it, or it would kill the
 process that started the turn.
+
+`memory_reserve` (2048 MB by default, 0 turns it off) is the free memory the chats leave the machine. It
+is read only when something is about to start a process, a chat's CLI or an ACP agent, and from the
+system's own low-memory signal (`services/memory_pressure.py`: PSI on Linux, `EVFILT_MEMORYSTATUS` on
+macOS, `LowMemoryResourceNotification` on Windows, which only fires near exhaustion), waited on in a
+sleeping thread, never polled. Below the reserve, `registry.relieve` stops the local MCP servers no call
+is using, then releases the chats holding a process that do nothing, oldest first, including ones still
+open on a device, and stops as soon as the reserve is free again; a turn that would start a CLI and
+still finds memory short runs as a one-shot. A one-shot CLI never outlives its turn, so its turn gets
+the no-background environment and hook (`_background_guard(kept=False)`), whatever the setting says.
 
 Mods ride on the CLI's internal UI protocol (`services/mods.py`): `ui_attach` as the
 `desktop` surface, `ui_render` per site, and the CLI's notifications, which fold into one
@@ -315,12 +331,53 @@ and the mods' `ui_*` requests, on both kinds of chat: `serve` wraps a persistent
 form and the answer back into `accept` / `decline` / `cancel`, the same mapping an ACP agent's
 `elicitation/create` goes through.
 
+## Local MCP servers on demand (`services/mcp_lazy.py`)
+
+The CLI starts every stdio MCP server it is configured with when it starts, one copy per CLI, and keeps
+the launcher alive above each one (`uv.exe` for `uvx`, the `node` of `npx`). A chat's CLI gets them from
+the backend instead: each stdio server of user, local or plugin scope goes in `mcp_servers` as
+`{"type": "http", "url": ".../api/mcp/lazy/<token>"}` under the same name, which the CLI takes over the
+configured one (scope `dynamic`) while claude.ai connectors and remote servers stay as they were.
+Project servers (`.mcp.json`), the ones turned off for the folder and any whose config keeps an
+unresolved `${…}` are left to the CLI.
+
+- **Lists come from a catalog.** `mcp_catalogs` keeps what each server answered the last time it ran:
+  its `initialize` result, tools, prompts, resources and templates, keyed by its command, arguments and
+  environment. `initialize` and every list are answered from it, so the CLI starts with no server
+  process at all. The first chat with a server that has no catalog yet starts it as before while the
+  backend reads one in the background, two at a time.
+- **The process starts on the first call.** `tools/call`, `prompts/get`, `resources/read`,
+  completions and subscriptions start the real server for that CLI session (`_Link`), with the
+  environment the CLI would give it: its own minus `CLAUDE_CODE_SDK_READS_SESSION_STATE` and the OTEL
+  temporality, plus `CLAUDECODE`, `CLAUDE_PROJECT_DIR`, `CLAUDE_CODE_SESSION_ID` and, for a plugin,
+  `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA`. Every start reads the lists again; when they changed,
+  the catalog is rewritten and the CLI gets `list_changed`.
+- **Launchers are skipped after the first start.** The first start of each server in a backend run goes
+  through its launcher, so `uvx` and `npx` still pick up new versions; the process it ended up running
+  (found by the `CCONNECT_MCP_SPAWN` marker in its environment) and the environment the launcher added
+  are kept, and later starts run it directly. A direct start that fails falls back to the launcher.
+- **The handshake era only.** The CLI speaks protocol 2026-07-28 to a server that accepts it, and that
+  era has no server→client requests. The real servers are spoken to over stdio in the handshake era, so
+  the proxy answers a newer `mcp-protocol-version` with the 400 an older server gives and the CLI
+  negotiates the same version it would with the server itself. Accepting it left the CLI with no tools.
+- **mcp 2.3 specifics.** One stateful `StreamableHTTPSessionManager` per server and CLI, with
+  `json_response=False` (with JSON, progress, logs and forms of a call are lost) and
+  `session_idle_timeout=None`. `_Proxy` overrides `get_capabilities` with the server's own, since the
+  manager would derive them from the handlers. Server→client requests and logs ride the stream of the
+  call in flight, or the session's own stream between calls; the `Connection` is only reachable as
+  `ctx.session._connection`. `stdio_client` lays the given environment over a short allow-list, so the
+  whole environment is passed.
+- **Lifetime.** A persistent CLI's servers close with it (`PersistentSession.lazy`), a one-shot's at the
+  end of the turn; closing the CLI's session ends the process. `release_idle` stops the processes no
+  call is using when memory runs short, and the next call starts them again. The processes carry the
+  chat's `CCONNECT_CHANNEL`, so the process list files them under their chat.
+
 ## Database
 
 Everything the server keeps as records lives in `data/config/cconnect.db` (SQLite in WAL), never in a
 loose JSON file rewritten whole: settings, chat placement and categories, the trash, database
-connections, agents and their chats' state, disabled MCP servers, pending rewinds, task lists and the
-steps of each delegation. Files are only for what is not a record: prompts edited by hand, packs, the
+connections, agents and their chats' state, disabled MCP servers and the catalogs of the local ones,
+pending rewinds, task lists and the steps of each delegation. Files are only for what is not a record: prompts edited by hand, packs, the
 CLI's account folders, caches, logs and the process files (`.runtime`, `.detached.*`).
 
 - **The migrations are the schema.** `core/migrations/versions/` holds them, each with a working

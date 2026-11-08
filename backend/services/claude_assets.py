@@ -480,7 +480,18 @@ def _same_folder(first: str, second: str) -> bool:
     return os.path.normcase(os.path.normpath(first)) == os.path.normcase(os.path.normpath(second))
 
 
-def _declared_mcp(folder: str) -> list[tuple[str, str, dict, bool, str]]:
+@dataclass(frozen=True)
+class DeclaredMcp:
+    name: str
+    label: str
+    config: dict
+    enabled: bool
+    source: str
+    muted: bool = False
+    plugin: dict | None = None
+
+
+def _declared_mcp(folder: str) -> list[DeclaredMcp]:
     config = _read_json(_CLAUDE_JSON)
     projects = config.get("projects")
     local = next(
@@ -488,15 +499,27 @@ def _declared_mcp(folder: str) -> list[tuple[str, str, dict, bool, str]]:
         {},
     ) if isinstance(projects, dict) else {}
     skipped = local.get("disabledMcpjsonServers") or []
+    muted = local.get("disabledMcpServers") or []
     return [
-        *((name, name, cfg, True, _MCP_USER_SOURCE) for name, cfg in _mcp_map(config.get("mcpServers")).items()),
-        *((name, name, cfg, True, "local") for name, cfg in _mcp_map(local.get("mcpServers")).items()),
         *(
-            (name, name, cfg, name not in skipped, "project")
+            DeclaredMcp(name, name, cfg, True, _MCP_USER_SOURCE, name in muted)
+            for name, cfg in _mcp_map(config.get("mcpServers")).items()
+        ),
+        *(DeclaredMcp(name, name, cfg, True, "local", name in muted) for name, cfg in _mcp_map(local.get("mcpServers")).items()),
+        *(
+            DeclaredMcp(name, name, cfg, name not in skipped, "project", name in muted)
             for name, cfg in _mcp_map(_read_json(Path(folder) / _MCP_FILE).get("mcpServers")).items()
         ),
         *(
-            (f"plugin:{plugin['name']}:{name}", name if name == plugin["name"] else joined(plugin["name"], name), cfg, True, "plugin")
+            DeclaredMcp(
+                f"plugin:{plugin['name']}:{name}",
+                name if name == plugin["name"] else joined(plugin["name"], name),
+                cfg,
+                True,
+                "plugin",
+                f"plugin:{plugin['name']}:{name}" in muted,
+                plugin,
+            )
             for plugin in list_plugins()
             if plugin["enabled"] and plugin["install_path"]
             for name, cfg in _plugin_mcp(Path(plugin["install_path"])).items()
@@ -509,7 +532,11 @@ def _mcp_folder(cwd: str | None) -> str:
 
 
 def mcp_config(name: str, cwd: str | None = None) -> dict | None:
-    return next((cfg for declared, _label, cfg, _enabled, _source in _declared_mcp(_mcp_folder(cwd)) if declared == name), None)
+    return next((declared.config for declared in _declared_mcp(_mcp_folder(cwd)) if declared.name == name), None)
+
+
+def declared_mcp(cwd: str | None) -> list[DeclaredMcp]:
+    return _declared_mcp(_mcp_folder(cwd))
 
 
 def list_mcp_servers(cwd: str | None = None) -> list[dict]:
@@ -518,7 +545,10 @@ def list_mcp_servers(cwd: str | None = None) -> list[dict]:
         needs_auth=set(_read_json(_MCP_AUTH_CACHE)),
         tokens={account: accounts.mcp_tokens(account) for account in accounts.known_ids()},
     )
-    items = [_mcp_entry(*server, logins) for server in _declared_mcp(folder)]
+    items = [
+        _mcp_entry(server.name, server.label, server.config, server.enabled, server.source, logins)
+        for server in _declared_mcp(folder)
+    ]
     for name, cfg in claude_manage.disabled_mcp_servers().items():
         if isinstance(cfg, dict) and not any(i["name"] == name for i in items):
             items.append(_mcp_entry(name, name, cfg, False, _MCP_USER_SOURCE, logins))
@@ -538,7 +568,7 @@ def mcp_tool_labels() -> dict[str, str]:
     version = tuple(_modified(path) for path in (_CLAUDE_JSON, _INSTALLED_PLUGINS, _SETTINGS_FILE))
     if _tool_labels[0] != version:
         connectors = _read_json(_CLAUDE_JSON).get(_CLAUDEAI_CONNECTED)
-        labels = {_MCP_TOOL_CHARS.sub("_", name): label for name, label, *_ in _declared_mcp(DEFAULT_CWD)}
+        labels = {_MCP_TOOL_CHARS.sub("_", server.name): server.label for server in _declared_mcp(DEFAULT_CWD)}
         for name in connectors if isinstance(connectors, list) else []:
             if isinstance(name, str):
                 labels[_MCP_TOOL_CHARS.sub("_", name)] = name.removeprefix(_CLAUDEAI_PREFIX)

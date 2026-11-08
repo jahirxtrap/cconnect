@@ -166,6 +166,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "persistent_sessions", label: "PERSISTENT_SESSIONS", summary: "PERSISTENT_SESSIONS_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "sessions" },
   { id: "session_grace", label: "SESSION_GRACE", summary: "SESSION_GRACE_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "sessions" },
   { id: "session_limit", label: "SESSION_LIMIT", summary: "SESSION_LIMIT_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "sessions" },
+  { id: "memory_reserve", label: "MEMORY_RESERVE", summary: "MEMORY_RESERVE_HINT", section: "server", group: "SETTINGS_SERVER", dialog: "sessions" },
   { id: "mod_surfaces", label: "MODS", summary: "MOD_SURFACES_DESC", section: "server", group: "SETTINGS_SERVER" },
 
   { id: "account", label: "ACCOUNT", value: accountValue, available: multipleAccounts, section: "server", group: "SETTINGS_SERVER", dialog: "account" },

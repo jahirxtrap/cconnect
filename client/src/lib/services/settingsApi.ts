@@ -14,6 +14,7 @@ export interface SettingsSnapshot {
   persistentSessions: boolean;
   sessionGrace: number;
   sessionLimit: number;
+  memoryReserve: number;
   modSurfaces: boolean | null;
   outputStyle: string;
   mcpDisabled: string;
@@ -58,6 +59,7 @@ export interface SettingsPatch {
   persistent_sessions?: boolean;
   session_grace?: number;
   session_limit?: number;
+  memory_reserve?: number;
   mod_surfaces?: boolean;
   output_style?: string;
   mcp_disabled?: string;
@@ -128,9 +130,10 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   browserView: effectiveBool(wire, "browser_view", false),
   suggestions: effectiveBool(wire, "suggestions", true),
   sdkAutoUpdate: effectiveBool(wire, "sdk_auto_update", true),
-  persistentSessions: effectiveBool(wire, "persistent_sessions", false),
+  persistentSessions: effectiveBool(wire, "persistent_sessions", true),
   sessionGrace: effectiveNum(wire, "session_grace", 300),
   sessionLimit: effectiveNum(wire, "session_limit", 10),
+  memoryReserve: effectiveNum(wire, "memory_reserve", 2048),
   modSurfaces: wire.mod_surfaces ? effectiveBool(wire, "mod_surfaces", false) : null,
   outputStyle: effectiveStr(wire, "output_style", "default"),
   mcpDisabled: effectiveStr(wire, "mcp_disabled", ""),

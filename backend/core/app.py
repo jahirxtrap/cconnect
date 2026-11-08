@@ -18,7 +18,7 @@ from core.db import init_db
 from core.rate_limit import limiter
 from core.responses import api_response
 from core.sdk import ensure_sdk_installed, ensure_subscription_auth
-from services import agent_mcp, settings_store, system_monitor
+from services import agent_mcp, mcp_lazy, settings_store, system_monitor
 from middleware.error_handler import register_error_handlers
 from middleware.public_auth import register_public_auth_middleware
 from middleware.security import register_security_middleware
@@ -46,6 +46,8 @@ async def lifespan(app: FastAPI):
     await system_watch.hub.start()
     from services import network
     await network.watchdog.start()
+    from services import live_sessions, memory_pressure
+    memory_pressure.watch(live_sessions.registry.relieve)
     yield
     chat_list.hub.stop()
     shared_watch.hub.stop()
@@ -96,6 +98,7 @@ for module_info in pkgutil.iter_modules(routers_pkg.__path__):
         app.include_router(module.router, prefix="/api")
 
 app.mount(agent_mcp.PATH, agent_mcp.asgi)
+app.mount(mcp_lazy.PATH, mcp_lazy.asgi)
 
 
 @app.api_route(

@@ -17,6 +17,7 @@ from services import (
     accounts,
     agent_connections,
     cli_info,
+    mcp_lazy,
     mods,
     persistent_sessions,
     todos as todos_store,
@@ -113,6 +114,7 @@ class LiveSession:
         agent.bind(self._emit, self._ask)
 
     async def open_agent(self, resume=None):
+        await registry.relieve(self.channel)
         await self.agent.open(resume)
         await registry.trim(self.channel)
 
@@ -307,6 +309,9 @@ class LiveSession:
         self._cancel_cooldown()
         if keep and self.resident_alive:
             return self._resident
+        if not self.resident_alive and await registry.relieve(self.channel):
+            await self.release_resident()
+            return None
         shape = persistent_sessions.shape_of(self.state.cwd, accounts.resolve(self.state.account), self.channel)
         self._resident = await persistent_sessions.pool.take(self.channel, shape)
         self._resident.listener = self._emit
@@ -366,6 +371,7 @@ class LiveSession:
             status, result = sessions_service.TASK_FAILED, str(exc) or type(exc).__name__
         finally:
             self._owned.pop(tool_use_id, None)
+            self._schedule_cooldown()
         if tool_use_id not in self._background:
             return
         duration_ms = int((time.monotonic() - started) * 1000)
@@ -415,23 +421,19 @@ class LiveSession:
             self._cooldown = None
 
     def _schedule_cooldown(self):
-        if not self.holds_process:
+        if not self.holds_process or self._sinks or self.working:
             return
         self._cancel_cooldown()
-        self._cooldown = asyncio.create_task(self._cooldown_loop())
+        self._cooldown = asyncio.create_task(self._cooldown_after(persistent_sessions.grace()))
 
-    async def _cooldown_loop(self):
+    async def _cooldown_after(self, delay):
         try:
-            while True:
-                await asyncio.sleep(persistent_sessions.grace())
-                if self._sinks:
-                    return
-                if self.working:
-                    continue
-                await self.release_process()
-                return
+            await asyncio.sleep(delay)
         except asyncio.CancelledError:
             return
+        self._cooldown = None
+        if not self._sinks and not self.working:
+            await self.release_process()
 
     async def release_process(self):
         """Let go of the process this chat holds: its persistent CLI, or its agent."""
@@ -611,6 +613,7 @@ class LiveSession:
             return
         if kind == "agent_result":
             self._background.pop(event.get("id"), None)
+            self._schedule_cooldown()
             return
         if kind in ("done", "interrupted") and not self.resident_alive:
             self._end_background()
@@ -1062,6 +1065,7 @@ class SessionRegistry:
         self._idle_since = {}
         self._grace = grace
         self._clock = clock
+        self._relief = asyncio.Lock()
 
     def create(self, state):
         self._sweep()
@@ -1148,6 +1152,28 @@ class SessionRegistry:
         excess = len(holding) - max(persistent_sessions.limit(), len(holding) - len(idle))
         for session in idle[:max(excess, 0)]:
             await session.release_process()
+
+    async def relieve(self, keep=None):
+        """Below the memory reserve, release the chats holding a process that do nothing, oldest first; whether memory stays short."""
+        async with self._relief:
+            if not persistent_sessions.memory_short():
+                return False
+            await mcp_lazy.release_idle(persistent_sessions.memory_short)
+            if not persistent_sessions.memory_short():
+                return False
+            idle = sorted(
+                (
+                    session for session in self._sessions.values()
+                    if session.holds_process and not session.working and session.channel != keep
+                    and (session.agent is None or not session.attached)
+                ),
+                key=lambda session: session.used_at,
+            )
+            for session in idle:
+                await session.release_process()
+                if not persistent_sessions.memory_short():
+                    return False
+            return True
 
     def on_account(self, account_id):
         return [session for session in self._sessions.values() if session.agent is None and accounts.resolve(session.state.account) == account_id]

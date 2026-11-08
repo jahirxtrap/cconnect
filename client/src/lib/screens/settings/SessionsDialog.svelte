@@ -10,29 +10,39 @@
     persistent: boolean;
     grace: number;
     limit: number;
-    onConfirm: (persistent: boolean, grace: number, limit: number) => void;
+    reserve: number;
+    onConfirm: (persistent: boolean, grace: number, limit: number, reserve: number) => void;
     onDismiss: () => void;
   }
 
-  const { persistent, grace, limit, onConfirm, onDismiss }: Props = $props();
+  const { persistent, grace, limit, reserve, onConfirm, onDismiss }: Props = $props();
 
   const GRACE_MAX = 3600;
   const LIMIT_MAX = 20;
+  const RESERVE_MAX = 65536;
 
   let live = $state(untrack(() => persistent));
   let seconds = $state(untrack(() => String(grace)));
   let count = $state(untrack(() => String(limit)));
+  let megabytes = $state(untrack(() => String(reserve)));
 
   const parsedGrace = $derived(Number(seconds));
   const parsedLimit = $derived(Number(count));
+  const parsedReserve = $derived(Number(megabytes));
   const graceValid = $derived(/^\d+$/.test(seconds.trim()) && parsedGrace >= 0 && parsedGrace <= GRACE_MAX);
   const limitValid = $derived(/^\d+$/.test(count.trim()) && parsedLimit >= 1 && parsedLimit <= LIMIT_MAX);
+  const reserveValid = $derived(/^\d+$/.test(megabytes.trim()) && parsedReserve >= 0 && parsedReserve <= RESERVE_MAX);
 </script>
 
 <CompactDialog title={t("SESSIONS")} {onDismiss}>
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
-    <Button enabled={graceValid && limitValid} onclick={() => onConfirm(live, parsedGrace, parsedLimit)}>{t("SAVE")}</Button>
+    <Button
+      enabled={graceValid && limitValid && reserveValid}
+      onclick={() => onConfirm(live, parsedGrace, parsedLimit, parsedReserve)}
+    >
+      {t("SAVE")}
+    </Button>
   {/snippet}
   <div class="flex flex-col gap-3.5">
     <SwitchRow
@@ -62,6 +72,17 @@
         oninput={(value) => (count = value)}
       />
       <p class="text-body-sm text-on-surface-variant">{t("SESSION_LIMIT_HINT")}</p>
+    </div>
+    <div class="flex flex-col gap-1.5">
+      <InputField
+        label={t("MEMORY_RESERVE")}
+        value={megabytes}
+        numeric
+        singleLine
+        error={megabytes.trim() === "" || reserveValid ? null : t("MEMORY_RESERVE_ERROR", RESERVE_MAX)}
+        oninput={(value) => (megabytes = value)}
+      />
+      <p class="text-body-sm text-on-surface-variant">{t("MEMORY_RESERVE_HINT")}</p>
     </div>
   </div>
 </CompactDialog>

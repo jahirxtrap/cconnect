@@ -406,3 +406,25 @@ class DelegateRun(Base):
         server_default=text(NOW),
         comment="When the run ended and its steps were saved, in UTC",
     )
+
+
+class McpCatalog(Base):
+    __tablename__ = "mcp_catalogs"
+    __table_args__ = {"comment": "What each local MCP server offers, so a chat lists its tools without starting it until one is used"}
+
+    key: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Hash of the server's command, arguments and environment; changing any of them makes a new entry",
+    )
+    name: Mapped[str] = mapped_column(
+        comment="Server name as the CLI knows it; one entry per name, the newest",
+    )
+    catalog: Mapped[dict[str, Any]] = mapped_column(
+        JSON,
+        comment="What it answered the last time it ran: its initialize result, tools, prompts, resources and resource templates",
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When it was last read from the running server, in UTC",
+    )

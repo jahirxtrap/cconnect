@@ -7,10 +7,10 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from core.config import PUBLIC_ACCESS_TOKEN
 from core.responses import api_response
-from services import agent_mcp, pages
+from services import agent_mcp, mcp_lazy, pages
 
 _OPEN_PATHS = frozenset({"/api/health", "/api/agents/browse"})
-_OPEN_PREFIXES = (f"{agent_mcp.PATH}/", f"{pages.PATH}/")
+_OPEN_PREFIXES = (f"{agent_mcp.PATH}/", f"{mcp_lazy.PATH}/", f"{pages.PATH}/")
 
 
 def _provided_token(authorization: str, query_token: str) -> str:

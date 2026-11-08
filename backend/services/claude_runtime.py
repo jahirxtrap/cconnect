@@ -20,7 +20,7 @@ from mcps import databases as database_tools
 from mcps.media import block_types
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -638,13 +638,13 @@ _NO_BACKGROUND_ENV = {
 }
 
 
-def _cli_env(account_id: Optional[str]) -> dict[str, str]:
+def _cli_env(account_id: Optional[str], kept: Optional[bool] = None) -> dict[str, str]:
     from services import accounts
 
     env = dict(accounts.env_for(account_id))
     if not os.environ.get("HOME") and not env.get("HOME"):
         env["HOME"] = str(Path.home())
-    if not persistent_sessions.enabled():
+    if not (persistent_sessions.enabled() if kept is None else kept):
         env.update(_NO_BACKGROUND_ENV)
     return env
 
@@ -659,12 +659,13 @@ def _denied(reason: str) -> dict:
     }
 
 
-async def _block_background(input_data, tool_use_id, context):
-    if persistent_sessions.enabled():
+def _background_guard(kept: bool):
+    async def guard(input_data, tool_use_id, context):
+        if not kept and ((input_data or {}).get("tool_input") or {}).get("run_in_background"):
+            return _denied(_NO_BACKGROUND)
         return {}
-    if ((input_data or {}).get("tool_input") or {}).get("run_in_background"):
-        return _denied(_NO_BACKGROUND)
-    return {}
+
+    return guard
 
 
 _NO_SECRETS = (
@@ -783,7 +784,8 @@ async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=Fa
     """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
     fresh = not resident.connected
     if fresh:
-        await resident.connect(options)
+        resident.lazy = await mcp_lazy.open_for(options, lambda: resident.session_info().get("session_id"))
+        await resident.connect(resident.lazy.apply(options) if resident.lazy is not None else options)
     from claude_agent_sdk import ResultMessage
 
     client = resident.client
@@ -925,7 +927,7 @@ async def run_prompt(
     if tools is not True:
         allowed = tools if isinstance(tools, list) else []
         options_kwargs["tools"] = [*allowed, _SHARE_RULE] if scope["guides"] else allowed
-    session_env = _cli_env(account)
+    session_env = _cli_env(account, resident is not None)
     if channel:
         session_env[CHANNEL_ENV] = channel
     if scope["search"]:
@@ -952,7 +954,7 @@ async def run_prompt(
         overrides["outputStyle"] = style
     options_kwargs["settings"] = json.dumps(overrides)
     hooks_map: dict[str, Any] = {
-        "PreToolUse": [HookMatcher(matcher=None, hooks=[_block_background, _secrets_guard(unlocked), _block_stale_shared])]
+        "PreToolUse": [HookMatcher(matcher=None, hooks=[_background_guard(resident is not None), _secrets_guard(unlocked), _block_stale_shared])]
     }
     loop = asyncio.get_running_loop() if emit is not None else None
 
@@ -1145,12 +1147,16 @@ async def run_prompt(
     compacting_shown = False
 
     retrying = False
+    lazy = None
     try:
         current_sid: str | None = None
         if resident is not None:
             resident.bind(persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, reload, session_info))
             source = _resident_stream(resident, options, prompt_arg, on_transport, adopt)
         else:
+            lazy = await mcp_lazy.open_for(options, lambda: current_sid or resume)
+            if lazy is not None:
+                options = lazy.apply(options)
             transport = None
             if on_transport is not None:
                 try:
@@ -1367,6 +1373,8 @@ async def run_prompt(
     finally:
         if resident is not None:
             resident.unbind()
+        if lazy is not None:
+            await asyncio.shield(lazy.close())
 
 
 async def fast_reply(prompt: str, system_prompt: str, account: Optional[str]) -> str:
@@ -1473,7 +1481,7 @@ async def ask_side_question(
     tools = scope["tools"]
     if tools is not True:
         options_kwargs["tools"] = tools if isinstance(tools, list) else []
-    hooks = [HookMatcher(matcher=None, hooks=[_block_background, _secrets_guard(_locked), _block_stale_shared])]
+    hooks = [HookMatcher(matcher=None, hooks=[_background_guard(persistent_sessions.enabled()), _secrets_guard(_locked), _block_stale_shared])]
     if ask_user is not None:
         options_kwargs["can_use_tool"] = _build_can_use_tool(ask_user)
         hooks.append(HookMatcher(matcher=None, hooks=[_keep_stream_open]))

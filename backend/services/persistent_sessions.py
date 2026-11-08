@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Awaitable, Callable, Optional
 
+import psutil
 from loguru import logger
 
 from services import control_requests, elicitation, mods, settings_store, visibility
 
 CLOSE_TIMEOUT = 20.0
 OWN_TURN_TIMEOUT = 300.0
+_MEGABYTE = 1024 * 1024
 _TURN_MESSAGES = frozenset({"AssistantMessage", "UserMessage", "StreamEvent"})
 
 
@@ -35,6 +37,7 @@ class PersistentSession:
         self.answerer: Optional[mods.Answerer] = None
         self.changed: Optional[Callable[[], None]] = None
         self.runner: Optional[Callable[..., Awaitable[bool]]] = None
+        self.lazy: Any = None
         self._reader: Optional[asyncio.Task] = None
         self._owner: Optional[asyncio.Task] = None
         self._stop = asyncio.Event()
@@ -125,6 +128,9 @@ class PersistentSession:
                 logger.warning(f"persistent session ended: {type(exc).__name__}: {exc}")
         finally:
             self.client = None
+            lazy, self.lazy = self.lazy, None
+            if lazy is not None:
+                await asyncio.shield(lazy.close())
             self._changed()
 
     def _changed(self) -> None:
@@ -235,6 +241,11 @@ def grace() -> float:
 
 def limit() -> int:
     return max(int(settings_store.get("session_limit") or 1), 1)
+
+
+def memory_short() -> bool:
+    reserve = max(int(settings_store.get("memory_reserve") or 0), 0) * _MEGABYTE
+    return reserve > 0 and psutil.virtual_memory().available < reserve
 
 
 def shape_of(cwd: str, account: Optional[str], scope_id: str) -> dict:
