@@ -4,8 +4,7 @@ import asyncio
 from pathlib import Path
 from typing import Any, Optional
 
-from claude_agent_sdk import tool
-
+from mcps.definition import Definition, reply
 from services import claude_runtime
 from services.chat_list import hub
 from services.sessions import _TRAVELLING_TYPES, _iter_lines, _project_dir, _session_file
@@ -148,27 +147,35 @@ async def _summarize(project_key: str, session_id: Optional[str] = None, account
     return summary or None
 
 
-DESCRIPTION = (
+CHECK_PROGRESS = Definition(
+    "check_progress",
     "Summarize the progress of work happening in another Claude Code project — "
     "what is done, what is pending, which files were touched, and the likely next "
     "step. Use this when the user asks how a task left running in another project "
     "or folder is going. Pass the user's reference verbatim as a folder name, path, "
     "substring or the title of a recent session; the tool resolves it against the "
-    "user's projects. Present the answer as prose, not as the raw labelled lines."
+    "user's projects. Present the answer as prose, not as the raw labelled lines.",
+    {
+        "type": "object",
+        "properties": {
+            "project": {"type": "string", "description": "The project as the user named it, verbatim."},
+        },
+        "required": ["project"],
+    },
 )
 
 
 def make_tools(context: dict) -> list:
     account = context.get("account")
 
-    @tool("check_progress", DESCRIPTION, {"project": str})
+    @CHECK_PROGRESS
     async def check_progress(args):
         ref = args.get("project") or ""
         target = _resolve_target(ref)
         if not target:
-            return {"content": [{"type": "text", "text": f"No project matching '{ref}'."}]}
+            return reply(f"No project matching '{ref}'.")
         project_key, session_id = target
         summary = await _summarize(project_key, session_id, account)
-        return {"content": [{"type": "text", "text": summary or "No session found for that project."}]}
+        return reply(summary or "No session found for that project.")
 
     return [check_progress]

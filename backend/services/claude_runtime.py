@@ -15,7 +15,7 @@ from loguru import logger
 
 from core import cli_manager, paths
 from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
-from mcps import build_cconnect_server, needs_key
+from mcps import build_cconnect_server, needs_key, tool_guides
 from mcps import databases as database_tools
 from mcps.media import block_types
 from mcps.packs import TOOL as PACKS_TOOL
@@ -110,6 +110,11 @@ def _blocks_guide(capabilities: list[str]) -> str:
     return guide.replace("{{BLOCK_TYPES}}", types)
 
 
+def _tools_guide(capabilities: list[str]) -> str:
+    lines = tool_guides(capabilities)
+    return _prompt_file("TOOLS.md").replace("{{TOOLS}}", "\n".join(lines)) if lines else ""
+
+
 def _install_guide(capabilities: list[str]) -> str:
     return _prompt_file("INSTALL.md") if "install" in capabilities else ""
 
@@ -152,6 +157,7 @@ def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]], scope: 
     caps = list(capabilities or ())
     guides = [
         _blocks_guide(caps),
+        _tools_guide(caps) if scope["cconnect"] else "",
         _browser_guide(caps) if scope["cconnect"] else "",
         _install_guide(caps) if scope["cconnect"] else "",
         _suggestions_guide(),

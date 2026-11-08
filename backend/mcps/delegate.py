@@ -1,10 +1,10 @@
 import asyncio
 from contextlib import suppress
+from dataclasses import replace
 from typing import Optional
 
-from claude_agent_sdk import tool
-
 from core import display, paths
+from mcps.definition import Definition, reply
 from services import (
     accounts,
     agent_registry,
@@ -138,6 +138,8 @@ SCHEMA = {
     },
 }
 
+DELEGATE = Definition(delegates.TOOL, DESCRIPTION, SCHEMA)
+
 
 def _line(entry: dict) -> str:
     about = entry["description"][:DESCRIPTION_LIMIT]
@@ -154,10 +156,6 @@ def _offer(item: dict) -> str:
     return f"- {item['id']}: {item.get('name') or item['id']}" + (f" ({', '.join(notes)})" if notes else "") + (f". {about}" if about else "")
 
 
-def _reply(text: str, error: bool = False) -> dict:
-    return {"content": [{"type": "text", "text": text}], **({"is_error": True} if error else {})}
-
-
 def _failure(exc: agents.AgentError) -> str:
     return f"{exc.reason}: {exc.detail}" if exc.detail else exc.reason
 
@@ -169,7 +167,14 @@ def make_tools(context: dict) -> list:
     session_info = context.get("session_info")
     wanted = context.get("visibility")
     background = context.get("background")
-    schema = {**SCHEMA, "properties": {**SCHEMA["properties"], "background": BACKGROUND_FIELD}} if background else SCHEMA
+    offered = replace(
+        DELEGATE,
+        description=DELEGATE.description.format(
+            background=BACKGROUND if background else "",
+            destinations="\n".join(map(_line, entries)) or NO_DESTINATIONS,
+        ),
+        schema={**SCHEMA, "properties": {**SCHEMA["properties"], "background": BACKGROUND_FIELD}} if background else SCHEMA,
+    )
 
     def info() -> dict:
         return (session_info() if session_info else None) or {}
@@ -198,34 +203,34 @@ def make_tools(context: dict) -> list:
         try:
             items = await asyncio.to_thread(agent_registry.catalog)
         except agent_registry.RegistryError as exc:
-            return _reply(f"The catalog could not be read: {exc}", error=True)
-        return _reply("Agents that can be installed:\n" + "\n".join(map(_offer, items)))
+            return reply(f"The catalog could not be read: {exc}", error=True)
+        return reply("Agents that can be installed:\n" + "\n".join(map(_offer, items)))
 
     async def install(args: dict) -> dict:
         ident = (args.get("destination") or "").strip()
         if not ident:
-            return _reply("Give the id of an agent from the catalog.", error=True)
+            return reply("Give the id of an agent from the catalog.", error=True)
         await pool.restart(ident)
         try:
             agent = await asyncio.to_thread(agents.install, ident)
         except agents.AgentError as exc:
-            return _reply(f"{ident} could not be installed: {_failure(exc)}", error=True)
+            return reply(f"{ident} could not be installed: {_failure(exc)}", error=True)
         except OSError as exc:
-            return _reply(f"{ident} could not be installed: {exc}", error=True)
+            return reply(f"{ident} could not be installed: {exc}", error=True)
         failed = await checked(agent)
         if failed is not None:
-            return _reply(
+            return reply(
                 f"{agent['name']} is installed as {agent['id']}, but it did not answer a small task: {failed}. "
                 "If it asks to sign in, the user signs in from the ACP agents panel."
             )
-        return _reply(f"{agent['name']} is installed as {agent['id']}: hand it tasks with that destination.")
+        return reply(f"{agent['name']} is installed as {agent['id']}: hand it tasks with that destination.")
 
     async def register(args: dict) -> dict:
         name = (args.get("name") or "").strip()
         program = (args.get("command") or "").strip()
         protocol = args.get("kind")
         if not name or not program or protocol not in agents.PROTOCOLS:
-            return _reply("Give the name, the kind (command or acp) and the command to register.", error=True)
+            return reply("Give the name, the kind (command or acp) and the command to register.", error=True)
         agent = agents.add({
             "name": name,
             "protocol": protocol,
@@ -236,51 +241,44 @@ def make_tools(context: dict) -> list:
         failed = await checked(agent)
         if failed is not None:
             agents.remove(agent["id"])
-            return _reply(f"{agent['name']} did not pass the check: {failed}", error=True)
-        return _reply(f"{agent['name']} is registered as {agent['id']}: hand it tasks with that destination.")
+            return reply(f"{agent['name']} did not pass the check: {failed}", error=True)
+        return reply(f"{agent['name']} is registered as {agent['id']}: hand it tasks with that destination.")
 
     async def update_agent(agent: dict, args: dict) -> dict:
         fields = {"name": "name", "kind": "protocol", "description": "purpose", "command": "program", **{key: key for key in agents.ARG_LISTS}}
         changes = {field: args[key] for key, field in fields.items() if args.get(key) is not None}
         updated = agents.update(agent["id"], changes)
         if updated is None:
-            return _reply("Name one of the destinations listed to update.", error=True)
+            return reply("Name one of the destinations listed to update.", error=True)
         if any(updated[key] != agent[key] for key in CHECKED_FIELDS):
             await pool.restart(agent["id"])
             failed = await checked(updated)
             if failed is not None:
                 agents.update(agent["id"], {key: agent[key] for key in changes})
-                return _reply(f"{updated['name']} did not pass the check: {failed}", error=True)
-        return _reply(f"{updated['name']} ({updated['id']}) is updated.")
+                return reply(f"{updated['name']} did not pass the check: {failed}", error=True)
+        return reply(f"{updated['name']} ({updated['id']}) is updated.")
 
     async def update(args: dict) -> dict:
         destination = delegates.find(args.get("destination") or "")
         if destination is None:
-            return _reply("Name one of the destinations listed to update.", error=True)
+            return reply("Name one of the destinations listed to update.", error=True)
         if destination["kind"] != delegates.ACCOUNT:
             return await update_agent(destination, args)
         accounts.set_delegation(destination["account"], True, args.get("description") or destination["description"])
-        return _reply(f"{destination['name']} ({destination['id']}) is updated.")
+        return reply(f"{destination['name']} ({destination['id']}) is updated.")
 
     async def remove(args: dict) -> dict:
         destination = delegates.find(args.get("destination") or "")
         if destination is None:
-            return _reply("Name one of the destinations listed to remove.", error=True)
+            return reply("Name one of the destinations listed to remove.", error=True)
         if destination["kind"] == delegates.ACCOUNT:
             accounts.set_delegation(destination["account"], False, destination["description"])
         else:
             await pool.restart(destination["id"])
             agents.remove(destination["id"])
-        return _reply(f"{destination['name']} ({destination['id']}) is removed.")
+        return reply(f"{destination['name']} ({destination['id']}) is removed.")
 
-    @tool(
-        delegates.TOOL,
-        DESCRIPTION.format(
-            background=BACKGROUND if background else "",
-            destinations="\n".join(map(_line, entries)) or NO_DESTINATIONS,
-        ),
-        schema,
-    )
+    @offered
     async def delegate(args):
         action = args.get("action")
         if action == "catalog":
@@ -296,7 +294,7 @@ def make_tools(context: dict) -> list:
         destination = delegates.find(args.get("destination") or "")
         task = (args.get("task") or "").strip()
         if destination is None or not task:
-            return _reply("Name one of the destinations listed and a task.", error=True)
+            return reply("Name one of the destinations listed and a task.", error=True)
         name = destination["name"]
         parent = await tool_calls.claim(delegates.TOOL_ID, args, CLAIM_TIMEOUT)
         session_id = info().get("session_id") or ""
@@ -326,11 +324,11 @@ def make_tools(context: dict) -> list:
         if args.get("background") and background and parent:
             label = display.joined(*delegates.label_of(args))
             if await background(parent, label, run, summary):
-                return _reply(BACKGROUND_REPLY.format(name=name))
+                return reply(BACKGROUND_REPLY.format(name=name))
         try:
             answer = await run(emit, ask)
         except delegate_runner.DelegateError as exc:
-            return _reply(f"{summary(sessions.TASK_FAILED)}: {exc}", error=True)
-        return _reply(answer or f"{name} finished without an answer.")
+            return reply(f"{summary(sessions.TASK_FAILED)}: {exc}", error=True)
+        return reply(answer or f"{name} finished without an answer.")
 
     return [delegate]

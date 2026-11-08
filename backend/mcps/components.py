@@ -1,16 +1,16 @@
 import json
-
-from claude_agent_sdk import tool
+from dataclasses import replace
 
 from core import paths
+from mcps.definition import Definition, reply
 from mcps.media import preview_description
 
 CAPABILITY = "components"
+PREVIEW = "{PREVIEW}"
 
-DESCRIPTION = """Show an interactive form in the chat and wait for the user to answer it.
-
-Use it when a decision has several options, needs more than one field at once, or reads better as a
-form than as prose. For a single yes/no or a quick question, just ask in text.
+DESCRIPTION = """Show an interactive form in the chat and wait for the user to answer it. Use it when a
+decision has several options, needs more than one field at once, or reads better as a form than as
+prose. For a single yes/no or a quick question, just ask in text.
 
 Elements, in the order you list them:
 - text: a markdown paragraph to explain, written in `text`.
@@ -58,11 +58,11 @@ Set present to "dialog" to ask in a dialog over the chat rather than inline; eit
 stays in the conversation. Reuse the same block_id to replace a form you already sent instead of
 stacking a new one. Never describe styling: the app owns the look."""
 
-SHOW_DESCRIPTION = """Draw a block in the chat: bars, text and media laid out together. It asks nothing
-and returns right away, so keep talking after calling it.
+SHOW_DESCRIPTION = """Draw a block in the chat: bars, text and media laid out together. Use it to show a
+state worth seeing rather than describing: progress, a comparison, a small report. For plain prose or
+a single image, write markdown instead.
 
-Use it to show a state worth seeing rather than describing: progress, a comparison, a small report.
-For plain prose or a single image, write markdown instead.
+It asks nothing and returns right away, so keep talking after calling it.
 
 Elements, in the order you list them:
 - text: a markdown paragraph, written in `text`.
@@ -259,6 +259,9 @@ SCHEMA = {
     "required": ["blocks"],
 }
 
+ASK_COMPONENT = Definition("ask_component", DESCRIPTION, SCHEMA, guide=True)
+SHOW_COMPONENT = Definition("show_component", SHOW_DESCRIPTION, SHOW_SCHEMA, guide=True)
+
 
 def _walk(blocks: list):
     for block in blocks or []:
@@ -296,6 +299,10 @@ def _number(value):
     return int(parsed) if parsed.is_integer() else parsed
 
 
+def _previewed(definition: Definition, preview: str) -> Definition:
+    return replace(definition, description=definition.description.replace(PREVIEW, preview))
+
+
 def make_tools(context: dict) -> list:
     ask_user = context.get("ask_user")
     emit = context.get("emit")
@@ -306,7 +313,7 @@ def make_tools(context: dict) -> list:
     tools = []
 
     if emit is not None:
-        @tool("show_component", SHOW_DESCRIPTION.replace("{PREVIEW}", preview), SHOW_SCHEMA)
+        @_previewed(SHOW_COMPONENT, preview)
         async def show(args):
             await emit({
                 "type": "component",
@@ -315,14 +322,14 @@ def make_tools(context: dict) -> list:
                 "icon": args.get("icon"),
                 "blocks": args.get("blocks") or [],
             })
-            return {"content": [{"type": "text", "text": "Shown in the chat."}]}
+            return reply("Shown in the chat.")
 
         tools.append(show)
 
     if ask_user is None:
         return tools
 
-    @tool("ask_component", DESCRIPTION.replace("{PREVIEW}", preview), SCHEMA)
+    @_previewed(ASK_COMPONENT, preview)
     async def ui(args):
         blocks = args.get("blocks") or []
         response = await ask_user({
@@ -357,7 +364,7 @@ def make_tools(context: dict) -> list:
             notes = {key: value for key, value in values.items() if key in note_ids and value}
             if notes:
                 answer["notes"] = notes
-        return {"content": [{"type": "text", "text": json.dumps(answer, ensure_ascii=False)}]}
+        return reply(json.dumps(answer, ensure_ascii=False))
 
     tools.append(ui)
     return tools

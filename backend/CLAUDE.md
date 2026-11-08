@@ -75,7 +75,8 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 - `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
   substituted per request), `BLOCKS.md`, `BROWSER.md`, `INSTALL.md` (the install cards,
   appended when the app advertises `install`), `MODS.md` (only what this app adds
-  for a mod Claude writes, appended while mods are on) and `SUGGESTIONS.md`. Versioned, so
+  for a mod Claude writes, appended while mods are on), `SUGGESTIONS.md` and `TOOLS.md` (the
+  deferred tools with a `guide`, appended while the turn offers any). Versioned, so
   the user-owned `USER.md` and the per-project prompts live in `data/config/prompts/`
   instead (never deleted — emptied). `{{SHARED_URL}}` resolves to `config.SHARED_SCHEME`
   (`cconnect://shared`) and never to a host: the prompt is fixed when the CLI session is
@@ -327,10 +328,14 @@ strips a tool's result, never an agent's subtasks: those still arrive, with thei
 
 ## MCP server (`mcps/`)
 
-Tools auto-register: each module exposes `tools = [...]`, or `make_tools(context)` when the
-tool needs the running turn (returning `[]` removes it from that turn — the safest gate). A
-module whose tools reach what the security key guards declares `needs_key(name, args)`, and the
-PreToolUse hook denies those calls when the message came without the key.
+Tools auto-register. Each one is declared once, at module level, as a `Definition`
+(`mcps/definition.py`: name, description, input schema, `eager`, `guide`) named after the tool in
+capitals (`TERMINAL_OPEN`, `DB_QUERY`); `make_tools(context)` binds it to its handler by using it
+as a decorator, runs fresh on every turn and returns `[]` to remove the module's tools from that
+turn (the safest gate). A description or schema that depends on the turn is a `replace` of the
+definition (the forms' previews, `delegate`'s destinations), and every text answer goes through
+`reply`. A module whose tools reach what the security key guards declares `needs_key(name, args)`,
+and the PreToolUse hook denies those calls when the message came without the key.
 Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own messages, numbered,
 before a compaction too, without the tool calls), `session_info`, `show_component`,
 `ask_component`, `share_files`, `packs` (writes a pack into the server's library),
@@ -338,6 +343,21 @@ before a compaction too, without the tool calls), `session_info`, `show_componen
 only), `db_inspect` / `db_query` / `db_execute` / `db_manage` (only in turns with the `databases`
 capability, which needs the key; `db_query` refuses anything that writes), and the
 browser and terminal tools behind their settings.
+
+What a turn gets is decided in layers. A family behind a setting is left out while it is off (the
+browser), one that reaches the machine needs the key (the terminal and the database tools), and
+what remains is **deferred behind tool search**: only the names reach the prompt, and Claude loads
+a definition with `ToolSearch` the first time it needs it. A definition with `eager` is loaded up
+front instead (`share_files` and the chat's own tools): `_load_up_front` marks it with `_meta`
+`anthropic/alwaysLoad`, which Claude Code reads per tool and the SDK's listing does not set yet,
+by wrapping the server's `tools/list` through mcp 2's handler API (hence `mcp>=2`). A definition
+with `guide` stays deferred, and the opening paragraph of its description, which has to say what it
+does and when to reach for it, goes in the system prompt through `TOOLS.md` (`tool_guides`, only
+for the tools the turn offers and the user has not disabled). That is how the forms stay deferred:
+without that line, an Opus turn asked to help pick a stack answered in prose, and with it, it loaded
+`ask_component` and opened a form. Measured on 07/11 with everything on: the deferred families saved
+~5,400 tokens of context per turn, and deferring the forms with their guide another ~4,800
+(27,887 → 23,116, read from the CLI's own context breakdown).
 
 `ask_component` and `show_component` share one element list (`mcps/components.py`). The
 contract is flat: every value travels as a string, an `id` means the element carries a

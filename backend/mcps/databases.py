@@ -4,9 +4,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from claude_agent_sdk import tool
-
 from mcps import SERVER
+from mcps.definition import Definition, reply
 from mcps.shared_files import listing
 from services import database_data, database_engines, databases, sessions, shared
 
@@ -47,37 +46,6 @@ NO = "no"
 EXPORTED = re.compile(r"^Wrote (.+) and showed it to the user", re.MULTILINE)
 ESCAPES = {"t": "\t", "n": "\n", "r": "\r"}
 
-INSPECT_DESCRIPTION = (
-    "What the database connections of the user's Databases panel hold. Without connection it lists the connections;"
-    " with one it lists its schemas, or the server's databases when the connection names none of its own; with"
-    " database it looks inside one of those; with schema it lists that schema's tables and views; with table it"
-    " describes the table: columns, primary key, foreign keys and indexes. Use it before writing SQL against a"
-    " database you have not looked at."
-)
-
-QUERY_DESCRIPTION = (
-    "Run SQL that only reads on a database connection: SELECT, WITH, EXPLAIN, SHOW, DESCRIBE. It runs in a"
-    " transaction that is rolled back and refuses anything that writes. Every statement answers on its own: a"
-    f" header, then its rows tab-separated under their columns, at most {DEFAULT_LIMIT} unless limit asks for more,"
-    f" NULL written as {NULL} and long values cut; the header says the offset that reads on."
-)
-
-EXECUTE_DESCRIPTION = (
-    "Run SQL that changes a database connection: INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, and CREATE or DROP"
-    " DATABASE. The statements run in one transaction, committed only if every one succeeds; a batch with one that"
-    " no transaction admits (CREATE DATABASE, VACUUM, CREATE INDEX CONCURRENTLY) runs without one and cannot be"
-    " undone. Answers like db_query. Only for a change the user asked for; refused on a read-only connection."
-)
-
-MANAGE_DESCRIPTION = (
-    "Manage the user's Databases panel: its connections, the drivers on the server and the database files it opens."
-    " engines lists every engine with its form, default port, the options its URL takes and its driver. add creates"
-    " a connection and update changes the fields given; remove deletes the connection, never the database; test"
-    " connects without saving. install and uninstall put an engine's driver on the server or take it off. open"
-    " opens a SQLite or DuckDB file as a connection for this session. export writes a table or a query to the"
-    " shared folder as CSV, or a table as SQL inserts, and shows the file to the user."
-)
-
 CONNECTION = {"type": "string", "description": f"The connection's id, from {INSPECT}."}
 DATABASE = {
     "type": "string",
@@ -87,76 +55,103 @@ SQL = {"type": "string", "description": "One or more statements separated by sem
 LIMIT = {"type": "integer", "description": f"Rows per statement, {DEFAULT_LIMIT} by default and at most {database_data.MAX_ROWS}."}
 OFFSET = {"type": "integer", "description": "Rows to skip in each statement's result, to read on past the last answer."}
 
-INSPECT_INPUT = {
-    "type": "object",
-    "properties": {
-        "connection": {"type": "string", "description": "The connection's id. Left out, the answer lists the connections."},
-        "database": DATABASE,
-        "schema": {"type": "string", "description": "A schema from the list: its tables and views, or where table is."},
-        "table": {"type": "string", "description": "A table or view to describe, in schema or in the default one."},
+DB_INSPECT = Definition(
+    INSPECT,
+    "What the database connections of the user's Databases panel hold. Without connection it lists the connections;"
+    " with one it lists its schemas, or the server's databases when the connection names none of its own; with"
+    " database it looks inside one of those; with schema it lists that schema's tables and views; with table it"
+    " describes the table: columns, primary key, foreign keys and indexes. Use it before writing SQL against a"
+    " database you have not looked at.",
+    {
+        "type": "object",
+        "properties": {
+            "connection": {"type": "string", "description": "The connection's id. Left out, the answer lists the connections."},
+            "database": DATABASE,
+            "schema": {"type": "string", "description": "A schema from the list: its tables and views, or where table is."},
+            "table": {"type": "string", "description": "A table or view to describe, in schema or in the default one."},
+        },
     },
-}
+)
 
-QUERY_INPUT = {
-    "type": "object",
-    "properties": {"connection": CONNECTION, "database": DATABASE, "sql": SQL, "limit": LIMIT, "offset": OFFSET},
-    "required": ["connection", "sql"],
-}
+DB_QUERY = Definition(
+    QUERY,
+    "Run SQL that only reads on a database connection: SELECT, WITH, EXPLAIN, SHOW, DESCRIBE. It runs in a"
+    " transaction that is rolled back and refuses anything that writes. Every statement answers on its own: a"
+    f" header, then its rows tab-separated under their columns, at most {DEFAULT_LIMIT} unless limit asks for more,"
+    f" NULL written as {NULL} and long values cut; the header says the offset that reads on.",
+    {
+        "type": "object",
+        "properties": {"connection": CONNECTION, "database": DATABASE, "sql": SQL, "limit": LIMIT, "offset": OFFSET},
+        "required": ["connection", "sql"],
+    },
+)
 
-EXECUTE_INPUT = QUERY_INPUT
+DB_EXECUTE = Definition(
+    EXECUTE,
+    "Run SQL that changes a database connection: INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, and CREATE or DROP"
+    " DATABASE. The statements run in one transaction, committed only if every one succeeds; a batch with one that"
+    " no transaction admits (CREATE DATABASE, VACUUM, CREATE INDEX CONCURRENTLY) runs without one and cannot be"
+    f" undone. Answers like {QUERY}. Only for a change the user asked for; refused on a read-only connection.",
+    DB_QUERY.schema,
+)
 
-MANAGE_INPUT = {
-    "type": "object",
-    "properties": {
-        "action": {"type": "string", "enum": ACTIONS},
-        "connection": {"type": "string", "description": "update, remove, test and export: the connection's id. test without it checks the fields given."},
-        "engine": {"type": "string", "description": "add, install and uninstall: an engine id from engines."},
-        "name": {"type": "string", "description": "add and update: the name the panel shows."},
-        "path": {"type": "string", "description": "add and update: a file engine's database file on the server. open: the file to open, absolute or from the chat's folder."},
-        "host": {"type": "string", "description": "add and update: the server a server engine connects to."},
-        "port": {"type": "integer", "description": "add and update: its port; the engine's default when left out."},
-        "database": {"type": "string", "description": "add and update: the database a server engine opens; left out, the connection lists the server's. export: one of those."},
-        "user": {"type": "string", "description": "add and update: the user a server engine signs in as."},
-        "password": {"type": "string", "description": "add and update: its password, kept on the server and never shown again."},
-        "options": {
-            "type": "object",
-            "additionalProperties": {"type": "string"},
-            "description": "add and update: the query parameters of a server engine's URL, such as Snowflake's warehouse.",
-        },
-        "url": {"type": "string", "description": "add and update: the custom engine's SQLAlchemy URL."},
-        "packages": {
-            "type": "array",
-            "items": {"type": "string"},
-            "description": "add and update: the pip packages the custom engine's driver needs. install: the packages to put on the server.",
-        },
-        "read_only": {"type": "boolean", "description": "add and update: run every query in a transaction that is rolled back."},
-        "ssh": {
-            "type": "object",
-            "properties": {
-                "host": {"type": "string", "description": "The machine the tunnel goes through."},
-                "port": {"type": "integer", "description": "Its SSH port, 22 when left out."},
-                "user": {"type": "string", "description": "The user it signs in as."},
-                "key": {"type": "string", "description": "A private key file on the server; left out, the ssh agent's."},
+DB_MANAGE = Definition(
+    MANAGE,
+    "Manage the user's Databases panel: its connections, the drivers on the server and the database files it opens."
+    " engines lists every engine with its form, default port, the options its URL takes and its driver. add creates"
+    " a connection and update changes the fields given; remove deletes the connection, never the database; test"
+    " connects without saving. install and uninstall put an engine's driver on the server or take it off. open"
+    " opens a SQLite or DuckDB file as a connection for this session. export writes a table or a query to the"
+    " shared folder as CSV, or a table as SQL inserts, and shows the file to the user.",
+    {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ACTIONS},
+            "connection": {"type": "string", "description": "update, remove, test and export: the connection's id. test without it checks the fields given."},
+            "engine": {"type": "string", "description": "add, install and uninstall: an engine id from engines."},
+            "name": {"type": "string", "description": "add and update: the name the panel shows."},
+            "path": {"type": "string", "description": "add and update: a file engine's database file on the server. open: the file to open, absolute or from the chat's folder."},
+            "host": {"type": "string", "description": "add and update: the server a server engine connects to."},
+            "port": {"type": "integer", "description": "add and update: its port; the engine's default when left out."},
+            "database": {"type": "string", "description": "add and update: the database a server engine opens; left out, the connection lists the server's. export: one of those."},
+            "user": {"type": "string", "description": "add and update: the user a server engine signs in as."},
+            "password": {"type": "string", "description": "add and update: its password, kept on the server and never shown again."},
+            "options": {
+                "type": "object",
+                "additionalProperties": {"type": "string"},
+                "description": "add and update: the query parameters of a server engine's URL, such as Snowflake's warehouse.",
             },
-            "description": "add and update: an SSH tunnel through another machine, with the server's ssh client.",
+            "url": {"type": "string", "description": "add and update: the custom engine's SQLAlchemy URL."},
+            "packages": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "add and update: the pip packages the custom engine's driver needs. install: the packages to put on the server.",
+            },
+            "read_only": {"type": "boolean", "description": "add and update: run every query in a transaction that is rolled back."},
+            "ssh": {
+                "type": "object",
+                "properties": {
+                    "host": {"type": "string", "description": "The machine the tunnel goes through."},
+                    "port": {"type": "integer", "description": "Its SSH port, 22 when left out."},
+                    "user": {"type": "string", "description": "The user it signs in as."},
+                    "key": {"type": "string", "description": "A private key file on the server; left out, the ssh agent's."},
+                },
+                "description": "add and update: an SSH tunnel through another machine, with the server's ssh client.",
+            },
+            "schema": {"type": "string", "description": "export: the table's schema, the default one when left out."},
+            "table": {"type": "string", "description": "export: the table to write."},
+            "sql": {"type": "string", "description": "export: a query that reads, written instead of a table."},
+            "format": {"type": "string", "enum": list(database_data.TABLE_FORMATS), "description": "export: csv, or sql for a table's inserts; csv when left out."},
         },
-        "schema": {"type": "string", "description": "export: the table's schema, the default one when left out."},
-        "table": {"type": "string", "description": "export: the table to write."},
-        "sql": {"type": "string", "description": "export: a query that reads, written instead of a table."},
-        "format": {"type": "string", "enum": list(database_data.TABLE_FORMATS), "description": "export: csv, or sql for a table's inserts; csv when left out."},
+        "required": ["action"],
     },
-    "required": ["action"],
-}
+)
 
-FIELDS = tuple(name for name in databases.FIELDS if name in MANAGE_INPUT["properties"])
+FIELDS = tuple(name for name in databases.FIELDS if name in DB_MANAGE.schema["properties"])
 
 
 def needs_key(name: str, args: dict) -> bool:
     return name.startswith(PREFIX)
-
-
-def _text(body: str) -> dict:
-    return {"content": [{"type": "text", "text": body}]}
 
 
 def _counted(number: int, word: str) -> str:
@@ -439,9 +434,9 @@ def _failure(exc: Exception) -> str:
 
 async def _answer(work: Callable[[], str]) -> dict:
     try:
-        return _text(await asyncio.to_thread(work))
+        return reply(await asyncio.to_thread(work))
     except FAILURES as exc:
-        return _text(_failure(exc))
+        return reply(_failure(exc))
 
 
 def _scope(args: dict) -> databases.Scope:
@@ -505,13 +500,13 @@ def make_tools(context: dict) -> list:
         try:
             name = await asyncio.to_thread(_export_file, args, shared.project_dir(key))
         except FAILURES as exc:
-            return _text(_failure(exc))
+            return reply(_failure(exc))
         delivered = listing({"paths": [name]}, key)
         if emit is not None:
             await emit({"type": "shared", "files": delivered})
-        return _text(f"Wrote {name} and showed it to the user: {delivered[0]['url']}")
+        return reply(f"Wrote {name} and showed it to the user: {delivered[0]['url']}")
 
-    @tool(INSPECT, INSPECT_DESCRIPTION, INSPECT_INPUT)
+    @DB_INSPECT
     async def db_inspect(args):
         if not args.get("connection"):
             return await _answer(_connections_text)
@@ -523,17 +518,17 @@ def make_tools(context: dict) -> list:
             return await _answer(lambda: _objects_text(database_data.objects(scope, schema)))
         return await _answer(lambda: _catalog_text(database_data.schemas(scope)))
 
-    @tool(QUERY, QUERY_DESCRIPTION, QUERY_INPUT)
+    @DB_QUERY
     async def db_query(args):
         offset = _offset(args)
         return await _answer(lambda: render(database_data.query(_scope(args), args["sql"], False, _limit(args), offset), offset))
 
-    @tool(EXECUTE, EXECUTE_DESCRIPTION, EXECUTE_INPUT)
+    @DB_EXECUTE
     async def db_execute(args):
         offset = _offset(args)
         return await _answer(lambda: render(database_data.query(_scope(args), args["sql"], True, _limit(args), offset), offset))
 
-    @tool(MANAGE, MANAGE_DESCRIPTION, MANAGE_INPUT)
+    @DB_MANAGE
     async def db_manage(args):
         action = args.get("action")
         connection = args.get("connection") or ""
@@ -556,6 +551,6 @@ def make_tools(context: dict) -> list:
             return await _answer(lambda: _connection_line(databases.open_path(opened(args.get("path") or ""))))
         if action == EXPORT:
             return await export(args)
-        return _text(f"action is one of {', '.join(ACTIONS)}.")
+        return reply(f"action is one of {', '.join(ACTIONS)}.")
 
     return [db_inspect, db_query, db_execute, db_manage]
