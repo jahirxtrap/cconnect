@@ -6,6 +6,7 @@ import {
   VALUE_SEPARATOR,
   type AgentRun,
   type CompactData,
+  type CurrentSession,
   type ComponentCondition,
   type ComponentConfirm,
   type ComponentElement,
@@ -110,6 +111,7 @@ export type ServerEvent =
   | { type: "ask_session"; sessionId: string }
   | { type: "command"; markdown: string; local: boolean }
   | { type: "usage"; usage: Usage; local: boolean }
+  | { type: "session_info"; session: CurrentSession }
   | {
       type: "component";
       title: string | null;
@@ -596,6 +598,10 @@ export class ChatSocket {
     this.#send({ type: "usage" });
   }
 
+  sendSessionInfo() {
+    this.#send({ type: "session_info" });
+  }
+
   sendReload(command: string) {
     this.#send({ type: "reload", command });
   }
@@ -842,6 +848,20 @@ export class ChatSocket {
         return { type: "command", markdown: event.markdown ?? "", local: event.local === true };
       case "usage":
         return { type: "usage", usage: usageOf(wire), local: event.local === true };
+      case "session_info":
+        return {
+          type: "session_info",
+          session: {
+            sessionId: event.session_id ?? null,
+            cwd: event.cwd ?? null,
+            account: event.account ?? null,
+            email: event.email ?? null,
+            plan: event.plan ?? null,
+            model: event.model ?? null,
+            effort: event.effort || null,
+            permissionMode: event.permission_mode ?? null,
+          },
+        };
       case "component":
         return {
           type: "component",

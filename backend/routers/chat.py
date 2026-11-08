@@ -126,14 +126,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     on_transport=on_transport,
                     adopt=adopted,
                     read_from=shown if adopted else None,
-                    session_info=lambda: {
-                        "session_id": state.session_id,
-                        "cwd": state.cwd,
-                        "model": _resolve_model(state.model),
-                        "account": accounts.resolve(state.account),
-                        "effort": _effort_sent(state),
-                        "permission_mode": state.permission_mode,
-                    },
+                    session_info=lambda: _session_info(state),
                 ):
                     if event.get("type") == "session_started":
                         state.session_id = event["session_id"]
@@ -272,6 +265,19 @@ def _effort_sent(state: _Session) -> str:
         return state.effort
     levels = cli_info.effort_levels_for(_resolve_model(state.model), state.account)
     return state.effort if state.effort in levels else ""
+
+
+def _session_info(state: _Session) -> dict:
+    account = accounts.resolve(state.account)
+    return {
+        "session_id": state.session_id,
+        "cwd": state.cwd,
+        "account": account,
+        **accounts.signed_in_as(account),
+        "model": _resolve_model(state.model),
+        "effort": _effort_sent(state),
+        "permission_mode": state.permission_mode,
+    }
 
 
 def _side_model(state: _Session) -> str | None:
@@ -613,6 +619,10 @@ async def chat_ws(ws: WebSocket):
                     seen["capabilities"],
                     session.state.locale if session else None,
                 ))
+
+            elif mtype == "session_info":
+                if session is not None and session.agent is None:
+                    await send({"type": "session_info", **_session_info(session.state)})
 
             elif mtype == "reload":
                 if session is not None:

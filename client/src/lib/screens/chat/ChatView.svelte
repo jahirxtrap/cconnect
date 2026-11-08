@@ -101,7 +101,7 @@
   }: Props = $props();
 
   const SIDE_PEEK = 58;
-  const OUTSIDE_TURN = ["usage", "reload"];
+  const OUTSIDE_TURN = ["usage", "session_info", "reload"];
 
   provideServer(() => chat.environment);
 

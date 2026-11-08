@@ -7,7 +7,7 @@ const SMALL = "var(--chat-gap-sm)";
 const TIGHT = "var(--chat-gap-xs)";
 const NONE = "0px";
 
-const NOTICE: GapRole[] = ["api_error", "info", "interrupted", "status", "usage"];
+const NOTICE: GapRole[] = ["api_error", "info", "interrupted", "status", "usage", "session_info"];
 
 const GROUPED: GapRole[] = [
   "thinking",

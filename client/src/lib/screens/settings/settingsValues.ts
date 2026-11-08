@@ -20,6 +20,7 @@ import { indicatorLabel } from "$lib/screens/claude/serviceStatus";
 import type { Account } from "$lib/services/accountsApi";
 import { agents } from "$lib/services/agents.svelte";
 import { address, backend } from "$lib/services/backend.svelte";
+import { optionLabel } from "$lib/services/capabilitiesApi";
 import { localServer, localServerStateOf } from "$lib/services/localServer.svelte";
 import { notifier } from "$lib/services/notifier.svelte";
 import { RETENTION_FOREVER_DAYS } from "$lib/services/settingsApi";
@@ -161,11 +162,7 @@ export const hasProjects = (): boolean => (chatListFor(backend.active)?.projects
 
 export const modelValue = (): string => {
   const snapshot = serverSettings.snapshot;
-  if (!snapshot) return "";
-  return (
-    serverSettings.capabilities?.models.find((model) => model.id === snapshot.model)?.label ??
-    snapshot.model
-  );
+  return snapshot ? optionLabel(serverSettings.capabilities?.models, snapshot.model) : "";
 };
 
 export const effortValue = (): string => serverSettings.snapshot?.effort ?? "";
@@ -182,20 +179,12 @@ export const chatLanguageValue = (): string =>
 
 export const permissionValue = (): string => {
   const snapshot = serverSettings.snapshot;
-  if (!snapshot) return "";
-  return (
-    serverSettings.capabilities?.permissionModes.find((mode) => mode.id === snapshot.permissionMode)
-      ?.label ?? snapshot.permissionMode
-  );
+  return snapshot ? optionLabel(serverSettings.capabilities?.permissionModes, snapshot.permissionMode) : "";
 };
 
 export const accountValue = (): string => {
   const snapshot = serverSettings.snapshot;
-  if (!snapshot) return "";
-  return (
-    serverSettings.capabilities?.accounts.find((account) => account.id === snapshot.account)?.label ??
-    snapshot.account
-  );
+  return snapshot ? optionLabel(serverSettings.capabilities?.accounts, snapshot.account) : "";
 };
 
 const hiddenTools = (): Set<string> =>

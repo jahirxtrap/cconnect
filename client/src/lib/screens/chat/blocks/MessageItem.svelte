@@ -39,6 +39,7 @@
   import PlanBlock from "./PlanBlock.svelte";
   import QueryBlock from "./QueryBlock.svelte";
   import ReplyActions, { type ReplyHandlers } from "./ReplyActions.svelte";
+  import SessionFacts from "./SessionFacts.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
   import { rowSite } from "./rowSite";
@@ -429,6 +430,12 @@
         {:else}
           <UsageWindows windows={message.usage.windows} />
         {/if}
+      </CardPanel>
+    </div>
+  {:else if message.role === "session_info" && message.currentSession}
+    <div class="w-full px-(--page-inset)">
+      <CardPanel>
+        <SessionFacts session={message.currentSession} />
       </CardPanel>
     </div>
   {:else if message.role === "notification"}

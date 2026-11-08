@@ -7,7 +7,7 @@
   import type { PromptCache } from "$lib/data/promptCache";
   import type { LimitWindow } from "$lib/data/usageWindows";
   import { t } from "$lib/i18n/index.svelte";
-  import { contextWindowFor, effortLevelsFor, type Capabilities } from "$lib/services/capabilitiesApi";
+  import { contextWindowFor, effortLevelsFor, optionLabel, type Capabilities } from "$lib/services/capabilitiesApi";
   import { accountIcon } from "$lib/ui/accountIcon";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSlider from "$lib/ui/MenuSlider.svelte";
@@ -126,14 +126,12 @@
   const AccountIcon = $derived(accountIcon(!!activeAccount?.provider));
 
   const modelsAvailable = $derived((capabilities?.models.length ?? 0) > 0);
-  const modelLabel = $derived(capabilities?.models.find((item) => item.id === model)?.label ?? model);
+  const modelLabel = $derived(optionLabel(capabilities?.models, model));
   const modelWindow = $derived(contextWindowFor(capabilities, model));
   const contextWindow = $derived(
     modelWindow !== null && compactWindow !== null ? Math.min(modelWindow, compactWindow) : modelWindow,
   );
-  const permissionLabel = $derived(
-    capabilities?.permissionModes.find((item) => item.id === permissionMode)?.label ?? permissionMode,
-  );
+  const permissionLabel = $derived(optionLabel(capabilities?.permissionModes, permissionMode));
   const permission = $derived(permissionStyle(permissionMode));
   const serverPermission = $derived(capabilities?.defaults.permissionMode ?? "");
 </script>

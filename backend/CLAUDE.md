@@ -176,7 +176,8 @@ Client → server: `start` (with `channel` + `last_seq` to re-attach, and the ap
 the plan usage's names follow), `prompt`, `unqueue`,
 `set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history` (with
 `until` for the messages before a compaction),
-`ask`, `usage`, `stop_task`, `reload`, `close_resident`, for mods `mod_render`, `mod_act`,
+`ask`, `usage`, `session_info` (`/status`, answered with the same fields the `session_info` tool
+gives Claude), `stop_task`, `reload`, `close_resident`, for mods `mod_render`, `mod_act`,
 `mod_answer`, `mod_client_module`, and for an ACP agent (a `start` that names one) `set_option`,
 `agent_login`, `agent_logout`, `agent_retry` and `history`. An agent's chat gets `agent_state`
 (status, options, commands, sign-in methods) and `history` (its rows, paged like a transcript)
@@ -205,7 +206,7 @@ release workflow runs it with `--check`, and `CCONNECT_CONTRACT_CHECK=1` validat
 it is sent.
 
 Server → client, all seq'd per session except the control ones (`ready`, `permission_mode`,
-`history_chunk`, `usage`, `ask_*`, `activity`) and the mods ones:
+`history_chunk`, `usage`, `session_info`, `ask_*`, `activity`) and the mods ones:
 
 | event | notes |
 |---|---|

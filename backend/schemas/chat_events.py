@@ -301,6 +301,18 @@ class Usage(Event):
     local: Optional[bool] = None
 
 
+class SessionInfo(Event):
+    type: Literal["session_info"]
+    session_id: Optional[str] = None
+    cwd: Optional[str] = None
+    account: Optional[str] = None
+    email: Optional[str] = None
+    plan: Optional[str] = None
+    model: Optional[str] = None
+    effort: Optional[str] = None
+    permission_mode: Optional[str] = None
+
+
 class Component(Event):
     type: Literal["component"]
     block_id: Optional[str] = None
@@ -608,8 +620,8 @@ ChatEvent = Annotated[
     Union[
         Ready, PermissionMode, Rejected, Activity, AgentState, History, Stop, TerminalOpened,
         AssistantText, Thinking, Working, ToolUse, ToolResult, FileChange, Shared, Compacting, CompactingEnded,
-        Status, Compact, CompactSummary, AskText, AskWorking, AskSession, Command, Usage, Component, Reloaded,
-        Agent, TaskRunning, AgentResult, ThinkingTokens, HookFailed, Notification, Notice, Mods, Commands,
+        Status, Compact, CompactSummary, AskText, AskWorking, AskSession, Command, Usage, SessionInfo, Component,
+        Reloaded, Agent, TaskRunning, AgentResult, ThinkingTokens, HookFailed, Notification, Notice, Mods, Commands,
         ModToast, ModInvalidate, ModTree, ModReply, ModRequest, ModFocus, ModScroll, SessionMessage,
         PluginMessage, AgentReport, Todos, Task, SessionStarted, Result, Context, RateLimit, Cache, Anchor,
         Done, Interrupted, Attached, Error, ApiError, Queued, Queue, Dequeued, HistoryChunk, Tail,

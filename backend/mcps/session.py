@@ -55,8 +55,8 @@ RELOAD = Definition(
 SESSION_INFO = Definition(
     "session_info",
     "What this very conversation is running on: its session id, working directory and project,"
-    " plus the model, effort, account and permission mode in use. Call it when the user asks"
-    " about the session itself, or when you need its id to read or act on this transcript.",
+    " the account with its email and plan, and the model, effort and permission mode in use. Call it"
+    " when the user asks about the session itself, or when you need its id to read or act on this transcript.",
     eager=True,
 )
 

@@ -154,6 +154,9 @@ export const toCommands = (raw: CommandWire[] | undefined): CommandOption[] =>
 const toOptions = (raw: Array<{ id?: string; label?: string }> | undefined): LabeledOption[] =>
   (raw ?? []).filter((option) => option.id).map((option) => ({ id: option.id!, label: option.label ?? option.id! }));
 
+export const optionLabel = (options: LabeledOption[] | undefined, id: string): string =>
+  options?.find((option) => option.id === id)?.label ?? id;
+
 export const effortLevelsFor = (capabilities: Capabilities | null, model: string): string[] =>
   capabilities?.models.find((item) => item.id === model)?.effortLevels ?? [];
 

@@ -26,7 +26,8 @@ export type Role =
   | "session_message"
   | "plugin_message"
   | "agent_report"
-  | "usage";
+  | "usage"
+  | "session_info";
 
 export type SendStatus = "sent" | "error";
 
@@ -95,6 +96,17 @@ export interface AgentRun {
   effort: string | null;
   agent: string | null;
   account: { provider: boolean } | null;
+}
+
+export interface CurrentSession {
+  sessionId: string | null;
+  cwd: string | null;
+  account: string | null;
+  email: string | null;
+  plan: string | null;
+  model: string | null;
+  effort: string | null;
+  permissionMode: string | null;
 }
 
 export interface InteractionOption {
@@ -244,6 +256,7 @@ export interface ChatMessage {
   children: ChatMessage[];
   sendStatus: SendStatus;
   usage: Usage | null;
+  currentSession: CurrentSession | null;
   uuid: string | null;
   beforeCompaction: string | null;
 }
@@ -467,6 +480,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   children: [],
   sendStatus: "sent",
   usage: null,
+  currentSession: null,
   uuid: null,
   beforeCompaction: null,
   ...patch,

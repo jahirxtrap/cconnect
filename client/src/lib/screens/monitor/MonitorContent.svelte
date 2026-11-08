@@ -8,6 +8,7 @@
   import { COMPACT_WIDTH } from "$lib/platform/layout.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
+  import InfoRow from "$lib/ui/InfoRow.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -136,17 +137,17 @@
               </div>
             </div>
             {#if current.cpuName}
-              {@render infoRow("CPU", current.cpuName)}
+              <InfoRow label="CPU" value={current.cpuName} />
             {/if}
             {#if gpu}
-              {@render infoRow("GPU", gpu.name)}
+              <InfoRow label="GPU" value={gpu.name} />
             {/if}
-            {@render infoRow(t("MEMORY"), formatSize(current.memoryTotal))}
+            <InfoRow label={t("MEMORY")} value={formatSize(current.memoryTotal)} />
             {#if gpu}
-              {@render infoRow("VRAM", formatSize(gpu.memTotal))}
+              <InfoRow label="VRAM" value={formatSize(gpu.memTotal)} />
             {/if}
             {#if current.arch}
-              {@render infoRow(t("ARCHITECTURE"), current.arch)}
+              <InfoRow label={t("ARCHITECTURE")} value={current.arch} />
             {/if}
           </div>
         </SettingsGroup>
@@ -201,12 +202,5 @@
   <div class="min-w-0 {CARD_CLASS}">
     <MetricBar {title} {subtitle} {percent} />
     <Sparkline points={history} capacity={monitor.historyCap} class="mt-3 h-16 w-full" />
-  </div>
-{/snippet}
-
-{#snippet infoRow(label: string, value: string)}
-  <div class="flex items-center gap-3">
-    <span class="shrink-0 text-body-sm text-on-surface-variant">{label}</span>
-    <span class="min-w-0 flex-1 truncate text-right text-body-sm">{value}</span>
   </div>
 {/snippet}

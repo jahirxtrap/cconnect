@@ -37,6 +37,8 @@ _CREDENTIALS_FILE = ".credentials.json"
 _IDENTITY_FILE = ".claude.json"
 _BUNDLE_FILES = (_CREDENTIALS_FILE, _IDENTITY_FILE, _META_FILE)
 _IDENTITY_KEYS = ("oauthAccount", "userID")
+_EMAIL_KEY = "emailAddress"
+_PLAN_KEY = "planDisplayName"
 
 _MAX_BUNDLE_BYTES = 2 * 1024 * 1024
 
@@ -366,10 +368,17 @@ def _identity(account_id: Optional[str]) -> dict:
     return {key: data[key] for key in _IDENTITY_KEYS if key in data}
 
 
+def signed_in_as(account_id: Optional[str]) -> dict[str, Optional[str]]:
+    account = _identity(account_id).get("oauthAccount")
+    fields = account if isinstance(account, dict) else {}
+    return {
+        name: value if isinstance(value, str) and value.strip() else None
+        for name, value in (("email", fields.get(_EMAIL_KEY)), ("plan", fields.get(_PLAN_KEY)))
+    }
+
+
 def plan_name(account_id: Optional[str]) -> Optional[str]:
-    account =_identity(account_id).get("oauthAccount")
-    name = account.get("planDisplayName") if isinstance(account, dict) else None
-    return name if isinstance(name, str) and name.strip() else None
+    return signed_in_as(account_id)["plan"]
 
 
 def export_bundle(account_id: str) -> Optional[bytes]:

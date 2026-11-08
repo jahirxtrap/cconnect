@@ -24,6 +24,7 @@ export type ChatEvent =
   | AskSession
   | Command
   | Usage
+  | SessionInfo
   | Component
   | Reloaded
   | Agent
@@ -411,6 +412,21 @@ export interface Usage {
   error?: string | null;
   reason?: string | null;
   local?: boolean | null;
+}
+export interface SessionInfo {
+  seq?: number | null;
+  channel?: string | null;
+  parent?: string | null;
+  replay?: boolean | null;
+  type: "session_info";
+  session_id?: string | null;
+  cwd?: string | null;
+  account?: string | null;
+  email?: string | null;
+  plan?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  permission_mode?: string | null;
 }
 export interface Component {
   seq?: number | null;

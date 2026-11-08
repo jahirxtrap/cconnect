@@ -14,6 +14,7 @@ import {
   type ComponentElement,
   type ComponentType,
   type ConnectionState,
+  type CurrentSession,
   type InteractionData,
   type InteractionOption,
   type InteractionRequest,
@@ -146,6 +147,7 @@ import {
   commandFor,
   createCapabilitiesApi,
   effortLevelsFor,
+  optionLabel,
   type Capabilities,
   type CommandOption,
 } from "$lib/services/capabilitiesApi";
@@ -1449,9 +1451,10 @@ export class ChatState {
   }
 
   runCommand(command: CommandOption) {
-    if (command.kind === "usage" || command.kind === "reload") {
+    if (command.kind === "usage" || command.kind === "session_info" || command.kind === "reload") {
       this.#appendLocal(newMessage(this.#nextId++, "user", { text: `/${command.name}`, ephemeral: true }));
       if (command.kind === "usage") this.#socket.sendUsage();
+      else if (command.kind === "session_info") this.#socket.sendSessionInfo();
       else this.#socket.sendReload(command.name);
       return;
     }
@@ -1849,6 +1852,16 @@ export class ChatState {
   #breakStream() {
     this.#assistantId = null;
     this.#thinkingId = null;
+  }
+
+  #labeled(session: CurrentSession): CurrentSession {
+    const capabilities = this.capabilities;
+    return {
+      ...session,
+      model: session.model && optionLabel(capabilities?.models, session.model),
+      account: session.account && optionLabel(capabilities?.accounts, session.account),
+      permissionMode: session.permissionMode && optionLabel(capabilities?.permissionModes, session.permissionMode),
+    };
   }
 
   #appendShown(item: ChatMessage, local: boolean | undefined) {
@@ -2462,6 +2475,11 @@ export class ChatState {
         break;
       case "usage":
         this.#appendShown(newMessage(this.#nextId++, "usage", { ephemeral: true, usage: event.usage }), event.local);
+        break;
+      case "session_info":
+        this.#appendLocal(
+          newMessage(this.#nextId++, "session_info", { ephemeral: true, currentSession: this.#labeled(event.session) }),
+        );
         break;
       case "reloaded": {
         const text = reloadText(event);

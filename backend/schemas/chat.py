@@ -115,7 +115,7 @@ class LoadHistoryMessage(BaseModel):
 
 
 class SignalMessage(BaseModel):
-    type: Literal["ping", "usage", "history", "close_resident", "agent_login_cancel", "agent_logout", "agent_retry"]
+    type: Literal["ping", "usage", "session_info", "history", "close_resident", "agent_login_cancel", "agent_logout", "agent_retry"]
 
 
 class SetOptionMessage(BaseModel):
