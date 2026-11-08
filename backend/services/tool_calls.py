@@ -3,11 +3,20 @@
 import asyncio
 import threading
 from collections import OrderedDict
-from typing import Any, Optional
+from dataclasses import dataclass
+from typing import Any, Iterable, Optional
 
 import orjson
 
 _BUDGET = 64 * 1024 * 1024
+_INLINE_LINE = 16 * 1024
+
+
+@dataclass(frozen=True)
+class OutputLine:
+    path: str
+    offset: int
+
 
 _calls: "OrderedDict[str, dict]" = OrderedDict()
 _sizes: dict[str, int] = {}
@@ -94,6 +103,24 @@ def recall(tool_use_id: Any) -> dict | None:
         return call
 
 
+def _read_output(tool_use_id: str, line: OutputLine) -> Any:
+    try:
+        with open(line.path, "rb") as fh:
+            fh.seek(line.offset)
+            entry = orjson.loads(fh.readline())
+    except (OSError, orjson.JSONDecodeError):
+        return None
+    content = (entry.get("message") or {}).get("content") if isinstance(entry, dict) else None
+    if not isinstance(content, list) or not any(isinstance(block, dict) and block.get("tool_use_id") == tool_use_id for block in content):
+        return None
+    return entry.get("toolUseResult")
+
+
+def output_of(tool_use_id: str, call: dict) -> Any:
+    output = call.get("output")
+    return _read_output(tool_use_id, output) if isinstance(output, OutputLine) else output
+
+
 def knows(tool_use_ids: list[str]) -> bool:
     with _lock:
         if not all(tool_use_id in _calls for tool_use_id in tool_use_ids):
@@ -103,9 +130,14 @@ def knows(tool_use_ids: list[str]) -> bool:
     return True
 
 
-def remember_entries(entries: list[dict]) -> list[str]:
+def _output(entry: dict, path: str, offset: int, size: int) -> Any:
+    result = entry.get("toolUseResult")
+    return result if result is None or size <= _INLINE_LINE else OutputLine(path, offset)
+
+
+def remember_entries(path: str, lines: Iterable[tuple[int, int, dict]]) -> list[str]:
     remembered: list[str] = []
-    for entry in entries:
+    for offset, size, entry in lines:
         content = (entry.get("message") or {}).get("content")
         if not isinstance(content, list):
             continue
@@ -121,6 +153,6 @@ def remember_entries(entries: list[dict]) -> list[str]:
                 remember(
                     block.get("tool_use_id"),
                     errored=bool(block.get("is_error")),
-                    output=entry.get("toolUseResult") if len(results) == 1 else None,
+                    output=_output(entry, path, offset, size) if len(results) == 1 else None,
                 )
     return remembered

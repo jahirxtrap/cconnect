@@ -364,8 +364,9 @@ class AgentSession:
                 result = await connection.call("session/load", params)
             finally:
                 self._replaying = False
-            self.rows = event_rows.rows_of(self._replayed)
-            self.todos = next((event.get("items") or [] for event in reversed(self._replayed) if event.get("type") == "todos"), [])
+            replayed, self._replayed = self._replayed, []
+            self.rows = event_rows.rows_of(replayed)
+            self.todos = next((event.get("items") or [] for event in reversed(replayed) if event.get("type") == "todos"), [])
         elif _present(connection.session_capabilities, "resume"):
             result = await connection.call("session/resume", params)
         elif connection.capabilities.get("loadSession"):
@@ -373,7 +374,7 @@ class AgentSession:
             try:
                 result = await connection.call("session/load", params)
             finally:
-                self._replaying = False
+                self._replaying, self._replayed = False, []
         else:
             connection.unbind(session_id)
             await self._create(connection)

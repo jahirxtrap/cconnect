@@ -1155,10 +1155,15 @@ class SessionRegistry:
 
     async def relieve(self, keep=None):
         """Below the memory reserve, release the chats holding a process that do nothing, oldest first; whether memory stays short."""
+        from services import sessions as sessions_service
+
         async with self._relief:
             if not persistent_sessions.memory_short():
                 return False
             await mcp_lazy.release_idle(persistent_sessions.memory_short)
+            if not persistent_sessions.memory_short():
+                return False
+            sessions_service.release_caches()
             if not persistent_sessions.memory_short():
                 return False
             idle = sorted(

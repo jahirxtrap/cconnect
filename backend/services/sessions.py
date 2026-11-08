@@ -8,6 +8,7 @@ import shutil
 import threading
 import time
 from collections import OrderedDict
+from concurrent.futures import Future
 from pathlib import Path
 from textwrap import dedent
 from typing import Any, Optional
@@ -42,8 +43,9 @@ _task_lock = threading.Lock()
 _NORMALIZED_KEPT = 8
 _normalized: "OrderedDict[tuple, tuple[tuple, list[dict], list[str], Optional[str]]]" = OrderedDict()
 _normalized_lock = threading.Lock()
+_normalizing: dict[tuple, tuple[tuple, Future]] = {}
 _CONVERSATIONS_KEPT = 2
-_conversations: "OrderedDict[str, tuple[int, list[list[dict]]]]" = OrderedDict()
+_conversations: "OrderedDict[str, tuple[int, list[dict], list[dict]]]" = OrderedDict()
 _BOUNDARY_SCANS_KEPT = 4
 _boundary_scans: "OrderedDict[str, tuple[int, list[tuple[int, dict]]]]" = OrderedDict()
 _boundary_lock = threading.Lock()
@@ -148,20 +150,25 @@ def _parse(line: bytes) -> Any:
             return None
 
 
-def _iter_lines(path: Path, offset: int = 0, end: Optional[int] = None):
+def _located_lines(path: Path, offset: int = 0, end: Optional[int] = None):
     with path.open("rb") as fh:
         if offset:
             fh.seek(offset)
         for raw in fh:
             if end is not None and offset >= end:
                 return
+            start = offset
             offset += len(raw)
             line = raw.strip()
             if not line:
                 continue
             entry = _parse(line)
             if entry is not None:
-                yield entry
+                yield start, len(raw), entry
+
+
+def _iter_lines(path: Path, offset: int = 0, end: Optional[int] = None):
+    return (entry for _, _, entry in _located_lines(path, offset, end))
 
 
 def _complete_lines(path: Path, offset: int):
@@ -899,6 +906,11 @@ def session_context(cwd: str, session_id: str, max_chars: int = 4000) -> str:
 
 _BRANCH_KEYS = ("uuid", "parentUuid", "logicalParentUuid", "isSidechain", "type", "subtype", "isCompactSummary")
 _CHAIN_TYPES = frozenset({"user", "assistant", "attachment", "system", "progress"})
+_READ_TYPES = _CHAIN_TYPES | {"summary", "queue-operation"}
+
+
+def _readable(entry: dict) -> bool:
+    return entry.get("type") in _READ_TYPES or isinstance(entry.get("content"), str)
 
 
 def _conversation_row(entry: dict) -> Optional[dict]:
@@ -926,7 +938,12 @@ def _skeleton(entry: dict) -> dict:
     return kept
 
 
+def _segment_rows(segment: list[dict], session_id: str) -> list[dict]:
+    return [skeleton["row"] for skeleton in _active_entries(segment, session_id) if "row" in skeleton]
+
+
 def conversation(cwd: str, session_id: str) -> list[dict]:
+    """Rows of the whole conversation; a stretch a compaction closed keeps only its resolved rows."""
     try:
         file = _session_file(project_key_for(cwd), session_id)
     except ValueError:
@@ -935,9 +952,9 @@ def conversation(cwd: str, session_id: str) -> list[dict]:
         return []
     key = str(file)
     with _conversation_lock:
-        offset, segments = _conversations.pop(key, (0, [[]]))
+        offset, closed, current = _conversations.pop(key, (0, [], []))
         if offset > file.stat().st_size:
-            offset, segments = 0, [[]]
+            offset, closed, current = 0, [], []
         for raw, offset in _complete_lines(file, offset):
             entry = _parse(raw.strip())
             if not isinstance(entry, dict):
@@ -947,17 +964,13 @@ def conversation(cwd: str, session_id: str) -> list[dict]:
             if row is not None:
                 skeleton["row"] = row
             if _is_boundary(skeleton):
-                segments.append([])
-            segments[-1].append(skeleton)
-        _conversations[key] = (offset, segments)
+                closed.extend(_segment_rows(current, session_id))
+                current = []
+            current.append(skeleton)
+        _conversations[key] = (offset, closed, current)
         while len(_conversations) > _CONVERSATIONS_KEPT:
             _conversations.popitem(last=False)
-    return [
-        skeleton["row"]
-        for segment in segments
-        for skeleton in _active_entries(segment, session_id)
-        if "row" in skeleton
-    ]
+        return closed + _segment_rows(current, session_id)
 
 
 _TASK_CREATED_RE = re.compile(r"Task #(\d+) created", re.IGNORECASE)
@@ -1203,7 +1216,7 @@ def list_checkpoints(project_key: str, session_id: str) -> list[dict]:
     file = _session_file(project_key, session_id)
     if not file.is_file():
         return []
-    entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
+    entries = _active_entries([entry for entry in _iter_lines(file, _last_compact_offset(file)) if _readable(entry)], session_id)
     points: list[dict] = []
     last_anchor: Optional[str] = None
     for entry in entries:
@@ -1337,8 +1350,9 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
         _FILE_EDIT_TOOLS, _build_file_diff, _format_tool_input,
         _tool_naming, _flatten_result_content,
     )
-    entries = [entry for entry in _iter_lines(sub_file) if entry.get("type") in _TRAVELLING_TYPES]
-    calls.extend(tool_calls.remember_entries(entries))
+    lines = [line for line in _located_lines(sub_file) if line[2].get("type") in _TRAVELLING_TYPES]
+    calls.extend(tool_calls.remember_entries(str(sub_file), lines))
+    entries = [entry for _, _, entry in lines]
     sub_ms = _tool_durations(entries)
     sub_results: dict[str, object] = {}
     for entry in entries:
@@ -1638,14 +1652,41 @@ def session_segment(
         if known is not None and known[0] == stamp and tool_calls.knows(known[2]):
             _normalized.move_to_end(key)
             return known[1], known[3]
-    span = closed or (_last_compact_offset(file), None)
-    items, calls, earlier = _normalize(file, project_key, session_id, prefs, span)
+        building = _normalizing.get(key)
+        if building is None or building[0] != stamp:
+            building = None
+            mine: Future = Future()
+            _normalizing[key] = (stamp, mine)
+    if building is not None:
+        return building[1].result()
+    try:
+        span = closed or (_last_compact_offset(file), None)
+        items, calls, earlier = _normalize(file, project_key, session_id, prefs, span)
+    except BaseException as error:
+        _done_normalizing(key, mine)
+        mine.set_exception(error)
+        raise
     with _normalized_lock:
         _normalized[key] = (stamp, items, calls, earlier)
         _normalized.move_to_end(key)
         while len(_normalized) > _NORMALIZED_KEPT:
             _normalized.popitem(last=False)
+    _done_normalizing(key, mine)
+    mine.set_result((items, earlier))
     return items, earlier
+
+
+def _done_normalizing(key: tuple, mine: Future) -> None:
+    with _normalized_lock:
+        if key in _normalizing and _normalizing[key][1] is mine:
+            del _normalizing[key]
+
+
+def release_caches() -> None:
+    with _normalized_lock:
+        _normalized.clear()
+    with _conversation_lock:
+        _conversations.clear()
 
 
 def _normalize(
@@ -1655,8 +1696,10 @@ def _normalize(
     prefs: dict | None,
     span: tuple[int, Optional[int]],
 ) -> tuple[list[dict], list[str], Optional[str]]:
-    entries = _active_entries(list(_iter_lines(file, *span)), session_id)
-    calls = tool_calls.remember_entries(entries)
+    lines = [line for line in _located_lines(file, *span) if _readable(line[2])]
+    entries = _active_entries([entry for _, _, entry in lines], session_id)
+    active = {id(entry) for entry in entries}
+    calls = tool_calls.remember_entries(str(file), (line for line in lines if id(line[2]) in active))
     queued_user_texts: set[str] = set()
     real_user_texts: set[str] = set()
 

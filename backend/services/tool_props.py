@@ -17,7 +17,7 @@ def _engine_call(page: dict) -> dict:
         if key in page and key in call:
             sent[key] = call[key]
     if "output" in call and not page.get("isRunning"):
-        sent["output"] = call["output"]
+        sent["output"] = tool_calls.output_of(page["tool_use_id"], call)
     if call.get("errored"):
         sent["isErrored"] = True
     return sent

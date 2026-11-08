@@ -151,7 +151,10 @@ def _load_catalogs(keys: list[str]) -> None:
 def _store(spec: Spec, catalog: dict[str, Any]) -> None:
     _catalogs[spec.key] = catalog
     with Session() as session:
-        session.query(McpCatalog).filter(McpCatalog.name == spec.name, McpCatalog.key != spec.key).delete()
+        stale = session.query(McpCatalog).filter(McpCatalog.name == spec.name, McpCatalog.key != spec.key)
+        for (key,) in stale.with_entities(McpCatalog.key):
+            _catalogs.pop(key, None)
+        stale.delete()
         session.merge(McpCatalog(key=spec.key, name=spec.name, catalog=catalog, updated_at=datetime.now(timezone.utc)))
         session.commit()
 
