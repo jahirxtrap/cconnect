@@ -138,12 +138,26 @@ def _claude_json(account_id: Optional[str]) -> Path:
     return Path(configured) / ".claude.json" if configured else Path.home() / ".claude.json"
 
 
-def is_logged_in(account_id: Optional[str]) -> bool:
+def _credentials(account_id: Optional[str]) -> dict:
     try:
         data = json.loads(credentials_path(account_id).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return False
-    return bool((data.get("claudeAiOauth") or {}).get("accessToken"))
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def is_logged_in(account_id: Optional[str]) -> bool:
+    return bool((_credentials(account_id).get("claudeAiOauth") or {}).get("accessToken"))
+
+
+def mcp_tokens(account_id: Optional[str]) -> dict[str, str]:
+    entries = _credentials(account_id).get("mcpOAuth")
+    tokens: dict[str, str] = {}
+    for entry in entries.values() if isinstance(entries, dict) else ():
+        name = entry.get("serverName") if isinstance(entry, dict) else None
+        if isinstance(name, str):
+            tokens[name] = tokens.get(name) or str(entry.get("accessToken") or "")
+    return tokens
 
 
 def _meta(path: Path) -> dict:

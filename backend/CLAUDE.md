@@ -51,7 +51,12 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account's folder, so MCP servers, plugins,
   settings and history are one for all, and only signing in uses that folder as the whole config,
   so the identity lands there; older folders still hold links into the primary, and `purge`
-  detaches every link before removing one, or refuses), `shared`, `git_ops` (the commit panel, on top of the single runner in
+  detaches every link before removing one, or refuses), `cli_login` (signing an account in to
+  Claude and to an MCP server through the CLI's own control requests, `claude_authenticate` and
+  `mcp_authenticate`, never a pseudo-terminal: the CLI stays open, in a task of its own, until the
+  pasted code or redirect address comes back. An MCP login is a credential, so it is per account;
+  the CLI reports no event when a browser on the server finishes one, so `wait_mcp` watches the
+  account's `.credentials.json` until that server's token changes), `shared`, `git_ops` (the commit panel, on top of the single runner in
   `services/git`, one lock per repository), `browser` (the server's Chromium, started only
   while a socket watches one of its tabs), `agents` / `agent_registry` (the ACP agents installed
   from the official catalog or added by hand), `agent_connections` / `agent_sessions` /
@@ -133,7 +138,7 @@ manager; listing is the `WS /api/shared/ws`; an upload streams to disk, so `PUT`
 `MAX_BODY_SIZE`), `/api/claude/*` (prompts, plugins and their reload, marketplaces, skills,
 MCP, memories, usage in the app's `lang`, status; installing an MCP server from its
 `.mcp.json` entry and a skill from a folder of a git repository, the two install links that
-need the server), `/api/accounts/*`, `/api/system/*` (also the processes the server runs and
+need the server; signing an account in to an MCP server, and out), `/api/accounts/*`, `/api/system/*` (also the processes the server runs and
 `processes/{pid}/stop`), `/api/pages` (registers an HTML page and serves the folder around
 it), `/api/network/*`, `/api/git/*` (repositories under a project, identities,
 the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client

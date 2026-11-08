@@ -85,9 +85,13 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, openExternal } from "$lib/platform";
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
+  import { accountsStore } from "$lib/data/accountsStore.svelte";
+  import type { Account } from "$lib/services/accountsApi";
+  import { accountIcon } from "$lib/ui/accountIcon";
+  import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
+  import SignInDialog from "./SignInDialog.svelte";
   import {
     claudeApi,
-    MCP_NEEDS_AUTH,
     pluginKey,
     type ActionResult,
     type CatalogPlugin,
@@ -206,6 +210,12 @@
   let mcpTransport = $state(TRANSPORTS[0]);
   let mcpAuth = $state<AuthInput>(emptyAuth());
   let mcpEnv = $state("");
+  let mcpSigning = $state<string | null>(null);
+  let mcpLogin = $state.raw<{ server: McpServer; account: string; url: string } | null>(null);
+  let mcpSubmitting = $state(false);
+  let mcpLoginError = $state<string | null>(null);
+  let mcpAccount = $state.raw<{ server: McpServer; account: Account } | null>(null);
+  let mcpSignOut = $state.raw<{ server: McpServer; account: Account } | null>(null);
   let areaWidth = $state(0);
   let viewHeight = $state(0);
 
@@ -246,7 +256,10 @@
   const load = async () => {
     if (kind === "plugins" || kind === "marketplaces") extensions = await claudeApi.extensions();
     else if (kind === "skills") skills = await claudeApi.skills();
-    else if (kind === "mcp") mcpServers = await claudeApi.mcp(chat.workingPath);
+    else if (kind === "mcp") {
+      accountsStore.ensure();
+      mcpServers = await claudeApi.mcp(chat.workingPath);
+    }
     else if (kind === "memories") memories = await claudeApi.memories(memoriesProject);
     else if (kind === "status") service = await claudeApi.status();
     loaded = true;
@@ -396,7 +409,64 @@
 
   const mcpSourceLabel = (source: string) => (MCP_SOURCE_LABELS[source] ? t(MCP_SOURCE_LABELS[source]) : source);
 
-  const mcpProblem = (server: McpServer) => (server.status === MCP_NEEDS_AUTH ? t("MCP_SIGN_IN_NEEDED") : null);
+  const mcpSignInShown = (server: McpServer) => server.oauth && server.enabled;
+
+  const mcpProblem = (server: McpServer) => {
+    const total = accountsStore.items.length;
+    if (!mcpSignInShown(server) || !total) return null;
+    const signedIn = accountsStore.items.filter((account) => server.signedIn.includes(account.id)).length;
+    if (!signedIn) return t("MCP_SIGN_IN_NEEDED");
+    return signedIn < total ? t("MCP_SIGNED_IN_COUNT", signedIn, total) : null;
+  };
+
+  const beginMcpLogin = async (server: McpServer, account: string) => {
+    mcpSigning = account;
+    const started = await claudeApi.mcpLogin(server.name, account, chat.workingPath);
+    mcpSigning = null;
+    if (!started.ok) {
+      actionError = started.message || t("CONNECTION_ERROR");
+      return;
+    }
+    if (!started.url) {
+      await reload();
+      return;
+    }
+    const current = { server, account, url: started.url };
+    mcpLoginError = null;
+    mcpLogin = current;
+    const signedIn = await claudeApi.mcpLoginWait(server.name, account);
+    if (!signedIn || mcpLogin !== current) return;
+    mcpLogin = null;
+    await reload();
+  };
+
+  const submitMcpLogin = async (address: string) => {
+    const current = mcpLogin;
+    if (!current) return;
+    mcpSubmitting = true;
+    mcpLoginError = null;
+    const result = await claudeApi.mcpLoginCallback(current.server.name, current.account, address);
+    mcpSubmitting = false;
+    if (mcpLogin !== current) return;
+    if (!result.ok) {
+      mcpLoginError = result.message || t("CONNECTION_ERROR");
+      return;
+    }
+    mcpLogin = null;
+    await reload();
+  };
+
+  const cancelMcpLogin = () => {
+    const current = mcpLogin;
+    mcpLogin = null;
+    if (current) void claudeApi.mcpLoginCancel(current.server.name, current.account);
+  };
+
+  const signOutMcp = async (server: McpServer, account: string) => {
+    mcpSigning = account;
+    await runAction(() => claudeApi.mcpSignOut(server.name, account, chat.workingPath));
+    mcpSigning = null;
+  };
 
   const mcpRank = (source: string) => {
     const rank = MCP_SOURCE_ORDER.indexOf(source);
@@ -1347,6 +1417,24 @@
       { label: t("COMMAND_OR_URL"), text: server.detail ?? "" },
     ].filter((fact) => fact.text)}
   />
+  {#if mcpSignInShown(server)}
+    <SettingsGroup label={t("ACCOUNTS")}>
+      {#each accountsStore.items as account (account.id)}
+        {@const signedIn = server.signedIn.includes(account.id)}
+        <PreferenceRow
+          icon={accountIcon(!!account.provider)}
+          title={account.label}
+          summary={signedIn ? t("ACCOUNT_CONNECTED") : t("ACCOUNT_PENDING")}
+          enabled={!busy && !mcpSigning}
+          onclick={() => (signedIn ? (mcpAccount = { server, account }) : void beginMcpLogin(server, account.id))}
+        >
+          {#snippet trailing()}
+            <StatusDot class={signedIn ? "bg-green" : "bg-orange"} box={20} loading={mcpSigning === account.id} />
+          {/snippet}
+        </PreferenceRow>
+      {/each}
+    </SettingsGroup>
+  {/if}
   {#if dialogBusy === "toggle"}
     <LinearProgress />
   {/if}
@@ -1392,6 +1480,67 @@
       void runAction(() => claudeApi.mcpRemove(name));
     }}
     onDismiss={() => (confirmMcpRemove = null)}
+  />
+{/if}
+
+{#if mcpAccount}
+  {@const choice = mcpAccount}
+  <CompactDialog title={choice.account.label} onDismiss={() => (mcpAccount = null)}>
+    {#snippet buttons()}
+      <Button onclick={() => (mcpAccount = null)} variant="outlined">{t("CANCEL")}</Button>
+    {/snippet}
+    <div class="flex flex-col gap-1.5">
+      <ActionButton
+        text={t("ACCOUNT_RELOGIN")}
+        onclick={() => {
+          const target = mcpAccount;
+          mcpAccount = null;
+          if (target) void beginMcpLogin(target.server, target.account.id);
+        }}
+        class="w-full"
+      />
+      <ActionButton
+        text={t("SIGN_OUT")}
+        danger
+        onclick={() => {
+          const target = mcpAccount;
+          mcpAccount = null;
+          mcpSignOut = target;
+        }}
+        class="w-full"
+      />
+    </div>
+  </CompactDialog>
+{/if}
+
+{#if mcpSignOut}
+  {@const choice = mcpSignOut}
+  <ConfirmDialog
+    title={choice.account.label}
+    text={t("SIGN_OUT_CONFIRM", choice.server.label)}
+    confirmLabel={t("SIGN_OUT")}
+    danger
+    onConfirm={() => {
+      const target = mcpSignOut;
+      mcpSignOut = null;
+      if (target) void signOutMcp(target.server, target.account.id);
+    }}
+    onDismiss={() => (mcpSignOut = null)}
+  />
+{/if}
+
+{#if mcpLogin}
+  {@const current = mcpLogin}
+  <SignInDialog
+    title={current.server.label}
+    confirmLabel={t("ACCOUNT_LOGIN")}
+    hint={t("MCP_LOGIN_HINT")}
+    url={current.url}
+    field={t("URL")}
+    busy={mcpSubmitting}
+    error={mcpLoginError}
+    onSubmit={(address) => void submitMcpLogin(address)}
+    onDismiss={cancelMcpLogin}
   />
 {/if}
 

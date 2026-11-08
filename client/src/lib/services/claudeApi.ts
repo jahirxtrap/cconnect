@@ -78,12 +78,15 @@ export interface McpServer {
   detail: string | null;
   enabled: boolean;
   source: string;
-  status: string | null;
+  oauth: boolean;
+  signedIn: string[];
+}
+
+export interface McpLogin extends ActionResult {
+  url: string | null;
 }
 
 export const MCP_USER_SOURCE = "user";
-
-export const MCP_NEEDS_AUTH = "needs-auth";
 
 export interface CatalogPlugin {
   name: string;
@@ -329,8 +332,31 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         detail: item.detail ?? null,
         enabled: item.enabled !== false,
         source: item.source || MCP_USER_SOURCE,
-        status: item.status ?? null,
+        oauth: item.oauth === true,
+        signedIn: Array.isArray(item.signed_in) ? item.signed_in : [],
       }));
+  },
+
+  async mcpLogin(name: string, account: string, cwd: string | null): Promise<McpLogin> {
+    const data = await client.post<Wire>("/claude/mcp/login", { name, account, cwd });
+    return { ...toAction(data), url: data?.url ?? null };
+  },
+
+  async mcpLoginWait(name: string, account: string): Promise<boolean> {
+    const data = await client.post<Wire>("/claude/mcp/login/wait", { name, account });
+    return data?.signed_in === true;
+  },
+
+  async mcpLoginCallback(name: string, account: string, url: string): Promise<ActionResult> {
+    return toAction(await client.post<Wire>("/claude/mcp/login/callback", { name, account, url }));
+  },
+
+  async mcpLoginCancel(name: string, account: string): Promise<void> {
+    await client.post("/claude/mcp/login/cancel", { name, account });
+  },
+
+  async mcpSignOut(name: string, account: string, cwd: string | null): Promise<ActionResult> {
+    return toAction(await client.post<Wire>("/claude/mcp/logout", { name, account, cwd }));
   },
 
   async mcpToggle(name: string, enabled: boolean): Promise<ActionResult> {

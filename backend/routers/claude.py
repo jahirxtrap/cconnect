@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from core.responses import api_response
 from schemas.accounts import ProviderAuth
-from services import claude_assets, claude_manage
+from services import accounts, claude_assets, claude_manage, cli_login
 from services import claude_status
 from services import usage as usage_service
 
@@ -83,6 +83,18 @@ class McpConfigBody(BaseModel):
 class ToggleBody(BaseModel):
     name: str
     enabled: bool
+
+
+class McpLoginBody(BaseModel):
+    name: str
+    account: str
+    cwd: str | None = None
+
+
+class McpCallbackBody(BaseModel):
+    name: str
+    account: str
+    url: str
 
 
 @router.get("/claude/prompts")
@@ -246,6 +258,36 @@ def add_mcp_config(body: McpConfigBody):
 @router.post("/claude/mcp/toggle")
 def toggle_mcp(body: ToggleBody):
     return api_response(data=claude_manage.mcp_set_enabled(body.name, body.enabled))
+
+
+@router.post("/claude/mcp/login")
+async def start_mcp_login(body: McpLoginBody):
+    if body.account not in accounts.known_ids():
+        return api_response(status=404)
+    return api_response(data=await cli_login.start_mcp(body.account, body.name, body.cwd))
+
+
+@router.post("/claude/mcp/login/wait")
+async def wait_mcp_login(body: McpLoginBody):
+    return api_response(data={"signed_in": await cli_login.wait_mcp(body.account, body.name)})
+
+
+@router.post("/claude/mcp/login/callback")
+async def submit_mcp_callback(body: McpCallbackBody):
+    return api_response(data=await cli_login.submit_mcp_callback(body.account, body.name, body.url))
+
+
+@router.post("/claude/mcp/login/cancel")
+async def cancel_mcp_login(body: McpLoginBody):
+    cli_login.cancel_mcp(body.account, body.name)
+    return api_response()
+
+
+@router.post("/claude/mcp/logout")
+async def sign_out_mcp(body: McpLoginBody):
+    if body.account not in accounts.known_ids():
+        return api_response(status=404)
+    return api_response(data=await cli_login.sign_out_mcp(body.account, body.name, body.cwd))
 
 
 @router.delete("/claude/mcp/{name}")

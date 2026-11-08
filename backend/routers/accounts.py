@@ -14,7 +14,7 @@ from schemas.accounts import (
     ProviderProbeRequest,
     ProviderUpdateRequest,
 )
-from services import account_login, accounts, cli_info, live_sessions, providers
+from services import accounts, cli_info, cli_login, live_sessions, providers
 
 router = APIRouter(tags=["accounts"])
 
@@ -107,7 +107,7 @@ async def delete_account(account_id: str):
     holders = live_sessions.registry.on_account(account_id)
     if not accounts.forget(account_id):
         return api_response(status=404)
-    account_login.cancel(account_id)
+    cli_login.cancel_account(account_id)
     cli_info.invalidate()
     _pending_purges.add(asyncio.create_task(_purge(account_id, holders)))
     return api_response()
@@ -151,24 +151,24 @@ def export_account(account_id: str):
 
 
 @router.post("/accounts/{account_id}/login")
-def start_login(account_id: str):
+async def start_login(account_id: str):
     if account_id not in accounts.known_ids():
         return api_response(status=404)
-    result = account_login.start(account_id)
+    result = await cli_login.start_account(account_id)
     if not result["ok"]:
         return api_response(status=500, message=result.get("message"))
     return api_response(data={"url": result["url"]})
 
 
 @router.post("/accounts/{account_id}/login/code")
-def submit_login_code(account_id: str, payload: LoginCodeRequest):
-    result = account_login.submit_code(account_id, payload.code)
+async def submit_login_code(account_id: str, payload: LoginCodeRequest):
+    result = await cli_login.submit_account_code(account_id, payload.code)
     if not result["ok"]:
         return api_response(status=400, message=result.get("message"))
     return api_response()
 
 
 @router.delete("/accounts/{account_id}/login")
-def cancel_login(account_id: str):
-    account_login.cancel(account_id)
+async def cancel_login(account_id: str):
+    cli_login.cancel_account(account_id)
     return api_response()

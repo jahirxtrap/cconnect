@@ -37,6 +37,13 @@ MCP servers, plugins, skills, settings and memories — so something added while
 using one account is there for every other, and switching accounts only changes
 who pays for the turn, not what you see.
 
+Signing in to an MCP server is a credential too, so each account keeps its own.
+An MCP server that asks for a sign-in lists the accounts in its card in the
+Claude screen, each with its status, and the list says how many of them are
+signed in: pick one to sign it in, again or out. The
+link opens anywhere; in a browser on the server it finishes by itself, and on
+another device the page it ends on won't load, so you paste its address back.
+
 Pick the account per chat from the composer bar, or set the server-wide default
 from the Claude screen's header (the usage shown there follows it, and its
 picker shows another account's for a quick look) or in Settings. Accounts you haven't signed into yet are listed too, so you can

@@ -106,7 +106,7 @@
       {#if chat.agentState?.logout && chat.agentState.status === "ready"}
         <MenuItem
           icon={LogOut}
-          text={t("AGENT_SIGN_OUT")}
+          text={t("SIGN_OUT")}
           onclick={() => {
             open = false;
             signingOut = true;
@@ -184,9 +184,9 @@
 {#if signingOut && chat}
   {@const target = chat}
   <ConfirmDialog
-    title={t("AGENT_SIGN_OUT")}
-    text={t("AGENT_SIGN_OUT_CONFIRM", target.agentName)}
-    confirmLabel={t("AGENT_SIGN_OUT")}
+    title={t("SIGN_OUT")}
+    text={t("SIGN_OUT_CONFIRM", target.agentName)}
+    confirmLabel={t("SIGN_OUT")}
     danger
     onConfirm={() => {
       target.agentLogout();

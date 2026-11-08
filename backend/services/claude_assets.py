@@ -4,12 +4,13 @@ plus the user prompt (USER.md) appended after the system context (CCONNECT.md)."
 import json
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from core import paths
 from core.config import DEFAULT_CWD
 from core.display import joined
-from services import claude_manage, cli_settings
+from services import accounts, claude_manage, cli_settings
 
 _CLAUDE_DIR = Path.home() / ".claude"
 SKILLS_DIR = _CLAUDE_DIR / "skills"
@@ -23,7 +24,7 @@ _CLAUDE_JSON = Path.home() / ".claude.json"
 _SETTINGS_FILE = _CLAUDE_DIR / "settings.json"
 _INSTALLED_PLUGINS = _CLAUDE_DIR / "plugins" / "installed_plugins.json"
 _MCP_USER_SOURCE = "user"
-_MCP_NEEDS_AUTH = "needs-auth"
+_MCP_OAUTH_TYPES = ("http", "sse")
 _MCP_FILE = ".mcp.json"
 _MCP_AUTH_CACHE = _CLAUDE_DIR / "mcp-needs-auth-cache.json"
 _MCP_TOOL_CHARS = re.compile(r"[^A-Za-z0-9_-]")
@@ -440,7 +441,13 @@ def delete_memory(scope: str, project_key: str, name: str) -> bool:
     return True
 
 
-def _mcp_entry(name: str, label: str, cfg: dict, enabled: bool, source: str, needs_auth: set[str]) -> dict:
+@dataclass(frozen=True)
+class _McpLogins:
+    needs_auth: set[str]
+    tokens: dict[str, dict[str, str]]
+
+
+def _mcp_entry(name: str, label: str, cfg: dict, enabled: bool, source: str, logins: _McpLogins) -> dict:
     kind = cfg.get("type") or ("http" if cfg.get("url") else "stdio")
     detail = cfg.get("url") or " ".join([cfg.get("command", ""), *cfg.get("args", [])]).strip()
     return {
@@ -450,7 +457,10 @@ def _mcp_entry(name: str, label: str, cfg: dict, enabled: bool, source: str, nee
         "detail": detail or None,
         "enabled": enabled,
         "source": source,
-        "status": _MCP_NEEDS_AUTH if name in needs_auth else None,
+        "oauth": kind in _MCP_OAUTH_TYPES and (
+            bool(cfg.get("oauth")) or name in logins.needs_auth or any(name in tokens for tokens in logins.tokens.values())
+        ),
+        "signed_in": sorted(account for account, tokens in logins.tokens.items() if tokens.get(name)),
     }
 
 
@@ -496,11 +506,14 @@ def _declared_mcp(folder: str) -> list[tuple[str, str, dict, bool, str]]:
 
 def list_mcp_servers(cwd: str | None = None) -> list[dict]:
     folder = cwd if cwd and Path(cwd).is_dir() else DEFAULT_CWD
-    needs_auth = set(_read_json(_MCP_AUTH_CACHE))
-    items = [_mcp_entry(*server, needs_auth) for server in _declared_mcp(folder)]
+    logins = _McpLogins(
+        needs_auth=set(_read_json(_MCP_AUTH_CACHE)),
+        tokens={account: accounts.mcp_tokens(account) for account in accounts.known_ids()},
+    )
+    items = [_mcp_entry(*server, logins) for server in _declared_mcp(folder)]
     for name, cfg in claude_manage.disabled_mcp_servers().items():
         if isinstance(cfg, dict) and not any(i["name"] == name for i in items):
-            items.append(_mcp_entry(name, name, cfg, False, _MCP_USER_SOURCE, needs_auth))
+            items.append(_mcp_entry(name, name, cfg, False, _MCP_USER_SOURCE, logins))
     items.sort(key=lambda s: (not s["enabled"], s["name"]))
     return items
 
