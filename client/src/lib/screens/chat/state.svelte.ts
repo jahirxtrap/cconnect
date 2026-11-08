@@ -157,6 +157,7 @@ import { createSettingsApi } from "$lib/services/settingsApi";
 import { listTerminals } from "$lib/services/terminalApi";
 import {
   createSessionsApi,
+  type MessagesPage,
   type RewindPoint,
   type RewindPreview,
   type TrashedSession,
@@ -347,6 +348,9 @@ export class ChatState {
   scrollTop = $state(0);
   expandedIds = $state<Record<number, boolean>>({});
   transcriptExhausted = $state(false);
+  earlierCompaction = $state<string | null>(null);
+  #segment: string | null = null;
+  #pagingUntil: string | null = null;
   followBottom = $state(true);
 
   #sides = $state<Record<string, SideChat>>({});
@@ -1144,22 +1148,50 @@ export class ChatState {
 
   loadOlder() {
     const before = this.oldestLoadedIndex;
-    if (before === null || this.transcriptExhausted || this.transcriptLoading || this.transcriptPaging) return;
+    if (before === null || this.transcriptExhausted) return;
+    this.#requestPage(before, this.#segment);
+  }
+
+  loadEarlier() {
+    if (this.transcriptExhausted && this.earlierCompaction) this.#requestPage(null, this.earlierCompaction);
+  }
+
+  #requestPage(before: number | null, until: string | null) {
+    if (this.transcriptLoading || this.transcriptPaging) return;
     if (this.viewOnly) {
-      void this.#loadOlderViewOnly(this.viewOnly, before);
+      void this.#loadOlderViewOnly(this.viewOnly, before, until);
       return;
     }
     const sessionId = this.sessionId;
     const project = this.#projectKey();
     if (!sessionId || !project) return;
-    this.transcriptPaging = this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE);
+    this.#pagingUntil = until;
+    this.transcriptPaging = this.#socket.sendLoadHistory(sessionId, project, before, HISTORY_PAGE, until);
+  }
+
+  #setPaging(oldest: number | null, exhausted: boolean, earlier: string | null, segment: string | null) {
+    this.oldestLoadedIndex = oldest;
+    this.transcriptExhausted = exhausted;
+    this.earlierCompaction = earlier;
+    this.#segment = segment;
+  }
+
+  #prependPage(page: Pick<MessagesPage, "items" | "startIndex" | "hasMore" | "earlier">, until: string | null, sessionId: string, projectKey: string | null) {
+    const older = page.items.filter(isVisible);
+    const prepended = this.#nest(
+      older.map((item, index) => this.#fromSession(item, this.#nextId + index, sessionId, projectKey, until)),
+    );
+    this.#nextId += older.length;
+    const kept = until === null && prepended.some((item) => item.role === "compact") ? withoutLiveCompact(this.messages) : this.messages;
+    this.messages = [...prepended, ...kept];
+    this.#setPaging(page.startIndex, !page.hasMore, page.earlier, until);
   }
 
   #abandonPage() {
     if (!this.viewOnly) this.transcriptPaging = false;
   }
 
-  async #loadOlderViewOnly(item: TrashedSession, before: number) {
+  async #loadOlderViewOnly(item: TrashedSession, before: number | null, until: string | null) {
     this.transcriptPaging = true;
     const page = await this.#sessions.messages(
       item.sessionId,
@@ -1168,18 +1200,11 @@ export class ChatState {
       before,
       settings.visibility,
       true,
+      until,
     );
     if (this.viewOnly !== item) return;
     this.transcriptPaging = false;
-    if (!page) return;
-    const older = page.items.filter(isVisible);
-    const prepended = this.#nest(
-      older.map((message, index) => this.#fromSession(message, this.#nextId + index, item.sessionId, item.projectKey)),
-    );
-    this.#nextId += older.length;
-    this.messages = [...prepended, ...this.messages];
-    this.oldestLoadedIndex = page.startIndex;
-    this.transcriptExhausted = !page.hasMore;
+    if (page) this.#prependPage(page, until, item.sessionId, item.projectKey);
   }
 
   setActivePage(requestId: string, index: number) {
@@ -1634,8 +1659,7 @@ export class ChatState {
     );
     this.#nextId = visible.length;
     this.expandedIds = {};
-    this.oldestLoadedIndex = page && page.items.length ? page.startIndex : null;
-    this.transcriptExhausted = !page?.hasMore;
+    this.#setPaging(page && page.items.length ? page.startIndex : null, !page?.hasMore, page?.earlier ?? null, null);
     this.contextTokens = page?.contextTokens ?? null;
     this.promptCache = page?.cache ?? null;
     this.requestBytes = page?.requestBytes ?? null;
@@ -1852,8 +1876,7 @@ export class ChatState {
     const cut = this.messages.findLastIndex((item, index) => index <= last && item.sourceIndex >= 0);
     if (cut <= 0) return;
     this.messages = this.messages.slice(cut);
-    this.oldestLoadedIndex = this.messages[0].sourceIndex;
-    this.transcriptExhausted = false;
+    this.#setPaging(this.messages[0].sourceIndex, false, null, this.messages[0].beforeCompaction);
   }
 
   async #indexLive() {
@@ -1879,7 +1902,7 @@ export class ChatState {
     for (let i = held.length - 1; i >= 0; i--) {
       const item = held[i];
       if (item.sourceIndex >= 0) {
-        const at = indexed.get(item.sourceIndex);
+        const at = item.beforeCompaction === null ? indexed.get(item.sourceIndex) : undefined;
         if (at === undefined) break;
         bound = Math.min(bound, at);
         continue;
@@ -1917,10 +1940,9 @@ export class ChatState {
     this.mediaBytes = null;
     this.pendingToolIds = [];
     this.backgroundTasks = [];
-    this.oldestLoadedIndex = null;
+    this.#setPaging(null, false, null, null);
     this.transcriptLoading = false;
     this.transcriptPaging = false;
-    this.transcriptExhausted = false;
     this.#breakStream();
     this.#sent.clear();
     this.#unacked.clear();
@@ -1964,9 +1986,8 @@ export class ChatState {
     this.sessionColor = session.color;
     this.todos = [];
     this.queue = [];
-    this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
+    this.#setPaging(page.items.length ? page.startIndex : null, !page.hasMore, page.earlier, null);
     this.transcriptPaging = false;
-    this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
     this.backgroundTasks = [];
     this.contextTokens = page.contextTokens;
@@ -2020,10 +2041,9 @@ export class ChatState {
     this.messages = live.length ? [...loaded, ...live] : loaded;
     this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
-    this.oldestLoadedIndex = page.items.length ? page.startIndex : null;
+    this.#setPaging(page.items.length ? page.startIndex : null, !page.hasMore, page.earlier, null);
     this.transcriptLoading = false;
     this.transcriptPaging = false;
-    this.transcriptExhausted = !page.hasMore;
     this.pendingToolIds = [];
     this.backgroundTasks = [];
     if (page.prompts) this.#history = page.prompts;
@@ -2041,9 +2061,11 @@ export class ChatState {
     id: number,
     sessionId: string,
     projectKey: string | null,
+    beforeCompaction: string | null = null,
   ): { message: ChatMessage; parent: string | null } {
     return {
       message: newMessage(id, item.role, {
+        beforeCompaction,
         text: item.text,
         toolName: item.name,
         toolMcp: item.mcp,
@@ -2217,26 +2239,11 @@ export class ChatState {
     }
   }
 
-  #onHistoryChunk(sessionId: string, startIndex: number, items: SessionMessage[], hasMore: boolean) {
+  #onHistoryChunk(sessionId: string, page: Pick<MessagesPage, "items" | "startIndex" | "hasMore" | "earlier">) {
     if (!this.transcriptPaging) return;
-    if (sessionId !== this.sessionId) {
-      this.transcriptLoading = false;
-      this.transcriptPaging = false;
-      return;
-    }
-    const older = items.filter(isVisible);
-    const prepended = this.#nest(
-      older.map((item, index) => this.#fromSession(item, this.#nextId + index, sessionId, this.projectKey)),
-    );
-    this.#nextId += older.length;
-    const kept = prepended.some((item) => item.role === "compact")
-      ? withoutLiveCompact(this.messages)
-      : this.messages;
-    this.messages = [...prepended, ...kept];
-    this.oldestLoadedIndex = startIndex;
     this.transcriptLoading = false;
     this.transcriptPaging = false;
-    this.transcriptExhausted = !hasMore;
+    if (sessionId === this.sessionId) this.#prependPage(page, this.#pagingUntil, sessionId, this.projectKey);
   }
 
   #onTail(items: SessionMessage[]) {
@@ -2388,7 +2395,9 @@ export class ChatState {
             const kept = list.filter((item) => !item.ephemeral);
             const awaiting = (item: ChatMessage) => !!item.interaction && isPending(item.interaction);
             if (committed !== null) {
-              return kept.filter((item) => awaiting(item) || (item.sourceIndex >= 0 && item.sourceIndex < committed));
+              return kept.filter(
+                (item) => awaiting(item) || item.beforeCompaction !== null || (item.sourceIndex >= 0 && item.sourceIndex < committed),
+              );
             }
             const lastUser = kept.findLastIndex((item) => item.role === "user");
             if (lastUser < 0) return kept;
@@ -2623,8 +2632,7 @@ export class ChatState {
         this.#nextId = visible.length;
         this.#breakStream();
         this.expandedIds = {};
-        this.oldestLoadedIndex = event.startIndex;
-        this.transcriptExhausted = !event.hasMore;
+        this.#setPaging(event.startIndex, !event.hasMore, null, null);
         this.transcriptPaging = false;
         this.transcriptLoading = this.#awaitingHistory();
         break;
@@ -2643,14 +2651,14 @@ export class ChatState {
         this.messages = [newMessage(this.#nextId++, "compact", { compact: compactOf(event) })];
         this.compacting = false;
         this.#history = [];
-        this.oldestLoadedIndex = 0;
-        this.transcriptExhausted = true;
+        this.#setPaging(0, true, event.earlier, null);
         this.transcriptPaging = false;
         break;
       case "compact_summary":
         this.messages = this.messages.map((item) =>
           item.role === "compact" && item.compact ? { ...item, compact: compactOf(event) } : item,
         );
+        if (this.#segment === null && event.earlier) this.earlierCompaction = event.earlier;
         break;
       case "todos":
         this.todos = event.items;
@@ -2674,12 +2682,12 @@ export class ChatState {
         this.#onTail(event.items.map(parseSessionMessage));
         break;
       case "history_chunk":
-        this.#onHistoryChunk(
-          event.sessionId,
-          event.startIndex,
-          event.items.map(parseSessionMessage),
-          event.hasMore,
-        );
+        this.#onHistoryChunk(event.sessionId, {
+          items: event.items.map(parseSessionMessage),
+          startIndex: event.startIndex,
+          hasMore: event.hasMore,
+          earlier: event.earlier,
+        });
         break;
       case "context":
         this.contextTokens = event.contextTokens;

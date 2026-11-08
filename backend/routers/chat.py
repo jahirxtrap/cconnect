@@ -30,6 +30,7 @@ from services import rewind as rewind_service
 from services import sessions as sessions_service
 from services import settings_store, visibility
 from services import todos as todos_store
+from services import usage
 from services.claude_runtime import run_prompt
 from services.event_rows import page, visible_rows
 from services.live_sessions import registry
@@ -318,15 +319,14 @@ def _build_side_runner(main_state: _Session, side_state: _Session, question: str
 async def _run_usage(send, account: str | None = None, capabilities=None, locale: str | None = None):
     """Send the plan-usage report as a one-off markdown message."""
     from mcps.components import CAPABILITY as COMPONENTS
-    from services.usage import CAPABILITY as USAGE, usage_blocks, usage_data, usage_markdown
 
     try:
-        if USAGE in (capabilities or ()):
-            await send({"type": "usage", **await usage_data(account, language=locale), "local": True})
+        if usage.CAPABILITY in (capabilities or ()):
+            await send({"type": "usage", **await usage.usage_data(account, language=locale), "local": True})
         elif COMPONENTS in (capabilities or ()):
-            await send({"type": "component", "blocks": await usage_blocks(account, locale), "local": True})
+            await send({"type": "component", "blocks": await usage.usage_blocks(account, locale), "local": True})
         else:
-            await send({"type": "command", "markdown": await usage_markdown(account, locale), "local": True})
+            await send({"type": "command", "markdown": await usage.usage_markdown(account, locale), "local": True})
     except Exception as exc:
         logger.debug(f"usage report ended: {type(exc).__name__}: {exc}")
 
@@ -482,6 +482,9 @@ async def chat_ws(ws: WebSocket):
                     if not msg.last_seq:
                         await sink({**session.agent.history(), "channel": session.channel})
                 await session.attach(sink, last_seq=msg.last_seq, since_committed=bool(by_session), prefs=seen)
+                windows = usage.live_windows(accounts.resolve(session.state.account)) if session.agent is None else None
+                if windows:
+                    await send({"type": "rate_limit", "windows": windows})
                 if session.agent is not None:
                     session.wake_agent()
                     if not session.running and session.agent.todos:
@@ -639,9 +642,11 @@ async def chat_ws(ws: WebSocket):
                 project = msg.project or (session.state.cwd if session else DEFAULT_CWD)
                 try:
                     if session is not None and session.agent is not None and msg.session_id == session.agent.session_id:
-                        items = visible_rows(session.agent.rows, seen["prefs"])
+                        items, earlier = visible_rows(session.agent.rows, seen["prefs"]), None
                     else:
-                        items = await asyncio.to_thread(sessions_service.get_session_messages, project, msg.session_id, seen["prefs"])
+                        items, earlier = await asyncio.to_thread(
+                            sessions_service.session_segment, project, msg.session_id, seen["prefs"], False, msg.until,
+                        )
                 except ValueError as exc:
                     await send(_rejected(raw, str(exc)))
                     continue
@@ -654,6 +659,7 @@ async def chat_ws(ws: WebSocket):
                     "items": rows,
                     "start_index": start,
                     "has_more": start > 0,
+                    "earlier": earlier,
                 })
 
             elif mtype == "ping":

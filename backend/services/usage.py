@@ -32,6 +32,16 @@ _WEEK_KEY = "week"
 _WINDOW_IDS = {"session": "session", "weekly_all": _WEEK_KEY}
 _LABELS = {"session": "Current session", _WEEK_KEY: "This week", _SPEND_KEY: "Extra usage"}
 
+_live_windows: dict[str, list[dict]] = {}
+
+
+def remember_windows(account: str, windows: list[dict]) -> None:
+    _live_windows[account] = windows
+
+
+def live_windows(account: str) -> list[dict] | None:
+    return _live_windows.get(account)
+
 
 def _oauth(field: str, account: str | None = None) -> object:
     try:

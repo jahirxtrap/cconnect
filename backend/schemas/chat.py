@@ -111,6 +111,7 @@ class LoadHistoryMessage(BaseModel):
     project: Optional[str] = None
     limit: int = Field(200, ge=1, le=500)
     before_index: Optional[int] = None
+    until: Optional[str] = None
 
 
 class SignalMessage(BaseModel):

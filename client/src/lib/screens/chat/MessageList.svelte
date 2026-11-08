@@ -13,7 +13,7 @@
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import Collapsible from "./blocks/Collapsible.svelte";
-  import DateSeparator from "./blocks/DateSeparator.svelte";
+  import ChatSeparator from "./blocks/ChatSeparator.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./blocks/gaps";
   import MessageItem from "./blocks/MessageItem.svelte";
   import type { ReplyHandlers } from "./blocks/ReplyActions.svelte";
@@ -38,6 +38,8 @@
     visibility: Visibility;
     onAnswer: (requestId: string, optionId: string) => void;
     onLoadOlder: () => void;
+    onEarlier?: (() => void) | null;
+    earlierLoading?: boolean;
     follow?: boolean;
     onSharedLink: (url: string, filename: string) => void;
     onSharedMenu?: ((url: string, filename: string) => void) | null;
@@ -67,6 +69,8 @@
     visibility,
     onAnswer,
     onLoadOlder,
+    onEarlier = null,
+    earlierLoading = false,
     follow = $bindable(true),
     onSharedLink,
     onSharedMenu = null,
@@ -165,7 +169,7 @@
       onCopy: () => void copyText(item.text),
       onShare: plainTextSharing() ? () => void sharePlainText(item.text) : null,
       onSpeak: speech.available ? () => toggleSpeech(item) : null,
-      onFork: replies && (item.uuid || last) ? () => replies.fork(item) : null,
+      onFork: replies && item.beforeCompaction === null && (item.uuid || last) ? () => replies.fork(item) : null,
     };
   };
 
@@ -361,13 +365,18 @@
   onScroll={onScrollTop}
   onNearTop={onLoadOlder}
 >
+    {#if !visible.length && onEarlier}
+      <ChatSeparator {onEarlier} loading={earlierLoading} />
+    {/if}
     {#each visible as item, index (item.id)}
       {@const run = runOf.get(item.id)}
       {#if !run || !groupHides(run, item.id)}
-        {@const separated = newDays.has(item.id)}
+        {@const dated = newDays.has(item.id)}
+        {@const earlier = index === 0 ? onEarlier : null}
+        {@const separated = dated || earlier !== null}
         <div data-mid={item.id}>
           {#if separated}
-            <DateSeparator millis={item.timestamp ?? 0} />
+            <ChatSeparator millis={dated ? (item.timestamp ?? 0) : null} onEarlier={earlier} loading={earlierLoading} />
           {/if}
           {#if mods && run?.anchor === item.id}
             {#snippet group(shown: Record<string, unknown>)}

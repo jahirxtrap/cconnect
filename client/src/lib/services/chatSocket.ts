@@ -103,8 +103,8 @@ export type ServerEvent =
   | { type: "compacting" }
   | { type: "compacting_ended" }
   | { type: "status"; kind: string; retry: ApiRetry | null }
-  | ({ type: "compact" } & CompactData)
-  | ({ type: "compact_summary" } & CompactData)
+  | ({ type: "compact"; earlier: string | null } & CompactData)
+  | ({ type: "compact_summary"; earlier: string | null } & CompactData)
   | { type: "ask_text"; text: string }
   | { type: "ask_working" }
   | { type: "ask_session"; sessionId: string }
@@ -179,6 +179,7 @@ export type ServerEvent =
       startIndex: number;
       items: Record<string, unknown>[];
       hasMore: boolean;
+      earlier: string | null;
     }
   | { type: "tail"; items: Record<string, unknown>[] }
   | ({
@@ -599,8 +600,8 @@ export class ChatSocket {
     this.#send({ type: "reload", command });
   }
 
-  sendLoadHistory(sessionId: string, project: string, beforeIndex: number, limit = 100): boolean {
-    return this.#send({ type: "load_history", session_id: sessionId, project, before_index: beforeIndex, limit });
+  sendLoadHistory(sessionId: string, project: string, beforeIndex: number | null, limit: number, until: string | null): boolean {
+    return this.#send({ type: "load_history", session_id: sessionId, project, before_index: beforeIndex, limit, until });
   }
 
   sendInteractionResponse(requestId: string, optionId: string, freeText: string | null) {
@@ -825,6 +826,7 @@ export class ChatSocket {
       case "compact_summary":
         return {
           type: event.type,
+          earlier: event.earlier ?? null,
           trigger: event.trigger ?? null,
           preTokens: event.pre_tokens ?? null,
           postTokens: event.post_tokens ?? null,
@@ -999,6 +1001,7 @@ export class ChatSocket {
           startIndex: event.start_index ?? 0,
           items: event.items ?? [],
           hasMore: event.has_more === true,
+          earlier: event.earlier ?? null,
         };
       case "interaction_request":
         return {

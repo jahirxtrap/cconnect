@@ -108,6 +108,10 @@ One component owns the viewport; the chat list (`MessageList`) and the quick cha
   provided). On scroll and on resize `updatePinned()` walks forward from `firstVisible()` (a
   binary search over `offsetTop`) and marks the head that is stuck with `data-stuck`, which
   is all the styling hooks onto; there is no copy of the header to measure or push.
+- History pages in on scroll (`onNearTop`), but never across a compaction: once the stretch
+  is exhausted and the page says `earlier`, `ChatSeparator` puts an **Earlier messages** pill
+  beside the day's date, and only that loads the stretch before (`loadEarlier`, the segment kept
+  in `#segment`). Those messages carry `beforeCompaction`, which drops Fork from them.
 
 ## Panels (`screens/chat/panes.svelte.ts`)
 

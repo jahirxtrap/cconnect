@@ -160,7 +160,8 @@ twice — once from disk and once from the replay.
 
 Client → server: `start` (with `channel` + `last_seq` to re-attach, and the app's `locale`, which
 the plan usage's names follow), `prompt`, `unqueue`,
-`set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history`,
+`set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history` (with
+`until` for the messages before a compaction),
 `ask`, `usage`, `stop_task`, `reload`, `close_resident`, for mods `mod_render`, `mod_act`,
 `mod_answer`, `mod_client_module`, and for an ACP agent (a `start` that names one) `set_option`,
 `agent_login`, `agent_logout`, `agent_retry` and `history`. An agent's chat gets `agent_state`
@@ -198,10 +199,10 @@ Server → client, all seq'd per session except the control ones (`ready`, `perm
 | `anchor` | the transcript uuid of a top-level reply with text, which forking from that reply goes up to |
 | `tool_use` / `tool_result` | `file_change` replaces them for Edit/Write/MultiEdit/NotebookEdit, with the diff already classified; `db_query` and `db_execute` add `query` (the connection, its name, the database, the SQL, `saved`) and, with the result, `statements` read back from it (`mcps/databases.statements_of`), each with its `kind` and `effect`, which the app draws as its query block. Like shared files, those two always arrive whole, whatever `show_tool_use` says (`mcps/databases.tool_mode`, and the socket filter lets an event with `query` or `statements` through) |
 | `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
-| `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase |
+| `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase, and carries `earlier`, the boundary's uuid, which `load_history` takes as `until` |
 | `context` | context size; see below |
 | `status` (`retrying`/`ok`) | `retrying` follows the CLI's `api_retry` with the attempt, the delay and the cause; a turn that fails arrives as an `api_error` whose `severity` tells a warning from an error |
-| `rate_limit` / `cache` | the plan's session and weekly windows as the CLI reports them (ids `session` and `week`), and the prompt cache's expiry for the context ring |
+| `rate_limit` / `cache` | the plan's session and weekly windows as the CLI reports them (ids `session` and `week`), and the prompt cache's expiry for the context ring. A CLI reports the windows only on its first turn, so the server keeps the last ones per account (`usage.live_windows`) and sends them, unsequenced, to every socket that attaches |
 | `task_running` / `agent_result` | a backgrounded agent or task started, and its end; the app shows the block as running in between, lists it under Running and stops it with `stop_task` |
 | `reloaded` | what `/reload-plugins` or `/reload-skills` brought in |
 | `commands` | the session's slash commands, sent again when `/reload-plugins` changes them |
@@ -241,6 +242,11 @@ The CLI's format is not a contract and it moves. What currently holds:
   looks like a dead sibling branch. Dropping it left a resumed chat with no compaction block
   and no summary.
 - Reading starts at `_last_compact_offset(file)`: only the tail after the last boundary.
+  `session_segment(..., until=<boundary uuid>)` reads the stretch before that boundary instead,
+  back to the one before it, and every page says `earlier`: the boundary its stretch starts after
+  when the conversation had messages before it (`logicalParentUuid`). The app asks for it only
+  when the user picks «Earlier messages», never on scroll. A closed stretch never changes, so its
+  cache stamp is its offsets, and `_boundaries` only reads what was appended since the last call.
 - `compactMetadata.postTokens` **is** present in the current CLI; `latest_compact` still
   falls back to the first post-boundary entry with usage.
 - Non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,

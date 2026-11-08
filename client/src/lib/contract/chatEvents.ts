@@ -346,6 +346,7 @@ export interface Compact {
   parent?: string | null;
   replay?: boolean | null;
   type: "compact";
+  earlier?: string | null;
   trigger?: string | null;
   pre_tokens?: number | null;
   post_tokens?: number | null;
@@ -357,6 +358,7 @@ export interface CompactSummary {
   parent?: string | null;
   replay?: boolean | null;
   type: "compact_summary";
+  earlier?: string | null;
   trigger?: string | null;
   pre_tokens?: number | null;
   post_tokens?: number | null;
@@ -825,6 +827,7 @@ export interface HistoryChunk {
   }[];
   start_index: number;
   has_more: boolean;
+  earlier?: string | null;
 }
 export interface Tail {
   seq?: number | null;

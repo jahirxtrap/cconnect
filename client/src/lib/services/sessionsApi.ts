@@ -18,6 +18,7 @@ export interface MessagesPage {
   items: SessionMessage[];
   startIndex: number;
   hasMore: boolean;
+  earlier: string | null;
   contextTokens: number | null;
   cache: PromptCache | null;
   requestBytes: number | null;
@@ -64,11 +65,13 @@ export const createSessionsApi = (http: HttpClient) => ({
     beforeIndex: number | null = null,
     prefs: VisibilityPrefs | null = null,
     trashed = false,
+    until: string | null = null,
   ): Promise<MessagesPage | null> {
     const data = await http.get<{
       items?: Record<string, unknown>[];
       start_index?: number;
       has_more?: boolean | string;
+      earlier?: string | null;
       context_tokens?: number;
       cache?: unknown;
       request_bytes?: number;
@@ -87,12 +90,14 @@ export const createSessionsApi = (http: HttpClient) => ({
       ...(prefs?.tokens === null || prefs === null ? {} : { tokens: prefs.tokens }),
       ...(prefs?.timings === null || prefs === null ? {} : { timings: prefs.timings }),
       ...(trashed ? { trashed: true } : {}),
+      ...(until ? { until } : {}),
     });
     if (!data) return null;
     return {
       items: (data.items ?? []).map(parseSessionMessage),
       startIndex: data.start_index ?? 0,
       hasMore: data.has_more === true || data.has_more === "true",
+      earlier: data.earlier ?? null,
       contextTokens: data.context_tokens ?? null,
       cache: promptCacheOf(data.cache),
       requestBytes: data.request_bytes ?? null,

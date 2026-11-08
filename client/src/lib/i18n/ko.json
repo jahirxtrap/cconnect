@@ -760,6 +760,7 @@
   "TOOL_GROUP_LISTINGS_OTHER": "목록 조회 {1}회",
   "SUMMARY": "요약",
   "COMPACTED": "압축됨",
+  "EARLIER_MESSAGES": "이전 메시지",
   "COMPACT_AUTO": "자동",
   "COMPACT_MANUAL": "수동",
   "PERMISSION_TITLE": "권한",

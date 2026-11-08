@@ -245,6 +245,7 @@ export interface ChatMessage {
   sendStatus: SendStatus;
   usage: Usage | null;
   uuid: string | null;
+  beforeCompaction: string | null;
 }
 
 export interface TodoItem {
@@ -467,5 +468,6 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   sendStatus: "sent",
   usage: null,
   uuid: null,
+  beforeCompaction: null,
   ...patch,
 });

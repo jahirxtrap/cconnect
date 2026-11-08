@@ -1321,6 +1321,7 @@ async def run_prompt(
                     meta = (data.get("compact_metadata") or {}) if isinstance(data, dict) else {}
                     yield {
                         "type": "compact",
+                        "earlier": data.get("uuid") if isinstance(data, dict) and data.get("logical_parent_uuid") else None,
                         "trigger": meta.get("trigger"),
                         "pre_tokens": meta.get("pre_tokens"),
                         "post_tokens": meta.get("post_tokens"),

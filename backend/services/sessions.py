@@ -40,10 +40,13 @@ _request_totals: dict[str, tuple[int, int, int]] = {}
 _task_scans: dict[str, tuple[int, dict, dict, bool]] = {}
 _task_lock = threading.Lock()
 _NORMALIZED_KEPT = 8
-_normalized: "OrderedDict[tuple, tuple[tuple, list[dict], list[str]]]" = OrderedDict()
+_normalized: "OrderedDict[tuple, tuple[tuple, list[dict], list[str], Optional[str]]]" = OrderedDict()
 _normalized_lock = threading.Lock()
 _CONVERSATIONS_KEPT = 2
 _conversations: "OrderedDict[str, tuple[int, list[list[dict]]]]" = OrderedDict()
+_BOUNDARY_SCANS_KEPT = 4
+_boundary_scans: "OrderedDict[str, tuple[int, list[tuple[int, dict]]]]" = OrderedDict()
+_boundary_lock = threading.Lock()
 _conversation_lock = threading.Lock()
 
 
@@ -145,11 +148,14 @@ def _parse(line: bytes) -> Any:
             return None
 
 
-def _iter_lines(path: Path, offset: int = 0):
+def _iter_lines(path: Path, offset: int = 0, end: Optional[int] = None):
     with path.open("rb") as fh:
         if offset:
             fh.seek(offset)
         for raw in fh:
+            if end is not None and offset >= end:
+                return
+            offset += len(raw)
             line = raw.strip()
             if not line:
                 continue
@@ -179,6 +185,37 @@ def _entries_since(path: Path, offset: int):
 
 def _is_boundary(entry: dict) -> bool:
     return entry.get("type") == "system" and entry.get("subtype") == "compact_boundary"
+
+
+def _earlier_of(boundary: Optional[dict]) -> Optional[str]:
+    return boundary.get("uuid") if boundary and boundary.get("logicalParentUuid") else None
+
+
+def _boundaries(path: Path) -> list[tuple[int, dict]]:
+    key = str(path)
+    with _boundary_lock:
+        offset, found = _boundary_scans.pop(key, (0, []))
+        if offset > path.stat().st_size:
+            offset, found = 0, []
+        for raw, end in _complete_lines(path, offset):
+            offset = end
+            if _COMPACT_MARK not in raw:
+                continue
+            entry = _parse(raw.strip())
+            if isinstance(entry, dict) and _is_boundary(entry):
+                found.append((end - len(raw), entry))
+        _boundary_scans[key] = (offset, found)
+        while len(_boundary_scans) > _BOUNDARY_SCANS_KEPT:
+            _boundary_scans.popitem(last=False)
+        return list(found)
+
+
+def _closed_span(path: Path, until: str) -> Optional[tuple[int, int]]:
+    marks = _boundaries(path)
+    at = next((index for index, (_offset, entry) in enumerate(marks) if entry.get("uuid") == until), None)
+    if at is None:
+        return None
+    return (marks[at - 1][0] if at else 0), marks[at][0]
 
 
 def _last_compact_offset(path: Path, block: int = 1 << 20) -> int:
@@ -909,7 +946,7 @@ def conversation(cwd: str, session_id: str) -> list[dict]:
             row = _conversation_row(entry)
             if row is not None:
                 skeleton["row"] = row
-            if skeleton.get("type") == "system" and skeleton.get("subtype") == "compact_boundary":
+            if _is_boundary(skeleton):
                 segments.append([])
             segments[-1].append(skeleton)
         _conversations[key] = (offset, segments)
@@ -1054,12 +1091,14 @@ def latest_compact(cwd: str, session_id: str) -> Optional[dict]:
     file = _transcript(cwd, session_id)
     if file is None:
         return None
+    boundary: Optional[dict] = None
     meta: dict = {}
     summary = ""
     post: Optional[int] = None
     post_locked = False
     for entry in _iter_lines(file, _last_compact_offset(file)):
         if _is_boundary(entry):
+            boundary = entry
             meta = entry.get("compactMetadata") or {}
             summary = ""
             post = None
@@ -1076,6 +1115,7 @@ def latest_compact(cwd: str, session_id: str) -> Optional[dict]:
     if not meta and not summary:
         return None
     return {
+        "earlier": _earlier_of(boundary),
         "trigger": meta.get("trigger"),
         "pre_tokens": meta.get("preTokens"),
         "post_tokens": meta.get("postTokens") or post,
@@ -1085,7 +1125,7 @@ def latest_compact(cwd: str, session_id: str) -> Optional[dict]:
 
 def _is_compact_marker(entry: dict) -> bool:
     """A compaction boundary or its summary — a marker on the thread, not a branch of it."""
-    return (entry.get("type") == "system" and entry.get("subtype") == "compact_boundary") or bool(entry.get("isCompactSummary"))
+    return _is_boundary(entry) or bool(entry.get("isCompactSummary"))
 
 
 def _reply_id(entry: dict) -> Optional[str]:
@@ -1554,14 +1594,13 @@ def _folder_stamp(folder: Path) -> tuple[int, int]:
     return newest, count
 
 
-def _normalized_stamp(file: Path, session_id: str) -> tuple:
+def _normalized_stamp(file: Path, session_id: str, closed: Optional[tuple[int, int]] = None) -> tuple:
     """Everything a normalized transcript is built from: the transcript, its subagents, its delegations, a pending rewind and the names it shows."""
     from services import rewind
 
-    stat = file.stat()
+    stat = None if closed else file.stat()
     return (
-        stat.st_mtime_ns,
-        stat.st_size,
+        closed or (stat.st_mtime_ns, stat.st_size),
         _folder_stamp(file.parent / session_id),
         delegate_runs.stamp(session_id),
         rewind.get_pending(session_id),
@@ -1576,27 +1615,47 @@ def get_session_messages(
     prefs: dict | None = None,
     trashed: bool = False,
 ) -> list[dict]:
+    return session_segment(project_key, session_id, prefs, trashed)[0]
+
+
+def session_segment(
+    project_key: str,
+    session_id: str,
+    prefs: dict | None = None,
+    trashed: bool = False,
+    until: Optional[str] = None,
+) -> tuple[list[dict], Optional[str]]:
     file = _session_file(project_key, session_id, trashed)
     if not file.is_file():
-        return []
-    key = (str(file), json.dumps(visibility.resolve(prefs), sort_keys=True))
-    stamp = _normalized_stamp(file, session_id)
+        return [], None
+    closed = _closed_span(file, until) if until else None
+    if until and closed is None:
+        return [], None
+    key = (str(file), until, json.dumps(visibility.resolve(prefs), sort_keys=True))
+    stamp = _normalized_stamp(file, session_id, closed)
     with _normalized_lock:
         known = _normalized.get(key)
         if known is not None and known[0] == stamp and tool_calls.knows(known[2]):
             _normalized.move_to_end(key)
-            return known[1]
-    items, calls = _normalize(file, project_key, session_id, prefs)
+            return known[1], known[3]
+    span = closed or (_last_compact_offset(file), None)
+    items, calls, earlier = _normalize(file, project_key, session_id, prefs, span)
     with _normalized_lock:
-        _normalized[key] = (stamp, items, calls)
+        _normalized[key] = (stamp, items, calls, earlier)
         _normalized.move_to_end(key)
         while len(_normalized) > _NORMALIZED_KEPT:
             _normalized.popitem(last=False)
-    return items
+    return items, earlier
 
 
-def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None) -> tuple[list[dict], list[str]]:
-    entries = _active_entries(list(_iter_lines(file, _last_compact_offset(file))), session_id)
+def _normalize(
+    file: Path,
+    project_key: str,
+    session_id: str,
+    prefs: dict | None,
+    span: tuple[int, Optional[int]],
+) -> tuple[list[dict], list[str], Optional[str]]:
+    entries = _active_entries(list(_iter_lines(file, *span)), session_id)
     calls = tool_calls.remember_entries(entries)
     queued_user_texts: set[str] = set()
     real_user_texts: set[str] = set()
@@ -1656,11 +1715,8 @@ def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None
                     if isinstance(aid, str) and aid:
                         agent_files[tuid] = aid
                         agent_results[tuid] = tur
-    last_boundary = max(
-        (i for i, e in enumerate(entries)
-         if e.get("type") == "system" and e.get("subtype") == "compact_boundary"),
-        default=-1,
-    )
+    last_boundary = max((i for i, e in enumerate(entries) if _is_boundary(e)), default=-1)
+    earlier = _earlier_of(entries[last_boundary] if last_boundary >= 0 else None)
     vis = visibility.resolve(prefs)
     messages = _StampedList()
     reported: set[str] = set()
@@ -1682,7 +1738,7 @@ def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None
         messages.cur_ts = _parse_ts(entry.get("timestamp"))
         messages.cur_parent = None
         etype = entry.get("type")
-        if etype == "system" and entry.get("subtype") == "compact_boundary":
+        if _is_boundary(entry):
             if i != last_boundary:
                 continue
             meta = entry.get("compactMetadata") or {}
@@ -1962,7 +2018,7 @@ def _normalize(file: Path, project_key: str, session_id: str, prefs: dict | None
                     messages.append({"type": "shared", "files": handed_export})
         if user_images:
             messages.append({"type": "text", "role": role, "text": "", "images": user_images})
-    return messages, calls
+    return messages, calls, earlier
 
 
 def get_message_image(

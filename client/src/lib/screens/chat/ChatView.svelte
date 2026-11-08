@@ -515,6 +515,8 @@
           }}
           onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
           onLoadOlder={() => chat.loadOlder()}
+          onEarlier={chat.transcriptExhausted && chat.earlierCompaction ? () => chat.loadEarlier() : null}
+          earlierLoading={chat.transcriptPaging}
           bind:follow={chat.followBottom}
           onSharedLink={openShared}
           onSharedMenu={(url, filename) => (sharedLink = { url, filename })}

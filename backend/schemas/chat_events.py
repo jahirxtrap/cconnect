@@ -256,6 +256,7 @@ class Status(Event):
 
 class Compact(Event):
     type: Literal["compact"]
+    earlier: Optional[str] = None
     trigger: Optional[str] = None
     pre_tokens: Optional[int] = None
     post_tokens: Optional[int] = None
@@ -264,6 +265,7 @@ class Compact(Event):
 
 class CompactSummary(Event):
     type: Literal["compact_summary"]
+    earlier: Optional[str] = None
     trigger: Optional[str] = None
     pre_tokens: Optional[int] = None
     post_tokens: Optional[int] = None
@@ -559,6 +561,7 @@ class HistoryChunk(Event):
     items: list[dict]
     start_index: int
     has_more: bool
+    earlier: Optional[str] = None
 
 
 class Tail(Event):

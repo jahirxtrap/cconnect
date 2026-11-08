@@ -1344,6 +1344,17 @@
           "const": "compact",
           "type": "string"
         },
+        "earlier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "trigger": {
           "anyOf": [
             {
@@ -1445,6 +1456,17 @@
         "type": {
           "const": "compact_summary",
           "type": "string"
+        },
+        "earlier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "trigger": {
           "anyOf": [
@@ -2313,6 +2335,17 @@
         },
         "has_more": {
           "type": "boolean"
+        },
+        "earlier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

@@ -21,6 +21,7 @@ from services import (
     persistent_sessions,
     todos as todos_store,
     tool_props,
+    usage,
     visibility,
 )
 
@@ -474,6 +475,8 @@ class LiveSession:
         if kind in mods.LIVE_EVENTS:
             await self._send({**event, "channel": self.channel})
             return None
+        if kind == "rate_limit":
+            usage.remember_windows(accounts.resolve(self.state.account), event.get("windows") or [])
         async with self._lock:
             if kind == "notice" and not self._turn_open:
                 await self._send(self._loose_notice(event))

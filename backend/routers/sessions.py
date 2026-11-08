@@ -349,11 +349,12 @@ def get_session_messages(
     tokens: bool | None = None,
     timings: bool | None = None,
     trashed: bool = False,
+    until: str | None = None,
 ):
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="invalid limit")
     try:
-        items = sessions_service.get_session_messages(project, session_id, {
+        items, earlier = sessions_service.session_segment(project, session_id, {
             "simple": simple,
             "thinking": thinking,
             "tool_use": tool_use,
@@ -362,10 +363,10 @@ def get_session_messages(
             "working": working,
             "tokens": tokens,
             "timings": timings,
-        }, trashed)
+        }, trashed, until)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    cut = None if trashed else registry.committed_cut(session_id)
+    cut = None if trashed or until else registry.committed_cut(session_id)
     if cut is not None:
         items = items[:sessions_service.committed_index(items, *cut)]
     rows, start = page(items, before_index, limit)
@@ -376,9 +377,10 @@ def get_session_messages(
         "total": len(items),
         "start_index": start,
         "has_more": start > 0,
+        "earlier": earlier,
         "context_tokens": sessions_service.context_tokens_in(tail),
         "cache": prompt_cache.from_entries(tail),
         "request_bytes": weight[0],
         "media_bytes": weight[1],
-        "prompts": None if before_index is not None else sessions_service.user_prompts(items),
+        "prompts": None if before_index is not None or until else sessions_service.user_prompts(items),
     })
