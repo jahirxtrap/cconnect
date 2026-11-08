@@ -96,6 +96,8 @@ class I18n {
 
 export const i18n = new I18n();
 
+if (import.meta.hot) void i18n.load();
+
 export const t = (key: string, ...args: Array<string | number>) => i18n.t(key, ...args);
 
 const formats = new Map<string, unknown>();

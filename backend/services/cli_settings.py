@@ -173,6 +173,11 @@ def declare_auto_update(name: str, enabled: bool) -> None:
     _write(data)
 
 
+def env() -> dict[str, str]:
+    declared = _read().get("env")
+    return {name: value for name, value in declared.items() if isinstance(value, str)} if isinstance(declared, dict) else {}
+
+
 def bypass_disabled() -> bool:
     permissions = _read().get("permissions")
     return isinstance(permissions, dict) and permissions.get("disableBypassPermissionsMode") == "disable"

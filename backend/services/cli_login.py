@@ -10,7 +10,7 @@ from watchfiles import awatch
 
 from core import cli_manager
 from core.config import DEFAULT_CWD
-from services import accounts
+from services import accounts, claude_assets, cli_settings
 
 _LOGIN_TIMEOUT = 600.0
 _EXCHANGE_TIMEOUT = 120.0
@@ -18,16 +18,24 @@ _ACCOUNT = "account"
 _MCP = "mcp"
 
 
-def _options(env: dict[str, str], cwd: Optional[str], mcp: bool):
+def _options(env: dict[str, str], cwd: Optional[str] = None, servers: Optional[dict] = None):
     from claude_agent_sdk import ClaudeAgentOptions
 
     return ClaudeAgentOptions(
         cwd=cwd if cwd and Path(cwd).is_dir() else DEFAULT_CWD,
         cli_path=cli_manager.resolve_cli_path(),
-        setting_sources=["user", "project"] if mcp else [],
-        strict_mcp_config=not mcp,
+        setting_sources=[],
+        strict_mcp_config=True,
+        mcp_servers=servers or {},
         env=env,
     )
+
+
+def _mcp_options(account_id: str, server: str, cwd: Optional[str]):
+    config = claude_assets.mcp_config(server, cwd)
+    if config is None:
+        return None
+    return _options({**cli_settings.env(), **accounts.env_for(account_id)}, cwd, {server: config})
 
 
 async def _ask(client: Any, request: dict, timeout: float = 60.0) -> dict:
@@ -113,7 +121,7 @@ def _mcp_key(account_id: str, server: str) -> tuple:
 
 
 async def start_account(account_id: str) -> dict:
-    options = _options(accounts.login_env(account_id), None, mcp=False)
+    options = _options(accounts.identity_env(account_id))
     try:
         login, answer = await _begin(_account_key(account_id), options, {"subtype": "claude_authenticate", "loginWithClaudeAi": True})
     except Exception as exc:
@@ -147,7 +155,9 @@ def cancel_account(account_id: str) -> None:
 
 
 async def start_mcp(account_id: str, server: str, cwd: Optional[str]) -> dict:
-    options = _options(accounts.env_for(account_id), cwd, mcp=True)
+    options = _mcp_options(account_id, server, cwd)
+    if options is None:
+        return {"ok": False, "message": f"Server not found: {server}"}
     try:
         login, answer = await _begin(_mcp_key(account_id, server), options, {"subtype": "mcp_authenticate", "serverName": server})
     except Exception as exc:
@@ -205,8 +215,11 @@ async def sign_out_mcp(account_id: str, server: str, cwd: Optional[str]) -> dict
     from claude_agent_sdk import ClaudeSDKClient
 
     cancel_mcp(account_id, server)
+    options = _mcp_options(account_id, server, cwd)
+    if options is None:
+        return {"ok": False, "message": f"Server not found: {server}"}
     try:
-        async with ClaudeSDKClient(options=_options(accounts.env_for(account_id), cwd, mcp=True)) as client:
+        async with ClaudeSDKClient(options=options) as client:
             await _ask(client, {"subtype": "mcp_clear_auth", "serverName": server})
     except Exception as exc:
         return {"ok": False, "message": str(exc)}

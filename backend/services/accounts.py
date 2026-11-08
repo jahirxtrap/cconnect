@@ -121,9 +121,19 @@ def env_for(account_id: Optional[str]) -> dict[str, str]:
     return env
 
 
-def login_env(account_id: Optional[str]) -> dict[str, str]:
-    path = config_dir(account_id)
-    return {"CLAUDE_CONFIG_DIR": str(path)} if path else {}
+def _identity_dir(account_id: Optional[str]) -> Path:
+    return config_dir(account_id) or paths.ACCOUNTS_DIR / PRIMARY_ID
+
+
+def identity_file(account_id: Optional[str]) -> Path:
+    return _identity_dir(account_id) / _IDENTITY_FILE
+
+
+def identity_env(account_id: Optional[str]) -> dict[str, str]:
+    """The shared .claude.json holds whichever login wrote it last, so each login signs in and reads its own identity, plan and models in a folder of its own."""
+    folder = _identity_dir(account_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    return {"CLAUDE_CONFIG_DIR": str(folder), "CLAUDE_SECURESTORAGE_CONFIG_DIR": str(credentials_path(account_id).parent)}
 
 
 def credentials_path(account_id: Optional[str] = None) -> Path:
@@ -131,9 +141,9 @@ def credentials_path(account_id: Optional[str] = None) -> Path:
 
 
 def _claude_json(account_id: Optional[str]) -> Path:
-    path = config_dir(account_id)
-    if path:
-        return path / ".claude.json"
+    own = identity_file(account_id)
+    if own.is_file() or config_dir(account_id):
+        return own
     configured = os.environ.get("CLAUDE_CONFIG_DIR")
     return Path(configured) / ".claude.json" if configured else Path.home() / ".claude.json"
 

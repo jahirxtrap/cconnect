@@ -49,9 +49,14 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
   `usage`, `accounts` (an account is only its credentials: the CLI runs on the primary config
   with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account's folder, so MCP servers, plugins,
-  settings and history are one for all, and only signing in uses that folder as the whole config,
-  so the identity lands there; older folders still hold links into the primary, and `purge`
-  detaches every link before removing one, or refuses), `cli_login` (signing an account in to
+  settings and history are one for all. The CLI writes the identity, the models it may use and
+  fast mode into the shared `.claude.json` of whichever login started last, and rechecks a refused
+  model with the API under its own token, so a chat on any account still gets its plan. Signing in
+  and the models, plan and fast mode CConnect offers go through `identity_env` instead: the
+  account's own folder (`accounts/default` for the primary, whose credentials stay in `~/.claude`)
+  as the whole config, so each login's identity lands and is read there. Older folders still
+  hold links into the primary, and `purge` detaches every link before removing one, or
+  refuses), `cli_login` (signing an account in to
   Claude and to an MCP server through the CLI's own control requests, `claude_authenticate` and
   `mcp_authenticate`, never a pseudo-terminal: the CLI stays open, in a task of its own, until the
   pasted code or redirect address comes back. An MCP login is a credential, so it is per account;

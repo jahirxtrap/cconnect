@@ -165,6 +165,7 @@ async def submit_login_code(account_id: str, payload: LoginCodeRequest):
     result = await cli_login.submit_account_code(account_id, payload.code)
     if not result["ok"]:
         return api_response(status=400, message=result.get("message"))
+    cli_info.refresh_later(account_id)
     return api_response()
 
 

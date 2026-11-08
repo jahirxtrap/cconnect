@@ -10,11 +10,14 @@ from loguru import logger
 from core import cli_manager, paths
 from core.config import COMMANDS, DEFAULT_CWD, ULTRACODE_EFFORT
 
-_CONFIG_FILES = ("settings.json", "settings.local.json", ".credentials.json", "plugins/installed_plugins.json")
+_CONFIG_FILES = ("settings.json", "settings.local.json", "plugins/installed_plugins.json")
 _CONFIG_FOLDERS = ("commands", "skills", "agents", "output-styles")
+_OWN_KEYS = ("models", "account", "fast_mode_state", "fast_mode_disabled_reason")
 
 _snapshots: dict[str, tuple[tuple, dict[str, Any]]] = {}
 _reading: dict[str, asyncio.Task] = {}
+_shared: tuple[tuple, dict[str, Any]] = ((), {})
+_shared_reading: Optional[asyncio.Task] = None
 _generation = 0
 _windows: dict[str, int] = {}
 _warm_tasks: set[asyncio.Task] = set()
@@ -42,36 +45,62 @@ def _save_windows() -> None:
         logger.warning("could not persist context windows")
 
 
-def _options(model: Optional[str] = None, account: Optional[str] = None):
+def _options(account: Optional[str] = None, own: bool = False):
     from claude_agent_sdk import ClaudeAgentOptions
 
-    from services import accounts
+    from services import accounts, cli_settings
 
+    target = account or accounts.default_account()
+    login = accounts.env_for(target) if accounts.provider_for(target) else accounts.identity_env(target)
     return ClaudeAgentOptions(
         cwd=DEFAULT_CWD,
         cli_path=cli_manager.resolve_cli_path(),
-        model=model,
-        setting_sources=["user", "project"],
-        env=accounts.env_for(account or accounts.default_account()),
+        setting_sources=[] if own else ["user", "project"],
+        strict_mcp_config=True,
+        env={**cli_settings.env(), **login} if own else accounts.env_for(target),
         max_turns=1,
     )
 
 
-async def _fetch(account: str) -> dict[str, Any]:
+async def _server_info(options: Any) -> dict[str, Any]:
     from claude_agent_sdk import ClaudeSDKClient
 
-    await provider_models(account)
-    async with ClaudeSDKClient(_options(account=account)) as client:
+    async with ClaudeSDKClient(options) as client:
         return await client.get_server_info() or {}
 
 
-async def _fetch_window(model: str, account: Optional[str] = None) -> Optional[int]:
-    from claude_agent_sdk import ClaudeSDKClient
+async def _read_shared(stamp: tuple, generation: int) -> dict[str, Any]:
+    global _shared
+    from services import accounts
 
-    async with ClaudeSDKClient(_options(None if model == "default" else model, account)) as client:
-        usage = await client.get_context_usage()
-    size = usage.get("maxTokens")
-    return size if isinstance(size, int) and size > 0 else None
+    info = await _server_info(_options(account=accounts.PRIMARY_ID))
+    if generation == _generation:
+        _shared = (stamp, info)
+    return info
+
+
+async def _shared_info(stamp: tuple, fresh: bool) -> dict[str, Any]:
+    global _shared_reading
+    if not fresh and _shared[1] and _shared[0] == stamp:
+        return _shared[1]
+    if _shared_reading is None or _shared_reading.done():
+        _shared_reading = asyncio.create_task(_read_shared(stamp, _generation))
+    return await asyncio.shield(_shared_reading)
+
+
+async def _fetch(account: str, stamp: tuple, fresh: bool) -> dict[str, Any]:
+    await provider_models(account)
+    shared, own = await asyncio.gather(
+        _shared_info(stamp, fresh),
+        _server_info(_options(account=account, own=True)),
+        return_exceptions=True,
+    )
+    if isinstance(shared, BaseException):
+        raise shared
+    if isinstance(own, BaseException):
+        logger.warning(f"CLI info of account {account} unavailable: {type(own).__name__}: {own}")
+        return dict(shared)
+    return {**shared, **{key: own[key] for key in _OWN_KEYS if key in own}}
 
 
 def _unknown_windows(listed: list[dict]) -> list[str]:
@@ -82,25 +111,30 @@ def _unknown_windows(listed: list[dict]) -> list[str]:
 
 
 async def warm_windows(listed: list[dict], account: Optional[str] = None) -> None:
-    """Probe and cache the context window of every model not already known."""
-    async def load(model: str) -> None:
-        try:
-            size = await _fetch_window(model, account)
-        except Exception as exc:
-            logger.warning(f"context window for {model} unavailable: {type(exc).__name__}: {exc}")
-            return
-        if size:
-            _windows[model] = size
+    """Probe and cache, through one CLI, the context window of every model not already known."""
+    from claude_agent_sdk import ClaudeSDKClient
 
     missing = _unknown_windows(listed)
     if not missing:
         return
-    await asyncio.gather(*(load(model) for model in missing))
+    try:
+        async with ClaudeSDKClient(_options(account=account, own=True)) as client:
+            for model in missing:
+                try:
+                    await client.set_model(None if model == "default" else model)
+                    size = (await client.get_context_usage()).get("maxTokens")
+                except Exception as exc:
+                    logger.warning(f"context window for {model} unavailable: {type(exc).__name__}: {exc}")
+                    continue
+                if isinstance(size, int) and size > 0:
+                    _windows[model] = size
+    except Exception as exc:
+        logger.warning(f"context windows unavailable: {type(exc).__name__}: {exc}")
     _save_windows()
 
 
 def _schedule_warm(listed: list[dict], account: str) -> None:
-    if not _unknown_windows(listed):
+    if _warm_tasks or not _unknown_windows(listed):
         return
     task = asyncio.create_task(warm_windows(listed, account))
     _warm_tasks.add(task)
@@ -130,10 +164,10 @@ def _stamp() -> tuple:
     )
 
 
-async def _read(target: str, generation: int) -> dict[str, Any]:
+async def _read(target: str, generation: int, fresh: bool) -> dict[str, Any]:
     stamp = await asyncio.to_thread(_stamp)
     try:
-        info = await _fetch(target)
+        info = await _fetch(target, stamp, fresh)
     except Exception as exc:
         logger.warning(f"CLI server info unavailable: {type(exc).__name__}: {exc}")
         return _snapshots.get(target, ((), {}))[1]
@@ -143,10 +177,10 @@ async def _read(target: str, generation: int) -> dict[str, Any]:
     return info
 
 
-def _reread(target: str) -> asyncio.Task:
+def _reread(target: str, fresh: bool = False) -> asyncio.Task:
     task = _reading.get(target)
     if task is None or task.done():
-        task = _reading[target] = asyncio.create_task(_read(target, _generation))
+        task = _reading[target] = asyncio.create_task(_read(target, _generation, fresh))
     return task
 
 
@@ -185,8 +219,8 @@ async def refresh() -> None:
     await server_info()
 
 
-def refresh_later(account: Optional[str] = None) -> None:
-    _reread(_target(account))
+def refresh_later(account: Optional[str] = None, shared: bool = False) -> None:
+    _reread(_target(account), shared)
 
 
 def invalidate() -> None:

@@ -30,7 +30,8 @@ One backend can hold more than one Claude login. Add an account from the Claude
 screen and sign in without leaving the app: it hands you a link — copy it, open
 it on whatever device you like, approve the account there and paste the code
 back. Nothing is typed on the server, and each account keeps its own
-credentials, refreshed by the CLI as usual.
+credentials, refreshed by the CLI as usual, and its own plan: the models and
+fast mode offered for an account are the ones that account has.
 
 Everything else is one configuration for all of them — conversation history,
 MCP servers, plugins, skills, settings and memories — so something added while

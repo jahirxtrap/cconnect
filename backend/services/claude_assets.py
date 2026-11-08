@@ -504,8 +504,16 @@ def _declared_mcp(folder: str) -> list[tuple[str, str, dict, bool, str]]:
     ]
 
 
+def _mcp_folder(cwd: str | None) -> str:
+    return cwd if cwd and Path(cwd).is_dir() else DEFAULT_CWD
+
+
+def mcp_config(name: str, cwd: str | None = None) -> dict | None:
+    return next((cfg for declared, _label, cfg, _enabled, _source in _declared_mcp(_mcp_folder(cwd)) if declared == name), None)
+
+
 def list_mcp_servers(cwd: str | None = None) -> list[dict]:
-    folder = cwd if cwd and Path(cwd).is_dir() else DEFAULT_CWD
+    folder = _mcp_folder(cwd)
     logins = _McpLogins(
         needs_auth=set(_read_json(_MCP_AUTH_CACHE)),
         tokens={account: accounts.mcp_tokens(account) for account in accounts.known_ids()},

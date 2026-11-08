@@ -460,7 +460,7 @@ class LiveSession:
                 await self._emit({"type": "agent_result", "id": tool_use_id, "status": None})
             return None
         if kind == "commands":
-            cli_info.refresh_later(self.state.account)
+            cli_info.refresh_later(self.state.account, shared=True)
             await self._send({**event, "channel": self.channel})
             return None
         if kind in AGENT_EVENTS:
