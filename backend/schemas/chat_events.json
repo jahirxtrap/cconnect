@@ -4640,6 +4640,10 @@
         "resumed": {
           "type": "boolean"
         },
+        "stale": {
+          "default": false,
+          "type": "boolean"
+        },
         "committed_count": {
           "anyOf": [
             {

@@ -81,6 +81,7 @@ export interface Ready {
   activity?: string | null;
   resident: boolean;
   resumed: boolean;
+  stale?: boolean;
   committed_count?: number | null;
   queued: QueuedItem[];
   agent?: string | null;

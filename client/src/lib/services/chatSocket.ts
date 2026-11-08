@@ -64,6 +64,7 @@ export type ServerEvent =
       channel: string | null;
       running: boolean;
       resumed: boolean;
+      stale: boolean;
       committedCount: number | null;
       queued: QueuedMessage[];
       activity: string | null;
@@ -704,6 +705,7 @@ export class ChatSocket {
         channel,
         running: event.running === true,
         resumed: event.resumed === true,
+        stale: event.stale === true,
         committedCount: event.committed_count ?? null,
         queued: queuedOf(event.queued),
         activity: event.activity ?? null,

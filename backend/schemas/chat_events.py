@@ -113,6 +113,7 @@ class Ready(Event):
     activity: Optional[str] = None
     resident: bool
     resumed: bool
+    stale: bool = False
     committed_count: Optional[int] = None
     queued: list[QueuedItem]
     agent: Optional[str] = None

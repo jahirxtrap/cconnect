@@ -171,6 +171,13 @@ has no request for and which win over the agent's in the list and in `agent_stat
 agent's options are remembered (`agent_defaults`); delegation creates it at once
 (`create_now`).
 
+A socket re-attaching with a `channel` and `last_seq` only gets a replay when the replay can fill
+it in. When the server no longer has that channel (it restarted, or released the chat) or the
+outbox already trimmed events after `last_seq` (`LiveSession.covers`), `ready` says `stale` and
+the app reopens the chat from its transcript, the way picking it from the list does. Otherwise
+a device that came back after a restart, once another device had reopened the chat, was attached
+to that one as `resumed`, got only the turn in progress and kept a view with a hole in it.
+
 Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
 the app adopts it, and only `set_generation` changes it. A tab that had not loaded its
 account yet used to send the default on reconnect and restart the CLI on it. Model, effort and

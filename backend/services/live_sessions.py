@@ -63,6 +63,7 @@ class LiveSession:
         self._committed_seq = 0
         self._outbox = collections.deque()
         self._outbox_room = OUTBOX_MAX
+        self._dropped_seq = 0
         self._joined = {}
         self._lock = asyncio.Lock()
         self._inbox = asyncio.Queue()
@@ -182,6 +183,9 @@ class LiveSession:
             await self._send_one(sink, self._mods_snapshot())
         self._watch_transcript()
 
+    def covers(self, last_seq):
+        return last_seq >= self._dropped_seq
+
     def _in_transcript(self, stamped):
         started = self._runs.get(stamped.get("parent"))
         return started is not None and started <= self._committed_seq
@@ -199,7 +203,8 @@ class LiveSession:
         if len(self._outbox) <= self._outbox_room:
             return
         while len(self._outbox) > OUTBOX_MAX and self._outbox[0]["seq"] <= self._committed_seq:
-            self._joined.pop(self._outbox.popleft()["seq"], None)
+            self._dropped_seq = self._outbox.popleft()["seq"]
+            self._joined.pop(self._dropped_seq, None)
         if len(self._outbox) > OUTBOX_MAX:
             self._outbox = self._joined_outbox()
         self._outbox_room = max(OUTBOX_MAX, 2 * len(self._outbox))

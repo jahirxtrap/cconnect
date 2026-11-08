@@ -1135,8 +1135,11 @@ export class ChatState {
 
   restoreSession(sessionId: string, projectKey: string) {
     if (this.sessionId === sessionId) return;
-    const known = this.list?.sessions.find((item) => item.sessionId === sessionId);
-    this.openSession(known ?? sessionInfo({ sessionId, projectKey, path: null }));
+    this.openSession(this.#knownSession(sessionId, projectKey));
+  }
+
+  #knownSession(sessionId: string, projectKey: string): SessionInfo {
+    return this.list?.sessions.find((item) => item.sessionId === sessionId) ?? sessionInfo({ sessionId, projectKey, path: null });
   }
 
   loadOlder() {
@@ -2396,6 +2399,11 @@ export class ChatState {
         this.#adoptAccount(event.account);
         void this.refreshServerInfo();
         this.#pumpQueue();
+        if (event.stale && this.sessionId) {
+          this.#cutChannel = null;
+          this.openSession(this.#knownSession(this.sessionId, this.#projectKey() ?? ""));
+          break;
+        }
         if (this.#cutChannel !== null && event.channel !== this.#cutChannel && !event.resumed && !event.running) {
           this.#resetStreaming();
           void this.#reloadConversation();

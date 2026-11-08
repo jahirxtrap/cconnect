@@ -421,6 +421,7 @@ async def chat_ws(ws: WebSocket):
                 seen["offered"] = msg.capabilities
                 seen["capabilities"] = authorize(msg.capabilities, msg.security_key)
                 existing = registry.get(msg.channel) if msg.channel else None
+                stale = bool(msg.channel and msg.last_seq) and (existing is None or not existing.covers(msg.last_seq))
                 by_session = None
                 if existing is None and msg.resume:
                     by_session = registry.get_by_session(msg.resume)
@@ -471,6 +472,7 @@ async def chat_ws(ws: WebSocket):
                     "activity": session.activity,
                     "resident": session.resident_alive,
                     "resumed": bool(by_session),
+                    "stale": stale,
                     "committed_count": committed,
                     "queued": session.queued_items(),
                     "agent": session.state.agent,
