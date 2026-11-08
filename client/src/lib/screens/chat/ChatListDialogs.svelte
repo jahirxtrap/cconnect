@@ -77,13 +77,10 @@
 {#if edits.deleting}
   {@const target = edits.deleting}
   <ConfirmDialog
-    title={t(chat.trashEnabled ? "TRASH" : "DELETE")}
-    text={t(
-      chat.trashEnabled ? "TRASH_CONVERSATION_CONFIRM" : "DELETE_CONVERSATION_CONFIRM",
-      target.title ?? target.preview ?? target.sessionId,
-    )}
-    confirmLabel={t(chat.trashEnabled ? "CONFIRM" : "DELETE")}
-    danger={!chat.trashEnabled}
+    title={t("DELETE")}
+    text={t("DELETE_CONVERSATION_CONFIRM", target.title ?? target.preview ?? target.sessionId)}
+    confirmLabel={t("DELETE")}
+    danger
     onConfirm={() => {
       void chat.remove(target);
       edits.deleting = null;

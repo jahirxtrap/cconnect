@@ -3,6 +3,7 @@
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
   import { DYNAMIC_ACCENT, THEME_ACCENT } from "$lib/design/accents";
+  import { textOn } from "$lib/design/contrast";
   import { packs } from "$lib/design/packs/registry.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -10,7 +11,8 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
-  import { SWATCH_CLASS, SWATCH_GRID_CLASS, swatchBorder } from "$lib/ui/swatch";
+  import { SWATCH_CLASS, SWATCH_GRID_CLASS, swatchState } from "$lib/ui/swatch";
+  import TooltipWrap from "$lib/ui/TooltipWrap.svelte";
 
   interface Props {
     onDismiss: () => void;
@@ -67,32 +69,35 @@
     {/if}
     <div class="{SWATCH_GRID_CLASS} {index < groups.length - 1 ? 'mb-3' : ''}">
       {#if showNone && index === 0}
-        <button
-          type="button"
-          onclick={() => pick(null)}
-          aria-label={t("COLOR_NONE")}
-          class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {swatchBorder(picked === null)}"
-        >
-          {#if picked === null}
-            <Check size={20} />
-          {:else}
-            <X size={18} />
-          {/if}
-        </button>
+        <TooltipWrap label={t("COLOR_NONE")} class="flex">
+          <button
+            type="button"
+            onclick={() => pick(null)}
+            aria-label={t("COLOR_NONE")}
+            class="{SWATCH_CLASS} bg-surface-variant text-on-surface-variant {swatchState(picked === null)}"
+          >
+            {#if picked === null}
+              <Check size={20} />
+            {:else}
+              <X size={18} />
+            {/if}
+          </button>
+        </TooltipWrap>
       {/if}
       {#each group.accents as accent (accent.id)}
-        <button
-          type="button"
-          title={accent.name}
-          aria-label={accent.name}
-          onclick={() => pick(accent.id)}
-          class="{SWATCH_CLASS} text-white {swatchBorder(picked === accent.id)}"
-          style="background: {accent.color}"
-        >
-          {#if picked === accent.id}
-            <Check size={20} />
-          {/if}
-        </button>
+        <TooltipWrap label={accent.name} class="flex">
+          <button
+            type="button"
+            aria-label={accent.name}
+            onclick={() => pick(accent.id)}
+            class="{SWATCH_CLASS} {swatchState(picked === accent.id)}"
+            style="background: {accent.color}; color: {textOn(accent.color, theme.current.colors)}"
+          >
+            {#if picked === accent.id}
+              <Check size={20} />
+            {/if}
+          </button>
+        </TooltipWrap>
       {/each}
     </div>
   {/each}

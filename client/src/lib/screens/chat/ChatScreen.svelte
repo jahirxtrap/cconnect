@@ -5,7 +5,7 @@
   import { navigation } from "$lib/app/navigation.svelte";
   import RouteScreen from "$lib/app/RouteScreen.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
-  import { accentVars, theme } from "$lib/design/theme.svelte";
+  import { theme } from "$lib/design/theme.svelte";
   import { serverStatus, type CompatNotice } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -53,7 +53,7 @@
 
   const accentOf = (environmentId: string | null | undefined) => {
     const accent = backend.environments.find((item) => item.id === environmentId)?.accent ?? null;
-    return accentVars(accent === null ? theme.appAccent : theme.resolve(accent));
+    return theme.accentVars(accent === null ? theme.appAccent : theme.resolve(accent));
   };
 
   const centerAccent = $derived(

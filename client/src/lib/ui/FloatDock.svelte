@@ -7,10 +7,11 @@
 
   interface Props {
     stacked?: boolean;
+    raised?: boolean;
     children: Snippet;
   }
 
-  const { stacked = false, children }: Props = $props();
+  const { stacked = false, raised = false, children }: Props = $props();
 
   const HALF = 2;
 
@@ -55,7 +56,7 @@
     )}px {snapToDevicePixel(bottom)}px {snapToDevicePixel(layout.menuPadding.left + layout.leftInset)}px; --float-panel-width: {layout.mobile
       ? '100%'
       : 'calc(var(--spacing) * 90)'}"
-    class="pointer-events-none fixed inset-x-0 bottom-0 z-30 {layout.insetsAnimated
+    class="pointer-events-none fixed inset-x-0 bottom-0 {raised ? 'z-50' : 'z-30'} {layout.insetsAnimated
       ? 'transition-[padding] duration-200'
       : ''}"
   >

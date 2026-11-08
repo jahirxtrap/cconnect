@@ -3,7 +3,7 @@
   import ErrorText from "./ErrorText.svelte";
   import type { IconSource } from "./icons";
   import Pressable from "./Pressable.svelte";
-  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "./preferenceRow";
+  import { PREFERENCE_BODY_INSET, PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "./preferenceRow";
 
   interface Props {
     icon: IconSource;
@@ -14,6 +14,7 @@
     flash?: boolean;
     onclick?: () => void;
     trailing?: Snippet;
+    children?: Snippet;
   }
 
   const {
@@ -25,25 +26,35 @@
     flash = false,
     onclick,
     trailing,
+    children,
   }: Props = $props();
+
+  const stateClass = $derived(`${enabled ? "" : "opacity-40"} ${flash ? "flash-highlight" : ""}`);
 </script>
 
-<Pressable
-  {onclick}
-  {enabled}
-  class="{PREFERENCE_ROW_CLASS} {enabled ? '' : 'opacity-40'} {flash ? 'flash-highlight' : ''}"
->
-  <IconComponent size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
-  <div class="min-w-0 flex-1">
-    <p class="truncate text-item-title">{title}</p>
-    {#if summary}
-      <p class="truncate text-body-sm text-on-surface-variant">{summary}</p>
+{#snippet row()}
+  <Pressable {onclick} {enabled} class="{PREFERENCE_ROW_CLASS} {children ? '' : stateClass}">
+    <IconComponent size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
+    <div class="min-w-0 flex-1">
+      <p class="truncate text-item-title">{title}</p>
+      {#if summary}
+        <p class="truncate text-body-sm text-on-surface-variant">{summary}</p>
+      {/if}
+      {#if alert}
+        <ErrorText text={alert} />
+      {/if}
+    </div>
+    {#if trailing}
+      <div class="flex shrink-0 items-center">{@render trailing()}</div>
     {/if}
-    {#if alert}
-      <ErrorText text={alert} />
-    {/if}
+  </Pressable>
+{/snippet}
+
+{#if children}
+  <div class="rounded-md {stateClass}">
+    {@render row()}
+    <div style="padding-left: {PREFERENCE_BODY_INSET}" class="pr-3 pb-3">{@render children()}</div>
   </div>
-  {#if trailing}
-    <div class="flex shrink-0 items-center">{@render trailing()}</div>
-  {/if}
-</Pressable>
+{:else}
+  {@render row()}
+{/if}

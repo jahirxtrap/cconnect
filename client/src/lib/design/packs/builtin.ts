@@ -33,6 +33,13 @@ export const BUILTIN_SYNTAX: Record<string, () => Promise<unknown>> = {
   "rose-pine": () => import("@shikijs/themes/rose-pine"),
   "dark-plus": () => import("@shikijs/themes/dark-plus"),
   "light-plus": () => import("@shikijs/themes/light-plus"),
+  monokai: () => import("@shikijs/themes/monokai"),
+  "ayu-dark": () => import("@shikijs/themes/ayu-dark"),
+  "ayu-mirage": () => import("@shikijs/themes/ayu-mirage"),
+  "ayu-light": () => import("@shikijs/themes/ayu-light"),
+  "everforest-dark": () => import("@shikijs/themes/everforest-dark"),
+  "everforest-light": () => import("@shikijs/themes/everforest-light"),
+  "kanagawa-wave": () => import("@shikijs/themes/kanagawa-wave"),
 };
 
 const inPack = <T>(entries: Record<string, T>, pack: string): Map<string, T> =>

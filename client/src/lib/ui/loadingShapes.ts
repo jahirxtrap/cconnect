@@ -1,54 +1,91 @@
-import { ACTIVE_INDICATOR_SCALE, MORPHS, SCALE_FACTOR } from "./loadingMorphs";
+const TAU = Math.PI * 2;
+const STAGES: readonly (readonly [order: number, amplitude: number])[] = [
+  [3, 0.2],
+  [4, 0.16],
+  [5, 0.14],
+  [6, 0.12],
+];
+const STEP_MS = 700;
+const CYCLE_MS = STEP_MS * STAGES.length;
+const QUARTER = TAU / 4;
+const DAMPING = 0.75;
+const STIFFNESS = 170;
+const REACH = 0.98;
+const SAMPLES = 60;
+const INSET = 0.685;
+const DIGITS = 3;
 
-export const SHAPE_COUNT = MORPHS.length;
+export const FILL_BOX = 2;
+export const INSET_BOX = (2 * REACH) / INSET;
 
-export const VIEW_BOX = 1 / (SCALE_FACTOR * ACTIVE_INDICATOR_SCALE);
+const natural = Math.sqrt(STIFFNESS);
+const damped = natural * Math.sqrt(1 - DAMPING * DAMPING);
+const decay = DAMPING * natural;
 
-export interface Shape {
-  path: string;
-  extent: number;
-}
-
-export const pathOf = (index: number, progress: number): Shape => {
-  const [start, end] = MORPHS[index % MORPHS.length];
-  const points = new Array<number>(start.length);
-  let minX = Number.MAX_VALUE;
-  let maxX = -Number.MAX_VALUE;
-  let minY = Number.MAX_VALUE;
-  let maxY = -Number.MAX_VALUE;
-  for (let position = 0; position < start.length; position += 2) {
-    const x = start[position] + (end[position] - start[position]) * progress;
-    const y = start[position + 1] + (end[position + 1] - start[position + 1]) * progress;
-    points[position] = x;
-    points[position + 1] = y;
-    if (x < minX) minX = x;
-    if (x > maxX) maxX = x;
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-  }
-  const centerX = (minX + maxX) / 2;
-  const centerY = (minY + maxY) / 2;
-  const at = (position: number) =>
-    (points[position] - (position % 2 === 0 ? centerX : centerY)).toFixed(4);
-  let path = `M${at(0)} ${at(1)}`;
-  for (let cubic = 0; cubic < points.length; cubic += 8) {
-    path += `C${at(cubic + 2)} ${at(cubic + 3)} ${at(cubic + 4)} ${at(cubic + 5)} ${at(cubic + 6)} ${at(cubic + 7)}`;
-  }
-  return { path: `${path}Z`, extent: Math.max(maxX - minX, maxY - minY) };
+const settle = (ms: number) => {
+  const time = ms / 1000;
+  return 1 - Math.exp(-decay * time) * (Math.cos(damped * time) + (decay / damped) * Math.sin(damped * time));
 };
 
-const listeners = new Set<(elapsed: number) => void>();
+const SETTLED = settle(STEP_MS);
+
+const unit = Array.from({ length: SAMPLES }, (_, index) => (index / SAMPLES) * TAU);
+const cosines = unit.map(Math.cos);
+const sines = unit.map(Math.sin);
+const waves = new Map(STAGES.map(([order]) => [order, unit.map((theta) => Math.cos(order * theta))]));
+
+const xs = new Float64Array(SAMPLES);
+const ys = new Float64Array(SAMPLES);
+
+const pathAt = (elapsed: number): string => {
+  const step = Math.floor(elapsed / STEP_MS);
+  const progress = settle(elapsed - step * STEP_MS) / SETTLED;
+  const [fromOrder, fromAmplitude] = STAGES[step % STAGES.length];
+  const [toOrder, toAmplitude] = STAGES[(step + 1) % STAGES.length];
+  const from = waves.get(fromOrder)!;
+  const to = waves.get(toOrder)!;
+  const leaving = fromAmplitude * (1 - progress);
+  const arriving = toAmplitude * progress;
+  const turn = ((elapsed % CYCLE_MS) / CYCLE_MS) * TAU + ((step % STAGES.length) + progress) * QUARTER;
+  const cosTurn = Math.cos(turn);
+  const sinTurn = Math.sin(turn);
+  let reach = 0;
+  for (let index = 0; index < SAMPLES; index++) {
+    const radius = 1 + leaving * from[index] + arriving * to[index];
+    if (radius > reach) reach = radius;
+    xs[index] = radius * (cosines[index] * cosTurn - sines[index] * sinTurn);
+    ys[index] = radius * (sines[index] * cosTurn + cosines[index] * sinTurn);
+  }
+  const scale = REACH / reach;
+  const point = (values: Float64Array, index: number) => values[(index + SAMPLES) % SAMPLES];
+  const at = (values: Float64Array, index: number) => (point(values, index) * scale).toFixed(DIGITS);
+  const control = (values: Float64Array, index: number, ahead: number, behind: number) =>
+    ((point(values, index) + (point(values, ahead) - point(values, behind)) / 6) * scale).toFixed(DIGITS);
+  let path = `M${at(xs, 0)} ${at(ys, 0)}`;
+  for (let index = 0; index < SAMPLES; index++) {
+    const next = index + 1;
+    path +=
+      `C${control(xs, index, next, index - 1)} ${control(ys, index, next, index - 1)} ` +
+      `${control(xs, next, index, next + 1)} ${control(ys, next, index, next + 1)} ` +
+      `${at(xs, next)} ${at(ys, next)}`;
+  }
+  return `${path}Z`;
+};
+
+const listeners = new Set<(path: string) => void>();
 let frame = 0;
 let origin = 0;
 
+export const currentPath = (): string => pathAt(origin ? performance.now() - origin : 0);
+
 const tick = (now: number) => {
   if (!origin) origin = now;
-  const elapsed = now - origin;
-  for (const listener of listeners) listener(elapsed);
+  const path = pathAt(now - origin);
+  for (const listener of listeners) listener(path);
   frame = listeners.size ? requestAnimationFrame(tick) : 0;
 };
 
-export const onFrame = (listener: (elapsed: number) => void) => {
+export const onFrame = (listener: (path: string) => void) => {
   listeners.add(listener);
   if (!frame) frame = requestAnimationFrame(tick);
   return () => {

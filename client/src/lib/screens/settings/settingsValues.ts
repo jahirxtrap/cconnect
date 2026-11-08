@@ -10,7 +10,7 @@ import { formatDays, joined } from "$lib/data/format";
 import { DYNAMIC_ACCENT, THEME_ACCENT } from "$lib/design/accents";
 import type { PackBackground, PackFont, PackTerminal, PackTheme } from "$lib/design/packs/model";
 import { packs } from "$lib/design/packs/registry.svelte";
-import { FONT_KINDS, THEME_KINDS } from "$lib/design/packs/schema";
+import { FONT_KINDS, type ThemeKind } from "$lib/design/packs/schema";
 import { theme } from "$lib/design/theme.svelte";
 import { i18n, LOCALES, localeName, plural, t } from "$lib/i18n/index.svelte";
 import { AUTO_READ_ALWAYS, AUTO_READ_BACKGROUND, AUTO_READ_OFF } from "$lib/platform/speech.svelte";
@@ -25,6 +25,10 @@ import { localServer, localServerStateOf } from "$lib/services/localServer.svelt
 import { notifier } from "$lib/services/notifier.svelte";
 import { RETENTION_FOREVER_DAYS } from "$lib/services/settingsApi";
 import type { SelectOption } from "$lib/ui/SelectDialog.svelte";
+
+export type ThemeTab = ThemeKind | "terminal";
+
+export const themeTabLabel = (tab: ThemeTab): string => t(tab === "terminal" ? "TERMINAL" : "COLORS");
 
 export const appearanceOptions = (): SelectOption[] => [
   { value: "system", label: t("THEME_SYSTEM") },
@@ -52,6 +56,10 @@ export const themeSwatches = (item: PackTheme): string[] => [...THEME_SWATCHES.m
 
 export const terminalSwatches = (item: PackTerminal): string[] => TERMINAL_SWATCHES.map((key) => item.colors[key]);
 
+const TERMINAL_PALETTE = ["red", "green", "yellow", "blue", "magenta", "cyan"];
+
+export const terminalPalette = (item: PackTerminal): string[] => TERMINAL_PALETTE.map((key) => item.colors[key]);
+
 const chosen = (options: SelectOption[], value: string): string =>
   options.find((option) => option.value === value)?.label ?? value;
 
@@ -78,11 +86,10 @@ export const backgroundLabel = (id: string): string => {
 
 export const chatBackgroundValue = (): string => backgroundLabel(chatBackground.current);
 
+export const appearanceTabs = (): ThemeTab[] => [theme.modeKind, "terminal"];
+
 export const themeValue = (): string =>
-  joined(
-    ...THEME_KINDS.map((kind) => packs.themeOf(kind, theme.themeIds[kind]).name),
-    packs.terminalOf(theme.terminalId).name,
-  );
+  joined(packs.themeOf(theme.modeKind, theme.themeIds[theme.modeKind]).name, packs.terminalOf(theme.terminalId).name);
 
 export const localeValue = (): string => chosen(localeOptions(), i18n.locale);
 

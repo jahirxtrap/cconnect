@@ -18,6 +18,7 @@
   import Volume2 from "@lucide/svelte/icons/volume-2";
   import { formatClock } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
+  import { CopyFeedback } from "$lib/ui/copyFeedback.svelte";
   import StopIcon from "$lib/ui/StopIcon.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
@@ -27,21 +28,14 @@
 
   const { timestamp, speaking, selection, onArm, onCopy, onShare, onSpeak, onFork }: Props = $props();
 
-  const COPIED_MS = 1000;
   const BUTTON_CLASS = "size-7";
   const STOP_SIZE_CLASS = "[&_svg]:size-3.75";
 
-  let copied = $state(false);
-
-  $effect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => (copied = false), COPIED_MS);
-    return () => clearTimeout(timer);
-  });
+  const feedback = new CopyFeedback();
 
   const copy = () => {
     onCopy();
-    copied = true;
+    feedback.mark();
   };
 
   const speakLabel = $derived(
@@ -79,8 +73,8 @@
       <Share2 />
     </TooltipIconButton>
   {/if}
-  <TooltipIconButton label={t("COPY")} active={copied} onclick={copy} class={BUTTON_CLASS}>
-    {#if copied}
+  <TooltipIconButton label={t("COPY")} active={feedback.copied} onclick={copy} class={BUTTON_CLASS}>
+    {#if feedback.copied}
       <Check />
     {:else}
       <Copy />

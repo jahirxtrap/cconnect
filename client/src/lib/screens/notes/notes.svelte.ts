@@ -161,6 +161,14 @@ class Notes {
     this.#save();
   }
 
+  restore(note: Note) {
+    const restored = { ...note, updatedAt: Date.now() };
+    this.items = this.items.some((item) => item.id === note.id)
+      ? this.items.map((item) => (item.id === note.id ? restored : item))
+      : [...this.items, restored];
+    this.#save();
+  }
+
   discardEmpty(id: string) {
     const note = this.find(id);
     if (!note || note.body.trim()) return;

@@ -6,7 +6,7 @@ export const THEME_ACCENT = ACCENT_SOURCES.theme;
 
 export const DEFAULT_ACCENT = THEME_ACCENT;
 
-const channelsOf = (hex: string): [number, number, number] | null => {
+export const channelsOf = (hex: string): [number, number, number] | null => {
   const value = hex.replace("#", "");
   const full = value.length <= 4 ? value.replace(/./g, (c) => c + c) : value;
   const channels = Number.parseInt(full.slice(0, 6), 16);

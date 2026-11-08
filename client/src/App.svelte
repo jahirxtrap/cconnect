@@ -35,6 +35,7 @@
   import { packOffers } from "$lib/screens/packs/packOffers.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import TransfersPanel from "$lib/ui/TransfersPanel.svelte";
+  import UndoToast from "$lib/ui/UndoToast.svelte";
   import QrCameraOverlay from "$lib/ui/QrCameraOverlay.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
 
@@ -159,6 +160,8 @@
 {/if}
 
 <TransfersPanel />
+
+<UndoToast />
 
 <QrCameraOverlay />
 

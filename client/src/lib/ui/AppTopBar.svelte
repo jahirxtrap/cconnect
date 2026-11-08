@@ -1,6 +1,7 @@
 <script lang="ts" module>
   export const TITLE_CLASS = "truncate text-title-md";
-  export const SUBTITLE_CLASS = "truncate text-topbar-subtitle text-on-surface-variant";
+  const SUBTITLE_TYPE = "truncate text-topbar-subtitle";
+  export const SUBTITLE_CLASS = `${SUBTITLE_TYPE} text-on-surface-variant`;
 </script>
 
 <script lang="ts">
@@ -8,13 +9,16 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { CopyFeedback } from "./copyFeedback.svelte";
   import { LINK_LOOKS } from "./linkStatus";
+  import { PRESS_FADE_MS } from "./press";
   import { SCROLL_ROW_CLASS } from "./scrollbar";
   import StatusDot from "./StatusDot.svelte";
 
   interface Props {
     title: string;
     subtitle?: string | null;
+    subtitleCopy?: { label: string; value: string } | null;
     server?: boolean;
     class?: string;
     contained?: boolean;
@@ -29,6 +33,7 @@
   let {
     title,
     subtitle,
+    subtitleCopy = null,
     server = false,
     class: className = "",
     contained = false,
@@ -42,6 +47,8 @@
 
   let heading = $state<HTMLElement | null>(null);
   let strip = $state<HTMLElement | null>(null);
+
+  const feedback = new CopyFeedback();
 
   const look = $derived(serverStatus.link === "connected" ? null : LINK_LOOKS[serverStatus.link]);
 
@@ -81,9 +88,26 @@
     <div class="min-w-0 shrink">
       <p bind:this={heading} class={TITLE_CLASS}>{title}</p>
       {#if line}
-        <div class="flex min-w-0 items-center gap-1.5">
+        <div class="group/status flex min-w-0 items-center gap-1.5">
           {@render (server ? serverDot : subtitleLeading)?.()}
-          <p class={SUBTITLE_CLASS}>{line}</p>
+          {#if subtitleCopy}
+            {@const id = subtitleCopy}
+            <button
+              type="button"
+              title={t("COPY")}
+              data-press="off"
+              onclick={() => feedback.copy(id.value)}
+              style="transition-duration: {PRESS_FADE_MS}ms"
+              class="{SUBTITLE_TYPE} min-w-0 cursor-pointer text-left transition-colors {feedback.copied
+                ? 'text-on-surface'
+                : 'text-on-surface-variant'}"
+            >
+              <span class="group-hover/status:hidden">{line}</span>
+              <span class="hidden group-hover/status:inline">{id.label}</span>
+            </button>
+          {:else}
+            <p class={SUBTITLE_CLASS}>{line}</p>
+          {/if}
         </div>
       {/if}
     </div>

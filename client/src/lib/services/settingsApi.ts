@@ -122,7 +122,7 @@ const effectiveNum = (wire: Wire, key: string, fallback: number): number =>
 
 const parse = (wire: Wire): SettingsSnapshot => ({
   account: effectiveStr(wire, "account", ""),
-  model: effectiveStr(wire, "model", "opus"),
+  model: effectiveStr(wire, "model", "opus[1m]"),
   effort: effectiveStr(wire, "effort", "xhigh"),
   permissionMode: effectiveStr(wire, "permission_mode", "bypassPermissions"),
   streaming: effectiveBool(wire, "streaming", true),
@@ -134,7 +134,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   sessionGrace: effectiveNum(wire, "session_grace", 300),
   sessionLimit: effectiveNum(wire, "session_limit", 10),
   memoryReserve: effectiveNum(wire, "memory_reserve", 2048),
-  modSurfaces: wire.mod_surfaces ? effectiveBool(wire, "mod_surfaces", false) : null,
+  modSurfaces: wire.mod_surfaces ? effectiveBool(wire, "mod_surfaces", true) : null,
   outputStyle: effectiveStr(wire, "output_style", "default"),
   mcpDisabled: effectiveStr(wire, "mcp_disabled", ""),
   showThinking: effectiveStr(wire, "show_thinking", "full"),

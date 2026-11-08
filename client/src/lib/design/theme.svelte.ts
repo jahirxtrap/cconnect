@@ -1,6 +1,7 @@
 import { untrack } from "svelte";
 import { devicePixelRatio } from "svelte/reactivity/window";
 import { DEFAULT_ACCENT, DYNAMIC_ACCENT, THEME_ACCENT, withAlpha } from "./accents";
+import { textOn } from "./contrast";
 import { DEFAULT_FONTS } from "./fonts";
 import { loadFace } from "./packs/faces";
 import { packs } from "./packs/registry.svelte";
@@ -47,18 +48,13 @@ const ACCENT_ALPHAS = {
   ring: 0.4,
 };
 
-const accentProperties = (color: string): [string, string][] => [
+const accentProperties = (color: string, colors: Readonly<Record<string, string>>): [string, string][] => [
   ["--c-accent", color],
-  ["--color-accent", color],
+  ["--c-on-accent", textOn(color, colors)],
   ...Object.entries(ACCENT_ALPHAS).map(([name, alpha]): [string, string] => [`--c-accent-${name}`, withAlpha(color, alpha)]),
 ];
 
 export const ringVars = (color: string): string => `--c-accent-ring: ${withAlpha(color, ACCENT_ALPHAS.ring)};`;
-
-export const accentVars = (color: string): string =>
-  accentProperties(color)
-    .map(([name, value]) => `${name}: ${value};`)
-    .join("");
 
 const androidSystemBars = () =>
   (window as unknown as { AndroidSystemBars?: { setAppearance: (dark: boolean) => void; accent: () => string } })
@@ -98,12 +94,18 @@ class Theme {
     return packs.accentOf(choice)?.color ?? this.current.accent;
   }
 
+  accentVars(color: string): string {
+    return accentProperties(color, this.current.colors)
+      .map(([name, value]) => `${name}: ${value};`)
+      .join("");
+  }
+
   paint() {
     const root = document.documentElement;
     root.dataset.theme = this.kind;
     for (const [key, value] of Object.entries(this.current.colors)) root.style.setProperty(`--c-${key}`, value);
     for (const [key, value] of Object.entries(this.terminal.colors)) root.style.setProperty(`--c-terminal-${key}`, value);
-    for (const [name, value] of accentProperties(this.accent)) root.style.setProperty(name, value);
+    for (const [name, value] of accentProperties(this.accent, this.current.colors)) root.style.setProperty(name, value);
     for (const kind of FONT_KINDS) {
       const font = packs.fontOf(kind, this.fonts[kind]);
       void loadFace(font);

@@ -13,7 +13,7 @@
     type InteractionData,
   } from "$lib/data/chatModels";
   import { severityTone } from "$lib/data/usageWindows";
-  import { sessionColorOf, sessionColorOptions } from "$lib/design/sessionColors";
+  import { sessionColorLabel, sessionColorOf, sessionColorOptions } from "$lib/design/sessionColors";
   import { t } from "$lib/i18n/index.svelte";
   import { parseCconnectBlock } from "$lib/markdown/cconnectBlock";
   import CconnectBlockView from "$lib/ui/CconnectBlockView.svelte";
@@ -252,7 +252,7 @@
           <span class="min-w-0 flex-1 truncate text-body-md">
             {element.label ?? t("COLOR")}{#if element.required}<span class="text-error">&nbsp;*</span>{/if}
           </span>
-          <span class="shrink-0 truncate text-body-sm text-on-surface-variant">{name || t("CHOOSE")}</span>
+          <span class="shrink-0 truncate text-body-sm text-on-surface-variant">{name ? sessionColorLabel(name) : t("CHOOSE")}</span>
         </button>
         {@render clearButton(element, name !== "")}
       </div>

@@ -15,6 +15,7 @@
   import SwatchBook from "@lucide/svelte/icons/swatch-book";
   import Type from "@lucide/svelte/icons/type";
   import Volume2 from "@lucide/svelte/icons/volume-2";
+  import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { theme, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
@@ -26,23 +27,32 @@
   import { useServerPacks } from "$lib/services/serverPacks.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import DiscordIcon from "$lib/ui/DiscordIcon.svelte";
+  import MenuSelect from "$lib/ui/MenuSelect.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
+  import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import AccentDialog from "./AccentDialog.svelte";
+  import AccentPicker from "./AccentPicker.svelte";
+  import BackgroundActions from "./BackgroundActions.svelte";
+  import BackgroundPicker from "./BackgroundPicker.svelte";
   import BrowserDialog from "./BrowserDialog.svelte";
   import ChatBackgroundDialog from "./ChatBackgroundDialog.svelte";
   import DiscordDialog from "./DiscordDialog.svelte";
   import FontDialog from "./FontDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
-  import { useSettingsDialog } from "./useSettingsDialog.svelte";
-  import { appearanceOptions, localeOptions } from "./settingsValues";
+  import { appearanceOptions, appearanceTabs, localeOptions, themeTabLabel } from "./settingsValues";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
   import SpeechDialog from "./SpeechDialog.svelte";
   import ThemeDialog from "./ThemeDialog.svelte";
+  import ThemePicker from "./ThemePicker.svelte";
+
+  const ROW_DIALOGS: readonly SettingsDialog[] = ["appearance", "theme", "language", "accent", "chat_background"];
 
   let dialog = $state<SettingsDialog | null>(null);
+  let themeTabIndex = $state(0);
 
+  const themeTabs = $derived(appearanceTabs());
   const appearances = $derived(appearanceOptions());
   const locales = $derived(localeOptions());
   const appearanceIcon = $derived(theme.mode === "light" ? Sun : theme.mode === "dark" ? Moon : SunMoon);
@@ -52,45 +62,86 @@
     return entry ? entryHint(entry) : "";
   };
 
-  useSettingsDialog("client", (target) => (dialog = target));
+  const highlight = useHighlight((target) => {
+    const entry = entryFor(target);
+    if (entry?.section !== "client") return;
+    const opened = entry.dialog ?? (layout.mobile ? ROW_DIALOGS.find((id) => id === target) : undefined);
+    if (opened) dialog = opened;
+  });
   useServerPacks();
 </script>
 
 <SettingsGroup label={t("SETTINGS_CLIENT")}>
-  <PreferenceRow
-    icon={appearanceIcon}
-    title={t("APPEARANCE")}
-    summary={rowSummary("appearance")}
-    onclick={() => (dialog = "appearance")}
-  />
-  <PreferenceRow
-    icon={SwatchBook}
-    title={t("THEME")}
-    summary={rowSummary("theme")}
-    onclick={() => (dialog = "theme")}
-  />
-  <PreferenceRow
-    icon={Languages}
-    title={t("LANGUAGE")}
-    summary={rowSummary("language")}
-    onclick={() => (dialog = "language")}
-  />
-  <PreferenceRow
-    icon={Palette}
-    title={t("ACCENT")}
-    summary={rowSummary("accent")}
-    onclick={() => (dialog = "accent")}
-  >
-    {#snippet trailing()}
-      <span class="flex h-7 w-9 items-center justify-center"><span class="size-5 rounded-full" style="background: {theme.appAccent}"></span></span>
-    {/snippet}
-  </PreferenceRow>
-  <PreferenceRow
-    icon={ImageIcon}
-    title={t("CHAT_BACKGROUND")}
-    summary={rowSummary("chat_background")}
-    onclick={() => (dialog = "chat_background")}
-  />
+  {#if layout.mobile}
+    <PreferenceRow
+      icon={appearanceIcon}
+      title={t("APPEARANCE")}
+      summary={rowSummary("appearance")}
+      onclick={() => (dialog = "appearance")}
+    />
+    <PreferenceRow icon={SwatchBook} title={t("THEME")} summary={rowSummary("theme")} onclick={() => (dialog = "theme")} />
+    <PreferenceRow icon={Palette} title={t("ACCENT")} summary={rowSummary("accent")} onclick={() => (dialog = "accent")}>
+      {#snippet trailing()}
+        <span class="flex h-7 w-9 items-center justify-center"><span class="size-5 rounded-full" style="background: {theme.appAccent}"></span></span>
+      {/snippet}
+    </PreferenceRow>
+    <PreferenceRow
+      icon={ImageIcon}
+      title={t("CHAT_BACKGROUND")}
+      summary={rowSummary("chat_background")}
+      onclick={() => (dialog = "chat_background")}
+    />
+  {:else}
+    <PreferenceRow icon={appearanceIcon} title={t("APPEARANCE")} flash={highlight.is("appearance")}>
+      {#snippet trailing()}
+        <SegmentedButtons
+          options={appearances.map((option) => option.label)}
+          selected={appearances.findIndex((option) => option.value === theme.mode)}
+          onSelect={(index) => theme.setMode(appearances[index].value as ThemeMode)}
+          shortcuts={false}
+        />
+      {/snippet}
+    </PreferenceRow>
+    <PreferenceRow icon={SwatchBook} title={t("THEME")} flash={highlight.is("theme")}>
+      {#snippet trailing()}
+        <SegmentedButtons
+          options={themeTabs.map(themeTabLabel)}
+          selected={themeTabIndex}
+          onSelect={(index) => (themeTabIndex = index)}
+          shortcuts={false}
+        />
+      {/snippet}
+      <ThemePicker tab={themeTabs[themeTabIndex]} />
+    </PreferenceRow>
+    <PreferenceRow icon={Palette} title={t("ACCENT")} flash={highlight.is("accent")}>
+      <AccentPicker />
+    </PreferenceRow>
+    <PreferenceRow icon={ImageIcon} title={t("CHAT_BACKGROUND")} flash={highlight.is("chat_background")}>
+      {#snippet trailing()}
+        <BackgroundActions onAdjust={() => (dialog = "chat_background")} />
+      {/snippet}
+      <BackgroundPicker onAdjust={() => (dialog = "chat_background")} />
+    </PreferenceRow>
+  {/if}
+  {#if layout.mobile}
+    <PreferenceRow
+      icon={Languages}
+      title={t("LANGUAGE")}
+      summary={rowSummary("language")}
+      onclick={() => (dialog = "language")}
+    />
+  {:else}
+    <PreferenceRow icon={Languages} title={t("LANGUAGE")} flash={highlight.is("language")}>
+      {#snippet trailing()}
+        <MenuSelect
+          label={t("LANGUAGE")}
+          options={locales}
+          selected={i18n.locale}
+          onSelect={(value) => i18n.set(value as Locale)}
+        />
+      {/snippet}
+    </PreferenceRow>
+  {/if}
   <PreferenceRow
     icon={Type}
     title={t("FONT")}
@@ -106,12 +157,6 @@
     title={t("PACKS")}
     summary={rowSummary("packs")}
     onclick={() => (dialog = "packs")}
-  />
-  <PreferenceRow
-    icon={Keyboard}
-    title={t("SHORTCUTS")}
-    summary={rowSummary("shortcuts")}
-    onclick={() => (dialog = "shortcuts")}
   />
   <PreferenceRow
     icon={Clock}
@@ -139,6 +184,12 @@
       />
     {/snippet}
   </PreferenceRow>
+  <PreferenceRow
+    icon={Keyboard}
+    title={t("SHORTCUTS")}
+    summary={rowSummary("shortcuts")}
+    onclick={() => (dialog = "shortcuts")}
+  />
   <PreferenceRow
     icon={Puzzle}
     title={t("MOD_BAND_HANDLE")}
@@ -202,7 +253,7 @@
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "theme"}
-  <ThemeDialog onDismiss={() => (dialog = null)} />
+  <ThemeDialog tabs={themeTabs} onDismiss={() => (dialog = null)} />
 {:else if dialog === "language"}
   <SelectDialog
     title={t("LANGUAGE")}
@@ -211,10 +262,6 @@
     onSelect={(value) => i18n.set(value as Locale)}
     onDismiss={() => (dialog = null)}
   />
-{:else if dialog === "font"}
-  <FontDialog onDismiss={() => (dialog = null)} />
-{:else if dialog === "packs"}
-  <PacksDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "accent"}
   <AccentDialog
     title={t("ACCENT")}
@@ -225,8 +272,12 @@
     }}
     onDismiss={() => (dialog = null)}
   />
+{:else if dialog === "font"}
+  <FontDialog onDismiss={() => (dialog = null)} />
+{:else if dialog === "packs"}
+  <PacksDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "chat_background"}
-  <ChatBackgroundDialog onDismiss={() => (dialog = null)} />
+  <ChatBackgroundDialog adjustOnly={!layout.mobile} onDismiss={() => (dialog = null)} />
 {:else if dialog === "shortcuts"}
   <ShortcutsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "discord"}

@@ -1,4 +1,6 @@
 import type { SessionInfo } from "$lib/data/models";
+import { t } from "$lib/i18n/index.svelte";
+import { undoNotice } from "$lib/ui/undoNotice.svelte";
 import type { ChatState } from "./state.svelte";
 
 export class ChatListEdits {
@@ -18,5 +20,15 @@ export class ChatListEdits {
 
   get chat(): ChatState {
     return this.#chat();
+  }
+
+  remove(session: SessionInfo) {
+    const chat = this.chat;
+    if (!chat.trashEnabled) {
+      this.deleting = session;
+      return;
+    }
+    void chat.remove(session);
+    undoNotice.offer(t("CHAT_TRASHED"), () => chat.restoreTrashed(session.sessionId));
   }
 }

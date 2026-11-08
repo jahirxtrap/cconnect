@@ -20,7 +20,7 @@
 
   const VARIANTS: Record<Variant, string> = {
     filled: "ripple bg-accent text-on-accent",
-    destructive: "ripple bg-red text-on-accent",
+    destructive: "ripple bg-red text-on-red",
     outlined: `text-on-surface ${OUTLINE_CLASS} enabled:hover:bg-hover`,
     danger: `text-red ${OUTLINE_CLASS} enabled:hover:bg-hover`,
     ghost: "text-on-surface enabled:hover:bg-hover",

@@ -107,7 +107,7 @@
                 onAfterSelect();
               },
             })}
-      onDelete={() => (edits.deleting = session)}
+      onDelete={() => edits.remove(session)}
       trash={chat.trashEnabled}
       onMove={(preset) => (edits.moving = { session, preset })}
       categories={chat.categoriesFor(session.projectKey)}

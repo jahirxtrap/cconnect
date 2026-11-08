@@ -28,10 +28,11 @@
   import { BACKGROUND_STYLE_LABELS, backgroundLabel } from "./settingsValues";
 
   interface Props {
+    adjustOnly?: boolean;
     onDismiss: () => void;
   }
 
-  const { onDismiss }: Props = $props();
+  const { adjustOnly = false, onDismiss }: Props = $props();
 
   const STYLES = Object.keys(BACKGROUND_STYLES) as BackgroundStyle[];
   const FIT_LABELS: Record<BackgroundFit, string> = {
@@ -77,6 +78,9 @@
     const id = selected;
     selected = DEFAULT_BACKGROUND;
     await chatBackground.remove(id);
+    if (!adjustOnly) return;
+    chatBackground.apply(DEFAULT_BACKGROUND, {});
+    onDismiss();
   };
 
   const save = () => {
@@ -101,7 +105,7 @@
   </div>
 {/snippet}
 
-<CompactDialog title={t("CHAT_BACKGROUND")} {onDismiss}>
+<CompactDialog title={t(adjustOnly ? "BACKGROUND_SETTINGS" : "CHAT_BACKGROUND")} {onDismiss}>
   {#snippet buttons()}
     <Button
       onclick={() => (edited = { ...edited, [selected]: chatBackground.defaultsOf(selected) })}
@@ -119,51 +123,55 @@
       {/if}
     </div>
 
-    <div>
-      <SectionHeader label={t("PACKS_BUILTIN")} />
-      <div class={TILE_GRID_CLASS}>
-        {@render tile(NO_BACKGROUND, backgroundLabel(NO_BACKGROUND))}
-        {#each builtinBackgrounds as background (background.id)}
-          {@render tile(background.id, backgroundLabel(background.id))}
-        {/each}
-      </div>
-    </div>
-
-    {#each packGroups as pack (pack.info.id)}
+    {#if !adjustOnly}
       <div>
-        <SectionHeader label={pack.info.name} />
+        <SectionHeader label={t("PACKS_BUILTIN")} />
         <div class={TILE_GRID_CLASS}>
-          {#each pack.backgrounds as background (background.id)}
+          {@render tile(NO_BACKGROUND, backgroundLabel(NO_BACKGROUND))}
+          {#each builtinBackgrounds as background (background.id)}
             {@render tile(background.id, backgroundLabel(background.id))}
           {/each}
         </div>
       </div>
-    {/each}
 
-    <div>
-      <SectionHeader label={t("BACKGROUNDS_MINE")} />
-      <div class={TILE_GRID_CLASS}>
-        <div class="flex min-w-0 flex-col gap-1">
-          <Pressable
-            title={t("UPLOAD")}
-            hover={false}
-            onclick={() => picker?.click()}
-            class="{TILE_CLASS} text-on-surface-variant"
-          >
-            <Plus size={20} class="absolute inset-0 m-auto" />
-            <span class="{TILE_LINE_CLASS} border-dashed {TILE_IDLE_CLASS}"></span>
-          </Pressable>
-          <p class="truncate text-center text-caption text-on-surface-variant">{t("UPLOAD")}</p>
+      {#each packGroups as pack (pack.info.id)}
+        <div>
+          <SectionHeader label={pack.info.name} />
+          <div class={TILE_GRID_CLASS}>
+            {#each pack.backgrounds as background (background.id)}
+              {@render tile(background.id, backgroundLabel(background.id))}
+            {/each}
+          </div>
         </div>
-        {#each chatBackground.uploads as id (id)}
-          {@render tile(id, null)}
-        {/each}
+      {/each}
+
+      <div>
+        <SectionHeader label={t("BACKGROUNDS_MINE")} />
+        <div class={TILE_GRID_CLASS}>
+          <div class="flex min-w-0 flex-col gap-1">
+            <Pressable
+              title={t("UPLOAD")}
+              hover={false}
+              onclick={() => picker?.click()}
+              class="{TILE_CLASS} text-on-surface-variant"
+            >
+              <Plus size={20} class="absolute inset-0 m-auto" />
+              <span class="{TILE_LINE_CLASS} border-dashed {TILE_IDLE_CLASS}"></span>
+            </Pressable>
+            <p class="truncate text-center text-caption text-on-surface-variant">{t("UPLOAD")}</p>
+          </div>
+          {#each chatBackground.uploads as id (id)}
+            {@render tile(id, null)}
+          {/each}
+        </div>
       </div>
-    </div>
+    {/if}
 
     {#if selected !== NO_BACKGROUND}
       <div class="flex flex-col gap-3.5">
-        <SectionHeader label={t("BACKGROUND_SETTINGS")} />
+        {#if !adjustOnly}
+          <SectionHeader label={t("BACKGROUND_SETTINGS")} />
+        {/if}
         <SelectField
           label={t("BACKGROUND_STYLE")}
           selected={style ?? ""}

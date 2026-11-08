@@ -80,11 +80,12 @@ Each file's id is its name in lowercase with dashes: `themes/Midnight Dark.json`
 | `colors` | optional | Any of the colours below |
 
 Colours are `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`. The built-in themes to extend are
-`cconnect-dark`, `cconnect-light`, `claude-dark`, `claude-light`, `catppuccin-latte`,
-`catppuccin-mocha`, `dracula`, `github-dark`, `github-dark-hc`, `github-dimmed`, `github-light`,
-`github-light-hc`, `gruvbox-dark`, `nord`, `one-dark`, `rose-pine`, `solarized-dark`,
-`solarized-light`, `tokyo-night`, `vscode-dark-modern`, `vscode-dark-plus`, `vscode-hc-dark`,
-`vscode-hc-light`, `vscode-light-modern` and `vscode-light-plus`.
+`cconnect-dark`, `cconnect-light`, `ayu-dark`, `ayu-light`, `ayu-mirage`, `claude-dark`, `claude-light`,
+`catppuccin-latte`, `catppuccin-mocha`, `dracula`, `everforest-dark`, `everforest-light`, `github-dark`,
+`github-dark-hc`, `github-dimmed`, `github-light`, `github-light-hc`, `gruvbox-dark`, `kanagawa`, `monokai`,
+`nord`, `one-dark`, `rose-pine`, `solarized-dark`, `solarized-light`, `tokyo-night`, `ubuntu-dark`,
+`ubuntu-light`, `vscode-dark-modern`, `vscode-dark-plus`, `vscode-light-modern` and
+`vscode-light-plus`.
 
 ### Colours
 
@@ -102,9 +103,9 @@ Colours are `#rgb`, `#rgba`, `#rrggbb` or `#rrggbbaa`. The built-in themes to ex
 | `shadow` | The shadow under floating surfaces. |
 | `shadow-soft` | The shadow under raised controls. |
 | `outline` | Visible borders and strokes, such as outlined buttons. |
-| `outline-variant` | Subtle dividers and the hairline around menus and media. |
+| `outline-variant` | Subtle dividers, the hairline around menus and media, and the fill of the selected segment in a switch, under `on-background` text. |
 | `error` | Error text and the ring of a field in error. |
-| `on-accent` | Text and icons on accent buttons. |
+| `on-accent` | Text and icons on accent and danger buttons, kept while it reaches 4.5:1 on them; otherwise the app takes `on-background`, `background`, black or white, the first that does. |
 | `scrollbar` | The scrollbar thumb. Computed from `on-background` when left out. |
 | `scrollbar-hover` | The scrollbar thumb under the pointer. Computed from `on-background` when left out. |
 | `red` | Errors, danger buttons, deleted files, a context or plan limit nearly used up, the Bypass permissions mode and the caution alert in Markdown. |

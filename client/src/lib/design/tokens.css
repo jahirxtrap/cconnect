@@ -20,6 +20,10 @@
 
 @theme inline {
   --color-card: var(--c-card, var(--c-surface));
+  --color-accent: var(--c-accent);
+  --color-accent-soft: var(--c-accent-soft);
+  --color-accent-ring: var(--c-accent-ring);
+  --color-on-accent: var(--c-on-accent);
 }
 
 @theme {
@@ -37,16 +41,13 @@
   --color-outline: var(--c-outline);
   --color-outline-variant: var(--c-outline-variant);
   --color-error: var(--c-error);
-  --color-accent: var(--c-accent);
-  --color-accent-soft: var(--c-accent-soft);
-  --color-accent-ring: var(--c-accent-ring);
-  --color-on-accent: var(--c-on-accent);
 
   --shadow-float: 0 0 0 1px var(--c-outline-variant), 0 10px 15px -3px var(--c-shadow), 0 4px 6px -4px var(--c-shadow);
   --shadow-composer: 0 0 0 1px var(--c-accent-ring);
   --shadow-raised: 0 1px 3px var(--c-shadow-soft);
 
   --color-red: var(--c-red);
+  --color-on-red: var(--c-on-red);
   --color-red-bg: var(--c-red-bg);
   --color-green: var(--c-green);
   --color-green-bg: var(--c-green-bg);

@@ -98,11 +98,11 @@ export interface SettingsEntry {
 }
 
 const SETTINGS_ROWS: SettingsEntry[] = [
-  { id: "appearance", label: "APPEARANCE", value: appearanceValue, section: "client", group: "SETTINGS_CLIENT", dialog: "appearance" },
-  { id: "theme", label: "THEME", value: themeValue, section: "client", group: "SETTINGS_CLIENT", dialog: "theme" },
-  { id: "language", label: "LANGUAGE", value: localeValue, section: "client", group: "SETTINGS_CLIENT", dialog: "language" },
-  { id: "accent", label: "ACCENT", value: accentValue, section: "client", group: "SETTINGS_CLIENT", dialog: "accent" },
-  { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT", dialog: "chat_background" },
+  { id: "appearance", label: "APPEARANCE", value: appearanceValue, section: "client", group: "SETTINGS_CLIENT" },
+  { id: "theme", label: "THEME", value: themeValue, section: "client", group: "SETTINGS_CLIENT" },
+  { id: "language", label: "LANGUAGE", value: localeValue, section: "client", group: "SETTINGS_CLIENT" },
+  { id: "accent", label: "ACCENT", value: accentValue, section: "client", group: "SETTINGS_CLIENT" },
+  { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
   { id: "packs", label: "PACKS", value: packsValue, section: "client", group: "SETTINGS_CLIENT", dialog: "packs" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },

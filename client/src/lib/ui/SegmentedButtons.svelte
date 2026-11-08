@@ -7,15 +7,24 @@
     onSelect: (index: number) => void;
     counts?: (number | null)[];
     fill?: boolean;
+    shortcuts?: boolean;
     class?: string;
   }
 
-  const { options, selected, onSelect, counts = [], fill = false, class: className = "" }: Props = $props();
+  const {
+    options,
+    selected,
+    onSelect,
+    counts = [],
+    fill = false,
+    shortcuts = true,
+    class: className = "",
+  }: Props = $props();
 
   const step = (delta: number) => onSelect((selected + delta + options.length) % options.length);
 
-  useShortcut("view.tab.next", () => step(1));
-  useShortcut("view.tab.previous", () => step(-1));
+  useShortcut("view.tab.next", () => step(1), () => shortcuts);
+  useShortcut("view.tab.previous", () => step(-1), () => shortcuts);
 </script>
 
 <div

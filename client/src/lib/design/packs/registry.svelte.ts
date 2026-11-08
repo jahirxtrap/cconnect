@@ -1,6 +1,7 @@
 import { strFromU8 } from "fflate";
 import { rgbOf, withAlpha } from "../accents";
 import { BUILTIN_BACKGROUNDS } from "../backgrounds";
+import { textOn } from "../contrast";
 import { BUILTIN_FONTS, DEFAULT_FONTS, SYSTEM_FAMILIES, SYSTEM_FONT } from "../fonts";
 import { DEFAULT_TERMINAL, DEFAULT_THEMES } from "../themes";
 import { BUILTIN_PACKS, BUILTIN_SYNTAX, EXTRAS_PACK } from "./builtin";
@@ -10,6 +11,7 @@ import { DERIVED_COLORS, FONT_KINDS, type FontKind, type ThemeKind } from "./sch
 import { packFile, readCatalog } from "./storage";
 
 const RGB_SOURCE = "on-surface-variant";
+const DANGER_FILL = "red";
 
 const EXTRAS_FONTS: PackFont[] = FONT_KINDS.flatMap((kind) =>
   BUILTIN_FONTS[kind].map((font) => ({ ...font, kind, pack: EXTRAS_PACK, face: null, files: [] })),
@@ -44,6 +46,7 @@ const resolveThemes = (packs: readonly Pack[]): PackTheme[] => {
       if (!(key in file.colors) && from in file.colors) colors[key] = withAlpha(file.colors[from], alpha);
     }
     colors[`${RGB_SOURCE}-rgb`] = rgbOf(colors[RGB_SOURCE]);
+    colors[`on-${DANGER_FILL}`] = textOn(colors[DANGER_FILL], colors);
     const theme: PackTheme = {
       id: file.id,
       pack: file.pack,

@@ -163,11 +163,11 @@
     {:else}
       <ToolbarSelect label={t("MODEL")} icon={Sparkles} text={modelLabel}>
         {#if effortLevels.length}
-          <MenuSub text={t("MODEL")} icon={Sparkles} value={modelLabel}>
+          <MenuSub text={modelLabel} icon={Sparkles}>
             {@render choices(modelOptions, modelSelected, onModel)}
           </MenuSub>
           <div class={MENU_DIVIDER_CLASS}></div>
-          <MenuSlider text={t("EFFORT")} icon={Gauge} options={effortOptions} selected={effortSelected} onPick={onEffort} />
+          <MenuSlider icon={Gauge} options={effortOptions} selected={effortSelected} onPick={onEffort} />
         {:else}
           {@render choices(modelOptions, modelSelected, onModel)}
         {/if}

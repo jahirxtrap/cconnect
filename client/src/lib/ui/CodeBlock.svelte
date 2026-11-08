@@ -6,8 +6,8 @@
   import Check from "@lucide/svelte/icons/check";
   import Copy from "@lucide/svelte/icons/copy";
   import { theme } from "$lib/design/theme.svelte";
-  import { copyText } from "$lib/platform/clipboard";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
+  import { CopyFeedback } from "./copyFeedback.svelte";
   import { hscrollbar, TEXT_VIEWPORT_CLASS, viewportScrollbar } from "./scrollbar";
 
   interface Props {
@@ -21,13 +21,12 @@
   const PRE_CLASS = "px-2.5 py-2 font-mono text-body-sm";
   const LINE_STYLE = "line-height: var(--chat-line-code)";
 
-  const COPIED_MS = 1000;
+  const feedback = new CopyFeedback();
 
   const body = $derived(code.replace(/\n+$/, ""));
   const resolved = $derived(resolveLang(lang));
 
   let html = $state<string | null>(null);
-  let copied = $state(false);
 
   $effect(() => {
     const language = resolved;
@@ -49,17 +48,6 @@
       active = false;
     };
   });
-
-  $effect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => (copied = false), COPIED_MS);
-    return () => clearTimeout(timer);
-  });
-
-  const copy = () => {
-    void copyText(body);
-    copied = true;
-  };
 </script>
 
 <div class="w-full overflow-hidden rounded-panel bg-surface-nested">
@@ -70,11 +58,11 @@
     <span class="flex-1 text-label-md text-on-surface-variant select-none">{lang || "text"}</span>
     <button
       type="button"
-      onclick={copy}
+      onclick={() => feedback.copy(body)}
       aria-label="copy"
       class="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-hover"
     >
-      {#if copied}
+      {#if feedback.copied}
         <Check size={14} class="text-accent" />
       {:else}
         <Copy size={14} class="text-on-surface-variant" />

@@ -244,6 +244,10 @@
 
   $effect(() => tabs.syncUrl());
 
+  const sessionCopy = $derived(
+    chat.sessionId ? { label: sessionIdPreview(chat.sessionId), value: chat.sessionId } : null,
+  );
+
   const status = $derived.by(() => {
     if (chat.viewOnly) return { dot: "bg-gray", spinner: false, text: t("TRASH") };
     if (chat.link !== "connected") {
@@ -261,19 +265,13 @@
     if (activity === "compacting") return { dot: "bg-gray", spinner: true, tone: "text-blue", text: t("COMPACTING") };
     if (activity === "retrying") return { dot: "bg-gray", spinner: true, tone: "text-yellow", text: t("WORKING") };
     if (activity === "working") return { dot: "bg-gray", spinner: true, text: t("WORKING") };
-    if (activity === "failed")
-      return {
-        dot: "bg-red",
-        spinner: false,
-        text: chat.sessionId ? sessionIdPreview(chat.sessionId) : t("NEW_CHAT"),
-      };
-    if (activity === "persistent") return { dot: "bg-green", spinner: false, ring: true, text: t("PERSISTENT_ALIVE") };
-    return {
-      dot: "bg-green",
-      spinner: false,
-      text: chat.sessionId ? sessionIdPreview(chat.sessionId) : t("NEW_CHAT"),
-    };
+    const named = { spinner: false, text: sessionCopy?.label ?? t("NEW_CHAT") };
+    if (activity === "failed") return { ...named, dot: "bg-red" };
+    if (activity === "persistent") return { ...named, dot: "bg-green", ring: true };
+    return { ...named, dot: "bg-green" };
   });
+
+  const persistent = $derived(resident || "ring" in status);
 
   $effect(() =>
     navigation.intercept(() => {
@@ -404,14 +402,21 @@
 <svelte:window onpaste={onPaste} />
 <svelte:document {onselectionchange} />
 
-<AppTopBar title={chat.agent ? chat.agentName : t("APP_NAME")} subtitle={status.text} {navigationIcon}>
+<AppTopBar
+  title={chat.agent ? chat.agentName : t("APP_NAME")}
+  subtitle={status.text}
+  subtitleCopy={sessionCopy}
+  {navigationIcon}
+>
   {#snippet subtitleLeading()}
-    <StatusDot
-      class={status.dot}
-      loading={status.spinner}
-      spinnerClass={"tone" in status ? status.tone : undefined}
-      ring={resident || "ring" in status}
-    />
+    <span class="flex" title={persistent ? t("PERSISTENT_ALIVE") : undefined}>
+      <StatusDot
+        class={status.dot}
+        loading={status.spinner}
+        spinnerClass={"tone" in status ? status.tone : undefined}
+        ring={persistent}
+      />
+    </span>
   {/snippet}
   {#snippet actions()}
     {#if chat.viewOnly}

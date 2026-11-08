@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { packs } from "$lib/design/packs/registry.svelte";
   import { THEME_KINDS, type ThemeKind } from "$lib/design/packs/schema";
   import { theme } from "$lib/design/theme.svelte";
@@ -11,17 +12,14 @@
   import SwatchRow from "$lib/ui/SwatchRow.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
-  import { packLabel, terminalSwatches, themeSwatches } from "./settingsValues";
+  import { packLabel, terminalSwatches, themeSwatches, themeTabLabel, type ThemeTab } from "./settingsValues";
 
   interface Props {
+    tabs: readonly ThemeTab[];
     onDismiss: () => void;
   }
 
-  const { onDismiss }: Props = $props();
-
-  const TABS = [...THEME_KINDS, "terminal"] as const;
-
-  type ThemeTab = (typeof TABS)[number];
+  const { tabs, onDismiss }: Props = $props();
 
   let themes = $state(
     Object.fromEntries(THEME_KINDS.map((kind) => [kind, packs.themeOf(kind, theme.themeIds[kind]).id])) as Record<
@@ -30,7 +28,7 @@
     >,
   );
   let terminal = $state(packs.terminalOf(theme.terminalId).id);
-  let tab = $state<ThemeTab>(theme.modeKind);
+  let tab = $state<ThemeTab>(untrack(() => tabs[0]));
 
   $effect(() => {
     const shown = tab === "terminal" ? theme.modeKind : tab;
@@ -41,14 +39,13 @@
     theme.preview = null;
   });
 
-  const titleOf = (value: ThemeTab) => t(value === "terminal" ? "TERMINAL" : `THEME_${value.toUpperCase()}`);
   const optionsOf = (value: ThemeTab) =>
     value === "terminal"
       ? packs.terminals.map((item) => ({ ...item, swatches: terminalSwatches(item) }))
       : packs.themesOf(value).map((item) => ({ ...item, swatches: themeSwatches(item) }));
   const selectedOf = (value: ThemeTab) => (value === "terminal" ? terminal : themes[value]);
   const customized = $derived(
-    terminal !== DEFAULT_TERMINAL || THEME_KINDS.some((kind) => themes[kind] !== DEFAULT_THEMES[kind]),
+    tabs.some((value) => (value === "terminal" ? terminal !== DEFAULT_TERMINAL : themes[value] !== DEFAULT_THEMES[value])),
   );
 
   const choose = (value: ThemeTab, id: string) => {
@@ -57,13 +54,17 @@
   };
 
   const reset = () => {
-    themes = { ...DEFAULT_THEMES };
-    terminal = DEFAULT_TERMINAL;
+    for (const value of tabs) {
+      if (value === "terminal") terminal = DEFAULT_TERMINAL;
+      else themes[value] = DEFAULT_THEMES[value];
+    }
   };
 
   const save = () => {
-    for (const kind of THEME_KINDS) theme.setTheme(kind, themes[kind]);
-    theme.setTerminal(terminal);
+    for (const value of tabs) {
+      if (value === "terminal") theme.setTerminal(terminal);
+      else theme.setTheme(value, themes[value]);
+    }
     onDismiss();
   };
 </script>
@@ -71,9 +72,9 @@
 <CompactDialog title={t("THEME")} {onDismiss} paged>
   {#snippet header()}
     <SegmentedButtons
-      options={TABS.map(titleOf)}
-      selected={TABS.indexOf(tab)}
-      onSelect={(index) => (tab = TABS[index])}
+      options={tabs.map(themeTabLabel)}
+      selected={tabs.indexOf(tab)}
+      onSelect={(index) => (tab = tabs[index])}
       fill
     />
   {/snippet}
@@ -82,8 +83,8 @@
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={save}>{t("SAVE")}</Button>
   {/snippet}
-  <TabPager selected={TABS.indexOf(tab)} onSelect={(index) => (tab = TABS[index])} class="min-h-0">
-    {#each TABS as value (value)}
+  <TabPager selected={tabs.indexOf(tab)} onSelect={(index) => (tab = tabs[index])} class="min-h-0">
+    {#each tabs as value (value)}
       <div use:viewportScrollbar class="{TAB_PAGE_CLASS} {DIALOG_PAGE_CLASS}">
         {#each optionsOf(value) as option (option.id)}
           <DialogSelectItem

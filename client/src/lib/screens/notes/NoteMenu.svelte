@@ -8,11 +8,11 @@
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { t } from "$lib/i18n/index.svelte";
   import { saveTextAs, saveTextToDownloads, shareText } from "$lib/services/sharedFiles";
-  import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { undoNotice } from "$lib/ui/undoNotice.svelte";
   import { notes, noteTitle, type Note } from "./notes.svelte";
 
   interface Props {
@@ -27,9 +27,15 @@
   const { note, open, onOpenChange, onDeleted, duplicable = false, class: className = "" }: Props = $props();
 
   let renaming = $state(false);
-  let deleting = $state(false);
 
   const filename = $derived(t("NOTES_FILENAME"));
+
+  const remove = () => {
+    const removed = $state.snapshot(note);
+    onDeleted();
+    notes.remove(removed.id);
+    undoNotice.offer(t("NOTE_DELETED"), () => notes.restore(removed));
+  };
 </script>
 
 <PopupMenu {open} {onOpenChange} label={t("MORE_OPTIONS")}>
@@ -45,7 +51,7 @@
   {#if duplicable}
     <MenuItem icon={Copy} text={t("DUPLICATE")} onclick={() => notes.duplicate(note.id)} />
   {/if}
-  <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => (deleting = true)} />
+  <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={remove} />
 </PopupMenu>
 
 {#if renaming}
@@ -57,21 +63,5 @@
       notes.rename(note.id, value);
     }}
     onDismiss={() => (renaming = false)}
-  />
-{/if}
-
-{#if deleting}
-  <ConfirmDialog
-    title={t("DELETE")}
-    text={t("DELETE_NOTE_CONFIRM", noteTitle(note) || t("NOTE_UNTITLED"))}
-    confirmLabel={t("DELETE")}
-    danger
-    onConfirm={() => {
-      const id = note.id;
-      deleting = false;
-      onDeleted();
-      notes.remove(id);
-    }}
-    onDismiss={() => (deleting = false)}
   />
 {/if}

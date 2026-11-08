@@ -347,8 +347,8 @@ html.scanning .qr-overlay {
 .dot-ring {
   mask-image: radial-gradient(
     closest-side,
-    #000 calc(50% - 0.5px),
-    transparent 50%,
+    #000 calc(42% - 0.5px),
+    transparent 42%,
     transparent calc(75% - 0.5px),
     #000 75%
   );

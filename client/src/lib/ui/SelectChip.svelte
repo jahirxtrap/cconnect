@@ -1,13 +1,16 @@
 <script lang="ts">
+  import type { Snippet } from "svelte";
+
   interface Props {
     label: string;
     selected?: boolean;
     required?: boolean;
     count?: number | null;
     onclick?: (() => void) | null;
+    leading?: Snippet;
   }
 
-  const { label, selected = false, required = false, count = null, onclick = null }: Props = $props();
+  const { label, selected = false, required = false, count = null, onclick = null, leading }: Props = $props();
 
   const BASE_CLASS =
     "inline-flex h-7 max-w-60 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-body-sm whitespace-nowrap transition-colors select-none";
@@ -17,6 +20,7 @@
 </script>
 
 {#snippet body()}
+  {@render leading?.()}
   <span class="truncate">{label}{#if required}&nbsp;*{/if}</span>
   {#if count !== null}
     <span class="text-caption text-accent">{count}</span>
