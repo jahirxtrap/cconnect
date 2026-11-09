@@ -146,7 +146,7 @@
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
-  import { rem } from "$lib/ui/rem";
+  import { cssLength, PAGE_INSET, rem } from "$lib/ui/rem";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { modAreas, modCommands } from "./modAreas";
   import PluginOptionsDialog from "./PluginOptionsDialog.svelte";
@@ -173,7 +173,6 @@
   const TRANSPORTS = ["stdio", "http", "sse"];
   const CARD_REM = 18;
   const PANEL_REM = 22.5;
-  const GAP_REM = 1;
 
   const chat = $derived(tabs.state);
 
@@ -232,7 +231,7 @@
   const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "hooks", "marketplaces"];
 
   const sidePanel = $derived(
-    embedded && PANEL_KINDS.includes(kind) && areaWidth >= (CARD_REM + GAP_REM + PANEL_REM) * rem(),
+    embedded && PANEL_KINDS.includes(kind) && areaWidth >= (CARD_REM + PANEL_REM) * rem() + cssLength(PAGE_INSET),
   );
 
   const skillKey = (skill: Skill) => `${skill.plugin}/${skill.id}`;
@@ -851,7 +850,7 @@
     <div bind:clientHeight={viewHeight} class="flex min-h-0 flex-1 flex-col">
     <PullToRefresh {refreshing} onRefresh={null} memory={memoryOf(kind)}>
       <div class="px-(--page-inset) pb-(--page-inset)">
-      <div bind:clientWidth={areaWidth} class="flex items-start" style="gap: {GAP_REM}rem">
+      <div bind:clientWidth={areaWidth} class="flex items-start gap-(--page-inset)">
         <div class="min-w-0 flex-1">
           <div
             class="grid content-start gap-2"

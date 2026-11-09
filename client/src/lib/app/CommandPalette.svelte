@@ -101,10 +101,10 @@
           <SectionHeader label={t(GROUP_LABELS[section.group])} divider={index > 0} />
           {#each section.items as command (command.id)}
             {@const index = shown.indexOf(command)}
-            <div role="option" aria-selected={index === active}>
+            <div role="option" tabindex="-1" aria-selected={index === active} onpointermove={() => (active = index)}>
               <Pressable
                 onclick={() => void launch(index)}
-                hover={index !== active}
+                hover={false}
                 class="{MENU_ITEM_CLASS} text-body-md {index === active ? 'bg-hover' : ''}"
               >
                 {#if command.icon}

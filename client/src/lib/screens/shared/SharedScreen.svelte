@@ -87,7 +87,8 @@
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
-  import { TOOLTIP_CLASS } from "$lib/ui/menuSurface";
+  import { MENU_ICON_SIZE, TOOLTIP_CLASS } from "$lib/ui/menuSurface";
+  import { PREFERENCE_ICON_SIZE } from "$lib/ui/preferenceRow";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -142,7 +143,6 @@
   const SORT_KEYS: SortKey[] = ["name", "date", "type", "size"];
   const SIZE_COLUMN = "w-24 shrink-0 justify-end text-right";
   const DATE_COLUMN = "w-36 shrink-0";
-  const ICON_SIZE = 18;
   const SORT_LABELS: Record<SortKey, string> = {
     name: "SORT_NAME",
     date: "SORT_DATE",
@@ -211,6 +211,7 @@
   let markBase: string[] = [];
 
   const wide = $derived(!compact && !layout.mobile && width >= WIDE_WIDTH);
+  const iconSize = $derived(wide ? MENU_ICON_SIZE : PREFERENCE_ICON_SIZE);
 
   const child = (name: string) => (path ? `${path}/${name}` : name);
 
@@ -1065,12 +1066,12 @@
       onclick={() => openEntry(entry)}
       oncontextmenu={() => contextSelect(entry)}
       hover={!isSelected && !dropping}
-      class="flex w-full items-center gap-3 rounded-md px-3 py-1.5 {wide ? 'min-h-10' : 'min-h-12'}"
+      class="flex w-full items-center rounded-md px-3 py-1.5 {wide ? 'min-h-8 gap-2' : 'min-h-12 gap-3'}"
     >
       {#if selecting}
         <SelectionDot selected={isSelected} />
       {/if}
-      <Icon size={ICON_SIZE} class="shrink-0 text-on-surface-variant" />
+      <Icon size={iconSize} class="shrink-0 text-on-surface-variant" />
       <span class="flex min-w-0 flex-1 flex-col">
         <span class="truncate text-body-md">{entryLabel(child(entry.file), entry.name)}</span>
         {#if entry.link}
@@ -1090,11 +1091,11 @@
 {/snippet}
 
 {#snippet columnsHead()}
-  <div class="sticky top-0 z-10 flex h-8 items-center gap-3 rounded-t-panel bg-card px-4 text-label-md text-on-surface-variant select-none">
+  <div class="sticky top-0 z-10 flex h-8 items-center gap-2 rounded-t-panel bg-card px-4 text-label-md text-on-surface-variant select-none">
     {#if selecting}
       <span class="invisible"><SelectionDot selected={false} /></span>
     {/if}
-    <span class="shrink-0" style="width: {ICON_SIZE}px"></span>
+    <span class="shrink-0" style="width: {iconSize}px"></span>
     {@render column("name", "min-w-0 flex-1")}
     {@render column("size", SIZE_COLUMN)}
     {@render column("date", DATE_COLUMN)}

@@ -5,7 +5,6 @@
   import Search from "@lucide/svelte/icons/search";
   import Type from "@lucide/svelte/icons/type";
   import { t } from "$lib/i18n/index.svelte";
-  import { layout } from "$lib/platform/layout.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import NoteMenu from "./NoteMenu.svelte";
   import { notes, type Note } from "./notes.svelte";
@@ -43,17 +42,15 @@
   <TooltipIconButton label={t("SEARCH")} active={notes.searching} onclick={() => notes.search(!notes.searching)}>
     <Search />
   </TooltipIconButton>
-  {#if layout.mobile}
-    <TooltipIconButton
-      label={t(notes.cards ? "VIEW_AS_LIST" : "VIEW_AS_CARDS")}
-      onclick={() => notes.show(notes.cards ? "list" : "cards")}
-    >
-      {#if notes.cards}
-        <Rows3 />
-      {:else}
-        <LayoutGrid />
-      {/if}
-    </TooltipIconButton>
-  {/if}
+  <TooltipIconButton
+    label={t(notes.cards ? "VIEW_AS_LIST" : "VIEW_AS_CARDS")}
+    onclick={() => notes.show(notes.cards ? "list" : "cards")}
+  >
+    {#if notes.cards}
+      <Rows3 />
+    {:else}
+      <LayoutGrid />
+    {/if}
+  </TooltipIconButton>
   {@render create()}
 {/if}

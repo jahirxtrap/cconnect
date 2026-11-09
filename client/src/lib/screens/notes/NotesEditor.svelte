@@ -142,7 +142,7 @@
 </script>
 
 <div class="flex min-h-0 flex-1 flex-col {inset ? 'px-(--page-inset) pb-(--page-inset)' : ''}">
-  <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card">
+  <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel bg-card">
     <div class="{SCROLL_ROW_CLASS} mx-2 mt-2 flex shrink-0 items-center">
       {#each tools as tool (tool.label)}
         <TooltipIconButton

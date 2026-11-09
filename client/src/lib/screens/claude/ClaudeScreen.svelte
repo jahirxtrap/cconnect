@@ -19,7 +19,7 @@
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import ChoiceMenu from "$lib/ui/ChoiceMenu.svelte";
   import PullToRefresh from "$lib/ui/PullToRefresh.svelte";
-  import { rem } from "$lib/ui/rem";
+  import { cssLength, PAGE_INSET, rem } from "$lib/ui/rem";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import { scrollbarWidth } from "$lib/ui/scrollbar";
@@ -58,14 +58,14 @@
   const tick = $derived(claudeRefresh.tick + (chat.connected ? 1 : 0));
   const refreshing = $derived(claudeRefresh.refreshing);
   const SECTION_REM = 24;
-  const SECTION_GAP_REM = 1;
   const MAX_COLUMNS = 4;
+  const sectionGap = cssLength(PAGE_INSET);
   let sectionsWidth = $state(0);
   let sectionsScroller = $state<HTMLDivElement | null>(null);
   const columnsWidth = $derived(sectionsWidth + (sectionsScroller ? scrollbarWidth(sectionsScroller) : 0));
   const columns = $derived(
     tabbed
-      ? Math.max(1, Math.min(MAX_COLUMNS, Math.floor((columnsWidth / rem() + SECTION_GAP_REM) / (SECTION_REM + SECTION_GAP_REM))))
+      ? Math.max(1, Math.min(MAX_COLUMNS, Math.floor((columnsWidth + sectionGap) / (SECTION_REM * rem() + sectionGap))))
       : 1,
   );
 

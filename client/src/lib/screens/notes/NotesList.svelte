@@ -44,7 +44,7 @@
 {#snippet row(note: Note)}
   {@const preview = notePreview(note.body)}
   <div
-    class="group relative shrink-0 rounded-panel hover:transition-colors {note.id === selectedId
+    class="group relative shrink-0 rounded-md hover:transition-colors {note.id === selectedId
       ? 'bg-surface-variant'
       : 'hover:bg-hover'}"
   >
@@ -53,7 +53,7 @@
       onlongclick={() => (menuId = note.id)}
       oncontextmenu={() => (menuId = note.id)}
       hover={false}
-      class="flex w-full flex-col gap-0.5 rounded-panel px-3.5 py-3"
+      class="flex w-full flex-col gap-0.5 rounded-md px-3 py-2"
     >
       <span class="truncate pr-6 text-label-lg">{noteLabel(note)}</span>
       {#if preview}
@@ -61,7 +61,7 @@
       {/if}
       <span class="truncate text-caption text-faint">{formatRecent(note.updatedAt)}</span>
     </Pressable>
-    {@render menu(note, "top-2.5 right-2.5", "size-6")}
+    {@render menu(note, "top-1.5 right-1.5", "size-6")}
   </div>
 {/snippet}
 
@@ -82,10 +82,10 @@
 {/snippet}
 
 {#if column}
-  <div class="flex min-h-0 flex-col overflow-hidden rounded-xl bg-card">
+  <div class="flex max-h-full min-h-0 flex-col self-start overflow-hidden rounded-panel bg-card">
     <div
       use:viewportScrollbar
-      class="rounded-viewport flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1 [--viewport-inset:0px]"
+      class="rounded-viewport flex min-h-0 flex-col gap-px overflow-y-auto p-1 [--viewport-inset:0px]"
     >
       {#each listed as note (note.id)}
         {@render row(note)}
@@ -93,7 +93,7 @@
         <EmptyState
           icon={notes.searching ? NO_RESULTS_ICON : NotepadText}
           text={t(notes.searching ? "NO_RESULTS" : "NOTES_EMPTY")}
-          class="flex-1"
+          class="py-8"
         />
       {/each}
     </div>
@@ -135,11 +135,13 @@
       use:viewportScrollbar
       use:dockArea
       use:scrollMemory={"notes|rows"}
-      class="rounded-viewport flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto {INSET}"
+      class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}"
     >
-      {#each listed as note (note.id)}
-        {@render row(note)}
-      {/each}
+      <div class="flex flex-col rounded-panel bg-card p-1">
+        {#each listed as note (note.id)}
+          {@render row(note)}
+        {/each}
+      </div>
     </div>
   {/if}
 {/if}

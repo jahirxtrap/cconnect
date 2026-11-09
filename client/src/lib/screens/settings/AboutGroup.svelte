@@ -36,7 +36,7 @@
   import GithubIcon from "$lib/ui/GithubIcon.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
-  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
+  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS, PREFERENCE_TRAILING_CLASS } from "$lib/ui/preferenceRow";
   import Pressable from "$lib/ui/Pressable.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -123,7 +123,7 @@
         <p class="truncate text-item-title">{profile.name ?? profile.login}</p>
         <p class="truncate text-body-sm text-on-surface-variant">{label}</p>
       </div>
-      <ExternalIndicator />
+      <div class={PREFERENCE_TRAILING_CLASS}><ExternalIndicator /></div>
     </Pressable>
   {/if}
 {/snippet}
@@ -151,7 +151,7 @@
           <p class="text-body-sm text-on-surface-variant">{t("UP_TO_DATE")}</p>
         {/if}
       </div>
-      <div class="shrink-0">
+      <div class={PREFERENCE_TRAILING_CLASS}>
         <TooltipIconButton label={t("CHANGELOG")} onclick={() => (changelogOpen = true)}>
           <FileText size={18} />
         </TooltipIconButton>

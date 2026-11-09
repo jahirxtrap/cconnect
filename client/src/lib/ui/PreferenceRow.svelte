@@ -3,7 +3,12 @@
   import ErrorText from "./ErrorText.svelte";
   import type { IconSource } from "./icons";
   import Pressable from "./Pressable.svelte";
-  import { PREFERENCE_BODY_INSET, PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "./preferenceRow";
+  import {
+    PREFERENCE_BODY_INSET,
+    PREFERENCE_ICON_SIZE,
+    PREFERENCE_ROW_CLASS,
+    PREFERENCE_TRAILING_CLASS,
+  } from "./preferenceRow";
 
   interface Props {
     icon: IconSource;
@@ -45,7 +50,7 @@
       {/if}
     </div>
     {#if trailing}
-      <div class="flex shrink-0 items-center">{@render trailing()}</div>
+      <div class={PREFERENCE_TRAILING_CLASS}>{@render trailing()}</div>
     {/if}
   </Pressable>
 {/snippet}

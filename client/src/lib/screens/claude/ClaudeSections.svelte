@@ -48,7 +48,7 @@
 {/snippet}
 
 {#if groups.length > 1}
-  <div class="flex items-start gap-4">
+  <div class="flex items-start gap-(--page-inset)">
     {#each groups as group, index (index)}
       <div class="flex min-w-0 flex-1 flex-col">
         {#each group as name (name)}

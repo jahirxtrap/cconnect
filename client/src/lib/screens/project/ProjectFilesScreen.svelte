@@ -62,7 +62,7 @@
 
   const ARCHIVE_MARK = "!";
   const INDENT = 14;
-  const ROW_CLASS = "flex h-8 w-full items-center gap-2.5 rounded-md px-2.5 text-left";
+  const ROW_CLASS = "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left";
   const LIST_FRAME = "flex-1 rounded-panel";
   const SEARCH_DELAY_MS = 200;
   const RAIL_X = 18;

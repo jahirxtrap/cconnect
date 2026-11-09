@@ -17,7 +17,7 @@
   import NotesActions from "$lib/screens/notes/NotesActions.svelte";
   import NotesEditor from "$lib/screens/notes/NotesEditor.svelte";
   import NotesList from "$lib/screens/notes/NotesList.svelte";
-  import { notes, noteTitle } from "$lib/screens/notes/notes.svelte";
+  import { noteLabel, notes } from "$lib/screens/notes/notes.svelte";
   import ProjectFilesScreen from "$lib/screens/project/ProjectFilesScreen.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import SharedScreen from "$lib/screens/shared/SharedScreen.svelte";
@@ -121,7 +121,7 @@
         {/if}
       {:else if view === "notes"}
         <PaneHeader
-          title={openNote ? noteTitle(openNote) || t("NOTE_UNTITLED") : t("NOTES")}
+          title={openNote ? noteLabel(openNote) : t("NOTES")}
           actions={notesActions}
           onBack={openNote ? closeNote : undefined}
         />

@@ -72,7 +72,7 @@
 
   {#if split && (notes.listed.length || notes.searching)}
     <div
-      class="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-(--pane-gap) px-(--page-inset) pb-(--page-inset)"
+      class="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-(--page-inset) px-(--page-inset) pb-(--page-inset)"
     >
       <NotesList column selectedId={shown?.id ?? null} onOpen={select} />
       {#if shown}
@@ -84,7 +84,7 @@
           </NotesEditor>
         {/key}
       {:else}
-        <div class="rounded-xl bg-card"></div>
+        <div class="rounded-panel bg-card"></div>
       {/if}
     </div>
   {:else if editing}

@@ -27,7 +27,7 @@ export const MENU_HEAD_CLASS = "shrink-0 px-1 pt-1";
 export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w-[min(20rem,calc(100vw-2rem))]`;
 
 export const MENU_ITEM_CLASS =
-  "flex min-h-8 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors outline-none select-none";
+  "flex min-h-8 w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-colors outline-none select-none";
 
 export const MENU_DIVIDER_CLASS = "my-1 border-t border-outline-variant";
 

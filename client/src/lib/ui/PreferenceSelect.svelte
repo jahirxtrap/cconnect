@@ -3,8 +3,9 @@
   import type { IconSource } from "./icons";
   import MenuItem from "./MenuItem.svelte";
   import PopupMenu from "./PopupMenu.svelte";
-  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "./preferenceRow";
+  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS, PREFERENCE_TRAILING_CLASS } from "./preferenceRow";
   import type { SelectOption } from "./SelectDialog.svelte";
+  import TrailingIcon from "./TrailingIcon.svelte";
 
   interface Props {
     icon: IconSource;
@@ -50,6 +51,6 @@
       <span class="block truncate text-item-title">{title}</span>
       <span class="block truncate text-body-sm text-on-surface-variant">{shown}</span>
     </span>
-    <ChevronsUpDown size={16} class="shrink-0 text-on-surface-variant" />
+    <span class={PREFERENCE_TRAILING_CLASS}><TrailingIcon icon={ChevronsUpDown} /></span>
   </button>
 {/snippet}
