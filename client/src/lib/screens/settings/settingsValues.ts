@@ -257,6 +257,9 @@ export const mcpValue = (): string => {
   return t("ENABLED_COUNT", servers.filter((item) => item.enabled).length, servers.length);
 };
 
+export const hooksValue = (): string =>
+  claudeStatus.hooks ? String(claudeStatus.hooks.length) : "";
+
 export const marketplacesValue = (): string =>
   claudeStatus.extensions ? String(claudeStatus.extensions.marketplaces.length) : "";
 

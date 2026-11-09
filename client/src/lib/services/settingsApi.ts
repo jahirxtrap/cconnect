@@ -21,6 +21,7 @@ export interface SettingsSnapshot {
   showThinking: string;
   showToolUse: string;
   showFileChange: string;
+  showHooks: string;
   showCompact: string;
   showWorking: string;
   showTokens: boolean;
@@ -66,6 +67,7 @@ export interface SettingsPatch {
   show_thinking?: string;
   show_tool_use?: string;
   show_file_change?: string;
+  show_hooks?: string;
   show_compact?: string;
   show_working?: string;
   show_tokens?: boolean;
@@ -140,6 +142,7 @@ const parse = (wire: Wire): SettingsSnapshot => ({
   showThinking: effectiveStr(wire, "show_thinking", "full"),
   showToolUse: effectiveStr(wire, "show_tool_use", "label"),
   showFileChange: effectiveStr(wire, "show_file_change", "full"),
+  showHooks: effectiveStr(wire, "show_hooks", "full"),
   showCompact: effectiveStr(wire, "show_compact", "full"),
   showWorking: effectiveStr(wire, "show_working", "label"),
   showTokens: effectiveBool(wire, "show_tokens", false),

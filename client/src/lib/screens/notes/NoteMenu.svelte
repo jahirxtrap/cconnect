@@ -13,7 +13,7 @@
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { undoNotice } from "$lib/ui/undoNotice.svelte";
-  import { notes, noteTitle, type Note } from "./notes.svelte";
+  import { noteLabel, notes, noteTitle, type Note } from "./notes.svelte";
 
   interface Props {
     note: Note;
@@ -34,7 +34,7 @@
     const removed = $state.snapshot(note);
     onDeleted();
     notes.remove(removed.id);
-    undoNotice.offer(t("NOTE_DELETED"), () => notes.restore(removed));
+    undoNotice.offer(t("NOTE_DELETED", noteLabel(removed)), () => notes.restore(removed));
   };
 </script>
 

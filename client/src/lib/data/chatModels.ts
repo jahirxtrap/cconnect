@@ -23,6 +23,7 @@ export type Role =
   | "agent"
   | "notification"
   | "notice"
+  | "hook"
   | "session_message"
   | "plugin_message"
   | "agent_report"
@@ -253,6 +254,7 @@ export interface ChatMessage {
   thinkingTokens: number | null;
   toolMs: number | null;
   toolFailed: boolean;
+  toolBlockedBy: string | null;
   sourceIndex: number;
   labelOnly: boolean;
   result: string | null;
@@ -484,6 +486,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   thinkingTokens: null,
   toolMs: null,
   toolFailed: false,
+  toolBlockedBy: null,
   sourceIndex: -1,
   labelOnly: false,
   result: null,

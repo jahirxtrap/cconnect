@@ -43,7 +43,7 @@
 
   const PERCENT = 100;
   const CHILD_PADDING = "py-1.5 pl-9 pr-3";
-  const CARD_CLASS = "rounded-lg bg-card p-3.5";
+  const CARD_CLASS = "rounded-panel bg-card p-3.5";
 
   const VIEWS: Record<ProcessKind, string> = {
     server: "",

@@ -4,6 +4,7 @@
   import { formatDuration } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
+  import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import { toolIcon } from "$lib/ui/toolIcons";
   import Collapsible from "./Collapsible.svelte";
 
@@ -15,6 +16,7 @@
     running: boolean;
     took?: number | null;
     failed?: boolean;
+    blockedBy?: string | null;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
     resultView?: Snippet<[string]>;
@@ -28,6 +30,7 @@
     running,
     took = null,
     failed = false,
+    blockedBy = null,
     expanded = null,
     onToggle = null,
     resultView,
@@ -43,6 +46,9 @@
 
   const empty = $derived(!input.trim() && !result?.trim());
   const elapsed = $derived(took !== null && took >= SLOW_MS ? formatDuration(took) : null);
+  const blockedText = $derived(
+    [`**${t("HOOK_BLOCKED", blockedBy ?? "")}**`, result?.trim()].filter(Boolean).join("\n\n"),
+  );
 </script>
 
 <Collapsible
@@ -60,7 +66,11 @@
   {#if input.trim()}
     <p class="font-mono text-body-sm wrap-anywhere whitespace-pre-wrap text-on-surface-variant">{input}</p>
   {/if}
-  {#if result?.trim()}
+  {#if blockedBy}
+    <div class="mt-1.5">
+      <MarkdownText text={blockedText} dense class="text-on-surface-variant" />
+    </div>
+  {:else if result?.trim()}
     <div class="mt-1.5">
       {#if resultView}
         {@render resultView(result)}

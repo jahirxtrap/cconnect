@@ -1090,7 +1090,7 @@
 {/snippet}
 
 {#snippet columnsHead()}
-  <div class="sticky top-0 z-10 flex h-8 items-center gap-3 bg-card px-3 text-label-md text-on-surface-variant select-none">
+  <div class="sticky top-0 z-10 flex h-8 items-center gap-3 rounded-t-panel bg-card px-4 text-label-md text-on-surface-variant select-none">
     {#if selecting}
       <span class="invisible"><SelectionDot selected={false} /></span>
     {/if}
@@ -1292,13 +1292,15 @@
             ? 'touch-none select-none'
             : ''}"
         >
-          <div class="flex flex-col rounded-lg bg-card p-1">
+          <div class="flex flex-col rounded-panel bg-card">
             {#if wide}
               {@render columnsHead()}
             {/if}
-            {#each ordered as entry, index (entry.file)}
-              {@render entryLine(entry, index)}
-            {/each}
+            <div class="flex flex-col p-1">
+              {#each ordered as entry, index (entry.file)}
+                {@render entryLine(entry, index)}
+              {/each}
+            </div>
           </div>
         </div>
       {:else}
@@ -1319,7 +1321,7 @@
         bind:clientHeight={bottomBar}
         class="px-(--page-inset) pb-(--page-inset)"
       >
-        <div class="flex items-center gap-2 rounded-lg bg-card p-1 {narrow ? '' : 'justify-end'}">
+        <div class="flex items-center gap-2 rounded-panel bg-card p-1 {narrow ? '' : 'justify-end'}">
           <Button onclick={() => (transfer = null)} variant="outlined" class={narrow ? "grow basis-0" : ""}>
             {t("CANCEL")}
           </Button>
@@ -1334,7 +1336,7 @@
         bind:clientHeight={bottomBar}
         class="px-(--page-inset) pb-(--page-inset)"
       >
-        <div class="flex items-center gap-1 rounded-lg bg-card p-1">
+        <div class="flex items-center gap-1 rounded-panel bg-card p-1">
           {#if wide}
             {@render selectAllAction()}
             <p class="min-w-0 flex-1 truncate px-1 text-label-lg">{plural("ITEM_COUNT", selected.length)}</p>

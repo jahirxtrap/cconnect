@@ -101,6 +101,7 @@ export type ServerEvent =
       ms: number | null;
       statements: QueryStatement[] | null;
       failed: boolean;
+      blockedBy: string | null;
     }
   | {
       type: "file_change";
@@ -148,7 +149,7 @@ export type ServerEvent =
       toolUses: number | null;
     }
   | { type: "thinking_tokens"; tokens: number }
-  | { type: "hook_failed"; name: string | null; text: string }
+  | { type: "hook"; event: string | null; matcher: string | null; text: string; level: string | null }
   | { type: "notification"; summary: string; status: string | null }
   | { type: "notice"; name: string | null; text: string; level: string | null }
   | { type: "mods"; state: ModState }
@@ -785,6 +786,7 @@ export class ChatSocket {
           ms: event.ms ?? null,
           statements: statementsOf(wire),
           failed: event.is_error === true,
+          blockedBy: event.blocked_by ?? null,
         };
       case "file_change":
         return {
@@ -976,8 +978,14 @@ export class ChatSocket {
         };
       case "thinking_tokens":
         return { type: "thinking_tokens", tokens: event.tokens ?? 0 };
-      case "hook_failed":
-        return { type: "hook_failed", name: event.name ?? null, text: event.text ?? "" };
+      case "hook":
+        return {
+          type: "hook",
+          event: event.event ?? null,
+          matcher: event.matcher ?? null,
+          text: event.text ?? "",
+          level: event.level ?? null,
+        };
       case "todos":
         return {
           type: "todos",

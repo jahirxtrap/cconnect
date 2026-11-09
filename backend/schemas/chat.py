@@ -16,6 +16,7 @@ class VisibilityPrefs(BaseModel):
     thinking: Optional[str] = None
     tool_use: Optional[str] = None
     file_change: Optional[str] = None
+    hooks: Optional[str] = None
     compact: Optional[str] = None
     working: Optional[str] = None
 

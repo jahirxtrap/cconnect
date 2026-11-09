@@ -73,6 +73,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "visibility_thinking", kind: "string", fallback: "", backup: false },
   { key: "visibility_tool_use", kind: "string", fallback: "", backup: false },
   { key: "visibility_file_change", kind: "string", fallback: "", backup: false },
+  { key: "visibility_hooks", kind: "string", fallback: "", backup: false },
   { key: "visibility_compact", kind: "string", fallback: "", backup: false },
   { key: "visibility_working", kind: "string", fallback: "", backup: false },
   { key: "skipped_release", kind: "string", fallback: "", backup: false },

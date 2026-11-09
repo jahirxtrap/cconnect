@@ -20,7 +20,7 @@ from mcps import databases as database_tools
 from mcps.media import block_types
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -318,13 +318,8 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
     if subtype == "thinking_tokens" and vis["thinking"] != "off" and vis.get("tokens"):
         tokens = data.get("estimated_tokens")
         return [{"type": "thinking_tokens", "tokens": tokens}] if isinstance(tokens, int) else []
-    if subtype == "hook_response" and data.get("outcome") == "error":
-        return [{
-            "type": "hook_failed",
-            "name": data.get("hook_name"),
-            "event": data.get("hook_event"),
-            "text": (data.get("stderr") or data.get("output") or "").strip()[:400],
-        }]
+    if subtype == "hook_response":
+        return [row for row in (hook_events.shown(item, vis["hooks"]) for item in hook_events.from_response(data)) if row]
     return mods.events(subtype, data)
 
 
@@ -424,9 +419,18 @@ def _build_file_diff(name: str, raw_input: dict, path: str) -> list[dict[str, st
     return []
 
 
-def _errored(block: Any) -> dict[str, bool]:
+def _errored(block: Any) -> dict[str, Any]:
     errored = block.get("is_error") if isinstance(block, dict) else getattr(block, "is_error", None)
-    return {"is_error": True} if errored is True else {}
+    if errored is not True:
+        return {}
+    content = block.get("content") if isinstance(block, dict) else getattr(block, "content", None)
+    gate = hook_events.refused_by(_flatten_result_content(content))
+    return {"is_error": True, **({"blocked_by": gate} if gate else {})}
+
+
+def _shown_result(content: Any, flags: dict) -> str:
+    text = _flatten_result_content(content)
+    return hook_events.reason(text) if flags.get("blocked_by") else text
 
 
 def _notebook_cell(name: str, raw_input: dict) -> dict[str, str]:
@@ -557,7 +561,7 @@ def _blocks_to_events(content: Any, vis: dict, skip_streamed: bool = False, hidd
                 continue
             ev = {"type": "tool_result", "tool_use_id": tuid, **_errored(block)}
             if mode == "full":
-                ev["content"] = _flatten_result_content(getattr(block, "content", None)).strip()
+                ev["content"] = _shown_result(getattr(block, "content", None), ev).strip()
                 ev.update(_result_view(tuid, ev["content"]))
             events.append(ev)
     return events
@@ -919,6 +923,7 @@ async def run_prompt(
         setting_sources=["user", "project"] if scope["project_files"] else [],
         thinking={"type": "adaptive", "display": "summarized"},
         include_partial_messages=partial,
+        include_hook_events=True,
         extra_args=extra_args,
         cli_path=cli_manager.resolve_cli_path(),
         enable_file_checkpointing=True,
@@ -1319,7 +1324,7 @@ async def run_prompt(
                     if began is not None and vis().get("timings"):
                         ev["ms"] = int((loop.time() - began) * 1000)
                     if tu_mode == "full":
-                        ev["content"] = _flatten_result_content(getattr(block, "content", None))
+                        ev["content"] = _shown_result(getattr(block, "content", None), ev)
                         ev.update(_result_view(tuid, ev["content"]))
                     if parent:
                         ev["parent"] = parent

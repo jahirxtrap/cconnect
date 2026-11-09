@@ -1,4 +1,4 @@
-import type { SessionInfo } from "$lib/data/models";
+import { sessionLabel, type SessionInfo } from "$lib/data/models";
 import { t } from "$lib/i18n/index.svelte";
 import { undoNotice } from "$lib/ui/undoNotice.svelte";
 import type { ChatState } from "./state.svelte";
@@ -29,6 +29,6 @@ export class ChatListEdits {
       return;
     }
     void chat.remove(session);
-    undoNotice.offer(t("CHAT_TRASHED"), () => chat.restoreTrashed(session.sessionId));
+    undoNotice.offer(t("CHAT_TRASHED", sessionLabel(session)), () => chat.restoreTrashed(session.sessionId));
   }
 }

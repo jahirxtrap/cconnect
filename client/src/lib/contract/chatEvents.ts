@@ -31,7 +31,7 @@ export type ChatEvent =
   | TaskRunning
   | AgentResult
   | ThinkingTokens
-  | HookFailed
+  | Hook
   | Notification
   | Notice
   | Mods
@@ -296,6 +296,7 @@ export interface ToolResult {
   content?: string | null;
   ms?: number | null;
   is_error?: boolean | null;
+  blocked_by?: string | null;
   statements?: QueryStatement[] | null;
 }
 export interface FileChange {
@@ -541,16 +542,17 @@ export interface ThinkingTokens {
   type: "thinking_tokens";
   tokens: number;
 }
-export interface HookFailed {
+export interface Hook {
   seq?: number | null;
   ts?: number | null;
   channel?: string | null;
   parent?: string | null;
   replay?: boolean | null;
-  type: "hook_failed";
-  name?: string | null;
+  type: "hook";
   event?: string | null;
+  matcher?: string | null;
   text: string;
+  level?: "warning" | null;
 }
 export interface Notification {
   seq?: number | null;

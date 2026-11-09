@@ -22,6 +22,7 @@
   import { contextServer } from "$lib/services/serverContext";
   import Chip from "$lib/ui/Chip.svelte";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
+  import { CLAUDE_ICONS } from "$lib/screens/claude/ClaudeDetail.svelte";
   import UsageWindows from "$lib/screens/claude/UsageWindows.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
@@ -186,6 +187,7 @@
       result={typeof props.output === "string" ? props.output : message.result}
       took={message.toolMs}
       failed={message.toolFailed}
+      blockedBy={message.toolBlockedBy}
       {running}
       {expanded}
       {onToggle}
@@ -461,6 +463,18 @@
       {expanded}
       {onToggle}
       tone={warning ? "warning" : "process"}
+    >
+      <MarkdownText text={message.text} dense class="text-on-surface-variant" />
+    </Collapsible>
+  {:else if message.role === "hook"}
+    <Collapsible
+      label={message.toolName || t("HOOKS")}
+      icon={CLAUDE_ICONS.hooks}
+      preview={message.text}
+      labelOnly={labelMode || message.labelOnly}
+      {expanded}
+      {onToggle}
+      tone={message.result === "warning" ? "warning" : "process"}
     >
       <MarkdownText text={message.text} dense class="text-on-surface-variant" />
     </Collapsible>

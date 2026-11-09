@@ -65,7 +65,7 @@
       use:scrollMemory={"ssh-hosts"}
       class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)"
     >
-      <div class="flex flex-col rounded-lg bg-card p-1">
+      <div class="flex flex-col rounded-panel bg-card p-1">
         {#each sshStore.profiles as profile (profile.id)}
           {@const OsIcon = osIcon(profile.os)}
           <ListRow

@@ -2666,7 +2666,7 @@
       "title": "HistoryChunk",
       "type": "object"
     },
-    "HookFailed": {
+    "Hook": {
       "additionalProperties": false,
       "properties": {
         "seq": {
@@ -2725,19 +2725,8 @@
           "default": null
         },
         "type": {
-          "const": "hook_failed",
+          "const": "hook",
           "type": "string"
-        },
-        "name": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null
         },
         "event": {
           "anyOf": [
@@ -2750,15 +2739,38 @@
           ],
           "default": null
         },
+        "matcher": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "text": {
           "type": "string"
+        },
+        "level": {
+          "anyOf": [
+            {
+              "const": "warning",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
         "type",
         "text"
       ],
-      "title": "HookFailed",
+      "title": "Hook",
       "type": "object"
     },
     "InteractionOption": {
@@ -7080,6 +7092,17 @@
           ],
           "default": null
         },
+        "blocked_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
         "statements": {
           "anyOf": [
             {
@@ -7488,7 +7511,7 @@
       "file_change": "#/$defs/FileChange",
       "history": "#/$defs/History",
       "history_chunk": "#/$defs/HistoryChunk",
-      "hook_failed": "#/$defs/HookFailed",
+      "hook": "#/$defs/Hook",
       "interaction_request": "#/$defs/InteractionRequest",
       "interaction_resolved": "#/$defs/InteractionResolved",
       "interrupted": "#/$defs/Interrupted",
@@ -7630,7 +7653,7 @@
       "$ref": "#/$defs/ThinkingTokens"
     },
     {
-      "$ref": "#/$defs/HookFailed"
+      "$ref": "#/$defs/Hook"
     },
     {
       "$ref": "#/$defs/Notification"

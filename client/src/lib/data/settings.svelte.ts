@@ -8,6 +8,7 @@ export interface VisibilityPrefs {
   thinking: string | null;
   tool_use: string | null;
   file_change: string | null;
+  hooks: string | null;
   compact: string | null;
   working: string | null;
 }
@@ -107,6 +108,7 @@ class Settings {
       thinking: this.#read<string>("visibility_thinking") || null,
       tool_use: this.#read<string>("visibility_tool_use") || null,
       file_change: this.#read<string>("visibility_file_change") || null,
+      hooks: this.#read<string>("visibility_hooks") || null,
       compact: this.#read<string>("visibility_compact") || null,
       working: this.#read<string>("visibility_working") || null,
     };
@@ -119,6 +121,7 @@ class Settings {
     this.#write("visibility_thinking", value.thinking ?? "");
     this.#write("visibility_tool_use", value.tool_use ?? "");
     this.#write("visibility_file_change", value.file_change ?? "");
+    this.#write("visibility_hooks", value.hooks ?? "");
     this.#write("visibility_compact", value.compact ?? "");
     this.#write("visibility_working", value.working ?? "");
   }

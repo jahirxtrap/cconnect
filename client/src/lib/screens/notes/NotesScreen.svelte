@@ -10,7 +10,7 @@
   import NotesActions from "./NotesActions.svelte";
   import NotesEditor from "./NotesEditor.svelte";
   import NotesList from "./NotesList.svelte";
-  import { notes, noteTitle } from "./notes.svelte";
+  import { noteLabel, notes } from "./notes.svelte";
 
   const SPLIT_WIDTH = 840;
 
@@ -59,7 +59,7 @@
 
 <div bind:clientWidth={width} class="flex h-full flex-col">
   <AppTopBar
-    title={editing ? noteTitle(editing) || t("NOTE_UNTITLED") : t("NOTES")}
+    title={editing ? noteLabel(editing) : t("NOTES")}
     search={split ? headerSearch : undefined}
     actions={headerActions}
   >

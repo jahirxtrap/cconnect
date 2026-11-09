@@ -1,4 +1,5 @@
 import { matchesLabel } from "$lib/data/textMatch";
+import { t } from "$lib/i18n/index.svelte";
 import { plainLines } from "$lib/markdown/render";
 import { layout } from "$lib/platform/layout.svelte";
 import { store } from "$lib/platform/storage";
@@ -39,6 +40,8 @@ const clipped = (line: string): string => {
 const autoTitle = (body: string): string => clipped(plainLines(body)[0] ?? "");
 
 export const noteTitle = (note: Note): string => note.title || autoTitle(note.body);
+
+export const noteLabel = (note: Note): string => noteTitle(note) || t("NOTE_UNTITLED");
 
 export const notePreview = (body: string): string => plainLines(body).slice(1).join(" ");
 

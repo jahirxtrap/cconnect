@@ -331,7 +331,7 @@
           sends: !blocked,
         };
 
-  const pickSuggestion = $derived(pickerFor(chat.busy, (text) => chat.submit(text)));
+  const pickSuggestion = $derived(pickerFor(chat.busy, (text) => chat.submitText(text)));
   const pickSideSuggestion = $derived(pickerFor(chat.sideStreaming, (text) => chat.sendSideQuestion(text)));
 
   $effect(() => {
@@ -736,6 +736,7 @@
       thinking: remote.thinking,
       toolUse: remote.tool_use,
       fileChange: remote.file_change,
+      hooks: remote.hooks,
       compact: remote.compact,
       working: remote.working,
       tokens: remote.tokens ? "on" : "off",
@@ -745,6 +746,7 @@
     thinking={local.thinking ?? ""}
     toolUse={local.tool_use ?? ""}
     fileChange={local.file_change ?? ""}
+    hooks={local.hooks ?? ""}
     compact={local.compact ?? ""}
     working={local.working ?? ""}
     tokens={local.tokens === null ? "" : local.tokens ? "on" : "off"}
@@ -755,6 +757,7 @@
         thinking: values.thinking || null,
         tool_use: values.toolUse || null,
         file_change: values.fileChange || null,
+        hooks: values.hooks || null,
         compact: values.compact || null,
         working: values.working || null,
         tokens: values.tokens === "" ? null : values.tokens === "on",

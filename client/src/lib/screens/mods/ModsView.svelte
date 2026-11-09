@@ -86,7 +86,7 @@
 
   const pick = (command: ModCommand) => {
     if (!takesArguments(command)) {
-      chat.submit(commandText(command));
+      chat.submitText(commandText(command));
       return;
     }
     chat.pendingInput = commandText(command);

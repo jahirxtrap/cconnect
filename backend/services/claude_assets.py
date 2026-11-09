@@ -1,4 +1,4 @@
-"""Read-only views over the local Claude Code installation (plugins, skills, MCP)
+"""Read-only views over the local Claude Code installation (plugins, skills, hooks, MCP)
 plus the user prompt (USER.md) appended after the system context (CCONNECT.md)."""
 
 import json
@@ -22,6 +22,7 @@ _HOOKS_FILE = "hooks/hooks.json"
 _PROJECT_KEY_RE = re.compile(r"^[A-Za-z0-9-]+$")
 _CLAUDE_JSON = Path.home() / ".claude.json"
 _SETTINGS_FILE = _CLAUDE_DIR / "settings.json"
+_SETTINGS_LOCAL_FILE = "settings.local.json"
 _INSTALLED_PLUGINS = _CLAUDE_DIR / "plugins" / "installed_plugins.json"
 _MCP_USER_SOURCE = "user"
 _MCP_OAUTH_TYPES = ("http", "sse")
@@ -154,13 +155,21 @@ def read_manifest(root: Path) -> dict:
     return _read_json(root / _MANIFEST)
 
 
+def _hook_configs(root: Path, manifest: dict) -> list[dict]:
+    declared = manifest.get("hooks")
+    configs = []
+    seen: set[Path] = set()
+    for source in [_HOOKS_FILE, *(declared if isinstance(declared, list) else [declared])]:
+        if isinstance(source, dict):
+            configs.append(source)
+        elif isinstance(source, str) and (path := (root / source).resolve()) not in seen:
+            seen.add(path)
+            configs.append(_read_json(path))
+    return configs
+
+
 def _is_mod(root: Path, manifest: dict) -> bool:
-    declared = manifest.get("hooks") or _HOOKS_FILE
-    for source in declared if isinstance(declared, list) else [declared]:
-        config = source if isinstance(source, dict) else _read_json(root / source) if isinstance(source, str) else {}
-        if config.get("modules"):
-            return True
-    return False
+    return any(config.get("modules") for config in _hook_configs(root, manifest))
 
 
 def _plugin_item(name: str, marketplace: str, root: Path | None, manifest: dict | None = None, **fields) -> dict:
@@ -300,6 +309,51 @@ def list_skills() -> list[dict]:
                 "enabled": True,
             })
     items.sort(key=lambda s: (not s["enabled"], s["name"]))
+    return items
+
+
+def _hook_entries(config: dict, source: str, plugin: dict | None = None) -> list[dict]:
+    events = config.get("hooks")
+    items = []
+    for event, groups in events.items() if isinstance(events, dict) else ():
+        for group in groups if isinstance(groups, list) else ():
+            handlers = group.get("hooks") if isinstance(group, dict) else None
+            for hook in handlers if isinstance(handlers, list) else ():
+                if not isinstance(hook, dict):
+                    continue
+                items.append({
+                    "event": event,
+                    "matcher": group.get("matcher") or None,
+                    "if": hook.get("if"),
+                    "type": hook.get("type"),
+                    "command": hook.get("command"),
+                    "prompt": hook.get("prompt"),
+                    "url": hook.get("url"),
+                    "timeout": hook.get("timeout"),
+                    "source": source,
+                    "plugin": f"{plugin['name']}@{plugin['marketplace']}" if plugin else None,
+                    "plugin_name": plugin["name"] if plugin else None,
+                })
+    return items
+
+
+def list_hooks(cwd: str | None = None) -> list[dict]:
+    project = Path(_mcp_folder(cwd)) / _CLAUDE_DIR.name
+    items = []
+    seen: set[Path] = set()
+    for source, path in (
+        (_MCP_USER_SOURCE, _SETTINGS_FILE),
+        ("project", project / _SETTINGS_FILE.name),
+        ("local", project / _SETTINGS_LOCAL_FILE),
+    ):
+        if path.resolve() not in seen:
+            seen.add(path.resolve())
+            items += _hook_entries(_read_json(path), source)
+    for plugin in list_plugins():
+        if plugin["enabled"] and plugin["install_path"]:
+            root = Path(plugin["install_path"])
+            for config in _hook_configs(root, read_manifest(root)):
+                items += _hook_entries(config, "plugin", plugin)
     return items
 
 

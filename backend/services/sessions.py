@@ -17,7 +17,7 @@ import orjson
 
 from core import paths
 from core.config import CLAUDE_PROJECTS_DIR
-from services import claude_assets, delegate_runs, delegates, mods, prompt_cache, tool_calls, visibility
+from services import claude_assets, delegate_runs, delegates, hook_events, mods, prompt_cache, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MARK, DISMISS, SUBMIT_KEY, questions_to_blocks, values_from_answers
 
@@ -1348,7 +1348,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
     from mcps import databases as database_tools
     from services.claude_runtime import (
         _FILE_EDIT_TOOLS, _build_file_diff, _errored, _format_tool_input,
-        _notebook_cell, _tool_naming, _flatten_result_content,
+        _notebook_cell, _tool_naming, _shown_result,
     )
     lines = [line for line in _located_lines(sub_file) if line[2].get("type") in _TRAVELLING_TYPES]
     calls.extend(tool_calls.remember_entries(str(sub_file), lines))
@@ -1417,7 +1417,7 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
             if took is not None:
                 ev["ms"] = took
             if shown == "full":
-                result = _flatten_result_content(sub_results.get(bid or "")).strip()
+                result = _shown_result(sub_results.get(bid or ""), sub_errors.get(bid or "", {})).strip()
                 if result:
                     ev["result"] = result
                     ev.update(database_tools.result_view(name, result, inp))
@@ -1815,7 +1815,12 @@ def _normalize(
             continue
         if entry.get("isMeta"):
             if i >= last_boundary:
-                messages.extend(_once(_agent_reports(_text_from_content(entry.get("message", {}).get("content")))))
+                meta_text = _text_from_content(entry.get("message", {}).get("content"))
+                feedback = hook_events.from_feedback(meta_text)
+                if feedback is None:
+                    messages.extend(_once(_agent_reports(meta_text)))
+                elif shown_hook := hook_events.shown(feedback, vis["hooks"]):
+                    messages.append(shown_hook)
             continue
         if i < last_boundary:
             continue
@@ -1832,6 +1837,8 @@ def _normalize(
                 if qtext and not consumed and not _COMMAND_META_RE.search(qtext) and not _INTERRUPT_RE.match(qtext):
                     messages.append({"type": "text", "role": "user", "text": qtext})
                 messages.extend(_once(notifs))
+            elif shown_hook := hook_events.shown(hook_events.from_attachment(att), vis["hooks"]):
+                messages.append(shown_hook)
             continue
         if etype == "queue-operation":
             if entry.get("operation") == "enqueue":
@@ -1900,7 +1907,7 @@ def _normalize(
                     messages.append(item)
             elif btype == "tool_use":
                 from mcps import databases as database_tools, packs as packs_tool, shared_files
-                from services.claude_runtime import _FILE_EDIT_TOOLS, _PACKS_RULE, _SHARE_RULE, _agent_event, _agent_input, _build_file_diff, _flatten_result_content, _format_tool_input, _notebook_cell, _tool_naming
+                from services.claude_runtime import _FILE_EDIT_TOOLS, _PACKS_RULE, _SHARE_RULE, _agent_event, _agent_input, _build_file_diff, _flatten_result_content, _format_tool_input, _notebook_cell, _shown_result, _tool_naming
                 name = (block.get("name") or "").strip()
                 inp = block.get("input")
                 bid = block.get("id")
@@ -2064,7 +2071,7 @@ def _normalize(
                     if took is not None:
                         ev["ms"] = took
                     if shown == "full":
-                        result = _flatten_result_content(tool_result_by_id.get(bid or "")).strip()
+                        result = _shown_result(tool_result_by_id.get(bid or ""), tool_errors.get(bid or "", {})).strip()
                         if result:
                             ev["result"] = result
                             ev.update(database_tools.result_view(name, result, inp))

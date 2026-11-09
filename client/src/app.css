@@ -403,8 +403,8 @@ html.scanning .qr-overlay {
     radial-gradient(circle at var(--viewport-overlap) var(--viewport-overlap), var(--viewport-corner-end));
   mask-size:
     100% calc(100% - var(--viewport-round) - var(--viewport-round-end)),
-    var(--viewport-left) 100%,
-    var(--viewport-right) 100%,
+    calc(var(--viewport-left) - var(--viewport-overlap)) 100%,
+    calc(var(--viewport-right) - var(--viewport-overlap)) 100%,
     calc(100% - var(--viewport-left) - var(--viewport-right) - 2 * var(--viewport-reach)) 100%,
     var(--viewport-square) var(--viewport-square),
     var(--viewport-square) var(--viewport-square),

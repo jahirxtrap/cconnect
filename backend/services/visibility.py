@@ -2,14 +2,14 @@
 
 from typing import Any, Callable, Iterable
 
-from services import settings_store
+from services import hook_events, settings_store
 from services.event_rows import HISTORY_PAGE, page_start, visible_rows
 
-TYPES = ("thinking", "tool_use", "file_change", "compact")
+TYPES = ("thinking", "tool_use", "file_change", "hooks", "compact")
 
 _RANK = {"off": 0, "label": 1, "full": 2}
 
-_SIMPLE = {"thinking": "off", "tool_use": "off", "compact": "label"}
+_SIMPLE = {"thinking": "off", "tool_use": "off", "hooks": "off", "compact": "label"}
 
 _STAMPS = ("seq", "channel", "parent")
 
@@ -130,6 +130,12 @@ def shrink(event: dict, prefs: dict, carry: dict) -> dict | None:
             kept = {key: value for key, value in event.items() if key in _FILE_CHANGE_KEEP}
             return {**kept, "label": True, **_stamps(event)}
         return event
+
+    if kind == "hook":
+        if prefs["hooks"] == "off":
+            return _working(event, prefs, carry)
+        _reset(carry)
+        return hook_events.shown(event, prefs["hooks"])
 
     if kind in ("compact", "compact_summary") and prefs["compact"] == "label":
         _reset(carry)

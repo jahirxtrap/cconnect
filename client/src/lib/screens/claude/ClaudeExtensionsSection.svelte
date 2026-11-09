@@ -43,6 +43,7 @@
   {@render link(t("PLUGINS"), rowSummary("plugins"), "plugins")}
   {@render link(t("SKILLS"), rowSummary("skills"), "skills")}
   {@render link(t("MCP_SERVERS"), rowSummary("mcp"), "mcp")}
+  {@render link(t("HOOKS"), rowSummary("hooks"), "hooks")}
   {@render link(t("MARKETPLACES"), rowSummary("marketplaces"), "marketplaces")}
   {@render link(t("MEMORIES"), memoriesSummary, "memories")}
 </SettingsGroup>

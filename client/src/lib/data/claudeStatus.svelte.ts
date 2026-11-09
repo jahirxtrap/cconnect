@@ -9,6 +9,7 @@ import { backend } from "$lib/services/backend.svelte";
 import {
   claudeApi,
   type Extensions,
+  type Hook,
   type McpServer,
   type Prompts,
   type ServiceStatus,
@@ -24,6 +25,7 @@ interface ClaudeSnapshot {
   extensions: Extensions | null;
   skills: Skill[] | null;
   mcpServers: McpServer[] | null;
+  hooks: Hook[] | null;
   service: ServiceStatus | null;
   accounts: AccountsSnapshot | null;
   usage: Usage | null;
@@ -36,6 +38,7 @@ const blank: ClaudeSnapshot = {
   extensions: null,
   skills: null,
   mcpServers: null,
+  hooks: null,
   service: null,
   accounts: null,
   usage: null,
@@ -48,6 +51,7 @@ class ClaudeStatus {
   extensions = $state<Extensions | null>(null);
   skills = $state<Skill[] | null>(null);
   mcpServers = $state<McpServer[] | null>(null);
+  hooks = $state<Hook[] | null>(null);
   service = $state<ServiceStatus | null>(null);
   accounts = $state<AccountsSnapshot | null>(null);
   usage = $state<Usage | null>(null);
@@ -101,17 +105,20 @@ class ClaudeStatus {
       this.extensions = null;
       this.skills = null;
       this.mcpServers = null;
+      this.hooks = null;
       return;
     }
-    const [extensions, skills, mcpServers] = await Promise.all([
+    const [extensions, skills, mcpServers, hooks] = await Promise.all([
       claudeApi.extensions(),
       claudeApi.skills(),
       claudeApi.mcp(),
+      claudeApi.hooks(),
     ]);
     if (at !== backend.activeId) return;
     this.extensions = extensions;
     this.skills = skills;
     this.mcpServers = mcpServers;
+    this.hooks = hooks;
   }
 
   async #loadService() {
@@ -175,6 +182,7 @@ class ClaudeStatus {
       extensions: this.extensions,
       skills: this.skills,
       mcpServers: this.mcpServers,
+      hooks: this.hooks,
       service: this.service,
       accounts: this.accounts,
       usage: this.usage,
@@ -188,6 +196,7 @@ class ClaudeStatus {
     this.extensions = snapshot.extensions;
     this.skills = snapshot.skills;
     this.mcpServers = snapshot.mcpServers;
+    this.hooks = snapshot.hooks;
     this.service = snapshot.service;
     this.accounts = snapshot.accounts;
     this.usage = snapshot.usage;

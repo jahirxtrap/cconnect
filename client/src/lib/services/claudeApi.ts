@@ -82,6 +82,18 @@ export interface McpServer {
   signedIn: string[];
 }
 
+export interface Hook {
+  event: string;
+  matcher: string | null;
+  condition: string | null;
+  type: string | null;
+  run: string | null;
+  timeout: number | null;
+  source: string;
+  plugin: string | null;
+  pluginName: string | null;
+}
+
 export interface McpLogin extends ActionResult {
   url: string | null;
 }
@@ -334,6 +346,24 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         source: item.source || MCP_USER_SOURCE,
         oauth: item.oauth === true,
         signedIn: Array.isArray(item.signed_in) ? item.signed_in : [],
+      }));
+  },
+
+  async hooks(cwd: string | null = null): Promise<Hook[] | null> {
+    const data = await client.get<Wire[]>("/claude/hooks", cwd ? { cwd } : undefined);
+    if (!Array.isArray(data)) return null;
+    return data
+      .filter((item) => item.event)
+      .map((item) => ({
+        event: item.event,
+        matcher: item.matcher ?? null,
+        condition: item.if ?? null,
+        type: item.type ?? null,
+        run: item.command ?? item.prompt ?? item.url ?? null,
+        timeout: typeof item.timeout === "number" ? item.timeout : null,
+        source: item.source || MCP_USER_SOURCE,
+        plugin: item.plugin ?? null,
+        pluginName: item.plugin_name ?? null,
       }));
   },
 

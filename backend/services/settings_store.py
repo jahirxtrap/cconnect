@@ -57,6 +57,7 @@ _VISIBILITY = {
     "thinking": "show_thinking",
     "tool_use": "show_tool_use",
     "file_change": "show_file_change",
+    "hooks": "show_hooks",
     "compact": "show_compact",
 }
 

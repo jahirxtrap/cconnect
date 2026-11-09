@@ -11,6 +11,7 @@
     thinking: string;
     toolUse: string;
     fileChange: string;
+    hooks: string;
     compact: string;
     working: string;
     tokens: string;
@@ -30,6 +31,7 @@
     thinking,
     toolUse,
     fileChange,
+    hooks,
     compact,
     working,
     tokens,
@@ -57,7 +59,7 @@
   const onOff = withServer([ON, NO]);
 
   let values = $state<Visibility>(
-    untrack(() => ({ simple, thinking, toolUse, fileChange, compact, working, tokens, timings })),
+    untrack(() => ({ simple, thinking, toolUse, fileChange, hooks, compact, working, tokens, timings })),
   );
 
   const isSimple = $derived((values.simple || server?.simple) === "on");
@@ -113,6 +115,14 @@
       shown={inherited(three, values.fileChange, server?.fileChange ?? "")}
       options={three}
       onSelect={(value) => (values = { ...values, fileChange: value })}
+    />
+    <SelectField
+      label={t("HOOKS")}
+      selected={isSimple ? "off" : values.hooks}
+      shown={isSimple ? null : inherited(three, values.hooks, server?.hooks ?? "")}
+      options={three}
+      enabled={!isSimple}
+      onSelect={(value) => (values = { ...values, hooks: value })}
     />
     <SelectField
       label={t("COMPACTED")}

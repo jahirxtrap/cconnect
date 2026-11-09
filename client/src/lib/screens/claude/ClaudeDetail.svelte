@@ -5,6 +5,7 @@
   import Store from "@lucide/svelte/icons/store";
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
+  import Webhook from "@lucide/svelte/icons/webhook";
   import { MCP_USER_SOURCE } from "$lib/services/claudeApi";
   import type { IconSource } from "$lib/ui/icons";
 
@@ -12,6 +13,7 @@
     "plugins",
     "skills",
     "mcp",
+    "hooks",
     "marketplaces",
     "memories",
     "status",
@@ -27,6 +29,7 @@
     plugins: "PLUGINS",
     skills: "SKILLS",
     mcp: "MCP",
+    hooks: "HOOKS",
     marketplaces: "MARKETPLACES",
     memories: "MEMORIES",
     status: "SERVICE_STATUS",
@@ -36,6 +39,7 @@
     plugins: Blocks,
     skills: Wand,
     mcp: Unplug,
+    hooks: Webhook,
     marketplaces: Store,
     memories: Brain,
     status: Activity,
@@ -45,6 +49,7 @@
     plugins: "NO_PLUGINS",
     skills: "NO_SKILLS",
     mcp: "NO_MCP_SERVERS",
+    hooks: "NO_HOOKS",
     marketplaces: "NO_MARKETPLACES",
     memories: "NO_MEMORIES",
   };
@@ -53,14 +58,14 @@
 
   const CLAUDEAI_CONNECTORS = "https://claude.ai/customize/connectors";
 
-  const MCP_SOURCE_LABELS: Record<string, string> = {
+  const SOURCE_LABELS: Record<string, string> = {
     [MCP_USER_SOURCE]: "MCP_SOURCE_USER",
     project: "PROJECT",
     local: "MCP_SOURCE_LOCAL",
     plugin: "PLUGINS",
   };
 
-  const MCP_SOURCE_ORDER = Object.keys(MCP_SOURCE_LABELS);
+  const SOURCE_ORDER = Object.keys(SOURCE_LABELS);
 </script>
 
 <script lang="ts">
@@ -76,7 +81,7 @@
   import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
-  import { joined, SEPARATOR } from "$lib/data/format";
+  import { formatSeconds, joined, SEPARATOR } from "$lib/data/format";
   import { holdRefresh } from "$lib/data/inflight";
   import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -97,6 +102,7 @@
     type CatalogPlugin,
     type ChatMod,
     type Extensions,
+    type Hook,
     type Marketplace,
     type McpServer,
     type Memories,
@@ -113,6 +119,7 @@
   import { LIST_VIEWPORT_CLASS, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
@@ -162,6 +169,7 @@
   const compact = inPane();
 
   const SKILL_FILE = "SKILL.md";
+  const HOOK_COMMAND = "command";
   const TRANSPORTS = ["stdio", "http", "sse"];
   const CARD_REM = 18;
   const PANEL_REM = 22.5;
@@ -172,6 +180,7 @@
   let extensions = $state<Extensions | null>(null);
   let skills = $state<Skill[] | null>(null);
   let mcpServers = $state<McpServer[] | null>(null);
+  let hooks = $state<Hook[] | null>(null);
   let memories = $state<Memories | null>(null);
   let service = $state<ServiceStatus | null>(null);
   let loaded = $state(false);
@@ -186,6 +195,7 @@
   let searching = $state(false);
   let skillSheet = $state<Skill | null>(null);
   let skillFiles = $state<string[] | null>(null);
+  let hookSheet = $state<Hook | null>(null);
 
   let pluginMenu = $state<Plugin | null>(null);
   let pluginReview = $state<PluginReview | null>(null);
@@ -219,7 +229,7 @@
   let areaWidth = $state(0);
   let viewHeight = $state(0);
 
-  const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "marketplaces"];
+  const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "hooks", "marketplaces"];
 
   const sidePanel = $derived(
     embedded && PANEL_KINDS.includes(kind) && areaWidth >= (CARD_REM + GAP_REM + PANEL_REM) * rem(),
@@ -234,9 +244,11 @@
         ? skillSheet?.name
         : kind === "mcp"
           ? mcpMenu?.label
-          : kind === "marketplaces"
-            ? marketMenu?.name
-            : undefined,
+          : kind === "hooks"
+            ? hookSheet?.event
+            : kind === "marketplaces"
+              ? marketMenu?.name
+              : undefined,
   );
 
   const title = $derived(
@@ -246,11 +258,13 @@
         ? t("SKILLS")
         : kind === "mcp"
           ? t("MCP_SERVERS")
-          : kind === "marketplaces"
-            ? t("MARKETPLACES")
-            : kind === "memories"
-              ? t("MEMORIES")
-              : t("SERVICE_STATUS"),
+          : kind === "hooks"
+            ? t("HOOKS")
+            : kind === "marketplaces"
+              ? t("MARKETPLACES")
+              : kind === "memories"
+                ? t("MEMORIES")
+                : t("SERVICE_STATUS"),
   );
 
   const load = async () => {
@@ -260,6 +274,7 @@
       accountsStore.ensure();
       mcpServers = await claudeApi.mcp(chat.workingPath);
     }
+    else if (kind === "hooks") hooks = await claudeApi.hooks(chat.workingPath);
     else if (kind === "memories") memories = await claudeApi.memories(memoriesProject);
     else if (kind === "status") service = await claudeApi.status();
     loaded = true;
@@ -407,7 +422,7 @@
 
   const mcpKey = (server: McpServer) => `${server.source}/${server.name}`;
 
-  const mcpSourceLabel = (source: string) => (MCP_SOURCE_LABELS[source] ? t(MCP_SOURCE_LABELS[source]) : source);
+  const sourceLabel = (source: string) => (SOURCE_LABELS[source] ? t(SOURCE_LABELS[source]) : source);
 
   const mcpSignInShown = (server: McpServer) => server.oauth && server.enabled;
 
@@ -468,19 +483,19 @@
     mcpSigning = null;
   };
 
-  const mcpRank = (source: string) => {
-    const rank = MCP_SOURCE_ORDER.indexOf(source);
-    return rank < 0 ? MCP_SOURCE_ORDER.length : rank;
+  const sourceRank = (source: string) => {
+    const rank = SOURCE_ORDER.indexOf(source);
+    return rank < 0 ? SOURCE_ORDER.length : rank;
   };
 
   const mcpFilters = $derived.by((): { source: string | null; label: string; count: number }[] => {
     const list = mcpServers ?? [];
-    const sources = [...new Set(list.map((server) => server.source))].sort((a, b) => mcpRank(a) - mcpRank(b));
+    const sources = [...new Set(list.map((server) => server.source))].sort((a, b) => sourceRank(a) - sourceRank(b));
     return [
       { source: null, label: t("ALL"), count: list.length },
       ...sources.map((source) => ({
         source,
-        label: mcpSourceLabel(source),
+        label: sourceLabel(source),
         count: list.filter((server) => server.source === source).length,
       })),
     ];
@@ -490,6 +505,35 @@
     (mcpServers ?? []).filter(
       (server) =>
         (mcpFilter === null || server.source === mcpFilter) && matches(server.label, server.name, server.detail),
+    ),
+  );
+
+  let hookFilter = $state<string | null>(null);
+
+  const hookKey = (hook: Hook) =>
+    [hook.source, hook.plugin, hook.event, hook.matcher, hook.condition, hook.run].join("\n");
+
+  const hookOrigin = (hook: Hook) => hook.pluginName ?? sourceLabel(hook.source);
+
+  const sortedHooks = $derived((hooks ?? []).toSorted((a, b) => a.event.localeCompare(b.event)));
+
+  const hookFilters = $derived.by((): { event: string | null; label: string; count: number }[] => {
+    const events = [...new Set(sortedHooks.map((hook) => hook.event))];
+    return [
+      { event: null, label: t("ALL"), count: sortedHooks.length },
+      ...events.map((event) => ({
+        event,
+        label: event,
+        count: sortedHooks.filter((hook) => hook.event === event).length,
+      })),
+    ];
+  });
+
+  const filteredHooks = $derived(
+    sortedHooks.filter(
+      (hook) =>
+        (hookFilter === null || hook.event === hookFilter) &&
+        matches(hook.event, hook.matcher, hook.condition, hook.run, hookOrigin(hook)),
     ),
   );
 
@@ -512,7 +556,10 @@
   );
 
   const filtering = $derived(
-    !!needle || (kind === "plugins" && pluginFilter.kind !== "all") || (kind === "mcp" && mcpFilter !== null),
+    !!needle ||
+      (kind === "plugins" && pluginFilter.kind !== "all") ||
+      (kind === "mcp" && mcpFilter !== null) ||
+      (kind === "hooks" && hookFilter !== null),
   );
 
   const failed = $derived(
@@ -523,9 +570,11 @@
           ? skills === null
           : kind === "mcp"
             ? mcpServers === null
-            : kind === "memories"
-              ? memories === null
-              : service === null),
+            : kind === "hooks"
+              ? hooks === null
+              : kind === "memories"
+                ? memories === null
+                : service === null),
   );
 
   const shownCount = $derived(
@@ -535,9 +584,11 @@
         ? filteredSkills.length
         : kind === "mcp"
           ? filteredMcp.length
-          : kind === "marketplaces"
-            ? filteredMarkets.length
-            : memoryList.length,
+          : kind === "hooks"
+            ? filteredHooks.length
+            : kind === "marketplaces"
+              ? filteredMarkets.length
+              : memoryList.length,
   );
 
   $effect(() => {
@@ -553,6 +604,10 @@
     } else if (kind === "mcp") {
       const current = mcpMenu;
       if (!current || !filteredMcp.some((server) => mcpKey(server) === mcpKey(current))) mcpMenu = filteredMcp[0] ?? null;
+    } else if (kind === "hooks") {
+      const current = hookSheet;
+      if (!current || !filteredHooks.some((hook) => hookKey(hook) === hookKey(current)))
+        hookSheet = filteredHooks[0] ?? null;
     } else if (kind === "marketplaces") {
       const current = marketMenu;
       if (!current || !filteredMarkets.some((market) => market.name === current.name))
@@ -568,6 +623,7 @@
       pluginMenu = null;
       skillSheet = null;
       mcpMenu = null;
+      hookSheet = null;
       marketMenu = null;
     }
     sideShown = shown;
@@ -667,6 +723,17 @@
                 count={item.count}
                 selected={item.source === mcpFilter}
                 onclick={() => (mcpFilter = item.source)}
+              />
+            {/each}
+          </div>
+        {:else if kind === "hooks" && loaded}
+          <div class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-1.5">
+            {#each hookFilters as item (item.event ?? "")}
+              <SelectChip
+                label={item.label}
+                count={item.count}
+                selected={item.event === hookFilter}
+                onclick={() => (hookFilter = item.event)}
               />
             {/each}
           </div>
@@ -819,10 +886,20 @@
                   title={server.label}
                   tag={mcpProblem(server)}
                   enabled={server.enabled}
-                  source={joined(mcpSourceLabel(server.source), server.type)}
+                  source={joined(sourceLabel(server.source), server.type)}
                   description={server.detail}
                   selected={sidePanel && !!mcpMenu && mcpKey(mcpMenu) === mcpKey(server)}
                   onclick={() => (mcpMenu = server)}
+                />
+              {/each}
+            {:else if kind === "hooks"}
+              {#each filteredHooks as hook}
+                <ClaudeCard
+                  title={hook.event}
+                  source={joined(hookOrigin(hook), hook.condition ?? hook.matcher)}
+                  description={hook.run}
+                  selected={sidePanel && !!hookSheet && hookKey(hookSheet) === hookKey(hook)}
+                  onclick={() => (hookSheet = hook)}
                 />
               {/each}
             {:else if kind === "marketplaces"}
@@ -871,6 +948,8 @@
                     {@render skillBody(skillSheet)}
                   {:else if kind === "mcp" && mcpMenu}
                     {@render mcpBody(mcpMenu)}
+                  {:else if kind === "hooks" && hookSheet}
+                    {@render hookBody(hookSheet)}
                   {:else if kind === "marketplaces" && marketMenu}
                     {@render marketBody(marketMenu)}
                   {/if}
@@ -924,11 +1003,23 @@
         {#each filteredMcp as server (mcpKey(server))}
           <ListRow
             title={server.label}
-            subtitle={joined(mcpProblem(server), mcpSourceLabel(server.source), server.type, server.detail)}
+            subtitle={joined(mcpProblem(server), sourceLabel(server.source), server.type, server.detail)}
             onclick={() => (mcpMenu = server)}
           >
             {#snippet trailing()}
               {@render stateDot(server.enabled)}
+            {/snippet}
+          </ListRow>
+        {/each}
+      {:else if kind === "hooks"}
+        {#each filteredHooks as hook}
+          <ListRow
+            title={hook.event}
+            subtitle={joined(hookOrigin(hook), hook.condition ?? hook.matcher)}
+            onclick={() => (hookSheet = hook)}
+          >
+            {#snippet trailing()}
+              {@render stateDot(true)}
             {/snippet}
           </ListRow>
         {/each}
@@ -1395,6 +1486,33 @@
     }}
     onDismiss={() => (addingMarket = false)}
   />
+{/if}
+
+{#snippet hookBody(hook: Hook)}
+  <FactList
+    rows={[
+      { label: t("HOOK_SOURCE"), text: hookOrigin(hook) },
+      { label: t("HOOK_MATCHER"), text: hook.matcher },
+      { label: t("HOOK_CONDITION"), text: hook.condition },
+      { label: t("HOOK_TYPE"), text: hook.type },
+      { label: t("HOOK_TIMEOUT"), text: hook.timeout === null ? null : formatSeconds(hook.timeout) },
+    ].filter((fact) => fact.text)}
+  />
+  {#if hook.run}
+    <CodeBlock code={hook.run} lang={hook.type === HOOK_COMMAND ? "bash" : null} />
+  {/if}
+{/snippet}
+
+{#if hookSheet && !sidePanel}
+  {@const hook = hookSheet}
+  <CompactDialog title={hook.event} onDismiss={() => (hookSheet = null)}>
+    {#snippet buttons()}
+      <Button onclick={() => (hookSheet = null)} variant="outlined">{t("CANCEL")}</Button>
+    {/snippet}
+    <div class="flex flex-col gap-3.5">
+      {@render hookBody(hook)}
+    </div>
+  </CompactDialog>
 {/if}
 
 {#snippet mcpSwitch(server: McpServer)}

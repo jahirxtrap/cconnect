@@ -1,6 +1,7 @@
 import { tick } from "svelte";
 import type { ApiRetry } from "$lib/data/apiRetry";
 import { chatListFor } from "$lib/data/chatList.svelte";
+import { joined } from "$lib/data/format";
 import { serverStatus } from "$lib/data/serverStatus.svelte";
 import { MILLIS_PER_SECOND } from "$lib/data/time";
 import {
@@ -119,6 +120,7 @@ interface Effective {
   thinking: string;
   tool_use: string;
   file_change: string;
+  hooks: string;
   compact: string;
   working: string;
 }
@@ -282,6 +284,7 @@ export class ChatState {
     thinking: "full",
     tool_use: "label",
     file_change: "full",
+    hooks: "full",
     compact: "full",
     working: "label",
   });
@@ -297,10 +300,11 @@ export class ChatState {
       thinking: local.thinking ?? server.thinking,
       tool_use: local.tool_use ?? server.tool_use,
       file_change: local.file_change ?? server.file_change,
+      hooks: local.hooks ?? server.hooks,
       compact: local.compact ?? server.compact,
       working: local.working ?? server.working,
     };
-    return simple ? { ...merged, thinking: "off", tool_use: "off" } : merged;
+    return simple ? { ...merged, thinking: "off", tool_use: "off", hooks: "off" } : merged;
   }
 
   get showThinking() {
@@ -675,13 +679,17 @@ export class ChatState {
   }
 
   submit(text: string) {
-    if (this.agent) {
-      void this.sendPrompt(text);
-      return;
-    }
-    const command = commandFor(this.capabilities, text);
-    if (command && command.kind !== "prompt") this.runCommand(command);
-    else void this.sendPrompt(text);
+    this.#dispatch(text, (body) => void this.sendPrompt(body));
+  }
+
+  submitText(text: string) {
+    this.#dispatch(text, (body) => this.send(body));
+  }
+
+  #dispatch(text: string, deliver: (body: string) => void) {
+    const command = this.agent ? null : commandFor(this.capabilities, text);
+    if (command && command.kind !== "prompt") this.runCommand(command, deliver);
+    else deliver(text);
   }
 
   async sendPrompt(text: string) {
@@ -1452,7 +1460,7 @@ export class ChatState {
     this.#pushGeneration({ partial: next ?? this.streamTokens });
   }
 
-  runCommand(command: CommandOption) {
+  runCommand(command: CommandOption, deliver: (body: string) => void = (body) => void this.sendPrompt(body)) {
     if (command.kind === "usage" || command.kind === "session_info" || command.kind === "reload") {
       this.#appendLocal(newMessage(this.#nextId++, "user", { text: `/${command.name}`, ephemeral: true }));
       if (command.kind === "usage") this.#socket.sendUsage();
@@ -1464,7 +1472,7 @@ export class ChatState {
       this.clearConversation();
       return;
     }
-    void this.sendPrompt(`/${command.name}`);
+    deliver(`/${command.name}`);
   }
 
   clearConversation() {
@@ -1799,6 +1807,7 @@ export class ChatState {
         thinking: snapshot.showThinking,
         tool_use: snapshot.showToolUse,
         file_change: snapshot.showFileChange,
+        hooks: snapshot.showHooks,
         compact: snapshot.showCompact,
         working: snapshot.showWorking,
       };
@@ -2098,6 +2107,7 @@ export class ChatState {
         thinkingTokens: item.thinkingTokens,
         toolMs: item.toolMs,
         toolFailed: item.toolFailed,
+        toolBlockedBy: item.toolBlockedBy,
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
         result: item.result,
@@ -2181,6 +2191,7 @@ export class ChatState {
                     result: event.content ?? kid.result,
                     statements: event.statements ?? kid.statements,
                     toolFailed: event.failed || kid.toolFailed,
+                    toolBlockedBy: event.blockedBy ?? kid.toolBlockedBy,
                   }
                 : kid,
             )
@@ -2593,12 +2604,14 @@ export class ChatState {
         }
         break;
       }
-      case "hook_failed":
+      case "hook":
         this.#breakStream();
         this.#append(
-          newMessage(this.#nextId++, "api_error", {
-            text: [t("HOOK_FAILED", event.name ?? "hook"), event.text].filter(Boolean).join("\n"),
-            result: "warning",
+          newMessage(this.#nextId++, "hook", {
+            text: event.text,
+            toolName: joined(event.event, event.matcher),
+            result: event.level,
+            labelOnly: !event.text,
           }),
         );
         break;
@@ -2620,6 +2633,7 @@ export class ChatState {
                     statements: event.statements ?? item.statements,
                     toolMs: event.ms ?? item.toolMs,
                     toolFailed: event.failed || item.toolFailed,
+                    toolBlockedBy: event.blockedBy ?? item.toolBlockedBy,
                   }
                 : item,
             );

@@ -32,6 +32,7 @@ import {
   generationValue,
   hasProjects,
   hasProviderAccount,
+  hooksValue,
   localeValue,
   localServerValue,
   marketplacesValue,
@@ -154,6 +155,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "show_thinking", label: "THINKING", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_tool_use", label: "TOOLS", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_file_change", label: "FILE_CHANGES", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
+  { id: "show_hooks", label: "HOOKS", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_compact", label: "COMPACTED", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
   { id: "show_working", label: "QUICK_CHAT_WORKING", section: "server", group: "SETTINGS_SERVER", dialog: "visibility" },
 
@@ -188,6 +190,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "plugins", label: "PLUGINS", value: pluginsValue, section: "claude", group: "EXTENSIONS" },
   { id: "skills", label: "SKILLS", value: skillsValue, section: "claude", group: "EXTENSIONS" },
   { id: "mcp", label: "MCP_SERVERS", value: mcpValue, section: "claude", group: "EXTENSIONS" },
+  { id: "hooks", label: "HOOKS", value: hooksValue, section: "claude", group: "EXTENSIONS" },
   { id: "marketplaces", label: "MARKETPLACES", value: marketplacesValue, section: "claude", group: "EXTENSIONS" },
   { id: "memories", label: "MEMORIES", value: memoriesValue, section: "claude", group: "EXTENSIONS" },
 

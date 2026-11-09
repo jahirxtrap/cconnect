@@ -20,7 +20,7 @@
   {:else}
     <div class="h-4"></div>
   {/if}
-  <div class="flex w-full flex-col overflow-hidden rounded-lg bg-card p-1">
+  <div class="flex w-full flex-col overflow-hidden rounded-panel bg-card p-1">
     {@render children()}
   </div>
 </div>

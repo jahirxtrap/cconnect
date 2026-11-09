@@ -369,6 +369,7 @@
     thinking={snapshot.showThinking}
     toolUse={snapshot.showToolUse}
     fileChange={snapshot.showFileChange}
+    hooks={snapshot.showHooks}
     compact={snapshot.showCompact}
     working={snapshot.showWorking}
     tokens={snapshot.showTokens ? "on" : "off"}
@@ -379,6 +380,7 @@
         show_thinking: values.thinking,
         show_tool_use: values.toolUse,
         show_file_change: values.fileChange,
+        show_hooks: values.hooks,
         show_compact: values.compact,
         show_working: values.working,
         show_tokens: values.tokens === "on",

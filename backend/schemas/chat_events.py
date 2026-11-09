@@ -219,6 +219,7 @@ class ToolResult(Event):
     content: Optional[str] = None
     ms: Optional[int] = None
     is_error: Optional[bool] = None
+    blocked_by: Optional[str] = None
     statements: Optional[list[QueryStatement]] = None
 
 
@@ -372,11 +373,12 @@ class ThinkingTokens(Event):
     tokens: int
 
 
-class HookFailed(Event):
-    type: Literal["hook_failed"]
-    name: Optional[str] = None
+class Hook(Event):
+    type: Literal["hook"]
     event: Optional[str] = None
+    matcher: Optional[str] = None
     text: str
+    level: Optional[Literal["warning"]] = None
 
 
 class Notification(Event):
@@ -623,7 +625,7 @@ ChatEvent = Annotated[
         Ready, PermissionMode, Rejected, Activity, AgentState, History, Stop, TerminalOpened,
         AssistantText, Thinking, Working, ToolUse, ToolResult, FileChange, Shared, Compacting, CompactingEnded,
         Status, Compact, CompactSummary, AskText, AskWorking, AskSession, Command, Usage, SessionInfo, Component,
-        Reloaded, Agent, TaskRunning, AgentResult, ThinkingTokens, HookFailed, Notification, Notice, Mods, Commands,
+        Reloaded, Agent, TaskRunning, AgentResult, ThinkingTokens, Hook, Notification, Notice, Mods, Commands,
         ModToast, ModInvalidate, ModTree, ModReply, ModRequest, ModFocus, ModScroll, SessionMessage,
         PluginMessage, AgentReport, Todos, Task, SessionStarted, Result, Context, RateLimit, Cache, Anchor,
         Done, Interrupted, Attached, Error, ApiError, Queued, Queue, Dequeued, HistoryChunk, Tail,

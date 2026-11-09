@@ -42,7 +42,7 @@
   const BATTERY_LEVELS = [BatteryLow, BatteryMedium, BatteryFull];
   const WIDE_WIDTH = 880;
   const INSET = "px-(--page-inset) pb-(--page-inset)";
-  const CARD_CLASS = "rounded-lg bg-card p-3.5";
+  const CARD_CLASS = "rounded-panel bg-card p-3.5";
   const ICON_CLASS = "shrink-0 text-on-surface-variant";
 
   let width = $state(0);

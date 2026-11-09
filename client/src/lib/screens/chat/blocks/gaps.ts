@@ -22,11 +22,12 @@ const GROUPED: GapRole[] = [
   "agent",
   "notification",
   "notice",
+  "hook",
   "session_message",
   "plugin_message",
 ];
 
-const ROW_ALIKE: Partial<Record<GapRole, GapRole>> = { notice: "tool" };
+const ROW_ALIKE: Partial<Record<GapRole, GapRole>> = { notice: "tool", hook: "tool" };
 
 const isNotice = (role: GapRole | null): boolean => role !== null && NOTICE.includes(role);
 

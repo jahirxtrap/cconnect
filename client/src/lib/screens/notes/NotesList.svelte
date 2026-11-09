@@ -11,7 +11,7 @@
   import { scrollMemory } from "$lib/ui/scrollMemory";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import NoteMenu from "./NoteMenu.svelte";
-  import { notePreview, notes, noteTitle, type Note } from "./notes.svelte";
+  import { noteLabel, notePreview, notes, type Note } from "./notes.svelte";
 
   interface Props {
     onOpen: (id: string) => void;
@@ -26,8 +26,6 @@
   let menuId = $state<string | null>(null);
 
   const listed = $derived(notes.listed);
-
-  const titleOf = (note: Note) => noteTitle(note) || t("NOTE_UNTITLED");
 </script>
 
 {#snippet menu(note: Note, place: string, size: string)}
@@ -57,7 +55,7 @@
       hover={false}
       class="flex w-full flex-col gap-0.5 rounded-panel px-3.5 py-3"
     >
-      <span class="truncate pr-6 text-label-lg">{titleOf(note)}</span>
+      <span class="truncate pr-6 text-label-lg">{noteLabel(note)}</span>
       {#if preview}
         <span class="truncate text-body-sm text-on-surface-variant">{preview}</span>
       {/if}
@@ -75,7 +73,7 @@
       oncontextmenu={() => (menuId = note.id)}
       class="h-40 gap-1"
     >
-      <span class="truncate pr-6 text-label-lg">{titleOf(note)}</span>
+      <span class="truncate pr-6 text-label-lg">{noteLabel(note)}</span>
       <span class="line-clamp-4 min-h-0 flex-1 text-body-sm text-on-surface-variant">{notePreview(note.body)}</span>
       <span class="truncate text-caption text-faint">{formatRecent(note.updatedAt)}</span>
     </CardPanel>

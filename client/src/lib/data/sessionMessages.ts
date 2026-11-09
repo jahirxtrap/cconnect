@@ -1,5 +1,6 @@
 import { agentRunOf, toDismiss, toElement } from "$lib/services/chatSocket";
 import { agentStopText } from "./agentModels";
+import { joined } from "./format";
 import {
   diffKindOf,
   emptyInteraction,
@@ -30,6 +31,7 @@ type MessageFields =
   | "thinkingTokens"
   | "toolMs"
   | "toolFailed"
+  | "toolBlockedBy"
   | "labelOnly"
   | "result"
   | "images"
@@ -50,6 +52,7 @@ const ROLES: Record<string, Role> = {
   working: "working",
   notification: "notification",
   notice: "notice",
+  hook: "hook",
   session_message: "session_message",
   plugin_message: "plugin_message",
   agent_report: "agent_report",
@@ -67,7 +70,7 @@ const ROLES: Record<string, Role> = {
   interrupted: "interrupted",
 };
 
-const RESULT_FIELD: Record<string, string> = { notice: "level", api_error: "severity", stop: "severity" };
+const RESULT_FIELD: Record<string, string> = { notice: "level", hook: "level", api_error: "severity", stop: "severity" };
 
 const roleOf = (raw: Wire): Role => {
   const type = text(raw, "type");
@@ -133,7 +136,10 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     type,
     role: roleOf(raw),
     text: body,
-    name: text(raw, "name") ?? text(raw, "tool_name") ?? text(raw, "subagent_type"),
+    name:
+      type === "hook"
+        ? joined(text(raw, "event"), text(raw, "matcher"))
+        : (text(raw, "name") ?? text(raw, "tool_name") ?? text(raw, "subagent_type")),
     mcp: raw.mcp === true,
     path: text(raw, "path"),
     interaction: type === "interaction" ? parseInteraction(raw) : null,
@@ -160,6 +166,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     thinkingTokens: type === "thinking" ? number(raw, "tokens") : null,
     toolMs: number(raw, "ms"),
     toolFailed: raw.is_error === true,
+    toolBlockedBy: text(raw, "blocked_by"),
     agentRun: type === "agent" ? agentRunOf(raw) : null,
     agentResult: (() => {
       const done = raw.agent_result;
@@ -173,7 +180,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
       };
     })(),
     index: number(raw, "index") ?? -1,
-    labelOnly: raw.label === true,
+    labelOnly: raw.label === true || (type === "hook" && !body),
     result: text(raw, RESULT_FIELD[type ?? ""] ?? "result"),
     images: images.length ? images : null,
     timestamp: number(raw, "ts"),
