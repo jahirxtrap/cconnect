@@ -40,7 +40,7 @@
       {#if id === NO_BACKGROUND}
         <X size={18} class="absolute inset-0 m-auto text-on-surface-variant" />
       {:else}
-        <ChatBackdrop {id} effects={chatBackground.effectsOf(id)} />
+        <ChatBackdrop thumbnail {id} effects={chatBackground.effectsOf(id)} />
       {/if}
       <span class="{TILE_LINE_CLASS} {chatBackground.current === id ? TILE_SELECTED_CLASS : TILE_IDLE_CLASS}"></span>
     </Pressable>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { currentPath, FILL_BOX, INSET_BOX, onFrame } from "./loadingShapes";
+  import { FILL_BOX, INSET_BOX, LOBE_CYCLE_MS, LOBE_FRAMES, lobePhase, lobeSprite } from "./loadingShapes";
 
   interface Props {
     size?: number;
@@ -9,19 +9,15 @@
 
   const { size = 16, fill = false, class: className = "text-accent" }: Props = $props();
 
-  let shape = $state(currentPath());
+  const phase = lobePhase();
 
-  const box = $derived(fill ? FILL_BOX : INSET_BOX);
-
-  $effect(() => onFrame((path) => (shape = path)));
+  const sprite = $derived(lobeSprite(fill ? FILL_BOX : INSET_BOX));
 </script>
 
-<svg
-  width={size}
-  height={size}
-  viewBox="{-box / 2} {-box / 2} {box} {box}"
-  class="shrink-0 {className}"
+<span
+  class="lobes shrink-0 {className}"
+  style="--lobes-size: {size}px; --lobes-frames: {LOBE_FRAMES}; --lobes-cycle: {LOBE_CYCLE_MS}ms; --lobes-phase: {phase}ms; --lobes-sprite: url({sprite})"
   aria-hidden="true"
 >
-  <path d={shape} fill="currentColor" />
-</svg>
+  <span></span>
+</span>

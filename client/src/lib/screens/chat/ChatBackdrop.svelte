@@ -2,35 +2,53 @@
   import { chatBackground } from "$lib/data/chatBackground.svelte";
   import type { BackgroundArt, BackgroundEffects } from "$lib/design/backgrounds";
   import { packs } from "$lib/design/packs/registry.svelte";
-  import { dialogSettled } from "$lib/ui/dialogSettled";
+  import { devicePixels, scaledUrl } from "$lib/services/imageSize";
   import LogoGlyph from "$lib/ui/LogoGlyph.svelte";
 
   interface Props {
     id: string;
     effects: BackgroundEffects;
-    src?: string | null;
+    file?: Blob | null;
+    thumbnail?: boolean;
     class?: string;
   }
 
-  const { id, effects, src = null, class: className = "" }: Props = $props();
+  const { id, effects, file = null, thumbnail = false, class: className = "" }: Props = $props();
 
   const PERCENT = 100;
   const BLEED_PER_BLUR = 2;
 
-  const settled = dialogSettled();
-
   let loaded = $state<string | null>(null);
+  let width = $state(0);
+  let height = $state(0);
+  let own = $state<string | null>(null);
+
+  const bleed = $derived(effects.blur * BLEED_PER_BLUR);
+  const pixels = $derived(thumbnail && width && height ? devicePixels(Math.max(width, height) + bleed * 2) : 0);
+
+  const wanted = $derived(thumbnail ? pixels : undefined);
+  const measured = $derived(!thumbnail || pixels > 0);
 
   $effect(() => {
-    if (!src && settled()) void chatBackground.ensure(id);
+    if (!file && measured) chatBackground.loadImage(id, wanted);
+  });
+
+  $effect(() => {
+    if (!file || !measured) return;
+    return scaledUrl(file, wanted ?? null, (made) => (own = made));
   });
 
   const art = $derived(packs.backgroundOf(id)?.file === null ? (id as BackgroundArt) : null);
-  const url = $derived(settled() ? (src ?? chatBackground.urls[id] ?? null) : null);
+  const url = $derived(file ? own : measured ? chatBackground.imageOf(id, wanted) : null);
   const shown = $derived(art === "logo" || (url !== null && loaded === url));
-  const bleed = $derived(effects.blur * BLEED_PER_BLUR);
   const filter = $derived(
-    `brightness(${effects.brightness / PERCENT}) saturate(${effects.saturation / PERCENT}) blur(${effects.blur}px)`,
+    [
+      effects.brightness !== PERCENT && `brightness(${effects.brightness / PERCENT})`,
+      effects.saturation !== PERCENT && `saturate(${effects.saturation / PERCENT})`,
+      effects.blur > 0 && `blur(${effects.blur}px)`,
+    ]
+      .filter(Boolean)
+      .join(" ") || "none",
   );
   const frame = $derived(
     `left: -${bleed}px; top: -${bleed}px; width: calc(100% + ${bleed * 2}px); height: calc(100% + ${bleed * 2}px); opacity: ${effects.opacity / PERCENT}; filter: ${filter}`,
@@ -43,6 +61,8 @@
 
 <div
   aria-hidden="true"
+  bind:clientWidth={width}
+  bind:clientHeight={height}
   class="pointer-events-none absolute inset-0 overflow-hidden {shown ? '' : 'opacity-0'} {className}"
 >
   {#if art === "logo"}

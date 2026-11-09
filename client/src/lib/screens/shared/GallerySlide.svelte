@@ -5,12 +5,12 @@
 </script>
 
 <script lang="ts">
-  import { devicePixelRatio } from "svelte/reactivity/window";
   import type { PreviewRequest } from "$lib/app/navigation.svelte";
   import { previewKindOf } from "$lib/data/previewKind";
   import { fallbackOf, revised, withoutFallback } from "$lib/data/url";
   import { t } from "$lib/i18n/index.svelte";
-  import { imageSrc, posterSrc, servedSrc, sizedImage } from "$lib/services/mediaSource";
+  import { devicePixels, sizedImage } from "$lib/services/imageSize";
+  import { imageSrc, posterSrc, servedSrc } from "$lib/services/mediaSource";
   import { videoStillOf } from "$lib/services/sharedApi";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -31,17 +31,15 @@
   const fallback = $derived(fallbackOf(item.url));
 
   let height = $state(0);
-  let loaded = $state(false);
-  let failed = $state(false);
+  let loadedFor = $state<string | null>(null);
+  let failedFor = $state<string | null>(null);
 
-  const still = $derived(item.poster ?? videoStillOf(base));
-  const frame = $derived(still && height ? sizedImage(still, Math.ceil(height * (devicePixelRatio.current ?? 1))) : null);
-
-  $effect(() => {
-    void source;
-    loaded = false;
-    failed = false;
-  });
+  const loaded = $derived(loadedFor === source);
+  const failed = $derived(failedFor === source);
+  const served = $derived(item.poster ? null : videoStillOf(base));
+  const frame = $derived(
+    item.poster ?? (served && height ? sizedImage(served, devicePixels(height)) : null),
+  );
 </script>
 
 <div bind:clientHeight={height} class="relative flex min-h-0 flex-1 flex-col">
@@ -51,8 +49,8 @@
         use:imageSrc={{
           url: source,
           fallback,
-          onload: () => (loaded = true),
-          onerror: () => (failed = true),
+          onload: () => (loadedFor = source),
+          onerror: () => (failedFor = source),
         }}
         alt={item.name}
         draggable="false"
@@ -71,10 +69,10 @@
       use:servedSrc={{ url: source }}
       use:posterSrc={{ url: frame ?? "" }}
       controls
-      class="min-h-0 flex-1 bg-black"
+      class="min-h-0 flex-1"
     ></video>
   {:else if kind === "video"}
-    <div class="flex min-h-0 flex-1 items-center justify-center bg-black">
+    <div class="flex min-h-0 flex-1 items-center justify-center">
       {#if frame}
         <img use:imageSrc={{ url: frame }} alt="" draggable="false" class="h-full w-full object-contain" />
       {/if}

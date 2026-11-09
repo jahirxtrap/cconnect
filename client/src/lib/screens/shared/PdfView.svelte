@@ -1,28 +1,44 @@
 <script lang="ts">
   import type { PDFDocumentLoadingTask } from "pdfjs-dist";
-  import type { PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
+  import type { EventBus, PDFLinkService, PDFViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
   import "pdfjs-dist/web/pdf_viewer.css";
   import { openExternal } from "$lib/platform";
+  import { nativePdfAvailable, openNativePdf, type NativePdf } from "$lib/platform/androidPdf";
   import { arrivesLater, serveFile, type ServedFile } from "$lib/services/mediaSource";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import { wheelZoomFactor } from "$lib/ui/wheelZoom";
+  import { nativePages, paintless, type Gesture } from "./pdfNativePages";
 
   interface Props {
     url: string;
     onerror: (missing: boolean) => void;
+    zoomable?: boolean;
   }
 
   interface Engine {
     pdfjs: typeof import("pdfjs-dist");
     view: PDFViewer;
     links: PDFLinkService;
+    eventBus: EventBus;
   }
 
-  const { url, onerror }: Props = $props();
+  interface Pinch {
+    distance: number;
+    zoom: number;
+    factor: number;
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    dx: number;
+    dy: number;
+  }
+
+  const { url, onerror, zoomable = true }: Props = $props();
 
   const MIN_ZOOM = 1;
   const MAX_ZOOM = 5;
   const DOUBLE_TAP_ZOOM = 2.5;
-  const WHEEL_STEP = 0.0015;
   const DRAWING_DELAY = 250;
   const SHARPEN_INTERVAL = 150;
   const SCALE_STEPS = 100;
@@ -40,20 +56,25 @@
   const zoomed = $derived(zoom > MIN_ZOOM);
 
   let pageWidth = 0;
+  let drawnUnit = { ratio: 0, unit: 0 };
   let onscreen = false;
   let sharpened = 0;
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const points = new Map<number, { x: number; y: number }>();
-  let pinchDistance = 0;
-  let pinchZoom = 1;
+  let pinch: Pinch | null = null;
+  let painter: ReturnType<typeof nativePages> | null = null;
 
   const clamp = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
   const roundUnit = () => {
-    const drawn = parseFloat(pages?.querySelector<HTMLElement>(".page")?.style.getPropertyValue("--scale-round-x") ?? "");
-    if (drawn > 0) return drawn;
     const ratio = window.devicePixelRatio || 1;
+    if (drawnUnit.ratio === ratio && drawnUnit.unit > 0) return drawnUnit.unit;
+    const drawn = parseFloat(pages?.querySelector<HTMLElement>(".page")?.style.getPropertyValue("--scale-round-x") ?? "");
+    if (drawn > 0) {
+      drawnUnit = { ratio, unit: drawn };
+      return drawn;
+    }
     for (let unit = 1; unit <= MAX_ROUND_UNIT; unit++) {
       if (Math.abs(ratio * unit - Math.round(ratio * unit)) < 1 / SCALE_STEPS) return unit;
     }
@@ -78,6 +99,9 @@
     center();
   };
 
+  const drifted = (view: PDFViewer, scale: number) =>
+    Math.abs(scale - view.currentScale) > (zoomed ? 1 / SCALE_STEPS : 1 / SCALE_STEPS / SCALE_STEPS);
+
   const apply = (view: PDFViewer, scale: number) => {
     view.currentScale = scale;
     center();
@@ -89,7 +113,7 @@
       settleTimer = null;
       const view = engine?.view;
       const scale = target();
-      if (view && scale !== null) apply(view, scale);
+      if (view && scale !== null && drifted(view, scale)) apply(view, scale);
     }, DRAWING_DELAY);
   };
 
@@ -107,15 +131,19 @@
     settle();
   };
 
-  const zoomAt = (next: number, clientX: number, clientY: number) => {
-    const box = container;
-    if (!box) return;
+  const zoomTo = (next: number, origin: [number, number]) => {
     zoom = clamp(next);
     const scale = target();
     if (scale === null) return;
-    const rect = box.getBoundingClientRect();
-    scaleTo(scale, [clientX - rect.left, clientY - rect.top]);
+    scaleTo(scale, origin);
     settle();
+  };
+
+  const zoomAt = (next: number, clientX: number, clientY: number) => {
+    const box = container;
+    if (!box) return;
+    const rect = box.getBoundingClientRect();
+    zoomTo(next, [clientX - rect.left, clientY - rect.top]);
   };
 
   const spread = () => {
@@ -128,38 +156,102 @@
     return { x: (first.x + second.x) / HALF, y: (first.y + second.y) / HALF };
   };
 
-  const regrip = () => {
-    pinchDistance = points.size >= 2 ? spread() : 0;
-    pinchZoom = zoom;
+  const grip = () => {
+    const box = container;
+    const host = pages;
+    const distance = spread();
+    if (!zoomable || !box || !host || pinch || points.size < 2 || distance <= 0) return;
+    const focus = centre();
+    const rect = box.getBoundingClientRect();
+    pinch = {
+      distance,
+      zoom,
+      factor: 1,
+      x: box.scrollLeft + focus.x - rect.left,
+      y: box.scrollTop + focus.y - rect.top,
+      startX: focus.x,
+      startY: focus.y,
+      dx: 0,
+      dy: 0,
+    };
+    host.style.transformOrigin = `${pinch.x}px ${pinch.y}px`;
+    painter?.follow(gestureOf(pinch));
+  };
+
+  const gestureOf = (active: Pinch): Gesture => ({
+    factor: active.factor,
+    limit: MAX_ZOOM / active.zoom,
+    x: active.x,
+    y: active.y,
+    dx: active.dx,
+    dy: active.dy,
+  });
+
+  const pageAt = (x: number, y: number) => {
+    const view = engine?.view;
+    if (!view) return null;
+    for (let index = 0; index < view.pagesCount; index++) {
+      const div = view.getPageView(index)?.div as HTMLElement | undefined;
+      if (!div || y > div.offsetTop + div.offsetHeight) continue;
+      return { div, x: (x - div.offsetLeft) / div.offsetWidth, y: (y - div.offsetTop) / div.offsetHeight };
+    }
+    return null;
+  };
+
+  const release = () => {
+    const active = pinch;
+    const box = container;
+    if (!active) return;
+    pinch = null;
+    if (pages) {
+      pages.style.transform = "";
+      pages.style.transformOrigin = "";
+    }
+    if (box) {
+      const viewX = active.x - box.scrollLeft + active.dx;
+      const viewY = active.y - box.scrollTop + active.dy;
+      const anchor = pageAt(active.x, active.y);
+      if (active.factor !== 1) zoomTo(active.zoom * active.factor, [viewX, viewY]);
+      if (anchor) {
+        if (zoomed) box.scrollLeft = anchor.div.offsetLeft + anchor.x * anchor.div.offsetWidth - viewX;
+        box.scrollTop = anchor.div.offsetTop + anchor.y * anchor.div.offsetHeight - viewY;
+      }
+    }
+    painter?.follow(null);
   };
 
   const onPointerDown = (event: PointerEvent) => {
     if (event.isPrimary) points.clear();
     points.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    regrip();
+    grip();
   };
 
   const onPointerMove = (event: PointerEvent) => {
     if (!points.has(event.pointerId)) return;
     points.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    if (points.size < 2 || pinchDistance <= 0) return;
+    if (!pinch || !pages || points.size < 2) return;
     event.preventDefault();
     const focus = centre();
-    zoomAt((pinchZoom * spread()) / pinchDistance, focus.x, focus.y);
+    pinch.factor = clamp((pinch.zoom * spread()) / pinch.distance) / pinch.zoom;
+    pinch.dx = focus.x - pinch.startX;
+    pinch.dy = focus.y - pinch.startY;
+    pages.style.transform = `translate(${pinch.dx}px, ${pinch.dy}px) scale(${pinch.factor})`;
+    painter?.follow(gestureOf(pinch));
   };
 
   const onPointerUp = (event: PointerEvent) => {
     points.delete(event.pointerId);
-    regrip();
+    if (points.size < 2) release();
   };
 
   const onWheel = (event: WheelEvent) => {
-    if (!event.ctrlKey) return;
+    if (!zoomable || !event.ctrlKey) return;
     event.preventDefault();
-    zoomAt(zoom - event.deltaY * WHEEL_STEP * zoom, event.clientX, event.clientY);
+    zoomAt(zoom * wheelZoomFactor(event), event.clientX, event.clientY);
   };
 
   const onDoubleClick = (event: MouseEvent) => {
+    if (!zoomable) return;
     zoomAt(zoomed ? MIN_ZOOM : DOUBLE_TAP_ZOOM, event.clientX, event.clientY);
   };
 
@@ -195,6 +287,7 @@
       eventBus.on("pagesinit", () => {
         const first = view.getPageView(0);
         pageWidth = first ? first.width / view.currentScale : 0;
+        drawnUnit = { ratio: 0, unit: 0 };
         zoom = MIN_ZOOM;
         const scale = target();
         if (scale !== null) apply(view, scale);
@@ -202,10 +295,10 @@
       });
       eventBus.on("pagerendered", () => {
         const scale = target();
-        if (scale !== null && Math.abs(scale - view.currentScale) > 1 / SCALE_STEPS / SCALE_STEPS) apply(view, scale);
+        if (scale !== null && drifted(view, scale)) apply(view, scale);
         else center();
       });
-      engine = { pdfjs, view, links };
+      engine = { pdfjs, view, links, eventBus };
     };
 
     start().catch(() => {
@@ -217,9 +310,14 @@
       onscreen = entry.isIntersecting;
     });
     visibility.observe(box);
+    const holdPinch = (event: TouchEvent) => {
+      if (zoomable && event.touches.length > 1 && event.cancelable) event.preventDefault();
+    };
+    box.addEventListener("touchmove", holdPinch, { passive: false });
 
     return () => {
       cancelled = true;
+      box.removeEventListener("touchmove", holdPinch);
       observer.disconnect();
       visibility.disconnect();
       if (settleTimer !== null) clearTimeout(settleTimer);
@@ -234,6 +332,7 @@
     let cancelled = false;
     let task: PDFDocumentLoadingTask | null = null;
     let served: ServedFile | null = null;
+    let native: NativePdf | null = null;
     loading = true;
 
     const open = async () => {
@@ -243,9 +342,18 @@
         return;
       }
       served = file;
-      task = current.pdfjs.getDocument({ url: file.src });
+      native = nativePdfAvailable() ? await openNativePdf(file.src).catch(() => null) : null;
+      if (cancelled) {
+        native?.close();
+        return;
+      }
+      task = current.pdfjs.getDocument({ url: native?.file ?? file.src });
       const document_ = await task.promise;
       if (cancelled) return;
+      if (native && pages && container) {
+        paintless(document_);
+        painter = nativePages(native, current.view, current.eventBus, container, pages);
+      }
       current.view.setDocument(document_);
       current.links.setDocument(document_);
     };
@@ -258,6 +366,9 @@
       cancelled = true;
       void task?.destroy();
       served?.close();
+      if (painter) painter.destroy();
+      else native?.close();
+      painter = null;
     };
   });
 </script>

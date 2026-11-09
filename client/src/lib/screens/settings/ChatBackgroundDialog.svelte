@@ -95,7 +95,7 @@
       {#if id === NO_BACKGROUND}
         <X size={20} class="absolute inset-0 m-auto text-on-surface-variant" />
       {:else}
-        <ChatBackdrop {id} effects={effectsOf(id)} />
+        <ChatBackdrop thumbnail {id} effects={effectsOf(id)} />
       {/if}
       <span class="{TILE_LINE_CLASS} {selected === id ? TILE_SELECTED_CLASS : TILE_IDLE_CLASS}"></span>
     </Pressable>
@@ -119,7 +119,7 @@
   <div class="flex w-full flex-col gap-3.5">
     <div class="relative aspect-video w-full overflow-hidden rounded-panel border border-outline-variant bg-background">
       {#if selected !== NO_BACKGROUND}
-        <ChatBackdrop id={selected} {effects} />
+        <ChatBackdrop thumbnail id={selected} {effects} />
       {/if}
     </div>
 

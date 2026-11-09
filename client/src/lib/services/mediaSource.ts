@@ -2,11 +2,14 @@ import { invoke } from "@tauri-apps/api/core";
 import { withQuery } from "$lib/data/url";
 import { isTauri } from "$lib/platform";
 import { backend, tokenOf, withToken } from "./backend.svelte";
+import { coversIn, fitsIn, originalImage, reducedIn, renditionOf } from "./imageSize";
 import { fileHeaders } from "./projectFilesApi";
+import { relativeFromUrl } from "./sharedApi";
 import { awaitSharedFile, followSharedFile } from "./sharedArrival.svelte";
 
 export interface SourceOptions {
   url: string;
+  borrow?: boolean;
   fallback?: string | null;
   transform?: (file: Blob) => Promise<Blob>;
   onerror?: () => void;
@@ -61,8 +64,6 @@ const probeFile = async (url: string) => {
 
 const versioned = (url: string, version: string) => withQuery(url, "v", version);
 
-export const sizedImage = (url: string, pixels: number) => withQuery(url, "size", pixels);
-
 type Freshness = "same" | "changed" | "gone";
 
 const SAME: Promise<Freshness> = Promise.resolve("same");
@@ -82,15 +83,23 @@ const recheck = (url: string, known: string): Promise<Freshness> =>
     },
   );
 
+const sharedFile = (url: string) => relativeFromUrl(url) !== null;
+
+const fileOf = (url: string) => (sharedFile(url) ? originalImage(url) : url);
+
+const renditionIn = (url: string) => (sharedFile(url) ? renditionOf(url) : null);
+
 const versionOf = async (url: string, fresh: boolean) => {
-  const known = fresh ? undefined : versions.get(url);
-  if (known) return { version: known, freshness: recheck(url, known) };
-  const version = await probeFile(url);
-  versions.set(url, version);
+  const file = fileOf(url);
+  const known = fresh ? undefined : versions.get(file);
+  if (known) return { version: known, freshness: recheck(file, known) };
+  const version = await probeFile(file);
+  versions.set(file, version);
   return { version, freshness: SAME };
 };
 
 export interface ServedFile {
+  url: string;
   src: string;
   close: () => void;
   freshness: Promise<Freshness>;
@@ -102,14 +111,14 @@ export const serveFile = async (url: string, fresh = true): Promise<ServedFile> 
   const unsent = Object.keys(headers).filter((name) => !(name === AUTHORIZATION && tokenOf(profile)));
   if (!isTauri && unsent.length) {
     const src = await fetchObjectUrl(url);
-    return { src, close: () => revoke(src), freshness: SAME };
+    return { url, src, close: () => revoke(src), freshness: SAME };
   }
   const { version, freshness } = await versionOf(url, fresh);
   const target = versioned(url, version);
-  if (!isTauri) return { src: withToken(target, profile), close: () => undefined, freshness };
+  if (!isTauri) return { url, src: withToken(target, profile), close: () => undefined, freshness };
   const id = crypto.randomUUID();
   const src = await invoke<string>("media_open", { id, url: target, headers });
-  return { src, close: () => void invoke("media_close", { id }).catch(() => undefined), freshness };
+  return { url, src, close: () => void invoke("media_close", { id }).catch(() => undefined), freshness };
 };
 
 const serveRecalled = (url: string, _options: SourceOptions, fresh: boolean) => serveFile(url, fresh);
@@ -264,19 +273,77 @@ const decoded = (served: ServedFile) => {
   return next.decode();
 };
 
+interface Shown {
+  url: string;
+  src: string;
+  width: number;
+  height: number;
+}
+
+const shownImages = new Map<string, Map<HTMLImageElement, Shown>>();
+
+const show = (node: HTMLImageElement, served: ServedFile) => {
+  const file = fileOf(served.url);
+  const holders = shownImages.get(file) ?? new Map<HTMLImageElement, Shown>();
+  holders.set(node, { url: served.url, src: served.src, width: node.naturalWidth, height: node.naturalHeight });
+  shownImages.set(file, holders);
+};
+
+const hide = (node: HTMLImageElement, src?: string) => {
+  for (const [file, holders] of shownImages) {
+    if (src !== undefined && holders.get(node)?.src !== src) continue;
+    holders.delete(node);
+    if (!holders.size) shownImages.delete(file);
+  }
+};
+
+const paintedFor = (url: string, borrow: boolean): Shown | null => {
+  const wanted = renditionIn(url);
+  for (const shown of shownImages.get(fileOf(url))?.values() ?? []) {
+    const whole = !reducedIn(renditionIn(shown.url), shown.width, shown.height);
+    const same = whole && fitsIn(wanted, shown.width, shown.height);
+    if (same || (borrow && (whole || coversIn(wanted, shown.width, shown.height)))) return shown;
+  }
+  return null;
+};
+
 export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
-  return sourceAction(
-    options,
+  const reuse = (requested: SourceOptions): SourceOptions => {
+    const shown = paintedFor(requested.url, requested.borrow === true);
+    if (!shown) return requested;
+    node.src = shown.src;
+    if (node.complete && node.naturalWidth) requested.onload?.();
+    return { ...requested, url: shown.url, fallback: null };
+  };
+  let requested = options;
+  let effective = reuse(options);
+  const action = sourceAction(
+    effective,
     serveRecalled,
     (served) => {
       const done = loaded(node);
       node.src = served.src;
-      return done;
+      return done.then(() => show(node, served));
     },
-    closeServed,
+    (served) => {
+      hide(node, served.src);
+      closeServed(served);
+    },
     decoded,
     freshnessOf,
   );
+  return {
+    update(next: SourceOptions) {
+      const moved = next.url !== requested.url || next.fallback !== requested.fallback;
+      requested = next;
+      effective = moved ? reuse(next) : { ...next, url: effective.url, fallback: effective.fallback };
+      action.update(effective);
+    },
+    destroy() {
+      hide(node);
+      action.destroy();
+    },
+  };
 }
 
 export function posterSrc(node: HTMLVideoElement, options: SourceOptions) {

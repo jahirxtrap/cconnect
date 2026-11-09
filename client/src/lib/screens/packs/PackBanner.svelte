@@ -46,7 +46,7 @@
   {@render bar(3.5, 64, 16, 4, colors["on-surface-variant"], 0.5)}
   <div class="absolute overflow-hidden rounded-lg" style="left: 26%; top: 5%; right: 2%; bottom: 5%; background: {colors.background}">
     {#if backdrop}
-      <ChatBackdrop id={backdrop} effects={chatBackground.effectsOf(backdrop)} />
+      <ChatBackdrop thumbnail id={backdrop} effects={chatBackground.effectsOf(backdrop)} />
     {/if}
     {@render bar(3, 8, 16, 6, colors["on-background"], 0.7)}
     {@render bar(3, 17, 9, 4, colors["on-surface-variant"], 0.5)}

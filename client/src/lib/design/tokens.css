@@ -43,6 +43,7 @@
   --color-error: var(--c-error);
 
   --shadow-float: 0 0 0 1px var(--c-outline-variant), 0 10px 15px -3px var(--c-shadow), 0 4px 6px -4px var(--c-shadow);
+  --float-shadow-reach: 1.25rem;
   --shadow-composer: 0 0 0 1px var(--c-accent-ring);
   --shadow-raised: 0 1px 3px var(--c-shadow-soft);
 

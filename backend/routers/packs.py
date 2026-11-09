@@ -1,13 +1,13 @@
 import mimetypes
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, WebSocket
+from fastapi import APIRouter, Header, HTTPException, Query, WebSocket
 from fastapi.responses import FileResponse, Response
 
 from core.access import key_matches
 from core.responses import FILE_HEADERS, api_response
 from core.ws import stream_watch
-from services import packs
+from services import attachments, packs
 from services.pack_format import MIME, PackFormatError
 
 router = APIRouter(tags=["Packs"])
@@ -47,9 +47,14 @@ async def delete_pack(name: str, x_security_key: str = Header("")):
 
 
 @router.get("/packs/{name}/preview")
-async def pack_preview(name: str):
+def pack_preview(name: str, size: int | None = Query(None, ge=1)):
     found = packs.preview(name)
     if found is None:
         raise HTTPException(status_code=404, detail="not found")
     data, extension = found
+    limit = attachments.thumbnail_size(size)
+    small = attachments.shrunk(data, limit, cover=True, stills_only=True, reduce_only=True) if limit else None
+    if small is not None:
+        media_type, data = small
+        return Response(content=data, media_type=media_type)
     return Response(content=data, media_type=mimetypes.guess_type(f"preview.{extension}")[0] or "application/octet-stream")

@@ -28,6 +28,7 @@ body,
 
 html {
   color-scheme: light;
+  overflow-x: auto;
 }
 
 html[data-theme="dark"] {
@@ -43,10 +44,17 @@ html[data-theme="dark"] {
 .menu-surface {
   transform-origin: var(--bits-floating-transform-origin);
   animation: menu-enter 120ms ease-out;
+  will-change: transform, opacity;
 }
 
 .menu-surface[data-state="closed"] {
   animation: menu-exit 90ms linear forwards;
+}
+
+.menu-surface[role="dialog"] {
+  clip-path: inset(
+    calc(-2 * var(--float-shadow-reach)) calc(-1 * min(var(--float-shadow-reach), (100vw - 100%) / 2))
+  );
 }
 
 .menu-surface[data-instant]:not([data-state="closed"]) {
@@ -55,6 +63,7 @@ html[data-theme="dark"] {
 
 .dialog-overlay {
   animation: overlay-enter 120ms ease-out;
+  will-change: opacity;
 }
 
 .dialog-overlay[data-state="closed"] {
@@ -184,6 +193,12 @@ html[data-theme="dark"] {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+@keyframes lobes-cycle {
+  to {
+    transform: translateX(-100%);
+  }
 }
 
 @keyframes spinner-turn {
@@ -324,19 +339,41 @@ html[data-theme="dark"] {
 
 html.scanning,
 html.scanning body,
-html.browsing body {
+html.browsing body,
+html.pdf-screen,
+html.pdf-screen body {
   background: transparent;
 }
 
-html.scanning #app {
+html.scanning #app,
+html.pdf-screen #app {
   visibility: hidden;
 }
 
-html.scanning .qr-overlay {
+html.scanning .qr-overlay,
+html.pdf-screen .pdf-screen-root {
   visibility: visible;
 }
 
 @layer components {
+  .lobes {
+    position: relative;
+    display: inline-block;
+    overflow: hidden;
+    width: var(--lobes-size);
+    height: var(--lobes-size);
+  }
+
+  .lobes > span {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: calc(var(--lobes-frames) * 100%);
+    background-color: currentColor;
+    mask: var(--lobes-sprite) 0 0 / 100% 100% no-repeat;
+    animation: lobes-cycle var(--lobes-cycle) steps(var(--lobes-frames)) var(--lobes-phase) infinite;
+  }
+
   .ripple {
     position: relative;
   }

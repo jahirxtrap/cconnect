@@ -2,6 +2,7 @@ import { APP_VERSION, SUPPORTED_SERVER } from "./build";
 import type { ConnectionState } from "./chatModels";
 import { chatListFor } from "./chatList.svelte";
 import { compareVersions, satisfies } from "./compat";
+import { serverSettings } from "./serverSettings.svelte";
 import { settings } from "./settings.svelte";
 import { isTauri } from "$lib/platform";
 import { onWake } from "$lib/platform/wake";
@@ -30,6 +31,7 @@ class ServerStatus {
 
   #releaseRequested = false;
   #request = 0;
+  #runtimes = new Map<string, string>();
   #listed = $state(false);
   #onlineWaiters: (() => void)[] = [];
   #offlineWaiters: (() => void)[] = [];
@@ -144,6 +146,14 @@ class ServerStatus {
     this.reachable = version !== null;
     this.checking = false;
     this.answered = true;
+    if (version && profile) this.#noteRuntime(profile.id, version);
+  }
+
+  #noteRuntime(profile: string, version: VersionInfo) {
+    const runtime = `${version.boot}:${version.cliVersion}`;
+    const seen = this.#runtimes.get(profile);
+    this.#runtimes.set(profile, runtime);
+    if (seen !== undefined && seen !== runtime) void serverSettings.load();
   }
 }
 

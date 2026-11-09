@@ -64,6 +64,7 @@ export interface Capabilities extends VersionInfo {
   packSchema: number | null;
   git: boolean;
   videoStills: boolean;
+  renditionLimit: number | null;
   outputStyles: string[];
   fastMode: FastMode;
   colors: string[];
@@ -75,6 +76,7 @@ export interface Capabilities extends VersionInfo {
 
 export interface VersionInfo {
   serverVersion: string | null;
+  boot: string | null;
   supportedApp: string | null;
   cliVersion: string | null;
   supportedCli: string | null;
@@ -85,6 +87,7 @@ export interface VersionInfo {
 
 interface VersionWire {
   version?: string;
+  boot?: string;
   supported_app?: string;
   cli_version?: string;
   supported_cli?: string;
@@ -120,6 +123,7 @@ interface CapabilitiesWire extends VersionWire {
   pack_schema?: number;
   git?: boolean;
   video_stills?: boolean;
+  rendition_limit?: number;
   output_styles?: string[];
   fast_mode?: { state?: string; disabled_reason?: string | null };
   colors?: string[];
@@ -131,6 +135,7 @@ interface CapabilitiesWire extends VersionWire {
 
 const toVersion = (data: VersionWire): VersionInfo => ({
   serverVersion: data.version ?? null,
+  boot: data.boot ?? null,
   supportedApp: data.supported_app ?? null,
   cliVersion: data.cli_version ?? null,
   supportedCli: data.supported_cli ?? null,
@@ -215,6 +220,7 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
       packSchema: data.pack_schema ?? null,
       git: data.git !== false,
       videoStills: data.video_stills === true,
+      renditionLimit: data.rendition_limit ?? null,
       outputStyles: data.output_styles ?? [],
       fastMode: {
         state: data.fast_mode?.state ?? "off",

@@ -21,7 +21,7 @@
   import BrowserOptionsMenu from "./BrowserOptionsMenu.svelte";
   import BrowserSideSwitch from "./BrowserSideSwitch.svelte";
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
-  import { BrowserLayer, coverOf } from "./browserLayer";
+  import { boundsOf, BrowserLayer, coverOf } from "./browserLayer";
   import { rememberBrowser, takeBrowser } from "./browserMemory";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
@@ -491,15 +491,6 @@
     void deviceBrowser.release().then(() => node.focus());
   };
 
-  const boundsOf = (area: DOMRect): DeviceBounds | null =>
-    area.width < 1 || area.height < 1
-      ? null
-      : {
-          x: Math.round(area.left),
-          y: Math.round(area.top),
-          width: Math.round(area.width),
-          height: Math.round(area.height),
-        };
 
   const animating = () =>
     document

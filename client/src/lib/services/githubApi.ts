@@ -1,7 +1,9 @@
+import { withQuery } from "$lib/data/url";
 import { isTauri, platformName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 
 const OWNER = "jahirxtrap";
+const AVATAR_SIZE = "s";
 const CONTRIBUTOR = "DiegoFernandoLojanTenesaca";
 const REPO = "cconnect";
 
@@ -9,6 +11,8 @@ export const REPO_URL = `https://github.com/${OWNER}/${REPO}`;
 export const RELEASES_URL = `${REPO_URL}/releases`;
 export const ISSUES_URL = `${REPO_URL}/issues`;
 export const KOFI_URL = "https://ko-fi.com/jahirtrap";
+
+export const sizedAvatar = (url: string, pixels: number) => withQuery(url, AVATAR_SIZE, pixels);
 
 const ISSUE_TEMPLATE = "bug_report.yml";
 

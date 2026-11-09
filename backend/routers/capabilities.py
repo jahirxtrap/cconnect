@@ -20,7 +20,7 @@ from core.config import (
     resolve_permission_mode,
 )
 from core.responses import api_response
-from services import accounts, cli_info, git
+from services import accounts, attachments, cli_info, git
 from services.pack_format import SCHEMA as PACK_SCHEMA
 import mcps
 
@@ -50,6 +50,7 @@ async def get_capabilities(capabilities: str = Query(""), account: str = Query("
         "pack_schema": PACK_SCHEMA["schema"],
         "git": git.available(),
         "video_stills": True,
+        "rendition_limit": attachments.RENDITION_LIMIT,
         "output_styles": cli_info.output_styles(info),
         "fast_mode": cli_info.fast_mode(info),
         "colors": COLORS,

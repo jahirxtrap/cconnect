@@ -6,6 +6,7 @@
   import type { PackSource } from "$lib/design/packs/reader";
   import { packImageKey } from "$lib/design/packs/storage";
   import { imageCache } from "$lib/services/imageCache.svelte";
+  import { scaledUrl } from "$lib/services/imageSize";
   import IconTile from "$lib/ui/IconTile.svelte";
 
   interface Props {
@@ -15,10 +16,11 @@
 
   const { pack, source = null }: Props = $props();
 
+  let pixels = $state(0);
   let offered = $state<string | null>(null);
 
   const key = $derived(pack.info.preview && !source ? packImageKey(pack.info.id, pack.info.preview) : null);
-  const url = $derived(key ? imageCache.get(key) : offered);
+  const url = $derived(key ? imageCache.get(key, pixels) : offered);
 
   const blobOf = (found: PackSource | null, path: string): Blob | null => {
     const bytes = found?.bytes(path);
@@ -27,28 +29,16 @@
 
   $effect(() => {
     const path = pack.info.preview;
-    if (key && path) imageCache.load(key, async () => blobOf(await packSource(pack), path));
+    if (key && path && pixels) imageCache.load(key, async () => blobOf(await packSource(pack), path), pixels);
   });
 
   $effect(() => {
     const path = pack.info.preview;
     offered = null;
-    if (!source || !path) return;
-    const blob = blobOf(source, path);
+    const blob = source && path && pixels ? blobOf(source, path) : null;
     if (!blob) return;
-    const made = URL.createObjectURL(blob);
-    offered = made;
-    return () => URL.revokeObjectURL(made);
+    return scaledUrl(blob, pixels, (made) => (offered = made));
   });
 </script>
 
-{#if url}
-  <img
-    src={url}
-    alt=""
-    draggable="false"
-    class="size-11 shrink-0 rounded-lg object-cover"
-  />
-{:else}
-  <IconTile icon={Package} />
-{/if}
+<IconTile icon={Package} src={url} bind:pixels />

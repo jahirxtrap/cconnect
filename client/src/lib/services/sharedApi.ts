@@ -1,7 +1,9 @@
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { backend, baseUrlOf, type Profile } from "./backend.svelte";
+import type { Capabilities } from "./capabilitiesApi";
 import { createHttp, http, type HttpClient } from "./http";
+import { fittedImage } from "./imageSize";
 
 export interface SharedEntry {
   name: string;
@@ -55,12 +57,25 @@ export const relativeFromUrl = (url: string, profile: Profile = backend.sharedPr
   return url.slice(prefix.length).split("?")[0].split("/").map(decodeSegment).join("/");
 };
 
-export const videoStillOf = (url: string): string | null | undefined => {
+const sharedCapabilitiesOf = (url: string): Capabilities | null | undefined => {
   const profile = backend.sharedProfileOf(url);
   if (relativeFromUrl(url, profile) === null) return null;
   const capabilities = serverSettings.capabilitiesFor(profile);
   if (capabilities === undefined) return profile?.id === backend.active?.id ? undefined : null;
+  return capabilities;
+};
+
+export const videoStillOf = (url: string): string | null | undefined => {
+  const capabilities = sharedCapabilitiesOf(url);
+  if (capabilities === undefined) return undefined;
   return capabilities?.videoStills ? url : null;
+};
+
+export const fittedImageOf = (url: string, pixels: number): string | undefined => {
+  const capabilities = sharedCapabilitiesOf(url);
+  if (capabilities === undefined) return undefined;
+  const limit = capabilities?.renditionLimit;
+  return limit ? fittedImage(url, Math.min(pixels, limit)) : url;
 };
 
 export const sharedFolderUrl = (url: string, profile: Profile = backend.sharedProfileOf(url)): string | null => {

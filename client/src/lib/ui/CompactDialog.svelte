@@ -1,9 +1,7 @@
 <script module lang="ts">
-  import { ROW_VIEWPORT_CLASS } from "./scrollbar";
+  export const DIALOG_PAGE_CLASS = "scrollbar-thin overflow-y-auto px-5 py-1";
 
-  export const DIALOG_PAGE_CLASS = `${ROW_VIEWPORT_CLASS} scrollbar-thin overflow-y-auto [--viewport-inset:calc(var(--spacing)*5)]`;
-
-  export const DIALOG_LIST_CLASS = `${ROW_VIEWPORT_CLASS} scrollbar-thin flex max-h-[420px] flex-col overflow-y-auto [--viewport-inset:0px]`;
+  export const DIALOG_LIST_CLASS = "scrollbar-thin flex max-h-[420px] flex-col overflow-y-auto py-1";
 </script>
 
 <script lang="ts">
@@ -11,7 +9,6 @@
   import { untrack, type Snippet } from "svelte";
   import { pushDismiss } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
-  import { provideDialogSettled } from "./dialogSettled";
   import { DIALOG_OVERLAY_CLASS, DIALOG_SURFACE_CLASS } from "./menuSurface";
   import { viewportScrollbar } from "./scrollbar";
 
@@ -41,10 +38,6 @@
 
   const instant = untrack(() => navigation.returning);
 
-  let settled = $state(instant);
-
-  provideDialogSettled(() => settled);
-
   $effect(() => pushDismiss(() => onDismiss()));
 </script>
 
@@ -54,9 +47,6 @@
     <Dialog.Content
       data-instant={instant || undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
-      onanimationend={(event) => {
-        if (event.target === event.currentTarget) settled = true;
-      }}
       class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-[min(40rem,calc(var(--safe-height)_-_2rem))] w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
       <div class="flex items-center">
@@ -80,14 +70,14 @@
         <div
           use:viewportScrollbar
           class="-mx-5 min-h-0 shrink {paged ? 'flex flex-col' : `overflow-x-clip ${DIALOG_PAGE_CLASS}`} {header
-            ? 'mt-1.5'
-            : 'mt-4'}"
+            ? 'mt-0.5'
+            : 'mt-3'}"
         >
           {@render children()}
         </div>
       {/if}
       {#if buttons}
-        <div class="mt-5 flex flex-wrap justify-end gap-2">{@render buttons()}</div>
+        <div class="{children ? 'mt-4' : 'mt-5'} flex flex-wrap justify-end gap-2">{@render buttons()}</div>
       {/if}
     </Dialog.Content>
   </Dialog.Portal>

@@ -89,6 +89,8 @@ class Fullscreen(private val activity: ComponentActivity, private val inner: Web
 
   override fun onReceivedIcon(view: WebView, icon: Bitmap) = inner.onReceivedIcon(view, icon)
 
+  override fun getDefaultVideoPoster(): Bitmap? = inner.defaultVideoPoster
+
   override fun onProgressChanged(view: WebView, newProgress: Int) = inner.onProgressChanged(view, newProgress)
 
   override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message) =

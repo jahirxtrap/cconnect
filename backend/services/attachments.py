@@ -13,6 +13,11 @@ _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 _VIDEO_EXTENSIONS = {".mp4", ".webm", ".ogv", ".mov", ".mkv"}
 _MAX_DIMENSION = 1568
 _STILL_AT = 0.1
+RENDITION_LIMIT = 1024
+
+
+def thumbnail_size(size: int | None) -> int | None:
+    return min(size, RENDITION_LIMIT) if size else None
 
 
 def is_image(name: str) -> bool:
@@ -23,8 +28,12 @@ def is_video(name: str) -> bool:
     return Path(name).suffix.lower() in _VIDEO_EXTENSIONS
 
 
+def _side(img, cover: bool) -> int:
+    return min(img.size) if cover else max(img.size)
+
+
 def _encoded(img, limit: int, cover: bool) -> tuple[str, bytes]:
-    side = min(img.size) if cover else max(img.size)
+    side = _side(img, cover)
     target = (ceil(img.width * limit / side), ceil(img.height * limit / side)) if side > limit else None
     if target:
         img.draft(None, target)
@@ -40,13 +49,23 @@ def _encoded(img, limit: int, cover: bool) -> tuple[str, bytes]:
     return "image/jpeg", buf.getvalue()
 
 
-def shrunk(path: Path, limit: int, cover: bool = False, stills_only: bool = False) -> tuple[str, bytes] | None:
+def shrunk(
+    source: Path | bytes,
+    limit: int,
+    cover: bool = False,
+    stills_only: bool = False,
+    reduce_only: bool = False,
+) -> tuple[str, bytes] | None:
     try:
         from PIL import Image
-        with Image.open(path) as img:
+        with Image.open(io.BytesIO(source) if isinstance(source, bytes) else source) as img:
             if stills_only and getattr(img, "is_animated", False):
                 return None
-            return _encoded(img, limit, cover)
+            if reduce_only and _side(img, cover) <= limit:
+                return None
+            encoded = _encoded(img, limit, cover)
+        original = len(source) if isinstance(source, bytes) else source.stat().st_size
+        return None if reduce_only and len(encoded[1]) >= original else encoded
     except Exception:
         return None
 

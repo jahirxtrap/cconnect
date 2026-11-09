@@ -24,6 +24,7 @@
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
   import DatabaseFile from "$lib/screens/databases/DatabaseFile.svelte";
   import { isMobile } from "$lib/platform";
+  import { pdfScreenAvailable } from "$lib/platform/androidPdf";
   import { layout } from "$lib/platform/layout.svelte";
   import { paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
@@ -52,6 +53,7 @@
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import GallerySlide, { GALLERY_KINDS } from "./GallerySlide.svelte";
   import GalleryStrip from "./GalleryStrip.svelte";
+  import NativePdfScreen from "./NativePdfScreen.svelte";
   import PdfView from "./PdfView.svelte";
 
   interface Props {
@@ -115,6 +117,7 @@
 
   const centered = paneRole() === "center";
   const nativePdf = $derived((!embedded || centered) && !isMobile && !layout.mobile);
+  const androidPdf = $derived(!embedded && pdfScreenAvailable());
 
   const refitOnResize = (node: HTMLIFrameElement) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -144,7 +147,7 @@
   let arrived = $state<{ base: string; name: string; body: string } | null>(null);
   let shown = $state<Shown | null>(null);
   let failed = $state(false);
-  let loaded = $state(false);
+  let loadedFor = $state<string | null>(null);
   let version = $state(0);
   let formatted = $state(settings.markdownPreviewFormatted);
   let menu = $state(false);
@@ -197,6 +200,7 @@
   const stamp = $derived(version + revision);
   const source = $derived(revised(base, stamp));
   const fallback = $derived(fallbackOf(url));
+  const loaded = $derived(loadedFor === source);
 
   $effect(() => {
     const target = source;
@@ -230,7 +234,6 @@
 
   $effect(() => {
     void url;
-    loaded = false;
     failed = false;
     version = 0;
   });
@@ -254,7 +257,6 @@
         else if (signature !== next) {
           signature = next;
           version++;
-          loaded = false;
           failed = false;
         }
       });
@@ -326,7 +328,7 @@
         use:imageSrc={{
           url: source,
           fallback,
-          onload: () => (loaded = true),
+          onload: () => (loadedFor = source),
           onerror: () => (failed = true),
         }}
         alt={filename}
@@ -345,7 +347,7 @@
     <video
       use:servedSrc={{ url: source, onerror: () => (failed = true) }}
       controls
-      class="min-h-0 flex-1 bg-black"
+      class="min-h-0 flex-1"
     ></video>
   {:else if kind === "audio"}
     <div class="flex min-h-0 flex-1 items-center justify-center p-6">
@@ -365,6 +367,8 @@
         title={filename}
         class="min-h-0 w-full flex-1 border-0"
       ></iframe>
+    {:else if androidPdf}
+      <NativePdfScreen url={source} onerror={() => (failed = true)} />
     {:else}
       <PdfView url={source} onerror={() => (failed = true)} />
     {/if}
@@ -449,7 +453,12 @@
     {@render content()}
   </div>
 {:else}
-  <div class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface">
+  <div
+    class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {androidPdf &&
+    kind === 'pdf'
+      ? 'pdf-screen-root'
+      : ''}"
+  >
     <AppTopBar title={t("VIEW")} subtitle={filename} actions={toolbar}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>

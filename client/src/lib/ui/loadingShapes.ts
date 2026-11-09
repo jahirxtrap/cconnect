@@ -72,28 +72,25 @@ const pathAt = (elapsed: number): string => {
   return `${path}Z`;
 };
 
-const listeners = new Set<(path: string) => void>();
-let frame = 0;
-let origin = 0;
+const FRAME_RATE = 60;
 
-export const currentPath = (): string => pathAt(origin ? performance.now() - origin : 0);
+export const LOBE_FRAMES = Math.round((CYCLE_MS / 1000) * FRAME_RATE);
 
-const tick = (now: number) => {
-  if (!origin) origin = now;
-  const path = pathAt(now - origin);
-  for (const listener of listeners) listener(path);
-  frame = listeners.size ? requestAnimationFrame(tick) : 0;
+export const LOBE_CYCLE_MS = CYCLE_MS;
+
+const sprites = new Map<number, string>();
+
+export const lobeSprite = (box: number): string => {
+  const known = sprites.get(box);
+  if (known) return known;
+  let paths = "";
+  for (let frame = 0; frame < LOBE_FRAMES; frame++) {
+    paths += `<path transform="translate(${(frame + 0.5) * box} ${box / 2})" d="${pathAt((frame * CYCLE_MS) / LOBE_FRAMES)}"/>`;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${LOBE_FRAMES * box} ${box}">${paths}</svg>`;
+  const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+  sprites.set(box, url);
+  return url;
 };
 
-export const onFrame = (listener: (path: string) => void) => {
-  listeners.add(listener);
-  if (!frame) frame = requestAnimationFrame(tick);
-  return () => {
-    listeners.delete(listener);
-    if (!listeners.size && frame) {
-      cancelAnimationFrame(frame);
-      frame = 0;
-      origin = 0;
-    }
-  };
-};
+export const lobePhase = (): number => -(Number(document.timeline.currentTime ?? 0) % CYCLE_MS);

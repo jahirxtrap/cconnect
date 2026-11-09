@@ -3,9 +3,9 @@
   import { visibleName } from "$lib/data/format";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { isVideo } from "$lib/data/previewKind";
-  import { devicePixelRatio } from "svelte/reactivity/window";
-  import { imageSrc, posterSrc, servedSrc, sizedImage } from "$lib/services/mediaSource";
-  import { videoStillOf } from "$lib/services/sharedApi";
+  import { devicePixels, sizedImage } from "$lib/services/imageSize";
+  import { imageSrc, posterSrc, servedSrc } from "$lib/services/mediaSource";
+  import { fittedImageOf, videoStillOf } from "$lib/services/sharedApi";
   import CenteredProgress from "./CenteredProgress.svelte";
   import ExpandButton from "./ExpandButton.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
@@ -20,6 +20,8 @@
   }
 
   const { url, alt, poster, onOpen, compact = false }: Props = $props();
+
+  const FRAME_ASPECT = 4 / 3;
 
   let status = $state<"loading" | "ready" | "error">("loading");
   let player = $state<HTMLVideoElement | null>(null);
@@ -45,20 +47,24 @@
   const still = $derived(
     stillMissing
       ? undefined
-      : poster || (served ? sizedImage(served, Math.ceil(frameHeight * (devicePixelRatio.current ?? 1))) : undefined),
+      : poster || (served ? sizedImage(served, devicePixels(frameHeight)) : undefined),
+  );
+  const shownUrl = $derived(
+    video || !frameHeight ? undefined : fittedImageOf(resolved, devicePixels(frameHeight * FRAME_ASPECT)),
   );
 
   $effect(() => {
-    if (video) serverSettings.ensure();
+    serverSettings.ensure();
   });
 </script>
 
 <div
   use:nearView={() => (near = true)}
   bind:clientHeight={frameHeight}
-  class="relative flex aspect-4/3 max-w-full shrink items-center justify-center overflow-hidden {MEDIA_FRAME_CLASS} select-none {compact
+  class="relative flex max-w-full shrink items-center justify-center overflow-hidden {MEDIA_FRAME_CLASS} bg-card select-none {compact
     ? 'h-40'
-    : 'h-70'} {video ? 'bg-black' : 'bg-card'}"
+    : 'h-70'}"
+  style:aspect-ratio={FRAME_ASPECT}
 >
   {#if video}
     {#if near && frameHeight && served !== undefined}
@@ -102,10 +108,10 @@
       aria-label={alt || filename}
       class="flex size-full cursor-pointer items-center justify-center {status === 'error' ? 'hidden' : ''}"
     >
-      {#if near}
+      {#if near && shownUrl}
         <img
           use:imageSrc={{
-            url: resolved,
+            url: shownUrl,
             onload: () => (status = "ready"),
             onerror: () => (status = "error"),
           }}

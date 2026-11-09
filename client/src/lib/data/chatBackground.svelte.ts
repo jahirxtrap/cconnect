@@ -7,9 +7,11 @@ import {
   type BackgroundEffects,
 } from "$lib/design/backgrounds";
 import { packs } from "$lib/design/packs/registry.svelte";
-import { packFile } from "$lib/design/packs/storage";
+import { packFile, packImageKey } from "$lib/design/packs/storage";
 import { blobStore } from "$lib/platform/blobStore";
 import { store } from "$lib/platform/storage";
+import { imageCache } from "$lib/services/imageCache.svelte";
+import { scaledImage } from "$lib/services/imageSize";
 import { guessMimeType } from "./previewKind";
 
 const SELECTED_KEY = "chat.background";
@@ -17,22 +19,9 @@ const EFFECTS_KEY = "chat.background_effects";
 const UPLOADS_KEY = "chat.backgrounds";
 const UPLOAD_PREFIX = "mine/";
 const MAX_SIDE = 2560;
-const QUALITY = 0.85;
 const IMAGE_TYPE = "image/jpeg";
 
 const uploadKey = (id: string) => `background.${id}`;
-
-const reduced = async (file: Blob): Promise<Blob> => {
-  const bitmap = await createImageBitmap(file).catch(() => null);
-  if (!bitmap) return file;
-  const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob ?? file), IMAGE_TYPE, QUALITY));
-};
 
 const without = <T>(record: Record<string, T>, key: string): Record<string, T> =>
   Object.fromEntries(Object.entries(record).filter(([entry]) => entry !== key));
@@ -41,8 +30,6 @@ class ChatBackground {
   selected = $state<string>(store.get(SELECTED_KEY, DEFAULT_BACKGROUND));
   saved = $state<Record<string, BackgroundEffects>>(store.get(EFFECTS_KEY, {}));
   uploads = $state<string[]>(store.get(UPLOADS_KEY, []));
-  urls = $state<Record<string, string>>({});
-  #loading = new Map<string, Promise<void>>();
 
   readonly current = $derived(this.exists(this.selected) ? this.selected : DEFAULT_BACKGROUND);
   readonly effects = $derived(this.effectsOf(this.current));
@@ -68,16 +55,20 @@ class ChatBackground {
     return this.saved[id] ?? this.defaultsOf(id);
   }
 
-  ensure(id: string = this.current): Promise<void> {
-    if (this.urls[id] || !this.isImage(id)) return Promise.resolve();
-    let loading = this.#loading.get(id);
-    if (!loading) {
-      loading = this.#blobOf(id).then((blob) => {
-        if (blob) this.urls = { ...this.urls, [id]: URL.createObjectURL(blob) };
-      });
-      this.#loading.set(id, loading);
-    }
-    return loading;
+  #imageKey(id: string): string | null {
+    if (this.isUpload(id)) return uploadKey(id);
+    const background = packs.backgroundOf(id);
+    return background?.file ? packImageKey(background.pack, background.file) : null;
+  }
+
+  imageOf(id: string, pixels?: number): string | null {
+    const key = this.#imageKey(id);
+    return key ? imageCache.get(key, pixels) : null;
+  }
+
+  loadImage(id: string, pixels?: number) {
+    const key = this.#imageKey(id);
+    if (key) imageCache.load(key, () => this.#blobOf(id), pixels);
   }
 
   async #blobOf(id: string): Promise<Blob | null> {
@@ -114,12 +105,13 @@ class ChatBackground {
 
   async upload(file: Blob): Promise<string> {
     const id = `${UPLOAD_PREFIX}${crypto.randomUUID()}`;
-    await this.restore(id, await reduced(file));
+    await this.restore(id, await scaledImage(file, MAX_SIDE, "long", IMAGE_TYPE));
     return id;
   }
 
   async restore(id: string, blob: Blob) {
     await blobStore.put(uploadKey(id), blob);
+    imageCache.drop(uploadKey(id));
     if (!this.uploads.includes(id)) this.#keepUploads([...this.uploads, id]);
   }
 
@@ -131,9 +123,8 @@ class ChatBackground {
   }
 
   forget(id: string) {
-    if (this.urls[id]) URL.revokeObjectURL(this.urls[id]);
-    this.urls = without(this.urls, id);
-    this.#loading.delete(id);
+    const key = this.#imageKey(id);
+    if (key) imageCache.drop(key);
   }
 
   async uploadedImages(): Promise<{ id: string; blob: Blob }[]> {

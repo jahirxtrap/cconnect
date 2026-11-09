@@ -2,10 +2,10 @@
   import Activity from "@lucide/svelte/icons/activity";
   import Blocks from "@lucide/svelte/icons/blocks";
   import Brain from "@lucide/svelte/icons/brain";
+  import FishingHook from "@lucide/svelte/icons/fishing-hook";
   import Store from "@lucide/svelte/icons/store";
   import Unplug from "@lucide/svelte/icons/unplug";
   import Wand from "@lucide/svelte/icons/wand";
-  import Webhook from "@lucide/svelte/icons/webhook";
   import { MCP_USER_SOURCE } from "$lib/services/claudeApi";
   import type { IconSource } from "$lib/ui/icons";
 
@@ -39,7 +39,7 @@
     plugins: Blocks,
     skills: Wand,
     mcp: Unplug,
-    hooks: Webhook,
+    hooks: FishingHook,
     marketplaces: Store,
     memories: Brain,
     status: Activity,

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { wheelZoomFactor } from "./wheelZoom";
 
   interface Props {
     minScale?: number;
@@ -12,7 +13,6 @@
   const { minScale = 1, maxScale = 6, active = true, class: className = "", children }: Props = $props();
 
   const DOUBLE_TAP_SCALE = 2.5;
-  const WHEEL_STEP = 0.0015;
   const HALF = 2;
 
   let scale = $state(1);
@@ -113,7 +113,7 @@
 
   const onWheel = (event: WheelEvent) => {
     event.preventDefault();
-    zoomAt(scale - event.deltaY * WHEEL_STEP, event.clientX, event.clientY);
+    zoomAt(scale * wheelZoomFactor(event), event.clientX, event.clientY);
   };
 
   const onDoubleClick = (event: MouseEvent) => {

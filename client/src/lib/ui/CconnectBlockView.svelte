@@ -3,6 +3,7 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import type { GalleryFile } from "$lib/data/chatModels";
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
+  import { layout } from "$lib/platform/layout.svelte";
   import { servedSrc } from "$lib/services/mediaSource";
   import { awaitSharedFile } from "$lib/services/sharedArrival.svelte";
   import InstallCards from "$lib/screens/install/InstallCards.svelte";
@@ -166,7 +167,11 @@
         class="flex w-full overflow-hidden {MEDIA_FRAME_CLASS} bg-card"
         style="height: {DOC_HEIGHT}"
       >
-        <PdfView url={data.url} onerror={(missing) => (pdfFailed = missing ? "missing" : "broken")} />
+        <PdfView
+          url={data.url}
+          zoomable={!layout.mobile}
+          onerror={(missing) => (pdfFailed = missing ? "missing" : "broken")}
+        />
       </div>
       {@render expand(data.url)}
     </div>

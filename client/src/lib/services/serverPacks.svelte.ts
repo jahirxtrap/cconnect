@@ -4,6 +4,7 @@ import { text as textOf, type Wire } from "$lib/data/wire";
 import { backend, withToken } from "./backend.svelte";
 import { createHttp, type HttpResult } from "./http";
 import { imageCache } from "./imageCache.svelte";
+import { sizedImage } from "./imageSize";
 import { fetchBlob, fetchFile } from "./mediaSource";
 import { ReconnectingSocket } from "./socket";
 
@@ -71,9 +72,13 @@ class ServerPacks {
     return `${this.#previews}${pack.file}?v=${pack.modified}`;
   }
 
-  loadPreview(pack: ServerPack) {
-    const url = this.urlOf(pack, "/preview");
-    imageCache.load(this.previewKey(pack), () => fetchBlob(url));
+  previewOf(pack: ServerPack, pixels: number): string | null {
+    return imageCache.get(this.previewKey(pack), pixels);
+  }
+
+  loadPreview(pack: ServerPack, pixels: number) {
+    const url = sizedImage(this.urlOf(pack, "/preview"), pixels);
+    imageCache.load(this.previewKey(pack), () => fetchBlob(url), pixels);
   }
 
   download(pack: ServerPack): Promise<Blob | null> {

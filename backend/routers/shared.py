@@ -18,8 +18,6 @@ from services.shared_watch import hub as watch_hub
 
 router = APIRouter(tags=["Shared"])
 
-_THUMBNAIL_LIMIT = 1024
-
 
 def _watch_message(queue: asyncio.Queue, msg: dict):
     if msg.get("type") == "watch":
@@ -215,19 +213,31 @@ async def upload_shared(path: str, request: Request, policy: Literal["keep", "re
 
 
 @router.get("/shared/{path:path}")
-def download_shared(path: str, request: Request, size: int | None = Query(None, ge=1, le=_THUMBNAIL_LIMIT)):
+def download_shared(
+    path: str,
+    request: Request,
+    size: int | None = Query(None, ge=1),
+    fit: int | None = Query(None, ge=1),
+):
+    cover = size is not None
+    limit = attachments.thumbnail_size(size or fit)
     try:
         resolved = shared_service.resolve_file(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    if size and attachments.is_image(resolved.name):
-        small = derived_response(request, resolved, f"{size}", lambda: attachments.shrunk(resolved, size, cover=True, stills_only=True))
+    if limit and attachments.is_image(resolved.name):
+        small = derived_response(
+            request,
+            resolved,
+            f"{limit}" if cover else f"fit{limit}",
+            lambda: attachments.shrunk(resolved, limit, cover=cover, stills_only=True, reduce_only=True),
+        )
         if small is not None:
             return small
-    if size and attachments.is_video(resolved.name):
-        still = derived_response(request, resolved, f"{size}", lambda: attachments.video_still(resolved, size))
+    if cover and attachments.is_video(resolved.name):
+        still = derived_response(request, resolved, f"{limit}", lambda: attachments.video_still(resolved, limit))
         if still is None:
             raise HTTPException(status_code=404, detail="no still for this video")
         return still

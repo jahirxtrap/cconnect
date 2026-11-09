@@ -14,6 +14,16 @@ const rounded = (box: DOMRect): DeviceBounds => ({
   height: Math.ceil(box.height),
 });
 
+export const boundsOf = (area: DOMRect): DeviceBounds | null =>
+  area.width < 1 || area.height < 1
+    ? null
+    : {
+        x: Math.round(area.left),
+        y: Math.round(area.top),
+        width: Math.round(area.width),
+        height: Math.round(area.height),
+      };
+
 const layered = (hit: Element | null, surface: Element): hit is Element =>
   !!hit && hit !== surface && !surface.contains(hit) && hit !== document.documentElement && hit !== document.body;
 
@@ -50,10 +60,23 @@ const painted = (node: HTMLElement) => {
   return style.backgroundImage !== "none" || style.backgroundColor !== CLEAR;
 };
 
+export interface LayerShape {
+  hole: DeviceBounds | null;
+  radius: number;
+  cover: DeviceBounds[];
+}
+
+const toBrowser = (shape: LayerShape) => browserCall<boolean>("browser_layer", { ...shape });
+
 export class BrowserLayer {
   #kept = new Map<HTMLElement, string[]>();
   #sent = "";
   #supported: boolean | null = null;
+  #send: (shape: LayerShape) => Promise<boolean>;
+
+  constructor(send: (shape: LayerShape) => Promise<boolean> = toBrowser) {
+    this.#send = send;
+  }
 
   get supported() {
     return this.#supported !== false;
@@ -64,7 +87,7 @@ export class BrowserLayer {
     const sent = JSON.stringify([hole, radius, cover]);
     if (sent !== this.#sent) {
       this.#sent = sent;
-      void browserCall<boolean>("browser_layer", { hole, radius, cover })
+      void this.#send({ hole, radius, cover })
         .then((supported) => this.#answer(supported))
         .catch(() => this.#answer(false));
     }
@@ -93,7 +116,7 @@ export class BrowserLayer {
   clear() {
     this.#uncover();
     this.#sent = JSON.stringify([null, 0, []]);
-    void browserCall("browser_layer", { hole: null, radius: 0, cover: [] }).catch(() => undefined);
+    void this.#send({ hole: null, radius: 0, cover: [] }).catch(() => undefined);
   }
 
   #answer(supported: boolean) {

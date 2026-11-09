@@ -72,6 +72,10 @@ class MainActivity : TauriActivity() {
 
   private val link by lazy { BackgroundLink(this) { content } }
 
+  private val pdfPages by lazy { PdfPages(this) { content } }
+
+  private val pdfScreen by lazy { PdfScreen(this) { content } }
+
   private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
   private var pendingFiles: ValueCallback<Array<Uri>>? = null
@@ -214,12 +218,14 @@ class MainActivity : TauriActivity() {
   override fun onDestroy() {
     link.closeAll()
     browser.closeAll()
+    pdfPages.closeAll()
+    pdfScreen.dismiss()
     if (narrator.isInitialized()) narrator.value.shutdown()
     super.onDestroy()
   }
 
   override fun dispatchTouchEvent(event: MotionEvent): Boolean =
-    browser.dispatch(event) || super.dispatchTouchEvent(event)
+    browser.dispatch(event) || pdfScreen.dispatch(event) || super.dispatchTouchEvent(event)
 
   private fun leave() {
     backCallback.isEnabled = false
@@ -244,6 +250,8 @@ class MainActivity : TauriActivity() {
     webView.addJavascriptInterface(googleAuth, "AndroidGoogleAuth")
     webView.addJavascriptInterface(link, "AndroidLink")
     webView.addJavascriptInterface(browser, "AndroidBrowser")
+    webView.addJavascriptInterface(pdfPages, "AndroidPdf")
+    webView.addJavascriptInterface(pdfScreen, "AndroidPdfScreen")
     PastedContent(webView).install()
     deliverShare()
   }

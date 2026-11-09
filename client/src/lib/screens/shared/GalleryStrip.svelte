@@ -7,9 +7,9 @@
   import { previewKindOf } from "$lib/data/previewKind";
   import { formatMediaTime } from "$lib/data/time";
   import { t } from "$lib/i18n/index.svelte";
-  import { devicePixelRatio } from "svelte/reactivity/window";
+  import { devicePixels, sizedImage } from "$lib/services/imageSize";
   import { mediaDuration } from "$lib/services/mediaDuration";
-  import { imageSrc, servedSrc, sizedImage } from "$lib/services/mediaSource";
+  import { imageSrc, servedSrc } from "$lib/services/mediaSource";
   import { videoStillOf } from "$lib/services/sharedApi";
   import { fileIcon } from "$lib/ui/fileIcons";
   import { ROUND_ARROW_CLASS } from "$lib/ui/roundButton";
@@ -35,7 +35,7 @@
   let shown = $state<boolean[]>([]);
   let stillMissing = $state<Record<string, true>>({});
 
-  const pixels = $derived(Math.ceil(tileSize * (devicePixelRatio.current ?? 1)));
+  const pixels = $derived(devicePixels(tileSize));
 
   $effect(() => {
     const child = strip?.children[index] as HTMLElement | undefined;
@@ -88,6 +88,7 @@
             <img
               use:imageSrc={{
                 url: sizedImage(still, pixels),
+                borrow: true,
                 onerror: () => {
                   if (kind === "video") stillMissing[item.url] = true;
                 },

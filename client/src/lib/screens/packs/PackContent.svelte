@@ -22,6 +22,8 @@
 
   type Category = "themes" | "terminals" | "fonts" | "accents" | "backgrounds";
 
+  const ROW_CLASS = "[content-visibility:auto] [contain-intrinsic-size:auto_3.25rem]";
+
   const LABELS: Record<Category, string> = {
     themes: "THEME",
     terminals: "TERMINAL",
@@ -29,8 +31,6 @@
     accents: "ACCENT",
     backgrounds: "CHAT_BACKGROUND",
   };
-
-  let images = $state<Record<string, string>>({});
 
   const themes = $derived(packs.themesIn(pack));
   const terminals = $derived(packs.terminalsIn(pack));
@@ -42,23 +42,18 @@
     backgrounds: pack.backgrounds.length,
   });
   const categories = $derived((Object.keys(LABELS) as Category[]).filter((category) => counts[category] > 0));
+  const files = $derived<Record<string, Blob>>(
+    Object.fromEntries(
+      pack.backgrounds.flatMap((background) => {
+        const bytes = background.file ? source?.bytes(background.file) : undefined;
+        if (!background.file || !bytes) return [];
+        return [[background.id, new Blob([bytes as BlobPart], { type: guessMimeType(background.file) ?? "" })]];
+      }),
+    ),
+  );
 
   $effect(() => {
     for (const font of pack.fonts) void loadFace(font, source);
-  });
-
-  $effect(() => {
-    if (!source) return;
-    const made = Object.fromEntries(
-      pack.backgrounds.flatMap((background) => {
-        const bytes = background.file ? source.bytes(background.file) : undefined;
-        if (!background.file || !bytes) return [];
-        const blob = new Blob([bytes as BlobPart], { type: guessMimeType(background.file) ?? "" });
-        return [[background.id, URL.createObjectURL(blob)]];
-      }),
-    );
-    images = made;
-    return () => Object.values(made).forEach((url) => URL.revokeObjectURL(url));
   });
 </script>
 
@@ -71,19 +66,19 @@
     <SectionHeader label={t(LABELS[category])} divider={index > 0} />
     {#if category === "themes"}
       {#each themes as item (item.id)}
-        <ListRow title={item.name} subtitle={t(`THEME_${item.kind.toUpperCase()}`)}>
+        <ListRow title={item.name} subtitle={t(`THEME_${item.kind.toUpperCase()}`)} class={ROW_CLASS}>
           {#snippet trailing()}{@render swatches(themeSwatches(item))}{/snippet}
         </ListRow>
       {/each}
     {:else if category === "terminals"}
       {#each terminals as item (item.id)}
-        <ListRow title={item.name}>
+        <ListRow title={item.name} class={ROW_CLASS}>
           {#snippet trailing()}{@render swatches(terminalSwatches(item))}{/snippet}
         </ListRow>
       {/each}
     {:else if category === "fonts"}
       {#each pack.fonts as item (`${item.kind}:${item.id}`)}
-        <ListRow title={fontLabel(item)} subtitle={t(`FONT_${item.kind.toUpperCase()}`)}>
+        <ListRow title={fontLabel(item)} subtitle={t(`FONT_${item.kind.toUpperCase()}`)} class={ROW_CLASS}>
           {#snippet trailing()}
             <span class="flex h-7 min-w-9 items-center justify-center px-1 text-body-lg" style="font-family: {item.family}"
               >{FONT_SAMPLES[item.kind]}</span
@@ -103,10 +98,15 @@
       </div>
     {:else}
       {#each pack.backgrounds as item (item.id)}
-        <ListRow title={packBackgroundLabel(item)}>
+        <ListRow title={packBackgroundLabel(item)} class={ROW_CLASS}>
           {#snippet trailing()}
             <span class="relative mr-2 h-10 w-8 overflow-hidden rounded-md border border-outline-variant bg-background">
-              <ChatBackdrop id={item.id} effects={{ ...DEFAULT_EFFECTS, ...item.effects }} src={images[item.id] ?? null} />
+              <ChatBackdrop
+                thumbnail
+                id={item.id}
+                effects={{ ...DEFAULT_EFFECTS, ...item.effects }}
+                file={files[item.id] ?? null}
+              />
             </span>
           {/snippet}
         </ListRow>

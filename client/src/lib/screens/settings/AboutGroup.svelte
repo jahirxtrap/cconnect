@@ -20,9 +20,11 @@
     releaseNotes,
     RELEASES_URL,
     REPO_URL,
+    sizedAvatar,
     type Profile,
     type Release,
   } from "$lib/services/githubApi";
+  import { devicePixels } from "$lib/services/imageSize";
   import { isTauri, openExternal, systemName } from "$lib/platform";
   import { webApp } from "$lib/platform/pwa.svelte";
   import { updater } from "$lib/services/updater.svelte";
@@ -114,7 +116,7 @@
   {#if profile}
     <Pressable onclick={() => open(profile.url)} class={PREFERENCE_ROW_CLASS}>
       <img
-        src={profile.avatarUrl}
+        src={sizedAvatar(profile.avatarUrl, devicePixels(PREFERENCE_ICON_SIZE))}
         alt=""
         class="shrink-0 rounded-full"
         style="width: {PREFERENCE_ICON_SIZE}px; height: {PREFERENCE_ICON_SIZE}px"
