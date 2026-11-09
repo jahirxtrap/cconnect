@@ -15,6 +15,8 @@ class DirectoryWatchHub:
         self._root = root
         self._snapshot = snapshot
         self._subscribers: dict[asyncio.Queue, str] = {}
+        self._sent: dict[asyncio.Queue, dict] = {}
+        self._answers: set[asyncio.Task] = set()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
         self._lifecycle = threading.Lock()
@@ -37,6 +39,7 @@ class DirectoryWatchHub:
     def unsubscribe(self, q: asyncio.Queue):
         with self._lock:
             self._subscribers.pop(q, None)
+            self._sent.pop(q, None)
         self._settle_later()
 
     def set_path(self, q: asyncio.Queue, path: str):
@@ -44,7 +47,17 @@ class DirectoryWatchHub:
             if q not in self._subscribers:
                 return
             self._subscribers[q] = path
-        q.put_nowait(self._snapshot(path))
+        task = asyncio.get_running_loop().create_task(self._answer(q, path))
+        self._answers.add(task)
+        task.add_done_callback(self._answers.discard)
+
+    async def _answer(self, q: asyncio.Queue, path: str):
+        snapshot = await asyncio.to_thread(self._snapshot, path)
+        with self._lock:
+            if self._subscribers.get(q) != path:
+                return
+            self._sent[q] = snapshot
+        q.put_nowait(snapshot)
 
     def _settle_later(self):
         threading.Thread(target=self._settle, name=f"settle-{self._root.name}", daemon=True).start()
@@ -95,6 +108,13 @@ class DirectoryWatchHub:
             return
         with self._lock:
             items = list(self._subscribers.items())
+        built: dict[str, dict] = {}
         for q, path in items:
-            snapshot = self._snapshot(path)
+            if path not in built:
+                built[path] = self._snapshot(path)
+            snapshot = built[path]
+            with self._lock:
+                if self._subscribers.get(q) != path or self._sent.get(q) == snapshot:
+                    continue
+                self._sent[q] = snapshot
             loop.call_soon_threadsafe(q.put_nowait, snapshot)

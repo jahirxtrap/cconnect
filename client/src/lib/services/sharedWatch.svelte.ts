@@ -1,3 +1,4 @@
+import { keepUnchanged } from "$lib/data/stableList";
 import { backend, type Profile } from "./backend.svelte";
 import { parseEntry, type SharedEntry } from "./sharedApi";
 import { ReconnectingSocket } from "./socket";
@@ -44,6 +45,7 @@ export class SharedWatch {
   #apply(message: Record<string, unknown>) {
     if (message.type !== "snapshot") return;
     if ((message.path ?? "") !== this.#path) return;
-    this.entries = ((message.entries as Record<string, unknown>[]) ?? []).map(parseEntry);
+    const next = ((message.entries as Record<string, unknown>[]) ?? []).map(parseEntry);
+    this.entries = keepUnchanged(this.entries, next, (entry) => entry.file);
   }
 }

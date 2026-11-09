@@ -152,17 +152,19 @@
   const highlight = useSettingsDialog("server", (target) => (dialog = target));
 </script>
 
-<SettingsGroup label={t("SETTINGS_SERVER")}>
-  {#snippet labelTrailing()}
-    <StatusDot class={ready ? "bg-green" : "bg-red"} {loading} />
-  {/snippet}
-
+<SettingsGroup label={t("SETTINGS_CONNECTIVITY")}>
   <PreferenceRow
     icon={Server}
     title={t("ENVIRONMENTS")}
     summary={hintOf("environments")}
     onclick={() => (dialog = "environments")}
   />
+</SettingsGroup>
+
+<SettingsGroup label={t("SETTINGS_SERVER")}>
+  {#snippet labelTrailing()}
+    <StatusDot class={ready ? "bg-green" : "bg-red"} {loading} />
+  {/snippet}
 
   <PreferenceRow
     icon={Sparkles}

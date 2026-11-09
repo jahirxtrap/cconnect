@@ -76,7 +76,8 @@
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import { MENU_ICON_SIZE, TOOLTIP_CLASS } from "$lib/ui/menuSurface";
   import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS, PREFERENCE_TRAILING_CLASS } from "$lib/ui/preferenceRow";
-  import RowMenu from "$lib/ui/RowMenu.svelte";
+  import RowMenuTrigger from "$lib/ui/RowMenuTrigger.svelte";
+  import { RowWindow } from "$lib/ui/rowWindow.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -190,7 +191,8 @@
   let extractRequest = $state<ExtractRequest | null>(null);
   let barMenu = $state(false);
   let actionsMenu = $state(false);
-  let rowMenu = $state<string | null>(null);
+  let rowMenu = $state<{ entry: SharedEntry; anchor: HTMLElement } | null>(null);
+  let rowMenuOpen = $state(false);
   let bottomBar = $state(0);
   let pendingUploads = $state<File[]>([]);
   let picker = $state<HTMLInputElement | null>(null);
@@ -320,6 +322,8 @@
     };
     return list.sort(compare);
   });
+
+  const rowWindow = new RowWindow(() => ordered.length);
 
   const shownCount = $derived.by(() => {
     const total = (searchResults ?? entries).length;
@@ -993,6 +997,7 @@
   <TooltipIconButton
     label={t(allSelected ? "DESELECT_ALL" : "SELECT_ALL")}
     shortcut="shared.selectAll"
+    enabled={ordered.length > 0}
     onclick={selectAll}
     class={inHead ? HEAD_SELECT_CLASS : ""}
   >
@@ -1127,20 +1132,22 @@
     </Pressable>
     {#if rowMenus}
       <div class={PREFERENCE_TRAILING_CLASS} role="presentation" onpointerdown={(event) => event.stopPropagation()}>
-        <RowMenu
-          open={rowMenu === entry.file}
-          onOpenChange={(open) => (rowMenu = open ? entry.file : null)}
+        <RowMenuTrigger
+          open={rowMenuOpen && rowMenu?.entry.file === entry.file}
           shown={isSelected}
-        >
-          <FileActionItems actions={rowActions(isSelected ? selectedEntries : [entry])} />
-        </RowMenu>
+          onOpen={(anchor) => {
+            rowMenu = { entry, anchor };
+            rowMenuOpen = true;
+          }}
+          onClose={() => (rowMenuOpen = false)}
+        />
       </div>
     {/if}
   </div>
 {/snippet}
 
 {#snippet columnsHead()}
-  <div class="sticky top-0 z-10 flex h-8 items-center gap-2 bg-card px-3 text-label-md text-on-surface-variant select-none">
+  <div class="sticky top-0 z-10 flex h-8 shrink-0 items-center gap-2 bg-card px-3 text-label-md text-on-surface-variant select-none">
     {@render selectAllAction(true)}
     {#if selecting}
       <span class="shrink-0" style="width: {iconSize}px"></span>
@@ -1272,37 +1279,51 @@
         <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
           <ServerUnavailable class="flex-1" />
         </div>
-      {:else if ordered.length}
+      {:else}
         <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
           <ScrollCard
             bind:scroller={list}
             dock
-            frame="rounded-panel"
+            frame="flex-1 rounded-panel"
             role="presentation"
             onpointerdown={onPointerDown}
             onpointermove={onPointerMove}
             onpointerup={onPointerUp}
             onpointercancel={endGesture}
             onclickcapture={onClickCapture}
-            class={marking || dragging ? "touch-none select-none" : ""}
+            class="flex flex-col [scrollbar-gutter:stable] {marking || dragging ? 'touch-none select-none' : ''}"
           >
             {#if wide}
               {@render columnsHead()}
             {/if}
-            {#each ordered as entry, index (entry.file)}
-              {@render entryLine(entry, index)}
-            {/each}
+            {#if ordered.length}
+              <div use:rowWindow.track style={rowWindow.style} class="shrink-0">
+                {#each rowWindow.slice(ordered) as entry, offset (entry.file)}
+                  {@render entryLine(entry, rowWindow.start + offset)}
+                {/each}
+              </div>
+            {:else}
+              <EmptyState
+                loading={!loaded}
+                icon={querying ? NO_RESULTS_ICON : FolderOpen}
+                text={t(querying ? "NO_RESULTS" : "NO_FILES")}
+                class="flex-1"
+              />
+            {/if}
           </ScrollCard>
         </div>
-      {:else}
-        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
-          <EmptyState
-            loading={!loaded}
-            icon={querying ? NO_RESULTS_ICON : FolderOpen}
-            text={t(querying ? "NO_RESULTS" : "NO_FILES")}
-            class="flex-1"
-          />
-        </div>
+        {#if rowMenu}
+          <PopupMenu
+            open={rowMenuOpen}
+            onOpenChange={(open) => (rowMenuOpen = open)}
+            anchor={rowMenu.anchor}
+            label={t("MORE_OPTIONS")}
+          >
+            <FileActionItems
+              actions={rowActions(selectedSet.has(rowMenu.entry.file) ? selectedEntries : [rowMenu.entry])}
+            />
+          </PopupMenu>
+        {/if}
       {/if}
     </div>
 

@@ -6,6 +6,7 @@
   import type { ModChild, ModComponent, ModNode } from "$lib/data/modModels";
   import { t } from "$lib/i18n/index.svelte";
   import ExternalLinkDialog from "$lib/ui/ExternalLinkDialog.svelte";
+  import { FIELD_RING_CLASS } from "$lib/ui/field";
   import { typingOnTouch } from "$lib/ui/keepFocus";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -91,8 +92,7 @@
   const KEYCAP_CLASS =
     "inline-flex h-[1.125rem] min-w-[1.125rem] shrink-0 items-center justify-center rounded-sm bg-surface-variant px-1 font-mono text-label-sm leading-none text-on-surface-variant uppercase";
 
-  const FIELD_CLASS =
-    "min-h-8 min-w-[12ch] flex-1 resize-none rounded-md bg-surface-variant px-2.5 py-1 text-on-surface ring-(length:--hairline) ring-transparent outline-none ring-inset placeholder:text-on-surface-variant focus:ring-accent disabled:opacity-40";
+  const FIELD_CLASS = `min-h-8 min-w-[12ch] flex-1 resize-none rounded-md bg-surface-variant px-2.5 py-1 text-on-surface ${FIELD_RING_CLASS} ring-transparent placeholder:text-on-surface-variant focus:ring-accent disabled:opacity-40`;
   const FIELD_BUTTON_CLASS =
     "ripple flex h-8 shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-3 text-label-md whitespace-nowrap select-none disabled:cursor-default disabled:opacity-40";
 

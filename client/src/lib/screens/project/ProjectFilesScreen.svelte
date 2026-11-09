@@ -17,6 +17,7 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
   import { compareText, isArchive, joined } from "$lib/data/format";
+  import { keepUnchanged } from "$lib/data/stableList";
   import { openFilePreview } from "$lib/app/filePreview";
   import { projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
@@ -38,6 +39,7 @@
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
   import { nearEdge } from "$lib/ui/paging";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import { RowWindow } from "$lib/ui/rowWindow.svelte";
   import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
@@ -85,13 +87,13 @@
   const list = $derived(chatListFor(backend.active));
   const projects = $derived(list?.visibleProjects ?? []);
 
-  let children = $state<Record<string, ProjectEntry[]>>({});
+  let children = $state.raw<Record<string, ProjectEntry[]>>({});
   let listingRun = 0;
   const listingRuns: Record<string, number> = {};
-  let expanded = $state<Record<string, boolean>>({});
+  let expanded = $state.raw<Record<string, boolean>>({});
   let searching = $state(false);
   let query = $state("");
-  let results = $state<ProjectEntry[] | null>(null);
+  let results = $state.raw<ProjectEntry[] | null>(null);
   let tracked = $state(false);
   let locked = $state(false);
   let showChanged = $state(settings.projectChangedOnly);
@@ -298,10 +300,18 @@
     for (const item of targets) picked[item.path] = turningOn;
   };
 
+  const pickedFolders = $derived.by(() => {
+    const folders = new Set<string>();
+    for (const item of files) {
+      if (picked[item.path] !== true) continue;
+      const segments = item.repoPath.split("/");
+      for (let depth = 1; depth < segments.length; depth++) folders.add(segments.slice(0, depth).join("/"));
+    }
+    return folders;
+  });
+
   const marked = (entry: ProjectEntry) =>
-    entry.isDir
-      ? files.some((item) => inFolder(entry, item) && picked[item.path] === true)
-      : picked[entry.path] === true;
+    entry.isDir ? pickedFolders.has(entry.path) : picked[entry.path] === true;
 
   let unlocking = $state(false);
   let rejected = $state(false);
@@ -342,6 +352,8 @@
     walk("", 0);
     return listed;
   });
+
+  const treeWindow = new RowWindow(() => rows.length);
 
   const folderEntry = (path: string, name: string): ProjectEntry => ({
     name,
@@ -406,6 +418,10 @@
     walk(changedTree, 0);
     return listed;
   });
+
+  const changedWindow = new RowWindow(() => changedRows.length);
+
+  const resultsWindow = new RowWindow(() => results?.length ?? 0);
 
   const fold = (path: string) => {
     expanded = { ...expanded, [path]: !expanded[path] };
@@ -545,12 +561,12 @@
       loading = false;
       const loaded = arrived.filter(([path]) => listingRuns[path] === run);
       const root = loaded.find(([path]) => path === "")?.[1];
-      children = {
-        ...children,
-        ...Object.fromEntries(
-          loaded.filter(([, listing]) => listing).map(([path, listing]) => [path, listing!.entries]),
-        ),
-      };
+      const updates = loaded
+        .filter(([, listing]) => listing)
+        .map(([path, listing]) => [path, keepUnchanged(children[path], listing!.entries, (entry) => entry.path)] as const);
+      if (updates.some(([path, entries]) => entries !== children[path])) {
+        children = { ...children, ...Object.fromEntries(updates) };
+      }
       if (!root) return;
       tracked = root.tracked;
       locked = !root.unlocked;
@@ -992,9 +1008,11 @@
     {:else if showChanged}
       {#if files.length}
         <ScrollCard frame={LIST_FRAME} memory={memoryOf("changed")}>
-          {#each changedRows as row (row.entry.path)}
-            {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true)}
-          {/each}
+          <div use:changedWindow.track style={changedWindow.style}>
+            {#each changedWindow.slice(changedRows) as row (row.entry.path)}
+              {@render changedRow(row.entry, row.depth, expanded[row.entry.path] === true)}
+            {/each}
+          </div>
         </ScrollCard>
       {:else}
         <EmptyState icon={GitCompare} text={t("NO_CHANGES")} class="min-h-0 flex-1" />
@@ -1002,20 +1020,24 @@
     {:else if results !== null}
       {#if results.length}
         <ScrollCard frame={LIST_FRAME}>
-          {#each results as entry (entry.path)}
-            {@render pathRow(entry)}
-          {/each}
+          <div use:resultsWindow.track style={resultsWindow.style}>
+            {#each resultsWindow.slice(results) as entry (entry.path)}
+              {@render pathRow(entry)}
+            {/each}
+          </div>
         </ScrollCard>
       {:else}
         <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
       {/if}
     {:else if rows.length}
       <ScrollCard frame={LIST_FRAME} memory={memoryOf("tree")}>
-        {#each rows as row (row.entry.path)}
-          {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
-            activate(row.entry),
-          )}
-        {/each}
+        <div use:treeWindow.track style={treeWindow.style}>
+          {#each treeWindow.slice(rows) as row (row.entry.path)}
+            {@render fileRow(row.entry, row.depth, expanded[row.entry.path] === true, () =>
+              activate(row.entry),
+            )}
+          {/each}
+        </div>
       </ScrollCard>
     {:else}
       <EmptyState icon={FolderClosed} text={t("NO_FILES")} class="min-h-0 flex-1" />

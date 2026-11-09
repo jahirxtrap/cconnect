@@ -60,7 +60,7 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
-  import { selectField } from "$lib/ui/field";
+  import { FIELD_RING_CLASS, selectField } from "$lib/ui/field";
   import { keepFocus } from "$lib/ui/keepFocus";
   import { TOUCH_SLOP } from "$lib/ui/press";
   import { PullState } from "$lib/ui/pull.svelte";
@@ -950,7 +950,7 @@
     </TooltipIconButton>
     <div
       bind:this={addressBox}
-      class="group/address mx-1 flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface-variant pl-2.5 ring-(length:--hairline) ring-transparent transition-shadow ring-inset focus-within:ring-accent {shielded
+      class="group/address mx-1 flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md bg-surface-variant pl-2.5 {FIELD_RING_CLASS} ring-transparent focus-within:ring-accent {shielded
         ? 'pr-1'
         : address
           ? 'pr-2.5 focus-within:pr-1'

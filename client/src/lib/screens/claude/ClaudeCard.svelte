@@ -5,6 +5,7 @@
 <script lang="ts">
   import { t } from "$lib/i18n/index.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
+  import { REPAINT_EDGE_CLASS } from "$lib/ui/field";
   import StatusDot from "$lib/ui/StatusDot.svelte";
 
   interface Props {
@@ -28,7 +29,7 @@
   }: Props = $props();
 </script>
 
-<CardPanel {onclick} class="min-w-0 gap-1.5 {selected ? 'ring-(length:--hairline) ring-accent-ring ring-inset' : ''}">
+<CardPanel {onclick} class="min-w-0 gap-1.5 {REPAINT_EDGE_CLASS} {selected ? 'ring-(length:--hairline) ring-accent-ring ring-inset' : ''}">
   <span class="flex min-w-0 items-center gap-2">
     <span class="min-w-0 truncate text-label-lg">{title}</span>
     {#if tag}

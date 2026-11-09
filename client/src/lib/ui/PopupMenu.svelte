@@ -25,7 +25,7 @@
     side?: "top" | "bottom";
     align?: "start" | "center" | "end";
     matchTriggerWidth?: boolean;
-    anchor?: MenuPoint | null;
+    anchor?: MenuPoint | HTMLElement | null;
     triggerClass?: string;
     trigger?: Snippet;
     triggerChild?: Snippet<[Record<string, unknown>]>;
@@ -50,8 +50,14 @@
     children,
   }: Props = $props();
 
-  const pointAnchor = $derived(
-    anchor ? { getBoundingClientRect: () => new DOMRect(anchor.x, anchor.y, 0, 0) } : null,
+  const atPoint = $derived(anchor !== null && !(anchor instanceof HTMLElement));
+
+  const customAnchor = $derived(
+    anchor instanceof HTMLElement
+      ? anchor
+      : anchor
+        ? { getBoundingClientRect: () => new DOMRect(anchor.x, anchor.y, 0, 0) }
+        : null,
   );
 
   const drill = provideMenuDrill();
@@ -85,7 +91,7 @@
         {@render triggerChild(props)}
       {/snippet}
     </DropdownMenu.Trigger>
-  {:else if !pointAnchor}
+  {:else if !customAnchor}
     <DropdownMenu.Trigger
       onmousedown={holdFocus}
       oncontextmenu={(event) => event.preventDefault()}
@@ -101,8 +107,8 @@
       onCloseAutoFocus={(event) => event.preventDefault()}
       {side}
       {align}
-      customAnchor={pointAnchor}
-      sideOffset={pointAnchor ? 0 : 4}
+      {customAnchor}
+      sideOffset={atPoint ? 0 : 4}
       collisionPadding={layout.menuPadding}
       style={matchTriggerWidth ? "min-width: var(--bits-dropdown-menu-anchor-width)" : ""}
       class={MENU_CONTENT_CLASS}

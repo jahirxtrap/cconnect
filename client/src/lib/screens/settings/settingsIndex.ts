@@ -122,7 +122,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "battery", label: "BATTERY_OPTIMIZATION", summary: "BATTERY_OPTIMIZATION_SUMMARY", available: () => androidBackground() !== null, section: "background", group: "BACKGROUND_GROUP" },
   { id: "tray", label: "MINIMIZE_TO_TRAY", summary: "MINIMIZE_TO_TRAY_SUMMARY", available: () => isDesktop, section: "background", group: "BACKGROUND_GROUP" },
 
-  { id: "environments", label: "ENVIRONMENTS", value: environmentValue, section: "server", group: "SETTINGS_SERVER", dialog: "environments" },
+  { id: "environments", label: "ENVIRONMENTS", value: environmentValue, section: "server", group: "SETTINGS_CONNECTIVITY", dialog: "environments" },
 
   { id: "generation", label: "GENERATION", value: generationValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "model", label: "MODEL", value: modelValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
@@ -246,7 +246,7 @@ const environmentEntries = (): SettingsEntry[] =>
     label: profile.name,
     value: () => address(profile),
     section: "server",
-    group: "SETTINGS_SERVER",
+    group: "SETTINGS_CONNECTIVITY",
     dialog: "environments",
   }));
 
