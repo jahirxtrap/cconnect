@@ -1,4 +1,5 @@
 import { strFromU8 } from "fflate";
+import { compareNames } from "$lib/data/format";
 import { rgbOf, withAlpha } from "../accents";
 import { BUILTIN_BACKGROUNDS } from "../backgrounds";
 import { textOn } from "../contrast";
@@ -31,7 +32,7 @@ const BUILTIN = BUILTIN_PACKS.map((pack) =>
 );
 
 const byName = <T extends { name: string | null }>(items: T[]): T[] =>
-  items.toSorted((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+  items.toSorted((a, b) => compareNames(a.name ?? "", b.name ?? ""));
 
 const resolveThemes = (packs: readonly Pack[]): PackTheme[] => {
   const files = new Map(packs.flatMap((pack) => byName(pack.themes).map((file) => [file.id, file] as const)));
@@ -73,7 +74,7 @@ class Packs {
 
   readonly all = $derived<readonly Pack[]>([
     ...BUILTIN,
-    ...this.installed.toSorted((a, b) => a.info.name.localeCompare(b.info.name)),
+    ...this.installed.toSorted((a, b) => compareNames(a.info.name, b.info.name)),
   ]);
   readonly themes = $derived(resolveThemes(this.all));
   readonly terminals = $derived(resolveTerminals(this.all));

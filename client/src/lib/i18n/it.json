@@ -116,6 +116,8 @@
   "SSH_USER": "Utente",
   "SSH_PASSWORD": "Password",
   "SSH_DISCONNECT": "Disconnetti",
+  "SSH_KEY_CHANGED": "La chiave host di {1} è cambiata. Nuova impronta: {2}",
+  "SSH_KEY_TRUST": "Premi Invio per considerare attendibile la nuova chiave e connetterti, oppure Esc per annullare.",
   "SSH_CONNECTING": "Connessione in corso",
   "SSH_CONNECTED": "Connesso",
   "SSH_CLOSED": "Disconnesso",

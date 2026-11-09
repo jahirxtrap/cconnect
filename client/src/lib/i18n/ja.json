@@ -115,6 +115,8 @@
   "SSH_USER": "ユーザー",
   "SSH_PASSWORD": "パスワード",
   "SSH_DISCONNECT": "切断",
+  "SSH_KEY_CHANGED": "{1} のホストキーが変更されました。新しいフィンガープリント: {2}",
+  "SSH_KEY_TRUST": "Enter キーで新しいキーを信頼して接続します。Esc キーでキャンセルします。",
   "SSH_CONNECTING": "接続中",
   "SSH_CONNECTED": "接続済み",
   "SSH_CLOSED": "未接続",

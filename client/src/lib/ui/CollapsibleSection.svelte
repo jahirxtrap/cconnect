@@ -13,11 +13,15 @@
   }
 
   const { label, open, marked = false, onToggle, children }: Props = $props();
+
+  const bodyId = $props.id();
 </script>
 
 <div class="chat-gap flex w-full flex-col">
   <button
     type="button"
+    aria-expanded={open}
+    aria-controls={open ? bodyId : undefined}
     onclick={(event) => onToggle(event.currentTarget)}
     class="flex w-full cursor-pointer items-center gap-1.5 rounded-md py-1 text-left transition-colors select-none hover:bg-hover"
   >
@@ -31,6 +35,6 @@
     </span>
   </button>
   {#if open}
-    <div use:gridHeight class="chat-gap flex flex-col">{@render children()}</div>
+    <div id={bodyId} use:gridHeight class="chat-gap flex flex-col">{@render children()}</div>
   {/if}
 </div>

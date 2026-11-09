@@ -81,7 +81,7 @@
   import { inPane } from "$lib/screens/chat/paneSurface";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
-  import { formatSeconds, joined, SEPARATOR } from "$lib/data/format";
+  import { compareText, formatSeconds, joined, SEPARATOR } from "$lib/data/format";
   import { holdRefresh } from "$lib/data/inflight";
   import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -515,7 +515,7 @@
 
   const hookOrigin = (hook: Hook) => hook.pluginName ?? sourceLabel(hook.source);
 
-  const sortedHooks = $derived((hooks ?? []).toSorted((a, b) => a.event.localeCompare(b.event)));
+  const sortedHooks = $derived((hooks ?? []).toSorted((a, b) => compareText(a.event, b.event)));
 
   const hookFilters = $derived.by((): { event: string | null; label: string; count: number }[] => {
     const events = [...new Set(sortedHooks.map((hook) => hook.event))];

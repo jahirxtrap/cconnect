@@ -5,6 +5,15 @@ use std::process::Command;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+const APPIMAGE_VAR: &str = "APPIMAGE";
+const APPIMAGE_EXTENSION: &str = ".AppImage";
+#[cfg(target_os = "linux")]
+const EXECUTABLE_MODE: u32 = 0o755;
+
+#[cfg(target_os = "macos")]
+const MAC_GRAPHITE: i64 = -1;
+#[cfg(target_os = "macos")]
+const MAC_MULTICOLOR: i64 = 4;
 #[cfg(target_os = "macos")]
 const MAC_ACCENTS: [&str; 8] = [
     "#ff5257", "#f7821b", "#ffc600", "#62ba46", "#0433ff", "#a550a7", "#f74f9e", "#8e8e93",
@@ -45,13 +54,49 @@ fn read_accent() -> Option<String> {
 
 #[cfg(target_os = "macos")]
 fn read_accent() -> Option<String> {
-    let raw = run("defaults", &["read", "-g", "AppleAccentColor"])?;
-    let index: usize = raw.trim().parse().ok()?;
-    MAC_ACCENTS.get(index).map(|color| color.to_string())
+    let index = run("defaults", &["read", "-g", "AppleAccentColor"])
+        .and_then(|raw| raw.trim().parse::<i64>().ok())
+        .unwrap_or(MAC_MULTICOLOR);
+    let slot = if index == MAC_GRAPHITE { MAC_ACCENTS.len() - 1 } else { usize::try_from(index).ok()? };
+    MAC_ACCENTS.get(slot).map(|color| color.to_string())
 }
 
 #[cfg(all(not(windows), not(target_os = "macos")))]
 fn read_accent() -> Option<String> {
+    portal_accent().or_else(gnome_accent)
+}
+
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn portal_accent() -> Option<String> {
+    let raw = run(
+        "busctl",
+        &[
+            "--user",
+            "call",
+            "org.freedesktop.portal.Desktop",
+            "/org/freedesktop/portal/desktop",
+            "org.freedesktop.portal.Settings",
+            "ReadOne",
+            "ss",
+            "org.freedesktop.appearance",
+            "accent-color",
+        ],
+    )?;
+    let channels: Vec<f64> = raw.split_whitespace().filter_map(|part| part.parse().ok()).collect();
+    match channels[..] {
+        [red, green, blue] if [red, green, blue].iter().all(|channel| (0.0..=1.0).contains(channel)) => {
+            let byte = |channel: f64| (channel * 255.0).round() as u8;
+            Some(format!("#{:02x}{:02x}{:02x}", byte(red), byte(green), byte(blue)))
+        }
+        _ => None,
+    }
+}
+
+#[cfg(all(not(windows), not(target_os = "macos")))]
+fn gnome_accent() -> Option<String> {
+    if !std::env::var("XDG_CURRENT_DESKTOP").is_ok_and(|desktop| desktop.to_uppercase().contains("GNOME")) {
+        return None;
+    }
     let raw = run("gsettings", &["get", "org.gnome.desktop.interface", "accent-color"])?;
     let name = raw.trim().trim_matches('\'');
     let color = match name {
@@ -92,6 +137,21 @@ pub fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String>
         return Ok(());
     }
 
+    if cfg!(target_os = "macos") {
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|error| error.to_string())?;
+        return Ok(());
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if path.ends_with(APPIMAGE_EXTENSION) {
+            return replace_appimage(&app, &file);
+        }
+    }
+
     if let Some(command) = package_command(&path) {
         if detached_install(&command) {
             app.exit(0);
@@ -108,6 +168,58 @@ pub fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String>
         .arg(&path)
         .spawn()
         .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn installer_kind() -> &'static str {
+    if cfg!(windows) {
+        let per_machine = std::env::current_exe()
+            .ok()
+            .zip(std::env::var_os("ProgramFiles"))
+            .is_some_and(|(exe, root)| exe.starts_with(root));
+        return if per_machine { ".msi" } else { ".exe" };
+    }
+    if cfg!(target_os = "macos") {
+        return ".dmg";
+    }
+    if std::env::var_os(APPIMAGE_VAR).is_some() {
+        return APPIMAGE_EXTENSION;
+    }
+    if owns_executable("dpkg", "-S") {
+        ".deb"
+    } else if owns_executable("rpm", "-qf") || !has_command("dpkg") {
+        ".rpm"
+    } else {
+        ".deb"
+    }
+}
+
+fn owns_executable(manager: &str, flag: &str) -> bool {
+    std::env::current_exe().is_ok_and(|exe| {
+        Command::new(manager)
+            .arg(flag)
+            .arg(exe)
+            .output()
+            .is_ok_and(|output| output.status.success())
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn replace_appimage(app: &tauri::AppHandle, downloaded: &std::path::Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let current = std::env::var_os(APPIMAGE_VAR)
+        .map(std::path::PathBuf::from)
+        .ok_or_else(|| "not running from an AppImage".to_string())?;
+    let staged = current.with_extension("new");
+    std::fs::copy(downloaded, &staged).map_err(|error| error.to_string())?;
+    std::fs::set_permissions(&staged, std::fs::Permissions::from_mode(EXECUTABLE_MODE))
+        .map_err(|error| error.to_string())?;
+    std::fs::rename(&staged, &current).map_err(|error| error.to_string())?;
+    Command::new(&current)
+        .spawn()
+        .map_err(|error| error.to_string())?;
+    app.exit(0);
     Ok(())
 }
 

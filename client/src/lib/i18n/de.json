@@ -116,6 +116,8 @@
   "SSH_USER": "Benutzer",
   "SSH_PASSWORD": "Passwort",
   "SSH_DISCONNECT": "Trennen",
+  "SSH_KEY_CHANGED": "Der Hostschlüssel von {1} hat sich geändert. Neuer Fingerabdruck: {2}",
+  "SSH_KEY_TRUST": "Drücke die Eingabetaste, um dem neuen Schlüssel zu vertrauen und zu verbinden, oder Esc zum Abbrechen.",
   "SSH_CONNECTING": "Wird verbunden",
   "SSH_CONNECTED": "Verbunden",
   "SSH_CLOSED": "Getrennt",

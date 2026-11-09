@@ -1,5 +1,6 @@
 """Read-only directory browsing for the apps' path pickers."""
 
+import ctypes
 import os
 import string
 from pathlib import Path
@@ -9,7 +10,8 @@ from typing import Optional
 def _roots() -> list[str]:
     if os.name != "nt":
         return ["/"]
-    return [f"{letter}:\\" for letter in string.ascii_uppercase if Path(f"{letter}:\\").is_dir()]
+    present = ctypes.windll.kernel32.GetLogicalDrives()
+    return [f"{letter}:\\" for index, letter in enumerate(string.ascii_uppercase) if present >> index & 1]
 
 
 def listing(path: Optional[str] = None, files: bool = False) -> dict:

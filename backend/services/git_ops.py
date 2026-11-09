@@ -101,8 +101,7 @@ def resolve(root: Path, repo_path: str) -> Optional[Path]:
 
 
 def _untracked(repo: Path, paths: list[str]) -> list[str]:
-    reported = _read(repo, "ls-files", "--others", "--exclude-standard", "--", *paths)
-    return [line for line in (reported or "").splitlines() if line]
+    return git.names(_read(repo, "ls-files", "--others", "--exclude-standard", "-z", "--", *paths))
 
 
 def identities(repo: Path) -> dict:
@@ -161,8 +160,7 @@ def _amend_base(repo: Path) -> str:
 
 
 def _head_files(repo: Path) -> list[str]:
-    reported = _read(repo, "show", "--pretty=", "--name-only", "HEAD")
-    return [line for line in (reported or "").splitlines() if line]
+    return git.names(_read(repo, "show", "--pretty=", "--name-only", "-z", "HEAD"))
 
 
 def diff_context(repo: Path, paths: list[str], base: str = "HEAD") -> dict:

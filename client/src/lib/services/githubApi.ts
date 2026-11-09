@@ -1,4 +1,4 @@
-import { platformName } from "$lib/platform";
+import { isTauri, platformName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 
 const OWNER = "jahirxtrap";
@@ -37,13 +37,11 @@ interface ReleaseWire {
   assets?: Array<{ name?: string; browser_download_url?: string }>;
 }
 
-const installerExtensions = (): string[] => {
-  const name = platformName();
-  if (name === "windows") return [".msi", ".exe"];
-  if (name === "macos") return [".dmg"];
-  if (name === "linux") return [".deb", ".rpm", ".AppImage"];
-  if (name === "android") return [".apk"];
-  return [];
+const installerExtension = async (): Promise<string | null> => {
+  if (platformName() === "android") return ".apk";
+  if (!isTauri) return null;
+  const { invoke } = await import("@tauri-apps/api/core");
+  return invoke<string>("installer_kind").catch(() => null);
 };
 
 interface ProfileWire {
@@ -87,14 +85,8 @@ const fetchJson = async <T>(url: string): Promise<T | null> => {
   }
 };
 
-const installerFor = (assets: ReleaseWire["assets"]): string | null => {
-  const listed = (assets ?? []).filter((asset) => !!asset.browser_download_url);
-  for (const extension of installerExtensions()) {
-    const match = listed.find((asset) => asset.browser_download_url!.endsWith(extension));
-    if (match) return match.browser_download_url!;
-  }
-  return null;
-};
+const installerFor = (assets: ReleaseWire["assets"], extension: string | null): string | null =>
+  (extension && assets?.find((asset) => asset.browser_download_url?.endsWith(extension))?.browser_download_url) || null;
 
 export const latestRelease = async (): Promise<Release | null> => {
   const data = await fetchJson<ReleaseWire>(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`);
@@ -102,7 +94,7 @@ export const latestRelease = async (): Promise<Release | null> => {
   return {
     tag: data.tag_name,
     url: data.html_url ?? RELEASES_URL,
-    installerUrl: installerFor(data.assets),
+    installerUrl: installerFor(data.assets, await installerExtension()),
   };
 };
 

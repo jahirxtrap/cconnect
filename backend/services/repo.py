@@ -6,6 +6,7 @@ from importlib.metadata import PackageNotFoundError, version as installed_versio
 from typing import Optional
 
 import httpx
+from packaging.version import InvalidVersion, Version
 
 from core import packages, paths, release
 from services import git
@@ -18,19 +19,16 @@ DISTRIBUTION = "cconnect"
 RELOADS = sys.platform != "win32"
 
 
-def _parts(version: str) -> tuple[int, ...]:
-    return tuple(int(piece) for piece in version.split(".") if piece.isdigit())
-
-
 def _released() -> Optional[str]:
     """The version on PyPI when it is newer than the one running, empty when it is not, None when PyPI did not answer."""
     try:
         answer = httpx.get(_RELEASE_URL, timeout=_RELEASE_TIMEOUT)
         answer.raise_for_status()
         latest = str(answer.json()["info"]["version"])
-    except (httpx.HTTPError, ValueError, KeyError):
+        newer = Version(latest) > Version(release.VERSION)
+    except (httpx.HTTPError, ValueError, KeyError, InvalidVersion):
         return None
-    return latest if _parts(latest) > _parts(release.VERSION) else ""
+    return latest if newer else ""
 
 
 def upgrade_command() -> list[str]:

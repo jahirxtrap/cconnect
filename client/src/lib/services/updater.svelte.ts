@@ -1,4 +1,5 @@
 import { APP_VERSION } from "$lib/data/build";
+import { compareVersions } from "$lib/data/compat";
 import { isMobile, isTauri } from "$lib/platform";
 import { androidInstaller, trackAndroidInstall } from "$lib/platform/androidInstaller";
 import { store } from "$lib/platform/storage";
@@ -9,15 +10,16 @@ interface Pending {
 }
 
 const PENDING_KEY = "update.pending";
+const FLUSH_BYTES = 4 * 1024 * 1024;
 
-const compare = (a: string, b: string) => {
-  const left = a.split(".").map(Number);
-  const right = b.split(".").map(Number);
-  for (let i = 0; i < Math.max(left.length, right.length); i++) {
-    const diff = (left[i] ?? 0) - (right[i] ?? 0);
-    if (diff !== 0) return diff;
+const joinChunks = (chunks: Uint8Array[], size: number): Uint8Array => {
+  const joined = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.length;
   }
-  return 0;
+  return joined;
 };
 
 class Updater {
@@ -30,7 +32,7 @@ class Updater {
   async consumeIfInstalled() {
     const current = this.pending;
     if (!current) return;
-    if (compare(APP_VERSION, current.version) >= 0) {
+    if (compareVersions(APP_VERSION, current.version) >= 0) {
       this.#clear();
       return;
     }
@@ -95,24 +97,27 @@ class Updater {
       if (!response.ok || !response.body) throw new Error(String(response.status));
       const total = Number(response.headers.get("content-length") ?? 0);
 
-      const chunks: Uint8Array[] = [];
+      await fs.writeFile(target, new Uint8Array());
+      let batch: Uint8Array[] = [];
+      let batched = 0;
       let received = 0;
+      const flush = async () => {
+        if (!batched) return;
+        await fs.writeFile(target, joinChunks(batch, batched), { append: true });
+        batch = [];
+        batched = 0;
+      };
       const reader = response.body.getReader();
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
-        chunks.push(value);
+        batch.push(value);
+        batched += value.length;
         received += value.length;
+        if (batched >= FLUSH_BYTES) await flush();
         if (total > 0) this.progress = received / total;
       }
-
-      const blob = new Uint8Array(received);
-      let offset = 0;
-      for (const chunk of chunks) {
-        blob.set(chunk, offset);
-        offset += chunk.length;
-      }
-      await fs.writeFile(target, blob);
+      await flush();
 
       this.pending = { version, path: target };
       store.set(PENDING_KEY, this.pending);

@@ -15,8 +15,8 @@ const LOGO: &str = "<svg width=\"72\" height=\"72\" viewBox=\"0 0 108 108\" aria
 
 const WAIT_LIMIT: Duration = Duration::from_secs(300);
 const POLL: Duration = Duration::from_millis(150);
-const HEX: u32 = 16;
-const ESCAPE_LEN: usize = 3;
+const READ_LIMIT: Duration = Duration::from_secs(5);
+const LOOPBACK: &str = "http://127.0.0.1";
 
 #[derive(Default)]
 pub struct OauthState {
@@ -69,7 +69,11 @@ fn accept(listener: &TcpListener, cancelled: &AtomicBool, message: &str) -> Redi
     let deadline = Instant::now() + WAIT_LIMIT;
     while Instant::now() < deadline && !cancelled.load(Ordering::Relaxed) {
         match listener.accept() {
-            Ok((stream, _)) => return answer(stream, message),
+            Ok((stream, _)) => {
+                if let Some(found) = answer(stream, message) {
+                    return found;
+                }
+            }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(POLL),
             Err(_) => break,
         }
@@ -77,9 +81,16 @@ fn accept(listener: &TcpListener, cancelled: &AtomicBool, message: &str) -> Redi
     Redirect::default()
 }
 
-fn answer(mut stream: TcpStream, message: &str) -> Redirect {
+fn answer(mut stream: TcpStream, message: &str) -> Option<Redirect> {
+    stream.set_nonblocking(false).ok()?;
+    stream.set_read_timeout(Some(READ_LIMIT)).ok()?;
     let mut line = String::new();
-    let _ = BufReader::new(&stream).read_line(&mut line);
+    BufReader::new(&stream).read_line(&mut line).ok()?;
+    let found = parse(&line);
+    if found.code.is_empty() && found.error.is_empty() {
+        let _ = write!(stream, "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        return None;
+    }
     let page = format!(
         "<!doctype html><meta charset=\"utf-8\"><title>CConnect</title>\
          <body style=\"margin:0;height:100vh;display:grid;place-items:center;background:#0a0a0a;color:#e6e6e6;font:16px/1.4 system-ui,-apple-system,Segoe UI,sans-serif\">\
@@ -91,58 +102,25 @@ fn answer(mut stream: TcpStream, message: &str) -> Redirect {
         page.len()
     );
     let _ = stream.flush();
-    parse(&line)
+    Some(found)
 }
 
 fn parse(request: &str) -> Redirect {
     let mut found = Redirect::default();
-    let Some(target) = request.split_whitespace().nth(1) else {
+    let Some(url) = request
+        .split_whitespace()
+        .nth(1)
+        .and_then(|target| tauri::Url::parse(&format!("{LOOPBACK}{target}")).ok())
+    else {
         return found;
     };
-    let Some((_, query)) = target.split_once('?') else {
-        return found;
-    };
-    for pair in query.split('&') {
-        let Some((key, value)) = pair.split_once('=') else {
-            continue;
-        };
-        match key {
-            "code" => found.code = decode(value),
-            "state" => found.state = decode(value),
-            "error" => found.error = decode(value),
+    for (key, value) in url.query_pairs() {
+        match key.as_ref() {
+            "code" => found.code = value.into_owned(),
+            "state" => found.state = value.into_owned(),
+            "error" => found.error = value.into_owned(),
             _ => {}
         }
     }
     found
-}
-
-fn decode(value: &str) -> String {
-    let bytes = value.as_bytes();
-    let mut plain = Vec::with_capacity(bytes.len());
-    let mut at = 0;
-    while at < bytes.len() {
-        match bytes[at] {
-            b'%' if at + ESCAPE_LEN <= bytes.len() => {
-                match u8::from_str_radix(&value[at + 1..at + ESCAPE_LEN], HEX) {
-                    Ok(byte) => {
-                        plain.push(byte);
-                        at += ESCAPE_LEN;
-                    }
-                    Err(_) => {
-                        plain.push(b'%');
-                        at += 1;
-                    }
-                }
-            }
-            b'+' => {
-                plain.push(b' ');
-                at += 1;
-            }
-            byte => {
-                plain.push(byte);
-                at += 1;
-            }
-        }
-    }
-    String::from_utf8_lossy(&plain).into_owned()
 }

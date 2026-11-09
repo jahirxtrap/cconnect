@@ -28,6 +28,7 @@
 
   let query = $state("");
   let active = $state(0);
+  let list = $state<HTMLDivElement | null>(null);
 
   const matches = $derived(filterCommands(commands, query));
 
@@ -38,16 +39,18 @@
     })),
   );
 
+  const shown = $derived(groups.flatMap((section) => section.items));
+
   const launch = (index: number) => {
-    const command = matches[index];
+    const command = shown[index];
     if (!command) return;
     command.run();
     onDismiss();
   };
 
   const move = (delta: number) => {
-    if (!matches.length) return;
-    active = (active + delta + matches.length) % matches.length;
+    if (!shown.length) return;
+    active = (active + delta + shown.length) % shown.length;
   };
 
   const onKeydown = (event: KeyboardEvent) => {
@@ -61,6 +64,11 @@
   $effect(() => {
     void query;
     active = 0;
+  });
+
+  $effect(() => {
+    void active;
+    list?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest" });
   });
 
   $effect(() => pushDismiss(() => onDismiss()));
@@ -82,29 +90,37 @@
           onkeydown={onKeydown}
         />
       </div>
-      <div use:viewportScrollbar class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pb-2 {LIST_VIEWPORT_CLASS}">
+      <div
+        bind:this={list}
+        use:viewportScrollbar
+        role="listbox"
+        aria-label={t("COMMANDS")}
+        class="scrollbar-thin min-h-0 flex-1 overflow-y-auto pb-2 {LIST_VIEWPORT_CLASS}"
+      >
         {#each groups as section, index (section.group)}
           <SectionHeader label={t(GROUP_LABELS[section.group])} divider={index > 0} />
           {#each section.items as command (command.id)}
-            {@const index = matches.indexOf(command)}
-            <Pressable
-              onclick={() => void launch(index)}
-              hover={index !== active}
-              class="{MENU_ITEM_CLASS} text-body-md {index === active ? 'bg-hover' : ''}"
-            >
-              {#if command.icon}
-                <command.icon size={18} class="shrink-0 text-on-surface-variant" />
-              {/if}
-              <span class="min-w-0 flex-1 truncate text-left">{command.label}</span>
-              {#if command.detail}
-                <span class="min-w-0 shrink truncate text-body-sm text-on-surface-variant">
-                  {command.detail}
-                </span>
-              {/if}
-              {#if command.hint}
-                <span class="shrink-0 text-caption text-faint">{command.hint}</span>
-              {/if}
-            </Pressable>
+            {@const index = shown.indexOf(command)}
+            <div role="option" aria-selected={index === active}>
+              <Pressable
+                onclick={() => void launch(index)}
+                hover={index !== active}
+                class="{MENU_ITEM_CLASS} text-body-md {index === active ? 'bg-hover' : ''}"
+              >
+                {#if command.icon}
+                  <command.icon size={18} class="shrink-0 text-on-surface-variant" />
+                {/if}
+                <span class="min-w-0 flex-1 truncate text-left">{command.label}</span>
+                {#if command.detail}
+                  <span class="min-w-0 shrink truncate text-body-sm text-on-surface-variant">
+                    {command.detail}
+                  </span>
+                {/if}
+                {#if command.hint}
+                  <span class="shrink-0 text-caption text-faint">{command.hint}</span>
+                {/if}
+              </Pressable>
+            </div>
           {/each}
         {:else}
           <EmptyState text={t("NO_RESULTS")} class="py-8" />

@@ -33,15 +33,14 @@ _DEFAULT_ROWS = 24
 _TERM = "xterm-256color"
 _CONPTY_BUILD = 17763
 
-ANSI_OSC = re.compile(r"\x1b\][^\x07]*\x07")
-ANSI_CSI = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]")
+ANSI_ESCAPE = re.compile(r"\x1b(?:\][^\x07\x1b]*(?:\x07|\x1b\\)|\[[0-?]*[ -/]*[@-~]|[()*+][0-9A-Za-z]|[78=>DEHMNOZc])")
 ANSI_QUERY = re.compile(rb"\x1b\[[0-9;?>=]*[cn]")
 
 _terminals: dict[str, "Terminal"] = {}
 
 
 def strip_ansi(raw: str) -> str:
-    return ANSI_CSI.sub("", ANSI_OSC.sub("", raw))
+    return ANSI_ESCAPE.sub("", raw)
 
 
 def visible_text(raw: str) -> str:

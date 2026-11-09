@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from core import paths
 from core.config import DEFAULT_CWD
 from core.display import joined
@@ -35,6 +37,8 @@ _CLAUDEAI_PREFIX = "claude.ai "
 _tool_labels: tuple[tuple[float, ...], dict[str, str]] = ((), {})
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
+_HEADER_KEYS = ("name", "description")
+_YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
 
 
 def get_user_prompt() -> str:
@@ -262,14 +266,24 @@ def _skill_meta(skill_file: Path) -> dict | None:
         text = skill_file.read_text(encoding="utf-8")
     except OSError:
         return None
-    meta = {}
     match = _FRONTMATTER_RE.match(text)
-    if match:
-        for line in match.group(1).splitlines():
-            key, _, value = line.partition(":")
-            if key.strip() in ("name", "description"):
-                meta[key.strip()] = value.strip().strip("\"'")
-    return meta or None
+    return (_header_fields(match.group(1)) if match else {}) or None
+
+
+def _header_fields(header: str) -> dict:
+    """The name and description of a frontmatter, read as YAML like Claude Code reads it, line by line when it is not valid YAML."""
+    try:
+        parsed = yaml.load(header, Loader=_YAML_LOADER)
+    except yaml.YAMLError:
+        parsed = None
+    if isinstance(parsed, dict):
+        return {key: str(parsed[key]).strip() for key in _HEADER_KEYS if parsed.get(key) is not None}
+    fields = {}
+    for line in header.splitlines():
+        key, _, value = line.partition(":")
+        if key.strip() in _HEADER_KEYS:
+            fields[key.strip()] = value.strip().strip("\"'")
+    return fields
 
 
 def list_skills() -> list[dict]:

@@ -1,4 +1,5 @@
 import { chatBackground } from "$lib/data/chatBackground.svelte";
+import { compareVersions } from "$lib/data/compat";
 import { forgetSyntax } from "$lib/markdown/highlighter";
 import { theme } from "../theme.svelte";
 import { openArchive, writeArchive } from "./archive";
@@ -16,18 +17,6 @@ export interface InspectedPack {
   source: PackSource;
   blob: Blob;
 }
-
-const versionParts = (version: string): number[] =>
-  version.split(/[.+-]/).map((part) => Number.parseInt(part, 10) || 0);
-
-export const compareVersions = (a: string, b: string): number => {
-  const [left, right] = [versionParts(a), versionParts(b)];
-  for (let index = 0; index < Math.max(left.length, right.length); index++) {
-    const difference = (left[index] ?? 0) - (right[index] ?? 0);
-    if (difference) return Math.sign(difference);
-  }
-  return 0;
-};
 
 export const standingFor = (id: string, version: string): PackStanding => {
   const installed = packs.installedOf(id);

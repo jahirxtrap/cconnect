@@ -190,11 +190,10 @@ def _unzip(data: bytes, root: Path) -> None:
 
 def _untar(data: bytes, root: Path) -> None:
     with tarfile.open(fileobj=io.BytesIO(data)) as archive:
-        for member in archive.getmembers():
-            _inside(root, member.name)
-            if member.issym() or member.islnk():
-                _inside(root, str(PurePosixPath(member.name).parent / member.linkname))
-        archive.extractall(root)
+        try:
+            archive.extractall(root, filter="data")
+        except tarfile.FilterError as exc:
+            raise AgentError(INSTALL_FAILED, f"{exc.tarinfo.name} points outside the agent") from exc
 
 
 def _executable(target: Path) -> None:

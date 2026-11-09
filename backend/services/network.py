@@ -10,6 +10,7 @@ import subprocess
 import sys
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import AsyncExitStack, asynccontextmanager, suppress
 from typing import AsyncIterator, Callable, Optional
 
@@ -31,6 +32,7 @@ _OFFLINE_GRACE = 45.0
 _JOB_DEADLINE = 4 * _SETTLE_TIMEOUT
 _SSID_RE = re.compile(r"^\s*SSID\s+\d+\s*:\s*(.*)$")
 _PERCENT_RE = re.compile(r"(\d{1,3})\s*%")
+_UTF8_OUTPUT = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8"
 
 _sudo_password: Optional[str] = None
 _jobs: dict[str, dict] = {}
@@ -145,7 +147,7 @@ def _run(args: list[str], timeout: int = 25, privileged: bool = False) -> dict:
 
 
 def _powershell(script: str, timeout: int = 25) -> dict:
-    return _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], timeout=timeout)
+    return _run(["powershell", "-NoProfile", "-NonInteractive", "-Command", f"{_UTF8_OUTPUT}; {script}"], timeout=timeout)
 
 
 def _ps_json(script: str, timeout: int = 25):
@@ -385,15 +387,22 @@ def wifi_radio_state() -> Optional[bool]:
 
 
 def status() -> dict:
-    return {
-        "supported": True,
-        "wired_control": WIRED_CONTROL,
-        "needs_password": WIRED_CONTROL and not has_sudo_password(),
-        "connectivity": connectivity(),
-        "wifi_radio": wifi_radio_state(),
-        "wifi_ssid": wifi_current(),
-        "interfaces": interfaces(),
-    }
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        probes = {
+            key: pool.submit(probe)
+            for key, probe in (
+                ("connectivity", connectivity),
+                ("wifi_radio", wifi_radio_state),
+                ("wifi_ssid", wifi_current),
+                ("interfaces", interfaces),
+            )
+        }
+        return {
+            "supported": True,
+            "wired_control": WIRED_CONTROL,
+            "needs_password": WIRED_CONTROL and not has_sudo_password(),
+            **{key: probe.result() for key, probe in probes.items()},
+        }
 
 
 def _windows_wifi_adapter() -> Optional[str]:

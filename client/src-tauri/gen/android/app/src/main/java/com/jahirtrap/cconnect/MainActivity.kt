@@ -159,7 +159,7 @@ class MainActivity : TauriActivity() {
   private fun deliverShare() {
     val (hook, arguments) = pendingCall ?: return
     val view = content ?: return
-    if (shareAttempts++ > SHARE_ATTEMPTS) return
+    if (shareAttempts++ >= SHARE_ATTEMPTS) return
     view.postDelayed({
       view.evaluateJavascript("window.$hook ? (window.$hook($arguments), true) : false") { accepted ->
         if (accepted == "true") pendingCall = null else deliverShare()

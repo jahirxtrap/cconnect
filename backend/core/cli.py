@@ -22,8 +22,9 @@ from urllib.parse import urlparse
 
 import psutil
 import qrcode
+from dotenv import set_key
 
-from core import cli_manager, paths, release, sdk
+from core import cli_manager, paths, process_tree, release, sdk
 from core.config import PORT, RESTART_EXIT_CODE
 from services import agent_registry, repo, system_monitor
 
@@ -48,22 +49,7 @@ def _abort(msg: str) -> None:
 
 
 def _persist_in_env(var: str, value: str) -> None:
-    if not _ENV_PATH.exists():
-        _ENV_PATH.write_text(f"{var}={value}\n", encoding="utf-8")
-        return
-
-    lines = _ENV_PATH.read_text(encoding="utf-8").splitlines()
-    pattern = re.compile(rf"^\s*{re.escape(var)}\s*=\s*(.*)$")
-    for i, line in enumerate(lines):
-        if pattern.match(line):
-            lines[i] = f"{var}={value}"
-            _ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
-            return
-
-    if lines and lines[-1] != "":
-        lines.append("")
-    lines.append(f"{var}={value}")
-    _ENV_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    set_key(_ENV_PATH, var, value, quote_mode="never", follow_symlinks=True)
 
 
 def _ensure_public_token() -> bool:
@@ -353,29 +339,8 @@ def _spawn_detached(child_args: list[str]) -> int:
     return process.pid
 
 
-def _reapable(target: psutil.Process) -> bool:
-    with suppress(psutil.Error, OSError):
-        return target.status() != psutil.STATUS_ZOMBIE
-    return False
-
-
-def _process_tree(pid: int) -> list[psutil.Process]:
-    with suppress(psutil.Error, OSError):
-        parent = psutil.Process(pid)
-        return [target for target in parent.children(recursive=True) + [parent] if _reapable(target)]
-    return []
-
-
 def _terminate_tree(pid: int) -> None:
-    targets = _process_tree(pid)
-    for target in targets:
-        with suppress(psutil.Error, OSError):
-            target.terminate()
-    with suppress(psutil.Error, OSError):
-        _, alive = psutil.wait_procs(targets, timeout=_STOP_TIMEOUT)
-        for target in alive:
-            with suppress(psutil.Error, OSError):
-                target.kill()
+    process_tree.terminate(pid, _STOP_TIMEOUT)
 
 
 def _stop_detached() -> None:

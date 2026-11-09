@@ -19,14 +19,14 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Software Development",
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.11.4"
 dependencies = [
     "fastapi>=0.136.0",
     "uvicorn[standard]>=0.45.0",
     "pydantic>=2.13.3",
     "loguru>=0.7.3",
     "orjson>=3.12.0",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.2.4",
     "slowapi>=0.1.9",
     "httpx>=0.28.0",
     "websockets>=13.0",
@@ -38,6 +38,8 @@ dependencies = [
     "sqlglot>=30.30.0",
     "pillow>=10.0.0",
     "psutil>=5.9.0",
+    "pyyaml>=6.0.3",
+    "packaging>=26.3",
     "nvidia-ml-py>=12.0.0",
     "py7zr>=1.0.0",
     "py7zz>=1.5.0",

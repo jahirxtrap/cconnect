@@ -42,3 +42,8 @@ def run(root: Path, *args: str, timeout: int, writes: bool = False) -> subproces
         )
     except FileNotFoundError:
         return subprocess.CompletedProcess(command, _NOT_FOUND, "", "git is not installed")
+
+
+def names(listed: Optional[str]) -> list[str]:
+    """Paths from a `-z` listing, which git leaves unquoted whatever characters they hold."""
+    return [name for name in (listed or "").split("\0") if name]

@@ -116,6 +116,8 @@
   "SSH_USER": "User",
   "SSH_PASSWORD": "Password",
   "SSH_DISCONNECT": "Disconnect",
+  "SSH_KEY_CHANGED": "The host key of {1} has changed. New fingerprint: {2}",
+  "SSH_KEY_TRUST": "Press Enter to trust the new key and connect, or Esc to cancel.",
   "SSH_CONNECTING": "Connecting",
   "SSH_CONNECTED": "Connected",
   "SSH_CLOSED": "Disconnected",

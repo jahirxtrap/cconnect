@@ -1,26 +1,12 @@
 import { i18n } from "$lib/i18n/index.svelte";
 import { speech } from "./speech.svelte";
 
-interface RecognitionAlternative {
-  transcript: string;
-}
-
-interface RecognitionResult {
-  isFinal: boolean;
-  0: RecognitionAlternative;
-}
-
-interface RecognitionEvent {
-  resultIndex: number;
-  results: { length: number; [index: number]: RecognitionResult };
-}
-
 interface Recognition {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: RecognitionEvent) => void) | null;
-  onerror: ((event: { error: string }) => void) | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;

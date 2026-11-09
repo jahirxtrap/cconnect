@@ -116,6 +116,8 @@
   "SSH_USER": "Usuario",
   "SSH_PASSWORD": "Contraseña",
   "SSH_DISCONNECT": "Desconectar",
+  "SSH_KEY_CHANGED": "La clave del servidor {1} cambió. Huella nueva: {2}",
+  "SSH_KEY_TRUST": "Pulsa Intro para confiar en la clave nueva y conectar, o Esc para cancelar.",
   "SSH_CONNECTING": "Conectando",
   "SSH_CONNECTED": "Conectado",
   "SSH_CLOSED": "Desconectado",

@@ -6,6 +6,7 @@
   import Palette from "@lucide/svelte/icons/palette";
   import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Trash from "@lucide/svelte/icons/trash";
+  import { compareNames } from "$lib/data/format";
   import { projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { settings } from "$lib/data/settings.svelte";
   import { sessionColorOf, sessionColorOptions } from "$lib/design/sessionColors";
@@ -112,7 +113,7 @@
   };
 
   const sortedProjects = $derived(
-    [...chat.allProjects].sort((a, b) => projectLabel(a).localeCompare(projectLabel(b))),
+    [...chat.allProjects].sort((a, b) => compareNames(projectLabel(a), projectLabel(b))),
   );
 
   const commitProject = (project: ProjectInfo) => {

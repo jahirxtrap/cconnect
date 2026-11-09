@@ -115,6 +115,8 @@
   "SSH_USER": "用户名",
   "SSH_PASSWORD": "密码",
   "SSH_DISCONNECT": "断开连接",
+  "SSH_KEY_CHANGED": "{1} 的主机密钥已更改。新指纹：{2}",
+  "SSH_KEY_TRUST": "按 Enter 信任新密钥并连接，或按 Esc 取消。",
   "SSH_CONNECTING": "正在连接",
   "SSH_CONNECTED": "已连接",
   "SSH_CLOSED": "已断开连接",

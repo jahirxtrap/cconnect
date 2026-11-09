@@ -116,6 +116,8 @@
   "SSH_USER": "Usuário",
   "SSH_PASSWORD": "Senha",
   "SSH_DISCONNECT": "Desconectar",
+  "SSH_KEY_CHANGED": "A chave do host {1} mudou. Nova impressão digital: {2}",
+  "SSH_KEY_TRUST": "Pressione Enter para confiar na nova chave e conectar, ou Esc para cancelar.",
   "SSH_CONNECTING": "Conectando",
   "SSH_CONNECTED": "Conectado",
   "SSH_CLOSED": "Desconectado",

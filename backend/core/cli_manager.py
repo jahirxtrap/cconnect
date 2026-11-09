@@ -139,7 +139,7 @@ def _settled_version(
     version = cli_version(path)
     while True:
         if target is not None:
-            if version and target in version:
+            if _reported_version(version) == target:
                 return version
         elif version != before:
             return version

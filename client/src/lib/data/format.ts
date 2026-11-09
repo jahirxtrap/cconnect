@@ -10,7 +10,8 @@ import {
   SECONDS_PER_MINUTE,
 } from "./time";
 
-const SIZE_UNITS = ["KB", "MB", "GB", "TB"];
+const BYTES_PER_UNIT = 1024;
+const SIZE_UNITS = ["kilobyte", "megabyte", "gigabyte", "terabyte"] as const;
 
 const ARCHIVE_SUFFIXES = [
   ".zip",
@@ -41,7 +42,20 @@ export const formatTokens = (value: number): string => {
   return `${Math.round(value / (MILLION / 10)) / 10}M`;
 };
 
-type MeasureUnit = "millisecond" | "second" | "minute" | "hour" | "day" | "month" | "year" | "celsius";
+type MeasureUnit =
+  | "millisecond"
+  | "second"
+  | "minute"
+  | "hour"
+  | "day"
+  | "month"
+  | "year"
+  | "celsius"
+  | "byte"
+  | "kilobyte"
+  | "megabyte"
+  | "gigabyte"
+  | "terabyte";
 
 const SPANS: { unit: MeasureUnit; millis: number }[] = [
   { unit: "year", millis: MILLIS_PER_YEAR },
@@ -62,9 +76,10 @@ export const formatUnit = (value: number, unit: MeasureUnit, decimals = 0): stri
 const collator = (key: string, options: Intl.CollatorOptions) =>
   localized(`collator:${key}`, (locale) => new Intl.Collator(locale, options));
 
-export const compareText = (a: string, b: string): number => collator("text", {}).compare(a, b);
+export const compareText = (a: string, b: string): number => collator("text", { numeric: true }).compare(a, b);
 
-export const compareNames = (a: string, b: string): number => collator("name", { sensitivity: "base" }).compare(a, b);
+export const compareNames = (a: string, b: string): number =>
+  collator("name", { sensitivity: "base", numeric: true }).compare(a, b);
 
 export const formatDuration = (millis: number): string => {
   if (millis < MILLIS_PER_SECOND) return formatUnit(Math.round(millis), "millisecond");
@@ -123,14 +138,14 @@ export const formatDecimal = (value: number, decimals: number, minimum = decimal
   ).format(value);
 
 export const formatSize = (bytes: number): string => {
-  if (bytes < 1024) return `${bytes} B`;
-  let value = bytes / 1024;
+  if (bytes < BYTES_PER_UNIT) return formatUnit(bytes, "byte");
+  let value = bytes / BYTES_PER_UNIT;
   let unit = 0;
-  while (value >= 1024 && unit < SIZE_UNITS.length - 1) {
-    value /= 1024;
+  while (value >= BYTES_PER_UNIT && unit < SIZE_UNITS.length - 1) {
+    value /= BYTES_PER_UNIT;
     unit++;
   }
-  return `${formatDecimal(value, 1, 0)} ${SIZE_UNITS[unit]}`;
+  return formatUnit(value, SIZE_UNITS[unit], 1);
 };
 
 export const usageRatio = (used: number, limit: number): number =>

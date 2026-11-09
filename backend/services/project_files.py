@@ -65,7 +65,7 @@ def _build_index(repo: Path) -> Optional[set[str]]:
     listed = _git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
     if listed is None:
         return None
-    tracked = {path for path in listed.split("\0") if path}
+    tracked = set(git.names(listed))
     for path in list(tracked):
         parent = path.rpartition("/")[0]
         while parent:
@@ -319,7 +319,7 @@ def diff(root: Path, relpath: str) -> dict:
         gone = _git(repo, "show", f"HEAD:{inside}")
         lines = (gone or "").splitlines()
         return {"added": [], "removed": {"1": lines} if lines else {}}
-    if inside in (_git(repo, "ls-files", "--others", "--exclude-standard", "--", inside) or "").splitlines():
+    if inside in git.names(_git(repo, "ls-files", "--others", "--exclude-standard", "-z", "--", inside)):
         return {"added": list(range(1, _line_count(path) + 1)), "removed": {}}
     reported = _git(repo, "diff", "--unified=0", "HEAD", "--", inside)
     added: list[int] = []

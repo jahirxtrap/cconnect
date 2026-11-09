@@ -13,6 +13,7 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.request
 from contextlib import suppress
@@ -24,7 +25,7 @@ from loguru import logger
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
-from core import paths
+from core import paths, process_tree
 from core.config import (
     BROWSER_DEBUG_PORT,
     BROWSER_EXECUTABLE,
@@ -33,7 +34,6 @@ from core.config import (
 )
 
 _LAUNCH_TIMEOUT = 20.0
-_ENDPOINT_POLL = 0.15
 _CLOSE_TIMEOUT = 5.0
 _LOAD_TIMEOUT = 20.0
 _MAX_PENDING_FRAMES = 2
@@ -52,6 +52,7 @@ _ICON_WATCH = f"({(paths.SCRIPTS_DIR / 'page_icon.js').read_text(encoding='utf-8
 _ANDROID = "14"
 _FALLBACK_MAJOR = "141"
 _MAJOR = re.compile(r"Chrome/(\d+)")
+_ANNOUNCED = re.compile(r"DevTools listening on (ws://\S+)")
 _DESCRIBE = """function() {
   const parts = [];
   let node = this;
@@ -207,17 +208,18 @@ async def ready_endpoint() -> str:
     return endpoint()
 
 
-def _kill_tree(pid: int):
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            check=False,
-        )
-        return
-    subprocess.run(["pkill", "-TERM", "-P", str(pid)], check=False)
+def _settle(announced: asyncio.Future, target: Optional[str]) -> None:
+    if not announced.done():
+        announced.set_result(target)
+
+
+def _watch_stderr(stream: Any, loop: asyncio.AbstractEventLoop, announced: asyncio.Future) -> None:
+    """Hands over the endpoint Chromium announces and keeps draining the pipe until it closes."""
+    for line in stream:
+        match = _ANNOUNCED.search(line)
+        if match:
+            loop.call_soon_threadsafe(_settle, announced, match.group(1))
+    loop.call_soon_threadsafe(_settle, announced, None)
 
 
 def _endpoint(port: int) -> Optional[str]:
@@ -569,16 +571,20 @@ class BrowserSession:
         self._process = subprocess.Popen(
             arguments,
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
             creationflags=creation,
         )
 
-        target = None
-        deadline = asyncio.get_running_loop().time() + _LAUNCH_TIMEOUT
-        while target is None and asyncio.get_running_loop().time() < deadline:
-            target = await asyncio.to_thread(_endpoint, BROWSER_DEBUG_PORT)
-            if target is None:
-                await asyncio.sleep(_ENDPOINT_POLL)
+        loop = asyncio.get_running_loop()
+        announced: asyncio.Future = loop.create_future()
+        threading.Thread(target=_watch_stderr, args=(self._process.stderr, loop, announced), daemon=True).start()
+        try:
+            target = await asyncio.wait_for(announced, _LAUNCH_TIMEOUT)
+        except asyncio.TimeoutError:
+            target = None
         if target is None:
             await self._teardown()
             raise RuntimeError("no_endpoint")
@@ -967,7 +973,7 @@ class BrowserSession:
             try:
                 await asyncio.wait_for(asyncio.to_thread(process.wait), _CLOSE_TIMEOUT)
             except asyncio.TimeoutError:
-                _kill_tree(process.pid)
+                await asyncio.to_thread(process_tree.terminate, process.pid, _CLOSE_TIMEOUT)
 
 
 session = BrowserSession()

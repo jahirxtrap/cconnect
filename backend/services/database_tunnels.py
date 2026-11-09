@@ -9,6 +9,7 @@ from core.packages import NO_WINDOW
 
 SSH_PORT = 22
 CONNECT_SECONDS = 10
+OPEN_SECONDS = 3 * CONNECT_SECONDS
 ALIVE_SECONDS = 30
 CLOSE_SECONDS = 5
 ERROR_LINES = 6
@@ -66,9 +67,14 @@ class Tunnel:
         if text and not text.startswith(DEBUG_PREFIX):
             self._errors.append(text)
 
-    def _drain(self) -> None:
-        for line in self._process.stderr:
-            self._keep(line)
+    def _watch(self, process: subprocess.Popen, ready: str, opened: threading.Event, settled: threading.Event) -> None:
+        for line in process.stderr:
+            if not settled.is_set() and "listening on" in line and ready in line:
+                opened.set()
+                settled.set()
+            else:
+                self._keep(line)
+        settled.set()
 
     def open(self) -> int:
         client = shutil.which("ssh")
@@ -85,13 +91,18 @@ class Tunnel:
             errors="replace",
             creationflags=NO_WINDOW,
         )
-        ready = f"port {self.local}"
-        for line in self._process.stderr:
-            if "listening on" in line and ready in line:
-                threading.Thread(target=self._drain, name="db-tunnel", daemon=True).start()
-                return self.local
-            self._keep(line)
-        self._process.wait()
+        opened = threading.Event()
+        settled = threading.Event()
+        threading.Thread(
+            target=self._watch,
+            args=(self._process, f"port {self.local}", opened, settled),
+            name="db-tunnel",
+            daemon=True,
+        ).start()
+        settled.wait(OPEN_SECONDS)
+        if opened.is_set():
+            return self.local
+        self.close()
         raise TunnelError(TUNNEL_FAILED, "\n".join(self._errors))
 
     def close(self) -> None:

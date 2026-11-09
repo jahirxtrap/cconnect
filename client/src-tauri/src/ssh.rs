@@ -1,17 +1,22 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use base64::Engine;
 use russh::client::{self, Config, Handle, Handler};
-use russh::keys::ssh_key::PublicKey;
+use russh::keys::ssh_key::{HashAlg, PublicKey};
+use russh::keys::known_hosts::{known_host_keys_path, learn_known_hosts_path};
 use russh::{ChannelMsg, Disconnect};
 use serde::Deserialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio::sync::Mutex;
 
 const TERM: &str = "xterm-256color";
 const KEEPALIVE_SECS: u64 = 15;
+const KNOWN_HOSTS: &str = "known_hosts";
+const DEFAULT_PORT: u16 = 22;
+const KEY_CHANGED: &str = "hostkey_changed:";
 const PROBE_COMMAND: &str =
     "sh -c 'uname -s 2>/dev/null; cat /etc/os-release /etc/lsb-release /etc/system-release 2>/dev/null'";
 
@@ -74,14 +79,63 @@ pub struct SshState {
     sessions: Mutex<HashMap<String, Session>>,
 }
 
-struct Client;
+struct Client {
+    known_hosts: PathBuf,
+    host: String,
+    port: u16,
+    changed: Arc<std::sync::Mutex<Option<String>>>,
+}
 
 impl Handler for Client {
     type Error = russh::Error;
 
-    async fn check_server_key(&mut self, _key: &PublicKey) -> Result<bool, Self::Error> {
-        Ok(true)
+    async fn check_server_key(&mut self, key: &PublicKey) -> Result<bool, Self::Error> {
+        let recorded = known_host_keys_path(&self.host, self.port, &self.known_hosts).unwrap_or_default();
+        if recorded.iter().any(|(_, known)| known == key) {
+            return Ok(true);
+        }
+        if recorded.is_empty() {
+            let _ = learn_known_hosts_path(&self.host, self.port, key, &self.known_hosts);
+            return Ok(true);
+        }
+        *self.changed.lock().unwrap() = Some(key.fingerprint(HashAlg::Sha256).to_string());
+        Ok(false)
     }
+}
+
+fn known_hosts_file(app: &AppHandle) -> Result<PathBuf, String> {
+    app.path()
+        .app_data_dir()
+        .map(|directory| directory.join(KNOWN_HOSTS))
+        .map_err(|error| error.to_string())
+}
+
+fn host_entry(host: &str, port: u16) -> String {
+    if port == DEFAULT_PORT {
+        host.to_string()
+    } else {
+        format!("[{host}]:{port}")
+    }
+}
+
+#[tauri::command]
+pub fn ssh_forget_host(app: AppHandle, host: String, port: u16) -> Result<(), String> {
+    let path = known_hosts_file(&app)?;
+    let Ok(listed) = std::fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let entry = host_entry(&host, port);
+    let kept: String = listed
+        .lines()
+        .filter(|line| {
+            !line
+                .split(' ')
+                .next()
+                .is_some_and(|hosts| hosts.split(',').any(|name| name == entry))
+        })
+        .map(|line| format!("{line}\n"))
+        .collect();
+    std::fs::write(&path, kept).map_err(|error| error.to_string())
 }
 
 fn data_event(id: &str) -> String {
@@ -105,9 +159,19 @@ pub async fn ssh_connect(
         keepalive_interval: Some(std::time::Duration::from_secs(KEEPALIVE_SECS)),
         ..Config::default()
     });
-    let mut handle = client::connect(config, (profile.host.as_str(), profile.port), Client)
+    let changed = Arc::new(std::sync::Mutex::new(None));
+    let client = Client {
+        known_hosts: known_hosts_file(&app)?,
+        host: profile.host.clone(),
+        port: profile.port,
+        changed: changed.clone(),
+    };
+    let mut handle = client::connect(config, (profile.host.as_str(), profile.port), client)
         .await
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| match changed.lock().unwrap().take() {
+            Some(fingerprint) => format!("{KEY_CHANGED}{fingerprint}"),
+            None => error.to_string(),
+        })?;
 
     let authenticated = handle
         .authenticate_password(&profile.user, &profile.password)
