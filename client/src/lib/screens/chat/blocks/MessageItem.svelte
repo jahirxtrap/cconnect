@@ -11,6 +11,7 @@
   import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
   import { formatTokens } from "$lib/data/format";
   import { fileIcon } from "$lib/ui/fileIcons";
+  import type { SharedMenuHandler } from "$lib/ui/menuSurface";
   import { settings } from "$lib/data/settings.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { formatClock } from "$lib/data/time";
@@ -60,7 +61,7 @@
     onGrow?: (grow: () => void, anchor: HTMLElement | null) => void;
     onAnswer?: (requestId: string, optionId: string) => void;
     onSharedLink?: (url: string, filename: string) => void;
-    onSharedMenu?: ((url: string, filename: string) => void) | null;
+    onSharedMenu?: SharedMenuHandler | null;
     onSuggest?: SuggestionPicker | null;
     component?: Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
     mods?: ModSurface | null;
@@ -136,7 +137,7 @@
                   name={attachment.name}
                   icon={fileIcon(attachment.name)}
                   onclick={() => onSharedLink?.(attachment.url, attachment.name)}
-                  onmenu={onSharedMenu ? () => onSharedMenu(attachment.url, attachment.name) : null}
+                  onmenu={onSharedMenu ? (at) => onSharedMenu(attachment.url, attachment.name, at) : null}
                 />
               {/each}
             </div>
@@ -175,6 +176,8 @@
       query={message.query}
       statements={message.statements}
       result={typeof props.output === "string" ? props.output : message.result}
+      failed={message.toolFailed}
+      blockedBy={message.toolBlockedBy}
       {running}
       {expanded}
       {onToggle}
@@ -203,6 +206,8 @@
     diffLines={Array.isArray(props.diff_lines) ? diffLinesOf(props) : (message.diffLines ?? [])}
     cell={message.notebookCell}
     labelOnly={message.labelOnly || labelMode}
+    failed={message.toolFailed}
+    blockedBy={message.toolBlockedBy}
     {expanded}
     {onToggle}
   />

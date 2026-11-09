@@ -7,7 +7,7 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
-  import { FILE_ACTIONS, OPEN_EXTERNALLY_ACTION, type FileSource } from "$lib/ui/sharedFileActions";
+  import { FILE_ACTION_LOOK, FILE_ACTIONS, OPEN_EXTERNALLY_ACTION, type FileSource } from "$lib/ui/sharedFileActions";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import PackCard from "./PackCard.svelte";
   import PackContent from "./PackContent.svelte";
@@ -70,10 +70,10 @@
       {#if source}
         {@const target = source}
         <div class="flex shrink-0 items-center">
-          {#each REMOTE_ACTIONS as action (action.label)}
-            {@const Icon = action.icon}
-            <TooltipIconButton label={t(action.label)} onclick={() => void action.run(target, offer.name)}>
-              <Icon />
+          {#each REMOTE_ACTIONS as action (action.id)}
+            {@const look = FILE_ACTION_LOOK[action.id]}
+            <TooltipIconButton label={t(look.label)} onclick={() => void action.run(target, offer.name)}>
+              <look.icon />
             </TooltipIconButton>
           {/each}
         </div>

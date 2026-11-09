@@ -33,7 +33,7 @@
   type="button"
   disabled={!enabled}
   {onclick}
-  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium whitespace-nowrap transition-colors select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40 {small
+  class="inline-flex shrink-0 cursor-pointer items-center justify-center rounded-full font-medium whitespace-nowrap transition-colors select-none disabled:cursor-default disabled:opacity-40 {small
     ? 'h-7 gap-1.5 px-3 text-body-sm'
     : 'h-8 gap-2 px-4 text-body-md'} {VARIANTS[variant]} {className}"
 >

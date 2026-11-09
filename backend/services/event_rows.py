@@ -3,6 +3,7 @@
 STAMPS = ("seq", "channel", "replay", "parent")
 VERBATIM = ("file_change", "shared", "compact", "notice", "api_error", "interrupted", "stop")
 FILTERED = ("tool_use", "thinking", "file_change")
+FAILURE_FIELDS = ("is_error", "blocked_by")
 HISTORY_PAGE = 100
 
 
@@ -36,10 +37,12 @@ def rows_of(events: list[dict]) -> list[dict]:
             row = {"type": "tool_use", "name": event.get("name"), "mcp": bool(event.get("mcp")), "text": event.get("input") or "", "id": event.get("id")}
             tools[str(event.get("id"))] = row
             rows.append(row)
-        elif kind == "tool_result" and event.get("content"):
+        elif kind == "tool_result":
             row = tools.get(str(event.get("tool_use_id")))
             if row is not None:
-                row["result"] = event["content"]
+                if event.get("content"):
+                    row["result"] = event["content"]
+                row.update({key: event[key] for key in FAILURE_FIELDS if event.get(key)})
         elif kind == "interaction_request" and event.get("kind") == "permission":
             row = {"type": "interaction", "kind": "permission", "tool_name": event.get("tool_name"), "input": event.get("input") or "", "resolved": None}
             asked[str(event.get("id"))] = row
@@ -49,7 +52,10 @@ def rows_of(events: list[dict]) -> list[dict]:
             if row is not None:
                 row["resolved"] = event.get("option_id")
         elif kind in VERBATIM:
-            rows.append(_bare(event))
+            row = _bare(event)
+            if kind == "file_change":
+                tools[str(event.get("id"))] = row
+            rows.append(row)
     for row in rows:
         if row["type"] in ("text", "thinking") and "text" in row:
             row["text"] = row["text"].strip()

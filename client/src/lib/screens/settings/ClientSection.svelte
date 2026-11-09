@@ -15,6 +15,7 @@
   import SwatchBook from "@lucide/svelte/icons/swatch-book";
   import Type from "@lucide/svelte/icons/type";
   import Volume2 from "@lucide/svelte/icons/volume-2";
+  import ZoomIn from "@lucide/svelte/icons/zoom-in";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { theme, type ThemeMode } from "$lib/design/theme.svelte";
@@ -41,13 +42,13 @@
   import DiscordDialog from "./DiscordDialog.svelte";
   import FontDialog from "./FontDialog.svelte";
   import { entryHint, entryFor, type SettingsDialog } from "./settingsIndex";
-  import { appearanceOptions, appearanceTabs, localeOptions, themeTabLabel } from "./settingsValues";
+  import { appearanceOptions, appearanceTabs, localeOptions, pageZoomOptions, themeTabLabel } from "./settingsValues";
   import ShortcutsDialog from "./ShortcutsDialog.svelte";
   import SpeechDialog from "./SpeechDialog.svelte";
   import ThemeDialog from "./ThemeDialog.svelte";
   import ThemePicker from "./ThemePicker.svelte";
 
-  const ROW_DIALOGS: readonly SettingsDialog[] = ["appearance", "theme", "language", "accent", "chat_background"];
+  const ROW_DIALOGS: readonly SettingsDialog[] = ["appearance", "theme", "language", "accent", "chat_background", "page_zoom"];
 
   let dialog = $state<SettingsDialog | null>(null);
   let themeTabIndex = $state(0);
@@ -156,6 +157,23 @@
     summary={rowSummary("packs")}
     onclick={() => (dialog = "packs")}
   />
+  {#if layout.mobile}
+    <PreferenceRow
+      icon={ZoomIn}
+      title={t("PAGE_ZOOM")}
+      summary={rowSummary("page_zoom")}
+      onclick={() => (dialog = "page_zoom")}
+    />
+  {:else}
+    <PreferenceSelect
+      icon={ZoomIn}
+      title={t("PAGE_ZOOM")}
+      options={pageZoomOptions()}
+      selected={String(settings.pageZoom)}
+      onSelect={(value) => (settings.pageZoom = Number(value))}
+      flash={highlight.is("page_zoom")}
+    />
+  {/if}
   <PreferenceRow
     icon={Clock}
     title={t("SHOW_TIMESTAMPS")}
@@ -258,6 +276,14 @@
     options={locales}
     selected={i18n.locale}
     onSelect={(value) => i18n.set(value as Locale)}
+    onDismiss={() => (dialog = null)}
+  />
+{:else if dialog === "page_zoom"}
+  <SelectDialog
+    title={t("PAGE_ZOOM")}
+    options={pageZoomOptions()}
+    selected={String(settings.pageZoom)}
+    onSelect={(value) => (settings.pageZoom = Number(value))}
     onDismiss={() => (dialog = null)}
   />
 {:else if dialog === "accent"}

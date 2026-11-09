@@ -43,7 +43,7 @@ class MainActivity : TauriActivity() {
   private val installer by lazy { Installer(this) { content } }
   private val dictation by lazy { Dictation(this) { content } }
   private val narrator = lazy { Speech(this) { content } }
-  private var pendingSave: Triple<String, String, String>? = null
+  private var pendingSave: ((Uri) -> Unit)? = null
   private var content: WebView? = null
   private var pendingCall: Pair<String, String>? = null
   private var shareAttempts = 0
@@ -97,17 +97,17 @@ class MainActivity : TauriActivity() {
   }
 
   private val createDocument = registerForActivityResult(ActivityResultContracts.CreateDocument("*/*")) { uri: Uri? ->
-    val pending = pendingSave ?: return@registerForActivityResult
+    val write = pendingSave ?: return@registerForActivityResult
     pendingSave = null
-    if (uri != null) downloads.writeUri(pending.first, uri, pending.third)
+    if (uri != null) write(uri)
   }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     dropWebViewExperiments()
     enableEdgeToEdge()
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) window.isNavigationBarContrastEnforced = false
-    downloads = Downloads(this, { content }) { url, filename, headers ->
-      pendingSave = Triple(url, filename, headers)
+    downloads = Downloads(this, { content }) { filename, write ->
+      pendingSave = write
       createDocument.launch(filename)
     }
     super.onCreate(savedInstanceState)

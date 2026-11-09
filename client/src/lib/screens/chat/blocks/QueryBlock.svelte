@@ -17,17 +17,29 @@
   import CodeBlock, { CAPPED_HEIGHT } from "$lib/ui/CodeBlock.svelte";
   import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import Collapsible from "./Collapsible.svelte";
+  import { headStatusOf } from "./headTones";
 
   interface Props {
     query: QueryCall;
     statements: QueryStatement[] | null;
     result: string | null;
     running: boolean;
+    failed?: boolean;
+    blockedBy?: string | null;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
   }
 
-  const { query, statements, result, running, expanded = null, onToggle = null }: Props = $props();
+  const {
+    query,
+    statements,
+    result,
+    running,
+    failed = false,
+    blockedBy = null,
+    expanded = null,
+    onToggle = null,
+  }: Props = $props();
 
   const SQL_LANG = "sql";
   const FRAME = `flex ${CAPPED_HEIGHT} flex-col overflow-hidden rounded-panel bg-surface-nested [--color-card:var(--color-surface-nested)]`;
@@ -126,6 +138,7 @@
   tone="action"
   preview={query.sql}
   stat={running || !last ? null : countOf(last)}
+  status={headStatusOf(failed, blockedBy)}
   labelOnly={!query.sql.trim()}
   {running}
   {expanded}

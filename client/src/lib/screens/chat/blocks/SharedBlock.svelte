@@ -8,12 +8,13 @@
   import Button from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
+  import type { SharedMenuHandler } from "$lib/ui/menuSurface";
   import Collapsible from "./Collapsible.svelte";
 
   interface Props {
     files: SharedFile[];
     onSharedLink?: ((url: string, filename: string) => void) | null;
-    onSharedMenu?: ((url: string, filename: string) => void) | null;
+    onSharedMenu?: SharedMenuHandler | null;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
   }
@@ -44,7 +45,7 @@
         name={file.name}
         icon={fileIcon(file.name)}
         onclick={() => onSharedLink?.(file.url, file.name)}
-        onmenu={onSharedMenu ? () => onSharedMenu(file.url, file.name) : null}
+        onmenu={onSharedMenu ? (at) => onSharedMenu(file.url, file.name, at) : null}
       />
     {/each}
   </div>

@@ -13,7 +13,7 @@
   import CardPanel from "./CardPanel.svelte";
   import ExpandButton from "./ExpandButton.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
-  import { ROUND_ARROW_CLASS } from "./roundButton";
+  import { ROUND_ARROW_CLASS, ROUND_ICON_SIZE } from "./roundButton";
   import SuggestionChips from "./SuggestionChips.svelte";
 
   interface Props {
@@ -111,7 +111,7 @@
             aria-label="previous"
             onclick={() => goto(page - 1)}
           >
-            <ChevronLeft size={18} />
+            <ChevronLeft size={ROUND_ICON_SIZE} />
           </button>
           <button
             type="button"
@@ -120,7 +120,7 @@
             aria-label="next"
             onclick={() => goto(page + 1)}
           >
-            <ChevronRight size={18} />
+            <ChevronRight size={ROUND_ICON_SIZE} />
           </button>
         </div>
       </div>

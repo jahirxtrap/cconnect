@@ -25,12 +25,13 @@
   import CodeBlock from "./CodeBlock.svelte";
   import ExternalLinkDialog from "./ExternalLinkDialog.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
+  import { menuPointOf, type SharedMenuHandler } from "./menuSurface";
   import { hscrollbar } from "./scrollbar";
 
   interface Props {
     text: string;
     onSharedLink?: ((url: string, filename: string, gallery?: GalleryFile[]) => void) | null;
-    onSharedMenu?: ((url: string, filename: string) => void) | null;
+    onSharedMenu?: SharedMenuHandler | null;
     onSuggest?: SuggestionPicker | null;
     linkTarget?: ((href: string) => (() => void) | null) | null;
     flavor?: MarkdownFlavor;
@@ -95,7 +96,7 @@
       target.closest<HTMLElement>("[data-shared]")?.dataset.shared;
     if (!url || !shared(url)) return;
     event.preventDefault();
-    onSharedMenu(url, filenameOf(url));
+    onSharedMenu(url, filenameOf(url), menuPointOf(event));
   };
 
   const decorate = (node: HTMLElement) => {

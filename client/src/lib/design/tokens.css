@@ -64,6 +64,7 @@
   --color-logo-mark: var(--c-logo-mark);
 
   --chat-gap-lg: 16px;
+  --chat-gap-md: 8px;
   --chat-gap-sm: 6px;
   --chat-gap-xs: 2px;
   --chat-line-body: 22px;
@@ -141,6 +142,7 @@
 :root {
   --font-terminal: var(--family-mono), monospace, var(--family-emoji), var(--family-symbols);
   --page-inset: 16px;
+  --page-inset-compact: 8px;
   --pane-gap: 0.375rem;
   --dot-size: 8px;
   --hairline: 1px;
@@ -151,6 +153,7 @@
 @supports (width: round(1px, 1px)) {
   :root {
     --chat-gap-lg: round(16px, var(--px-grid, 1px));
+    --chat-gap-md: round(8px, var(--px-grid, 1px));
     --chat-gap-sm: round(up, 6px, var(--px-grid, 1px));
     --chat-gap-xs: round(up, 2px, var(--px-grid, 1px));
     --chat-line-body: round(22px, var(--px-grid, 1px));

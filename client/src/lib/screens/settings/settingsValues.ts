@@ -6,7 +6,7 @@ import { claudeStatus } from "$lib/data/claudeStatus.svelte";
 import { projectNameOf } from "$lib/data/models";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { settings } from "$lib/data/settings.svelte";
-import { formatDays, joined } from "$lib/data/format";
+import { formatDays, formatPercent, joined } from "$lib/data/format";
 import { DYNAMIC_ACCENT, THEME_ACCENT } from "$lib/design/accents";
 import type { PackBackground, PackFont, PackTerminal, PackTheme } from "$lib/design/packs/model";
 import { packs } from "$lib/design/packs/registry.svelte";
@@ -25,6 +25,7 @@ import { localServer, localServerStateOf } from "$lib/services/localServer.svelt
 import { notifier } from "$lib/services/notifier.svelte";
 import { RETENTION_FOREVER_DAYS } from "$lib/services/settingsApi";
 import type { SelectOption } from "$lib/ui/SelectDialog.svelte";
+import { ZOOM_LEVELS } from "$lib/ui/zoomLevels";
 
 export type ThemeTab = ThemeKind | "terminal";
 
@@ -137,6 +138,11 @@ const AUTO_READ_LABELS: Record<string, string> = {
 export const autoReadLabel = (mode: string): string => t(AUTO_READ_LABELS[mode] ?? "OPTION_OFF");
 
 export const speechValue = (): string => autoReadLabel(settings.speechAutoRead);
+
+export const pageZoomOptions = (): SelectOption[] =>
+  ZOOM_LEVELS.map((level) => ({ value: String(level), label: formatPercent(level) }));
+
+export const pageZoomValue = (): string => formatPercent(settings.pageZoom);
 
 export const environmentValue = (): string =>
   backend.active ? joined(backend.active.name, address(backend.active)) : t("NO_ENVIRONMENTS");

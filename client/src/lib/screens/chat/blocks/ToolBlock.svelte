@@ -1,5 +1,4 @@
 <script lang="ts">
-  import CircleX from "@lucide/svelte/icons/circle-x";
   import type { Snippet } from "svelte";
   import { formatDuration } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
@@ -7,6 +6,7 @@
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
   import { toolIcon } from "$lib/ui/toolIcons";
   import Collapsible from "./Collapsible.svelte";
+  import { headStatusOf } from "./headTones";
 
   interface Props {
     name: string | null;
@@ -57,7 +57,7 @@
   preview={headline}
   previewTail={headlinePath}
   stat={running ? null : elapsed}
-  meta={failed ? failedMark : undefined}
+  status={headStatusOf(failed, blockedBy)}
   labelOnly={empty}
   {running}
   {expanded}
@@ -80,7 +80,3 @@
     </div>
   {/if}
 </Collapsible>
-
-{#snippet failedMark()}
-  <CircleX size={14} class="text-red" role="img" aria-label={t("TOOL_FAILED")} />
-{/snippet}

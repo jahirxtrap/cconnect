@@ -262,6 +262,9 @@ $effect.root(() => {
   });
 });
 
+export const openChatList = (profile: Profile): ChatListStore | null =>
+  isConfigured(profile) ? (stores.get(profileKey(profile)) ?? null) : null;
+
 export const chatListFor = (profile: Profile): ChatListStore | null => {
   if (!isConfigured(profile)) return null;
   const key = profileKey(profile);

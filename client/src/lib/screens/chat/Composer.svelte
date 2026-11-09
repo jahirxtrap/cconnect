@@ -35,7 +35,7 @@
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar, SCROLL_ROW_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
-  import { ROUND_BUTTON_CLASS } from "$lib/ui/roundButton";
+  import { ROUND_BUTTON_CLASS, ROUND_ICON_SIZE } from "$lib/ui/roundButton";
   import StopButton from "$lib/ui/StopButton.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
   import type { Attachment, ComposerElement } from "./state.svelte";
@@ -648,7 +648,7 @@
             title={t("CLOSE")}
             class={ACTION_CLASS}
           >
-            <X size={18} />
+            <X size={ROUND_ICON_SIZE} />
           </button>
         {:else if !actionsEnabled}
           <button
@@ -658,7 +658,7 @@
             title={t("ACTIONS")}
             class="{ROUND_BUTTON_CLASS} bg-surface-variant text-faint disabled:cursor-default"
           >
-            <Plus size={18} />
+            <Plus size={ROUND_ICON_SIZE} />
           </button>
         {:else}
           <PopupMenu
@@ -669,7 +669,7 @@
           >
             {#snippet trigger()}
               <span aria-label={t("ACTIONS")} title={t("ACTIONS")} class={ACTION_CLASS}>
-                <Plus size={18} />
+                <Plus size={ROUND_ICON_SIZE} />
               </span>
             {/snippet}
             {#if phone}
@@ -701,7 +701,7 @@
             title={t(listening ? "VOICE_STOP" : "VOICE_START")}
             class={listening ? `${ROUND_BUTTON_CLASS} bg-accent text-on-accent` : ACTION_CLASS}
           >
-            <Mic size={18} />
+            <Mic size={ROUND_ICON_SIZE} />
           </button>
         {/if}
         {#if busy}
@@ -716,7 +716,7 @@
           title={t("SEND")}
           class="{ROUND_BUTTON_CLASS} {canSubmit ? 'bg-accent text-on-accent' : 'bg-surface-variant text-faint'} disabled:cursor-default"
         >
-          <ArrowUp size={18} />
+          <ArrowUp size={ROUND_ICON_SIZE} />
         </button>
       </div>
     </div>

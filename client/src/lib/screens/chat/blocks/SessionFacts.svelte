@@ -31,7 +31,7 @@
   );
 </script>
 
-<div class="flex flex-col gap-2.5">
+<div class="flex flex-col">
   {#each facts as fact (fact.label)}
     <InfoRow icon={fact.icon} label={fact.label} value={fact.value} />
   {/each}

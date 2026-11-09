@@ -8,11 +8,13 @@
   import { provideMenuDrill } from "./menuDrill.svelte";
   import {
     MENU_CONTENT_CLASS,
+    MENU_FOOT_CLASS,
     MENU_HEAD_CLASS,
     MENU_ICON_SIZE,
     MENU_ITEM_CLASS,
     MENU_SCROLL_CLASS,
     menuIconClass,
+    type MenuPoint,
   } from "$lib/ui/menuSurface";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
 
@@ -23,10 +25,12 @@
     side?: "top" | "bottom";
     align?: "start" | "center" | "end";
     matchTriggerWidth?: boolean;
+    anchor?: MenuPoint | null;
     triggerClass?: string;
     trigger?: Snippet;
     triggerChild?: Snippet<[Record<string, unknown>]>;
     header?: Snippet;
+    footer?: Snippet;
     children: Snippet;
   }
 
@@ -37,12 +41,18 @@
     side = "bottom",
     align = "start",
     matchTriggerWidth = false,
+    anchor = null,
     triggerClass = "",
     trigger,
     triggerChild,
     header,
+    footer,
     children,
   }: Props = $props();
+
+  const pointAnchor = $derived(
+    anchor ? { getBoundingClientRect: () => new DOMRect(anchor.x, anchor.y, 0, 0) } : null,
+  );
 
   const drill = provideMenuDrill();
 
@@ -75,7 +85,7 @@
         {@render triggerChild(props)}
       {/snippet}
     </DropdownMenu.Trigger>
-  {:else}
+  {:else if !pointAnchor}
     <DropdownMenu.Trigger
       onmousedown={holdFocus}
       oncontextmenu={(event) => event.preventDefault()}
@@ -91,7 +101,8 @@
       onCloseAutoFocus={(event) => event.preventDefault()}
       {side}
       {align}
-      sideOffset={4}
+      customAnchor={pointAnchor}
+      sideOffset={pointAnchor ? 0 : 4}
       collisionPadding={layout.menuPadding}
       style={matchTriggerWidth ? "min-width: var(--bits-dropdown-menu-anchor-width)" : ""}
       class={MENU_CONTENT_CLASS}
@@ -100,6 +111,10 @@
         <div class={MENU_HEAD_CLASS}>{@render header()}</div>
       {/if}
       <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>{@render body()}</div>
+      {#if drill.current ? drill.current.footer : footer}
+        {@const pinned = drill.current ? drill.current.footer : footer}
+        <div class={MENU_FOOT_CLASS}>{@render pinned?.()}</div>
+      {/if}
     </DropdownMenu.Content>
   </DropdownMenu.Portal>
 </DropdownMenu.Root>

@@ -46,6 +46,7 @@
   const ALIGN_SLACK = 0.01;
   const HALF = 2;
   const EXTERNAL_LINK = /^(https?|mailto):/i;
+  const MOUSE = "mouse";
 
   let container = $state<HTMLDivElement | null>(null);
   let pages = $state<HTMLDivElement | null>(null);
@@ -62,6 +63,7 @@
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
   const points = new Map<number, { x: number; y: number }>();
+  let pointer = MOUSE;
   let pinch: Pinch | null = null;
   let painter: ReturnType<typeof nativePages> | null = null;
 
@@ -221,6 +223,7 @@
   };
 
   const onPointerDown = (event: PointerEvent) => {
+    pointer = event.pointerType;
     if (event.isPrimary) points.clear();
     points.set(event.pointerId, { x: event.clientX, y: event.clientY });
     grip();
@@ -251,7 +254,7 @@
   };
 
   const onDoubleClick = (event: MouseEvent) => {
-    if (!zoomable) return;
+    if (!zoomable || pointer === MOUSE) return;
     zoomAt(zoomed ? MIN_ZOOM : DOUBLE_TAP_ZOOM, event.clientX, event.clientY);
   };
 

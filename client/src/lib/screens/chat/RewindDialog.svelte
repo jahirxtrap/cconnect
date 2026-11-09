@@ -7,7 +7,7 @@
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
 
   interface Props {
@@ -55,9 +55,9 @@
     <CardPanel>
       <p class="selectable line-clamp-3 text-body-md">{readableText(target.text) || target.id}</p>
       {#if both}
-        <p class="mt-1 flex items-center gap-1 text-label-md text-on-surface-variant">
+        <p class="flex items-center gap-1 text-label-md text-on-surface-variant">
           {#if preview === null}
-            <LoadingIndicator size={13} />
+            <StatusDot loading />
             {t("LOADING")}
           {:else if preview.canRewind}
             <span class="text-green">+{preview.insertions}</span>

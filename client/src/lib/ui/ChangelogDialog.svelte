@@ -6,6 +6,7 @@
   import CompactDialog from "./CompactDialog.svelte";
   import EmptyState from "./EmptyState.svelte";
   import MarkdownText from "./MarkdownText.svelte";
+  import { nearView } from "./nearView";
 
   interface Props {
     load: () => Promise<ReleaseNotes[] | null>;
@@ -15,12 +16,18 @@
 
   const { load, onDismiss, limitHeight = true }: Props = $props();
 
-  let notes = $state<ReleaseNotes[] | null>(null);
+  const BATCH = 5;
+
+  let loaded = $state<ReleaseNotes[] | null>(null);
   let failed = $state(false);
+  let painted = $state(false);
+  let shown = $state(BATCH);
+
+  const notes = $derived(painted ? loaded : null);
 
   $effect(() => {
     void load().then((result) => {
-      if (result) notes = result;
+      if (result) loaded = result;
       else failed = true;
     });
   });
@@ -30,18 +37,25 @@
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
   {/snippet}
-  {#if !notes && !failed}
-    <CenteredProgress class="w-full py-6" />
-  {:else if !notes}
+  {#if failed}
     <EmptyState text={t("UPDATE_CHECK_FAILED")} class="py-6" />
+  {:else if !notes}
+    <div use:nearView={() => (painted = true)} class="w-full">
+      <CenteredProgress class="w-full py-6" />
+    </div>
   {:else}
     <div class="selectable flex flex-col gap-4 {limitHeight ? 'max-h-[420px]' : ''}">
-      {#each notes as release (release.tag)}
+      {#each notes.slice(0, shown) as release (release.tag)}
         <div>
           <p class="text-title-md text-accent">{release.tag}</p>
           <MarkdownText text={release.body} class="mt-1" />
         </div>
       {/each}
+      {#if shown < notes.length}
+        {#key shown}
+          <div use:nearView={() => (shown += BATCH)}></div>
+        {/key}
+      {/if}
     </div>
   {/if}
 </CompactDialog>

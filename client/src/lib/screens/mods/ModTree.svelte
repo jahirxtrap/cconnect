@@ -81,20 +81,20 @@
   };
   const BLOCK_CLASS = "inline-block h-[1lh] overflow-hidden align-top whitespace-pre [-webkit-text-fill-color:transparent]";
   const BUTTON_CLASS =
-    "ripple flex max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-label-md whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-label-md whitespace-nowrap select-none disabled:cursor-default disabled:opacity-40";
   const BUTTON_LOOK = {
     primary: "bg-accent text-on-accent",
     secondary: "bg-surface-variant",
   };
   const PLAIN_CLASS =
-    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap transition-colors select-none enabled:hover:bg-hover focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex min-h-[1lh] max-w-full shrink-0 cursor-pointer items-center gap-1.5 rounded-sm px-1 whitespace-nowrap transition-colors select-none enabled:hover:bg-hover disabled:cursor-default disabled:opacity-40";
   const KEYCAP_CLASS =
     "inline-flex h-[1.125rem] min-w-[1.125rem] shrink-0 items-center justify-center rounded-sm bg-surface-variant px-1 font-mono text-label-sm leading-none text-on-surface-variant uppercase";
 
   const FIELD_CLASS =
     "min-h-8 min-w-[12ch] flex-1 resize-none rounded-md bg-surface-variant px-2.5 py-1 text-on-surface ring-(length:--hairline) ring-transparent outline-none ring-inset placeholder:text-on-surface-variant focus:ring-accent disabled:opacity-40";
   const FIELD_BUTTON_CLASS =
-    "ripple flex h-8 shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-3 text-label-md whitespace-nowrap select-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-default disabled:opacity-40";
+    "ripple flex h-8 shrink-0 cursor-pointer items-center rounded-md bg-surface-variant px-3 text-label-md whitespace-nowrap select-none disabled:cursor-default disabled:opacity-40";
 
   const hotBoxes = new SvelteSet<string>();
   let drafts = $state<Record<string, string>>({});

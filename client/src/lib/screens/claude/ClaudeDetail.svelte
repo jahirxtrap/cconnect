@@ -173,6 +173,7 @@
   const TRANSPORTS = ["stdio", "http", "sse"];
   const CARD_REM = 18;
   const PANEL_REM = 22.5;
+  const FILTER_ROW_CLASS = `${SCROLL_ROW_CLASS} flex min-h-8 min-w-0 items-center gap-1.5`;
 
   const chat = $derived(tabs.state);
 
@@ -473,7 +474,7 @@
   const cancelMcpLogin = () => {
     const current = mcpLogin;
     mcpLogin = null;
-    if (current) void claudeApi.mcpLoginCancel(current.server.name, current.account);
+    if (current) void claudeApi.mcpLoginCancel(current.server.name, current.account).then(reload);
   };
 
   const signOutMcp = async (server: McpServer, account: string) => {
@@ -704,7 +705,7 @@
     {#if kind !== "status"}
       <div class="flex shrink-0 items-center gap-1.5 px-(--page-inset) pb-3">
         {#if kind === "plugins" && loaded}
-          <div class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-1.5">
+          <div class={FILTER_ROW_CLASS}>
             {#each pluginFilters as item (item.label)}
               <SelectChip
                 label={item.label}
@@ -715,7 +716,7 @@
             {/each}
           </div>
         {:else if kind === "mcp" && loaded}
-          <div class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-1.5">
+          <div class={FILTER_ROW_CLASS}>
             {#each mcpFilters as item (item.source ?? "")}
               <SelectChip
                 label={item.label}
@@ -726,7 +727,7 @@
             {/each}
           </div>
         {:else if kind === "hooks" && loaded}
-          <div class="{SCROLL_ROW_CLASS} flex min-w-0 items-center gap-1.5">
+          <div class={FILTER_ROW_CLASS}>
             {#each hookFilters as item (item.event ?? "")}
               <SelectChip
                 label={item.label}
@@ -761,11 +762,17 @@
     </AppTopBar>
   {/if}
 
-  {#snippet headerActions()}
-    {#if !embedded && kind !== "status"}
+  {#snippet searchAction()}
+    {#if !embedded}
       <TooltipIconButton label={t("SEARCH")} active={searching} onclick={() => search(!searching)}>
         <Search />
       </TooltipIconButton>
+    {/if}
+  {/snippet}
+
+  {#snippet headerActions()}
+    {#if kind !== "status" && kind !== "mcp"}
+      {@render searchAction()}
     {/if}
     {#if kind === "plugins"}
       <TooltipIconButton label={t("INSTALL")} onclick={browse}>
@@ -779,6 +786,7 @@
       <TooltipIconButton label={t("MCP_MANAGE_CLAUDEAI")} onclick={() => openExternal(CLAUDEAI_CONNECTORS)}>
         <ExternalLink />
       </TooltipIconButton>
+      {@render searchAction()}
       <TooltipIconButton
         label={t("ADD")}
         onclick={() => {
@@ -811,7 +819,7 @@
   {#if kind === "memories" && chat.historyProjects.length}
     <div class="px-(--page-inset) pb-3 {embedded ? 'max-w-md' : ''}">
       <SelectField
-        label={t("PROJECT")}
+        label=""
         selected={memoriesProject ?? ""}
         options={chat.historyProjects.map((item) => ({ value: item.projectKey, label: projectLabel(item) }))}
         onSelect={(key) => {
@@ -1076,7 +1084,7 @@
                   <div class="min-w-0 flex-1">
                     <p class="truncate text-body-md">{incident.name}</p>
                     {#if incident.latest}
-                      <p class="mt-0.5 line-clamp-4 text-body-sm text-on-surface-variant">
+                      <p class="line-clamp-4 text-body-sm text-on-surface-variant">
                         {#if incident.status}
                           <span class="text-label-md {indicatorTone(incident.impact).replace('bg-', 'text-')}">
                             {incidentLabel(incident.status)}
@@ -1087,7 +1095,7 @@
                       </p>
                     {/if}
                     {#if millis !== null}
-                      <p class="mt-0.5 text-label-md text-on-surface-variant">{formatDateShort(millis)}</p>
+                      <p class="text-label-md text-on-surface-variant">{formatDateShort(millis)}</p>
                     {/if}
                   </div>
                 </Pressable>
@@ -1281,14 +1289,16 @@
             void openCatalog({ kind: "chats" });
           }}
         />
-        <MenuItem
-          icon={FolderOpen}
-          text={t("PLUGIN_FROM_FOLDER")}
-          onclick={() => {
-            marketPicker = false;
-            pickingFolder = true;
-          }}
-        />
+        {#snippet footer()}
+          <MenuItem
+            icon={FolderOpen}
+            text={t("PLUGIN_FROM_FOLDER")}
+            onclick={() => {
+              marketPicker = false;
+              pickingFolder = true;
+            }}
+          />
+        {/snippet}
       </PopupMenu>
     {/snippet}
     {#snippet buttons()}

@@ -9,7 +9,8 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import GridBar, { BAR_ACTION_CLASS } from "./GridBar.svelte";
+  import { BAR_ACTION_CLASS } from "$lib/ui/actionBar";
+  import GridBar from "./GridBar.svelte";
 
   interface Props {
     page: number;

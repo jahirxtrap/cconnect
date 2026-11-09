@@ -5,6 +5,7 @@ import { settings } from "$lib/data/settings.svelte";
 import { isDesktop, systemName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 import { backend } from "$lib/services/backend.svelte";
+import { zoomStep } from "$lib/ui/zoomLevels";
 import { browserCall, browserListen, deviceBrowsing } from "./deviceEngine";
 
 export interface DeviceTab {
@@ -69,7 +70,6 @@ export interface ShieldState {
 }
 
 const STORE_KEY = "browser.device";
-const ZOOM_LEVELS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3];
 export const DESKTOP_SITE = "desktop";
 const CAPTURE_NAME = "capture";
 const PRESETS: Record<string, Preset> = {
@@ -402,9 +402,7 @@ class DeviceBrowser {
 
   zoomBy(step: number) {
     if (!this.zoomable) return;
-    const current = this.zoom;
-    const next =
-      step > 0 ? ZOOM_LEVELS.find((level) => level > current) : ZOOM_LEVELS.findLast((level) => level < current);
+    const next = zoomStep(this.zoom, step);
     if (next !== undefined) this.#setZoom(next);
   }
 

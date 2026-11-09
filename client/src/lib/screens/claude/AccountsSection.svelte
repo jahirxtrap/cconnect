@@ -13,7 +13,6 @@
   import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
@@ -216,11 +215,7 @@
       onclick={enabled ? () => openActions(account) : undefined}
     >
       {#snippet trailing()}
-        {#if busy === account.id}
-          <LoadingIndicator size={16} />
-        {:else}
-          <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} box={20} />
-        {/if}
+        <StatusDot class={account.loggedIn ? "bg-green" : "bg-orange"} box={20} loading={busy === account.id} />
       {/snippet}
     </PreferenceRow>
   {/each}
@@ -360,9 +355,6 @@
       onclick={openProvider}
       class="mt-1.5 w-full"
     />
-    {#if importing}
-      <LoadingIndicator size={16} class="mt-3" />
-    {/if}
     {#if importFailed}
       <ErrorText text={t("ACCOUNT_IMPORT_FAILED")} class="mt-2" />
     {/if}

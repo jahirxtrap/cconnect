@@ -11,6 +11,7 @@ export interface Note {
   title?: string;
   updatedAt: number;
   deletedAt?: number;
+  draft?: boolean;
 }
 
 interface History {
@@ -80,7 +81,7 @@ class Notes {
   }
 
   create(): string {
-    const note: Note = { id: crypto.randomUUID(), body: "", updatedAt: Date.now() };
+    const note: Note = { id: crypto.randomUUID(), body: "", updatedAt: Date.now(), draft: true };
     this.items = [...this.items, note];
     return note.id;
   }
@@ -89,7 +90,12 @@ class Notes {
     const named = title.trim();
     this.items = this.items.map((note) =>
       note.id === id
-        ? { ...note, title: named && named !== autoTitle(note.body) ? named : undefined, updatedAt: Date.now() }
+        ? {
+            ...note,
+            title: named && named !== autoTitle(note.body) ? named : undefined,
+            updatedAt: Date.now(),
+            draft: note.draft && !named ? true : undefined,
+          }
         : note,
     );
     this.#save();
@@ -152,7 +158,11 @@ class Notes {
   }
 
   #set(id: string, body: string) {
-    this.items = this.items.map((note) => (note.id === id ? { ...note, body, updatedAt: Date.now() } : note));
+    this.items = this.items.map((note) =>
+      note.id === id
+        ? { ...note, body, updatedAt: Date.now(), draft: note.draft && !body.trim() ? true : undefined }
+        : note,
+    );
     this.#schedule();
   }
 
@@ -173,7 +183,7 @@ class Notes {
 
   discardEmpty(id: string) {
     const note = this.find(id);
-    if (!note || note.body.trim()) return;
+    if (!note?.draft || note.body.trim() || note.title) return;
     this.items = this.items.filter((item) => item.id !== id);
     this.#save();
   }

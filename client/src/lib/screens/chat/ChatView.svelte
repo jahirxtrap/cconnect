@@ -26,7 +26,7 @@
   import { offerShared } from "$lib/screens/packs/packIntake";
   import type { CommandOption } from "$lib/services/capabilitiesApi";
   import { provideServer } from "$lib/services/serverContext";
-  import { downloadUrl, relativeFromUrl } from "$lib/services/sharedApi";
+  import { downloadUrl, relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -41,6 +41,10 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import { SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import SharedLinkActionsDialog from "$lib/ui/SharedLinkActionsDialog.svelte";
+  import FileActionItems from "$lib/ui/FileActionItems.svelte";
+  import type { MenuPoint } from "$lib/ui/menuSurface";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import { FILE_ACTIONS, fileEntries, type FileActionEntry } from "$lib/ui/sharedFileActions";
   import { LINK_LOOKS } from "$lib/ui/linkStatus";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -110,7 +114,7 @@
   let purgeViewOpen = $state(false);
   let closingResident = $state(false);
   let queuedId = $state<string | null>(null);
-  let sharedLink = $state<{ url: string; filename: string } | null>(null);
+  let sharedLink = $state<{ url: string; filename: string; at: MenuPoint | null } | null>(null);
   let visibilityOpen = $state(false);
   let sideHeight = $state(SIDE_PEEK);
   let sideDragging = $state(false);
@@ -186,13 +190,32 @@
     return { url, name, onDelete: relative ? () => void chat.shared.remove(relative) : null };
   };
 
+  const sharedLinkActions = $derived.by((): FileActionEntry[] => {
+    const target = sharedLink;
+    if (!target) return [];
+    const relative = relativeFromUrl(target.url);
+    const actions = fileEntries(FILE_ACTIONS, { url: target.url }, target.filename);
+    if (isPreviewable(target.filename)) {
+      actions.push({ id: "view", run: () => openFilePreview(sharedPreview(target.url, target.filename)) });
+    }
+    if (relative) {
+      if (isArchive(target.filename)) actions.push({ id: "openInShared", run: () => navigation.openShared(relative) });
+      actions.push({ id: "attach", run: () => chat.addSharedAttachments([{ path: relative, name: target.filename }]) });
+      actions.push({
+        id: "copyPath",
+        run: () => void sharedApi.absolutePaths([relative]).then((paths) => paths && copyText(paths[0])),
+      });
+    }
+    return actions;
+  });
+
   const openShared = (url: string, filename: string, gallery?: GalleryFile[]) => {
     if (isPackFile(filename)) {
       offerShared(url, filename);
       return;
     }
     if (!isPreviewable(filename)) {
-      sharedLink = { url, filename };
+      sharedLink = { url, filename, at: null };
       return;
     }
     openFilePreview({
@@ -524,7 +547,7 @@
           earlierLoading={chat.transcriptPaging}
           bind:follow={chat.followBottom}
           onSharedLink={openShared}
-          onSharedMenu={(url, filename) => (sharedLink = { url, filename })}
+          onSharedMenu={(url, filename, at) => (sharedLink = { url, filename, at })}
           onSuggest={pickSuggestion}
           sessionId={chat.sessionId}
           timestamps={!chat.agent}
@@ -770,21 +793,19 @@
   />
 {/if}
 
-{#if sharedLink}
-  {@const target = sharedLink}
-  {@const relative = relativeFromUrl(target.url)}
+{#if sharedLink?.at}
+  <PopupMenu
+    open
+    onOpenChange={(open) => !open && (sharedLink = null)}
+    anchor={sharedLink.at}
+    label={sharedLink.filename}
+  >
+    <FileActionItems actions={sharedLinkActions} />
+  </PopupMenu>
+{:else if sharedLink}
   <SharedLinkActionsDialog
-    url={target.url}
-    filename={target.filename}
-    onView={() =>
-      openFilePreview({
-        url: target.url,
-        name: target.filename,
-        onDelete: relative ? () => void chat.shared.remove(relative) : null,
-      })}
-    onOpenInShared={relative && isArchive(target.filename)
-      ? () => navigation.openShared(relative)
-      : null}
+    filename={sharedLink.filename}
+    actions={sharedLinkActions}
     onDismiss={() => (sharedLink = null)}
   />
 {/if}
@@ -826,9 +847,9 @@
               {name}
               icon={isArchive(name) ? FolderArchive : FileIcon}
               onclick={() => openFilePreview({ url: downloadUrl(attachment, chat.environment), name, onDelete: null })}
-              onmenu={() => {
+              onmenu={(at) => {
                 queuedId = null;
-                sharedLink = { url: downloadUrl(attachment, chat.environment), filename: name };
+                sharedLink = { url: downloadUrl(attachment, chat.environment), filename: name, at };
               }}
             />
           {/each}

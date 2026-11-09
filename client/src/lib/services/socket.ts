@@ -15,7 +15,7 @@ const MAX_BACKOFF_MS = 15_000;
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_SHIFT = 4;
 
-const CONNECT_TIMEOUT_MS = 12_000;
+export const CONNECT_TIMEOUT_MS = 12_000;
 
 const backoffFor = (attempts: number) =>
   Math.min(MAX_BACKOFF_MS, BASE_BACKOFF_MS << Math.min(attempts, MAX_BACKOFF_SHIFT));

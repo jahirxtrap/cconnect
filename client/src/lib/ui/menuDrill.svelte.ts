@@ -4,6 +4,7 @@ import { pushDismiss } from "$lib/app/dismissStack";
 interface DrillLevel {
   text: string;
   children: Snippet;
+  footer?: Snippet;
   release: () => void;
 }
 
@@ -14,9 +15,9 @@ export class MenuDrill {
 
   readonly current = $derived(this.levels.at(-1) ?? null);
 
-  open(text: string, children: Snippet) {
+  open(text: string, children: Snippet, footer?: Snippet) {
     const release = pushDismiss(() => this.back());
-    this.levels = [...this.levels, { text, children, release }];
+    this.levels = [...this.levels, { text, children, footer, release }];
   }
 
   back() {

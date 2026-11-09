@@ -5,6 +5,7 @@
   import SquareCheckBig from "@lucide/svelte/icons/square-check-big";
   import type { TodoItem } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
+  import { MENU_ICON_SIZE } from "$lib/ui/menuSurface";
   import HeaderListMenu from "./HeaderListMenu.svelte";
 
   interface Props {
@@ -14,7 +15,6 @@
   const { todos }: Props = $props();
 
   const PIE = 18;
-  const MARK = 20;
   const FULL_TURN = 360;
   const HALF_TURN = 180;
   const QUARTER_TURN = 90;
@@ -59,14 +59,14 @@
     {#each todos as todo, index (index)}
       {@const finished = todo.status === "completed"}
       {@const active = todo.status === "in_progress"}
-      <div class="flex items-start gap-2.5 px-2.5 py-1.5">
+      <div class="flex min-h-8 items-start gap-2 px-2.5 py-1.5">
         <span class="flex h-5 shrink-0 items-center">
           {#if finished}
-            <SquareCheckBig size={MARK} class="text-accent" />
+            <SquareCheckBig size={MENU_ICON_SIZE} class="text-accent" />
           {:else if active}
-            <CircleDot size={MARK} class="text-accent" />
+            <CircleDot size={MENU_ICON_SIZE} class="text-accent" />
           {:else}
-            <Square size={MARK} class="text-on-surface-variant" />
+            <Square size={MENU_ICON_SIZE} class="text-on-surface-variant" />
           {/if}
         </span>
         <span

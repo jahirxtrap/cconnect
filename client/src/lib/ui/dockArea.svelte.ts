@@ -1,5 +1,5 @@
 import { SvelteMap } from "svelte/reactivity";
-import { layout } from "$lib/platform/layout.svelte";
+import { layout, MENU_GAP } from "$lib/platform/layout.svelte";
 import { scrollbarWidth } from "./scrollbar";
 
 interface DockAreaState {
@@ -64,13 +64,13 @@ class DockSpot {
 
   readonly right = $derived(
     this.#area
-      ? layout.width - this.#area.box.right + this.#area.bar + layout.menuPadding.right
+      ? Math.max(layout.width - this.#area.box.right + this.#area.bar, layout.safeRight) + MENU_GAP
       : layout.menuPadding.right + layout.rightInset,
   );
 
   readonly bottom = $derived(
     this.#area
-      ? layout.height - this.#area.box.bottom + layout.menuPadding.bottom
+      ? Math.max(layout.height - this.#area.box.bottom, layout.safeBottom + layout.keyboard) + MENU_GAP
       : layout.menuPadding.bottom + layout.bottomInset,
   );
 }

@@ -108,6 +108,24 @@ fn hide_helper_windows() {
     unsafe { EnumWindows(Some(visit), 0) };
 }
 
+#[cfg(windows)]
+fn allow_pinch(app: &tauri::App) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings5;
+    use windows_core::Interface;
+
+    let Some(window) = app.get_webview_window(MAIN_WINDOW) else {
+        return;
+    };
+    let _ = window.with_webview(|platform| unsafe {
+        let Ok(settings) = platform.controller().CoreWebView2().and_then(|core| core.Settings()) else {
+            return;
+        };
+        if let Ok(settings) = settings.cast::<ICoreWebView2Settings5>() {
+            let _ = settings.SetIsPinchZoomEnabled(true);
+        }
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -153,6 +171,8 @@ pub fn run() {
         .setup(|_app| {
             #[cfg(windows)]
             hide_helper_windows();
+            #[cfg(windows)]
+            allow_pinch(_app);
             #[cfg(desktop)]
             present_window(_app);
             #[cfg(windows)]

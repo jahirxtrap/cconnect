@@ -1,6 +1,7 @@
 """HTML pages the apps show, each served with the files of its folder under an address of its own."""
 
 import posixpath
+import re
 import secrets
 from collections import OrderedDict
 from dataclasses import dataclass
@@ -8,10 +9,14 @@ from pathlib import Path
 from threading import Lock
 from typing import Callable, Optional
 
+from core import paths
 from services import project_files, shared
 
 PATH = "/api/pages"
 LIMIT = 256
+HTML_SUFFIXES = (".html", ".htm")
+FRAME_SCRIPT = b"<script>" + (paths.SCRIPTS_DIR / "page_frame.js").read_bytes() + b"</script>"
+ANCHORS = (re.compile(rb"<head\b[^>]*>", re.IGNORECASE), re.compile(rb"<!doctype[^>]*>", re.IGNORECASE))
 
 Resolver = Callable[[str], Optional[Path]]
 
@@ -73,6 +78,13 @@ def page(page_id: str) -> Optional[Page]:
         if found is not None:
             _pages.move_to_end(page_id)
         return found
+
+
+def framed(html: bytes) -> bytes:
+    """The page with the script that keeps pinch and Ctrl+wheel off the app and takes the app's zoom and keys."""
+    anchor = next((match for match in (pattern.search(html) for pattern in ANCHORS) if match), None)
+    at = anchor.end() if anchor else 0
+    return html[:at] + FRAME_SCRIPT + html[at:]
 
 
 def file_of(found: Page, rest: str) -> Optional[Path]:

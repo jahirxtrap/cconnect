@@ -49,6 +49,7 @@ export interface ChatLocation {
   tab: number;
   sessionId: string;
   projectKey: string;
+  environmentId: string | null;
   view: boolean;
   right: ChatLink | null;
 }
@@ -74,6 +75,7 @@ export const readChatLocation = (): ChatLocation | null => {
     tab: Number.parseInt(query.get("t") ?? "0", 10) || 0,
     sessionId,
     projectKey,
+    environmentId: backend.environments.find((item) => item.id === query.get("e"))?.id ?? null,
     view: query.get("v") === "1",
     right: readRightLocation(),
   };
@@ -109,7 +111,12 @@ class Tabs {
         if (target) {
           this.list = this.list.map((tab) =>
             tab.id === target.id
-              ? { ...tab, sessionId: location.sessionId, projectKey: location.projectKey }
+              ? {
+                  ...tab,
+                  sessionId: location.sessionId,
+                  projectKey: location.projectKey,
+                  environmentId: location.environmentId ?? tab.environmentId,
+                }
               : tab,
           );
           activeId = target.id;
@@ -160,7 +167,13 @@ class Tabs {
           this.select(open.id);
           return;
         }
-        this.stateFor(this.active).restoreSession(location.sessionId, location.projectKey);
+        const chat = this.stateFor(this.active);
+        const { sessionId, projectKey, environmentId } = location;
+        if (environmentId && environmentId !== chat.environmentId) {
+          this.update(this.active.id, { sessionId, projectKey, environmentId });
+          chat.selectEnvironment(environmentId);
+        }
+        chat.restoreSession(sessionId, projectKey);
       };
       window.addEventListener("popstate", onPopState);
       return () => window.removeEventListener("popstate", onPopState);
@@ -501,6 +514,7 @@ class Tabs {
       query.set("t", String(index));
       query.set("c", chat.sessionId!);
       query.set("p", chat.projectKey!);
+      if (current?.environmentId) query.set("e", current.environmentId);
       if (view) query.set("v", "1");
     }
     const beside = this.right.find((tab) => tab.id === this.rightActiveId);

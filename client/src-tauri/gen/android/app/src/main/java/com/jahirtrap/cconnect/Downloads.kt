@@ -37,7 +37,7 @@ private const val SAVED_LIMIT = 50
 class Downloads(
     private val activity: Activity,
     private val webView: () -> WebView?,
-    private val onSaveAs: (String, String, String) -> Unit,
+    private val onSaveAs: (String, (Uri) -> Unit) -> Unit,
 ) {
     private val workers = Executors.newCachedThreadPool()
     private val transfers = ConcurrentHashMap<String, Progress>()
@@ -82,7 +82,15 @@ class Downloads(
 
     @JavascriptInterface
     fun saveAs(url: String, filename: String, headersJson: String) {
-        activity.runOnUiThread { onSaveAs(url, filename, headersJson) }
+        activity.runOnUiThread { onSaveAs(filename) { target -> writeUri(url, target, headersJson) } }
+    }
+
+    @JavascriptInterface
+    fun saveDataAs(filename: String, base64: String) {
+        workers.execute {
+            val file = cacheData(filename, base64) ?: return@execute
+            activity.runOnUiThread { onSaveAs(filename) { target -> writeFile(file, target) } }
+        }
     }
 
     @JavascriptInterface
@@ -140,13 +148,24 @@ class Downloads(
         if (!viewFile(file, filename)) sendFile(file, filename)
     }
 
-    fun writeUri(url: String, target: Uri, headersJson: String) {
+    private fun writeUri(url: String, target: Uri, headersJson: String) {
         workers.execute {
             runCatching {
                 open(url, headersJson).use { stream ->
                     activity.contentResolver.openOutputStream(target)?.use { out -> stream.copyTo(out) }
                 }
             }
+        }
+    }
+
+    private fun writeFile(file: File, target: Uri) {
+        workers.execute {
+            runCatching {
+                file.inputStream().use { stream ->
+                    activity.contentResolver.openOutputStream(target)?.use { out -> stream.copyTo(out) }
+                }
+            }
+            file.delete()
         }
     }
 

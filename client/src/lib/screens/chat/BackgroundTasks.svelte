@@ -2,10 +2,10 @@
   import Bot from "@lucide/svelte/icons/bot";
   import type { BackgroundTask } from "$lib/data/chatModels";
   import { t } from "$lib/i18n/index.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
+  import StatusDot from "$lib/ui/StatusDot.svelte";
   import StopButton from "$lib/ui/StopButton.svelte";
+  import { MENU_ICON_SIZE } from "$lib/ui/menuSurface";
   import HeaderListMenu from "./HeaderListMenu.svelte";
-  import { CHIP_ICON_SIZE } from "./toolbarChips";
 
   interface Props {
     tasks: BackgroundTask[];
@@ -21,8 +21,8 @@
       <Bot size={18} class="text-accent" />
     {/snippet}
     {#each tasks as task (task.id)}
-      <div class="flex items-center gap-2.5 py-0.5 pr-0.5 pl-2.5">
-        <LoadingIndicator size={CHIP_ICON_SIZE} />
+      <div class="flex min-h-8 items-center gap-2 py-0.5 pr-0.5 pl-2.5">
+        <StatusDot box={MENU_ICON_SIZE} loading />
         <span class="min-w-0 flex-1 truncate text-body-md">{task.description || t("AGENT")}</span>
         <StopButton onclick={() => onStop(task.id)} />
       </div>

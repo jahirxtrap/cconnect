@@ -1,4 +1,15 @@
+import { isTouch } from "$lib/platform";
 import { CARD_SCROLL_CLASS } from "./scrollbar";
+
+export interface MenuPoint {
+  x: number;
+  y: number;
+}
+
+export const menuPointOf = (event: MouseEvent): MenuPoint | null =>
+  isTouch ? null : { x: event.clientX, y: event.clientY };
+
+export type SharedMenuHandler = (url: string, filename: string, at: MenuPoint | null) => void;
 
 export const MENU_PADDING = 4;
 
@@ -23,6 +34,8 @@ export const MENU_SCROLL_CLASS = `${CARD_SCROLL_CLASS} scrollbar-thin`;
 export const MENU_CONTENT_CLASS = `${MENU_LIST_CLASS} ${MENU_BOUNDS}`;
 
 export const MENU_HEAD_CLASS = "shrink-0 px-1 pt-1";
+
+export const MENU_FOOT_CLASS = "shrink-0 px-1 pb-1";
 
 export const SUBMENU_CONTENT_CLASS = `${MENU_LIST_CLASS} max-h-96 min-w-48 max-w-[min(20rem,calc(100vw-2rem))]`;
 

@@ -206,7 +206,10 @@
 {#snippet notesActions()}
   <NotesActions
     note={openNote}
-    onNew={() => (panes.noteId = notes.create())}
+    onNew={() => {
+      closeNote();
+      panes.noteId = notes.create();
+    }}
     onClosed={() => (panes.noteId = null)}
   />
 {/snippet}

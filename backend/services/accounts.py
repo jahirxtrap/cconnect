@@ -172,6 +172,27 @@ def mcp_tokens(account_id: Optional[str]) -> dict[str, str]:
     return tokens
 
 
+def mcp_entries(account_id: Optional[str], server: str) -> dict[str, dict]:
+    entries = _credentials(account_id).get("mcpOAuth")
+    if not isinstance(entries, dict):
+        return {}
+    return {key: entry for key, entry in entries.items() if isinstance(entry, dict) and entry.get("serverName") == server}
+
+
+def restore_mcp_entries(account_id: Optional[str], server: str, saved: dict[str, dict]) -> None:
+    """Puts back an MCP server's sign-in that the CLI cleared when a new sign-in started and that never got replaced."""
+    if not any(entry.get("accessToken") for entry in saved.values()) or mcp_tokens(account_id).get(server):
+        return
+    target = credentials_path(account_id)
+    data = _credentials(account_id)
+    current = data.get("mcpOAuth")
+    data["mcpOAuth"] = {**(current if isinstance(current, dict) else {}), **saved}
+    mode = target.stat().st_mode if target.exists() else None
+    files.write_json(target, data)
+    if mode is not None:
+        os.chmod(target, mode)
+
+
 def _meta(path: Path) -> dict:
     try:
         stored = json.loads((path / _META_FILE).read_text(encoding="utf-8"))

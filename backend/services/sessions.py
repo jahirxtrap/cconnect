@@ -1399,11 +1399,11 @@ def _subagent_blocks(sub_file: Path, parent_id: Optional[str], vis: dict, calls:
                     if vis["file_change"] == "off":
                         _working(out, vis)
                         continue
-                    cell = _notebook_cell(name, inp)
+                    extra = {**_notebook_cell(name, inp), **sub_errors.get(bid or "", {})}
                     if vis["file_change"] == "label":
-                        out.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, "parent": parent_id, **cell})
+                        out.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, "parent": parent_id, **extra})
                         continue
-                    out.append({"type": "file_change", "name": name, "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id, **cell})
+                    out.append({"type": "file_change", "name": name, "path": path, "diff_lines": _build_file_diff(name, inp, path), "id": bid, "parent": parent_id, **extra})
                     continue
             shown = database_tools.tool_mode(name, vis["tool_use"])
             if shown == "off":
@@ -1998,8 +1998,8 @@ def _normalize(
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
                     if vis["tool_use"] != "off":
-                        block_event = _agent_event(bid, inp)
-                        done =notified.get(bid or "") or agent_results.get(bid or "")
+                        block_event = {**_agent_event(bid, inp), **tool_errors.get(bid or "", {})}
+                        done = notified.get(bid or "") or agent_results.get(bid or "")
                         if done is not None:
                             block_event["agent_result"] = _agent_result(done, vis)
                         messages.append(block_event)
@@ -2013,7 +2013,7 @@ def _normalize(
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
                     if vis["tool_use"] != "off":
-                        block_event = _agent_event(bid, _agent_input(name, inp))
+                        block_event = {**_agent_event(bid, _agent_input(name, inp)), **tool_errors.get(bid or "", {})}
                         done = notified.get(bid or "")
                         if done is not None:
                             block_event["agent_result"] = _agent_result(done, vis)
@@ -2044,9 +2044,9 @@ def _normalize(
                         if vis["file_change"] == "off":
                             _working(messages, vis)
                             continue
-                        cell = _notebook_cell(name, inp)
+                        extra = {**_notebook_cell(name, inp), **tool_errors.get(bid or "", {})}
                         if vis["file_change"] == "label":
-                            messages.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, **cell})
+                            messages.append({"type": "file_change", "name": name, "path": path, "id": bid, "label": True, **extra})
                             continue
                         messages.append({
                             "type": "file_change",
@@ -2054,7 +2054,7 @@ def _normalize(
                             "path": path,
                             "diff_lines": _build_file_diff(name, inp, path),
                             "id": bid,
-                            **cell,
+                            **extra,
                         })
                         continue
                 pack_id = str(inp.get("id") or "").strip() if isinstance(inp, dict) else ""

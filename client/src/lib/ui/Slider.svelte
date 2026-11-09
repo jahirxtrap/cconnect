@@ -84,9 +84,4 @@
     border-radius: 999px;
     background: currentColor;
   }
-
-  .cc-range:focus-visible ~ .cc-thumb {
-    outline: 2px solid var(--color-accent);
-    outline-offset: 2px;
-  }
 </style>

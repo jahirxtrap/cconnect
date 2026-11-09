@@ -40,7 +40,7 @@
       onChange={(value) => settings.setDiscord("enabled", value)}
     />
     {#if prefs.enabled}
-      <CardPanel class="mb-1 w-full gap-0.5">
+      <CardPanel class="mb-1 w-full">
         {#if preview}
           <p class="truncate text-body-md">{preview.details}</p>
           {#if preview.state}

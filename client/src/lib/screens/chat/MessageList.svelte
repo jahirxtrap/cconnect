@@ -10,6 +10,7 @@
   import { plainTextSharing, sharePlainText } from "$lib/services/sharedFiles";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
+  import type { SharedMenuHandler } from "$lib/ui/menuSurface";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import Collapsible from "./blocks/Collapsible.svelte";
@@ -42,7 +43,7 @@
     earlierLoading?: boolean;
     follow?: boolean;
     onSharedLink: (url: string, filename: string) => void;
-    onSharedMenu?: ((url: string, filename: string) => void) | null;
+    onSharedMenu?: SharedMenuHandler | null;
     onSuggest?: SuggestionPicker | null;
     sessionId: string | null;
     expandedIds: Record<number, boolean>;

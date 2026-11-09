@@ -27,8 +27,17 @@
   const current = $derived(views.find((view) => view.kind === panes.viewAt(role)) ?? null);
 </script>
 
+{#snippet swapAction()}
+  <MenuItem icon={ArrowLeftRight} text={t("SWAP_PANES")} onclick={() => panes.swap()} />
+{/snippet}
+
 <span use:bar.trigger class="relative inline-flex rounded-full">
-  <PopupMenu open={bar.menuOpen} onOpenChange={(value) => (bar.menuOpen = value)} label={t("PANEL_VIEW")}>
+  <PopupMenu
+    open={bar.menuOpen}
+    onOpenChange={(value) => (bar.menuOpen = value)}
+    label={t("PANEL_VIEW")}
+    footer={panes.swappable ? swapAction : undefined}
+  >
     {#snippet triggerChild(props)}
       <TooltipIconButton label={t("PANEL_VIEW")} selected={!!current && !layout.mobile} active={!!current} {...props}>
         {#if current}
@@ -66,9 +75,6 @@
         </div>
       {/each}
     </div>
-    {#if panes.swappable}
-      <MenuItem icon={ArrowLeftRight} text={t("SWAP_PANES")} onclick={() => panes.swap()} />
-    {/if}
   </PopupMenu>
   {#if bar.overMenu}
     <span

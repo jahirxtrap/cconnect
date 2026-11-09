@@ -150,6 +150,9 @@
       {/if}
       {#if onPlace}
         <MenuSub icon={Tag} text={t("CATEGORY")}>
+          {#snippet footer()}
+            <MenuItem icon={Plus} text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)} />
+          {/snippet}
           {#if categories.length}
             <MenuItem
               text={t("NO_CATEGORY")}
@@ -164,11 +167,13 @@
               />
             {/each}
           {/if}
-          <MenuItem icon={Plus} text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)} />
         </MenuSub>
       {/if}
       {#if onMove}
         <MenuSub icon={FolderInput} text={t("PROJECT")}>
+          {#snippet footer()}
+            <MenuItem icon={Plus} text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))} />
+          {/snippet}
           {#each projects as project (project.projectKey)}
             {@const current = project.projectKey === currentProjectKey}
             <MenuItem
@@ -177,7 +182,6 @@
               onclick={() => run(() => (current || !project.path ? undefined : onMove(project.path)))}
             />
           {/each}
-          <MenuItem icon={Plus} text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))} />
         </MenuSub>
       {/if}
       {#if onDelete}

@@ -17,7 +17,6 @@
   import AboutGroup from "./AboutGroup.svelte";
   import BackgroundSection from "./BackgroundSection.svelte";
   import ClientSection from "./ClientSection.svelte";
-  import ConnectivitySection from "./ConnectivitySection.svelte";
   import RecoverySection from "./RecoverySection.svelte";
   import { isSettingsSection, SETTINGS_SECTIONS, type SettingsSection } from "./sections";
   import ServerSection from "./ServerSection.svelte";
@@ -25,7 +24,7 @@
   import { useSettingsPage } from "./settingsPage.svelte";
 
   const sectionOf = (value: string | null): SettingsSection =>
-    isSettingsSection(value) ? value : backend.configured ? "general" : "connectivity";
+    isSettingsSection(value) ? value : backend.configured ? "general" : "server";
 
   let section = $state<SettingsSection>(sectionOf(navigation.sub));
   let scroller = $state<HTMLDivElement | null>(null);
@@ -53,7 +52,6 @@
   {#if id === "general"}
     <ClientSection />
     <BackgroundSection />
-    <ConnectivitySection />
     <ServerSection tick={page.tick} flash={page.highlight.is("server")} />
     <RecoverySection onChanged={page.changed} />
     <AboutGroup flash={page.highlight.is("about")} />
@@ -61,8 +59,6 @@
     <ClientSection />
   {:else if id === "background"}
     <BackgroundSection />
-  {:else if id === "connectivity"}
-    <ConnectivitySection />
   {:else if id === "server"}
     <ServerSection tick={page.tick} flash={page.highlight.is("server")} />
   {:else if id === "claude"}

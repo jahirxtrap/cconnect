@@ -1,9 +1,6 @@
-<script lang="ts" module>
-  export const BAR_ACTION_CLASS = "size-7";
-</script>
-
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { BAR_CARD_CLASS, BAR_LABEL_CLASS } from "$lib/ui/actionBar";
 
   interface Props {
     label: string;
@@ -13,7 +10,7 @@
   const { label, children }: Props = $props();
 </script>
 
-<div class="flex min-h-10 shrink-0 items-center gap-1 rounded-panel bg-card py-1 pr-1.5 pl-3">
-  <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">{label}</span>
+<div class={BAR_CARD_CLASS}>
+  <span class={BAR_LABEL_CLASS}>{label}</span>
   {@render children?.()}
 </div>

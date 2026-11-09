@@ -1,14 +1,7 @@
 <script lang="ts">
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
-  import Paperclip from "@lucide/svelte/icons/paperclip";
-  import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import ExternalLink from "@lucide/svelte/icons/external-link";
   import Maximize2 from "@lucide/svelte/icons/maximize-2";
-  import Save from "@lucide/svelte/icons/save";
-  import Share2 from "@lucide/svelte/icons/share-2";
-  import Trash from "@lucide/svelte/icons/trash";
   import Type from "@lucide/svelte/icons/type";
   import type { Snippet } from "svelte";
   import type { PreviewLinks, PreviewRequest } from "$lib/app/navigation.svelte";
@@ -29,12 +22,6 @@
   import { paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
-  import {
-    downloadShared,
-    openSharedExternally,
-    saveSharedAs,
-    shareShared,
-  } from "$lib/services/sharedFiles";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -43,12 +30,16 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
-  import MenuItem from "$lib/ui/MenuItem.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
+  import FileActionItems from "$lib/ui/FileActionItems.svelte";
+  import { FILE_ACTIONS, fileEntries, type FileActionEntry } from "$lib/ui/sharedFileActions";
   import PageFrame from "$lib/ui/PageFrame.svelte";
+  import { pageZoom } from "$lib/ui/pageZoom.svelte";
+  import ZoomMenu from "$lib/ui/ZoomMenu.svelte";
+  import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import GallerySlide, { GALLERY_KINDS } from "./GallerySlide.svelte";
@@ -63,7 +54,7 @@
     onDelete?: (() => void) | null;
     embedded?: boolean;
     onExpand?: (() => void) | null;
-    menuItems?: Snippet;
+    extraActions?: FileActionEntry[];
     actions?: Snippet<[boolean]>;
     onCopyPath?: (() => void) | null;
     added?: number[];
@@ -96,7 +87,7 @@
     onDelete = null,
     embedded = false,
     onExpand = null,
-    menuItems,
+    extraActions = [],
     actions,
     onCopyPath = null,
     added = [],
@@ -157,9 +148,16 @@
   const FRAME_CLASS = `${BODY_CLASS} overflow-hidden rounded-panel`;
   const PANE_SIDES_CLASS = `${FRAME_CLASS} mx-(--page-inset)`;
   const PANE_FRAME_CLASS = `${PANE_SIDES_CLASS} mb-(--page-inset)`;
+  const PAGE_ZOOM_KEYS = { in: "preview.zoom.in", out: "preview.zoom.out", reset: "preview.zoom.reset" };
   const TEXT_SCROLL_CLASS = `${TEXT_VIEWPORT_CLASS} selectable min-h-0 flex-1`;
 
   const kind = $derived(forcedKind ?? previewKindOf(filename));
+  const paged = () => kind === "html";
+
+  useShortcut("preview.zoom.in", () => pageZoom.step(1), paged);
+  useShortcut("preview.zoom.out", () => pageZoom.step(-1), paged);
+  useShortcut("preview.zoom.reset", () => pageZoom.reset(), paged);
+
   const strip = $derived(
     gallery && gallery.length > 1 && onPick
       ? { items: gallery, onPick, index: gallery.findIndex((item) => item.url === url) }
@@ -196,6 +194,14 @@
         ? null
         : () => void sharedApi.absolutePaths([relative]).then((paths) => paths && copyText(paths[0]))),
   );
+
+  const menuActions = $derived.by(() => {
+    const entries: FileActionEntry[] = [...extraActions, ...fileEntries(FILE_ACTIONS, { url }, filename)];
+    if (attach) entries.push({ id: "attach", run: attach });
+    if (copyPath) entries.push({ id: "copyPath", run: copyPath });
+    if (onDelete) entries.push({ id: "delete", run: () => (confirmingDelete = true) });
+    return entries;
+  });
   const base = $derived(withoutFallback(url));
   const stamp = $derived(version + revision);
   const source = $derived(revised(base, stamp));
@@ -300,24 +306,15 @@
         <EllipsisVertical />
       </TooltipIconButton>
     {/snippet}
-    {@render menuItems?.()}
-    {#if attach}
-      <MenuItem text={t("ATTACH_TO_CHAT")} icon={Paperclip} onclick={attach} />
+    {#if kind === "html"}
+      <ZoomMenu
+        zoom={pageZoom.value}
+        shortcuts={PAGE_ZOOM_KEYS}
+        onZoom={(step) => pageZoom.step(step)}
+        onReset={() => pageZoom.reset()}
+      />
     {/if}
-    <MenuItem text={t("SAVE")} icon={Download} onclick={() => void downloadShared(url, filename)} />
-    <MenuItem text={t("SAVE_AS")} icon={Save} onclick={() => void saveSharedAs(url, filename)} />
-    <MenuItem
-      text={t("OPEN_EXTERNALLY")}
-      icon={ExternalLink}
-      onclick={() => void openSharedExternally(url, filename)}
-    />
-    {#if copyPath}
-      <MenuItem text={t("COPY_PATH")} icon={ClipboardCopy} onclick={copyPath} />
-    {/if}
-    <MenuItem text={t("SHARE")} icon={Share2} onclick={() => void shareShared(url, filename)} />
-    {#if onDelete}
-      <MenuItem text={t("DELETE")} icon={Trash} danger onclick={() => (confirmingDelete = true)} />
-    {/if}
+    <FileActionItems actions={menuActions} />
   </PopupMenu>
 {/snippet}
 
@@ -383,6 +380,7 @@
       url={source}
       name={filename}
       title={filename}
+      zoomable
       onerror={() => (failed = true)}
       class="min-h-0 w-full flex-1 border-0"
     />

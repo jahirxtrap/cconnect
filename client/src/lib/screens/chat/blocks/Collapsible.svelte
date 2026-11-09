@@ -4,7 +4,7 @@
   import type { IconSource } from "$lib/ui/icons";
   import { insideCard, provideCardFrame } from "./cards";
   import CollapsibleHead from "./CollapsibleHead.svelte";
-  import type { HeadTone } from "./headTones";
+  import type { HeadStatus, HeadTone } from "./headTones";
   import { provideStickyHeads, stickyHeads } from "./stickyHeads";
 
   interface Props {
@@ -17,6 +17,7 @@
     meta?: Snippet;
     labelOnly?: boolean;
     running?: boolean;
+    status?: HeadStatus | null;
     tone?: HeadTone;
     bodyClass?: string;
     expanded?: boolean | null;
@@ -34,6 +35,7 @@
     meta,
     labelOnly = false,
     running = false,
+    status = null,
     tone = "process",
     bodyClass = "pt-1",
     expanded = null,
@@ -73,6 +75,7 @@
       {meta}
       {labelOnly}
       {running}
+      {status}
       {tone}
       expanded={isExpanded}
       onclick={toggle}

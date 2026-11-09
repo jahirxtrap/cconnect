@@ -3,6 +3,7 @@ import type { Role } from "$lib/data/chatModels";
 export type GapRole = Role | "status";
 
 const BIG = "var(--chat-gap-lg)";
+const EDGE = "var(--chat-gap-md)";
 const SMALL = "var(--chat-gap-sm)";
 const TIGHT = "var(--chat-gap-xs)";
 const NONE = "0px";
@@ -41,7 +42,7 @@ const group = (role: GapRole | null): number => {
 export const gapAbove = (before: GapRole | null, role: GapRole): string => {
   const prev = before === null ? null : (ROW_ALIKE[before] ?? before);
   const current = ROW_ALIKE[role] ?? role;
-  if (prev === null) return BIG;
+  if (prev === null) return EDGE;
   if (prev === "interaction" && current === "interaction") return SMALL;
   if (prev === current) return NONE;
   if (isNotice(current) || isNotice(prev)) {
@@ -57,7 +58,7 @@ export const gapAbove = (before: GapRole | null, role: GapRole): string => {
   return a === 1 || b === 1 ? NONE : SMALL;
 };
 
-export const gapBelow = (next: GapRole | null): string => (next === null ? BIG : NONE);
+export const gapBelow = (next: GapRole | null): string => (next === null ? EDGE : NONE);
 
 const CARDS: GapRole[] = [...GROUPED, ...NOTICE, "summary", "agent_report"];
 

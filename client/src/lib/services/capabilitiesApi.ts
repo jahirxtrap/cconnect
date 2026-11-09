@@ -1,5 +1,6 @@
 import { CLIENT_CAPABILITIES } from "$lib/data/clientCapabilities";
 import { http, type HttpClient } from "./http";
+import { CONNECT_TIMEOUT_MS } from "./socket";
 
 export interface LabeledOption {
   id: string;
@@ -191,7 +192,7 @@ export const contextWindowFor = (capabilities: Capabilities | null, model: strin
 
 export const createCapabilitiesApi = (http: HttpClient) => ({
   async versionInfo(): Promise<VersionInfo | null> {
-    const data = await http.get<VersionWire>("/health");
+    const data = await http.get<VersionWire>("/health", undefined, CONNECT_TIMEOUT_MS);
     return data && toVersion(data);
   },
 

@@ -11,6 +11,7 @@
   import Search from "@lucide/svelte/icons/search";
   import { untrack } from "svelte";
   import { activeScope } from "$lib/app/activeScope.svelte";
+  import { dismissOpen } from "$lib/app/dismissStack";
   import { navigation } from "$lib/app/navigation.svelte";
   import { isEditing, paneFocus } from "$lib/data/paneFocus.svelte";
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
@@ -243,7 +244,7 @@
   const stepBack = () => (isTouch ? cancelMode() || leaveView() : leaveView() || cancelMode());
 
   const onKeydown = (event: KeyboardEvent) => {
-    if (event.key !== "Escape" || !engaged || isEditing()) return;
+    if (event.key !== "Escape" || !engaged || isEditing() || dismissOpen()) return;
     if (!cancelMode() && !stepUp()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -817,12 +818,13 @@
 {/snippet}
 
 {#snippet selectAllAction()}
+  {@const allChosen = files.length > 0 && chosen.length === files.length}
   <TooltipIconButton
-    label={t("SELECT_ALL")}
+    label={t(allChosen ? "DESELECT_ALL" : "SELECT_ALL")}
     shortcut="project.selectAll"
     onclick={selectAll}
   >
-    <SelectionDot selected={files.length > 0 && chosen.length === files.length} size={compact ? 16 : 18} />
+    <SelectionDot selected={allChosen} size={compact ? 16 : 18} />
   </TooltipIconButton>
 {/snippet}
 

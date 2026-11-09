@@ -10,6 +10,7 @@
   import MessagesSquare from "@lucide/svelte/icons/messages-square";
   import Puzzle from "@lucide/svelte/icons/puzzle";
   import Server from "@lucide/svelte/icons/server";
+  import ServerCog from "@lucide/svelte/icons/server-cog";
   import { joined } from "$lib/data/format";
   import { loads } from "$lib/data/inflight";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
@@ -33,6 +34,7 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import AgentsDialog from "$lib/screens/agents/AgentsDialog.svelte";
   import ChatsDialog from "./ChatsDialog.svelte";
+  import EnvironmentsDialog from "./EnvironmentsDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
   import PrivacyDialog from "./PrivacyDialog.svelte";
   import SessionsDialog from "./SessionsDialog.svelte";
@@ -123,11 +125,12 @@
       })(),
     );
 
-  const rowSummary = (id: string) => {
-    if (!ready) return loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE");
+  const hintOf = (id: string) => {
     const entry = entryFor(id);
     return entry ? entryHint(entry) : "";
   };
+
+  const rowSummary = (id: string) => (ready ? hintOf(id) : loading ? t("CONNECTING") : t("SERVER_UNAVAILABLE"));
 
   const apply = async (patch: SettingsPatch) => {
     dialog = null;
@@ -153,6 +156,13 @@
   {#snippet labelTrailing()}
     <StatusDot class={ready ? "bg-green" : "bg-red"} {loading} />
   {/snippet}
+
+  <PreferenceRow
+    icon={Server}
+    title={t("ENVIRONMENTS")}
+    summary={hintOf("environments")}
+    onclick={() => (dialog = "environments")}
+  />
 
   <PreferenceRow
     icon={Sparkles}
@@ -269,7 +279,7 @@
   {/if}
 
   <div class="{PREFERENCE_ROW_CLASS} {ready ? '' : 'opacity-40'} {flash ? 'flash-highlight' : ''}">
-    <Server size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
+    <ServerCog size={PREFERENCE_ICON_SIZE} class="shrink-0 text-on-surface-variant" />
     <div class="min-w-0 flex-1">
       <p class="truncate text-item-title">{t("SERVER_VERSION")}</p>
       <p class="truncate text-body-sm text-on-surface-variant">
@@ -308,6 +318,10 @@
     </div>
   {/if}
 </SettingsGroup>
+
+{#if dialog === "environments"}
+  <EnvironmentsDialog onDismiss={() => (dialog = null)} />
+{/if}
 
 {#if dialog === "generation" && snapshot && capabilities}
   <GenerationDialog

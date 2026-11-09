@@ -102,5 +102,5 @@
   >
     {@render children()}
   </div>
-  <PullIndicator fraction={pull.fraction} {refreshing} />
+  <PullIndicator {pull} {refreshing} />
 </div>

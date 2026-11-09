@@ -2,7 +2,7 @@ import { accountsStore } from "$lib/data/accountsStore.svelte";
 import { serverSettings } from "$lib/data/serverSettings.svelte";
 import { rankLabel } from "$lib/data/textMatch";
 import { t } from "$lib/i18n/index.svelte";
-import { isDesktop, isTauri } from "$lib/platform";
+import { isDesktop } from "$lib/platform";
 import { androidBackground } from "$lib/platform/androidBackground";
 import { layout } from "$lib/platform/layout.svelte";
 import { webApp } from "$lib/platform/pwa.svelte";
@@ -35,6 +35,7 @@ import {
   hooksValue,
   localeValue,
   localServerValue,
+  pageZoomValue,
   marketplacesValue,
   mcpValue,
   memoriesValue,
@@ -72,6 +73,7 @@ export type SettingsDialog =
   | "packs"
   | "accent"
   | "chat_background"
+  | "page_zoom"
   | "shortcuts"
   | "discord"
   | "browser"
@@ -106,6 +108,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
   { id: "packs", label: "PACKS", value: packsValue, section: "client", group: "SETTINGS_CLIENT", dialog: "packs" },
+  { id: "page_zoom", label: "PAGE_ZOOM", value: pageZoomValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
@@ -119,8 +122,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "battery", label: "BATTERY_OPTIMIZATION", summary: "BATTERY_OPTIMIZATION_SUMMARY", available: () => androidBackground() !== null, section: "background", group: "BACKGROUND_GROUP" },
   { id: "tray", label: "MINIMIZE_TO_TRAY", summary: "MINIMIZE_TO_TRAY_SUMMARY", available: () => isDesktop, section: "background", group: "BACKGROUND_GROUP" },
 
-  { id: "environments", label: "ENVIRONMENTS", value: environmentValue, section: "connectivity", group: "SETTINGS_CONNECTIVITY", dialog: "environments" },
-  { id: "ssh_hosts", label: "SSH_HOSTS", summary: "SSH_HOSTS_SUMMARY", available: () => isTauri, section: "connectivity", group: "SETTINGS_CONNECTIVITY" },
+  { id: "environments", label: "ENVIRONMENTS", value: environmentValue, section: "server", group: "SETTINGS_SERVER", dialog: "environments" },
 
   { id: "generation", label: "GENERATION", value: generationValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
   { id: "model", label: "MODEL", value: modelValue, section: "server", group: "SETTINGS_SERVER", dialog: "generation" },
@@ -243,8 +245,8 @@ const environmentEntries = (): SettingsEntry[] =>
     id: `environment.${profile.id}`,
     label: profile.name,
     value: () => address(profile),
-    section: "connectivity",
-    group: "SETTINGS_CONNECTIVITY",
+    section: "server",
+    group: "SETTINGS_SERVER",
     dialog: "environments",
   }));
 

@@ -39,8 +39,10 @@ def page_file(page_id: str, rest: str, request: Request):
     if found is None:
         raise HTTPException(status_code=404, detail="page not found")
     if rest == found.entry:
-        return HTMLResponse(found.html, headers=FILE_HEADERS)
+        return HTMLResponse(pages.framed(found.html.encode("utf-8")), headers=FILE_HEADERS)
     resolved = pages.file_of(found, rest)
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
+    if resolved.suffix.lower() in pages.HTML_SUFFIXES:
+        return HTMLResponse(pages.framed(resolved.read_bytes()), headers=FILE_HEADERS)
     return file_response(request, resolved)

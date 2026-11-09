@@ -53,7 +53,7 @@
       onlongclick={() => (menuId = note.id)}
       oncontextmenu={() => (menuId = note.id)}
       hover={false}
-      class="flex w-full flex-col gap-0.5 rounded-md px-3 py-2"
+      class="flex w-full flex-col rounded-md px-3 py-2"
     >
       <span class="truncate pr-6 text-label-lg">{noteLabel(note)}</span>
       {#if preview}
@@ -71,7 +71,7 @@
       onclick={() => onOpen(note.id)}
       onlongclick={() => (menuId = note.id)}
       oncontextmenu={() => (menuId = note.id)}
-      class="h-40 gap-1"
+      class="h-40"
     >
       <span class="truncate pr-6 text-label-lg">{noteLabel(note)}</span>
       <span class="line-clamp-4 min-h-0 flex-1 text-body-sm text-on-surface-variant">{notePreview(note.body)}</span>

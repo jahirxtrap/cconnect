@@ -36,7 +36,7 @@ from core.config import (
 _LAUNCH_TIMEOUT = 20.0
 _CLOSE_TIMEOUT = 5.0
 _LOAD_TIMEOUT = 20.0
-_MAX_PENDING_FRAMES = 2
+_UNANSWERED_MOUSE = ("mouseMoved", "mouseWheel")
 _DEFAULT_WIDTH = 1024
 _DEFAULT_HEIGHT = 768
 _MIN_WIDTH = 320
@@ -344,12 +344,15 @@ class BrowserSession:
         self._device = ""
         self._picking = False
         self._settling: Optional[asyncio.Task] = None
+        self._load_pending = False
         self._loaded = asyncio.Event()
         self._back = False
         self._forward = False
         self._agent = ""
         self._icons: set[asyncio.Task] = set()
         self._watchers = 0
+        self._frames = 0
+        self._unacked: list[tuple[int, Any, str]] = []
 
     @property
     def running(self) -> bool:
@@ -398,6 +401,19 @@ class BrowserSession:
 
     def unsubscribe(self, queue: asyncio.Queue):
         self._subscribers.discard(queue)
+
+    async def delivered(self, number: int):
+        """Acknowledges every frame up to one a viewer sent, so Chromium only encodes frames someone takes."""
+        acked = [entry for entry in self._unacked if entry[0] <= number]
+        if not acked:
+            return
+        self._unacked = [entry for entry in self._unacked if entry[0] > number]
+        cdp = self._cdp
+        if cdp is None:
+            return
+        with suppress(ConnectionClosed, OSError, RuntimeError):
+            for _, frame, page in acked:
+                await cdp.post("Page.screencastFrameAck", {"sessionId": frame}, page)
 
     async def watch(self):
         self._watchers += 1
@@ -511,7 +527,10 @@ class BrowserSession:
         if params["type"] == "mouseWheel":
             params["deltaX"] = float(payload.get("deltaX") or 0)
             params["deltaY"] = float(payload.get("deltaY") or 0)
-        await self._cdp.call("Input.dispatchMouseEvent", params, self._page)
+        if params["type"] in _UNANSWERED_MOUSE:
+            await self._cdp.post("Input.dispatchMouseEvent", params, self._page)
+        else:
+            await self._cdp.call("Input.dispatchMouseEvent", params, self._page)
 
     async def key(self, payload: dict):
         params = {
@@ -589,7 +608,7 @@ class BrowserSession:
             await self._teardown()
             raise RuntimeError("no_endpoint")
 
-        socket = await connect(target, max_size=None, ping_interval=None)
+        socket = await connect(target, max_size=None, ping_interval=None, compression=None)
         self._cdp = _Cdp(socket)
         self._tasks = [
             asyncio.create_task(self._pump()),
@@ -812,9 +831,10 @@ class BrowserSession:
             return
         frame = await self.shot()
         if frame:
-            self._publish(("frame", frame))
+            self._publish(("frame", (self._frames, frame)))
 
     async def _stop_stream(self):
+        self._unacked = []
         page = self._page
         if page:
             try:
@@ -861,10 +881,9 @@ class BrowserSession:
         if method == "Page.screencastFrame":
             if session != self._page:
                 return
-            await self._cdp.post(
-                "Page.screencastFrameAck", {"sessionId": params.get("sessionId")}, session
-            )
-            self._publish(("frame", base64.b64decode(params.get("data") or "")))
+            self._frames += 1
+            self._unacked.append((self._frames, params.get("sessionId"), session))
+            self._publish(("frame", (self._frames, base64.b64decode(params.get("data") or ""))))
             return
         if method == "Runtime.bindingCalled":
             if params.get("name") == _CURSOR_BINDING and session == self._page:
@@ -901,25 +920,31 @@ class BrowserSession:
         if method in _PAGE_EVENTS and session == self._page:
             if method == "Page.loadEventFired":
                 self._loaded.set()
-            self._schedule(self._settle(method == "Page.loadEventFired"))
+            self._schedule(method == "Page.loadEventFired")
 
     def _idle(self) -> bool:
         tab = self._tabs.get(self._active)
         return tab is None or not tab.url or tab.url.startswith("about:")
 
-    def _schedule(self, work):
+    def _schedule(self, loaded: bool):
+        self._load_pending = self._load_pending or loaded
         if self._settling is not None and not self._settling.done():
-            work.close()
             return
-        self._settling = asyncio.create_task(work)
+        self._settling = asyncio.create_task(self._settle())
 
-    async def _settle(self, loaded: bool):
-        try:
-            await self._refresh()
-            if loaded:
-                await self._kick()
-        except (RuntimeError, ConnectionClosed, OSError, KeyError):
-            return
+    async def _settle(self):
+        while True:
+            loaded, self._load_pending = self._load_pending, False
+            try:
+                await self._refresh()
+                if loaded and self._watchers:
+                    async with self._lock:
+                        await self._stop_stream()
+                        await self._start_stream()
+            except (RuntimeError, ConnectionClosed, OSError, KeyError):
+                return
+            if not self._load_pending:
+                return
 
     async def _refresh(self):
         page = self._page

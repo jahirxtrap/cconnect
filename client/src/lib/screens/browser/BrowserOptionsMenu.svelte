@@ -5,21 +5,18 @@
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import Monitor from "@lucide/svelte/icons/monitor";
   import Paperclip from "@lucide/svelte/icons/paperclip";
-  import RotateCcw from "@lucide/svelte/icons/rotate-ccw";
   import Smartphone from "@lucide/svelte/icons/smartphone";
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import Star from "@lucide/svelte/icons/star";
   import StarOff from "@lucide/svelte/icons/star-off";
   import Tablet from "@lucide/svelte/icons/tablet";
   import Trash from "@lucide/svelte/icons/trash";
-  import ZoomIn from "@lucide/svelte/icons/zoom-in";
-  import ZoomOut from "@lucide/svelte/icons/zoom-out";
-  import { formatPercent } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import ZoomMenu from "$lib/ui/ZoomMenu.svelte";
   import { DESKTOP_SITE } from "./deviceBrowser.svelte";
 
   interface Props {
@@ -60,6 +57,7 @@
     onClearAll,
   }: Props = $props();
 
+  const BROWSER_ZOOM_KEYS = { in: "browser.zoom.in", out: "browser.zoom.out", reset: "browser.zoom.reset" };
   const NATIVE_DEVICES = [
     { name: "", label: "BROWSER_MOBILE", icon: Smartphone },
     { name: DESKTOP_SITE, label: "BROWSER_DESKTOP", icon: Monitor },
@@ -104,29 +102,7 @@
     {/each}
   </MenuSub>
   {#if zoom !== null}
-    <MenuSub icon={ZoomIn} text={t("BROWSER_ZOOM")} value={formatPercent(zoom)}>
-      <MenuItem
-        icon={ZoomIn}
-        text={t("BROWSER_ZOOM_IN")}
-        shortcut="browser.zoom.in"
-        closeOnSelect={false}
-        onclick={() => onZoom(1)}
-      />
-      <MenuItem
-        icon={ZoomOut}
-        text={t("BROWSER_ZOOM_OUT")}
-        shortcut="browser.zoom.out"
-        closeOnSelect={false}
-        onclick={() => onZoom(-1)}
-      />
-      <MenuItem
-        icon={RotateCcw}
-        text={t("RESET")}
-        shortcut="browser.zoom.reset"
-        enabled={zoom !== 1}
-        onclick={onZoomReset}
-      />
-    </MenuSub>
+    <ZoomMenu {zoom} shortcuts={BROWSER_ZOOM_KEYS} {onZoom} onReset={onZoomReset} />
   {/if}
   {#if onPick}
     <MenuItem

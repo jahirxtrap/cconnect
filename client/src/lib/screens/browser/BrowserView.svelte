@@ -1110,7 +1110,7 @@
       style="left: {page.x}px; top: {page.y}px; width: {page.width}px"
       class="pointer-events-none fixed z-10"
     >
-      <PullIndicator fraction={pull.fraction} refreshing={pullRefreshing} />
+      <PullIndicator {pull} refreshing={pullRefreshing} />
     </div>
   </Portal>
 {/if}

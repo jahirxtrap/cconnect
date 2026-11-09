@@ -113,6 +113,19 @@
   };
 
   $effect(() => {
+    const holdPageZoom = (event: WheelEvent) => {
+      if (event.ctrlKey) event.preventDefault();
+    };
+    const holdGesture = (event: Event) => event.preventDefault();
+    window.addEventListener("wheel", holdPageZoom, { passive: false });
+    window.addEventListener("gesturestart", holdGesture);
+    return () => {
+      window.removeEventListener("wheel", holdPageZoom);
+      window.removeEventListener("gesturestart", holdGesture);
+    };
+  });
+
+  $effect(() => {
     theme.environmentAccent = backend.active?.accent ?? null;
   });
 

@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { IconSource } from "$lib/ui/icons";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import { CHIP_ICON_SIZE, CHIP_STATE_CLASS } from "./toolbarChips";
 
@@ -16,7 +15,7 @@
 
 <span class={CHIP_STATE_CLASS}>
   {#if loading}
-    <LoadingIndicator size={CHIP_ICON_SIZE} />
+    <StatusDot box={CHIP_ICON_SIZE} loading />
   {:else if dot}
     <StatusDot class={dot} box={CHIP_ICON_SIZE} />
   {:else if Icon}

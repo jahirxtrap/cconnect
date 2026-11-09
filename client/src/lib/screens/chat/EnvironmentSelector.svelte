@@ -2,20 +2,17 @@
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import Server from "@lucide/svelte/icons/server";
   import Settings from "@lucide/svelte/icons/settings";
-  import type { ConnectionState } from "$lib/data/chatModels";
+  import { environmentLinks } from "$lib/data/environmentLinks.svelte";
   import { joined } from "$lib/data/format";
-  import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import EnvironmentsDialog from "$lib/screens/settings/EnvironmentsDialog.svelte";
   import { address, backend } from "$lib/services/backend.svelte";
-  import { createCapabilitiesApi } from "$lib/services/capabilitiesApi";
-  import { createHttp } from "$lib/services/http";
   import AppLogo from "$lib/ui/AppLogo.svelte";
   import { SUBTITLE_CLASS, TITLE_CLASS } from "$lib/ui/AppTopBar.svelte";
   import { LINK_LOOKS } from "$lib/ui/linkStatus";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import { MENU_DIVIDER_CLASS } from "$lib/ui/menuSurface";
+  import { MENU_ICON_SIZE } from "$lib/ui/menuSurface";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -33,27 +30,13 @@
 
   let open = $state(false);
   let managing = $state(false);
-  let probed = $state<Record<string, ConnectionState>>({});
 
   const profile = $derived(backend.find(selected));
   const locked = $derived(!profile || settings.environmentLocked);
 
-  const linkOf = (id: string): ConnectionState =>
-    id === backend.active?.id ? serverStatus.link : (probed[id] ?? "connecting");
-
-  const probe = () => {
-    for (const environment of backend.environments) {
-      if (environment.id === backend.active?.id) continue;
-      probed[environment.id] = "connecting";
-      void createCapabilitiesApi(createHttp(() => environment))
-        .versionInfo()
-        .then((version) => (probed[environment.id] = version ? "connected" : "disconnected"));
-    }
-  };
-
   const toggle = (next: boolean) => {
     open = next;
-    if (next) probe();
+    if (next) environmentLinks.check(backend.environments);
   };
 
   const pick = (id: string) => {
@@ -99,7 +82,7 @@
     triggerChild={compact ? compactTrigger : undefined}
   >
     {#each backend.environments as environment (environment.id)}
-      {@const link = linkOf(environment.id)}
+      {@const link = environmentLinks.linkOf(environment)}
       {@const look = link === "connected" ? null : LINK_LOOKS[link]}
       <MenuItem
         text={environment.name}
@@ -108,12 +91,13 @@
         onclick={() => pick(environment.id)}
       >
         {#snippet leading()}
-          <StatusDot class={look?.dot ?? "bg-green"} loading={look?.spinner ?? false} />
+          <StatusDot box={MENU_ICON_SIZE} class={look?.dot ?? "bg-green"} loading={look?.spinner ?? false} />
         {/snippet}
       </MenuItem>
     {/each}
-    <div class={MENU_DIVIDER_CLASS}></div>
-    <MenuItem icon={Settings} text={t("MANAGE_ENVIRONMENTS")} onclick={() => (managing = true)} />
+    {#snippet footer()}
+      <MenuItem icon={Settings} text={t("MANAGE_ENVIRONMENTS")} onclick={() => (managing = true)} />
+    {/snippet}
   </PopupMenu>
 {/if}
 

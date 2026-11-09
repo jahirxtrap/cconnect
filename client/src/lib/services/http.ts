@@ -29,8 +29,8 @@ export const outcomeOf = <T, F, W = Record<string, unknown>>(
     : { ok: false, status: result.status, value: null, failure: failure(result.data) };
 
 export interface HttpClient {
-  call: <T>(method: string, path: string, query?: Query, body?: unknown) => Promise<HttpResult<T>>;
-  get: <T>(path: string, query?: Query) => Promise<T | null>;
+  call: <T>(method: string, path: string, query?: Query, body?: unknown, timeout?: number) => Promise<HttpResult<T>>;
+  get: <T>(path: string, query?: Query, timeout?: number) => Promise<T | null>;
   post: <T>(path: string, body?: unknown) => Promise<T | null>;
   put: <T>(path: string, body?: unknown) => Promise<T | null>;
   patch: <T>(path: string, body?: unknown) => Promise<T | null>;
@@ -49,12 +49,19 @@ const withQuery = (base: string, path: string, query?: Query) => {
 };
 
 export const createHttp = (profile: () => Profile, extraHeaders?: () => Record<string, string>): HttpClient => {
-  const call = async <T>(method: string, path: string, query?: Query, body?: unknown): Promise<HttpResult<T>> => {
+  const call = async <T>(
+    method: string,
+    path: string,
+    query?: Query,
+    body?: unknown,
+    timeout?: number,
+  ): Promise<HttpResult<T>> => {
     const target = profile();
     if (!isConfigured(target)) return { ok: false, status: 0, data: null };
     try {
       const response = await fetch(withQuery(baseUrlOf(target), path, query), {
         method,
+        signal: timeout ? AbortSignal.timeout(timeout) : undefined,
         headers: {
           ...authHeadersOf(target),
           ...(extraHeaders?.() ?? {}),
@@ -69,14 +76,20 @@ export const createHttp = (profile: () => Profile, extraHeaders?: () => Record<s
     }
   };
 
-  const execute = async <T>(method: string, path: string, query?: Query, body?: unknown): Promise<T | null> => {
-    const result = await call<T>(method, path, query, body);
+  const execute = async <T>(
+    method: string,
+    path: string,
+    query?: Query,
+    body?: unknown,
+    timeout?: number,
+  ): Promise<T | null> => {
+    const result = await call<T>(method, path, query, body, timeout);
     return result.ok ? (result.data ?? ({} as T)) : null;
   };
 
   return {
     call,
-    get: <T>(path: string, query?: Query) => execute<T>("GET", path, query),
+    get: <T>(path: string, query?: Query, timeout?: number) => execute<T>("GET", path, query, undefined, timeout),
     post: <T>(path: string, body?: unknown) => execute<T>("POST", path, undefined, body ?? {}),
     put: <T>(path: string, body?: unknown) => execute<T>("PUT", path, undefined, body ?? {}),
     patch: <T>(path: string, body?: unknown) => execute<T>("PATCH", path, undefined, body ?? {}),

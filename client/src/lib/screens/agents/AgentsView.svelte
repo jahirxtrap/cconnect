@@ -103,24 +103,26 @@
           {/snippet}
         </MenuItem>
       {/each}
-      {#if chat.agentState?.logout && chat.agentState.status === "ready"}
+      {#snippet footer()}
+        {#if chat.agentState?.logout && chat.agentState.status === "ready"}
+          <MenuItem
+            icon={LogOut}
+            text={t("SIGN_OUT")}
+            onclick={() => {
+              open = false;
+              signingOut = true;
+            }}
+          />
+        {/if}
         <MenuItem
-          icon={LogOut}
-          text={t("SIGN_OUT")}
+          icon={Settings2}
+          text={t("AGENTS_MANAGE")}
           onclick={() => {
             open = false;
-            signingOut = true;
+            managing = true;
           }}
         />
-      {/if}
-      <MenuItem
-        icon={Settings2}
-        text={t("AGENTS_MANAGE")}
-        onclick={() => {
-          open = false;
-          managing = true;
-        }}
-      />
+      {/snippet}
     </PopupMenu>
   {/if}
 {/snippet}

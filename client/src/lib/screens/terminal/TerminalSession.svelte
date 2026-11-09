@@ -6,6 +6,7 @@
   import type { TerminalConnector, TerminalStatus } from "$lib/data/terminalLink";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
+  import { BAR_DOCK_CLASS } from "$lib/ui/actionBar";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -78,23 +79,25 @@
   {:else if status === "failed"}
     <ConnectionError class="flex-1" />
   {:else}
-    <div class="mx-(--page-inset) mb-(--page-inset) min-h-0 flex-1 overflow-hidden rounded-panel bg-terminal">
-      {#if Surface}
-        <Surface bind:this={pane} {connect} onStatus={(next) => (status = next)} />
+    <div class="flex min-h-0 flex-1 flex-col pb-(--page-inset)">
+      <div class="mx-(--page-inset) min-h-0 flex-1 overflow-hidden rounded-panel bg-terminal">
+        {#if Surface}
+          <Surface bind:this={pane} {connect} onStatus={(next) => (status = next)} />
+        {/if}
+      </div>
+      {#if isTouch}
+        <div class="{BAR_DOCK_CLASS} flex shrink-0 items-center gap-2">
+          <SoftKeys onKey={(bytes) => pane?.sendKey(bytes)} />
+          <TooltipIconButton
+            label={t("KEYBOARD")}
+            tooltip={false}
+            class="size-8"
+            onclick={() => pane?.toggleKeyboard()}
+          >
+            <Keyboard />
+          </TooltipIconButton>
+        </div>
       {/if}
     </div>
-    {#if isTouch}
-      <div class="flex shrink-0 items-center gap-2 px-(--page-inset) pb-(--page-inset)">
-        <SoftKeys onKey={(bytes) => pane?.sendKey(bytes)} />
-        <TooltipIconButton
-          label={t("KEYBOARD")}
-          tooltip={false}
-          class="size-8"
-          onclick={() => pane?.toggleKeyboard()}
-        >
-          <Keyboard />
-        </TooltipIconButton>
-      </div>
-    {/if}
   {/if}
 </div>

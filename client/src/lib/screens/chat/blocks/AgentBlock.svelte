@@ -7,6 +7,7 @@
   import { accountIcon } from "$lib/ui/accountIcon";
   import AgentIcon from "$lib/screens/agents/AgentIcon.svelte";
   import Collapsible from "./Collapsible.svelte";
+  import { headStatusOf, type HeadStatus } from "./headTones";
   import MessageItem from "./MessageItem.svelte";
 
   interface Props {
@@ -37,16 +38,28 @@
     return label === key ? fallback : label;
   };
 
+  const COMPLETED = "completed";
+  const FAILED = "failed";
+  const BACKGROUND = "async_launched";
+
   const stat = $derived.by(() => {
     const done = message.agentResult;
     return (
       joined(
         message.agentRun?.model,
         message.agentRun?.effort,
-        done?.status && done.status !== "completed" && keyed("AGENT_", done.status, done.status.replace(/_/g, " ")),
+        done?.status === BACKGROUND && keyed("AGENT_", done.status, done.status.replace(/_/g, " ")),
         done && done.durationMs !== null && formatDuration(done.durationMs),
         done && done.tokens !== null && formatTokens(done.tokens),
       ) || null
+    );
+  });
+
+  const status = $derived.by((): HeadStatus | null => {
+    const done = message.agentResult?.status;
+    return (
+      headStatusOf(message.toolFailed || done === FAILED, message.toolBlockedBy) ??
+      (done && done !== COMPLETED && done !== BACKGROUND ? "stopped" : null)
     );
   });
 </script>
@@ -65,6 +78,7 @@
   leading={account ? undefined : agentLogo}
   preview={message.text}
   {stat}
+  {status}
   labelOnly={!message.children.length}
   {running}
   {expanded}

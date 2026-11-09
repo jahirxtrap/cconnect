@@ -7,6 +7,7 @@
   import type { IconSource } from "./icons";
   import { menuDrill } from "./menuDrill.svelte";
   import {
+    MENU_FOOT_CLASS,
     MENU_ICON_SIZE,
     MENU_ITEM_CLASS,
     MENU_PADDING,
@@ -22,10 +23,11 @@
     value?: string;
     icon?: IconSource;
     leading?: Snippet;
+    footer?: Snippet;
     children: Snippet;
   }
 
-  const { text, value, icon: IconComponent, leading, children }: Props = $props();
+  const { text, value, icon: IconComponent, leading, footer, children }: Props = $props();
 
   const drill = isTouch ? menuDrill() : undefined;
 </script>
@@ -45,7 +47,7 @@
 {#if drill}
   <DropdownMenu.Item
     closeOnSelect={false}
-    onSelect={() => drill.open(text, children)}
+    onSelect={() => drill.open(text, children, footer)}
     onfocusin={returnFocus}
     class={MENU_ITEM_CLASS}
   >
@@ -66,6 +68,9 @@
         class={SUBMENU_CONTENT_CLASS}
       >
         <div class={MENU_SCROLL_CLASS} use:viewportScrollbar>{@render children()}</div>
+        {#if footer}
+          <div class={MENU_FOOT_CLASS}>{@render footer()}</div>
+        {/if}
       </DropdownMenu.SubContent>
     </DropdownMenu.Portal>
   </DropdownMenu.Sub>

@@ -3,7 +3,16 @@ import { SvelteMap } from "svelte/reactivity";
 import { isTauri, isTouch, systemName } from "./index";
 import { store } from "./storage";
 
-export type ShortcutScope = "global" | "chat" | "terminal" | "shared" | "browser" | "project" | "databases" | "mods";
+export type ShortcutScope =
+  | "global"
+  | "chat"
+  | "terminal"
+  | "shared"
+  | "browser"
+  | "project"
+  | "databases"
+  | "mods"
+  | "preview";
 
 export interface ShortcutDef {
   id: string;
@@ -85,6 +94,9 @@ export const SHORTCUTS: ShortcutDef[] = [
   { id: "browser.zoom.in", label: "SHORTCUT_BROWSER_ZOOM_IN", scope: "browser", keys: "Mod+Equal" },
   { id: "browser.zoom.out", label: "SHORTCUT_BROWSER_ZOOM_OUT", scope: "browser", keys: "Mod+Minus" },
   { id: "browser.zoom.reset", label: "SHORTCUT_BROWSER_ZOOM_RESET", scope: "browser", keys: "Mod+Digit0" },
+  { id: "preview.zoom.in", label: "SHORTCUT_BROWSER_ZOOM_IN", scope: "preview", keys: "Mod+Equal" },
+  { id: "preview.zoom.out", label: "SHORTCUT_BROWSER_ZOOM_OUT", scope: "preview", keys: "Mod+Minus" },
+  { id: "preview.zoom.reset", label: "SHORTCUT_BROWSER_ZOOM_RESET", scope: "preview", keys: "Mod+Digit0" },
   { id: "browser.pick", label: "SHORTCUT_BROWSER_PICK", scope: "browser", keys: "Mod+Shift+KeyE" },
   { id: "browser.copy", label: "SHORTCUT_BROWSER_COPY", scope: "browser", keys: "Mod+KeyC" },
   { id: "browser.cut", label: "SHORTCUT_BROWSER_CUT", scope: "browser", keys: "Mod+KeyX" },

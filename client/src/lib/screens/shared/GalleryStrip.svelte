@@ -12,7 +12,7 @@
   import { imageSrc, servedSrc } from "$lib/services/mediaSource";
   import { videoStillOf } from "$lib/services/sharedApi";
   import { fileIcon } from "$lib/ui/fileIcons";
-  import { ROUND_ARROW_CLASS } from "$lib/ui/roundButton";
+  import { ROUND_ARROW_CLASS, ROUND_ICON_SIZE } from "$lib/ui/roundButton";
   import { nearView } from "$lib/ui/nearView";
   import { HSCROLL_CLASS, hscrollbar } from "$lib/ui/scrollbar";
   import { TILE_FRAME_CLASS, TILE_IDLE_CLASS, TILE_LINE_CLASS, TILE_SELECTED_CLASS } from "$lib/ui/tile";
@@ -56,7 +56,7 @@
 
 <div class="flex shrink-0 items-center gap-2 p-(--page-inset)">
   <button type="button" class={ROUND_ARROW_CLASS} disabled={index <= 0} aria-label={t("PREVIOUS_FILE")} onclick={() => onStep(-1)}>
-    <ChevronLeft size={18} />
+    <ChevronLeft size={ROUND_ICON_SIZE} />
   </button>
   <div
     bind:this={strip}
@@ -126,6 +126,6 @@
     aria-label={t("NEXT_FILE")}
     onclick={() => onStep(1)}
   >
-    <ChevronRight size={18} />
+    <ChevronRight size={ROUND_ICON_SIZE} />
   </button>
 </div>

@@ -2,12 +2,13 @@
   import type { Snippet } from "svelte";
   import { OUTLINE_CLASS } from "./Button.svelte";
   import type { IconSource } from "./icons";
+  import { menuPointOf, type MenuPoint } from "./menuSurface";
 
   interface Props {
     name: string;
     icon?: IconSource;
     onclick?: () => void;
-    onmenu?: (() => void) | null;
+    onmenu?: ((at: MenuPoint | null) => void) | null;
     trailing?: Snippet;
   }
 
@@ -16,7 +17,7 @@
   const contextMenu = (event: MouseEvent) => {
     if (!onmenu) return;
     event.preventDefault();
-    onmenu();
+    onmenu(menuPointOf(event));
   };
 
   const BASE_CLASS = `flex max-w-60 shrink-0 items-center gap-1.5 rounded-full ${OUTLINE_CLASS} px-2.5 py-1 select-none`;

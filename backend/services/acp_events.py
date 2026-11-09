@@ -19,7 +19,8 @@ TOOL_NAMES = {
     "fetch": "Fetch",
 }
 DEFERRED_KINDS = ("edit", "delete", "move")
-FINISHED = ("completed", "failed")
+TOOL_FAILED = "failed"
+FINISHED = ("completed", TOOL_FAILED)
 COMPACTION_DONE = "completed"
 COMPACTION_RUNNING = "in_progress"
 PERMISSION_IDS = {"allow_once": "allow", "allow_always": "allow_always", "reject_once": "deny", "reject_always": "deny"}
@@ -162,8 +163,11 @@ class UpdateReader:
             })
         if finished and not record["done"]:
             record["done"] = True
+            failed = {"is_error": True} if record["status"] == TOOL_FAILED else {}
             if not record["file"] and not record["terminals"]:
-                events.append({"type": "tool_result", "tool_use_id": record["id"], "content": _output(record)})
+                events.append({"type": "tool_result", "tool_use_id": record["id"], "content": _output(record), **failed})
+            elif failed:
+                events.append({"type": "tool_result", "tool_use_id": record["id"], **failed})
         return events
 
     def _diff(self, record: dict, item: dict, index: int) -> list[dict]:

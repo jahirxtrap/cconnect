@@ -19,7 +19,7 @@
 
 <div
   use:swipeDismiss={{ onDismiss }}
-  class="pointer-events-auto {isTouch ? 'flex items-center gap-1 px-3.5 py-1' : FLOAT_HEAD_CLASS} {FLOAT_PANEL_WIDTH} {FLOAT_SURFACE_CLASS}"
+  class="pointer-events-auto {isTouch ? 'flex items-center gap-1 px-3.5 py-2' : FLOAT_HEAD_CLASS} {FLOAT_PANEL_WIDTH} {FLOAT_SURFACE_CLASS}"
 >
   <p class="min-w-0 flex-1 pr-1 text-body-md">{text}</p>
   {#if actionLabel && onAction}

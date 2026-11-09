@@ -3,8 +3,9 @@
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import type { Snippet } from "svelte";
   import type { IconSource } from "$lib/ui/icons";
+  import { t } from "$lib/i18n/index.svelte";
   import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
-  import { HEAD_TONES, type HeadTone } from "./headTones";
+  import { HEAD_STATUS, HEAD_TONES, type HeadStatus, type HeadTone } from "./headTones";
 
   interface Props {
     label: string;
@@ -16,6 +17,7 @@
     meta?: Snippet;
     labelOnly?: boolean;
     running?: boolean;
+    status?: HeadStatus | null;
     expanded?: boolean;
     tone?: HeadTone;
     onclick?: (() => void) | null;
@@ -31,6 +33,7 @@
     meta,
     labelOnly = false,
     running = false,
+    status = null,
     expanded = false,
     tone = "process",
     onclick = null,
@@ -39,6 +42,7 @@
   const GLYPH = "size-(--chat-glyph) shrink-0 self-start mt-(--chat-glyph-top)";
 
   const colors = $derived(HEAD_TONES[tone]);
+  const mark = $derived(running || !status ? null : HEAD_STATUS[status]);
 </script>
 
 <button
@@ -73,6 +77,12 @@
   {/if}
   {#if running}
     <LoadingIndicator class="{GLYPH} text-accent group-data-[stuck]/head:hidden" />
+  {:else if mark}
+    <mark.icon
+      class="{GLYPH} {mark.color} group-data-[stuck]/head:hidden"
+      role="img"
+      aria-label={t(mark.label)}
+    />
   {/if}
   {#if !labelOnly}
     {#if expanded}

@@ -21,6 +21,7 @@
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import type { IconSource } from "$lib/ui/icons";
   import InfoRow from "$lib/ui/InfoRow.svelte";
+  import { PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -44,6 +45,7 @@
   const INSET = "px-(--page-inset) pb-(--page-inset)";
   const CARD_CLASS = "rounded-panel bg-card p-3.5";
   const ICON_CLASS = "shrink-0 text-on-surface-variant";
+  const ROW_INSET = "px-3";
 
   let width = $state(0);
   let logBox = $state<HTMLDivElement | null>(null);
@@ -171,8 +173,8 @@
         </div>
 
         <SettingsGroup label={t("INFORMATION")}>
-          <div class="flex flex-col gap-2.5 p-3">
-            <div class="mb-1 flex items-center gap-3">
+          <div class="flex flex-col p-1">
+            <div class={PREFERENCE_ROW_CLASS}>
               {#if OsIcon}
                 <OsIcon class="size-8 shrink-0" aria-hidden="true" />
               {:else}
@@ -186,17 +188,17 @@
               </div>
             </div>
             {#if current.cpuName}
-              <InfoRow icon={Cpu} label="CPU" value={current.cpuName} />
+              <InfoRow icon={Cpu} label="CPU" value={current.cpuName} class={ROW_INSET} />
             {/if}
             {#if gpu}
-              <InfoRow icon={Gpu} label="GPU" value={gpu.name} />
+              <InfoRow icon={Gpu} label="GPU" value={gpu.name} class={ROW_INSET} />
             {/if}
-            <InfoRow icon={MemoryStick} label={t("MEMORY")} value={formatSize(current.memoryTotal)} />
+            <InfoRow icon={MemoryStick} label={t("MEMORY")} value={formatSize(current.memoryTotal)} class={ROW_INSET} />
             {#if gpu}
-              <InfoRow icon={Layers} label="VRAM" value={formatSize(gpu.memTotal)} />
+              <InfoRow icon={Layers} label="VRAM" value={formatSize(gpu.memTotal)} class={ROW_INSET} />
             {/if}
             {#if current.arch}
-              <InfoRow icon={Binary} label={t("ARCHITECTURE")} value={current.arch} />
+              <InfoRow icon={Binary} label={t("ARCHITECTURE")} value={current.arch} class={ROW_INSET} />
             {/if}
           </div>
         </SettingsGroup>

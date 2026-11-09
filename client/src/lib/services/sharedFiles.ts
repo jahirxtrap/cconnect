@@ -143,7 +143,7 @@ export const downloadShared = (url: string, filename: string) => {
 
 const base64Of = async (blob: Blob): Promise<string> => encodeBase64(new Uint8Array(await blob.arrayBuffer()));
 
-const textBlob = (text: string) => new Blob([text], { type: TEXT_TYPE });
+export const textBlob = (text: string) => new Blob([text], { type: TEXT_TYPE });
 
 export const saveFileToDownloads = async (filename: string, blob: Blob) => {
   const bridge = androidDownloads();
@@ -155,12 +155,10 @@ export const saveFileToDownloads = async (filename: string, blob: Blob) => {
   });
 };
 
-export const saveTextToDownloads = (filename: string, text: string) => saveFileToDownloads(filename, textBlob(text));
-
 export const saveFileAs = async (filename: string, blob: Blob) => {
   const bridge = androidDownloads();
   if (bridge) {
-    bridge.saveData(filename, await base64Of(blob));
+    bridge.saveDataAs(filename, await base64Of(blob));
     return;
   }
   if (!isTauri) {
@@ -170,8 +168,6 @@ export const saveFileAs = async (filename: string, blob: Blob) => {
   const target = await askSavePath(filename);
   if (target !== null) await writeBlob(target, blob);
 };
-
-export const saveTextAs = (filename: string, text: string) => saveFileAs(filename, textBlob(text));
 
 const nativeShare = async (file: File): Promise<boolean> => {
   if (!navigator.canShare?.({ files: [file] })) return false;
@@ -190,8 +186,20 @@ const shareData = async (filename: string, blob: Blob): Promise<boolean> => {
   return true;
 };
 
+const shareAsText = async (filename: string, blob: Blob): Promise<boolean> => {
+  if (!blob.type.startsWith("text/") || !navigator.share) return false;
+  try {
+    await navigator.share({ title: filename, text: await blob.text() });
+  } catch {
+    return true;
+  }
+  return true;
+};
+
 export const shareFile = async (filename: string, blob: Blob) => {
-  if (!(await shareData(filename, blob))) await saveFileToDownloads(filename, blob);
+  if (await shareData(filename, blob)) return;
+  if (await shareAsText(filename, blob)) return;
+  await saveFileToDownloads(filename, blob);
 };
 
 export const plainTextSharing = (): boolean =>
@@ -208,19 +216,6 @@ export const sharePlainText = async (text: string) => {
   } catch {
     return;
   }
-};
-
-export const shareText = async (filename: string, text: string) => {
-  if (await shareData(filename, textBlob(text))) return;
-  if (navigator.share) {
-    try {
-      await navigator.share({ title: filename, text });
-      return;
-    } catch {
-      return;
-    }
-  }
-  await saveTextToDownloads(filename, text);
 };
 
 const saveBlobAs = async (blob: Blob, filename: string) => {

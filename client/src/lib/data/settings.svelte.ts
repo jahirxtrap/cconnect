@@ -336,6 +336,13 @@ class Settings {
     this.#write("browser_zoom", value);
   }
 
+  get pageZoom() {
+    return this.#read<number>("page_zoom");
+  }
+  set pageZoom(value: number) {
+    this.#write("page_zoom", value);
+  }
+
   get browserFavorites(): BrowserFavorite[] {
     const value = this.#read<unknown>("browser_favorites");
     return Array.isArray(value) ? value.map(favoriteOf).filter((item): item is BrowserFavorite => item !== null) : [];

@@ -35,6 +35,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "browser_proxy_bypass", kind: "string", fallback: "", backup: true },
   { key: "browser_viewport", kind: "string", fallback: "", backup: true, legacy: "browser.preset" },
   { key: "browser_zoom", kind: "json", fallback: {}, backup: true, legacy: "browser.zoom" },
+  { key: "page_zoom", kind: "number", fallback: 1, backup: true },
   { key: "browser_favorites", kind: "json", fallback: [], backup: true },
   { key: "mod_band_hidden", kind: "boolean", fallback: false, backup: true, legacy: "mods.bandHidden" },
   { key: "discord_presence", kind: "boolean", fallback: false, backup: true },

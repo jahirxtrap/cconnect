@@ -3,33 +3,20 @@
   import ArrowDownUp from "@lucide/svelte/icons/arrow-down-up";
   import ChevronDown from "@lucide/svelte/icons/chevron-down";
   import ChevronUp from "@lucide/svelte/icons/chevron-up";
-  import CircleX from "@lucide/svelte/icons/circle-x";
-  import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
   import { copyText } from "$lib/platform/clipboard";
-  import Copy from "@lucide/svelte/icons/copy";
-  import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import ExternalLink from "@lucide/svelte/icons/external-link";
-  import Eye from "@lucide/svelte/icons/eye";
   import Filter from "@lucide/svelte/icons/filter";
-  import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
   import Link2 from "@lucide/svelte/icons/link-2";
   import Folder from "@lucide/svelte/icons/folder";
-  import FolderArchive from "@lucide/svelte/icons/folder-archive";
   import FolderInput from "@lucide/svelte/icons/folder-input";
   import FolderOpen from "@lucide/svelte/icons/folder-open";
   import FolderPlus from "@lucide/svelte/icons/folder-plus";
-  import Package from "@lucide/svelte/icons/package";
   import PackageOpen from "@lucide/svelte/icons/package-open";
-  import Paperclip from "@lucide/svelte/icons/paperclip";
-  import Pencil from "@lucide/svelte/icons/pencil";
-  import Save from "@lucide/svelte/icons/save";
-  import Share2 from "@lucide/svelte/icons/share-2";
-  import Trash from "@lucide/svelte/icons/trash";
   import Upload from "@lucide/svelte/icons/upload";
   import X from "@lucide/svelte/icons/x";
   import { untrack } from "svelte";
   import { slide } from "svelte/transition";
+  import { dismissOpen } from "$lib/app/dismissStack";
   import { openFilePreview } from "$lib/app/filePreview";
   import { navigation } from "$lib/app/navigation.svelte";
   import { chatListFor } from "$lib/data/chatList.svelte";
@@ -88,17 +75,20 @@
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import { MENU_ICON_SIZE, TOOLTIP_CLASS } from "$lib/ui/menuSurface";
-  import { PREFERENCE_ICON_SIZE } from "$lib/ui/preferenceRow";
+  import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS, PREFERENCE_TRAILING_CLASS } from "$lib/ui/preferenceRow";
+  import RowMenu from "$lib/ui/RowMenu.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
-  import { viewportScrollbar } from "$lib/ui/scrollbar";
+  import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import { rememberScroll } from "$lib/ui/scrollMemory";
   import { joinedCorners } from "$lib/ui/joinedCorners";
   import SearchBar, { HEADER_SEARCH_CLASS } from "$lib/ui/SearchBar.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import FileActionItems from "$lib/ui/FileActionItems.svelte";
+  import { FILE_ACTION_LOOK, type FileActionEntry, type FileActionId } from "$lib/ui/sharedFileActions";
+  import { BAR_ACTION_CLASS, BAR_CARD_CLASS, BAR_DOCK_CLASS, BAR_LABEL_CLASS } from "$lib/ui/actionBar";
   import PathBar from "./PathBar.svelte";
   import CompressDialog from "./CompressDialog.svelte";
   import { recallShared, rememberShared } from "./sharedMemory";
@@ -137,6 +127,16 @@
 
   const SEARCH_DELAY_MS = 300;
   const SLIDE_MS = 150;
+  const HEAD_SELECT_CLASS = "size-4 [&_svg]:size-4";
+  const BAR_SHORTCUTS: Partial<Record<FileActionId, string>> = {
+    move: "shared.cut",
+    copy: "shared.copy",
+    delete: "shared.delete",
+  };
+  const TONE_JOINING =
+    "[transition:background-color_var(--default-transition-duration)_var(--default-transition-timing-function),border-radius_0s]";
+  const TONE_PARTING =
+    "[transition:background-color_var(--default-transition-duration)_var(--default-transition-timing-function),border-radius_0s_var(--default-transition-duration)]";
   const EDGE_ZONE = 96;
   const EDGE_STEP = 24;
   const WIDE_WIDTH = 800;
@@ -183,13 +183,14 @@
   let hiddenKinds = $state(new Set(settings.sharedHiddenKinds));
   let clashing = $state<string[] | null>(null);
   let uploading = $state<File[] | null>(null);
-  let confirmingDelete = $state(false);
+  let deleting = $state<SharedEntry[] | null>(null);
   let renaming = $state<SharedEntry | null>(null);
   let creatingFolder = $state(false);
-  let compressing = $state<string[] | null>(null);
+  let compressing = $state<SharedEntry[] | null>(null);
   let extractRequest = $state<ExtractRequest | null>(null);
   let barMenu = $state(false);
   let actionsMenu = $state(false);
+  let rowMenu = $state<string | null>(null);
   let bottomBar = $state(0);
   let pendingUploads = $state<File[]>([]);
   let picker = $state<HTMLInputElement | null>(null);
@@ -327,8 +328,6 @@
 
   const selectedSet = $derived(new Set(selected));
   const selectedEntries = $derived(entries.filter((entry) => selectedSet.has(entry.file)));
-  const single = $derived(selected.length === 1 ? (selectedEntries[0] ?? null) : null);
-  const canShare = $derived(selectedEntries.length > 0 && selectedEntries.every((entry) => !entry.isDir));
   const allSelected = $derived(ordered.length > 0 && ordered.every((entry) => selectedSet.has(entry.file)));
   const transferAllowed = $derived(
     transfer !== null &&
@@ -337,6 +336,8 @@
       (transfer.kind !== "move" || path !== transfer.sourceDir),
   );
   const selectionBar = $derived(selecting && (wide || selected.length > 0));
+  const docked = $derived(transfer !== null || selectionBar);
+  const rowMenus = $derived(transfer === null && !isTouch);
   const querying = $derived(searching && searchQuery.trim().length > 0);
 
   const selectAll = () => {
@@ -465,12 +466,16 @@
     }
   };
 
-  const startTransfer = (kind: TransferKind) => {
+  const finishWith = (items: SharedEntry[]) => {
+    if (items.some((entry) => selectedSet.has(entry.file))) exitSelection();
+  };
+
+  const startTransfer = (kind: TransferKind, items: SharedEntry[] = selectedEntries) => {
     transfer = {
       kind,
-      paths: selectedEntries.map((entry) => child(entry.file)),
+      paths: items.map((entry) => child(entry.file)),
       sourceDir: path,
-      folders: selectedEntries.filter((entry) => entry.isDir).map((entry) => child(entry.file)),
+      folders: items.filter((entry) => entry.isDir).map((entry) => child(entry.file)),
     };
     exitSelection();
   };
@@ -501,56 +506,60 @@
     await reload();
   };
 
-  const shareSelection = () => {
-    const files = selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name }));
+  const sourceOf = (entry: SharedEntry) => ({
+    url: archive === null ? downloadUrl(child(entry.file)) : archiveFileUrl(archive, innerChild(entry.name)),
+    name: entry.name,
+  });
+
+  const shareEntries = (items: SharedEntry[]) => {
+    const files = items.map(sourceOf);
     if (files.length === 1) void shareShared(files[0].url, files[0].name);
     else void shareAllShared(files);
-    exitSelection();
+    finishWith(items);
   };
 
-  const saveSelection = () => {
-    selectedEntries.forEach((entry) => void downloadShared(downloadUrl(child(entry.file)), entry.name));
-    exitSelection();
+  const saveEntries = (items: SharedEntry[]) => {
+    items.map(sourceOf).forEach((file) => void downloadShared(file.url, file.name));
+    finishWith(items);
   };
 
-  const saveSelectionAs = () => {
-    void saveSharedItemsAs(
-      selectedEntries.map((entry) => ({ url: downloadUrl(child(entry.file)), name: entry.name })),
-    );
-    exitSelection();
+  const saveEntriesAs = (items: SharedEntry[]) => {
+    void saveSharedItemsAs(items.map(sourceOf));
+    finishWith(items);
   };
 
-  const attachSelection = () => {
+  const attachEntries = (items: SharedEntry[]) => {
     const target = panes.focusedTab;
-    if (target) tabs.stateFor(target).addSharedAttachments(sharedSelection());
-    exitSelection();
+    if (target) tabs.stateFor(target).addSharedAttachments(filesOf(items));
+    finishWith(items);
   };
 
-  const copySelectionPaths = () => {
+  const copyPathsOf = (items: SharedEntry[]) => {
     void sharedApi
-      .absolutePaths(selectedEntries.map((entry) => child(entry.file)))
+      .absolutePaths(items.map((entry) => child(entry.file)))
       .then((paths) => paths && copyText(paths.join("\n")));
-    exitSelection();
+    finishWith(items);
   };
 
   const bringHere = (entry: SharedEntry) => {
     void sharedApi.materialize(child(entry.file)).then(reload);
-    exitSelection();
+    finishWith([entry]);
   };
 
   const viewEntry = (entry: SharedEntry) => {
     const relative = child(entry.file);
     openFilePreview({
-      url: downloadUrl(relative),
+      url: sourceOf(entry).url,
       name: entry.name,
-      onDelete: () => void sharedApi.remove(relative).then(reload),
+      onDelete: archive === null ? () => void sharedApi.remove(relative).then(reload) : null,
     });
-    exitSelection();
+    finishWith([entry]);
   };
 
   const openExternally = (entry: SharedEntry) => {
-    void openSharedExternally(downloadUrl(child(entry.file)), entry.name);
-    exitSelection();
+    const file = sourceOf(entry);
+    void openSharedExternally(file.url, file.name);
+    finishWith([entry]);
   };
 
   const extractArchive = (entry: SharedEntry) => {
@@ -562,29 +571,52 @@
     };
   };
 
-  const extractMembers = (current: string) => {
+  const extractMembers = (items: SharedEntry[]) => {
+    if (archive === null) return;
     extractRequest = {
-      archive: current,
-      members: selectedEntries.map((entry) => innerChild(entry.name)),
+      archive,
+      members: items.map((entry) => innerChild(entry.name)),
       base: archiveDir,
-      stem: archiveStem(visibleName(current.split("/").pop() ?? current)),
+      stem: archiveStem(visibleName(archive.split("/").pop() ?? archive)),
     };
   };
 
-  const viewArchived = (current: string) => {
-    if (!single) return;
-    openFilePreview({
-      url: archiveFileUrl(current, innerChild(single.name)),
-      name: single.name,
-      onDelete: null,
-    });
-    exitSelection();
+  const actionsFor = (items: SharedEntry[]): FileActionEntry[] => {
+    const one = items.length === 1 ? items[0] : null;
+    const file = one && !one.isDir ? one : null;
+    const files = items.length > 0 && items.every((entry) => !entry.isDir);
+    const actions: FileActionEntry[] = [];
+    const offer = (id: FileActionId, run: () => unknown, when = true) => {
+      if (when) actions.push({ id, run });
+    };
+    if (archive !== null) {
+      offer("extract", () => extractMembers(items));
+    } else {
+      offer("bring", () => one && bringHere(one), !!one?.link && !one.missing);
+      offer("extract", () => file && extractArchive(file), !!file && isArchive(file.name));
+      offer("install", () => file && offerShared(downloadUrl(child(file.file)), file.name), !!file && isPackFile(file.name));
+    }
+    offer("view", () => file && viewEntry(file), !!file && isPreviewable(file.name));
+    offer("external", () => file && openExternally(file), !!file);
+    offer("save", () => saveEntries(items), files);
+    offer("saveAs", () => saveEntriesAs(items), files);
+    offer("share", () => shareEntries(items), files);
+    if (archive !== null) return actions;
+    offer("rename", () => (renaming = one), !!one);
+    offer("move", () => startTransfer("move", items));
+    offer("copy", () => startTransfer("copy", items));
+    offer("compress", () => (compressing = items));
+    offer("attach", () => attachEntries(items), filesOf(items).length > 0);
+    offer("copyPath", () => copyPathsOf(items));
+    offer("delete", () => (deleting = items));
+    return actions;
   };
 
-  const saveArchived = (current: string) => {
-    selectedEntries.forEach((entry) => void downloadShared(archiveFileUrl(current, innerChild(entry.name)), entry.name));
-    exitSelection();
-  };
+  const rowActions = (items: SharedEntry[]) => actionsFor(items).filter((action) => action.id !== "compress");
+
+  const barIds = $derived<FileActionId[]>(archive === null ? ["move", "copy", "share", "delete"] : ["extract", "save", "share"]);
+
+  const barMore = $derived(actionsFor(selectedEntries).filter((action) => !barIds.includes(action.id)));
 
   const selectSort = (field: SortKey) => {
     sortField = field;
@@ -620,7 +652,6 @@
   const detailOf = (entry: SharedEntry) =>
     entry.isDir ? plural("ITEM_COUNT", entry.items) : entry.missing ? "" : formatSize(entry.size);
 
-  const subtitleOf = (entry: SharedEntry) => (entry.missing ? t("LINK_MISSING") : entry.link || dateOf(entry));
 
   const rowAt = (x: number, y: number) => {
     const element = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-row]");
@@ -768,7 +799,7 @@
       !searching &&
       renaming === null &&
       !creatingFolder &&
-      !confirmingDelete &&
+      deleting === null &&
       extractRequest === null &&
       compressing === null &&
       !navigation.previewOverlay &&
@@ -805,7 +836,7 @@
   const stepBack = () => (isTouch ? cancelMode() || stepUp() : stepUp() || cancelMode());
 
   const onKeydown = (event: KeyboardEvent) => {
-    if (!engaged) return;
+    if (!engaged || dismissOpen()) return;
     const active = document.activeElement;
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return;
     if (event.key === "Escape") {
@@ -834,7 +865,7 @@
   });
   useShortcut("shared.delete", () => {
     if (!selected.length) return false;
-    confirmingDelete = true;
+    deleting = selectedEntries;
   });
 
   const onPaste = (event: ClipboardEvent) => {
@@ -863,8 +894,7 @@
 
   $effect(() => {
     if (compact) return;
-    const visible = transfer !== null || selectionBar;
-    layout.bottomInset = visible ? bottomBar : 0;
+    layout.bottomInset = docked ? bottomBar : 0;
     return () => (layout.bottomInset = 0);
   });
 
@@ -959,18 +989,19 @@
   });
 </script>
 
-{#snippet selectAllAction()}
+{#snippet selectAllAction(inHead = false)}
   <TooltipIconButton
-    label={t("SELECT_ALL")}
+    label={t(allSelected ? "DESELECT_ALL" : "SELECT_ALL")}
     shortcut="shared.selectAll"
     onclick={selectAll}
+    class={inHead ? HEAD_SELECT_CLASS : ""}
   >
-    <SelectionDot selected={allSelected} size={compact ? 18 : 24} />
+    <SelectionDot selected={allSelected} size={inHead ? iconSize : compact ? 18 : 24} />
   </TooltipIconButton>
 {/snippet}
 
-{#snippet cancelAction()}
-  <TooltipIconButton label={t("CANCEL")} onclick={exitSelection}>
+{#snippet cancelAction(inBar = false)}
+  <TooltipIconButton label={t("CANCEL")} onclick={exitSelection} class={inBar ? BAR_ACTION_CLASS : ""}>
     <X />
   </TooltipIconButton>
 {/snippet}
@@ -1047,9 +1078,9 @@
 {/snippet}
 
 {#snippet linkNote(entry: SharedEntry, className: string)}
-  {@const LinkIcon = entry.missing ? CircleX : Link2}
-  <span class="flex min-w-0 items-center gap-1.5 text-caption {entry.missing ? 'text-red' : 'text-faint'} {className}">
-    <LinkIcon size={12} class="shrink-0" />
+  {@const LinkIcon = entry.missing ? X : Link2}
+  <span class="flex min-w-0 items-baseline gap-1.5 text-caption {entry.missing ? 'text-red' : 'text-faint'} {className}">
+    <LinkIcon size={12} class="shrink-0 self-center" />
     <span class="truncate">{entry.missing ? t("LINK_MISSING") : entry.link}</span>
   </span>
 {/snippet}
@@ -1061,23 +1092,30 @@
   {@const corners = isSelected
     ? joinedCorners(selectedSet.has(ordered[index - 1]?.file), selectedSet.has(ordered[index + 1]?.file))
     : joinedCorners(false, false)}
-  <div data-row={index} data-name={entry.file} class="{corners} {rowTone(isSelected, dropping)}">
+  <div
+    data-row={index}
+    data-name={entry.file}
+    class="group flex items-center gap-2 {isSelected ? TONE_JOINING : TONE_PARTING} {corners} {rowTone(
+      isSelected,
+      dropping,
+    )} {isSelected || dropping ? '' : 'hover:bg-hover'}"
+  >
     <Pressable
       onclick={() => openEntry(entry)}
       oncontextmenu={() => contextSelect(entry)}
-      hover={!isSelected && !dropping}
-      class="flex w-full items-center rounded-md px-3 py-1.5 {wide ? 'min-h-8 gap-2' : 'min-h-12 gap-3'}"
+      hover={false}
+      class="min-w-0 flex-1 {wide ? 'flex min-h-8 w-full items-center gap-2 rounded-md px-3 py-1.5' : PREFERENCE_ROW_CLASS}"
     >
       {#if selecting}
-        <SelectionDot selected={isSelected} />
+        <SelectionDot selected={isSelected} size={iconSize} />
       {/if}
       <Icon size={iconSize} class="shrink-0 text-on-surface-variant" />
-      <span class="flex min-w-0 flex-1 flex-col">
-        <span class="truncate text-body-md">{entryLabel(child(entry.file), entry.name)}</span>
-        {#if entry.link}
-          {@render linkNote(entry, "")}
+      <span class="flex min-w-0 flex-1 {wide ? 'items-baseline gap-2' : 'flex-col'}">
+        <span class="max-w-full truncate text-body-md {wide ? 'shrink-0' : ''}">{entryLabel(child(entry.file), entry.name)}</span>
+        {#if entry.link || entry.missing}
+          {@render linkNote(entry, wide ? "flex-1" : "")}
         {:else if !wide}
-          <span class="truncate text-caption text-faint">{subtitleOf(entry)}</span>
+          <span class="truncate text-caption text-faint">{dateOf(entry)}</span>
         {/if}
       </span>
       {#if wide}
@@ -1087,18 +1125,32 @@
         <span class="shrink-0 text-caption text-faint">{detailOf(entry)}</span>
       {/if}
     </Pressable>
+    {#if rowMenus}
+      <div class={PREFERENCE_TRAILING_CLASS} role="presentation" onpointerdown={(event) => event.stopPropagation()}>
+        <RowMenu
+          open={rowMenu === entry.file}
+          onOpenChange={(open) => (rowMenu = open ? entry.file : null)}
+          shown={isSelected}
+        >
+          <FileActionItems actions={rowActions(isSelected ? selectedEntries : [entry])} />
+        </RowMenu>
+      </div>
+    {/if}
   </div>
 {/snippet}
 
 {#snippet columnsHead()}
-  <div class="sticky top-0 z-10 flex h-8 items-center gap-2 rounded-t-panel bg-card px-4 text-label-md text-on-surface-variant select-none">
+  <div class="sticky top-0 z-10 flex h-8 items-center gap-2 bg-card px-3 text-label-md text-on-surface-variant select-none">
+    {@render selectAllAction(true)}
     {#if selecting}
-      <span class="invisible"><SelectionDot selected={false} /></span>
+      <span class="shrink-0" style="width: {iconSize}px"></span>
     {/if}
-    <span class="shrink-0" style="width: {iconSize}px"></span>
     {@render column("name", "min-w-0 flex-1")}
     {@render column("size", SIZE_COLUMN)}
     {@render column("date", DATE_COLUMN)}
+    {#if rowMenus}
+      <span class={PREFERENCE_TRAILING_CLASS}></span>
+    {/if}
   </div>
 {/snippet}
 
@@ -1121,79 +1173,22 @@
   </button>
 {/snippet}
 
-{#snippet selectionItems()}
-  {#if single && single.link && !single.missing}
-    <MenuItem text={t("BRING_HERE")} icon={HardDriveDownload} onclick={() => single && bringHere(single)} />
-  {/if}
-  {#if single && !single.isDir && isPreviewable(single.name)}
-    <MenuItem text={t("VIEW")} icon={Eye} onclick={() => single && viewEntry(single)} />
-  {/if}
-  {#if single}
-    <MenuItem text={t("RENAME")} icon={Pencil} onclick={() => (renaming = single)} />
-  {/if}
-  {#if canShare}
-    <MenuItem text={t("SAVE")} icon={Download} onclick={saveSelection} />
-    <MenuItem text={t("SAVE_AS")} icon={Save} onclick={saveSelectionAs} />
-  {/if}
-  {#if single && !single.isDir}
-    <MenuItem text={t("OPEN_EXTERNALLY")} icon={ExternalLink} onclick={() => single && openExternally(single)} />
-  {/if}
-  {#if sharedSelection().length}
-    <MenuItem text={t("ATTACH_TO_CHAT")} icon={Paperclip} onclick={attachSelection} />
-  {/if}
-  <MenuItem text={t("COPY_PATH")} icon={ClipboardCopy} onclick={copySelectionPaths} />
-  <MenuItem
-    text={t("COMPRESS")}
-    icon={FolderArchive}
-    onclick={() => (compressing = selectedEntries.map((entry) => child(entry.file)))}
-  />
-  {#if single && !single.isDir && isArchive(single.name)}
-    <MenuItem text={t("EXTRACT")} icon={PackageOpen} onclick={() => single && extractArchive(single)} />
-  {/if}
-  {#if single && !single.isDir && isPackFile(single.name)}
-    <MenuItem
-      text={t("PACK_INSTALL")}
-      icon={Package}
-      onclick={() => single && offerShared(downloadUrl(child(single.file)), single.name)}
-    />
-  {/if}
-{/snippet}
-
 {#snippet selectionActions()}
-  {#if archive !== null}
-    {@const current = archive}
-    <ToolbarAction {narrow} icon={PackageOpen} label={t("EXTRACT")} onclick={() => extractMembers(current)} />
+  {@const available = actionsFor(selectedEntries)}
+  {#each barIds as id (id)}
+    {@const action = available.find((item) => item.id === id)}
+    {@const look = FILE_ACTION_LOOK[id]}
     <ToolbarAction
       {narrow}
-      icon={Eye}
-      label={t("VIEW")}
-      enabled={!!single && !single.isDir && isPreviewable(single.name)}
-      onclick={() => viewArchived(current)}
+      shortcut={BAR_SHORTCUTS[id]}
+      icon={look.icon}
+      label={t(look.label)}
+      danger={id === "delete"}
+      enabled={!!action}
+      onclick={() => void action?.run()}
     />
-    <ToolbarAction {narrow} icon={Download} label={t("SAVE")} enabled={canShare} onclick={() => saveArchived(current)} />
-  {:else}
-    <ToolbarAction
-      {narrow}
-      shortcut="shared.cut"
-      icon={FolderInput}
-      label={t("MOVE")}
-      onclick={() => startTransfer("move")}
-    />
-    <ToolbarAction
-      {narrow}
-      shortcut="shared.copy"
-      icon={Copy}
-      label={t("COPY")}
-      onclick={() => startTransfer("copy")}
-    />
-    <ToolbarAction {narrow} icon={Share2} label={t("SHARE")} enabled={canShare} onclick={shareSelection} />
-    <ToolbarAction
-      {narrow}
-      shortcut="shared.delete"
-      icon={Trash}
-      label={t("DELETE")}
-      onclick={() => (confirmingDelete = true)}
-    />
+  {/each}
+  {#if barMore.length}
     <PopupMenu
       open={actionsMenu}
       onOpenChange={(value) => (actionsMenu = value)}
@@ -1201,11 +1196,11 @@
       side="top"
     >
       {#snippet triggerChild(props)}
-        <TooltipIconButton label={t("MORE")} {...props}>
+        <TooltipIconButton label={t("MORE")} class={BAR_ACTION_CLASS} {...props}>
           <EllipsisVertical />
         </TooltipIconButton>
       {/snippet}
-      {@render selectionItems()}
+      <FileActionItems actions={barMore} />
     </PopupMenu>
   {/if}
 {/snippet}
@@ -1274,38 +1269,33 @@
 
     <div class="flex min-h-0 flex-1 flex-col">
       {#if serverStatus.unavailable}
-        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset) pb-(--page-inset)">
+        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
           <ServerUnavailable class="flex-1" />
         </div>
       {:else if ordered.length}
-        <div
-          bind:this={list}
-          use:viewportScrollbar
-          use:dockArea
-          role="presentation"
-          onpointerdown={onPointerDown}
-          onpointermove={onPointerMove}
-          onpointerup={onPointerUp}
-          onpointercancel={endGesture}
-          onclickcapture={onClickCapture}
-          class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset) {marking ||
-          dragging
-            ? 'touch-none select-none'
-            : ''}"
-        >
-          <div class="flex flex-col rounded-panel bg-card">
+        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
+          <ScrollCard
+            bind:scroller={list}
+            dock
+            frame="rounded-panel"
+            role="presentation"
+            onpointerdown={onPointerDown}
+            onpointermove={onPointerMove}
+            onpointerup={onPointerUp}
+            onpointercancel={endGesture}
+            onclickcapture={onClickCapture}
+            class={marking || dragging ? "touch-none select-none" : ""}
+          >
             {#if wide}
               {@render columnsHead()}
             {/if}
-            <div class="flex flex-col p-1">
-              {#each ordered as entry, index (entry.file)}
-                {@render entryLine(entry, index)}
-              {/each}
-            </div>
-          </div>
+            {#each ordered as entry, index (entry.file)}
+              {@render entryLine(entry, index)}
+            {/each}
+          </ScrollCard>
         </div>
       {:else}
-        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset) pb-(--page-inset)">
+        <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
           <EmptyState
             loading={!loaded}
             icon={querying ? NO_RESULTS_ICON : FolderOpen}
@@ -1316,43 +1306,36 @@
       {/if}
     </div>
 
-    {#if transfer}
-      <div
-        transition:slide={{ duration: SLIDE_MS }}
-        bind:clientHeight={bottomBar}
-        class="px-(--page-inset) pb-(--page-inset)"
-      >
-        <div class="flex items-center gap-2 rounded-panel bg-card p-1 {narrow ? '' : 'justify-end'}">
-          <Button onclick={() => (transfer = null)} variant="outlined" class={narrow ? "grow basis-0" : ""}>
-            {t("CANCEL")}
-          </Button>
-          <Button onclick={() => void runTransfer()} enabled={transferAllowed} class={narrow ? "grow basis-0" : ""}>
-            {transfer.kind === "move" ? t("MOVE_HERE") : transfer.kind === "copy" ? t("COPY_HERE") : t("EXTRACT_HERE")}
-          </Button>
+    <div bind:clientHeight={bottomBar} class="pb-(--page-inset)">
+      {#if transfer}
+        <div transition:slide={{ duration: SLIDE_MS }} class={BAR_DOCK_CLASS}>
+          <div class="flex items-center gap-2 rounded-panel bg-card p-1 {narrow ? '' : 'justify-end'}">
+            <Button onclick={() => (transfer = null)} variant="outlined" class={narrow ? "grow basis-0" : ""}>
+              {t("CANCEL")}
+            </Button>
+            <Button onclick={() => void runTransfer()} enabled={transferAllowed} class={narrow ? "grow basis-0" : ""}>
+              {transfer.kind === "move" ? t("MOVE_HERE") : transfer.kind === "copy" ? t("COPY_HERE") : t("EXTRACT_HERE")}
+            </Button>
+          </div>
         </div>
-      </div>
-    {:else if selectionBar}
-      <div
-        transition:slide={{ duration: SLIDE_MS }}
-        bind:clientHeight={bottomBar}
-        class="px-(--page-inset) pb-(--page-inset)"
-      >
-        <div class="flex items-center gap-1 rounded-panel bg-card p-1">
-          {#if wide}
-            {@render selectAllAction()}
-            <p class="min-w-0 flex-1 truncate px-1 text-label-lg">{plural("ITEM_COUNT", selected.length)}</p>
-          {/if}
-          {#if selected.length}
-            <div class="flex min-w-0 items-center justify-end gap-1 {wide ? '' : 'flex-1'}">
-              {@render selectionActions()}
-            </div>
-          {/if}
-          {#if wide}
-            {@render cancelAction()}
-          {/if}
+      {:else if selectionBar}
+        <div transition:slide={{ duration: SLIDE_MS }} class={BAR_DOCK_CLASS}>
+          <div class={BAR_CARD_CLASS}>
+            {#if wide}
+              <p class={BAR_LABEL_CLASS}>{plural("ITEM_COUNT", selected.length)}</p>
+            {/if}
+            {#if selected.length}
+              <div class="flex min-w-0 items-center justify-end gap-1 {wide ? '' : 'flex-1'}">
+                {@render selectionActions()}
+              </div>
+            {/if}
+            {#if wide}
+              {@render cancelAction(true)}
+            {/if}
+          </div>
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -1418,21 +1401,22 @@
   />
 {/if}
 
-{#if confirmingDelete && selectedEntries.length}
+{#if deleting?.length}
+  {@const items = deleting}
   <ConfirmDialog
     title={t("DELETE")}
-    text={selectedEntries.length === 1
-      ? t(selectedEntries[0].link ? "DELETE_LINK_CONFIRM" : "DELETE_FILE_CONFIRM", selectedEntries[0].name)
-      : t("DELETE_ITEMS_CONFIRM", selectedEntries.length)}
+    text={items.length === 1
+      ? t(items[0].link ? "DELETE_LINK_CONFIRM" : "DELETE_FILE_CONFIRM", items[0].name)
+      : t("DELETE_ITEMS_CONFIRM", items.length)}
     confirmLabel={t("DELETE")}
     danger
     onConfirm={() => {
-      const targets = selectedEntries.map((entry) => child(entry.file));
-      confirmingDelete = false;
-      exitSelection();
+      const targets = items.map((entry) => child(entry.file));
+      deleting = null;
+      finishWith(items);
       void Promise.all(targets.map((target) => sharedApi.remove(target))).then(reload);
     }}
-    onDismiss={() => (confirmingDelete = false)}
+    onDismiss={() => (deleting = null)}
   />
 {/if}
 
@@ -1452,7 +1436,7 @@
       const target = entry;
       const full = extension ? `${input.trim()}.${extension}` : input.trim();
       renaming = null;
-      exitSelection();
+      finishWith([target]);
       void sharedApi.rename(child(target.file), full).then(reload);
     }}
     onDismiss={() => (renaming = null)}
@@ -1475,14 +1459,14 @@
 {/if}
 
 {#if compressing}
-  {@const paths = compressing}
+  {@const items = compressing}
   <CompressDialog
-    defaultName={single ? archiveNameOf(single) : pathLabel(path) || t("SHARED").toLowerCase()}
+    defaultName={items.length === 1 ? archiveNameOf(items[0]) : pathLabel(path) || t("SHARED").toLowerCase()}
     onConfirm={(name, format) => {
-      const targets = paths;
+      const targets = items.map((entry) => child(entry.file));
       compressing = null;
       void sharedApi.compress(targets, format, name).then(() => {
-        exitSelection();
+        finishWith(items);
         return reload();
       });
     }}

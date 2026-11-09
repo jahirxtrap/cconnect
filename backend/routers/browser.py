@@ -80,7 +80,9 @@ async def browser_ws(ws: WebSocket):
             kind, body = await queue.get()
             if kind == "frame":
                 if watching:
-                    await ws.send_bytes(body)
+                    number, frame = body
+                    await ws.send_bytes(frame)
+                    await session.delivered(number)
             else:
                 await send_event(ws, {"type": kind, **body})
 

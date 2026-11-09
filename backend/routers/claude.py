@@ -284,7 +284,7 @@ async def submit_mcp_callback(body: McpCallbackBody):
 
 @router.post("/claude/mcp/login/cancel")
 async def cancel_mcp_login(body: McpLoginBody):
-    cli_login.cancel_mcp(body.account, body.name)
+    await cli_login.cancel_mcp(body.account, body.name)
     return api_response()
 
 

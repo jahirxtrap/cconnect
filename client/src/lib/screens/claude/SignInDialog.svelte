@@ -2,10 +2,11 @@
   import ClipboardPaste from "@lucide/svelte/icons/clipboard-paste";
   import { t } from "$lib/i18n/index.svelte";
   import { openExternal } from "$lib/platform";
-  import { copyText, pasteText } from "$lib/platform/clipboard";
+  import { pasteText } from "$lib/platform/clipboard";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CopyField from "$lib/ui/CopyField.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
@@ -39,11 +40,10 @@
     <Button onclick={() => onSubmit(value.trim())} enabled={!!value.trim() && !busy}>{confirmLabel}</Button>
   {/snippet}
   <p class="text-body-md">{hint}</p>
-  <p class="mt-3 line-clamp-3 wrap-anywhere text-body-sm text-accent">{url}</p>
-  <div class="mt-2 flex flex-col gap-1.5">
-    <ActionButton text={t("COPY_LINK")} onclick={() => void copyText(url)} class="w-full" />
-    <ActionButton text={t("OPEN")} onclick={() => openExternal(url)} class="w-full" />
+  <div class="mt-3">
+    <CopyField value={url} url />
   </div>
+  <ActionButton text={t("OPEN")} onclick={() => openExternal(url)} class="mt-2 w-full" />
   <div class="mt-3">
     <InputField {value} oninput={(next) => (value = next)} label={field} singleLine>
       {#snippet trailing()}

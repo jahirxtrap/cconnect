@@ -5,12 +5,13 @@
     label: string;
     value: string;
     icon?: IconSource;
+    class?: string;
   }
 
-  const { label, value, icon: IconComponent }: Props = $props();
+  const { label, value, icon: IconComponent, class: className = "" }: Props = $props();
 </script>
 
-<div class="flex items-center gap-3">
+<div class="flex h-8 items-center gap-2 {className}">
   {#if IconComponent}
     <IconComponent size={16} class="shrink-0 text-on-surface-variant" />
   {/if}

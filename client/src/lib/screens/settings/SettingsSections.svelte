@@ -2,7 +2,6 @@
   import AboutGroup from "./AboutGroup.svelte";
   import BackgroundSection from "./BackgroundSection.svelte";
   import ClientSection from "./ClientSection.svelte";
-  import ConnectivitySection from "./ConnectivitySection.svelte";
   import RecoverySection from "./RecoverySection.svelte";
   import type { SettingsSection } from "./sections";
   import ServerSection from "./ServerSection.svelte";
@@ -27,9 +26,6 @@
     </div>
     <div bind:this={blocks.background} data-section="background">
       <BackgroundSection />
-    </div>
-    <div bind:this={blocks.connectivity} data-section="connectivity">
-      <ConnectivitySection />
     </div>
     <div bind:this={blocks.server} data-section="server">
       <ServerSection tick={page.tick} flash={page.highlight.is("server")} />

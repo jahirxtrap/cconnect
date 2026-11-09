@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import DiffView from "$lib/ui/DiffView.svelte";
   import Collapsible from "./Collapsible.svelte";
+  import { headStatusOf } from "./headTones";
 
   interface Props {
     path: string;
@@ -11,11 +12,23 @@
     diffLines: DiffLine[];
     cell?: NotebookCell | null;
     labelOnly: boolean;
+    failed?: boolean;
+    blockedBy?: string | null;
     expanded?: boolean | null;
     onToggle?: (() => void) | null;
   }
 
-  const { path, tool = null, diffLines, cell = null, labelOnly, expanded = null, onToggle = null }: Props = $props();
+  const {
+    path,
+    tool = null,
+    diffLines,
+    cell = null,
+    labelOnly,
+    failed = false,
+    blockedBy = null,
+    expanded = null,
+    onToggle = null,
+  }: Props = $props();
 
   const CELL_TEXTS: Record<string, string> = {
     replace: "NOTEBOOK_CELL_REPLACED",
@@ -39,6 +52,7 @@
   previewTail
   icon={FilePen}
   labelOnly={labelOnly || (!diffLines.length && !cellText)}
+  status={headStatusOf(failed, blockedBy)}
   {expanded}
   {onToggle}
 >

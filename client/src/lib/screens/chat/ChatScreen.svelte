@@ -350,10 +350,11 @@
   {#if !layout.mobile}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="relative h-full shrink-0 overflow-hidden {still
+      class="relative h-full shrink-0 overflow-clip {still
         ? ''
         : 'transition-[width] duration-200'}"
       style="width: {rightShown ? `calc(${panelWidth}px + 2 * var(--pane-gap))` : 'var(--pane-gap)'}; {rightAccent}"
+      inert={!rightShown}
       data-unfocused={panes.focused === "right" ? undefined : true}
       onpointerdowncapture={(event) => focusFrom(event, "right")}
     >

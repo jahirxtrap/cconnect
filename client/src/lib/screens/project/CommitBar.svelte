@@ -20,6 +20,7 @@
   import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { BAR_ACTION_CLASS, BAR_LABEL_CLASS, BAR_ROW_CLASS } from "$lib/ui/actionBar";
 
   interface Props {
     projectKey: string;
@@ -41,7 +42,6 @@
     onDone,
   }: Props = $props();
 
-  const ACTION_CLASS = "size-7";
   const DOT_SIZE = 16;
   const PANEL_MS = 350;
   const LINE_HEIGHT = 20;
@@ -158,9 +158,9 @@
       }}
     ></div>
   {/if}
-  <div class="flex min-h-10 items-center gap-1 py-1 pr-1.5 pl-3">
+  <div class={BAR_ROW_CLASS}>
     <GitBranch size={14} class="shrink-0 text-on-surface-variant" />
-    <span class="min-w-0 flex-1 truncate text-label-lg text-on-surface-variant">
+    <span class={BAR_LABEL_CLASS}>
       {joined(repo.branch || t("GIT_DETACHED"), repo.relative !== "." && repo.relative)}
     </span>
     {#if repo.behind}
@@ -174,7 +174,7 @@
     {#if !locked}
       <TooltipIconButton
         label={t("GIT_PULL")}
-        class={ACTION_CLASS}
+        class={BAR_ACTION_CLASS}
         enabled={idle}
         onclick={() => void guard("pull", () => gitApi.pull(projectKey, repo.path))}
       >
@@ -186,7 +186,7 @@
       </TooltipIconButton>
       <TooltipIconButton
         label={t("GIT_PUSH")}
-        class={ACTION_CLASS}
+        class={BAR_ACTION_CLASS}
         enabled={idle}
         onclick={() => (asking = "push")}
       >
@@ -198,7 +198,7 @@
       </TooltipIconButton>
       <TooltipIconButton
         label={open ? t("COLLAPSE") : t("EXPAND")}
-        class={ACTION_CLASS}
+        class={BAR_ACTION_CLASS}
         shortcut="project.commit"
         onclick={() => (settings.projectCommitOpen = !open)}
       >
@@ -240,7 +240,7 @@
         </button>
         <TooltipIconButton
           label={t("GIT_GENERATE_MESSAGE")}
-          class={ACTION_CLASS}
+          class={BAR_ACTION_CLASS}
           enabled={amend || paths.length > 0}
           onclick={() => void suggest()}
         >
@@ -252,7 +252,7 @@
         </TooltipIconButton>
         <TooltipIconButton
           label={t("GIT_REVERT")}
-          class={ACTION_CLASS}
+          class={BAR_ACTION_CLASS}
           enabled={paths.length > 0 && idle}
           onclick={() => (asking = "revert")}
         >

@@ -17,7 +17,6 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
-  import LoadingIndicator from "$lib/ui/LoadingIndicator.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -192,7 +191,7 @@
       >
         {#snippet trailing()}
           {#if busy === item.name}
-            <LoadingIndicator size={16} />
+            <StatusDot box={20} loading />
           {:else if controllable}
             <CompactSwitch
               checked={item.up}
@@ -221,7 +220,7 @@
       >
         {#snippet trailing()}
           {#if busy === "radio"}
-            <LoadingIndicator size={16} />
+            <StatusDot box={20} loading />
           {:else}
             <CompactSwitch
               checked={radioOn}
@@ -250,10 +249,8 @@
                   : (passwordFor = network.ssid)}
         >
           {#snippet trailing()}
-            {#if busy === network.ssid}
-              <LoadingIndicator size={16} />
-            {:else if network.active}
-              <StatusDot class="bg-green" box={20} />
+            {#if busy === network.ssid || network.active}
+              <StatusDot class="bg-green" box={20} loading={busy === network.ssid} />
             {/if}
           {/snippet}
         </PreferenceRow>

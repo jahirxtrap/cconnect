@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from contextlib import suppress
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from loguru import logger
 from watchfiles import awatch
@@ -43,13 +43,14 @@ async def _ask(client: Any, request: dict, timeout: float = 60.0) -> dict:
 
 
 class _Login:
-    def __init__(self, key: tuple) -> None:
+    def __init__(self, key: tuple, on_end: Optional[Callable[[], None]] = None) -> None:
         self.key = key
         self.client: Any = None
         self.before = ""
         self.ended = asyncio.Event()
         self._stop = asyncio.Event()
         self._owner: Optional[asyncio.Task] = None
+        self._on_end = on_end
 
     async def open(self, options: Any) -> None:
         ready: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -74,6 +75,9 @@ class _Login:
             self.client = None
             if _logins.get(self.key) is self:
                 del _logins[self.key]
+            if self._on_end is not None:
+                with suppress(OSError):
+                    self._on_end()
             self.ended.set()
 
     async def ask(self, request: dict, timeout: float = 60.0) -> dict:
@@ -88,9 +92,11 @@ class _Login:
 _logins: dict[tuple, _Login] = {}
 
 
-async def _begin(key: tuple, options: Any, request: dict) -> tuple[_Login, dict]:
+async def _begin(
+    key: tuple, options: Any, request: dict, on_end: Optional[Callable[[], None]] = None
+) -> tuple[_Login, dict]:
     _cancel(key)
-    login = _Login(key)
+    login = _Login(key, on_end)
     _logins[key] = login
     try:
         await login.open(options)
@@ -158,8 +164,14 @@ async def start_mcp(account_id: str, server: str, cwd: Optional[str]) -> dict:
     options = _mcp_options(account_id, server, cwd)
     if options is None:
         return {"ok": False, "message": f"Server not found: {server}"}
+    saved = accounts.mcp_entries(account_id, server)
     try:
-        login, answer = await _begin(_mcp_key(account_id, server), options, {"subtype": "mcp_authenticate", "serverName": server})
+        login, answer = await _begin(
+            _mcp_key(account_id, server),
+            options,
+            {"subtype": "mcp_authenticate", "serverName": server},
+            lambda: accounts.restore_mcp_entries(account_id, server, saved),
+        )
     except Exception as exc:
         return {"ok": False, "message": str(exc)}
     url = answer.get("authUrl") if answer.get("requiresUserAction") else None
@@ -207,14 +219,18 @@ async def submit_mcp_callback(account_id: str, server: str, url: str) -> dict:
     return {"ok": True}
 
 
-def cancel_mcp(account_id: str, server: str) -> None:
-    _cancel(_mcp_key(account_id, server))
+async def cancel_mcp(account_id: str, server: str) -> None:
+    login = _logins.get(_mcp_key(account_id, server))
+    if login is None:
+        return
+    _end(login)
+    await login.ended.wait()
 
 
 async def sign_out_mcp(account_id: str, server: str, cwd: Optional[str]) -> dict:
     from claude_agent_sdk import ClaudeSDKClient
 
-    cancel_mcp(account_id, server)
+    await cancel_mcp(account_id, server)
     options = _mcp_options(account_id, server, cwd)
     if options is None:
         return {"ok": False, "message": f"Server not found: {server}"}

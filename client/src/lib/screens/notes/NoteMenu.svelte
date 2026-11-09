@@ -1,14 +1,9 @@
 <script lang="ts">
-  import Copy from "@lucide/svelte/icons/copy";
-  import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import Pencil from "@lucide/svelte/icons/pencil";
-  import Save from "@lucide/svelte/icons/save";
-  import Share2 from "@lucide/svelte/icons/share-2";
-  import Trash2 from "@lucide/svelte/icons/trash-2";
   import { t } from "$lib/i18n/index.svelte";
-  import { saveTextAs, saveTextToDownloads, shareText } from "$lib/services/sharedFiles";
-  import MenuItem from "$lib/ui/MenuItem.svelte";
+  import { textBlob } from "$lib/services/sharedFiles";
+  import FileActionItems from "$lib/ui/FileActionItems.svelte";
+  import { FILE_ACTIONS, fileEntries, type FileActionEntry } from "$lib/ui/sharedFileActions";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -30,6 +25,13 @@
 
   const filename = $derived(t("NOTES_FILENAME"));
 
+  const actions = $derived<FileActionEntry[]>([
+    { id: "rename", run: () => (renaming = true) },
+    ...fileEntries(FILE_ACTIONS, { blob: textBlob(note.body) }, filename),
+    ...(duplicable ? [{ id: "duplicate" as const, run: () => notes.duplicate(note.id) }] : []),
+    { id: "delete", run: () => remove() },
+  ]);
+
   const remove = () => {
     const removed = $state.snapshot(note);
     onDeleted();
@@ -44,14 +46,7 @@
       <EllipsisVertical />
     </TooltipIconButton>
   {/snippet}
-  <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => (renaming = true)} />
-  <MenuItem icon={Download} text={t("SAVE")} onclick={() => saveTextToDownloads(filename, note.body)} />
-  <MenuItem icon={Save} text={t("SAVE_AS")} onclick={() => void saveTextAs(filename, note.body)} />
-  <MenuItem icon={Share2} text={t("SHARE")} onclick={() => void shareText(filename, note.body)} />
-  {#if duplicable}
-    <MenuItem icon={Copy} text={t("DUPLICATE")} onclick={() => notes.duplicate(note.id)} />
-  {/if}
-  <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={remove} />
+  <FileActionItems {actions} />
 </PopupMenu>
 
 {#if renaming}

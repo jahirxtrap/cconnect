@@ -87,14 +87,16 @@
       }}
     />
   {/each}
-  <MenuItem
-    icon={Plus}
-    text={t("ADD_PROJECT")}
-    onclick={() => {
-      adding = true;
-      open = false;
-    }}
-  />
+  {#snippet footer()}
+    <MenuItem
+      icon={Plus}
+      text={t("ADD_PROJECT")}
+      onclick={() => {
+        adding = true;
+        open = false;
+      }}
+    />
+  {/snippet}
 </PopupMenu>
 {/if}
 

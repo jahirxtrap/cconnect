@@ -88,6 +88,8 @@ class ServerStatus {
     });
     $effect(() => {
       void profileKey(backend.active);
+      this.reachable = false;
+      this.version = null;
       this.checking = true;
       this.answered = false;
       void this.refresh();
@@ -113,7 +115,10 @@ class ServerStatus {
         }
         void list.drops;
         if (!opened) return;
-        if (!lost) {
+        if (lost) {
+          this.checking = false;
+          this.answered = true;
+        } else {
           lost = true;
           this.reachable = false;
           this.checking = true;

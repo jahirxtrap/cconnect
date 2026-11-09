@@ -1,5 +1,7 @@
 export const PANE_BODY_CLASS = "flex h-full flex-col";
 
+export const COMPACT_INSET_CLASS = "[--page-inset:var(--page-inset-compact)]";
+
 export const PANE_CARD_CLASS = "overflow-hidden rounded-panel bg-background";
 
 export const PANE_TOP_CLASS = "flex h-12 shrink-0 items-center gap-1 px-2";
