@@ -1,8 +1,10 @@
+import type { StreamInfo } from "$lib/services/browserSocket";
 import { surfacePainter } from "./frameSurface";
 
 type Inbound =
   | { op: "init"; canvas: OffscreenCanvas }
   | { op: "frame"; buffer: ArrayBuffer }
+  | { op: "stream"; info: StreamInfo }
   | { op: "clear" }
   | { op: "rearm" }
   | { op: "capture"; id: number };
@@ -24,8 +26,13 @@ scope.onmessage = (event) => {
   const message = event.data;
   if (message.op === "init") {
     canvas = message.canvas;
-    painter = surfacePainter(canvas, () => scope.postMessage({ op: "painted" }));
+    painter = surfacePainter(
+      canvas,
+      () => scope.postMessage({ op: "painted" }),
+      () => scope.postMessage({ op: "keyframe" }),
+    );
   } else if (message.op === "frame") painter?.frame(message.buffer);
+  else if (message.op === "stream") painter?.stream(message.info);
   else if (message.op === "clear") painter?.clear();
   else if (message.op === "rearm") painter?.rearm();
   else void capture(message.id);

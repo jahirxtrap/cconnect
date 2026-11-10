@@ -30,6 +30,7 @@ CACHE_DIR = Path(os.environ.get("CCONNECT_CACHE_DIR") or DATA_DIR.parent / "cach
 
 PROMPTS_DIR = PACKAGE_DIR / "prompts"
 SCRIPTS_DIR = PACKAGE_DIR / "scripts"
+CAPTURE_DIR = PACKAGE_DIR / "capture"
 BUILTIN_PACKS_DIR = PACKAGE_DIR / "packs"
 DATABASE_ENGINES_FILE = PACKAGE_DIR / "databases" / "engines.json"
 MIGRATIONS_DIR = PACKAGE_DIR / "migrations"

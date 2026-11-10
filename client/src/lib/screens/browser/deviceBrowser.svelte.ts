@@ -6,6 +6,7 @@ import { isDesktop, systemName } from "$lib/platform";
 import { store } from "$lib/platform/storage";
 import { backend } from "$lib/services/backend.svelte";
 import { zoomStep } from "$lib/ui/zoomLevels";
+import { hostOf, setZoomOf, zoomOf } from "./browserZoom";
 import { browserCall, browserListen, deviceBrowsing } from "./deviceEngine";
 
 export interface DeviceTab {
@@ -249,11 +250,7 @@ class DeviceBrowser {
   }
 
   hostOf(url: string) {
-    try {
-      return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
-    } catch {
-      return "";
-    }
+    return hostOf(url);
   }
 
   async allowHere(allowed: boolean) {
@@ -411,14 +408,13 @@ class DeviceBrowser {
   }
 
   #zoomOf(url: string): number {
-    return settings.browserZoom[this.hostOf(url)] ?? 1;
+    return zoomOf(hostOf(url));
   }
 
   #setZoom(value: number) {
-    const host = this.hostOf(this.active?.url ?? "");
+    const host = hostOf(this.active?.url ?? "");
     if (!host) return;
-    const { [host]: _kept, ...others } = settings.browserZoom;
-    settings.browserZoom = value === 1 ? others : { ...others, [host]: value };
+    setZoomOf(host, value);
     this.#present();
   }
 

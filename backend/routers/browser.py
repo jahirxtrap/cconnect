@@ -13,6 +13,8 @@ from services.browser import BrowserSession
 
 router = APIRouter(tags=["browser"])
 
+JPEG_KIND = b"\x00"
+
 
 @router.get("/browser/status")
 def status():
@@ -63,6 +65,35 @@ async def _dispatch(session: BrowserSession, payload: dict):
             int(payload.get("height") or 0),
             float(payload.get("scale") or 1.0),
         )
+    elif kind == "touch":
+        await session.touch(payload)
+    elif kind == "keyframe":
+        session.ask_key()
+
+
+@router.websocket("/browser/feed/{token}")
+async def browser_feed(ws: WebSocket, token: str):
+    session = browser.session
+    if not session.feed_ok(token, ws.client.host if ws.client else ""):
+        await ws.close(code=1008)
+        return
+    await ws.accept()
+    session.feed_attached(ws)
+    try:
+        while True:
+            message = await ws.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            data = message.get("bytes")
+            if data:
+                session.video(data)
+            elif message.get("text"):
+                with suppress(ValueError):
+                    session.stream_info(json.loads(message["text"]))
+    except (WebSocketDisconnect, RuntimeError):
+        pass
+    finally:
+        session.feed_detached(ws)
 
 
 @router.websocket("/browser/ws")
@@ -74,6 +105,7 @@ async def browser_ws(ws: WebSocket):
     session = browser.session
     queue = session.subscribe()
     watching = opening.get("watch") is not False
+    video = opening.get("video") is True
 
     async def outgoing():
         while True:
@@ -81,8 +113,11 @@ async def browser_ws(ws: WebSocket):
             if kind == "frame":
                 if watching:
                     number, frame = body
-                    await ws.send_bytes(frame)
+                    await ws.send_bytes(JPEG_KIND + frame)
                     await session.delivered(number)
+            elif kind == "video":
+                if watching:
+                    await ws.send_bytes(body[1])
             else:
                 await send_event(ws, {"type": kind, **body})
 
@@ -99,7 +134,7 @@ async def browser_ws(ws: WebSocket):
 
     async def follow(wanted: bool):
         try:
-            await (session.watch() if wanted else session.unwatch())
+            await (session.watch(video) if wanted else session.unwatch(video))
         except (RuntimeError, OSError) as exc:
             await send_event(ws, {"type": "error", "reason": str(exc)})
 
@@ -132,4 +167,4 @@ async def browser_ws(ws: WebSocket):
         session.unsubscribe(queue)
         if watching:
             with suppress(RuntimeError, OSError):
-                await session.unwatch()
+                await session.unwatch(video)

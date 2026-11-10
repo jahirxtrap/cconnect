@@ -24,10 +24,18 @@ export interface BrowserState {
   pageHeight: number;
   device: string;
   picking: boolean;
+  stream: string;
+}
+
+export interface StreamInfo {
+  codec: string;
+  width: number;
+  height: number;
 }
 
 export interface BrowserHooks {
   onFrame: (buffer: ArrayBuffer) => void;
+  onStream: (info: StreamInfo) => void;
   onState: (state: BrowserState) => void;
   onConnected: (value: boolean) => void;
   onPicked: (pick: ElementPick) => void;
@@ -59,20 +67,32 @@ export interface BrowserLink {
   closeTab: (id: string) => void;
   reorder: (ids: string[]) => void;
   mouse: (payload: Record<string, unknown>) => void;
+  touch: (payload: Record<string, unknown>) => void;
   key: (payload: Record<string, unknown>) => void;
   text: (value: string) => void;
+  keyframe: () => void;
   close: () => void;
 }
+
+export const videoDecodable = typeof VideoDecoder !== "undefined";
 
 export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport): BrowserLink => {
   let watched = false;
 
   const socket = new ReconnectingSocket("/browser/ws", {
-    onOpen: () => socket.send({ type: "attach", watch: watched, ...viewport() }),
+    onOpen: () => socket.send({ type: "attach", watch: watched, video: videoDecodable, ...viewport() }),
     onBinary: (buffer) => {
       if (watched) hooks.onFrame(buffer);
     },
     onMessage: (data) => {
+      if (data.type === "stream") {
+        hooks.onStream({
+          codec: (data.codec as string) ?? "",
+          width: (data.width as number) ?? 0,
+          height: (data.height as number) ?? 0,
+        });
+        return;
+      }
       if (data.type === "picked") {
         hooks.onPicked(data as unknown as ElementPick);
         return;
@@ -108,6 +128,7 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
         pageHeight: (data.pageHeight as number) ?? 0,
         device: (data.device as string) ?? "",
         picking: data.picking === true,
+        stream: (data.stream as string) ?? "jpeg",
       });
     },
     onDrop: () => hooks.onConnected(false),
@@ -137,8 +158,10 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
     closeTab: (id) => post({ type: "close_tab", id }),
     reorder: (ids) => post({ type: "reorder", ids }),
     mouse: (payload) => post({ type: "mouse", ...payload }),
+    touch: (payload) => post({ type: "touch", ...payload }),
     key: (payload) => post({ type: "key", ...payload }),
     text: (value) => post({ type: "text", value }),
+    keyframe: () => post({ type: "keyframe" }),
     close: () => socket.close(),
   };
 };

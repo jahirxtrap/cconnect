@@ -6,14 +6,18 @@ same browser shows up in the pane as one more tab.
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
 import re
+import secrets
 import shutil
 import subprocess
 import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from contextlib import suppress
@@ -25,14 +29,29 @@ from loguru import logger
 from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
-from core import paths, process_tree
+from core import paths, process_job, process_tree
 from core.config import (
     BROWSER_DEBUG_PORT,
     BROWSER_EXECUTABLE,
     BROWSER_HEADLESS,
     BROWSER_QUALITY,
+    PORT,
 )
 
+if os.name == "nt":
+    import msvcrt
+
+FEED_PATH = "/api/browser/feed"
+_LOOPBACK = ("127.0.0.1", "::1")
+_VIDEO_MOTION_QUANTIZER = 30
+_VIDEO_STILL_QUANTIZER = 6
+_VIDEO_BACKLOG = 30
+_FRAME_ALIGN = 16
+_CAPTURER_WAIT = 20
+_CAPTURER_POLL = 0.25
+_FIT_ATTEMPTS = 3
+_FIT_SETTLE = 0.15
+_PIPE_TIMEOUT = 15.0
 _LAUNCH_TIMEOUT = 20.0
 _CLOSE_TIMEOUT = 5.0
 _LOAD_TIMEOUT = 20.0
@@ -230,6 +249,93 @@ def _endpoint(port: int) -> Optional[str]:
         return None
 
 
+def _aligned(size: float) -> int:
+    return max(_FRAME_ALIGN, -(-round(size) // _FRAME_ALIGN) * _FRAME_ALIGN)
+
+
+async def _close_stale(port: int) -> None:
+    target = _endpoint(port)
+    if not target:
+        return
+    with suppress(OSError, ConnectionClosed, asyncio.TimeoutError):
+        async with connect(target, max_size=None, ping_interval=None, compression=None) as socket:
+            await socket.send(json.dumps({"id": 1, "method": "Browser.close"}))
+            await asyncio.wait_for(socket.recv(), _CLOSE_TIMEOUT)
+    for _ in range(int(_CLOSE_TIMEOUT / _CAPTURER_POLL)):
+        if _endpoint(port) is None:
+            return
+        await asyncio.sleep(_CAPTURER_POLL)
+
+
+def _extension_id() -> str:
+    manifest = json.loads((paths.CAPTURE_DIR / "manifest.json").read_text(encoding="utf-8"))
+    digest = hashlib.sha256(base64.b64decode(manifest["key"])).hexdigest()[:32]
+    return "".join(chr(ord("a") + int(char, 16)) for char in digest)
+
+
+_EXTENSION_ID = _extension_id()
+
+
+class _Pipe:
+    def __init__(self):
+        self._chrome_reads, self._we_write = os.pipe()
+        self._we_read, self._chrome_writes = os.pipe()
+        self._last_id = 0
+        self._buffer = b""
+
+    def _handles(self) -> tuple[int, int]:
+        return msvcrt.get_osfhandle(self._chrome_reads), msvcrt.get_osfhandle(self._chrome_writes)
+
+    def arguments(self) -> list[str]:
+        if os.name != "nt":
+            return ["--remote-debugging-pipe"]
+        handles = self._handles()
+        for handle in handles:
+            os.set_handle_inheritable(handle, True)
+        return ["--remote-debugging-pipe", f"--remote-debugging-io-pipes={handles[0]},{handles[1]}"]
+
+    def popen_options(self) -> dict:
+        if os.name == "nt":
+            startup = subprocess.STARTUPINFO()
+            startup.lpAttributeList = {"handle_list": list(self._handles())}
+            return {"startupinfo": startup}
+        reads, writes = self._chrome_reads, self._chrome_writes
+
+        def place():
+            kept = (os.dup(reads), os.dup(writes))
+            os.dup2(kept[0], 3)
+            os.dup2(kept[1], 4)
+
+        return {"pass_fds": (reads, writes), "preexec_fn": place}
+
+    def child_started(self):
+        os.close(self._chrome_reads)
+        os.close(self._chrome_writes)
+
+    def call(self, method: str, params: Optional[dict] = None, timeout: float = _PIPE_TIMEOUT) -> dict:
+        self._last_id += 1
+        os.write(self._we_write, json.dumps({"id": self._last_id, "method": method, "params": params or {}}).encode() + b"\0")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            while b"\0" in self._buffer:
+                raw, self._buffer = self._buffer.split(b"\0", 1)
+                reply = json.loads(raw)
+                if reply.get("id") == self._last_id:
+                    if reply.get("error"):
+                        raise RuntimeError(reply["error"].get("message") or "pipe error")
+                    return reply.get("result") or {}
+            chunk = os.read(self._we_read, 65536)
+            if not chunk:
+                raise RuntimeError("pipe closed")
+            self._buffer += chunk
+        raise RuntimeError("pipe timeout")
+
+    def close(self):
+        for descriptor in (self._we_write, self._we_read):
+            with suppress(OSError):
+                os.close(descriptor)
+
+
 def _fetch_icon(url: str, agent: str) -> str:
     if url.startswith("data:image/"):
         return url if len(url) <= _ICON_BYTES else ""
@@ -351,8 +457,19 @@ class BrowserSession:
         self._agent = ""
         self._icons: set[asyncio.Task] = set()
         self._watchers = 0
+        self._jpeg_viewers = 0
         self._frames = 0
         self._unacked: list[tuple[int, Any, str]] = []
+        self._pipe: Optional[_Pipe] = None
+        self._capturer = ""
+        self._feed_token = secrets.token_urlsafe(24)
+        self._feed: Any = None
+        self._stream_info: dict = {}
+        self._streaming = ""
+        self._feed_chunks = 0
+        self._capture_failed = False
+        self._frame_extra = (0, 0)
+        self._inner = (0, 0)
 
     @property
     def running(self) -> bool:
@@ -367,9 +484,14 @@ class BrowserSession:
         tab = self._tabs.get(self._active)
         return tab.session if tab else ""
 
+    def _video_able(self) -> bool:
+        return bool(self._capturer) and not self._device and not self._jpeg_viewers and not self._capture_failed
+
     def status(self) -> dict:
         tab = self._tabs.get(self._active)
         device = _DEVICES.get(self._device)
+        css_width, css_height, _ = self._viewport()
+        fitted = self._video_able() and self._inner[0] > 0
         return {
             "device": self._device,
             "picking": self._picking,
@@ -381,8 +503,9 @@ class BrowserSession:
             "viewers": len(self._subscribers),
             "width": self._width,
             "height": self._height,
-            "pageWidth": device["width"] if device else int(self._width * self._scale),
-            "pageHeight": device["height"] if device else int(self._height * self._scale),
+            "pageWidth": self._inner[0] if fitted else css_width,
+            "pageHeight": self._inner[1] if fitted else css_height,
+            "stream": self._streaming or ("video" if self._video_able() else "jpeg"),
             "url": tab.url if tab else "",
             "title": tab.title if tab else "",
             "canGoBack": self._back,
@@ -415,17 +538,30 @@ class BrowserSession:
             for _, frame, page in acked:
                 await cdp.post("Page.screencastFrameAck", {"sessionId": frame}, page)
 
-    async def watch(self):
+    async def watch(self, video: bool = True):
         self._watchers += 1
-        if self._watchers == 1 and self.running:
-            async with self._lock:
-                await self._start_stream()
-
-    async def unwatch(self):
-        self._watchers -= 1
-        if not self._watchers and self.running:
+        self._jpeg_viewers += 0 if video else 1
+        if not self.running:
+            return
+        if self._watchers == 1 or (self._streaming == "video" and not video):
             async with self._lock:
                 await self._stop_stream()
+                await self._start_stream()
+        elif self._streaming == "video":
+            self._publish(("stream", self._stream_info))
+            self.ask_key()
+
+    async def unwatch(self, video: bool = True):
+        self._watchers -= 1
+        self._jpeg_viewers -= 0 if video else 1
+        if not self.running:
+            return
+        async with self._lock:
+            if not self._watchers:
+                await self._stop_stream()
+            elif not video and self._video_able():
+                await self._stop_stream()
+                await self._start_stream()
 
     async def ensure(self, width: int, height: int, scale: float):
         async with self._lock:
@@ -505,6 +641,7 @@ class BrowserSession:
         async with self._lock:
             await self._stop_stream()
             self._active = tab_id
+            self._capture_failed = False
             await self._cdp.call("Target.activateTarget", {"targetId": self._tabs[tab_id].target})
             await self._start_stream()
         await self._refresh()
@@ -531,6 +668,51 @@ class BrowserSession:
             await self._cdp.post("Input.dispatchMouseEvent", params, self._page)
         else:
             await self._cdp.call("Input.dispatchMouseEvent", params, self._page)
+
+    async def touch(self, payload: dict):
+        points = [
+            {"x": float(point.get("x") or 0), "y": float(point.get("y") or 0), "id": int(point.get("id") or 0)}
+            for point in payload.get("points") or []
+            if isinstance(point, dict)
+        ]
+        await self._cdp.call(
+            "Input.dispatchTouchEvent",
+            {"type": payload.get("event") or "touchEnd", "touchPoints": points, "modifiers": int(payload.get("modifiers") or 0)},
+            self._page,
+        )
+
+    def feed_ok(self, token: str, host: str) -> bool:
+        return host in _LOOPBACK and hmac.compare_digest(token, self._feed_token)
+
+    def feed_attached(self, feed: Any):
+        self._feed = feed
+
+    def feed_detached(self, feed: Any):
+        if self._feed is not feed:
+            return
+        self._feed = None
+        if self._streaming != "video" or not self._watchers:
+            return
+        if not self._feed_chunks:
+            self._capture_failed = True
+        self._spawn(self._recover_capture())
+
+    def video(self, chunk: bytes):
+        self._feed_chunks += 1
+        self._publish(("video", (chunk[:1] == b"\x01", chunk)))
+
+    def stream_info(self, info: dict):
+        self._stream_info = info
+        self._publish(("stream", info))
+
+    def ask_key(self):
+        feed = self._feed
+        if feed is not None:
+            self._spawn(self._tell_feed(feed, "key"))
+
+    async def _tell_feed(self, feed: Any, text: str):
+        with suppress(Exception):
+            await feed.send_text(text)
 
     async def key(self, payload: dict):
         params = {
@@ -573,9 +755,14 @@ class BrowserSession:
             raise RuntimeError("no_browser")
         profile = paths.BROWSER_PROFILE_DIR
         profile.mkdir(parents=True, exist_ok=True)
+        await _close_stale(BROWSER_DEBUG_PORT)
+        self._pipe = _Pipe()
         arguments = [
             binary,
             f"--remote-debugging-port={BROWSER_DEBUG_PORT}",
+            *self._pipe.arguments(),
+            "--enable-unsafe-extension-debugging",
+            f"--allowlisted-extension-id={_EXTENSION_ID}",
             f"--user-data-dir={profile}",
             "--remote-allow-origins=*",
             "--no-first-run",
@@ -595,7 +782,10 @@ class BrowserSession:
             encoding="utf-8",
             errors="replace",
             creationflags=creation,
+            **self._pipe.popen_options(),
         )
+        self._pipe.child_started()
+        process_job.tie(self._process.pid)
 
         loop = asyncio.get_running_loop()
         announced: asyncio.Future = loop.create_future()
@@ -616,9 +806,34 @@ class BrowserSession:
         ]
         self._agent = (await self._cdp.call("Browser.getVersion")).get("userAgent") or ""
         logger.info(f"browser: attached to {binary}")
+        with suppress(RuntimeError, OSError, ValueError):
+            await asyncio.to_thread(self._pipe.call, "Extensions.loadUnpacked", {"path": str(paths.CAPTURE_DIR)})
+
+    async def _find_capturer(self) -> str:
+        if self._capturer:
+            return self._capturer
+        with suppress(RuntimeError):
+            await self._cdp.call("ServiceWorker.enable")
+        for _ in range(_CAPTURER_WAIT):
+            found = await self._cdp.call("Target.getTargets")
+            worker = next(
+                (
+                    info
+                    for info in found.get("targetInfos") or []
+                    if info.get("type") == "service_worker" and _EXTENSION_ID in (info.get("url") or "")
+                ),
+                None,
+            )
+            if worker is not None:
+                attached = await self._cdp.call("Target.attachToTarget", {"targetId": worker["targetId"], "flatten": True})
+                self._capturer = attached["sessionId"]
+                return self._capturer
+            await asyncio.sleep(_CAPTURER_POLL)
+        return ""
 
     async def _discover(self):
         self._known = {tab.target for tab in self._tabs.values()}
+        await self._find_capturer()
         await self._cdp.call("Target.setDiscoverTargets", {"discover": True})
         found = await self._cdp.call("Target.getTargets")
         for info in found.get("targetInfos") or []:
@@ -696,20 +911,82 @@ class BrowserSession:
         await self._start_stream()
         await self._refresh()
 
-    def _metrics(self) -> tuple[int, int, dict]:
+    def _viewport(self) -> tuple[int, int, float]:
         device = _DEVICES.get(self._device)
         if device is None:
-            width = int(self._width * self._scale)
-            height = int(self._height * self._scale)
-            return width, height, {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": False}
-        width = int(device["width"] * device["scale"])
-        height = int(device["height"] * device["scale"])
-        return width, height, {
-            "width": device["width"],
-            "height": device["height"],
-            "deviceScaleFactor": device["scale"],
-            "mobile": True,
+            return max(1, round(self._width * self._scale)), max(1, round(self._height * self._scale)), 1.0
+        return device["width"], device["height"], device["scale"]
+
+    def _metrics(self) -> tuple[int, int, dict]:
+        width, height, scale = self._viewport()
+        return round(width * scale), round(height * scale), {
+            "width": width,
+            "height": height,
+            "deviceScaleFactor": scale,
+            "mobile": self._device in _DEVICES,
         }
+
+    async def _fit_window(self):
+        tab = self._tabs.get(self._active)
+        if tab is None:
+            return
+        width, height, _ = self._viewport()
+        await self._cdp.call("Emulation.clearDeviceMetricsOverride", {}, tab.session)
+        window = (await self._cdp.call("Browser.getWindowForTarget", {"targetId": tab.target})).get("windowId")
+        wanted = inner = (_aligned(width), _aligned(height))
+        for _ in range(_FIT_ATTEMPTS):
+            bounds = {
+                "width": wanted[0] + self._frame_extra[0],
+                "height": wanted[1] + self._frame_extra[1],
+                "windowState": "normal",
+            }
+            await self._cdp.call("Browser.setWindowBounds", {"windowId": window, "bounds": bounds})
+            await asyncio.sleep(_FIT_SETTLE)
+            measured = await self._cdp.call(
+                "Runtime.evaluate", {"expression": "[innerWidth, innerHeight]", "returnByValue": True}, tab.session
+            )
+            got = (measured.get("result") or {}).get("value")
+            inner = (int(got[0]), int(got[1])) if isinstance(got, list) and len(got) == 2 else inner
+            if inner == wanted:
+                break
+            actual = (await self._cdp.call("Browser.getWindowBounds", {"windowId": window})).get("bounds") or {}
+            if actual.get("width") and actual.get("height"):
+                self._frame_extra = (int(actual["width"]) - inner[0], int(actual["height"]) - inner[1])
+            if inner[0] > width:
+                wanted = (_aligned(inner[0]), _aligned(height * inner[0] / width))
+        self._inner = inner
+
+    async def _capture(self) -> bool:
+        if not self._capturer:
+            return False
+        _, _, scale = self._viewport()
+        options = {
+            "width": _aligned(self._inner[0] * scale),
+            "height": _aligned(self._inner[1] * scale),
+            "feed": f"ws://127.0.0.1:{PORT}{FEED_PATH}/{self._feed_token}",
+            "motion": _VIDEO_MOTION_QUANTIZER,
+            "still": _VIDEO_STILL_QUANTIZER,
+        }
+        try:
+            result = await self._cdp.call(
+                "Runtime.evaluate",
+                {"expression": f"__capture({json.dumps(options)})", "awaitPromise": True, "returnByValue": True},
+                self._capturer,
+            )
+        except RuntimeError:
+            return False
+        value = (result.get("result") or {}).get("value")
+        if result.get("exceptionDetails") or not isinstance(value, dict) or value.get("error"):
+            return False
+        self._feed_chunks = 0
+        self._streaming = "video"
+        return True
+
+    async def _recover_capture(self):
+        async with self._lock:
+            await self._stop_stream()
+            await self._find_capturer()
+            await self._start_stream()
 
     async def set_picking(self, enabled: bool):
         page = self._page
@@ -780,15 +1057,25 @@ class BrowserSession:
             _agent_of(device, self._major()) if device else {"userAgent": ""},
             session,
         )
-        await self._cdp.call("Emulation.setDeviceMetricsOverride", self._metrics()[2], session)
+        if self._video_able():
+            await self._cdp.call("Emulation.clearDeviceMetricsOverride", {}, session)
+        else:
+            await self._cdp.call("Emulation.setDeviceMetricsOverride", self._metrics()[2], session)
 
     async def _start_stream(self):
         page = self._page
         if not page:
             return
+        self._streaming = ""
         raster_width, raster_height, metrics = self._metrics()
-        await self._cdp.call("Emulation.setDeviceMetricsOverride", metrics, page)
+        if self._video_able():
+            await self._fit_window()
+        else:
+            await self._cdp.call("Emulation.setDeviceMetricsOverride", metrics, page)
         if not self._watchers:
+            return
+        if self._video_able() and await self._capture():
+            await self._kick()
             return
         await self._cdp.call(
             "Page.startScreencast",
@@ -801,6 +1088,7 @@ class BrowserSession:
             },
             page,
         )
+        self._streaming = "jpeg"
         await self._kick()
 
     async def shot(self) -> bytes:
@@ -835,6 +1123,12 @@ class BrowserSession:
 
     async def _stop_stream(self):
         self._unacked = []
+        streaming, self._streaming = self._streaming, ""
+        if streaming == "video":
+            if self._capturer:
+                with suppress(RuntimeError):
+                    await self._cdp.call("Runtime.evaluate", {"expression": "__stop()", "awaitPromise": True}, self._capturer)
+            return
         page = self._page
         if page:
             try:
@@ -849,6 +1143,7 @@ class BrowserSession:
         if not force and (width, height, scale) == (self._width, self._height, self._scale):
             return
         self._width, self._height, self._scale = width, height, scale
+        self._capture_failed = False
         await self._stop_stream()
         await self._start_stream()
         self._publish(("state", self.status()))
@@ -898,6 +1193,11 @@ class BrowserSession:
         if method == "Overlay.inspectNodeRequested" and session == self._page:
             await self._picked(int(params.get("backendNodeId") or 0), session)
             return
+        if method == "Target.detachedFromTarget" and params.get("sessionId") == self._capturer:
+            self._capturer = ""
+            if self._streaming == "video":
+                self._spawn(self._recover_capture())
+            return
         if method == "Target.targetCreated":
             info = params.get("targetInfo") or {}
             if info.get("type") == "page":
@@ -937,7 +1237,7 @@ class BrowserSession:
             loaded, self._load_pending = self._load_pending, False
             try:
                 await self._refresh()
-                if loaded and self._watchers:
+                if loaded and self._watchers and self._streaming != "video":
                     async with self._lock:
                         await self._stop_stream()
                         await self._start_stream()
@@ -963,16 +1263,29 @@ class BrowserSession:
         self._publish(("state", self.status()))
 
     def _publish(self, item: tuple[str, Any]):
+        kind = item[0]
+        key_wanted = False
         for queue in list(self._subscribers):
-            if item[0] == "frame":
-                kept = []
-                while not queue.empty():
-                    pending = queue.get_nowait()
-                    if pending[0] != "frame":
-                        kept.append(pending)
-                for entry in kept:
-                    queue.put_nowait(entry)
+            pending = []
+            while not queue.empty():
+                pending.append(queue.get_nowait())
+            if kind == "frame":
+                pending = [entry for entry in pending if entry[0] != "frame"]
+            elif kind == "video":
+                waiting = sum(1 for entry in pending if entry[0] == "video")
+                if item[1][0]:
+                    pending = [entry for entry in pending if entry[0] != "video"]
+                elif waiting >= _VIDEO_BACKLOG:
+                    pending = [entry for entry in pending if entry[0] != "video"]
+                    key_wanted = True
+                    for entry in pending:
+                        queue.put_nowait(entry)
+                    continue
+            for entry in pending:
+                queue.put_nowait(entry)
             queue.put_nowait(item)
+        if key_wanted:
+            self.ask_key()
 
     async def _teardown(self):
         cdp, process, tasks = self._cdp, self._process, self._tasks
@@ -981,6 +1294,13 @@ class BrowserSession:
         self._known = set()
         self._active = ""
         self._back = self._forward = False
+        self._capturer = ""
+        self._streaming = ""
+        self._capture_failed = False
+        self._inner = (0, 0)
+        if self._pipe is not None:
+            self._pipe.close()
+            self._pipe = None
 
         if cdp is not None:
             try:

@@ -24,6 +24,7 @@
   import { boundsOf, BrowserLayer, coverOf } from "./browserLayer";
   import { rememberBrowser, takeBrowser } from "./browserMemory";
   import { framePainter, type FramePainter } from "./framePainter";
+  import { JPEG_KIND } from "./frameSurface";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
     androidBrowsing,
@@ -120,6 +121,7 @@
     pageHeight: 0,
     device: "",
     picking: false,
+    stream: "jpeg",
   };
 
   let connected = $state(false);
@@ -225,10 +227,10 @@
     else deviceBrowser.back();
   };
   const picking = $derived(onServer ? page.picking : deviceBrowser.picking);
-  const zoomable = $derived(!onServer && deviceBrowser.zoomable);
   const shielded = $derived(!onServer && !atHome && deviceBrowsing && settings.browserShield.enabled);
 
   const host = $derived(deviceBrowser.hostOf(shownUrl));
+  const zoomable = $derived(!onServer && deviceBrowser.zoomable);
 
   let clearing = $state<{ site: string | null } | null>(null);
   let favoriting = $state<{ url: string; title: string } | null>(null);
@@ -337,7 +339,7 @@
   });
 
   const paint = (buffer: ArrayBuffer) => {
-    lastFrame = buffer;
+    if (new Uint8Array(buffer, 0, 1)[0] === JPEG_KIND) lastFrame = buffer;
     painter?.frame(buffer);
   };
 
@@ -348,7 +350,11 @@
 
   $effect(() => {
     if (!canvas) return;
-    const created = framePainter(canvas, () => (ready = true));
+    const created = framePainter(
+      canvas,
+      () => (ready = true),
+      () => link?.keyframe(),
+    );
     painter = created;
     return () => {
       created.close();
@@ -375,6 +381,7 @@
     const created = browserLink(
       {
         onFrame: paint,
+        onStream: (info) => painter?.stream(info),
         onState: receive,
         onConnected: (value) => {
           connected = value;
@@ -610,6 +617,22 @@
   };
 
   let swipe: { id: number; x: number; y: number; moved: boolean } | null = null;
+  const touches = new Map<number, { x: number; y: number }>();
+
+  const forwardingTouches = () => onServer && !!page.device;
+
+  const sendTouches = (event: PointerEvent, kind: string) =>
+    link?.touch({
+      event: kind,
+      points: [...touches].map(([id, point]) => ({ id, ...point })),
+      modifiers: modifiers(event),
+    });
+
+  const endTouch = (event: PointerEvent, kind: string) => {
+    if (!touches.delete(event.pointerId)) return false;
+    sendTouches(event, kind);
+    return true;
+  };
 
   const pressCanvas = (event: PointerEvent) => {
     const touch = event.pointerType === "touch";
@@ -619,12 +642,23 @@
       pointer(event, "mousePressed");
       return;
     }
+    if (forwardingTouches()) {
+      touches.set(event.pointerId, at(event));
+      canvas?.setPointerCapture(event.pointerId);
+      sendTouches(event, "touchStart");
+      return;
+    }
     if (swipe === null) swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false };
   };
 
   const moveCanvas = (event: PointerEvent) => {
     if (event.pointerType !== "touch") {
       pointer(event, "mouseMoved");
+      return;
+    }
+    if (touches.has(event.pointerId)) {
+      touches.set(event.pointerId, at(event));
+      sendTouches(event, "touchMove");
       return;
     }
     if (swipe?.id !== event.pointerId) return;
@@ -636,11 +670,16 @@
     scrollPage(event, -dx / scale, -dy / scale);
   };
 
+  const cancelCanvas = (event: PointerEvent) => {
+    if (!endTouch(event, "touchCancel")) swipe = null;
+  };
+
   const releaseCanvas = (event: PointerEvent) => {
     if (event.pointerType !== "touch") {
       pointer(event, "mouseReleased");
       return;
     }
+    if (endTouch(event, "touchEnd")) return;
     if (swipe?.id !== event.pointerId) return;
     const tapped = !swipe.moved;
     swipe = null;
@@ -1020,7 +1059,7 @@
       onpointerdown={pressCanvas}
       onpointerup={releaseCanvas}
       onpointermove={moveCanvas}
-      onpointercancel={() => (swipe = null)}
+      onpointercancel={cancelCanvas}
       oncontextmenu={(event) => event.preventDefault()}
       {onwheel}
       {onkeydown}
