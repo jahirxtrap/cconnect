@@ -153,9 +153,11 @@ draft (`draftOf(...).sql`), so whatever writes the draft shows in an open consol
 whole like shared files, and `MessageItem` draws them with `QueryBlock` instead of `ToolBlock`, under
 the same `ToolUse` mod site: the connection and database, the SQL, and for each statement what it
 did, in words and in data: the rows a SELECT read, the rows an INSERT, UPDATE or DELETE touched (in a
-`DataGrid`), or the columns a CREATE or ALTER left (`ColumnsTable`, shared with the structure panel),
-each of the three, the SQL too (`CodeBlock`'s `capped`), held to one height (`CAPPED_HEIGHT`) and
-scrolled inside. Its head takes the Databases screen's own icon (`screenFor("databases")`) and the
+`DataGrid`), the columns a CREATE left (`ColumnsTable`, shared with the structure panel) or, for an
+ALTER, a line per column its `changes` report, instead of the whole table again. Each of the three,
+and the SQL (`CodeBlock`'s `capped`), is held to one height (`CAPPED_HEIGHT`) and scrolled inside;
+the tables go flat, with no frame and no rounding of their own (`[--viewport-radius:0px]`), so they
+read like the panel's. Its head takes the Databases screen's own icon (`screenFor("databases")`) and the
 `action` tone, the one every block CConnect draws for a feature of its own takes (shared files, the
 plan), while Claude Code's own work (tools, file changes, agents) stays `process`. The actions end the
 block the way the shared block's do: a `Chip` for each table or view the batch touched and did not
@@ -163,7 +165,9 @@ drop, which opens it in Databases, and for a query that only reads a small outli
 console**, which writes the SQL into the console's draft. Both need a saved connection
 (`query.saved`) of the server the panel shows. A `DataGrid` never lets its header or row numbers be
 selected, and its cells only when a row does not open on click (the chat and the console, not a
-table in the panel, whose row dialog holds the values).
+table in the panel, whose row dialog holds the values). It right-aligns a numeric column, header
+included, from the `kinds` it is given; where the server sends no types, as in the chat and the
+console, `kindsOfValues` reads them off the values.
 
 `DatabaseTree` is the only tree. The panel roots it at the connections; a database file's preview
 (`DatabaseFile`, which `FilePreview` shows when `previewKind` answers `database`) shows the file's

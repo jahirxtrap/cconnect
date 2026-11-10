@@ -47,21 +47,7 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   does not answer), `elicitation` (an MCP form as the chat's form and back), `sessions` (transcripts, checkpoints, images), `chat_list`,
   `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
   `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
-  `usage`, `accounts` (an account is only its credentials: the CLI runs on the primary config
-  with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account's folder, so MCP servers, plugins,
-  settings and history are one for all. The CLI writes the identity, the models it may use and
-  fast mode into the shared `.claude.json` of whichever login started last, and rechecks a refused
-  model with the API under its own token, so a chat on any account still gets its plan. Signing in
-  and the models, plan and fast mode CConnect offers go through `identity_env` instead: the
-  account's own folder (`accounts/default` for the primary, whose credentials stay in `~/.claude`)
-  as the whole config, so each login's identity lands and is read there. Older folders still
-  hold links into the primary, and `purge` detaches every link before removing one, or
-  refuses), `cli_login` (signing an account in to
-  Claude and to an MCP server through the CLI's own control requests, `claude_authenticate` and
-  `mcp_authenticate`, never a pseudo-terminal: the CLI stays open, in a task of its own, until the
-  pasted code or redirect address comes back. An MCP login is a credential, so it is per account;
-  the CLI reports no event when a browser on the server finishes one, so `wait_mcp` watches the
-  account's `.credentials.json` until that server's token changes), `shared`, `git_ops` (the commit panel, on top of the single runner in
+  `usage`, `shared`, `git_ops` (the commit panel, on top of the single runner in
   `services/git`, one lock per repository), `browser` (the server's Chromium, started only
   while a socket watches one of its tabs), `agents` / `agent_registry` (the ACP agents installed
   from the official catalog or added by hand), `agent_connections` / `agent_sessions` /
@@ -79,15 +65,28 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
   `chat_list` does (on Linux starting it walks the whole tree, one inotify watch per folder,
   and a large project froze the server when that ran on the event loop), `pages` (an HTML page served with the folder around it, so its
   styles, scripts and images load), `processes` (what the server runs, matched to its chat,
-  agent, terminal or browser, and stopped the way that screen stops it), `mcp_lazy` (the local MCP
-  servers a chat's CLI reaches through the backend, each started on its first call; see *Local MCP
-  servers on demand*), `memory_pressure` (the system's low-memory signal, see *Persistent sessions and
-  mods*), `databases` (the
-  connections in `database_connections`, whose passwords never reach the app, and one engine per
-  connection), `database_engines` (**the** engine table: dialect, driver distributions installed on
-  demand, read-only preludes, timeout, binary literal and hidden schemas), `database_tunnels`
-  (SSH tunnels through the system's `ssh`), `database_data` (browsing, paging, SQL, row edits and
-  exports to `shared/databases/<id>/`).
+  agent, terminal or browser, and stopped the way that screen stops it), `mcp_lazy` and
+  `memory_pressure` (see *Local MCP servers on demand* and *Persistent sessions and mods*), and the
+  four database modules, covered in *Databases*: `databases` (the connections of
+  `database_connections`, whose passwords never reach the app, one engine per connection),
+  `database_engines`, `database_tunnels` (SSH through the system's `ssh`) and `database_data`
+  (browsing, paging, SQL, row edits and exports to `shared/databases/<id>/`).
+- `services/accounts` and `services/cli_login` — an account is only its credentials: the CLI runs on
+  the primary config with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account's folder, so MCP
+  servers, plugins, settings and history are one for all. The CLI writes the identity, the models it
+  may use and fast mode into the shared `.claude.json` of whichever login started last, and rechecks
+  a refused model with the API under its own token, so a chat on any account still gets its plan.
+  Signing in, and the models, plan and fast mode CConnect offers, go through `identity_env` instead:
+  the account's own folder (`accounts/default` for the primary, whose credentials stay in `~/.claude`)
+  as the whole config. Older folders still hold links into the primary, and `purge` detaches every
+  link before removing one, or refuses. A sign-in goes through the CLI's own control requests
+  (`claude_authenticate`, `mcp_authenticate`), never a pseudo-terminal: the CLI stays open, in a task
+  of its own, until the pasted code or redirect address comes back. An MCP login is a credential, so
+  it is per account, and the CLI reports no event when a browser on the server finishes one, so
+  `wait_mcp` watches the account's `.credentials.json` until that server's token changes.
+  `login_expiry` asks `claude auth status --json` once per login and keeps the date in
+  `account.json` beside a stamp of `.credentials.json`, so opening an account's dialog starts no
+  process while that file is the same one.
 - `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
 - `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
   substituted per request), `BLOCKS.md`, `BROWSER.md`, `INSTALL.md` (the install cards,
@@ -266,6 +265,10 @@ The CLI's format is not a contract and it moves. What currently holds:
   when the conversation had messages before it (`logicalParentUuid`). The app asks for it only
   when the user picks «Earlier messages», never on scroll. A closed stretch never changes, so its
   cache stamp is its offsets, and `_boundaries` only reads what was appended since the last call.
+  `list_checkpoints(..., until=…)` walks the same stretches for Rewind and answers
+  `{points, earlier}`, skipping a stretch whose only prompt has no reply to anchor on. The CLI
+  rewinds nothing before the last boundary (neither files nor `--resume-session-at`), so those
+  points only fork, which the SDK does by slicing the file.
 - `compactMetadata.postTokens` **is** present in the current CLI; `latest_compact` still
   falls back to the first post-boundary entry with usage.
 - Non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,
@@ -284,6 +287,13 @@ is rendered **from the transcript** (`_flush_users` greedily matches new user en
 against the leading chips), which is what makes resume and live agree when the CLI joins
 several messages into one entry. The turn is held open until the queue drains and the
 final `result` lands.
+
+A task's notification is written twice, as the queued entry and as the delivered user
+message, and the queued one carries no uuid. The tail sends whichever exists when it wakes,
+and the turn the CLI then adopts would carry the other: `LiveSession.shown_notices` keeps the
+texts the tail already sent and `_flush_users` skips them, along with the `agent_result` they
+bring. Cutting by byte offset (`shown_size`) is not enough, since the entry can land between
+the stamp and the read.
 
 ## Persistent sessions and mods
 
@@ -403,6 +413,10 @@ Model, effort, permission mode, streaming, CLI source and per-block visibility l
 `show_thinking` / `show_tool_use` / `show_file_change` / `show_compact` take
 `full | label | off` and are applied identically on the live stream and on resume. `label`
 strips a tool's result, never an agent's subtasks: those still arrive, with their `parent`.
+Simple mode forces thinking, tools and hooks off and compaction to a label; what the user
+cannot afford to miss is exempt — file changes, shared files, the query blocks and the forms —
+and so are `task_running` / `task_progress` / `agent_result`, which feed Running in the header
+rather than a block, and without them a task could not be seen or stopped there.
 
 ## MCP server (`mcps/`)
 
@@ -492,13 +506,17 @@ Every SQL statement goes through `database_data`, and nothing there trusts the c
   it (`clause` appends `RETURNING *`; `cte`, the PostgreSQL family, wraps it as
   `WITH … SELECT … LIMIT`, so a change of millions of rows still ships only the first ones and its
   total from a window count), and a CREATE or ALTER of a table or view is followed by its
-  reflected columns. A batch holding a statement no transaction admits (CREATE or
+  reflected columns, each statement reflected on its own connection right after it runs — read at
+  the end of the batch, a CREATE came back with the columns a later ALTER had added. An ALTER also
+  carries `changes`, the columns added, removed or changed against the reflection taken before it,
+  which the app shows instead of the whole table again. A batch holding a statement no transaction admits (CREATE or
   DROP DATABASE, VACUUM, CREATE INDEX CONCURRENTLY…, `OUTSIDE_TRANSACTION`) runs in autocommit and
   cannot be undone; before it runs, the server closes its own pooled sessions on the connection's
   other databases (`release_others`), which DROP DATABASE would otherwise count as users.
 - **Claude's tools answer in text, not JSON** (`mcps/databases.render`): a header per statement
   (`[1] 50 rows, more from offset 50`, `[2] 120 rows inserted into items, 50 shown`,
-  `[3] created table items, 3 columns`, `[4] dropped table old`, `[5] done`), the columns and rows
+  `[3] created table items, 3 columns`, `[4] altered table items, 1 column change`,
+  `[5] dropped table old`, `[6] done`), the columns and rows
   tab-separated with `\\`, `\t`, `\n` and `\r` escaped, NULL as `\N`, cells cut at 200 characters,
   50 rows by default with `limit` and `offset`. `statements_of` reads it back for the query block, so
   the two change together.

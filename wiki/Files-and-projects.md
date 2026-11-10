@@ -122,8 +122,8 @@ runs SQL that writes, creating and dropping databases included, creates, edits,
 tests and deletes connections, installs and uninstalls drivers, opens a database
 file and exports a table or a query to the shared folder, handed over in the
 chat. Each query shows in the chat as a block with the connection, its SQL and what
-each statement did: the rows it read, the rows it inserted, updated or deleted, or
-the columns of the table it created or changed. The block shows whatever the tool
+each statement did: the rows it read, the rows it inserted, updated or deleted, the
+columns of the table it created, or the ones an `ALTER` added, removed or changed. The block shows whatever the tool
 setting says, like shared files. Each table it touched ends the block as a chip
 that opens it in Databases, and a query that only reads goes to the panel's
 console with **Open SQL console**.

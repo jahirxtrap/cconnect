@@ -23,12 +23,14 @@ plan usage is drawn the same way, and ask it to compact and it does.
 **Attachments** travel with your message: tap the clip, pick any files or
 photos on your device, and they land on the PC before the prompt runs. Images
 reach Claude as real vision input — it sees them, not a path — and other files
-arrive as mentions it can open directly.
+arrive as mentions it can open directly. Pasting works without clicking the
+box first: files and images become attachments, text goes into the message.
 
 **Rewind** takes a conversation back to an earlier point. Pick the moment,
 preview exactly what would change on disk (`+added −removed • files`), and
 choose whether to roll back the conversation alone or code and conversation
-together.
+together. **Earlier points** at the end of the list reaches the stretches
+before each compaction; Claude Code cannot roll those back, so they only fork.
 
 **Fork** copies a chat into a new one and leaves the original as it is: the
 whole conversation from the chat's menu, or up to a point from Rewind or from
@@ -67,7 +69,8 @@ project's instructions, and which Claude CLI the backend drives are all set from
 The server holds the defaults and every client follows them, but each device can
 decide for itself how much of a turn it receives — including a **simple mode**
 that folds thinking and tool detail into a single working block, the way the
-quick chat already reads.
+quick chat already reads. What you cannot afford to miss stays visible there:
+file changes, databases, shared files, forms, and what runs under Running.
 
 ## Tabs
 

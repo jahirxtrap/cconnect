@@ -1,11 +1,22 @@
-- A file you open from a gallery in the chat shows the rest of the gallery in a strip below, and you swipe between them like pages
-- Videos show a frame of their own in the chat and in that strip, with their length in the strip
-- The Claude screen groups MCP servers by where they come from and tells you when a claude.ai connector needs you to sign in
-- The internet speed test needs nothing installed on the server and works from anywhere, falling back to M-Lab when Cloudflare can't be reached
-- RAR files open without WinRAR or unrar on the server, and files inside a 7z open in the preview again
-- Code previews are colored whatever the file's size, without freezing the app
-- Each message spends fewer tokens on CConnect's own tools, and long chats open faster
-- The server's browser scrolls with your finger on the phone, holding a chat opens its menu when the list has nothing to reorder, Project files tells you when Git is not installed on the server, the server log shows each line as it is written, images and videos in the chat no longer reload when you reconnect or switch tabs, and Claude's terminal, removing a pack and sharing a file by link ask for the security key too
+- Databases connects to SQLite, PostgreSQL, MySQL and a couple dozen more: browse a table page by page, edit a row, run SQL in a console and open a database file from Shared or from a project, with its driver installed the first time you need it
+- Claude reads and changes those databases once you unlock them, and the chat shows the connection, the SQL and what each statement did, with the rows it read or touched
+- A chat keeps its Claude Code between turns, so your next message starts answering right away
+- The MCP servers a chat uses start on the first call instead of all at once, and the Server settings hold how much memory the chats must leave the machine, releasing the idle ones when it runs short
+- Sign in to a Claude account, or to an MCP server that asks for it, without leaving the app, and sign out from the same place
+- Each account carries its own email, plan and usage, and says when its sign-in expires
+- The Claude screen lists the hooks of each environment, with what they match and when they run, and the chat shows the ones that stopped a tool
+- PDFs open in CConnect's own viewer, on the phone too
+- Images arrive at the size they are drawn, so the chat, a gallery and the packs fill in at once and the whole file only travels when you open it
+- Messages from before a compaction load when you ask for them, and Rewind reaches the points before it
+- The server's browser moves while you scroll or type instead of arriving picture by picture, and a page zooms from ⋮
+- SSH checks the key a machine answers with and stops when it changed, with the fingerprint to trust before you connect
+- A chat or a note you delete can be brought back from the message that follows it
+- Settings change where they are on the desktop: theme, accent and chat background are picked in the row itself, with nine themes more — Ubuntu, Monokai, Ayu, Everforest and Kanagawa — and a Theme that follows the system
+- Monitor draws each resource as a card with its number large, battery and disks as bars, and Information names the machine with its processor, graphics and memory
+- /status answers with the session the chat runs on, its folder and what it is spending
+- The app reads as one piece: lists and columns share a single spacing, the loading indicator is new, menus carry their icon on the left, Permissions and Account are pills in the Server settings, and the chat's id copies from the header
+- A file in Shared or in Project files opens its own menu and several are picked at once, search hides behind its icon so the toolbar fits, long file lists scroll without stutter, text pastes into the composer without clicking it first, a code block inside a list reads like any other, an edit to a notebook says which cell it touched, a tool that fails says so, the context ring says how much of the cache was read, and the tables in the chat read like the ones in Databases
+- A message you send just after switching chats lands in the one you are in, the queue no longer gets stuck, a long chat no longer makes the server heavy, your weekly limit stops jumping about, a device that comes back catches up after the server restarts, Project files shows new files inside ignored folders, a page behind a panel stops working until you come back, and a task's notification no longer arrives twice
 
 > [!NOTE]
 > The web version is available at https://app.cconnect.dev/
