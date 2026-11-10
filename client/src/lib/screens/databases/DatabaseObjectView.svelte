@@ -15,6 +15,7 @@
   import {
     databaseFailureText,
     EXPORT_FORMATS,
+    kindsOfValues,
     qualifiedName,
     statementSummary,
     type ColumnKind,
@@ -389,7 +390,7 @@
       {#if failure}
         <ErrorText text={failure} class="p-3" />
       {:else if result?.rows && result.columns}
-        <DataGrid columns={result.columns} rows={result.rows} dock />
+        <DataGrid columns={result.columns} rows={result.rows} kinds={kindsOfValues(result.columns, result.rows)} dock />
       {:else if result}
         <EmptyState icon={Check} text={summary} class="min-h-0 flex-1" />
       {:else}

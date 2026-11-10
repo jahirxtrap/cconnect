@@ -1209,14 +1209,25 @@ def _active_entries(entries: list[dict], session_id: str) -> list[dict]:
     ]
 
 
-def list_checkpoints(project_key: str, session_id: str) -> list[dict]:
+def list_checkpoints(project_key: str, session_id: str, until: Optional[str] = None) -> dict:
     """Rewind points: each real user prompt on the active branch. `id` rewinds files;
     `rewind_id` is the previous assistant TEXT entry (--resume-session-at accepts only
     those), which is why the first prompt is omitted."""
     file = _session_file(project_key, session_id)
     if not file.is_file():
-        return []
-    entries = _active_entries([entry for entry in _iter_lines(file, _last_compact_offset(file)) if _readable(entry)], session_id)
+        return {"points": [], "earlier": None}
+    span = _closed_span(file, until) if until else (_last_compact_offset(file), None)
+    while span is not None:
+        entries = _active_entries([entry for entry in _iter_lines(file, *span) if _readable(entry)], session_id)
+        points = _points_of(entries)
+        earlier = _earlier_of(next((entry for entry in entries if _is_boundary(entry)), None))
+        if points or earlier is None or not until:
+            return {"points": points, "earlier": earlier}
+        span = _closed_span(file, earlier)
+    return {"points": [], "earlier": None}
+
+
+def _points_of(entries: list[dict]) -> list[dict]:
     points: list[dict] = []
     last_anchor: Optional[str] = None
     for entry in entries:

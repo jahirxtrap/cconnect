@@ -291,9 +291,9 @@ def _session_cwd(project: str, session_id: str) -> str:
 
 
 @router.get("/sessions/{session_id}/checkpoints")
-def get_session_checkpoints(session_id: str, project: str):
+def get_session_checkpoints(session_id: str, project: str, until: str | None = None):
     try:
-        return api_response(data=sessions_service.list_checkpoints(project, session_id))
+        return api_response(data=sessions_service.list_checkpoints(project, session_id, until))
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

@@ -4641,6 +4641,58 @@
       "title": "QueryColumn",
       "type": "object"
     },
+    "QueryColumnChange": {
+      "additionalProperties": false,
+      "properties": {
+        "change": {
+          "enum": [
+            "added",
+            "removed",
+            "changed"
+          ],
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "nullable": {
+          "type": "boolean"
+        },
+        "default": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "was_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "change",
+        "name",
+        "type",
+        "nullable"
+      ],
+      "title": "QueryColumnChange",
+      "type": "object"
+    },
     "QueryEffect": {
       "additionalProperties": false,
       "properties": {
@@ -4751,6 +4803,20 @@
             {
               "items": {
                 "$ref": "#/$defs/QueryColumn"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "changes": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/QueryColumnChange"
               },
               "type": "array"
             },
@@ -6440,6 +6506,119 @@
       "title": "Task",
       "type": "object"
     },
+    "TaskProgress": {
+      "additionalProperties": false,
+      "properties": {
+        "seq": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "ts": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "replay": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "type": {
+          "const": "task_progress",
+          "type": "string"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tool_uses": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "TaskProgress",
+      "type": "object"
+    },
     "TaskRunning": {
       "additionalProperties": false,
       "properties": {
@@ -6528,6 +6707,39 @@
           "anyOf": [
             {
               "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tool_uses": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "integer"
             },
             {
               "type": "null"
@@ -7543,6 +7755,7 @@
       "stop": "#/$defs/Stop",
       "tail": "#/$defs/Tail",
       "task": "#/$defs/Task",
+      "task_progress": "#/$defs/TaskProgress",
       "task_running": "#/$defs/TaskRunning",
       "terminal_opened": "#/$defs/TerminalOpened",
       "thinking": "#/$defs/Thinking",
@@ -7645,6 +7858,9 @@
     },
     {
       "$ref": "#/$defs/TaskRunning"
+    },
+    {
+      "$ref": "#/$defs/TaskProgress"
     },
     {
       "$ref": "#/$defs/AgentResult"

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import io
 import json
 import os
 import re
+import subprocess
 import zipfile
 
 import psutil
@@ -12,7 +14,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 
-from core import paths
+from core import cli_manager, paths
 from core.config import CLAUDE_PROJECTS_DIR
 from core.slugs import unique
 from services import files, providers, settings_store
@@ -36,6 +38,7 @@ _ID_RE = re.compile(r"[^a-z0-9-]+")
 _CREDENTIALS_FILE = ".credentials.json"
 _IDENTITY_FILE = ".claude.json"
 _BUNDLE_FILES = (_CREDENTIALS_FILE, _IDENTITY_FILE, _META_FILE)
+_AUTH_STATUS_TIMEOUT = 20
 _IDENTITY_KEYS = ("oauthAccount", "userID")
 _EMAIL_KEY = "emailAddress"
 _PLAN_KEY = "planDisplayName"
@@ -140,6 +143,53 @@ def identity_env(account_id: Optional[str]) -> dict[str, str]:
 
 def credentials_path(account_id: Optional[str] = None) -> Path:
     return (config_dir(account_id) or primary_dir()) / ".credentials.json"
+
+
+def _login_stamp(account_id: str) -> Optional[list[int]]:
+    try:
+        found = credentials_path(account_id).stat()
+    except OSError:
+        return None
+    return [found.st_mtime_ns, found.st_size]
+
+
+async def _auth_status_expiry(account_id: str) -> Optional[str]:
+    cli = cli_manager.resolve_cli_path()
+    if not cli:
+        return None
+    try:
+        process = await asyncio.create_subprocess_exec(
+            cli,
+            "auth",
+            "status",
+            "--json",
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            env={**os.environ, **identity_env(account_id)},
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        )
+        output, _ = await asyncio.wait_for(process.communicate(), _AUTH_STATUS_TIMEOUT)
+        status = json.loads(output.decode("utf-8", errors="replace"))
+    except (OSError, ValueError, asyncio.TimeoutError):
+        return None
+    expires = status.get("loginExpiresAt") if isinstance(status, dict) else None
+    return expires if isinstance(expires, str) and expires else None
+
+
+async def login_expiry(account_id: str) -> Optional[str]:
+    path = config_dir(account_id) if account_id != PRIMARY_ID else primary_dir()
+    if path is None:
+        return None
+    stamp = _login_stamp(account_id)
+    meta = _meta(path)
+    stored = meta.get("loginExpiresAt")
+    if stamp is not None and meta.get("loginStamp") == stamp and isinstance(stored, str):
+        return stored
+    expires = await _auth_status_expiry(account_id)
+    if expires is not None:
+        _write_meta(account_id, {"loginExpiresAt": expires, "loginStamp": stamp})
+    return expires
 
 
 def _claude_json(account_id: Optional[str]) -> Path:

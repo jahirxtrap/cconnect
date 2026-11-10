@@ -296,14 +296,23 @@ def _system_events(subtype: Optional[str], data: Any, vis: dict) -> list[dict]:
     """Typed events for the `system` subtypes the app renders; the rest are dropped."""
     if not isinstance(data, dict):
         return []
-    if subtype == "task_started" and data.get("tool_use_id") and vis["tool_use"] != "off":
+    if subtype == "task_started" and data.get("tool_use_id"):
         return [{
             "type": "task_running",
             "id": data["tool_use_id"],
             "task": data.get("task_id"),
             "description": data.get("description"),
         }]
-    if subtype == "task_notification" and vis["tool_use"] != "off":
+    if subtype == "task_progress" and data.get("tool_use_id"):
+        usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
+        return [{
+            "type": "task_progress",
+            "id": data["tool_use_id"],
+            "tokens": usage.get("total_tokens"),
+            "tool_uses": usage.get("tool_uses"),
+            "duration_ms": usage.get("duration_ms") if vis.get("timings") else None,
+        }]
+    if subtype == "task_notification":
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else {}
         return [{
             "type": "agent_result",
@@ -875,6 +884,7 @@ async def run_prompt(
     resident: Optional[Any] = None,
     adopt: bool = False,
     read_from: Optional[int] = None,
+    seen_notices: Optional[set] = None,
     unlocked: Callable[[], bool] = _locked,
     channel: Optional[str] = None,
 ) -> AsyncIterator[dict]:
@@ -1019,6 +1029,7 @@ async def run_prompt(
     pending_announce: list[dict] = list(chips)
     handed: dict[str, dict] = {}
     seen_users: set[str] = set()
+    shown_notices: set[str] = set(seen_notices or ())
     carried_seen: set[str] = set()
     read_offsets: dict[str, int] = {}
     turn_started_ms = int(time.time() * 1000)
@@ -1070,6 +1081,8 @@ async def run_prompt(
             )
             if carried is not None:
                 seen_users.add(uid)
+                if carried["type"] == "notification" and carried.get("text") in shown_notices:
+                    continue
                 key = json.dumps(carried, sort_keys=True)
                 if key not in carried_seen:
                     carried_seen.add(key)

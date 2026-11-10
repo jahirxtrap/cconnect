@@ -17,6 +17,19 @@ export type ColumnKind =
   | "text"
   | "string";
 
+const NUMBER_TEXT = /^-?\d+(\.\d+)?$/;
+
+const numeric = (value: CellValue): boolean =>
+  typeof value === "number" || (typeof value === "string" && NUMBER_TEXT.test(value));
+
+export const kindsOfValues = (columns: string[], rows: CellValue[][]): Record<string, ColumnKind> =>
+  Object.fromEntries(
+    columns.flatMap((column, index) => {
+      const values = rows.map((row) => row[index]).filter((value) => value !== null && value !== undefined);
+      return values.length && values.every(numeric) ? [[column, "number"]] : [];
+    }),
+  );
+
 export type EngineForm = "file" | "server" | "url";
 
 export interface DatabaseEngine {

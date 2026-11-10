@@ -139,7 +139,8 @@ export type ServerEvent =
       subagentType: string | null;
       description: string | null;
     } & AgentRun)
-  | { type: "task_running"; id: string | null; description: string | null }
+  | { type: "task_running"; id: string | null; description: string | null; tokens: number | null; toolUses: number | null; durationMs: number | null }
+  | { type: "task_progress"; id: string | null; tokens: number | null; toolUses: number | null; durationMs: number | null }
   | {
       type: "agent_result";
       id: string | null;
@@ -966,7 +967,22 @@ export class ChatSocket {
       case "agent":
         return { type: "agent", id: event.id ?? null, ...agentFieldsOf(wire) };
       case "task_running":
-        return { type: "task_running", id: event.id ?? null, description: event.description ?? null };
+        return {
+          type: "task_running",
+          id: event.id ?? null,
+          description: event.description ?? null,
+          tokens: event.tokens ?? null,
+          toolUses: event.tool_uses ?? null,
+          durationMs: event.duration_ms ?? null,
+        };
+      case "task_progress":
+        return {
+          type: "task_progress",
+          id: event.id ?? null,
+          tokens: event.tokens ?? null,
+          toolUses: event.tool_uses ?? null,
+          durationMs: event.duration_ms ?? null,
+        };
       case "agent_result":
         return {
           type: "agent_result",

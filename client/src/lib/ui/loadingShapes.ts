@@ -12,7 +12,7 @@ const DAMPING = 0.75;
 const STIFFNESS = 170;
 const REACH = 0.98;
 const SAMPLES = 60;
-const INSET = 0.685;
+const INSET = 0.64;
 const DIGITS = 3;
 const CELL_ROOM = 1.2;
 

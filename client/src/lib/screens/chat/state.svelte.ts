@@ -367,6 +367,8 @@ export class ChatState {
   #sideAssistantId: number | null = null;
 
   rewindPoints = $state<RewindPoint[]>([]);
+  rewindEarlier = $state<string | null>(null);
+  rewindEarlierBusy = $state(false);
   rewindLoading = $state(false);
   rewindTarget = $state<RewindPoint | null>(null);
   rewindPreview = $state<RewindPreview | null>(null);
@@ -1271,8 +1273,24 @@ export class ChatState {
     const project = this.#projectKey();
     if (!sessionId || !project) return;
     this.rewindLoading = true;
-    this.rewindPoints = await this.#sessions.checkpoints(sessionId, project);
+    const loaded = await this.#sessions.checkpoints(sessionId, project);
+    this.rewindPoints = loaded.points;
+    this.rewindEarlier = loaded.earlier;
     this.rewindLoading = false;
+  }
+
+  async loadEarlierRewindPoints() {
+    const sessionId = this.sessionId;
+    const project = this.#projectKey();
+    const until = this.rewindEarlier;
+    if (!sessionId || !project || !until || this.rewindEarlierBusy) return;
+    this.rewindEarlierBusy = true;
+    const loaded = await this.#sessions.checkpoints(sessionId, project, until);
+    if (this.rewindEarlier === until) {
+      this.rewindPoints = [...loaded.points, ...this.rewindPoints];
+      this.rewindEarlier = loaded.earlier;
+    }
+    this.rewindEarlierBusy = false;
   }
 
   async selectRewindPoint(point: RewindPoint) {
@@ -1281,6 +1299,7 @@ export class ChatState {
     if (!sessionId || !project) return;
     this.rewindTarget = point;
     this.rewindPreview = null;
+    if (point.forkOnly) return;
     const preview = await this.#sessions.rewindPreview(sessionId, project, point.id);
     if (this.rewindTarget?.id === point.id) this.rewindPreview = preview;
   }
@@ -1293,6 +1312,7 @@ export class ChatState {
   dismissRewind() {
     this.clearRewindTarget();
     this.rewindPoints = [];
+    this.rewindEarlier = null;
   }
 
   async rewind(mode: "both" | "conversation"): Promise<boolean> {
@@ -2575,8 +2595,16 @@ export class ChatState {
         break;
       case "task_running":
         if (event.id && !this.backgroundToolIds.includes(event.id)) {
-          this.backgroundTasks = [...this.backgroundTasks, { id: event.id, description: event.description }];
+          this.backgroundTasks = [
+            ...this.backgroundTasks,
+            { id: event.id, description: event.description, tokens: event.tokens, toolUses: event.toolUses, durationMs: event.durationMs },
+          ];
         }
+        break;
+      case "task_progress":
+        this.backgroundTasks = this.backgroundTasks.map((task) =>
+          task.id === event.id ? { ...task, tokens: event.tokens, toolUses: event.toolUses, durationMs: event.durationMs } : task,
+        );
         break;
       case "agent_result": {
         const agentId = event.id;

@@ -175,7 +175,14 @@
       }
     }
     const files = pasted.map(pastedName);
-    if (!files.length || !canAttach || dialogOpen) return;
+    if (!files.length) {
+      const text = data?.getData("text/plain") ?? "";
+      if (!text || dialogOpen || active instanceof HTMLTextAreaElement || (active as HTMLElement | null)?.isContentEditable) return;
+      event.preventDefault();
+      composer?.place(text, "append");
+      return;
+    }
+    if (!canAttach || dialogOpen) return;
     event.preventDefault();
     chat.addAttachments(files);
   };
@@ -723,6 +730,9 @@
 {#if rewindOpen}
   <RewindDialog
     points={chat.rewindPoints}
+    earlier={chat.rewindEarlier !== null}
+    earlierBusy={chat.rewindEarlierBusy}
+    onEarlier={() => void chat.loadEarlierRewindPoints()}
     loading={chat.rewindLoading}
     target={chat.rewindTarget}
     preview={chat.rewindPreview}

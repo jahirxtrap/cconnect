@@ -64,6 +64,15 @@ class QueryEffect(Shape):
     name: str
 
 
+class QueryColumnChange(Shape):
+    change: Literal["added", "removed", "changed"]
+    name: str
+    type: str
+    nullable: bool
+    default: Optional[str] = None
+    was_type: Optional[str] = None
+
+
 class QueryStatement(Shape):
     kind: Literal["rows", "changed", "structure", "done"]
     columns: Optional[list[str]] = None
@@ -71,6 +80,7 @@ class QueryStatement(Shape):
     affected: Optional[int] = None
     more: bool = False
     structure: Optional[list[QueryColumn]] = None
+    changes: Optional[list[QueryColumnChange]] = None
     effect: Optional[QueryEffect] = None
 
 
@@ -357,6 +367,17 @@ class TaskRunning(Event):
     id: Optional[str] = None
     task: Optional[str] = None
     description: Optional[str] = None
+    tokens: Optional[int] = None
+    tool_uses: Optional[int] = None
+    duration_ms: Optional[int] = None
+
+
+class TaskProgress(Event):
+    type: Literal["task_progress"]
+    id: Optional[str] = None
+    tokens: Optional[int] = None
+    tool_uses: Optional[int] = None
+    duration_ms: Optional[int] = None
 
 
 class AgentResult(Event):
@@ -625,7 +646,7 @@ ChatEvent = Annotated[
         Ready, PermissionMode, Rejected, Activity, AgentState, History, Stop, TerminalOpened,
         AssistantText, Thinking, Working, ToolUse, ToolResult, FileChange, Shared, Compacting, CompactingEnded,
         Status, Compact, CompactSummary, AskText, AskWorking, AskSession, Command, Usage, SessionInfo, Component,
-        Reloaded, Agent, TaskRunning, AgentResult, ThinkingTokens, Hook, Notification, Notice, Mods, Commands,
+        Reloaded, Agent, TaskRunning, TaskProgress, AgentResult, ThinkingTokens, Hook, Notification, Notice, Mods, Commands,
         ModToast, ModInvalidate, ModTree, ModReply, ModRequest, ModFocus, ModScroll, SessionMessage,
         PluginMessage, AgentReport, Todos, Task, SessionStarted, Result, Context, RateLimit, Cache, Anchor,
         Done, Interrupted, Attached, Error, ApiError, Queued, Queue, Dequeued, HistoryChunk, Tail,

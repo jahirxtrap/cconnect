@@ -59,6 +59,7 @@ CHANGES = {exp.Insert: "inserted", exp.Update: "updated", exp.Delete: "deleted"}
 DEFINITIONS = {exp.Create: "created", exp.Alter: "altered", exp.Drop: "dropped"}
 SHAPED = ("table", "view")
 SHAPING = ("created", "altered")
+ALTERING = ("altered",)
 CHANGED_ALIAS = "cconnect_changed"
 TOTAL_ALIAS = "cconnect_total"
 RETURNING_CTE = "cte"
@@ -554,23 +555,42 @@ def _changed_result(result: Any, mode: str, limit: int) -> dict:
     }
 
 
-def _structure(scope: databases.Scope, found: dict) -> Optional[list[dict]]:
+def _columns_now(scope: databases.Scope, connection: Connection, found: Optional[dict], actions: tuple) -> Optional[list[dict]]:
+    if not found or found["action"] not in actions or found["object"] not in SHAPED or not found["name"]:
+        return None
+    item = database_engines.spec_of(databases.require(scope.connection))
     try:
-        info = table(scope, found["schema"], found["name"])
+        primary = _primary(connection, item, found["schema"], found["name"])
+        columns = _columns(connection, item, found["schema"], found["name"])
     except (databases.DatabaseError, SQLAlchemyError, NoSuchTableError):
         return None
     return [
         {key: column[key] for key in ("name", "type", "primary_key", "nullable", "auto", "default")}
-        for column in info["columns"]
+        for column in (_column(column, primary) for column in columns)
     ]
 
 
-def _shaped(scope: databases.Scope, done: dict) -> dict:
-    found = done["effect"]
-    if not found or found["action"] not in SHAPING or found["object"] not in SHAPED:
-        return done
-    columns = _structure(scope, found)
-    return {**done, "kind": STRUCTURE, "structure": columns} if columns else done
+def _column_changes(before: list[dict], after: list[dict]) -> list[dict]:
+    previous = {column["name"]: column for column in before}
+    current = {column["name"]: column for column in after}
+    changes = []
+    for name, column in current.items():
+        old = previous.get(name)
+        if old is None:
+            changes.append({"change": "added", "name": name, "type": column["type"], "nullable": column["nullable"], "default": column["default"], "was_type": None})
+        elif any(old[key] != column[key] for key in ("type", "primary_key", "nullable", "auto", "default")):
+            changes.append({"change": "changed", "name": name, "type": column["type"], "nullable": column["nullable"], "default": column["default"], "was_type": old["type"]})
+    for name, column in previous.items():
+        if name not in current:
+            changes.append({"change": "removed", "name": name, "type": column["type"], "nullable": column["nullable"], "default": column["default"], "was_type": None})
+    return changes
+
+
+def _shaped(before: Optional[list[dict]], columns: Optional[list[dict]]) -> dict:
+    if not columns:
+        return {"structure": None, "changes": None}
+    changes = _column_changes(before, columns) if before is not None else None
+    return {"kind": STRUCTURE, "structure": columns, "changes": changes}
 
 
 def query(scope: databases.Scope, sql: str, write: bool, limit: int = MAX_ROWS, offset: int = 0) -> dict:
@@ -593,14 +613,15 @@ def query(scope: databases.Scope, sql: str, write: bool, limit: int = MAX_ROWS, 
         for index, part in enumerate(parts, 1):
             tree = None if reading else _parsed(part, dialect)
             mode = _returning(tree, item)
+            effect = _effect_of(tree)
+            before = _columns_now(scope, connection, effect, ALTERING)
             try:
                 result = connection.exec_driver_sql(_with_returning(part, mode, limit) if mode else part, execution_options=NO_PARAMETERS)
                 done = _changed_result(result, mode, limit) if mode else _statement_result(result, limit, offset, type(tree) in CHANGES)
             except SQLAlchemyError as exc:
                 raise databases.DatabaseError(QUERY_FAILED, databases.detail_of(exc), index) from exc
-            results.append({**done, "effect": _effect_of(tree), "structure": None})
+            results.append({**done, "effect": effect, **_shaped(before, _columns_now(scope, connection, effect, SHAPING))})
     elapsed = round((time.monotonic() - started) * 1000)
-    results = [_shaped(scope, found) for found in results]
     shown = next((found for found in reversed(results) if found["columns"] is not None), None)
     counts = [found["affected"] for found in results if found["affected"] is not None]
     return {

@@ -3,6 +3,7 @@
   import { downloadShared } from "$lib/services/sharedFiles";
   import { accountsStore } from "$lib/data/accountsStore.svelte";
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
+  import { formatDay, MILLIS_PER_DAY, parseIsoMillis } from "$lib/data/time";
   import { accountIdOf } from "$lib/screens/settings/settingsIndex";
   import { useSettingsDialog } from "$lib/screens/settings/useSettingsDialog.svelte";
   import { accountSummary, scopeLabel } from "$lib/screens/settings/settingsValues";
@@ -52,10 +53,20 @@
   let offered = $state(false);
   let purpose = $state("");
 
+  const LOGIN_WARNING_DAYS = 10;
+
+  let loginEnds = $state<number | null>(null);
+  const loginEndsSoon = $derived(loginEnds !== null && loginEnds - Date.now() <= LOGIN_WARNING_DAYS * MILLIS_PER_DAY);
+
   const openActions = (account: Account) => {
     offered = account.delegate;
     purpose = account.purpose;
+    loginEnds = null;
     actions = account;
+    if (account.provider || !account.loggedIn) return;
+    void accountsApi.loginExpiry(account.id).then((value) => {
+      if (actions?.id === account.id) loginEnds = value === null ? null : parseIsoMillis(value);
+    });
   };
 
   const saveDelegation = async (account: Account) => {
@@ -252,6 +263,13 @@
       />
       {#if offered}
         <InputField value={purpose} oninput={(value) => (purpose = value)} label={t("PURPOSE")} optional minLines={2} />
+      {/if}
+      {#if loginEnds !== null}
+        {#if loginEndsSoon}
+          <ErrorText text={t("ACCOUNT_LOGIN_ENDS", formatDay(loginEnds))} />
+        {:else}
+          <p class="text-body-sm text-on-surface-variant">{t("ACCOUNT_LOGIN_ENDS", formatDay(loginEnds))}</p>
+        {/if}
       {/if}
     </div>
     <div class="mt-3 flex flex-col gap-1.5">

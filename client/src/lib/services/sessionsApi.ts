@@ -30,6 +30,12 @@ export interface RewindPoint {
   id: string;
   rewindId: string;
   text: string;
+  forkOnly: boolean;
+}
+
+export interface RewindPoints {
+  points: RewindPoint[];
+  earlier: string | null;
 }
 
 export interface RewindPreview {
@@ -107,15 +113,18 @@ export const createSessionsApi = (http: HttpClient) => ({
     };
   },
 
-  async checkpoints(sessionId: string, project: string): Promise<RewindPoint[]> {
-    const data = await http.get<Array<{ id?: string; rewind_id?: string; text?: string }>>(
+  async checkpoints(sessionId: string, project: string, until: string | null = null): Promise<RewindPoints> {
+    const data = await http.get<{ points?: Array<{ id?: string; rewind_id?: string; text?: string }>; earlier?: string | null }>(
       `/sessions/${sessionId}/checkpoints`,
-      { project },
+      until ? { project, until } : { project },
     );
-    if (!Array.isArray(data)) return [];
-    return data
-      .filter((point) => point.id && point.rewind_id)
-      .map((point) => ({ id: point.id!, rewindId: point.rewind_id!, text: point.text ?? "" }));
+    const points = Array.isArray(data?.points) ? data.points : [];
+    return {
+      points: points
+        .filter((point) => point.id && point.rewind_id)
+        .map((point) => ({ id: point.id!, rewindId: point.rewind_id!, text: point.text ?? "", forkOnly: until !== null })),
+      earlier: data?.earlier ?? null,
+    };
   },
 
   async rewindPreview(sessionId: string, project: string, userMessageId: string) {

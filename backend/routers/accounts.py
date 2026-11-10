@@ -150,6 +150,13 @@ def export_account(account_id: str):
     )
 
 
+@router.get("/accounts/{account_id}/login")
+async def login_expiry(account_id: str):
+    if account_id not in accounts.known_ids():
+        return api_response(status=404)
+    return api_response(data={"expires_at": await accounts.login_expiry(account_id)})
+
+
 @router.post("/accounts/{account_id}/login")
 async def start_login(account_id: str):
     if account_id not in accounts.known_ids():

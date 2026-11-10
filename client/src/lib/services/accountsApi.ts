@@ -167,6 +167,11 @@ export const createAccountsApi = (client: HttpClient) => ({
     return done;
   },
 
+  async loginExpiry(id: string): Promise<string | null> {
+    const data = await client.get<{ expires_at: string | null }>(`/accounts/${id}/login`);
+    return data?.expires_at ?? null;
+  },
+
   async startLogin(id: string): Promise<string | null> {
     const data = await client.post<Wire>(`/accounts/${id}/login`);
     return data?.url ?? null;

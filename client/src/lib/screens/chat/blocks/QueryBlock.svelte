@@ -3,8 +3,8 @@
   import View from "@lucide/svelte/icons/view";
   import { screenFor } from "$lib/app/screens";
   import { openDatabaseObject, type DatabaseObjectRef } from "$lib/app/viewer.svelte";
-  import type { QueryCall, QueryStatement, StatementEffect } from "$lib/data/chatModels";
-  import { qualifiedName, statementSummary } from "$lib/data/databaseModels";
+  import type { ColumnChange, QueryCall, QueryStatement, StatementEffect } from "$lib/data/chatModels";
+  import { kindsOfValues, qualifiedName, statementSummary } from "$lib/data/databaseModels";
   import { formatDecimal, joined } from "$lib/data/format";
   import { plural, t } from "$lib/i18n/index.svelte";
   import ColumnsTable from "$lib/screens/databases/ColumnsTable.svelte";
@@ -43,7 +43,7 @@
 
   const SQL_LANG = "sql";
   const CAPPED_HEIGHT = "max-h-72";
-  const FRAME = `flex ${CAPPED_HEIGHT} flex-col overflow-hidden rounded-panel bg-surface-nested [--color-card:var(--color-surface-nested)]`;
+  const FRAME = `flex ${CAPPED_HEIGHT} flex-col overflow-hidden [--viewport-radius:0px]`;
   const DATABASES_ICON = screenFor("databases").icon;
   const OPENABLE = ["table", "view"];
   const DROPPED = "dropped";
@@ -86,6 +86,20 @@
     const key = statement.effect ? EFFECT_KEYS[`${statement.effect.action}.${statement.effect.object}`] : undefined;
     return key && statement.effect?.name ? t(key, statement.effect.name) : statementSummary(null, statement.affected);
   };
+
+  const CHANGE_KEYS: Record<string, string> = {
+    added: "DATABASE_COLUMN_ADDED",
+    removed: "DATABASE_COLUMN_REMOVED",
+    changed: "DATABASE_COLUMN_CHANGED",
+  };
+
+  const shapeOf = (change: ColumnChange) =>
+    joined(change.type, change.nullable ? "NULL" : "NOT NULL", change.default !== null && t("DATABASE_DEFAULT_VALUE", change.default));
+
+  const changeText = (change: ColumnChange): string =>
+    change.change === "changed"
+      ? t(CHANGE_KEYS.changed, change.name, shapeOf(change), change.wasType ?? "")
+      : t(CHANGE_KEYS[change.change], change.name, shapeOf(change));
 
   const label = $derived(joined(query.name || query.connection, query.database));
   const last = $derived(statements?.at(-1) ?? null);
@@ -151,11 +165,15 @@
       <p class="text-body-sm text-on-surface-variant">{summaryOf(statement)}</p>
       {#if statement.columns && statement.rows?.length}
         <div class={FRAME}>
-          <DataGrid columns={statement.columns} rows={statement.rows} />
+          <DataGrid columns={statement.columns} rows={statement.rows} kinds={kindsOfValues(statement.columns, statement.rows)} />
         </div>
+      {:else if statement.changes}
+        {#each statement.changes as change (change.change + change.name)}
+          <p class="text-body-sm text-on-surface-variant">{changeText(change)}</p>
+        {/each}
       {:else if statement.structure?.length}
         <div class={FRAME}>
-          <div use:viewportScrollbar class="{TEXT_VIEWPORT_CLASS} scrollbar-thin selectable min-h-0 flex-1 overflow-auto px-1">
+          <div use:viewportScrollbar class="{TEXT_VIEWPORT_CLASS} scrollbar-thin selectable min-h-0 flex-1 overflow-auto">
             <ColumnsTable columns={statement.structure} />
           </div>
         </div>

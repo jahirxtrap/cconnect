@@ -29,6 +29,7 @@ export type ChatEvent =
   | Reloaded
   | Agent
   | TaskRunning
+  | TaskProgress
   | AgentResult
   | ThinkingTokens
   | Hook
@@ -269,6 +270,7 @@ export interface QueryStatement {
   affected?: number | null;
   more?: boolean;
   structure?: QueryColumn[] | null;
+  changes?: QueryColumnChange[] | null;
   effect?: QueryEffect | null;
 }
 export interface QueryColumn {
@@ -278,6 +280,14 @@ export interface QueryColumn {
   nullable: boolean;
   auto: boolean;
   default?: string | null;
+}
+export interface QueryColumnChange {
+  change: "added" | "removed" | "changed";
+  name: string;
+  type: string;
+  nullable: boolean;
+  default?: string | null;
+  was_type?: string | null;
 }
 export interface QueryEffect {
   action: "inserted" | "updated" | "deleted" | "created" | "altered" | "dropped";
@@ -519,6 +529,21 @@ export interface TaskRunning {
   id?: string | null;
   task?: string | null;
   description?: string | null;
+  tokens?: number | null;
+  tool_uses?: number | null;
+  duration_ms?: number | null;
+}
+export interface TaskProgress {
+  seq?: number | null;
+  ts?: number | null;
+  channel?: string | null;
+  parent?: string | null;
+  replay?: boolean | null;
+  type: "task_progress";
+  id?: string | null;
+  tokens?: number | null;
+  tool_uses?: number | null;
+  duration_ms?: number | null;
 }
 export interface AgentResult {
   seq?: number | null;

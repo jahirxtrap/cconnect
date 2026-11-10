@@ -74,7 +74,7 @@ class _Session:
         self.side_of: str | None = None
 
 
-def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False, shown=None):
+def _build_turn_runner(session, text: str, attachments: list[str] | None = None, seed_id: str | None = None, wanted=None, capabilities=None, on_transport=None, adopt=False, shown=None, seen=None):
     """Build the async-gen factory the LiveSession runs for one prompt. It wraps
     the run_prompt loop plus the post-turn session bookkeeping; the LiveSession
     appends the trailing ``done`` event itself."""
@@ -126,6 +126,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
                     on_transport=on_transport,
                     adopt=adopted,
                     read_from=shown if adopted else None,
+                    seen_notices=seen if adopted else None,
                     session_info=lambda: _session_info(state),
                 ):
                     if event.get("type") == "session_started":
@@ -264,7 +265,10 @@ async def _adopt_turn(session, prefs=None, capabilities=None):
     """Show a turn the CLI started on its own, such as a prompt a mod submitted, as it runs."""
     turn_start = await asyncio.to_thread(_turn_start, session, prefs)
     if session.start(
-        _build_turn_runner(session, "", wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities, on_transport=session.set_transport, adopt=True, shown=session.shown_size),
+        _build_turn_runner(
+            session, "", wanted=lambda: visibility.ceiling(session.wanted()), capabilities=capabilities,
+            on_transport=session.set_transport, adopt=True, shown=session.shown_size, seen=set(session.shown_notices),
+        ),
     ):
         session.turn_start_index = turn_start
 
@@ -633,6 +637,7 @@ async def chat_ws(ws: WebSocket):
             elif mtype == "session_info":
                 if session is not None and session.agent is None:
                     await send({"type": "session_info", **_session_info(session.state)})
+
 
             elif mtype == "reload":
                 if session is not None:

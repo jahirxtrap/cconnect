@@ -69,6 +69,17 @@ export interface StatementEffect {
   name: string;
 }
 
+export type ColumnChangeKind = "added" | "removed" | "changed";
+
+export interface ColumnChange {
+  change: ColumnChangeKind;
+  name: string;
+  type: string;
+  nullable: boolean;
+  default: string | null;
+  wasType: string | null;
+}
+
 export interface QueryStatement {
   kind: StatementKind;
   columns: string[] | null;
@@ -76,6 +87,7 @@ export interface QueryStatement {
   affected: number | null;
   more: boolean;
   structure: ColumnShape[] | null;
+  changes: ColumnChange[] | null;
   effect: StatementEffect | null;
 }
 
@@ -280,6 +292,9 @@ export interface TodoItem {
 export interface BackgroundTask {
   id: string;
   description: string | null;
+  tokens: number | null;
+  toolUses: number | null;
+  durationMs: number | null;
 }
 
 export interface QueuedMessage {
@@ -324,6 +339,17 @@ const statementColumnOf = (raw: Wire): ColumnShape => ({
   default: text(raw, "default"),
 });
 
+const COLUMN_CHANGE_KINDS: ColumnChangeKind[] = ["added", "removed", "changed"];
+
+const columnChangeOf = (raw: Wire): ColumnChange => ({
+  change: COLUMN_CHANGE_KINDS.find((kind) => kind === raw.change) ?? "changed",
+  name: text(raw, "name") ?? "",
+  type: text(raw, "type") ?? "",
+  nullable: flag(raw, "nullable"),
+  default: text(raw, "default"),
+  wasType: text(raw, "was_type"),
+});
+
 const effectOf = (raw: Wire): StatementEffect | null => {
   const action = text(raw, "action");
   return action ? { action, object: text(raw, "object") ?? "", schema: text(raw, "schema"), name: text(raw, "name") ?? "" } : null;
@@ -338,6 +364,7 @@ export const statementsOf = (raw: Wire): QueryStatement[] | null =>
         affected: number(item, "affected"),
         more: flag(item, "more"),
         structure: Array.isArray(item.structure) ? list(item, "structure").map(statementColumnOf) : null,
+        changes: Array.isArray(item.changes) ? list(item, "changes").map(columnChangeOf) : null,
         effect: effectOf(record(item, "effect")),
       }))
     : null;

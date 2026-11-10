@@ -38,9 +38,12 @@ ACTIONS = [ENGINES, ADD, UPDATE, REMOVE, TEST, INSTALL, UNINSTALL, OPEN, EXPORT]
 ROWS_HEADER = re.compile(r"^\[(\d+)\] (\d+) rows?(, more from offset \d+)?$")
 CHANGED_HEADER = re.compile(r"^\[(\d+)\] (\d+) rows? (?:inserted|updated|deleted|affected)\b.*?(?:, (\d+) shown)?$")
 STRUCTURE_HEADER = re.compile(r"^\[(\d+)\] (?:created|altered) (?:table|view) .*, (\d+) columns?$")
+CHANGES_HEADER = re.compile(r"^\[(\d+)\] altered (?:table|view) .*, (\d+) column changes?$")
+NO_CHANGES_HEADER = re.compile(r"^\[(\d+)\] altered (?:table|view) .*, no column changes$")
 DONE_HEADER = re.compile(r"^\[(\d+)\] .+$")
 CHANGE_PLACES = {"inserted": "into", "updated": "in", "deleted": "from"}
 STRUCTURE_COLUMNS = ["column", "type", "primary key", "nullable", "auto", "default"]
+CHANGE_COLUMNS = ["change", "column", "type", "nullable", "default", "was"]
 YES = "yes"
 NO = "no"
 EXPORTED = re.compile(r"^Wrote (.+) and showed it to the user", re.MULTILINE)
@@ -217,10 +220,16 @@ def _changed_block(index: int, item: dict) -> list[str]:
 
 def _structure_block(index: int, item: dict) -> list[str]:
     found = item["effect"]
+    changes = item.get("changes")
+    lead = f"[{index}] {found['action']} {found['object']} {_object_name(found)}"
+    if changes is not None:
+        if not changes:
+            return [f"{lead}, no column changes"]
+        rows = [[change["change"], change["name"], change["type"], _flag(change["nullable"]), change["default"], change["was_type"]] for change in changes]
+        return [f"{lead}, {_counted(len(changes), 'column change')}", *_tsv(CHANGE_COLUMNS, rows)]
     columns = item["structure"]
     rows = [[column["name"], column["type"], _flag(column["primary_key"]), _flag(column["nullable"]), _flag(column["auto"]), column["default"]] for column in columns]
-    header = f"[{index}] {found['action']} {found['object']} {_object_name(found)}, {_counted(len(columns), 'column')}"
-    return [header, *_tsv(STRUCTURE_COLUMNS, rows)]
+    return [f"{lead}, {_counted(len(columns), 'column')}", *_tsv(STRUCTURE_COLUMNS, rows)]
 
 
 def _done_block(index: int, item: dict) -> list[str]:
@@ -270,6 +279,18 @@ def _column_of(row: list[Optional[str]]) -> dict:
     }
 
 
+def _change_of(row: list[Optional[str]]) -> dict:
+    change, name, kind, nullable, default, was = (row + [None] * len(CHANGE_COLUMNS))[:len(CHANGE_COLUMNS)]
+    return {
+        "change": change if change in ("added", "removed", "changed") else "changed",
+        "name": name or "",
+        "type": kind or "",
+        "nullable": nullable == YES,
+        "default": default,
+        "was_type": was,
+    }
+
+
 def statements_of(text: str) -> list[dict]:
     lines = text.split("\n")
     found: list[dict] = []
@@ -277,7 +298,7 @@ def statements_of(text: str) -> list[dict]:
     while index < len(lines):
         line = lines[index]
         index += 1
-        empty = {"index": 0, "kind": database_data.DONE, "columns": None, "rows": None, "affected": None, "more": False, "structure": None}
+        empty = {"index": 0, "kind": database_data.DONE, "columns": None, "rows": None, "affected": None, "more": False, "structure": None, "changes": None}
         if match := ROWS_HEADER.match(line):
             count = int(match.group(2))
             columns, rows = _table_at(lines, index, count)
@@ -291,6 +312,13 @@ def statements_of(text: str) -> list[dict]:
                 item = {**item, "columns": columns, "rows": rows, "more": item["affected"] > shown}
                 index += 1 + shown
             found.append(item)
+        elif match := CHANGES_HEADER.match(line):
+            count = int(match.group(2))
+            _, rows = _table_at(lines, index, count)
+            found.append({**empty, "index": int(match.group(1)), "kind": database_data.STRUCTURE, "changes": [_change_of(row) for row in rows]})
+            index += 1 + count
+        elif match := NO_CHANGES_HEADER.match(line):
+            found.append({**empty, "index": int(match.group(1)), "kind": database_data.STRUCTURE, "changes": []})
         elif match := STRUCTURE_HEADER.match(line):
             count = int(match.group(2))
             _, rows = _table_at(lines, index, count)

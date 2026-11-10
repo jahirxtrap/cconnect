@@ -2,6 +2,7 @@
   import { readableText } from "$lib/data/pickedElements";
   import { t } from "$lib/i18n/index.svelte";
   import type { RewindPoint, RewindPreview } from "$lib/services/sessionsApi";
+  import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
@@ -12,28 +13,46 @@
 
   interface Props {
     points: RewindPoint[];
+    earlier: boolean;
+    earlierBusy: boolean;
     loading: boolean;
     target: RewindPoint | null;
     preview: RewindPreview | null;
     busy: boolean;
     onSelect: (point: RewindPoint) => void;
+    onEarlier: () => void;
     onRewind: (mode: "both" | "conversation") => void;
     onFork: () => void;
     onBack: () => void;
     onDismiss: () => void;
   }
 
-  const { points, loading, target, preview, busy, onSelect, onRewind, onFork, onBack, onDismiss }: Props =
-    $props();
+  const {
+    points,
+    earlier,
+    earlierBusy,
+    loading,
+    target,
+    preview,
+    busy,
+    onSelect,
+    onEarlier,
+    onRewind,
+    onFork,
+    onBack,
+    onDismiss,
+  }: Props = $props();
 
   const codeAvailable = $derived(preview?.canRewind !== false);
+  const forkOnly = $derived(target?.forkOnly === true);
 
   let mode = $state<"both" | "conversation" | "fork">("both");
 
   const both = $derived(mode === "both");
 
   $effect(() => {
-    if (preview !== null && !preview.canRewind && mode === "both") mode = "conversation";
+    if (forkOnly) mode = "fork";
+    else if (preview !== null && !preview.canRewind && mode === "both") mode = "conversation";
   });
 
   const ordered = $derived([...points].reverse());
@@ -74,13 +93,13 @@
     <DialogSelectItem
       label={t("REWIND_BOTH")}
       selected={both}
-      enabled={!busy && codeAvailable}
+      enabled={!busy && codeAvailable && !forkOnly}
       onclick={() => (mode = "both")}
     />
     <DialogSelectItem
       label={t("REWIND_CONVERSATION")}
       selected={mode === "conversation"}
-      enabled={!busy}
+      enabled={!busy && !forkOnly}
       onclick={() => (mode = "conversation")}
     />
     <DialogSelectItem
@@ -98,16 +117,22 @@
 
     {#if loading}
       <CenteredProgress class="py-6" />
-    {:else if !points.length}
-      <EmptyState text={t("REWIND_EMPTY")} />
     {:else}
-      <div class="flex flex-col gap-2 pb-2">
-        {#each ordered as point (point.id)}
-          <CardPanel onclick={() => onSelect(point)} class="w-full text-left">
-            <p class="selectable line-clamp-2 text-body-md">{readableText(point.text) || point.id}</p>
-          </CardPanel>
-        {/each}
-      </div>
+      {#if !points.length}
+        <EmptyState text={t("REWIND_EMPTY")} />
+      {/if}
+      {#if points.length || earlier}
+        <div class="flex flex-col gap-2 pb-2">
+          {#each ordered as point (point.id)}
+            <CardPanel onclick={() => onSelect(point)} class="w-full text-left">
+              <p class="line-clamp-2 text-body-md">{readableText(point.text) || point.id}</p>
+            </CardPanel>
+          {/each}
+          {#if earlier}
+            <ActionButton text={t("EARLIER_POINTS")} enabled={!earlierBusy} onclick={onEarlier} class="w-full" />
+          {/if}
+        </div>
+      {/if}
     {/if}
   </CompactDialog>
 {/if}

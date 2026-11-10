@@ -36,7 +36,7 @@
   const NUMERIC: ColumnKind[] = ["integer", "number"];
   const CELL_CLASS = "max-w-80 truncate border-b border-outline-variant px-2 py-1.5";
   const HEAD_CLASS = "sticky top-0 border-b border-outline-variant bg-card px-2 py-1.5 text-left font-semibold select-none";
-  const NUMBER_CLASS = "sticky left-0 border-b border-outline-variant bg-card px-2 py-1.5 text-right text-faint select-none";
+  const NUMBER_CLASS = "sticky left-0 w-px border-b border-outline-variant bg-card px-2 py-1.5 text-right text-faint select-none";
 
   const alignOf = (column: string) => (NUMERIC.includes(kinds[column]) ? "text-right" : "");
 </script>
@@ -49,7 +49,7 @@
   <table class="min-w-full border-separate border-spacing-0 text-body-sm">
     <thead>
       <tr>
-        <th class="{HEAD_CLASS} left-0 z-20"></th>
+        <th class="{HEAD_CLASS} left-0 z-20 w-px"></th>
         {#each columns as column, at (at)}
           <th class="{HEAD_CLASS} z-10">
             {#if onSort}
@@ -61,7 +61,7 @@
                 {@render label(column)}
               </button>
             {:else}
-              <span class="flex items-center gap-1 whitespace-nowrap">{@render label(column)}</span>
+              <span class="flex items-center gap-1 whitespace-nowrap {alignOf(column) ? 'justify-end' : ''}">{@render label(column)}</span>
             {/if}
           </th>
         {/each}
@@ -76,7 +76,7 @@
           <td class={NUMBER_CLASS}>{formatDecimal(offset + index + 1, 0)}</td>
           {#each columns as column, at (at)}
             {@const value = row[at] ?? null}
-            <td class="{CELL_CLASS} {alignOf(column)}" title={value === null ? undefined : cellText(value)}>
+            <td class="{CELL_CLASS} {alignOf(column)}">
               {#if value === null}
                 <span class="text-faint italic">NULL</span>
               {:else}

@@ -100,6 +100,7 @@ class LiveSession:
         self._tail_counts = {}
         self._tail_stamp = None
         self.shown_size = None
+        self.shown_notices = set()
         self._mods = mods.Surface()
         self._mod_asks = {}
         self._mod_lock = asyncio.Lock()
@@ -249,6 +250,7 @@ class LiveSession:
         self._tail_counts = {}
         self._tail_stamp = None
         self.shown_size = None
+        self.shown_notices = set()
         self._wake_tail()
 
     def _tail_groups(self):
@@ -294,6 +296,9 @@ class LiveSession:
                         continue
                     self.shown_size = stamp[1]
                     fresh = [dict(item, index=index) for index, item in enumerate(items[known:], start=known)]
+                    self.shown_notices.update(
+                        item["text"] for item in fresh if item.get("type") == "notification" and item.get("text")
+                    )
                     for sink in sinks:
                         await self._send_one(sink, {"type": "tail", "items": fresh, "channel": self.channel})
         except asyncio.CancelledError:
@@ -611,6 +616,11 @@ class LiveSession:
                 "task": event.get("task"),
                 "description": event.get("description"),
             }
+            return
+        if kind == "task_progress":
+            running = self._background.get(event.get("id"))
+            if running is not None:
+                running.update({key: event.get(key) for key in ("tokens", "tool_uses", "duration_ms")})
             return
         if kind == "agent_result":
             self._background.pop(event.get("id"), None)
