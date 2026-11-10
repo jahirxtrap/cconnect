@@ -161,7 +161,7 @@
             onRefresh={() => void claudeRefresh.run()}
             memory={CLAUDE_MEMORY}
           >
-            <div class="px-2 pb-2">
+            <div class="px-(--page-inset) pb-(--page-inset)">
               <ClaudeSections
                 tick={claudeRefresh.tick}
                 onOpen={(kind) => (panes.claudeDetail = kind)}

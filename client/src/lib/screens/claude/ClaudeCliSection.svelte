@@ -13,6 +13,7 @@
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { claudeApi } from "$lib/services/claudeApi";
   import { cliApi } from "$lib/services/cliApi";
+  import { systemApi } from "$lib/services/systemApi";
   import { entryFor, entryText } from "$lib/screens/settings/settingsIndex";
   import { useSettingsDialog } from "$lib/screens/settings/useSettingsDialog.svelte";
   import { claudeChangelog, sdkChangelog } from "$lib/services/githubApi";
@@ -20,6 +21,7 @@
   import ChangelogDialog from "$lib/ui/ChangelogDialog.svelte";
   import ClaudeIcon from "$lib/ui/ClaudeIcon.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
+  import ErrorText from "$lib/ui/ErrorText.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -37,6 +39,7 @@
   const { enabled, tick = 0, pending, flash = false }: Props = $props();
 
   let sdkUpdating = $state(false);
+  let sdkFailure = $state<string | null>(null);
   let promptOpen = $state(false);
   let projectPromptFor = $state<string | null>(null);
   let commitPromptOpen = $state(false);
@@ -63,9 +66,13 @@
 
   const updateSdk = async () => {
     sdkUpdating = true;
+    sdkFailure = null;
     const result = await cliApi.updateSdk();
     sdkUpdating = false;
-    if (result) claudeStatus.sdk = result;
+    if (!result) return;
+    claudeStatus.sdk = { package: result.package, version: result.version };
+    if (!result.ok) sdkFailure = result.message;
+    else if (result.changed) void systemApi.restart();
   };
 
   const setSdkAutoUpdate = (value: boolean) => {
@@ -129,6 +136,9 @@
       onclick={() => void updateSdk()}
       class="w-full"
     />
+    {#if sdkFailure}
+      <ErrorText text={sdkFailure} class="mt-2.5" />
+    {/if}
   </div>
   <PreferenceRow
     icon={FilePen}

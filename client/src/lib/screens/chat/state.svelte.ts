@@ -545,7 +545,6 @@ export class ChatState {
     this.#endSwitch();
     backend.select(id);
     this.cwd = this.defaultCwd;
-    this.onContextChange?.();
     this.#uploadAbort?.abort();
     this.#socket.close();
     this.connection = "disconnected";
@@ -557,6 +556,7 @@ export class ChatState {
     this.#resetTranscript();
     this.historyProjectKey = null;
     this.#applyDefaultProject();
+    this.onContextChange?.();
     this.#connect();
   }
 
@@ -2062,7 +2062,11 @@ export class ChatState {
     this.#interrupting = false;
     this.#pendingTrim = null;
     const live = loaded.some((item) => item.role === "compact") ? withoutLiveCompact(carried) : carried;
-    this.messages = live.length ? [...loaded, ...live] : loaded;
+    const prompt = live.find((item) => item.role === "user");
+    const lastUser = loaded.findLastIndex((item) => item.role === "user");
+    const settled =
+      prompt && lastUser >= 0 && loaded[lastUser].text.trim() === prompt.text.trim() ? loaded.slice(0, lastUser) : loaded;
+    this.messages = live.length ? [...settled, ...live] : loaded;
     this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
     this.#setPaging(page.items.length ? page.startIndex : null, !page.hasMore, page.earlier, null);

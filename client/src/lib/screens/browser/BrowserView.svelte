@@ -23,6 +23,7 @@
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
   import { boundsOf, BrowserLayer, coverOf } from "./browserLayer";
   import { rememberBrowser, takeBrowser } from "./browserMemory";
+  import { framePainter, type FramePainter } from "./framePainter";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
     androidBrowsing,
@@ -62,9 +63,11 @@
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { FIELD_RING_CLASS, selectField } from "$lib/ui/field";
   import { keepFocus } from "$lib/ui/keepFocus";
+  import { onScreen } from "$lib/ui/onScreen";
   import { TOUCH_SLOP } from "$lib/ui/press";
   import { PullState } from "$lib/ui/pull.svelte";
   import PullIndicator from "$lib/ui/PullIndicator.svelte";
+  import { SURFACE_FRAME_CLASS } from "$lib/ui/surfaceFrame";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
   interface Props {
@@ -132,8 +135,9 @@
   let dragging = $state(false);
   let link = $state.raw<BrowserLink | null>(null);
 
-  let context: CanvasRenderingContext2D | null = null;
-  let lastFrame: ImageBitmap | null = null;
+  let shownOnScreen = $state(true);
+  let painter: FramePainter | null = null;
+  let lastFrame: ArrayBuffer | null = null;
   let resizeTimer: ReturnType<typeof setTimeout> | null = null;
   let typed = "";
   let touchedAt = -Infinity;
@@ -233,14 +237,10 @@
 
   const pull = new PullState();
 
-  const serverCapture = () =>
-    new Promise<File | null>((done) => {
-      if (!canvas) return done(null);
-      canvas.toBlob(
-        (blob) => done(blob ? new File([blob], captureName(active?.title ?? ""), { type: "image/png" }) : null),
-        "image/png",
-      );
-    });
+  const serverCapture = async () => {
+    const blob = painter ? await painter.capture() : null;
+    return blob ? new File([blob], captureName(active?.title ?? ""), { type: "image/png" }) : null;
+  };
 
   const capture = async () => {
     const target = panes.focusedTab;
@@ -336,23 +336,25 @@
     scale: Math.min(MAX_SCALE, Math.max(1, window.devicePixelRatio || 1)),
   });
 
-  const paint = (bitmap: ImageBitmap) => {
-    const node = canvas;
-    if (!node) {
-      bitmap.close();
-      return;
-    }
-    ready = true;
-    if (node.width !== bitmap.width || node.height !== bitmap.height) {
-      node.width = bitmap.width;
-      node.height = bitmap.height;
-      context = node.getContext("2d");
-    }
-    context ??= node.getContext("2d");
-    context?.drawImage(bitmap, 0, 0);
-    if (lastFrame !== bitmap) lastFrame?.close();
-    lastFrame = bitmap;
+  const paint = (buffer: ArrayBuffer) => {
+    lastFrame = buffer;
+    painter?.frame(buffer);
   };
+
+  const unready = () => {
+    ready = false;
+    painter?.rearm();
+  };
+
+  $effect(() => {
+    if (!canvas) return;
+    const created = framePainter(canvas, () => (ready = true));
+    painter = created;
+    return () => {
+      created.close();
+      painter = null;
+    };
+  });
 
   const receive = (next: BrowserState) => {
     page = dragging ? { ...next, tabs: page.tabs } : next;
@@ -377,7 +379,7 @@
         onConnected: (value) => {
           connected = value;
           dropped = !value;
-          if (!value) ready = false;
+          if (!value) unready();
         },
         onCursor: (shape) => (cursor = shape),
         onEditing: editingChanged,
@@ -399,7 +401,7 @@
       rememberBrowser(environment, { page, frame: lastFrame });
       lastFrame = null;
       link = null;
-      ready = false;
+      unready();
       connected = false;
       dropped = false;
       page = { ...IDLE_PAGE };
@@ -408,8 +410,8 @@
 
   $effect(() => {
     const wanted = onServer && (page.running || launching);
-    link?.watch(wanted);
-    if (!wanted) ready = false;
+    link?.watch(wanted && shownOnScreen);
+    if (!wanted) untrack(unready);
   });
 
   $effect(() => {
@@ -537,9 +539,7 @@
 
   $effect(() => {
     if (page.activeTab || !canvas) return;
-    context ??= canvas.getContext("2d");
-    context?.clearRect(0, 0, canvas.width, canvas.height);
-    lastFrame?.close();
+    painter?.clear();
     lastFrame = null;
   });
 
@@ -1004,7 +1004,8 @@
 
   <div
     bind:this={surface}
-    class="relative mx-2 mb-2 flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-panel bg-background"
+    use:onScreen={(shown) => (shownOnScreen = shown)}
+    class="{SURFACE_FRAME_CLASS} relative flex min-h-0 flex-1 items-center justify-center bg-background"
   >
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <canvas

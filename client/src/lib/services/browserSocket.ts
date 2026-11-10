@@ -27,7 +27,7 @@ export interface BrowserState {
 }
 
 export interface BrowserHooks {
-  onFrame: (bitmap: ImageBitmap) => void;
+  onFrame: (buffer: ArrayBuffer) => void;
   onState: (state: BrowserState) => void;
   onConnected: (value: boolean) => void;
   onPicked: (pick: ElementPick) => void;
@@ -65,32 +65,12 @@ export interface BrowserLink {
 }
 
 export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport): BrowserLink => {
-  let disposed = false;
-  let decoding = false;
-  let pending: ArrayBuffer | null = null;
   let watched = false;
-
-  const draw = (buffer: ArrayBuffer) => {
-    if (decoding) {
-      pending = buffer;
-      return;
-    }
-    decoding = true;
-    void createImageBitmap(new Blob([buffer], { type: "image/jpeg" }))
-      .then((bitmap) => (disposed ? bitmap.close() : hooks.onFrame(bitmap)))
-      .catch(() => undefined)
-      .finally(() => {
-        decoding = false;
-        const next = pending;
-        pending = null;
-        if (next && !disposed) draw(next);
-      });
-  };
 
   const socket = new ReconnectingSocket("/browser/ws", {
     onOpen: () => socket.send({ type: "attach", watch: watched, ...viewport() }),
     onBinary: (buffer) => {
-      if (watched) draw(buffer);
+      if (watched) hooks.onFrame(buffer);
     },
     onMessage: (data) => {
       if (data.type === "picked") {
@@ -159,9 +139,6 @@ export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport
     mouse: (payload) => post({ type: "mouse", ...payload }),
     key: (payload) => post({ type: "key", ...payload }),
     text: (value) => post({ type: "text", value }),
-    close: () => {
-      disposed = true;
-      socket.close();
-    },
+    close: () => socket.close(),
   };
 };

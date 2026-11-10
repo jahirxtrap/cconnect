@@ -13,6 +13,7 @@
     MENU_ICON_SIZE,
     MENU_ITEM_CLASS,
     MENU_SCROLL_CLASS,
+    MENU_VALUE_CLASS,
     menuIconClass,
     type MenuPoint,
   } from "$lib/ui/menuSurface";
@@ -70,16 +71,19 @@
 </script>
 
 {#snippet body()}
-  {#if drill.current}
-    {@const level = drill.current}
-    <DropdownMenu.Item closeOnSelect={false} onSelect={() => drill.back()} class={MENU_ITEM_CLASS}>
-      <ChevronLeft size={MENU_ICON_SIZE} class={menuIconClass()} />
-      <span class="min-w-0 flex-1 truncate text-body-md text-on-surface-variant">{level.text}</span>
-    </DropdownMenu.Item>
-    {@render level.children()}
-  {:else}
-    {@render children()}
-  {/if}
+  <div class={drill.current ? "hidden" : "contents"}>{@render children()}</div>
+  {#each drill.levels as level, index (level)}
+    <div class={index === drill.levels.length - 1 ? "contents" : "hidden"}>
+      <DropdownMenu.Item closeOnSelect={false} onSelect={() => drill.back()} class={MENU_ITEM_CLASS}>
+        <ChevronLeft size={MENU_ICON_SIZE} class={menuIconClass()} />
+        <span class="min-w-0 flex-1 truncate text-body-md text-on-surface-variant">{level.text}</span>
+        {#if level.value()}
+          <span class={MENU_VALUE_CLASS}>{level.value()}</span>
+        {/if}
+      </DropdownMenu.Item>
+      {@render level.children()}
+    </div>
+  {/each}
 {/snippet}
 
 <MenuScrim {open} onDismiss={() => onOpenChange(false)} />

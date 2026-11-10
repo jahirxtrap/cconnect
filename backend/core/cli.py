@@ -320,7 +320,7 @@ def _detached_provider() -> str:
     return ""
 
 
-def _spawn_detached(child_args: list[str]) -> int:
+def _spawn_detached() -> int:
     handle = paths.DETACHED_LOG_FILE.open("ab")
     kwargs: dict = {
         "stdin": subprocess.DEVNULL,
@@ -334,7 +334,7 @@ def _spawn_detached(child_args: list[str]) -> int:
         kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
-    process = subprocess.Popen([sys.executable, "-m", _MODULE, *child_args], **kwargs)
+    process = subprocess.Popen([sys.executable, "-m", _MODULE], **kwargs)
     paths.DETACHED_PID_FILE.write_text(str(process.pid), encoding="utf-8")
     return process.pid
 
@@ -368,8 +368,6 @@ def _invocation() -> str:
 def _flag_parser() -> argparse.ArgumentParser:
     """The launcher's original flags, accepted alongside the subcommands."""
     parser = argparse.ArgumentParser(description="CConnect backend launcher.")
-    parser.add_argument("--production", action="store_true",
-                        help="No reload (Linux/macOS only).")
     parser.add_argument("--expose", choices=list(_PROVIDERS), default="",
                         help="Serve the backend through the given provider: tailnet keeps it "
                              "inside your tailnet, tailscale and caddy publish it.")
@@ -393,14 +391,12 @@ def _command_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cconnect", description="CConnect backend.")
     parser.add_argument("-v", "--version", action="version", version=f"cconnect {release.VERSION}")
     parser.set_defaults(
-        production=False, expose="", public_host="", detach=False, port=None,
+        expose="", public_host="", detach=False, port=None,
         security_key=False, rotate=False, source="", force=False, json=False, follow=False,
     )
     commands = parser.add_subparsers(dest="command")
 
     run = commands.add_parser("run", help="Serve on this machine and its network. The default.")
-    run.add_argument("--production", action="store_true",
-                     help="No reload (Linux/macOS only).")
     run.add_argument("--detach", action="store_true",
                      help="Run in the background; the server outlives the terminal.")
     run.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
@@ -412,8 +408,6 @@ def _command_parser() -> argparse.ArgumentParser:
                              "then to <user>-<ip>.sslip.io.")
     expose.add_argument("--detach", action="store_true",
                         help="Run in the background; the server outlives the terminal.")
-    expose.add_argument("--production", action="store_true",
-                        help="No reload (Linux/macOS only).")
     expose.add_argument("--port", type=int, default=None, help=f"Port to serve on instead of {PORT}.")
 
     commands.add_parser("stop", help="Stop a backend started with --detach.")
@@ -598,8 +592,6 @@ def main():
         _stop_detached()
         return
 
-    is_windows = sys.platform == "win32"
-
     if args.detach:
         running = _running_pid()
         if running is not None:
@@ -611,8 +603,7 @@ def main():
             paths.DETACHED_PROVIDER_FILE.write_text(args.expose, encoding="utf-8")
         else:
             _print_security_key(key_generated)
-        child_args = ["--production"] if args.production else []
-        pid = _spawn_detached(child_args)
+        pid = _spawn_detached()
         print(
             f"  Detached   : pid {pid}"
             f"\n  Log        : {paths.DETACHED_LOG_FILE}"
@@ -627,10 +618,13 @@ def main():
     else:
         _print_security_key(key_generated)
 
-    reload = not args.production and not is_windows
+    reload = not paths.INSTALLED and sys.platform != "win32"
 
     cmd = [sys.executable, "-m", "uvicorn", _APP, "--host", "0.0.0.0", "--port", str(port)]
-    cmd += ["--reload", "--reload-exclude", str(paths.DATA_DIR)] if reload else ["--workers", "1"]
+    if reload:
+        cmd += ["--reload", "--reload-exclude", str(paths.DATA_DIR), "--reload-exclude", sys.prefix]
+    else:
+        cmd += ["--workers", "1"]
 
     paths.RESTART_FLAG.unlink(missing_ok=True)
     paths.STOP_FLAG.unlink(missing_ok=True)

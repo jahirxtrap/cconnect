@@ -1,7 +1,6 @@
 """How this backend updates itself: from the git checkout it runs from, or from PyPI."""
 
 import subprocess
-import sys
 from importlib.metadata import PackageNotFoundError, version as installed_version
 from typing import Optional
 
@@ -16,7 +15,6 @@ _RELEASE_TIMEOUT = 10
 _RELEASE_URL = "https://pypi.org/pypi/cconnect/json"
 
 DISTRIBUTION = "cconnect"
-RELOADS = sys.platform != "win32"
 
 
 def _released() -> Optional[str]:
@@ -67,7 +65,6 @@ def _package_status() -> dict:
         "ahead": 0,
         "dirty": False,
         "latest": "",
-        "reloads": RELOADS,
     }
 
 
@@ -112,7 +109,6 @@ def status() -> dict:
         "ahead": _count("@{u}..HEAD") if current else 0,
         "dirty": dirty() if current else False,
         "latest": "",
-        "reloads": RELOADS,
     }
 
 

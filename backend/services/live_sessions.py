@@ -92,6 +92,7 @@ class LiveSession:
         self._drained = asyncio.Event()
         self._resident = None
         self.adopter = None
+        self.resumer = None
         self._cooldown = None
         self._ending = False
         self._tail = None
@@ -753,8 +754,8 @@ class LiveSession:
             "dismissed": dismissed,
         })
 
-    async def enqueue(self, mid, text, attachments=None):
-        if mid and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued + self._inflight)):
+    async def enqueue(self, mid, text, attachments=None, again=False):
+        if mid and not again and (mid in self._seen_ids or any(it["id"] == mid for it in self._queued + self._inflight)):
             return False
         item = {"id": mid, "text": text, "attachments": list(attachments or []), "ts": int(time.time() * 1000)}
         self._queued.append(item)
@@ -819,6 +820,7 @@ class LiveSession:
         if item is None:
             return None
         self._queued.remove(item)
+        await self._emit({"type": "dequeued", "ids": [item["id"]], "text": item["text"], "consumed": 0, "ts": item["ts"]})
         carried = []
         while not self._inbox.empty():
             try:
@@ -1020,6 +1022,7 @@ class LiveSession:
         await self._emit({"type": "dequeued", "ids": stuck, "text": "", "consumed": 0})
 
     async def _run(self, runner_factory):
+        resume = None
         try:
             async for event in runner_factory(self._ask, self._emit):
                 if self._stopping and event.get("type") in ("error", "status"):
@@ -1046,6 +1049,7 @@ class LiveSession:
             await self._flush_inflight()
             await self._emit({"type": "interrupted" if self._stopping else "done"})
             self._settle()
+            resume = self.resumer if self._queued else None
         finally:
             self._ending = True
             self._rebase_tail()
@@ -1054,6 +1058,8 @@ class LiveSession:
                 self._watch_transcript()
             else:
                 self._schedule_cooldown()
+            if resume is not None:
+                asyncio.create_task(resume())
 
 
 class SessionRegistry:

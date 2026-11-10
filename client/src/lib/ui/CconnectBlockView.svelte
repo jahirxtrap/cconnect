@@ -139,7 +139,7 @@
     </div>
   {/if}
 {:else if data.type === "playlist"}
-  <CardPanel class="w-full gap-2 {MEDIA_FRAME_CLASS}">
+  <CardPanel dense class="w-full gap-2 {MEDIA_FRAME_CLASS}">
     {#each data.items as item (item.url)}
       <div class="flex w-full min-w-0 flex-col gap-1">
         <span class="truncate text-body-sm text-on-surface-variant">{item.title ?? fileName(item.url)}</span>

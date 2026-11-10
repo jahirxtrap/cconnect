@@ -1,5 +1,4 @@
 <script lang="ts">
-  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import { claudeStatus } from "$lib/data/claudeStatus.svelte";
   import { joined } from "$lib/data/format";
   import { usageErrorText, type Usage } from "$lib/data/usageWindows";
@@ -84,7 +83,7 @@
   {#if loading}
     <EmptyState loading text={t("LOADING")} class="py-6" />
   {:else if !usage || usage.error !== null || !usage.windows.length}
-    <EmptyState icon={TriangleAlert} text={usageErrorText(usage) || pending} />
+    <EmptyState text={usageErrorText(usage) || pending} class="py-6" />
   {:else}
     <UsageWindows windows={usage.windows} class="p-4" />
   {/if}

@@ -192,7 +192,7 @@
             multi={element.multiple}
           />
           {#if selected && option.preview?.trim()}
-            <CardPanel class="w-full">
+            <CardPanel dense class="w-full">
               <MarkdownText text={option.preview.replace(/\n+$/, "")} dense />
             </CardPanel>
           {/if}

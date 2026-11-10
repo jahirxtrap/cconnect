@@ -5,6 +5,7 @@ interface DrillLevel {
   text: string;
   children: Snippet;
   footer?: Snippet;
+  value: () => string | undefined;
   release: () => void;
 }
 
@@ -15,9 +16,9 @@ export class MenuDrill {
 
   readonly current = $derived(this.levels.at(-1) ?? null);
 
-  open(text: string, children: Snippet, footer?: Snippet) {
+  open(text: string, children: Snippet, footer: Snippet | undefined, value: () => string | undefined) {
     const release = pushDismiss(() => this.back());
-    this.levels = [...this.levels, { text, children, footer, release }];
+    this.levels = [...this.levels, { text, children, footer, value, release }];
   }
 
   back() {

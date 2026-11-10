@@ -16,6 +16,12 @@ export interface SdkInfo {
   version: string | null;
 }
 
+export interface SdkUpdate extends SdkInfo {
+  ok: boolean;
+  message: string;
+  changed: boolean;
+}
+
 type Wire = Record<string, any>;
 
 const DEFAULT_SOURCES = ["system", "custom", "bundled"];
@@ -50,9 +56,17 @@ export const createCliApi = (client: HttpClient) => ({
     return data && { package: data.package ?? "", version: data.version ?? null };
   },
 
-  async updateSdk(): Promise<SdkInfo | null> {
+  async updateSdk(): Promise<SdkUpdate | null> {
     const data = await client.post<Wire>("/cli/sdk/update");
-    return data && { package: data.package ?? "", version: data.version ?? null };
+    return (
+      data && {
+        package: data.package ?? "",
+        version: data.version ?? null,
+        ok: data.ok === true,
+        message: data.message ?? "",
+        changed: data.changed === true,
+      }
+    );
   },
 
   async update(source?: string, customPath?: string): Promise<{ ok: boolean; message: string }> {

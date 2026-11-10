@@ -56,7 +56,7 @@
   import { isPackFile } from "$lib/design/packs/schema";
   import EnvironmentAction from "$lib/screens/chat/EnvironmentAction.svelte";
   import { offerShared } from "$lib/screens/packs/packIntake";
-  import { inPane } from "$lib/screens/chat/paneSurface";
+  import { compactPane, paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
@@ -89,7 +89,7 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import FileActionItems from "$lib/ui/FileActionItems.svelte";
   import { FILE_ACTION_LOOK, type FileActionEntry, type FileActionId } from "$lib/ui/sharedFileActions";
-  import { BAR_ACTION_CLASS, BAR_CARD_CLASS, BAR_DOCK_CLASS, BAR_LABEL_CLASS } from "$lib/ui/actionBar";
+  import { BAR_ACTION_CLASS, BAR_CARD_CLASS, BAR_DOCK_CLASS, BAR_LABEL_CLASS, BAR_REGION_CLASS } from "$lib/ui/actionBar";
   import PathBar from "./PathBar.svelte";
   import CompressDialog from "./CompressDialog.svelte";
   import { recallShared, rememberShared } from "./sharedMemory";
@@ -120,7 +120,8 @@
     stem: string;
   }
 
-  const compact = inPane();
+  const role = paneRole();
+  const compact = role !== null;
 
   let width = $state(0);
 
@@ -341,7 +342,7 @@
   );
   const selectionBar = $derived(selecting && (wide || selected.length > 0));
   const docked = $derived(transfer !== null || selectionBar);
-  const rowMenus = $derived(transfer === null && !isTouch);
+  const rowMenus = $derived(transfer === null && !isTouch && !(role !== null && compactPane(role, false)));
   const querying = $derived(searching && searchQuery.trim().length > 0);
 
   const selectAll = () => {
@@ -665,9 +666,9 @@
 
   const scrollEdge = (y: number) => {
     const box = list?.getBoundingClientRect();
-    if (!box || !list) return;
-    if (y > box.bottom - EDGE_ZONE) list.scrollBy(0, EDGE_STEP);
-    else if (y < box.top + EDGE_ZONE) list.scrollBy(0, -EDGE_STEP);
+    if (!box || !list || !pressOrigin) return;
+    if (y > box.bottom - EDGE_ZONE && y > pressOrigin.y + TOUCH_SLOP) list.scrollBy(0, EDGE_STEP);
+    else if (y < box.top + EDGE_ZONE && y < pressOrigin.y - TOUCH_SLOP) list.scrollBy(0, -EDGE_STEP);
   };
 
   const filesOf = (items: SharedEntry[]): SharedFile[] =>
@@ -1327,7 +1328,7 @@
       {/if}
     </div>
 
-    <div bind:clientHeight={bottomBar} class="pb-(--page-inset)">
+    <div bind:clientHeight={bottomBar} class={BAR_REGION_CLASS}>
       {#if transfer}
         <div transition:slide={{ duration: SLIDE_MS }} class={BAR_DOCK_CLASS}>
           <div class="flex items-center gap-2 rounded-panel bg-card p-1 {narrow ? '' : 'justify-end'}">

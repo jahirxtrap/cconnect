@@ -1,6 +1,9 @@
 import { SvelteMap } from "svelte/reactivity";
+import { isTouch } from "$lib/platform";
 import { layout, MENU_GAP } from "$lib/platform/layout.svelte";
 import { scrollbarWidth } from "./scrollbar";
+
+export const CARD_DOCK = !isTouch;
 
 interface DockAreaState {
   bar: number;
@@ -61,6 +64,12 @@ class DockSpot {
   });
 
   readonly anchored = $derived(this.#area !== null);
+
+  readonly left = $derived(
+    this.#area
+      ? Math.max(this.#area.box.left, layout.safeLeft) + MENU_GAP
+      : layout.menuPadding.left + layout.leftInset,
+  );
 
   readonly right = $derived(
     this.#area

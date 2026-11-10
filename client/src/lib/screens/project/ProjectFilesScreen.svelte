@@ -32,6 +32,7 @@
   import { gitApi, type GitCommit, type GitRepo } from "$lib/services/gitApi";
   import { ProjectWatch } from "$lib/services/projectWatch.svelte";
   import { recallProject, rememberProject } from "./projectMemory";
+  import { BAR_DOCK_CLASS, BAR_REGION_CLASS } from "$lib/ui/actionBar";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
@@ -947,7 +948,7 @@
     </div>
   {/if}
 
-  <div class="flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset) pb-(--page-inset)">
+  <div class="flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset)">
     {#if searching}
       <SearchBar
         value={query}
@@ -1042,19 +1043,23 @@
     {:else}
       <EmptyState icon={FolderClosed} text={t("NO_FILES")} class="min-h-0 flex-1" />
     {/if}
+  </div>
 
+  <div class={BAR_REGION_CLASS}>
     {#if showChanged && activeRepo && projectKey}
-      <CommitBar
-        {projectKey}
-        repo={activeRepo}
-        paths={commitPaths}
-        {locked}
-        {instant}
-        onDone={() => {
-          gitTick++;
-          watch.refresh();
-        }}
-      />
+      <div class={BAR_DOCK_CLASS}>
+        <CommitBar
+          {projectKey}
+          repo={activeRepo}
+          paths={commitPaths}
+          {locked}
+          {instant}
+          onDone={() => {
+            gitTick++;
+            watch.refresh();
+          }}
+        />
+      </div>
     {/if}
   </div>
 

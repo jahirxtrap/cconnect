@@ -342,7 +342,7 @@
   </CompactDialog>
 {:else}
   <div class="w-full px-(--page-inset)">
-    <CardPanel>
+    <CardPanel dense>
       {#if heading || closable}
         {@const Icon = componentIcon(data.icon) ?? (answerable ? CircleQuestionMark : null)}
         <div class="flex items-center gap-1.5">

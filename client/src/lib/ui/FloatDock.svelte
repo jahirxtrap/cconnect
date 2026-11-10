@@ -29,9 +29,10 @@
   <div
     style="padding: {snapToDevicePixel(layout.menuPadding.top)}px {snapToDevicePixel(dockSpot.right)}px {snapToDevicePixel(
       bottom,
-    )}px {snapToDevicePixel(layout.menuPadding.left + layout.leftInset)}px; --float-panel-width: {layout.mobile
+    )}px {snapToDevicePixel(dockSpot.left)}px; --float-panel-width: {layout.mobile
       ? '100%'
       : 'calc(var(--spacing) * 90)'}"
+    data-layer={raised ? "raised" : "base"}
     class="pointer-events-none fixed inset-x-0 bottom-0 {raised ? 'z-50' : 'z-30'} {layout.insetsAnimated &&
     !dockSpot.anchored
       ? 'transition-[padding] duration-200'

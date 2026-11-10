@@ -1,6 +1,7 @@
 package com.jahirtrap.cconnect
 
 import android.graphics.Color
+import android.graphics.Outline
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Handler
@@ -8,6 +9,7 @@ import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewOutlineProvider
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.widget.FrameLayout
@@ -39,6 +41,7 @@ class PdfScreen(private val activity: AppCompatActivity, private val content: ()
     private var loading: Job? = null
     private var hole: RectF? = null
     private var cover: List<RectF> = emptyList()
+    private var corner = 0f
     private var touching = false
 
     @JavascriptInterface
@@ -79,6 +82,12 @@ class PdfScreen(private val activity: AppCompatActivity, private val content: ()
         val parent = content()?.parent as? ViewGroup ?: return report(false)
         val pdf = PdfView(activity)
         ViewCompat.setOnApplyWindowInsetsListener(pdf) { _, _ -> WindowInsetsCompat.CONSUMED }
+        pdf.outlineProvider = object : ViewOutlineProvider() {
+            override fun getOutline(view: View, outline: Outline) {
+                outline.setRoundRect(0, 0, view.width, view.height, corner)
+            }
+        }
+        pdf.clipToOutline = true
         runCatching { pdf.setBackgroundColor(Color.parseColor(background)) }
         pdf.visibility = View.INVISIBLE
         parent.addView(pdf, 0, FrameLayout.LayoutParams(0, 0))
@@ -98,6 +107,7 @@ class PdfScreen(private val activity: AppCompatActivity, private val content: ()
             val pageWidth = runCatching { opened.getPageInfo(0).width }.getOrNull()
             document = opened
             pdf.pdfDocument = opened
+            pdf.fastScrollVisibility = PdfView.FastScrollVisibility.ALWAYS_HIDE
             if (pageWidth != null && pageWidth > 0) fitWidth(pdf, pageWidth)
             pdf.visibility = View.VISIBLE
             report(true)
@@ -126,9 +136,11 @@ class PdfScreen(private val activity: AppCompatActivity, private val content: ()
         hole = args.optJSONObject("hole")?.let { area(it, origin) }
         val list = args.optJSONArray("cover") ?: JSONArray()
         cover = (0 until list.length()).map { area(list.getJSONObject(it), origin) }
+        corner = args.optDouble("radius", 0.0).toFloat() * activity.resources.displayMetrics.density
         if (hole != null) webView.setBackgroundColor(Color.TRANSPARENT)
         val pdf = view ?: return
         hole?.let { fit(pdf, it) }
+        pdf.invalidateOutline()
     }
 
     private fun fit(pdf: PdfView, area: RectF) {

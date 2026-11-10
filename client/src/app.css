@@ -350,7 +350,8 @@ html.pdf-screen body {
 }
 
 html.scanning #app,
-html.pdf-screen #app {
+html.pdf-screen #app,
+html.pdf-screen [data-layer="base"] {
   visibility: hidden;
 }
 
@@ -363,12 +364,28 @@ html.pdf-screen .pdf-screen-root {
   .lobes {
     position: relative;
     display: inline-block;
-    overflow: hidden;
     width: var(--lobes-size);
     height: var(--lobes-size);
   }
 
   .lobes > span {
+    position: absolute;
+    inset: calc(50% * (1 - var(--lobes-window)));
+    overflow: hidden;
+  }
+
+  @supports (width: round(1px, 1px)) {
+    .lobes > span {
+      --lobes-span: round(up, calc(100% * var(--lobes-window)), var(--px-grid, 1px));
+      inset: auto;
+      left: round(calc((100% - var(--lobes-span)) / 2), var(--px-grid, 1px));
+      top: round(calc((100% - var(--lobes-span)) / 2), var(--px-grid, 1px));
+      width: var(--lobes-span);
+      height: var(--lobes-span);
+    }
+  }
+
+  .lobes > span > span {
     position: absolute;
     inset-block: 0;
     left: 0;

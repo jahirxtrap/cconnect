@@ -90,7 +90,7 @@
     {/if}
   {/snippet}
 
-  <CardPanel>
+  <CardPanel dense>
   {#if isPlan}
     <button
       type="button"

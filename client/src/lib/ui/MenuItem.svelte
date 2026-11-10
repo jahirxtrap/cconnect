@@ -5,7 +5,7 @@
   import { shortcuts } from "$lib/platform/shortcuts.svelte";
   import type { IconSource } from "./icons";
   import { holdFocus, returnFocus } from "./keepFocus";
-  import { MENU_ICON_SIZE, MENU_ITEM_CLASS, menuIconClass } from "./menuSurface";
+  import { MENU_ICON_SIZE, MENU_ITEM_CLASS, MENU_VALUE_CLASS, menuIconClass } from "./menuSurface";
 
   interface Props {
     text: string;
@@ -65,7 +65,7 @@
     <Check size={MENU_ICON_SIZE} class="shrink-0 text-accent" />
   {/if}
   {#if hint}
-    <span class="shrink-0 pl-4 text-caption text-faint">{hint}</span>
+    <span class={MENU_VALUE_CLASS}>{hint}</span>
   {/if}
   {@render trailing?.()}
 </DropdownMenu.Item>

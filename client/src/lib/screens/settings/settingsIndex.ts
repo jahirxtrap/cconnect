@@ -35,7 +35,6 @@ import {
   hooksValue,
   localeValue,
   localServerValue,
-  pageZoomValue,
   marketplacesValue,
   mcpValue,
   memoriesValue,
@@ -73,7 +72,6 @@ export type SettingsDialog =
   | "packs"
   | "accent"
   | "chat_background"
-  | "page_zoom"
   | "shortcuts"
   | "discord"
   | "browser"
@@ -108,7 +106,6 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "chat_background", label: "CHAT_BACKGROUND", value: chatBackgroundValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "font", label: "FONT", value: fontValue, section: "client", group: "SETTINGS_CLIENT", dialog: "font" },
   { id: "packs", label: "PACKS", value: packsValue, section: "client", group: "SETTINGS_CLIENT", dialog: "packs" },
-  { id: "page_zoom", label: "PAGE_ZOOM", value: pageZoomValue, section: "client", group: "SETTINGS_CLIENT" },
   { id: "shortcuts", label: "SHORTCUTS", summary: "SHORTCUTS_SUMMARY", section: "client", group: "SETTINGS_CLIENT", dialog: "shortcuts" },
   { id: "timestamps", label: "SHOW_TIMESTAMPS", summary: "SHOW_TIMESTAMPS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },

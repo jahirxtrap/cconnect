@@ -39,6 +39,7 @@
   import StopButton from "$lib/ui/StopButton.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
   import type { Attachment, ComposerElement } from "./state.svelte";
+  import { TOOLBAR_GAP_CLASS } from "./toolbarChips";
   import { pastedName } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
   import { keepFocus } from "$lib/ui/keepFocus";
@@ -638,7 +639,7 @@
         {/if}
       </div>
 
-      <div class="flex items-center gap-1.5 px-2 pt-1.5 pb-2">
+      <div class="flex items-center {TOOLBAR_GAP_CLASS} px-2 pt-1.5 pb-2">
         {#if onCloseSide}
           <button
             type="button"

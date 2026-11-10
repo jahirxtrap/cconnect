@@ -542,5 +542,8 @@ Everything comes from environment variables; `core/config.py` declares them and 
 3. **Imports at the top.** The only exception is the deferred `claude_agent_sdk` import.
 4. **Subprocesses that print text use `encoding="utf-8", errors="replace"`** — Windows
    defaults to cp1252 and mojibakes CLI output.
-5. `reload=True` only on Linux/macOS; on Windows it breaks the CLI subprocess, so the
-   backend has to be restarted by hand after editing it.
+5. **Auto-reload only in a checkout on Linux/macOS,** never in the installed package, whose
+   watched folder would be the whole site-packages, so any `pip install` (the SDK update, a
+   database driver) restarted the server. It excludes the data folder and the Python
+   environment (`sys.prefix`). On Windows it breaks the CLI subprocess, so a checkout there
+   has to be restarted by hand after editing it.

@@ -72,7 +72,7 @@
   });
 </script>
 
-<div bind:this={surface} class="relative min-h-0 flex-1">
+<div bind:this={surface} class="relative min-h-0 flex-1 rounded-panel">
   {#if !ready}
     <CenteredProgress class="absolute inset-0" />
   {/if}

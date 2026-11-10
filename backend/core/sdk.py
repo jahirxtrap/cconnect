@@ -4,6 +4,7 @@ import asyncio
 import importlib.metadata
 import os
 import subprocess
+import sys
 
 from loguru import logger
 
@@ -29,6 +30,11 @@ def installed_version() -> str | None:
         return None
 
 
+def loaded_version() -> str | None:
+    module = sys.modules.get(SDK_MODULE)
+    return getattr(module, "__version__", None) if module else None
+
+
 async def update_sdk() -> dict:
     """Upgrade the SDK with a fixed argument list (no shell), in a worker thread so it does
     not depend on the event loop type: Windows SelectorEventLoop cannot spawn subprocesses."""
@@ -41,7 +47,14 @@ async def update_sdk() -> dict:
     )
     if result.returncode != 0:
         logger.warning(f"SDK update failed:\n{result.stdout}{result.stderr}")
-    return {**sdk_status(), "ok": result.returncode == 0, "message": (result.stderr or result.stdout).strip()}
+    status = sdk_status()
+    loaded = loaded_version()
+    return {
+        **status,
+        "ok": result.returncode == 0,
+        "message": (result.stderr or result.stdout).strip(),
+        "changed": loaded is not None and loaded != status["version"],
+    }
 
 
 async def ensure_sdk_installed():

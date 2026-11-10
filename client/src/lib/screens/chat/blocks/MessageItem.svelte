@@ -433,7 +433,7 @@
     </Collapsible>
   {:else if message.role === "usage" && message.usage}
     <div class="w-full px-(--page-inset) select-none">
-      <CardPanel>
+      <CardPanel dense>
         {#if message.usage.error !== null || !message.usage.windows.length}
           <p class="text-body-md text-on-surface-variant">{usageErrorText(message.usage) ?? t("NO_USAGE_DATA")}</p>
         {:else}
@@ -443,7 +443,7 @@
     </div>
   {:else if message.role === "session_info" && message.currentSession}
     <div class="w-full px-(--page-inset)">
-      <CardPanel>
+      <CardPanel dense rows>
         <SessionFacts session={message.currentSession} />
       </CardPanel>
     </div>

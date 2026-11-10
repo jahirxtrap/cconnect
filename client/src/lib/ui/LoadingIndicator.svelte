@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { FILL_BOX, INSET_BOX, LOBE_CYCLE_MS, LOBE_FRAMES, lobePhase, lobeSprite } from "./loadingShapes";
+  import { FILL_BOX, INSET_BOX, LOBE_CYCLE_MS, LOBE_FRAMES, LOBE_WINDOW, lobePhase, lobeSprite } from "./loadingShapes";
 
   interface Props {
     size?: number;
@@ -16,8 +16,8 @@
 
 <span
   class="lobes shrink-0 {className}"
-  style="--lobes-size: {size}px; --lobes-frames: {LOBE_FRAMES}; --lobes-cycle: {LOBE_CYCLE_MS}ms; --lobes-phase: {phase}ms; --lobes-sprite: url({sprite})"
+  style="--lobes-size: {size}px; --lobes-window: {LOBE_WINDOW}; --lobes-frames: {LOBE_FRAMES}; --lobes-cycle: {LOBE_CYCLE_MS}ms; --lobes-phase: {phase}ms; --lobes-sprite: url({sprite})"
   aria-hidden="true"
 >
-  <span></span>
+  <span><span></span></span>
 </span>

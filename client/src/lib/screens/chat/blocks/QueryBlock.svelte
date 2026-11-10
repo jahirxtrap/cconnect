@@ -14,7 +14,7 @@
   import { contextServer } from "$lib/services/serverContext";
   import Button from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
-  import CodeBlock, { CAPPED_HEIGHT } from "$lib/ui/CodeBlock.svelte";
+  import CodeBlock from "$lib/ui/CodeBlock.svelte";
   import { TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import Collapsible from "./Collapsible.svelte";
   import { headStatusOf } from "./headTones";
@@ -42,6 +42,7 @@
   }: Props = $props();
 
   const SQL_LANG = "sql";
+  const CAPPED_HEIGHT = "max-h-72";
   const FRAME = `flex ${CAPPED_HEIGHT} flex-col overflow-hidden rounded-panel bg-surface-nested [--color-card:var(--color-surface-nested)]`;
   const DATABASES_ICON = screenFor("databases").icon;
   const OPENABLE = ["table", "view"];
@@ -145,7 +146,7 @@
   {onToggle}
 >
   <div class="chat-gap flex flex-col">
-    <CodeBlock code={query.sql} lang={SQL_LANG} capped />
+    <CodeBlock code={query.sql} lang={SQL_LANG} />
     {#each statements ?? [] as statement, index (index)}
       <p class="text-body-sm text-on-surface-variant">{summaryOf(statement)}</p>
       {#if statement.columns && statement.rows?.length}

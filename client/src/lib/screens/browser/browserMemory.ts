@@ -2,7 +2,7 @@ import type { BrowserState } from "$lib/services/browserSocket";
 
 export interface BrowserPosition {
   page: BrowserState;
-  frame: ImageBitmap | null;
+  frame: ArrayBuffer | null;
 }
 
 const positions = new Map<string, BrowserPosition>();
@@ -14,7 +14,5 @@ export const takeBrowser = (environment: string): BrowserPosition | undefined =>
 };
 
 export const rememberBrowser = (environment: string, position: BrowserPosition) => {
-  const replaced = positions.get(environment)?.frame;
-  if (replaced && replaced !== position.frame) replaced.close();
   positions.set(environment, position);
 };

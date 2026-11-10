@@ -37,6 +37,7 @@
   import { createDatabasesApi } from "$lib/services/databasesApi";
   import { downloadUrl } from "$lib/services/sharedApi";
   import { downloadShared } from "$lib/services/sharedFiles";
+  import { BAR_DOCK_CLASS, BAR_REGION_CLASS } from "$lib/ui/actionBar";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -69,7 +70,7 @@
   const { connection, database, schema, name, kind, embedded = false, onExpand = null, onClose }: Props = $props();
 
   const EXPORT_LABELS: Record<ExportFormat, string> = { csv: "DATABASE_EXPORT_CSV", sql: "DATABASE_EXPORT_SQL" };
-  const BODY_CLASS = "flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset) pb-(--page-inset)";
+  const BODY_CLASS = "flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset)";
   const CARD_CLASS = "relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-panel bg-card";
 
   const api = createDatabasesApi(() => backend.active);
@@ -350,16 +351,20 @@
         />
       {/if}
     </div>
+  </div>
+  <div class={BAR_REGION_CLASS}>
     {#if rows}
-      <RowsPager
-        page={rows.page}
-        size={rows.size}
-        total={rows.total}
-        shown={rows.rows.length}
-        sizes={listed?.pageSizes ?? []}
-        onPage={goTo}
-        onSize={resize}
-      />
+      <div class={BAR_DOCK_CLASS}>
+        <RowsPager
+          page={rows.page}
+          size={rows.size}
+          total={rows.total}
+          shown={rows.rows.length}
+          sizes={listed?.pageSizes ?? []}
+          onPage={goTo}
+          onSize={resize}
+        />
+      </div>
     {/if}
   </div>
 {/snippet}
@@ -391,8 +396,12 @@
         <EmptyState icon={Play} text={t("NO_RESULTS")} class="min-h-0 flex-1" />
       {/if}
     </div>
+  </div>
+  <div class={BAR_REGION_CLASS}>
     {#if result}
-      <GridBar label={joined(summary, result.truncated && t("DATABASE_TRUNCATED", formatDecimal(listed?.maxRows ?? 0, 0)))} />
+      <div class={BAR_DOCK_CLASS}>
+        <GridBar label={joined(summary, result.truncated && t("DATABASE_TRUNCATED", formatDecimal(listed?.maxRows ?? 0, 0)))} />
+      </div>
     {/if}
   </div>
 {/snippet}

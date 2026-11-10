@@ -17,7 +17,7 @@
   import { hscrollbar, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import ContextRing from "./ContextRing.svelte";
   import { permissionStyle } from "./permissionStyle";
-  import { CHIP_ICON_SIZE, CHIP_SLOT } from "./toolbarChips";
+  import { CHIP_ICON_SIZE, TOOLBAR_GAP_CLASS } from "./toolbarChips";
   import ToolbarSelect from "./ToolbarSelect.svelte";
   import ToolbarState from "./ToolbarState.svelte";
   import ToolbarToggle from "./ToolbarToggle.svelte";
@@ -142,14 +142,14 @@
   {/each}
 {/snippet}
 
-<div class="flex h-full min-w-0 flex-1 items-stretch">
-<ToolbarToggle label={t("QUICK_CHAT")} pressed={quickChatActive} class="{CHIP_SLOT} pr-1.5 pl-0.5" onclick={onQuickChat}>
+<div class="flex h-full min-w-0 flex-1 items-stretch {TOOLBAR_GAP_CLASS}">
+<ToolbarToggle label={t("QUICK_CHAT")} pressed={quickChatActive} onclick={onQuickChat}>
   <QUICK_CHAT_ICON size={CHIP_ICON_SIZE} class="text-accent" />
 </ToolbarToggle>
 
 <div
   use:hscrollbar={{ wheel: true }}
-  class="{SCROLL_ROW_CLASS} flex min-w-0 flex-1 items-center gap-1.5"
+  class="{SCROLL_ROW_CLASS} flex min-w-0 flex-1 items-center {TOOLBAR_GAP_CLASS}"
 >
   {#if disconnected}
     <ToolbarState text={t(LINK_LOOKS.disconnected.text)} dot={LINK_LOOKS.disconnected.dot} />

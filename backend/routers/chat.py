@@ -231,6 +231,7 @@ def _committed_index(session, prefs=None) -> int | None:
 
 
 async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=None):
+    session.resumer = lambda: _resume_queue(session, prefs, capabilities)
     if session.agent is not None:
         if not session.start(agent_sessions.runner(session, session.agent, text, attachments or [], mid), seed_id=mid):
             return False
@@ -249,6 +250,14 @@ async def _start_turn(session, mid, text, attachments, prefs=None, capabilities=
     if mid:
         await session.commit_user(mid, text)
     return True
+
+
+async def _resume_queue(session, prefs=None, capabilities=None):
+    if session.running:
+        return
+    item = await session.take_queued()
+    if item is not None and not await _start_turn(session, item["id"], item["text"], item.get("attachments"), prefs, capabilities):
+        await session.enqueue(item["id"], item["text"], item.get("attachments"), again=True)
 
 
 async def _adopt_turn(session, prefs=None, capabilities=None):
@@ -517,7 +526,8 @@ async def chat_ws(ws: WebSocket):
                 target.unlocked = key_matches(msg.security_key or "")
                 seen["capabilities"] = authorize(seen["offered"], msg.security_key)
                 if target.running:
-                    await target.enqueue(msg.id, msg.text, msg.attachments)
+                    if not await target.enqueue(msg.id, msg.text, msg.attachments) and msg.id and target.already_consumed(msg.id):
+                        await target.consumed(msg.id)
                 elif msg.id and target.already_consumed(msg.id):
                     await target.consumed(msg.id)
                 elif not await _start_turn(target, msg.id, msg.text, msg.attachments, seen["prefs"], seen["capabilities"]):

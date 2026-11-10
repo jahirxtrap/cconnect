@@ -12,6 +12,7 @@
     MENU_ITEM_CLASS,
     MENU_PADDING,
     MENU_SCROLL_CLASS,
+    MENU_VALUE_CLASS,
     SUBMENU_CONTENT_CLASS,
     menuIconClass,
   } from "./menuSurface";
@@ -39,7 +40,7 @@
   {@render leading?.()}
   <span class="min-w-0 flex-1 truncate text-body-md">{text}</span>
   {#if value}
-    <span class="shrink-0 pl-4 text-caption text-faint">{value}</span>
+    <span class={MENU_VALUE_CLASS}>{value}</span>
   {/if}
   <ChevronRight size={MENU_ICON_SIZE} class={menuIconClass()} />
 {/snippet}
@@ -47,7 +48,7 @@
 {#if drill}
   <DropdownMenu.Item
     closeOnSelect={false}
-    onSelect={() => drill.open(text, children, footer)}
+    onSelect={() => drill.open(text, children, footer, () => value)}
     onfocusin={returnFocus}
     class={MENU_ITEM_CLASS}
   >

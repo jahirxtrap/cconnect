@@ -8,15 +8,14 @@
     label: string;
     pressed?: boolean;
     tinted?: boolean;
-    class?: string;
     onclick: () => void;
     children: Snippet;
   }
 
-  const { label, pressed = false, tinted = true, class: className = CHIP_SLOT, onclick, children }: Props = $props();
+  const { label, pressed = false, tinted = true, onclick, children }: Props = $props();
 </script>
 
-<TooltipWrap {label} class={className}>
+<TooltipWrap {label} class={CHIP_SLOT}>
   <button
     type="button"
     use:keepFocus

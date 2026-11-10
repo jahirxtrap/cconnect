@@ -23,6 +23,7 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
+  import { SURFACE_FRAME_CLASS, SURFACE_KEYS_CLASS } from "$lib/ui/surfaceFrame";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
@@ -234,9 +235,7 @@
   />
 
   <div
-    class="relative min-h-0 flex-1 {terminalTabs.items.length
-      ? 'mx-2 mb-2 overflow-hidden rounded-panel bg-terminal'
-      : ''}"
+    class="relative min-h-0 flex-1 {terminalTabs.items.length ? `${SURFACE_FRAME_CLASS} bg-terminal` : ''}"
   >
     {#each terminalTabs.items as tab (tab.id)}
       {@const connect = terminalTabs.connectorOf(tab.id)}
@@ -268,7 +267,7 @@
   </div>
 
   {#if layout.touch && terminalTabs.activeId}
-    <div class="flex shrink-0 items-center gap-2 px-2 pb-2">
+    <div class={SURFACE_KEYS_CLASS}>
       <SoftKeys onKey={(bytes) => panes[terminalTabs.activeId ?? ""]?.sendKey(bytes)} />
       <TooltipIconButton
         label={t("KEYBOARD")}

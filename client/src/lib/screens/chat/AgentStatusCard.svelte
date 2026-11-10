@@ -88,7 +88,7 @@
 
 {#if current && title}
   <div class="pb-2">
-    <CardPanel>
+    <CardPanel dense>
       <p class="text-label-lg text-accent">{t(title, chat.agentName)}</p>
       <div class="scrollbar-thin max-h-36 overflow-y-auto">
         {#if problem && !current.signingIn}

@@ -65,6 +65,12 @@ export const readRightLocation = (): ChatLink | null => {
 export const readFocusedPane = (): PaneRole =>
   onChatRoute() && new URLSearchParams(window.location.search).get("f") === "r" ? "right" : "center";
 
+const readEnvironment = (): string | null | undefined => {
+  const id = new URLSearchParams(window.location.search).get("e");
+  if (!id) return undefined;
+  return backend.environments.find((item) => item.id === id)?.id ?? null;
+};
+
 export const readChatLocation = (): ChatLocation | null => {
   if (!onChatRoute()) return null;
   const query = new URLSearchParams(window.location.search);
@@ -75,7 +81,7 @@ export const readChatLocation = (): ChatLocation | null => {
     tab: Number.parseInt(query.get("t") ?? "0", 10) || 0,
     sessionId,
     projectKey,
-    environmentId: backend.environments.find((item) => item.id === query.get("e"))?.id ?? null,
+    environmentId: readEnvironment() ?? null,
     view: query.get("v") === "1",
     right: readRightLocation(),
   };
@@ -88,6 +94,7 @@ class Tabs {
   rightFocused = $state(false);
 
   #counter = 0;
+  #following = false;
   #states = new Map<string, HeldChat>();
 
   readonly center = $derived(this.list.filter((tab) => tab.pane === "center"));
@@ -152,34 +159,44 @@ class Tabs {
     $effect(() => {
       const onPopState = () => {
         if (!onChatRoute()) return;
-        const location = readChatLocation();
-        if (!location) {
-          const chat = this.stateFor(this.active);
-          if (chat.sessionId !== null || chat.viewOnly) chat.newSession();
-          return;
+        this.#following = true;
+        try {
+          this.#followHistory();
+        } finally {
+          this.#following = false;
         }
-        if (location.view) {
-          void this.stateFor(this.active).openTrashed(location.sessionId, location.projectKey);
-          return;
-        }
-        const open = this.list.find((tab) => tab.sessionId === location.sessionId);
-        if (open) {
-          this.select(open.id);
-          return;
-        }
-        const chat = this.stateFor(this.active);
-        const { sessionId, projectKey, environmentId } = location;
-        if (environmentId && environmentId !== chat.environmentId) {
-          this.update(this.active.id, { sessionId, projectKey, environmentId });
-          chat.selectEnvironment(environmentId);
-        }
-        chat.restoreSession(sessionId, projectKey);
       };
       window.addEventListener("popstate", onPopState);
       return () => window.removeEventListener("popstate", onPopState);
     });
 
     $effect(() => onSessionForgotten((sessionId) => this.#forget(sessionId)));
+  }
+
+  #followHistory() {
+    const location = readChatLocation();
+    const wanted = readEnvironment();
+    const chat = this.stateFor(this.active);
+    if (!location || wanted === null) {
+      if (wanted && wanted !== chat.environmentId) chat.selectEnvironment(wanted);
+      else if (chat.sessionId !== null || chat.viewOnly) chat.newSession();
+      return;
+    }
+    if (location.view) {
+      void chat.openTrashed(location.sessionId, location.projectKey);
+      return;
+    }
+    const open = this.list.find((tab) => tab.sessionId === location.sessionId);
+    if (open) {
+      this.select(open.id);
+      return;
+    }
+    const { sessionId, projectKey, environmentId } = location;
+    if (environmentId && environmentId !== chat.environmentId) {
+      this.update(this.active.id, { sessionId, projectKey, environmentId });
+      chat.selectEnvironment(environmentId);
+    }
+    chat.restoreSession(sessionId, projectKey);
   }
 
   #forget(sessionId: string) {
@@ -244,8 +261,12 @@ class Tabs {
   #syncContext(id: string, state: ChatState) {
     const current = this.list.find((tab) => tab.id === id);
     if (!current || (current.environmentId === state.environmentId && current.cwd === state.cwd)) return;
+    const session =
+      current.environmentId === state.environmentId
+        ? {}
+        : { sessionId: state.sessionId, projectKey: state.projectKey };
     this.list = this.list.map((tab) =>
-      tab.id === id ? { ...tab, environmentId: state.environmentId, cwd: state.cwd } : tab,
+      tab.id === id ? { ...tab, environmentId: state.environmentId, cwd: state.cwd, ...session } : tab,
     );
     this.#persist();
   }
@@ -501,7 +522,7 @@ class Tabs {
   }
 
   syncUrl() {
-    if (!onChatRoute()) return;
+    if (!onChatRoute() || this.#following) return;
     const current = this.active;
     const index = Math.max(
       this.center.findIndex((tab) => tab.id === this.activeId),
@@ -514,9 +535,9 @@ class Tabs {
       query.set("t", String(index));
       query.set("c", chat.sessionId!);
       query.set("p", chat.projectKey!);
-      if (current?.environmentId) query.set("e", current.environmentId);
       if (view) query.set("v", "1");
     }
+    if (current?.environmentId) query.set("e", current.environmentId);
     const beside = this.right.find((tab) => tab.id === this.rightActiveId);
     if (beside?.sessionId && beside.projectKey) {
       query.set("r", beside.sessionId);

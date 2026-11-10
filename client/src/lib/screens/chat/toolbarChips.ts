@@ -5,6 +5,7 @@ export const CHIP_ITEM_CLASS = `${CHIP} ripple cursor-pointer gap-1.5 px-2.5 tra
 export const CHIP_STATE_CLASS = `${CHIP} cursor-default gap-1.5 px-2.5`;
 export const CHIP_SLOT = "flex shrink-0 items-center";
 export const CHIP_ICON_SIZE = 16;
+export const TOOLBAR_GAP_CLASS = "gap-1.5";
 
 export const chipToggleClass = (on: boolean) =>
   `${CHIP_SHAPE} ${on ? "bg-accent-soft" : "bg-surface-variant"} ripple w-7 cursor-pointer justify-center transition-colors hover:text-on-surface`;

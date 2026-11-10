@@ -828,7 +828,7 @@
       {/snippet}
       {@const queued = splitElements(item.text)}
       {#if queued.text.trim()}
-        <CardPanel>
+        <CardPanel dense>
           <p class="selectable text-body-md wrap-anywhere whitespace-pre-wrap">{queued.text}</p>
         </CardPanel>
       {/if}
