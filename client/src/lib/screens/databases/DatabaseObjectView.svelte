@@ -348,7 +348,6 @@
           {descending}
           onSort={sortBy}
           onRow={info ? (index) => (editing = index) : null}
-          dock
         />
       {/if}
     </div>
@@ -390,7 +389,7 @@
       {#if failure}
         <ErrorText text={failure} class="p-3" />
       {:else if result?.rows && result.columns}
-        <DataGrid columns={result.columns} rows={result.rows} kinds={kindsOfValues(result.columns, result.rows)} dock />
+        <DataGrid columns={result.columns} rows={result.rows} kinds={kindsOfValues(result.columns, result.rows)} />
       {:else if result}
         <EmptyState icon={Check} text={summary} class="min-h-0 flex-1" />
       {:else}

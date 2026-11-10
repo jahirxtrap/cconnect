@@ -90,12 +90,12 @@
       {/if}
     {/snippet}
   </AppTopBar>
-  <div class="flex min-h-0 flex-1 gap-(--page-inset) pl-(--page-inset)">
+  <div class="flex min-h-0 flex-1 pl-(--page-inset)">
     <div class="flex min-h-0 w-52 shrink-0 flex-col pb-(--page-inset)">
       <nav class="flex max-h-full min-h-0 flex-col overflow-hidden rounded-panel bg-card">
         <div
           use:viewportScrollbar
-          class="rounded-viewport flex min-h-0 flex-col gap-px overflow-y-auto p-1 [--viewport-inset:0px]"
+          class="scrollbar-thin rounded-viewport flex min-h-0 flex-col gap-px overflow-y-auto p-1 [--viewport-inset:0px]"
         >
           {#each SETTINGS_SECTIONS as item (item.id)}
             {@const current = section === item.id && !page.searching}
@@ -119,7 +119,7 @@
         refreshing={page.refreshing}
         onRefresh={() => void page.refresh()}
         bind:scroller
-        class="pr-(--page-inset) pb-(--page-inset)"
+        class="px-(--page-inset) pb-(--page-inset)"
       >
         {#if page.searching}
           <SettingsResults query={page.query} onSelect={page.reveal} />

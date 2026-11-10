@@ -14,7 +14,6 @@
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import { scrollMemory } from "$lib/ui/scrollMemory";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -61,7 +60,6 @@
   {:else}
     <div
       use:viewportScrollbar
-      use:dockArea
       use:scrollMemory={"ssh-hosts"}
       class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)"
     >

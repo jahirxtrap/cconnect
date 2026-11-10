@@ -13,7 +13,6 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { keyCodeOf } from "$lib/platform/shortcuts.svelte";
   import MarkdownText from "$lib/ui/MarkdownText.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { SCROLL_ROW_CLASS, TEXT_VIEWPORT_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { notes, type Note } from "./notes.svelte";
@@ -180,14 +179,13 @@
       {@render actions?.()}
     </div>
     {#if notes.formatted}
-      <div use:tasks use:viewportScrollbar use:dockArea class="tasks-live selectable overflow-y-auto {BODY_CLASS}">
+      <div use:tasks use:viewportScrollbar class="tasks-live selectable overflow-y-auto {BODY_CLASS}">
         <MarkdownText text={note.body} flavor="note" class="markdown-chat" />
       </div>
     {:else}
       <textarea
         bind:this={field}
         use:viewportScrollbar
-        use:dockArea
         value={note.body}
         oninput={(event) => notes.write(note.id, event.currentTarget.value)}
         onkeydown={onKeydown}

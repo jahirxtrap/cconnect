@@ -3,7 +3,6 @@
   import { joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SectionHeader from "$lib/ui/SectionHeader.svelte";
   import ColumnsTable from "./ColumnsTable.svelte";
@@ -17,7 +16,6 @@
 
 <div
   use:viewportScrollbar
-  use:dockArea
   class="rounded-viewport selectable min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)"
 >
   <div class="scrollbar-thin overflow-x-auto rounded-panel bg-card px-2 pb-2">

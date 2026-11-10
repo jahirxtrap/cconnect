@@ -72,20 +72,22 @@
 
   {#if split && (notes.listed.length || notes.searching)}
     <div
-      class="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] gap-(--page-inset) px-(--page-inset) pb-(--page-inset)"
+      class="grid min-h-0 flex-1 grid-cols-[300px_minmax(0,1fr)] grid-rows-[minmax(0,1fr)] px-(--page-inset) pb-(--page-inset)"
     >
       <NotesList column selectedId={shown?.id ?? null} onOpen={select} />
-      {#if shown}
-        {#key shown.id}
-          <NotesEditor note={shown} inset={false}>
-            {#snippet actions()}
-              <NotesActions note={shown} wide onNew={create} onClosed={close} />
-            {/snippet}
-          </NotesEditor>
-        {/key}
-      {:else}
-        <div class="rounded-panel bg-card"></div>
-      {/if}
+      <div class="flex min-h-0 flex-col pl-(--page-inset)">
+        {#if shown}
+          {#key shown.id}
+            <NotesEditor note={shown} inset={false}>
+              {#snippet actions()}
+                <NotesActions note={shown} wide onNew={create} onClosed={close} />
+              {/snippet}
+            </NotesEditor>
+          {/key}
+        {:else}
+          <div class="min-h-0 flex-1 rounded-panel bg-card"></div>
+        {/if}
+      </div>
     </div>
   {:else if editing}
     <NotesEditor note={editing} />

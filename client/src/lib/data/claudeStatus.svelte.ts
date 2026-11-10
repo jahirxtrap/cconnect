@@ -131,6 +131,7 @@ class ClaudeStatus {
   }
 
   async #loadUsage(force: boolean): Promise<void> {
+    if (!force && untrack(() => this.usage) !== null) return;
     if (this.#usageRun) {
       this.#usageAgain ||= force;
       return this.#usageRun;

@@ -1284,7 +1284,6 @@
         <div class="flex min-h-0 flex-1 flex-col px-(--page-inset)">
           <ScrollCard
             bind:scroller={list}
-            dock
             frame="flex-1 rounded-panel"
             role="presentation"
             onpointerdown={onPointerDown}

@@ -15,7 +15,6 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import type { IconSource } from "$lib/ui/icons";
   import ListRow from "$lib/ui/ListRow.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -156,7 +155,7 @@
   </div>
 {/snippet}
 
-<div use:viewportScrollbar use:dockArea class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
+<div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto px-(--page-inset) pb-(--page-inset)">
   <div class="flex flex-col gap-3.5 {CARD_CLASS}">
     <UsageSplit
       title="CPU"

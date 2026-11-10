@@ -38,9 +38,6 @@ from core.config import (
     PORT,
 )
 
-if os.name == "nt":
-    import msvcrt
-
 FEED_PATH = "/api/browser/feed"
 _LOOPBACK = ("127.0.0.1", "::1")
 _VIDEO_MOTION_QUANTIZER = 30
@@ -51,7 +48,6 @@ _CAPTURER_WAIT = 20
 _CAPTURER_POLL = 0.25
 _FIT_ATTEMPTS = 3
 _FIT_SETTLE = 0.15
-_PIPE_TIMEOUT = 15.0
 _LAUNCH_TIMEOUT = 20.0
 _CLOSE_TIMEOUT = 5.0
 _LOAD_TIMEOUT = 20.0
@@ -276,66 +272,6 @@ def _extension_id() -> str:
 _EXTENSION_ID = _extension_id()
 
 
-class _Pipe:
-    def __init__(self):
-        self._chrome_reads, self._we_write = os.pipe()
-        self._we_read, self._chrome_writes = os.pipe()
-        self._last_id = 0
-        self._buffer = b""
-
-    def _handles(self) -> tuple[int, int]:
-        return msvcrt.get_osfhandle(self._chrome_reads), msvcrt.get_osfhandle(self._chrome_writes)
-
-    def arguments(self) -> list[str]:
-        if os.name != "nt":
-            return ["--remote-debugging-pipe"]
-        handles = self._handles()
-        for handle in handles:
-            os.set_handle_inheritable(handle, True)
-        return ["--remote-debugging-pipe", f"--remote-debugging-io-pipes={handles[0]},{handles[1]}"]
-
-    def popen_options(self) -> dict:
-        if os.name == "nt":
-            startup = subprocess.STARTUPINFO()
-            startup.lpAttributeList = {"handle_list": list(self._handles())}
-            return {"startupinfo": startup}
-        reads, writes = self._chrome_reads, self._chrome_writes
-
-        def place():
-            kept = (os.dup(reads), os.dup(writes))
-            os.dup2(kept[0], 3)
-            os.dup2(kept[1], 4)
-
-        return {"pass_fds": (reads, writes), "preexec_fn": place}
-
-    def child_started(self):
-        os.close(self._chrome_reads)
-        os.close(self._chrome_writes)
-
-    def call(self, method: str, params: Optional[dict] = None, timeout: float = _PIPE_TIMEOUT) -> dict:
-        self._last_id += 1
-        os.write(self._we_write, json.dumps({"id": self._last_id, "method": method, "params": params or {}}).encode() + b"\0")
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
-            while b"\0" in self._buffer:
-                raw, self._buffer = self._buffer.split(b"\0", 1)
-                reply = json.loads(raw)
-                if reply.get("id") == self._last_id:
-                    if reply.get("error"):
-                        raise RuntimeError(reply["error"].get("message") or "pipe error")
-                    return reply.get("result") or {}
-            chunk = os.read(self._we_read, 65536)
-            if not chunk:
-                raise RuntimeError("pipe closed")
-            self._buffer += chunk
-        raise RuntimeError("pipe timeout")
-
-    def close(self):
-        for descriptor in (self._we_write, self._we_read):
-            with suppress(OSError):
-                os.close(descriptor)
-
-
 def _fetch_icon(url: str, agent: str) -> str:
     if url.startswith("data:image/"):
         return url if len(url) <= _ICON_BYTES else ""
@@ -460,7 +396,6 @@ class BrowserSession:
         self._jpeg_viewers = 0
         self._frames = 0
         self._unacked: list[tuple[int, Any, str]] = []
-        self._pipe: Optional[_Pipe] = None
         self._capturer = ""
         self._feed_token = secrets.token_urlsafe(24)
         self._feed: Any = None
@@ -756,11 +691,9 @@ class BrowserSession:
         profile = paths.BROWSER_PROFILE_DIR
         profile.mkdir(parents=True, exist_ok=True)
         await _close_stale(BROWSER_DEBUG_PORT)
-        self._pipe = _Pipe()
         arguments = [
             binary,
             f"--remote-debugging-port={BROWSER_DEBUG_PORT}",
-            *self._pipe.arguments(),
             "--enable-unsafe-extension-debugging",
             f"--allowlisted-extension-id={_EXTENSION_ID}",
             f"--user-data-dir={profile}",
@@ -782,9 +715,7 @@ class BrowserSession:
             encoding="utf-8",
             errors="replace",
             creationflags=creation,
-            **self._pipe.popen_options(),
         )
-        self._pipe.child_started()
         process_job.tie(self._process.pid)
 
         loop = asyncio.get_running_loop()
@@ -806,8 +737,8 @@ class BrowserSession:
         ]
         self._agent = (await self._cdp.call("Browser.getVersion")).get("userAgent") or ""
         logger.info(f"browser: attached to {binary}")
-        with suppress(RuntimeError, OSError, ValueError):
-            await asyncio.to_thread(self._pipe.call, "Extensions.loadUnpacked", {"path": str(paths.CAPTURE_DIR)})
+        with suppress(Exception):
+            await self._cdp.call("Extensions.loadUnpacked", {"path": str(paths.CAPTURE_DIR)})
 
     async def _find_capturer(self) -> str:
         if self._capturer:
@@ -1298,9 +1229,6 @@ class BrowserSession:
         self._streaming = ""
         self._capture_failed = False
         self._inner = (0, 0)
-        if self._pipe is not None:
-            self._pipe.close()
-            self._pipe = None
 
         if cdp is not None:
             try:

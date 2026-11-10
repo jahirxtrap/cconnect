@@ -6,7 +6,6 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import { scrollMemory } from "$lib/ui/scrollMemory";
   import SearchBar from "$lib/ui/SearchBar.svelte";
@@ -120,7 +119,6 @@
   {:else if notes.cards}
     <div
       use:viewportScrollbar
-      use:dockArea
       use:scrollMemory={"notes|cards"}
       class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}"
     >
@@ -133,7 +131,6 @@
   {:else}
     <div
       use:viewportScrollbar
-      use:dockArea
       use:scrollMemory={"notes|rows"}
       class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}"
     >

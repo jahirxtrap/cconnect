@@ -95,12 +95,12 @@
     bind:this={scroller}
     use:touches
     use:viewportScrollbar
-    use:dockArea
+    use:dockArea={{ screen: true }}
     {onscroll}
     {onscrollend}
-    class="rounded-viewport h-full overflow-y-auto {className}"
+    class="rounded-viewport relative h-full overflow-y-auto {className}"
   >
+    <PullIndicator {pull} {refreshing} />
     {@render children()}
   </div>
-  <PullIndicator {pull} {refreshing} />
 </div>

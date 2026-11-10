@@ -34,6 +34,7 @@
       : 'calc(var(--spacing) * 90)'}"
     data-layer={raised ? "raised" : "base"}
     class="pointer-events-none fixed inset-x-0 bottom-0 {raised ? 'z-50' : 'z-30'} {layout.insetsAnimated &&
+    !layout.mobile &&
     !dockSpot.anchored
       ? 'transition-[padding] duration-200'
       : ''}"

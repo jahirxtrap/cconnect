@@ -26,7 +26,6 @@
   import MetricBar from "$lib/ui/MetricBar.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import Sparkline from "$lib/ui/Sparkline.svelte";
-  import { dockArea } from "$lib/ui/dockArea.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
@@ -109,7 +108,7 @@
 
   <TabPager selected={monitor.page} onSelect={(index) => monitor.select(index)} class="min-h-0 flex-1">
     <div class={TAB_PAGE_CLASS}>
-      <div use:viewportScrollbar use:dockArea class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}">
+      <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}">
         <div class="flex flex-col gap-2.5">
           <div class="grid gap-2.5 {width >= WIDE_WIDTH ? 'grid-cols-4' : 'grid-cols-2'}">
             {@render graph(Cpu, "CPU", plural("CORES_COUNT", current.cpuCores), current.cpuPercent, monitor.cpuHistory)}
@@ -228,7 +227,6 @@
       <div class="min-h-0 flex-1 {INSET}">
         <ScrollCard
           bind:scroller={logBox}
-          dock
           onscroll={trackLogs}
           frame="h-full rounded-lg"
           class="selectable scrollbar-thin"

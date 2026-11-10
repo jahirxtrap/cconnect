@@ -168,6 +168,7 @@
     return () => {
       layout.leftInset = 0;
       layout.rightInset = 0;
+      layout.insetsAnimated = false;
     };
   });
 
