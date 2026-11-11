@@ -19,6 +19,7 @@ export interface MessagesPage {
   startIndex: number;
   hasMore: boolean;
   earlier: string | null;
+  project: string | null;
   contextTokens: number | null;
   cache: PromptCache | null;
   requestBytes: number | null;
@@ -78,6 +79,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       start_index?: number;
       has_more?: boolean | string;
       earlier?: string | null;
+      project?: string | null;
       context_tokens?: number;
       cache?: unknown;
       request_bytes?: number;
@@ -105,6 +107,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       startIndex: data.start_index ?? 0,
       hasMore: data.has_more === true || data.has_more === "true",
       earlier: data.earlier ?? null,
+      project: data.project ?? null,
       contextTokens: data.context_tokens ?? null,
       cache: promptCacheOf(data.cache),
       requestBytes: data.request_bytes ?? null,

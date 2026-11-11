@@ -23,12 +23,13 @@
     text: string;
     value?: string;
     icon?: IconSource;
+    enabled?: boolean;
     leading?: Snippet;
     footer?: Snippet;
     children: Snippet;
   }
 
-  const { text, value, icon: IconComponent, leading, footer, children }: Props = $props();
+  const { text, value, icon: IconComponent, enabled = true, leading, footer, children }: Props = $props();
 
   const drill = isTouch ? menuDrill() : undefined;
 </script>
@@ -45,7 +46,11 @@
   <ChevronRight size={MENU_ICON_SIZE} class={menuIconClass()} />
 {/snippet}
 
-{#if drill}
+{#if !enabled}
+  <DropdownMenu.Item disabled closeOnSelect={false} class="{MENU_ITEM_CLASS} data-disabled:cursor-default data-disabled:opacity-40">
+    {@render face()}
+  </DropdownMenu.Item>
+{:else if drill}
   <DropdownMenu.Item
     closeOnSelect={false}
     onSelect={() => drill.open(text, children, footer, () => value)}

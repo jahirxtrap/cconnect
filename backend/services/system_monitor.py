@@ -18,6 +18,7 @@ from loguru import logger
 from core import paths
 
 _READ_CAP = 64 * 1024
+_KEPT_LOGS = 5
 _capture_installed = False
 _listeners: set[Callable[[dict], None]] = set()
 _HIDDEN = "***"
@@ -49,9 +50,17 @@ def _redact(record) -> None:
     record["message"] = _redacted(record["message"])
 
 
+def _previous_log(index: int) -> Path:
+    previous = paths.PREVIOUS_SERVER_LOG_FILE
+    return previous if index == 1 else previous.with_name(f"{previous.stem}.{index}{previous.suffix}")
+
+
 def reset_log_file() -> None:
+    for index in range(_KEPT_LOGS, 1, -1):
+        with suppress(OSError):
+            _previous_log(index - 1).replace(_previous_log(index))
     with suppress(OSError):
-        paths.SERVER_LOG_FILE.replace(paths.PREVIOUS_SERVER_LOG_FILE)
+        paths.SERVER_LOG_FILE.replace(_previous_log(1))
     paths.SERVER_LOG_FILE.write_text("", encoding="utf-8")
 
 

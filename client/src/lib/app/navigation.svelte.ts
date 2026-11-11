@@ -77,12 +77,47 @@ class Navigation {
 
   routeLocked = $state(false);
 
+  #mark = window.history.length;
+  #settled = window.history.length;
+  #forward = 0;
+  #retreating = false;
+
+  push(state: unknown, url: string) {
+    window.history.pushState(state, "", url);
+    this.#mark = window.history.length;
+    this.#settled = this.#mark;
+    this.#forward = 0;
+  }
+
+  #retreat() {
+    const length = window.history.length;
+    const stale = length === this.#settled ? this.#forward : 0;
+    const foreign = Math.max(0, length - this.#mark - stale);
+    const steps = Math.min(foreign + 1, length - 1);
+    if (steps <= 0) return;
+    this.#forward = steps;
+    this.#mark = Math.max(1, this.#mark - 1);
+    this.#settled = length;
+    this.#retreating = true;
+    window.history.go(-steps);
+  }
+
+  #landed() {
+    if (this.#retreating) {
+      this.#retreating = false;
+      return;
+    }
+    this.#forward += 1;
+    this.#mark = Math.max(1, this.#mark - 1);
+    this.#settled = window.history.length;
+  }
+
   start() {
     if (blocked(baseOf(window.location.pathname))) {
       window.history.replaceState(null, "", "/");
     }
     if (!backend.configured) {
-      if (window.location.pathname === "/") window.history.pushState(null, "", "/settings");
+      if (window.location.pathname === "/") this.push(null, "/settings");
       this.route = "/settings";
     }
 
@@ -92,12 +127,13 @@ class Navigation {
       if (this.route === "/") return false;
       this.settingsHighlight = null;
       this.sharedTarget = null;
-      window.history.back();
+      this.#retreat();
       return true;
     };
 
     $effect(() => {
       const onPopState = () => {
+        this.#landed();
         const leaving = this.#leaving;
         this.#leaving = false;
         if (consumingDismiss()) return;
@@ -107,7 +143,7 @@ class Navigation {
           return;
         }
         if (this.#dismiss(leaving)) {
-          window.history.pushState(null, "", this.#url());
+          this.push(null, this.#url());
           return;
         }
         this.route = currentRoute();
@@ -125,7 +161,7 @@ class Navigation {
     this.sub = null;
     this.#leaving = false;
     if (sibling) window.history.replaceState(null, "", target);
-    else window.history.pushState(null, "", target);
+    else this.push(null, target);
     this.route = target;
   }
 
@@ -136,7 +172,7 @@ class Navigation {
   openSub(value: string) {
     if (this.sub === value) return;
     this.sub = value;
-    window.history.pushState(null, "", `${this.route}/${encodeURIComponent(value)}`);
+    this.push(null, `${this.route}/${encodeURIComponent(value)}`);
   }
 
   showSub(value: string) {
@@ -146,7 +182,7 @@ class Navigation {
   }
 
   closeSub() {
-    if (this.sub !== null) window.history.back();
+    if (this.sub !== null) this.#retreat();
   }
 
   clearSub() {
@@ -194,11 +230,11 @@ class Navigation {
     const stacked = this.previewOverlay;
     this.preview = request;
     this.previewPane = false;
-    if (!stacked) window.history.pushState({ overlay: "preview" }, "", window.location.href);
+    if (!stacked) this.push({ overlay: "preview" }, window.location.href);
   }
 
   closePreview() {
-    if (this.previewOverlay) window.history.back();
+    if (this.previewOverlay) this.#retreat();
   }
 
   intercept(handler: () => boolean, { system = false }: { system?: boolean } = {}) {
@@ -228,7 +264,7 @@ class Navigation {
     this.settingsHighlight = null;
     this.sharedTarget = null;
     this.#leaving = true;
-    window.history.back();
+    this.#retreat();
   }
 
   #url(): string {

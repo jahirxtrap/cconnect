@@ -1392,12 +1392,12 @@ export class ChatState {
 
   selectHistoryProject(projectKey: string | null) {
     this.historyProjectKey = projectKey;
-    if (!projectKey && this.sessionId) return;
+    if (this.busy || (!projectKey && this.sessionId)) return;
     const path = projectKey ? this.#projectPath(projectKey) : this.defaultCwd;
     if (path === null || path === this.cwd) return;
     this.cwd = path;
     this.onContextChange?.();
-    if (!this.sessionId) this.#pushGeneration({ cwd: path });
+    if (!this.sessionId && !this.busy) this.#pushGeneration({ cwd: path });
   }
 
   answerInteraction(requestId: string, optionId: string) {
@@ -2026,7 +2026,7 @@ export class ChatState {
     if (this.#frozen === null) this.mods.showTranscript(session.sessionId);
     this.messages = loaded;
     this.sessionId = session.sessionId;
-    this.projectKey = project;
+    this.projectKey = page.project ?? project;
     this.sessionColor = session.color;
     this.todos = [];
     this.queue = [];

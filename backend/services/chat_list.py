@@ -64,7 +64,7 @@ class ChatListHub:
         self._resident: set[str] = set()
         self._hidden: set[str] = set()
         self._projects: dict[str, dict] = {}
-        self._sig_cache: dict[str, tuple] = {}
+        self._sig_cache: dict[tuple[str, str], tuple] = {}
         self._folders: dict[str, Folder] = {}
         self._followers: set[Callable[[set[str]], None]] = set()
         self._subscribers: set[asyncio.Queue] = set()
@@ -223,9 +223,9 @@ class ChatListHub:
     def _poll_loop(self):
         while not self._stop.wait(_POLL_SECONDS):
             with self._scanning:
-                before = {sid: cached[0] for sid, cached in self._sig_cache.items()}
+                before = {key: cached[0] for key, cached in self._sig_cache.items()}
                 self._rescan(True, None)
-                written = {sid for sid, cached in self._sig_cache.items() if before.get(sid) != cached[0]}
+                written = {key[1] for key, cached in self._sig_cache.items() if before.get(key) != cached[0]}
             self._tell_followers(written)
 
     def _tell_followers(self, written: set[str]):
@@ -242,7 +242,7 @@ class ChatListHub:
             return False, None
         sid = file.stem
         sig = (st.st_mtime, st.st_size)
-        cached = self._sig_cache.get(sid)
+        cached = self._sig_cache.get((pkey, sid))
         if cached is not None and cached[0] == sig:
             return True, cached[1]
         cwd, preview, title, color, entrypoint, has_content = sessions_service._session_meta(file)
@@ -259,7 +259,7 @@ class ChatListHub:
                 "title": title,
                 "color": color,
             }
-        self._sig_cache[sid] = (sig, meta)
+        self._sig_cache[(pkey, sid)] = (sig, meta)
         return True, meta
 
     def _scan_folder(self, directory: Path, live: set[str], known: Optional[Folder], names: Optional[set[str]]) -> Folder:
@@ -314,12 +314,17 @@ class ChatListHub:
             else:
                 folders[pkey] = self._scan_folder(directory, live, known, touched.get(pkey) if touched else None)
         self._folders = folders
-        seen = {sid for _project, _listed, found in folders.values() for sid in found}
+        seen = {(pkey, sid) for pkey, (_project, _listed, found) in folders.items() for sid in found}
+        newest: dict[str, dict] = {}
         for pkey, (project, listed, _found) in folders.items():
             if project is not None:
                 projects[pkey] = dict(project)
             for sid, meta in listed.items():
-                sessions[sid] = self._with_activity(sid, sessions_service.with_pinned(sid, meta))
+                known = newest.get(sid)
+                if known is None or meta["last_active"] > known["last_active"]:
+                    newest[sid] = meta
+        for sid, meta in newest.items():
+            sessions[sid] = self._with_activity(sid, sessions_service.with_pinned(sid, meta))
         if len(self._sig_cache) > len(seen):
             self._sig_cache = {k: v for k, v in self._sig_cache.items() if k in seen}
         for key, meta in projects_service.snapshot().items():

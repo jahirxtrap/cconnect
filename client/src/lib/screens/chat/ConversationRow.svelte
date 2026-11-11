@@ -9,7 +9,7 @@
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Tag from "@lucide/svelte/icons/tag";
   import Trash2 from "@lucide/svelte/icons/trash-2";
-  import { isPersistentSession, projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
+  import { isBusyActivity, isPersistentSession, projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
@@ -66,6 +66,8 @@
     currentProjectKey = null,
     sortable = false,
   }: Props = $props();
+
+  const busy = $derived(isBusyActivity(activity));
 
   const actionable = $derived(
     [onRename, onAutoRename, onColor, onOpenNewTab, onOpenRight, onFork, onMove, onPlace, onDelete].some(Boolean),
@@ -146,7 +148,7 @@
         <MenuItem icon={PanelRight} text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
       {/if}
       {#if onFork}
-        <MenuItem icon={GitFork} text={t("CHAT_FORK")} onclick={() => run(onFork)} />
+        <MenuItem icon={GitFork} text={t("CHAT_FORK")} enabled={!busy} onclick={() => run(onFork)} />
       {/if}
       {#if onPlace}
         <MenuSub icon={Tag} text={t("CATEGORY")}>
@@ -170,7 +172,7 @@
         </MenuSub>
       {/if}
       {#if onMove}
-        <MenuSub icon={FolderInput} text={t("PROJECT")}>
+        <MenuSub icon={FolderInput} text={t("PROJECT")} enabled={!busy}>
           {#snippet footer()}
             <MenuItem icon={Plus} text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))} />
           {/snippet}

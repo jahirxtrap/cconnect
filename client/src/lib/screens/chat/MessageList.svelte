@@ -54,6 +54,7 @@
     mods?: ModSurface | null;
     timestamps?: boolean;
     replies?: ReplyCommands | null;
+    repliesBusy?: boolean;
   }
 
   interface ReplyCommands {
@@ -85,6 +86,7 @@
     mods = null,
     timestamps = true,
     replies = null,
+    repliesBusy = false,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -171,6 +173,7 @@
       onShare: plainTextSharing() ? () => void sharePlainText(item.text) : null,
       onSpeak: speech.available ? () => toggleSpeech(item) : null,
       onFork: replies && item.beforeCompaction === null && (item.uuid || last) ? () => replies.fork(item) : null,
+      forkReady: !repliesBusy,
     };
   };
 

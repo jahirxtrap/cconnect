@@ -253,10 +253,12 @@
   let forkingReply = $state<ChatMessage | null>(null);
 
   const replyCommands = $derived(
-    chat.agent || chat.viewOnly || chat.sessionId === null || !idle || running
+    chat.agent || chat.viewOnly || chat.sessionId === null
       ? null
       : { fork: (reply: ChatMessage) => (forkingReply = reply) },
   );
+
+  const repliesBusy = $derived(!idle || running);
   const chatsWindow = $derived(
     !panes.historyInList(pane) &&
       (!chat.agent || (!!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume))),
@@ -559,6 +561,7 @@
           sessionId={chat.sessionId}
           timestamps={!chat.agent}
           replies={replyCommands}
+          {repliesBusy}
           mods={chat.mods}
           expandedIds={chat.expandedIds}
           savedTop={chat.scrollTop}

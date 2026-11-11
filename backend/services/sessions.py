@@ -733,7 +733,12 @@ async def move_session(project_key: str, session_id: str, target_cwd: str) -> Op
     live = registry.get_by_session(session_id)
     if live is not None and live.running:
         raise RuntimeError("a turn is running in this session")
-    return await asyncio.to_thread(_move_transcript, project_key, session_id, (target_cwd or "").strip())
+    cwd = (target_cwd or "").strip()
+    moved = await asyncio.to_thread(_move_transcript, project_key, session_id, cwd)
+    if moved is not None and live is not None:
+        live.state.cwd = cwd
+        await live.release_resident()
+    return moved
 
 
 def _move_transcript(project_key: str, session_id: str, target_cwd: str) -> Optional[str]:
@@ -767,20 +772,34 @@ def _move_transcript(project_key: str, session_id: str, target_cwd: str) -> Opti
     return target_key
 
 
-def find_session_cwd(session_id: str) -> Optional[str]:
-    """The cwd a transcript records, looked up wherever it lives."""
-    if not session_id or "/" in session_id or "\\" in session_id:
+def newest_copy(session_id: str) -> Optional[Path]:
+    """The most recently written transcript with this id across every project folder."""
+    if not _SESSION_RE.match(session_id or ""):
         return None
     base = _base()
     if not base.is_dir():
         return None
+    newest: Optional[tuple[float, Path]] = None
     for directory in base.iterdir():
-        if not directory.is_dir():
-            continue
         file = directory / f"{session_id}.jsonl"
-        if file.is_file():
-            return _read_cwd(file)
-    return None
+        try:
+            modified = file.stat().st_mtime
+        except OSError:
+            continue
+        if newest is None or modified > newest[0]:
+            newest = (modified, file)
+    return newest[1] if newest else None
+
+
+def newest_project_key(session_id: str, project_key: str) -> str:
+    file = newest_copy(session_id)
+    return file.parent.name if file is not None else project_key
+
+
+def find_session_cwd(session_id: str) -> Optional[str]:
+    """The cwd a transcript records, looked up wherever it lives."""
+    file = newest_copy(session_id)
+    return _read_cwd(file) if file is not None else None
 
 
 def session_cwd(project_key: str, session_id: str) -> Optional[str]:

@@ -292,6 +292,7 @@ def _session_cwd(project: str, session_id: str) -> str:
 
 @router.get("/sessions/{session_id}/checkpoints")
 def get_session_checkpoints(session_id: str, project: str, until: str | None = None):
+    project = sessions_service.newest_project_key(session_id, project)
     try:
         return api_response(data=sessions_service.list_checkpoints(project, session_id, until))
     except ValueError as exc:
@@ -354,6 +355,8 @@ def get_session_messages(
 ):
     if limit < 1 or limit > 500:
         raise HTTPException(status_code=400, detail="invalid limit")
+    if not trashed:
+        project = sessions_service.newest_project_key(session_id, project)
     try:
         items, earlier = sessions_service.session_segment(project, session_id, {
             "simple": simple,
@@ -380,6 +383,7 @@ def get_session_messages(
         "start_index": start,
         "has_more": start > 0,
         "earlier": earlier,
+        "project": project,
         "context_tokens": sessions_service.context_tokens_in(tail),
         "cache": prompt_cache.from_entries(tail),
         "request_bytes": weight[0],

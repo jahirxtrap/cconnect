@@ -1,5 +1,5 @@
 import { untrack } from "svelte";
-import { ROUTES } from "$lib/app/navigation.svelte";
+import { navigation, ROUTES } from "$lib/app/navigation.svelte";
 import { chatListFor, onSessionForgotten } from "$lib/data/chatList.svelte";
 import { settings, type VisibilityPrefs } from "$lib/data/settings.svelte";
 import { isBusyActivity, sessionIdPreview, sessionLabel, type SessionInfo } from "$lib/data/models";
@@ -546,9 +546,9 @@ class Tabs {
     if (this.rightFocused) query.set("f", "r");
     const search = query.toString();
     const target = search ? `/?${search}` : "/";
-    if (target !== window.location.pathname + window.location.search) {
-      window.history.pushState(null, "", target);
-    }
+    if (target === window.location.pathname + window.location.search) return;
+    if (navigation.previewOverlay) window.history.replaceState(window.history.state, "", target);
+    else navigation.push(null, target);
   }
 }
 

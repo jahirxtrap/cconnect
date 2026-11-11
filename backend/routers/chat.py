@@ -543,7 +543,8 @@ async def chat_ws(ws: WebSocket):
 
             elif mtype == "set_generation":
                 if session is not None:
-                    if msg.cwd is not None and session.state.session_id is None:
+                    settled = session.state.session_id is not None or session.running or session.resident_alive
+                    if msg.cwd is not None and not settled:
                         session.state.cwd = msg.cwd or DEFAULT_CWD
                     if msg.model is not None:
                         session.state.model = msg.model

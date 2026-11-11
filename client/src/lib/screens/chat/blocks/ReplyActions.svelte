@@ -7,6 +7,7 @@
     onShare: (() => void) | null;
     onSpeak: (() => void) | null;
     onFork: (() => void) | null;
+    forkReady: boolean;
   }
 </script>
 
@@ -26,7 +27,7 @@
     timestamp: number | null;
   }
 
-  const { timestamp, speaking, selection, onArm, onCopy, onShare, onSpeak, onFork }: Props = $props();
+  const { timestamp, speaking, selection, onArm, onCopy, onShare, onSpeak, onFork, forkReady }: Props = $props();
 
   const BUTTON_CLASS = "size-7";
   const STOP_SIZE_CLASS = "[&_svg]:size-3.75";
@@ -49,7 +50,7 @@
   {/if}
   <span class="flex-1"></span>
   {#if onFork}
-    <TooltipIconButton label={t("FORK_FROM_HERE")} onclick={onFork} class={BUTTON_CLASS}>
+    <TooltipIconButton label={t("FORK_FROM_HERE")} enabled={forkReady} onclick={onFork} class={BUTTON_CLASS}>
       <GitFork />
     </TooltipIconButton>
   {/if}

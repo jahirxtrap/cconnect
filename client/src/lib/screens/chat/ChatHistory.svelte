@@ -2,7 +2,7 @@
   import History from "@lucide/svelte/icons/history";
   import { navigation } from "$lib/app/navigation.svelte";
   import { sessionColorOf } from "$lib/design/sessionColors";
-  import { isBusyActivity, sessionLabel, type SessionInfo } from "$lib/data/models";
+  import { sessionLabel, type SessionInfo } from "$lib/data/models";
   import { rankLabel } from "$lib/data/textMatch";
   import { t } from "$lib/i18n/index.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
@@ -97,16 +97,14 @@
             onAfterSelect();
           }
         : null}
-      onFork={isBusyActivity(session.activity)
-        ? null
-        : () =>
-            (edits.forking = {
-              session,
-              open: (forked) => {
-                onOpenSession(forked);
-                onAfterSelect();
-              },
-            })}
+      onFork={() =>
+        (edits.forking = {
+          session,
+          open: (forked) => {
+            onOpenSession(forked);
+            onAfterSelect();
+          },
+        })}
       onDelete={() => edits.remove(session)}
       trash={chat.trashEnabled}
       onMove={(preset) => (edits.moving = { session, preset })}
