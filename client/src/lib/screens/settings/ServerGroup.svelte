@@ -13,12 +13,15 @@
   import ServerCog from "@lucide/svelte/icons/server-cog";
   import { joined } from "$lib/data/format";
   import { loads } from "$lib/data/inflight";
+  import { screenFor } from "$lib/app/screens";
+  import { KeyGate } from "$lib/data/keyGate.svelte";
   import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { plural, t } from "$lib/i18n/index.svelte";
   import { layout } from "$lib/platform/layout.svelte";
   import { useAgents } from "$lib/services/agents.svelte";
   import { backend } from "$lib/services/backend.svelte";
+  import { databases } from "$lib/services/databases.svelte";
   import { isLocalProfile, localServer } from "$lib/services/localServer.svelte";
   import { type SettingsPatch } from "$lib/services/settingsApi";
   import { systemApi, type ServerUpdate } from "$lib/services/systemApi";
@@ -29,10 +32,12 @@
   import PreferenceSelect from "$lib/ui/PreferenceSelect.svelte";
   import PreferenceRow from "$lib/ui/PreferenceRow.svelte";
   import { PREFERENCE_ICON_SIZE, PREFERENCE_ROW_CLASS } from "$lib/ui/preferenceRow";
+  import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SelectDialog from "$lib/ui/SelectDialog.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import AgentsDialog from "$lib/screens/agents/AgentsDialog.svelte";
+  import DriversDialog from "$lib/screens/databases/DriversDialog.svelte";
   import ChatsDialog from "./ChatsDialog.svelte";
   import EnvironmentsDialog from "./EnvironmentsDialog.svelte";
   import GenerationDialog from "./GenerationDialog.svelte";
@@ -53,6 +58,12 @@
   useAgents();
 
   let dialog = $state<SettingsDialog | null>(null);
+
+  const driversGate = new KeyGate();
+
+  $effect(() => {
+    if (dialog === "drivers") void databases.refresh(backend.active);
+  });
   let repo = $state<ServerUpdate | null>(null);
   let checkingUpdate = $state(false);
   let updating = $state(false);
@@ -188,6 +199,14 @@
     summary={rowSummary("agents")}
     enabled={ready}
     onclick={() => (dialog = "agents")}
+  />
+
+  <PreferenceRow
+    icon={screenFor("databases").icon}
+    title={t("DATABASES")}
+    summary={rowSummary("databases")}
+    enabled={ready}
+    onclick={() => (dialog = "drivers")}
   />
 
   {#if layout.mobile}
@@ -371,6 +390,8 @@
   />
 {:else if dialog === "agents"}
   <AgentsDialog onDismiss={() => (dialog = null)} />
+{:else if dialog === "drivers"}
+  <DriversDialog gate={driversGate} onDismiss={() => (dialog = null)} />
 {:else if dialog === "permissions" && snapshot}
   <SelectDialog
     title={t("PERMISSION_MODE")}
@@ -443,5 +464,13 @@
     selected={snapshot.account}
     onSelect={(value) => void apply({ account: value })}
     onDismiss={() => (dialog = null)}
+  />
+{/if}
+
+{#if driversGate.asking}
+  <SecurityKeyDialog
+    rejected={driversGate.rejected}
+    onConfirm={(key) => driversGate.confirm(key)}
+    onDismiss={() => driversGate.dismiss()}
   />
 {/if}

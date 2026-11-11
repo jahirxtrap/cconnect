@@ -21,6 +21,7 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
+  import { mentionInChat } from "$lib/screens/chat/mention";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import { SharedWatch } from "$lib/services/sharedWatch.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
@@ -195,9 +196,16 @@
         : () => void sharedApi.absolutePaths([relative]).then((paths) => paths && copyText(paths[0]))),
   );
 
+  const mention = $derived(
+    relative === null
+      ? null
+      : () => void sharedApi.absolutePaths([relative]).then((paths) => paths && mentionInChat(paths[0])),
+  );
+
   const menuActions = $derived.by(() => {
     const entries: FileActionEntry[] = [...extraActions, ...fileEntries(FILE_ACTIONS, { url }, filename)];
     if (attach) entries.push({ id: "attach", run: attach });
+    if (mention) entries.push({ id: "mention", run: mention });
     if (copyPath) entries.push({ id: "copyPath", run: copyPath });
     if (onDelete) entries.push({ id: "delete", run: () => (confirmingDelete = true) });
     return entries;

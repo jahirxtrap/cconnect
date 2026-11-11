@@ -15,7 +15,7 @@ export interface EffectRange {
   max: number;
 }
 
-export type BackgroundFit = "cover" | "contain";
+export type BackgroundFit = "cover" | "contain" | "tile";
 
 export type BackgroundEffect = "opacity" | "brightness" | "blur" | "saturation" | "x" | "y";
 

@@ -46,6 +46,6 @@
     <span class="truncate text-caption text-faint">{source}</span>
   {/if}
   {#if description}
-    <span class="line-clamp-2 text-body-sm text-on-surface-variant">{description}</span>
+    <span class="line-clamp-2 wrap-anywhere text-body-sm text-on-surface-variant">{description}</span>
   {/if}
 </CardPanel>

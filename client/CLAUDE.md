@@ -63,9 +63,11 @@ request with it went through, as the terminal does.
 - Every string goes through `t()` and lives in the `lib/i18n/*.json` catalogs, one per
   locale and picked up on their own. `en.json` is the base: a key missing from another
   catalog falls back to it, so a new string goes there first. Plurals are CLDR forms in
-  uppercase (`_ONE`, `_FEW`, `_MANY`, `_OTHER`) and a catalog only has the forms its language
-  uses. Outside English every form carries `{1}`, since `_ONE` there also covers numbers
-  like 21.
+  uppercase (`_ONE`, `_FEW`, `_MANY`, `_OTHER`): every catalog carries the forms the base has,
+  plus the ones its language adds (Russian's `_FEW` and `_MANY`). A language that does not
+  inflect (Japanese, Korean, Chinese) repeats its `_OTHER` text under `_ONE`, so every catalog
+  holds every key. Outside English every form carries `{1}`, since `_ONE` there also covers
+  numbers like 21.
 - **`platformName()` answers `"web"` for anything outside Tauri**, so it says which build
   is running, not which system. Anything that depends on the OS — ⌘ versus Ctrl, the
   iPhone's install path — asks `systemName()`, which reads the agent either way. Mixing

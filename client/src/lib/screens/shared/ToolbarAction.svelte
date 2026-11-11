@@ -32,7 +32,7 @@
     <IconComponent class={tone} />
   </TooltipIconButton>
 {:else}
-  <Button variant="ghost" small {onclick} {enabled}>
+  <Button variant="ghost" {onclick} {enabled}>
     <IconComponent size={16} class="shrink-0 {tone}" />
     <span class="truncate {tone}">{label}</span>
   </Button>

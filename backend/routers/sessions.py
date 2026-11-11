@@ -320,6 +320,13 @@ async def rewind_session(session_id: str, body: RewindBody):
     return api_response(data=result)
 
 
+@router.delete("/sessions/{session_id}/rewind")
+def cancel_rewind(session_id: str):
+    rewind_service.clear_pending(session_id)
+    chat_list.hub.refresh_session(session_id)
+    return api_response(message="rewind cancelled")
+
+
 @router.get("/sessions/{session_id}/images/{message_uuid}/{index}")
 def get_session_image(request: Request, session_id: str, message_uuid: str, index: int, project: str, trashed: bool = False):
     try:

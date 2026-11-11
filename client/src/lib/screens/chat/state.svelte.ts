@@ -405,6 +405,10 @@ export class ChatState {
   readonly liveActivity = $derived(this.activity === undefined ? (this.listed?.activity ?? null) : this.activity);
   readonly listedRewind = $derived(this.list?.loading === false ? (this.listed?.rewind ?? null) : undefined);
   readonly busy = $derived(this.streaming || isBusyActivity(this.liveActivity));
+  #rewindDismissed = $state<string | null>(null);
+  readonly rewindNotice = $derived(
+    !this.busy && !!this.listedRewind && this.listedRewind !== this.#rewindDismissed,
+  );
   readonly historyUnavailable = $derived(this.list === null || serverStatus.unavailable);
   readonly historyLoading = $derived(
     this.list !== null && !serverStatus.unavailable && (this.list.loading || !this.list.settingsReady),
@@ -1335,6 +1339,23 @@ export class ChatState {
     this.rewindBusy = false;
     this.restoreComposer(point.text);
     return true;
+  }
+
+  hideRewindNotice() {
+    this.#rewindDismissed = this.listedRewind ?? null;
+  }
+
+  async cancelRewind(): Promise<boolean> {
+    const sessionId = this.sessionId;
+    if (!sessionId || this.rewindBusy) return false;
+    this.rewindBusy = true;
+    const done = await this.#sessions.cancelRewind(sessionId);
+    if (done) {
+      this.#rewindSeen = { sessionId, anchor: null };
+      await this.#reloadConversation({ keepLive: this.streaming });
+    }
+    this.rewindBusy = false;
+    return done;
   }
 
   async fork(session: SessionInfo, upTo: string | null = null): Promise<SessionInfo | null> {

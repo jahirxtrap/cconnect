@@ -58,6 +58,7 @@
   import { offerShared } from "$lib/screens/packs/packIntake";
   import { compactPane, paneRole } from "$lib/screens/chat/paneSurface";
   import { panes } from "$lib/screens/chat/panes.svelte";
+  import { mentionInChat } from "$lib/screens/chat/mention";
   import { tabs } from "$lib/screens/chat/tabs.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
@@ -539,6 +540,13 @@
     finishWith(items);
   };
 
+  const mentionEntries = (items: SharedEntry[]) => {
+    void sharedApi
+      .absolutePaths(filesOf(items).map((file) => file.path))
+      .then((paths) => paths && mentionInChat(...paths));
+    finishWith(items);
+  };
+
   const copyPathsOf = (items: SharedEntry[]) => {
     void sharedApi
       .absolutePaths(items.map((entry) => child(entry.file)))
@@ -612,6 +620,7 @@
     offer("copy", () => startTransfer("copy", items));
     offer("compress", () => (compressing = items));
     offer("attach", () => attachEntries(items), filesOf(items).length > 0);
+    offer("mention", () => mentionEntries(items), filesOf(items).length > 0);
     offer("copyPath", () => copyPathsOf(items));
     offer("delete", () => (deleting = items));
     return actions;
@@ -1346,7 +1355,7 @@
               <p class={BAR_LABEL_CLASS}>{plural("ITEM_COUNT", selected.length)}</p>
             {/if}
             {#if selected.length}
-              <div class="flex min-w-0 items-center justify-end gap-1 {wide ? '' : 'flex-1'}">
+              <div class="flex min-w-0 items-center justify-end {wide ? '' : 'flex-1'}">
                 {@render selectionActions()}
               </div>
             {/if}

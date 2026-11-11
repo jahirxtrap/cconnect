@@ -84,6 +84,7 @@ export type SettingsDialog =
   | "account_actions"
   | "tools"
   | "agents"
+  | "drivers"
   | "chats"
   | "privacy";
 
@@ -139,6 +140,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "tools", label: "TOOLS", summary: "MCP_TOOLS_DESC", value: toolsValue, section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
   { id: "browser_view", label: "BROWSER_VIEW", summary: "BROWSER_VIEW_DESC", section: "server", group: "SETTINGS_SERVER", dialog: "tools" },
   { id: "agents", label: "AGENTS", value: agentsValue, section: "server", group: "SETTINGS_SERVER", dialog: "agents" },
+  { id: "databases", label: "DATABASES", summary: "DATABASE_DRIVERS", section: "server", group: "SETTINGS_SERVER", dialog: "drivers" },
 
   { id: "permissions", label: "PERMISSIONS", value: permissionValue, section: "server", group: "SETTINGS_SERVER", dialog: "permissions" },
 

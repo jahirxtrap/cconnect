@@ -252,6 +252,8 @@
 
   let forkingReply = $state<ChatMessage | null>(null);
 
+  const rewindNotice = $derived(!chat.viewOnly && chat.rewindNotice);
+
   const replyCommands = $derived(
     chat.agent || chat.viewOnly || chat.sessionId === null
       ? null
@@ -571,9 +573,17 @@
         />
       {/key}
     </div>
-    {#if notices || chat.mods.toasts.length}
+    {#if notices || chat.mods.toasts.length || rewindNotice}
       <FloatDock stacked>
         {@render notices?.()}
+        {#if rewindNotice}
+          <NoticeCard
+            text={t("REWIND_PENDING")}
+            actionLabel={t("UNDO")}
+            onAction={() => void chat.cancelRewind()}
+            onDismiss={() => chat.hideRewindNotice()}
+          />
+        {/if}
         {#each chat.mods.toasts as toast (toast.id)}
           <NoticeCard text={toast.text} onDismiss={() => chat.mods.dismissToast(toast.id)} />
         {/each}

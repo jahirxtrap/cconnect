@@ -150,6 +150,10 @@ export const createSessionsApi = (http: HttpClient) => ({
     );
   },
 
+  async cancelRewind(sessionId: string): Promise<boolean> {
+    return (await http.delete(`/sessions/${sessionId}/rewind`)) !== null;
+  },
+
   async fork(sessionId: string, project: string, upTo: string | null, title: string): Promise<string | null> {
     const data = await http.post<{ session_id?: string }>(`/sessions/${sessionId}/fork`, {
       project,

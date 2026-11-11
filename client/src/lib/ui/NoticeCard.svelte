@@ -9,12 +9,12 @@
 
   interface Props {
     text: string;
-    onDismiss: () => void;
+    onDismiss?: (() => void) | null;
     actionLabel?: string | null;
     onAction?: () => void;
   }
 
-  const { text, onDismiss, actionLabel, onAction }: Props = $props();
+  const { text, onDismiss = null, actionLabel, onAction }: Props = $props();
 </script>
 
 <div
@@ -25,7 +25,7 @@
   {#if actionLabel && onAction}
     <Button onclick={onAction} variant="accent" small>{actionLabel}</Button>
   {/if}
-  {#if !isTouch}
+  {#if !isTouch && onDismiss}
     <TooltipIconButton label={t("CLOSE")} onclick={onDismiss}>
       <X />
     </TooltipIconButton>

@@ -38,6 +38,7 @@
   const FIT_LABELS: Record<BackgroundFit, string> = {
     cover: "BACKGROUND_FIT_COVER",
     contain: "BACKGROUND_FIT_CONTAIN",
+    tile: "BACKGROUND_FIT_TILE",
   };
   const SLIDERS = [
     { field: "opacity", label: "BACKGROUND_OPACITY" },

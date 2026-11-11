@@ -83,7 +83,7 @@
   import { AUTH_KINDS, emptyAuth, type AuthInput } from "$lib/data/auth";
   import { compareText, formatSeconds, joined, SEPARATOR } from "$lib/data/format";
   import { holdRefresh } from "$lib/data/inflight";
-  import { projectLabel, projectNameOf, sessionIdPreview, sessionLabel } from "$lib/data/models";
+  import { projectLabel, sessionIdPreview, sessionLabel } from "$lib/data/models";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { matchesLabel } from "$lib/data/textMatch";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
@@ -116,7 +116,7 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import AuthFields from "$lib/ui/AuthFields.svelte";
-  import { LIST_VIEWPORT_CLASS, SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
+  import { SCROLL_ROW_CLASS } from "$lib/ui/scrollbar";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import CodeBlock from "$lib/ui/CodeBlock.svelte";
@@ -230,10 +230,13 @@
   let viewHeight = $state(0);
 
   const PANEL_KINDS: ClaudeKind[] = ["plugins", "skills", "mcp", "hooks", "marketplaces"];
+  const FILTER_KINDS: ClaudeKind[] = ["plugins", "mcp", "hooks"];
 
   const sidePanel = $derived(
     embedded && PANEL_KINDS.includes(kind) && areaWidth >= (CARD_REM + PANEL_REM) * rem() + cssLength(PAGE_INSET),
   );
+
+  const filterable = $derived(loaded && FILTER_KINDS.includes(kind));
 
   const skillKey = (skill: Skill) => `${skill.plugin}/${skill.id}`;
 
@@ -704,40 +707,7 @@
   {#if embedded}
     {#if kind !== "status"}
       <div class="flex shrink-0 items-center gap-1.5 px-(--page-inset) pb-3">
-        {#if kind === "plugins" && loaded}
-          <div class={FILTER_ROW_CLASS}>
-            {#each pluginFilters as item (item.label)}
-              <SelectChip
-                label={item.label}
-                count={item.count}
-                selected={sameFilter(item.filter, pluginFilter)}
-                onclick={() => (pluginFilter = item.filter)}
-              />
-            {/each}
-          </div>
-        {:else if kind === "mcp" && loaded}
-          <div class={FILTER_ROW_CLASS}>
-            {#each mcpFilters as item (item.source ?? "")}
-              <SelectChip
-                label={item.label}
-                count={item.count}
-                selected={item.source === mcpFilter}
-                onclick={() => (mcpFilter = item.source)}
-              />
-            {/each}
-          </div>
-        {:else if kind === "hooks" && loaded}
-          <div class={FILTER_ROW_CLASS}>
-            {#each hookFilters as item (item.event ?? "")}
-              <SelectChip
-                label={item.label}
-                count={item.count}
-                selected={item.event === hookFilter}
-                onclick={() => (hookFilter = item.event)}
-              />
-            {/each}
-          </div>
-        {/if}
+        {@render filters()}
         <div class="flex-1"></div>
         <div class="flex shrink-0 items-center">{@render headerActions()}</div>
       </div>
@@ -745,12 +715,7 @@
   {:else if compact}
     <PaneHeader {title} onBack={onClose} actions={headerActions} />
   {:else}
-    <AppTopBar
-      {title}
-      subtitle={kind === "memories" && memoriesProject
-        ? projectNameOf(chat.historyProjects, memoriesProject, chat.cwd)
-        : null}
-    >
+    <AppTopBar {title}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>
           <ArrowLeft />
@@ -761,6 +726,43 @@
       {/snippet}
     </AppTopBar>
   {/if}
+
+  {#snippet filters()}
+    {#if kind === "plugins" && loaded}
+      <div class={FILTER_ROW_CLASS}>
+        {#each pluginFilters as item (item.label)}
+          <SelectChip
+            label={item.label}
+            count={item.count}
+            selected={sameFilter(item.filter, pluginFilter)}
+            onclick={() => (pluginFilter = item.filter)}
+          />
+        {/each}
+      </div>
+    {:else if kind === "mcp" && loaded}
+      <div class={FILTER_ROW_CLASS}>
+        {#each mcpFilters as item (item.source ?? "")}
+          <SelectChip
+            label={item.label}
+            count={item.count}
+            selected={item.source === mcpFilter}
+            onclick={() => (mcpFilter = item.source)}
+          />
+        {/each}
+      </div>
+    {:else if kind === "hooks" && loaded}
+      <div class={FILTER_ROW_CLASS}>
+        {#each hookFilters as item (item.event ?? "")}
+          <SelectChip
+            label={item.label}
+            count={item.count}
+            selected={item.event === hookFilter}
+            onclick={() => (hookFilter = item.event)}
+          />
+        {/each}
+      </div>
+    {/if}
+  {/snippet}
 
   {#snippet searchAction()}
     {#if !embedded}
@@ -842,6 +844,12 @@
     </div>
   {/if}
 
+  {#if !embedded && filterable}
+    <div class="px-(--page-inset) pb-3">
+      {@render filters()}
+    </div>
+  {/if}
+
   {#if serverStatus.unavailable}
     <ServerUnavailable class="min-h-0 flex-1" />
   {:else if !loaded}
@@ -854,7 +862,7 @@
       text={t(filtering ? "NO_RESULTS" : CLAUDE_EMPTY[kind])}
       class="min-h-0 flex-1"
     />
-  {:else if embedded && kind !== "status"}
+  {:else if kind !== "status"}
     <div bind:clientHeight={viewHeight} class="flex min-h-0 flex-1 flex-col">
     <PullToRefresh {refreshing} onRefresh={null} memory={memoryOf(kind)}>
       <div class="px-(--page-inset) pb-(--page-inset)">
@@ -970,87 +978,9 @@
     </PullToRefresh>
     </div>
   {:else}
-    <PullToRefresh
-      {refreshing}
-      onRefresh={kind === "status" ? () => void refresh() : null}
-      memory={memoryOf(kind)}
-      class={kind === "status" ? "" : LIST_VIEWPORT_CLASS}
-    >
-    <div class="{kind === 'status' ? 'flex min-h-full flex-col px-(--page-inset)' : ''} pb-(--page-inset)">
-      {#if kind === "plugins"}
-        {#each filteredPlugins as plugin (pluginKey(plugin))}
-          <ListRow
-            title={plugin.name}
-            subtitle={joined(
-              plugin.mod && t("MOD"),
-              plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace,
-              plugin.version,
-              plugin.scope,
-            )}
-            onclick={() => (pluginMenu = plugin)}
-          >
-            {#snippet trailing()}
-              {@render stateDot(plugin.enabled)}
-            {/snippet}
-          </ListRow>
-        {/each}
-      {:else if kind === "skills"}
-        {#each filteredSkills as skill (`${skill.plugin}/${skill.id}`)}
-          <ListRow
-            title={skill.name}
-            subtitle={skill.description ?? skill.pluginName}
-            onclick={() => (skillSheet = skill)}
-          >
-            {#snippet trailing()}
-              {@render stateDot(skill.enabled)}
-            {/snippet}
-          </ListRow>
-        {/each}
-      {:else if kind === "mcp"}
-        {#each filteredMcp as server (mcpKey(server))}
-          <ListRow
-            title={server.label}
-            subtitle={joined(mcpProblem(server), sourceLabel(server.source), server.type, server.detail)}
-            onclick={() => (mcpMenu = server)}
-          >
-            {#snippet trailing()}
-              {@render stateDot(server.enabled)}
-            {/snippet}
-          </ListRow>
-        {/each}
-      {:else if kind === "hooks"}
-        {#each filteredHooks as hook}
-          <ListRow
-            title={hook.event}
-            subtitle={joined(hookOrigin(hook), hook.condition ?? hook.matcher)}
-            onclick={() => (hookSheet = hook)}
-          >
-            {#snippet trailing()}
-              {@render stateDot(true)}
-            {/snippet}
-          </ListRow>
-        {/each}
-      {:else if kind === "marketplaces"}
-        {#each filteredMarkets as market (market.name)}
-          <ListRow title={market.name} subtitle={market.repo} onclick={() => (marketMenu = market)}>
-            {#snippet trailing()}
-              {@render stateDot(true)}
-            {/snippet}
-          </ListRow>
-        {/each}
-      {:else if kind === "memories"}
-        {#each memoryList as memory (`${memory.scope}/${memory.name}`)}
-          <ListRow
-            title={memory.name}
-            subtitle={memory.description ?? scopeLabel(memory.scope)}
-            onclick={() => openMemory(memory.scope, memory.name)}
-          >
-            {#snippet trailing()}
-              {@render stateDot(true)}
-            {/snippet}
-          </ListRow>
-        {/each}
-      {:else if !service || service.error !== null}
+    <PullToRefresh {refreshing} onRefresh={() => void refresh()} memory={memoryOf(kind)}>
+    <div class="flex min-h-full flex-col px-(--page-inset) pb-(--page-inset)">
+      {#if !service || service.error !== null}
         <EmptyState icon={CLAUDE_ICONS.status} text={t("STATUS_UNKNOWN")} class="flex-1" />
       {:else}
         {@const indicator = service.indicator}

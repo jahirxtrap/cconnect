@@ -22,11 +22,11 @@
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { copyText } from "$lib/platform/clipboard";
-  import { tabs } from "$lib/screens/chat/tabs.svelte";
   import FilePreview from "$lib/screens/shared/FilePreview.svelte";
   import { projectFileUrl } from "$lib/services/projectFilesApi";
   import { sharedApi } from "$lib/services/sharedApi";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { mentionInChat } from "$lib/screens/chat/mention";
   import { projectDiffs } from "./projectDiffs.svelte";
 
   interface Props {
@@ -93,11 +93,6 @@
     anchorAt = Math.min(Math.max(at, 0), anchors.length - 1);
   };
 
-  const mention = () => {
-    const chat = tabs.state;
-    chat.draft = chat.draft ? `${chat.draft} @${absolute}` : `@${absolute}`;
-  };
-
   $effect(() => {
     void path;
     anchorAt = null;
@@ -150,7 +145,7 @@
   databaseFile={{ project: projectKey, path }}
   {embedded}
   extraActions={[
-    { id: "mention", run: mention },
+    { id: "mention", run: () => mentionInChat(absolute) },
     { id: "link", run: () => void sharedApi.link(absolute, projectKey) },
   ]}
   onCopyPath={() => void copyText(absolute)}

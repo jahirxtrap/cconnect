@@ -39,7 +39,7 @@
     label={t("DATABASE_PAGE_SIZE")}
     side="top"
     align="end"
-    triggerClass="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-label-md text-on-surface-variant transition-colors hover:bg-hover"
+    triggerClass="flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-full px-2 text-label-md text-on-surface-variant transition-colors hover:bg-hover"
   >
     {#snippet trigger()}
       <span>{t("DATABASE_PER_PAGE", count(size))}</span>

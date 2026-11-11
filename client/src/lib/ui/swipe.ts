@@ -4,7 +4,7 @@ const MIN_DISMISS = 80;
 export const SWIPE_MS = 180;
 
 export interface SwipeDismissOptions {
-  onDismiss: () => void;
+  onDismiss: (() => void) | null;
 }
 
 export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
@@ -30,7 +30,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (dismiss === null || (event.pointerType === "mouse" && event.button !== 0)) return;
     startX = event.clientX;
     tracking = true;
     pointer = event.pointerId;
@@ -61,7 +61,8 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
       return;
     }
     paint(target, true);
-    setTimeout(dismiss, SWIPE_MS);
+    const settle = dismiss;
+    setTimeout(() => settle?.(), SWIPE_MS);
   };
 
   const onClick = (event: MouseEvent) => {

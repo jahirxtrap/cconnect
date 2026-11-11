@@ -19,16 +19,18 @@
   import { compareText, isArchive, joined } from "$lib/data/format";
   import { keepUnchanged } from "$lib/data/stableList";
   import { openFilePreview } from "$lib/app/filePreview";
-  import { projectLabel, type ProjectInfo } from "$lib/data/models";
+  import { projectFilePath, projectLabel, type ProjectInfo } from "$lib/data/models";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { formatDateShort, MILLIS_PER_SECOND } from "$lib/data/time";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch } from "$lib/platform";
+  import { copyText } from "$lib/platform/clipboard";
   import { layout } from "$lib/platform/layout.svelte";
   import { backend } from "$lib/services/backend.svelte";
-  import { projectArchiveFileUrl, projectFilesApi, type ProjectEntry } from "$lib/services/projectFilesApi";
+  import { projectArchiveFileUrl, projectFilesApi, projectFileUrl, type ProjectEntry } from "$lib/services/projectFilesApi";
+  import { sharedApi } from "$lib/services/sharedApi";
   import { gitApi, type GitCommit, type GitRepo } from "$lib/services/gitApi";
   import { ProjectWatch } from "$lib/services/projectWatch.svelte";
   import { recallProject, rememberProject } from "./projectMemory";
@@ -36,18 +38,22 @@
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState, { NO_RESULTS_ICON } from "$lib/ui/EmptyState.svelte";
+  import FileActionItems from "$lib/ui/FileActionItems.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import { fileIcon, projectIcon } from "$lib/ui/fileIcons";
   import { nearEdge } from "$lib/ui/paging";
   import Pressable from "$lib/ui/Pressable.svelte";
+  import RowMenu from "$lib/ui/RowMenu.svelte";
   import { RowWindow } from "$lib/ui/rowWindow.svelte";
   import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import SegmentedButtons from "$lib/ui/SegmentedButtons.svelte";
   import SelectionDot from "$lib/ui/SelectionDot.svelte";
+  import { FILE_ACTIONS, fileEntries, type FileActionEntry } from "$lib/ui/sharedFileActions";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import CommitBar from "./CommitBar.svelte";
+  import { mentionInChat } from "$lib/screens/chat/mention";
   import ProjectDiffView, { diffCounts } from "./ProjectDiffView.svelte";
   import { closeProjectFile, opened, openProjectFile } from "$lib/app/viewer.svelte";
   import { projectDiffs } from "./projectDiffs.svelte";
@@ -486,6 +492,26 @@
     else open(entry);
   };
 
+  let menuPath = $state<string | null>(null);
+
+  const entryActions = (entry: ProjectEntry): FileActionEntry[] => {
+    const key = projectKey;
+    if (!key) return [];
+    if (insideArchive(entry.path)) return entry.isDir ? [] : [{ id: "view", run: () => open(entry) }];
+    const absolute = projectFilePath(project?.path ?? null, entry.path);
+    const located: FileActionEntry[] = [
+      { id: "mention", run: () => mentionInChat(absolute) },
+      { id: "copyPath", run: () => void copyText(absolute) },
+    ];
+    if (entry.isDir) return located;
+    return [
+      { id: "view", run: () => open(entry) },
+      ...fileEntries(FILE_ACTIONS, { url: projectFileUrl(key, entry.path) }, entry.name),
+      { id: "link", run: () => void sharedApi.link(absolute, key) },
+      ...located,
+    ];
+  };
+
   const slot = $derived(`${backend.activeId ?? ""}|${projectKey ?? ""}`);
   const memoryOf = (view: string) => `project|${slot}|${activeRepo?.path ?? ""}|${view}`;
 
@@ -897,13 +923,29 @@
 
 {#snippet fileRow(entry: ProjectEntry, depth: number, open: boolean, action: () => void)}
   {@const current = !entry.isDir && entry.path === opened.path}
-  <Pressable
-    onclick={action}
-    hover={!current}
-    class="flex h-8 w-full items-center gap-1.5 rounded-md px-2 text-left {current ? 'bg-surface-variant' : ''}"
+  {@const menued = menuPath === entry.path}
+  {@const holdMenu = () => (menuPath = entry.path)}
+  <div
+    data-press
+    class="group flex h-8 w-full items-center rounded-md transition-colors {current || menued
+      ? 'bg-surface-variant'
+      : 'hover:bg-hover'}"
   >
-    {@render rowLabel(entry, depth, open)}
-  </Pressable>
+    <Pressable
+      onclick={action}
+      onlongclick={holdMenu}
+      oncontextmenu={holdMenu}
+      hover={false}
+      class="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2 text-left"
+    >
+      {@render rowLabel(entry, depth, open)}
+    </Pressable>
+    <div class="shrink-0 pr-1">
+      <RowMenu open={menued} onOpenChange={(value) => (menuPath = value ? entry.path : null)} shown={current}>
+        <FileActionItems actions={entryActions(entry)} />
+      </RowMenu>
+    </div>
+  </div>
 {/snippet}
 
 <div
