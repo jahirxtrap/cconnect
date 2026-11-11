@@ -1,10 +1,9 @@
 # CLAUDE.md — backend
 
-FastAPI bridge between the CConnect apps and Claude Code, running on the user's PC.
-Drives the CLI through `claude-agent-sdk` using the **subscription** (the logged-in
-CLI's OAuth): `core/sdk.ensure_subscription_auth()` drops `ANTHROPIC_API_KEY`, because
-an exported key silently wins and bills API credits. The SDK is upgraded on startup while
-the `sdk_auto_update` setting is on, which is why its import is deferred inside `claude_runtime`.
+FastAPI bridge between the CConnect apps and Claude Code, on the user's PC. It drives the CLI
+through `claude-agent-sdk` on the **subscription**: `core/sdk.ensure_subscription_auth()` drops
+`ANTHROPIC_API_KEY`, which would otherwise win and bill API credits. The SDK import is deferred
+inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_update`).
 
 ```
 [app] ──WS  /api/chat/ws──> chat router ──> live_sessions ──> claude_runtime ──> SDK query()
@@ -15,553 +14,254 @@ the `sdk_auto_update` setting is on, which is why its import is deferred inside 
 
 ## Layout
 
-- `core/app.py` — the FastAPI app: router auto-discovery, gzip, catch-all 404. Served as
-  `core.app:app`; it lives inside the package so an installed wheel carries it.
-- `core/cli.py` — the `cconnect` command and the supervisor: launches uvicorn as a child
-  and relaunches it on a restart request. Subcommands `run / expose / stop / restart /
-  status / logs / doctor / update / key`, plus `-v` and `--port`, with the
-  launcher's original flags still accepted. `run.py` at
-  the backend root is the three-line entry a checkout (and the desktop app) calls.
-  uvicorn always runs one worker: every registry lives in the process's memory, so a second
-  one would split chats and sockets. The desktop app starts its local server with
-  `CCONNECT_LIFELINE=1` and a pipe on stdin; when the pipe closes the supervisor stops the
-  way `stop` does, so a server never outlives the app that launched it. uvicorn itself gets
-  `stdin=DEVNULL`, or Windows deadlocks on the inherited pipe.
-- `core/` — `paths` (**the** path table: every file the backend owns, plus `INSTALLED`,
-  which decides where the data folder is), `release` (the version contract), `config`
-  (env), `display` (separator and joining, shared with the app), `db` + `models` + `migrations/`
-  (the SQLite store; see *Database*), `settings_defs` + `settings_store` (the settings it keeps),
-  `cli_manager`, `sdk`, `process_job` (on Windows, the job
-  object that takes the agents' processes down with the server), `responses` (**the**
-  envelope: `{success, status, message, data}`), `ws` (**the** socket handshake:
-  `accept_authorized`, `opening_message` for a socket that opens with a message, and
-  `stream_watch` for a hub's snapshots).
-- `core/packs/` — the built-in packs and `schema.json` / `builtin.json`, the pack format. The
-  client build and the Tauri compile read them too, and so does `core/scripts/page_icon.js`
-  (the page icon both browsers report), so all of them ship in the wheel.
-- `middleware/` — `public_auth` (Bearer, no-op without a token), `security`, `error_handler`.
+- `core/app.py` — the app (`core.app:app`): router auto-discovery, gzip, catch-all 404.
+- `core/cli.py` — the `cconnect` command and the supervisor that runs uvicorn as a child.
+  `run.py` is the checkout's entry. Always **one worker**: every registry lives in memory. With
+  `CCONNECT_LIFELINE=1` the server stops when its stdin pipe closes, so it never outlives the
+  desktop app; uvicorn gets `stdin=DEVNULL`, or Windows deadlocks on the inherited pipe.
+- `core/` — `paths` (**the** path table; `INSTALLED` picks the data folder), `release`,
+  `config`, `db` / `models` / `migrations/`, `settings_defs` / `settings_store`, `responses`
+  (**the** envelope `{success, status, message, data}`), `ws` (**the** handshake:
+  `accept_authorized`, `opening_message`, `stream_watch`), `process_job` (Windows job object
+  that takes child processes down with the server).
+- `core/packs/` — built-in packs and the pack format (`schema.json`, `builtin.json`); the client
+  build and Tauri read them too, as they do `core/scripts/page_icon.js`.
+- `core/prompts/` — the system prompt pieces (`CCONNECT.md`, `BLOCKS.md`, `BROWSER.md`,
+  `INSTALL.md`, `MODS.md`, `SUGGESTIONS.md`, `TOOLS.md`). User-owned prompts (`USER.md`, per
+  project) live in `data/config/prompts/` and are emptied, never deleted. `{{SHARED_URL}}`
+  becomes `cconnect://shared`, never a host: the prompt is fixed when the CLI session starts,
+  and the app swaps the scheme for the server it talks to (`shared_scheme` in health).
+- `middleware/` — `public_auth`, `security`, `error_handler`.
 - `routers/` — thin: validate, call a service, return `api_response()`.
-- `services/` — all the logic. `live_sessions` (turn decoupled from the socket), `claude_runtime`
-  (SDK stream → normalized events), `persistent_sessions` (the CLI a chat keeps between
-  turns), `mods` (the CLI's internal UI protocol), `control_requests` (the CLI's requests the SDK
-  does not answer), `elicitation` (an MCP form as the chat's form and back), `sessions` (transcripts, checkpoints, images), `chat_list`,
-  `categories`, `trash`, `rewind`, `questions`, `attachments`, `claude_assets` / `claude_manage`,
-  `system_monitor` (also redacts tokens, keys and passwords from every log sink), `network`,
-  `usage`, `shared`, `git_ops` (the commit panel, on top of the single runner in
-  `services/git`, one lock per repository), `browser` (the server's Chromium, started only
-  while a socket watches one of its tabs), `agents` / `agent_registry` (the ACP agents installed
-  from the official catalog or added by hand), `agent_connections` / `agent_sessions` /
-  `acp_peer` / `acp_events` (one process per agent and folder, a chat's session on it, and its
-  updates turned into the chat's events), `agent_mcp` (the `cconnect` MCP an agent's chat gets:
-  `share_files` and the guides of `system_append(..., AGENT_SCOPE)`, served at
-  `/api/mcp/agent/<token>` over HTTP, or through `core/scripts/mcp_bridge.py` on stdio, and the
-  same guides as `systemPrompt` only when the agent advertises it), `event_rows` (those events
-  as history rows),
-  `delegates` / `delegate_runner` / `delegate_runs` (handing a task to an agent or another
-  account, with the model it asks for), `packs` / `pack_format` (the server's pack library and the
-  validation the client's reader mirrors), `prompt_cache`, `tool_calls` / `tool_props`,
-  `api_errors`, `directory_watch` (the base of the shared and pack watchers) and
-  `project_watch` (Project files), which run `watchfiles` in a thread of their own, as
-  `chat_list` does (on Linux starting it walks the whole tree, one inotify watch per folder,
-  and a large project froze the server when that ran on the event loop), `pages` (an HTML page served with the folder around it, so its
-  styles, scripts and images load), `processes` (what the server runs, matched to its chat,
-  agent, terminal or browser, and stopped the way that screen stops it), `mcp_lazy` and
-  `memory_pressure` (see *Local MCP servers on demand* and *Persistent sessions and mods*), and the
-  four database modules, covered in *Databases*: `databases` (the connections of
-  `database_connections`, whose passwords never reach the app, one engine per connection),
-  `database_engines`, `database_tunnels` (SSH through the system's `ssh`) and `database_data`
-  (browsing, paging, SQL, row edits and exports to `shared/databases/<id>/`).
-- `services/accounts` and `services/cli_login` — an account is only its credentials: the CLI runs on
-  the primary config with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account's folder, so MCP
-  servers, plugins, settings and history are one for all. The CLI writes the identity, the models it
-  may use and fast mode into the shared `.claude.json` of whichever login started last, and rechecks
-  a refused model with the API under its own token, so a chat on any account still gets its plan.
-  Signing in, and the models, plan and fast mode CConnect offers, go through `identity_env` instead:
-  the account's own folder (`accounts/default` for the primary, whose credentials stay in `~/.claude`)
-  as the whole config. Older folders still hold links into the primary, and `purge` detaches every
-  link before removing one, or refuses. A sign-in goes through the CLI's own control requests
-  (`claude_authenticate`, `mcp_authenticate`), never a pseudo-terminal: the CLI stays open, in a task
-  of its own, until the pasted code or redirect address comes back. An MCP login is a credential, so
-  it is per account, and the CLI reports no event when a browser on the server finishes one, so
-  `wait_mcp` watches the account's `.credentials.json` until that server's token changes.
-  `login_expiry` asks `claude auth status --json` once per login and keeps the date in
-  `account.json` beside a stamp of `.credentials.json`, so opening an account's dialog starts no
-  process while that file is the same one.
-- `mcps/` — in-process MCP server exposed to Claude as `cconnect`.
-- `core/prompts/` — `CCONNECT.md` (appended to every turn, `{{SHARED_DIR}}` / `{{SHARED_URL}}`
-  substituted per request), `BLOCKS.md`, `BROWSER.md`, `INSTALL.md` (the install cards,
-  appended when the app advertises `install`), `MODS.md` (only what this app adds
-  for a mod Claude writes, appended while mods are on), `SUGGESTIONS.md` and `TOOLS.md` (the
-  deferred tools with a `guide`, appended while the turn offers any). Versioned, so
-  the user-owned `USER.md` and the per-project prompts live in `data/config/prompts/`
-  instead (never deleted — emptied). `{{SHARED_URL}}` resolves to `config.SHARED_SCHEME`
-  (`cconnect://shared`) and never to a host: the prompt is fixed when the CLI session is
-  created, so an address baked into it is stale the moment the app changes environment.
-  `/api/health` and `/api/capabilities` publish the scheme as `shared_scheme` and the app swaps
-  it for the server it is talking to, which is the only side that knows. Health never waits on
-  the CLI, so a chat's files still resolve when capabilities fail.
+- `services/` — all the logic, one module per integration. Watchers (`chat_list`,
+  `directory_watch`, `project_watch`) run `watchfiles` in their own thread, never on the event
+  loop. `project_watch` never recurses (on Linux that is an inotify watch per folder): it watches
+  the folders the clients send as open, the ones git tracks and each `.git`.
+- `services/accounts` / `cli_login` — an account is only its credentials: the CLI runs on the
+  primary config with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account folder. Sign-in and the
+  models, plan and fast mode CConnect offers use `identity_env` (the account folder as the whole
+  config). Sign-in goes through the CLI's control requests (`claude_authenticate`,
+  `mcp_authenticate`), never a pseudo-terminal. `wait_mcp` watches `.credentials.json` because the
+  CLI reports no event when an MCP login finishes. `login_expiry` caches per `.credentials.json`.
+- `mcps/` — the in-process MCP server Claude sees as `cconnect`.
 
 ## Auth
 
-`PUBLIC_ACCESS_TOKEN` is honoured only when `CCONNECT_AUTH_ACTIVE=1`, so a token left in
-`.env` never locks down a plain local run. `PublicAuthMiddleware` gates every `/api/*`
-except `/api/health` and the routes a process the server started calls on loopback with a token
-of its own instead: `/api/agents/browse` (the `BROWSER` helper,
-`core/scripts/browse.py`, which still opens the page on the PC and hands the URL to the agent's
-card), `/api/mcp/agent/<token>` and `/api/mcp/lazy/<token>` (a CLI's local MCP servers), plus the
-files of a registered page, `/api/pages/<id>/…`,
-whose random id is the token: an iframe cannot send headers. Every WS handshake checks the same
-header through `core/ws.accept_authorized`, which closes before accepting, so a socket without it
-is refused at the HTTP layer (403).
-
-`SECURITY_KEY` is the other gate and a different one: `core/access.key_matches()` compares
-the `X-Security-Key` header and guards what belongs to the **machine** rather than to
-Claude — the shells, the files git ignores, every git write, deleting a pack from the
-server's library, an agent's environment variables, and the saved database connections: listing
-them, reading what they hold, installing or removing a driver and anything that writes (a database
-file follows the rule of the file it is). It also lifts the PreToolUse hook that
-keeps Claude off the server's own `paths.ENV_FILE` and off the cconnect tools that reach the same
-things (the terminal, removing a pack, linking a file, the database tools): the chat sends the key
-with every `prompt` and the hook asks the live session on each call. A turn sent without it
-loses the `terminal` and `databases` capabilities (`core/access.authorize`, run again on every
-`prompt` with that prompt's key), so those tools are not even offered; the persistent CLI's `mark`
-carries the capabilities, so unlocking mid-chat restarts it with them. It only gates while the Bearer gate is on (`gated()`), so a plain local
-run is open. Each route checks it for itself; there is no middleware for it, and a read that
-the panel needs before it can ask for anything (`repos`, `databases/engines`) is deliberately outside it.
-
-`--expose tailnet` is the one exposure that skips both the token and `CCONNECT_AUTH_ACTIVE`:
-`tailscale serve` answers only inside the tailnet, so it is the local mode with HTTPS on top.
-`--expose caddy` only advertises an exposure someone else terminates, so `--stop` must not
-close a Funnel it never opened (`.detached.provider`, which also tells a `serve` apart from a
-`funnel` when shutting down). Its default hostname aborts when no globally routable IPv4
-exists, or the QR would point nowhere.
+- `PUBLIC_ACCESS_TOKEN` applies only with `CCONNECT_AUTH_ACTIVE=1`. `PublicAuthMiddleware` gates
+  every `/api/*` except `/api/health` and the loopback routes that carry their own token
+  (`/api/agents/browse`, `/api/mcp/agent/<token>`, `/api/mcp/lazy/<token>`, `/api/pages/<id>/…`,
+  since an iframe cannot send headers). WS handshakes check it in `accept_authorized` before
+  accepting.
+- `SECURITY_KEY` (`X-Security-Key`, `core/access.key_matches()`) guards what belongs to the
+  machine: shells, git-ignored files, git writes, deleting a server pack, an agent's environment,
+  saved database connections and their drivers. Each route checks it itself, and it only gates
+  while the Bearer gate is on (`gated()`). Reads the panels need before asking (`repos`,
+  `databases/engines`) stay outside it.
+- A turn sent without the key loses the `terminal` and `databases` capabilities
+  (`core/access.authorize`, per `prompt`), and the PreToolUse hook keeps Claude off
+  `paths.ENV_FILE` and the key-gated tools. The capabilities are part of the persistent CLI's
+  `mark`, so unlocking mid-chat restarts it.
+- `--expose tailnet` skips the token. `--expose caddy` only advertises, so `--stop` never closes
+  a Funnel it did not open (`.detached.provider`).
 
 ## HTTP API
 
-Everything returns `api_response()`. Route groups: `/api/health`, `/api/capabilities`,
-`/api/settings`, `/api/cli`, `/api/sessions/*` (transcript slices, checkpoints + rewind,
-rename/color/move/delete, fork through the SDK's `fork_session` up to a message or the
-pending rewind point, trash, categories, transcript images), `/api/shared/*` (file
-manager; listing is the `WS /api/shared/ws`; an upload streams to disk, so `PUT` is outside
-`MAX_BODY_SIZE`), `/api/claude/*` (prompts, plugins and their reload, marketplaces, skills,
-MCP, memories, usage in the app's `lang`, status; installing an MCP server from its
-`.mcp.json` entry and a skill from a folder of a git repository, the two install links that
-need the server; signing an account in to an MCP server, and out), `/api/accounts/*`, `/api/system/*` (also the processes the server runs and
-`processes/{pid}/stop`), `/api/pages` (registers an HTML page and serves the folder around
-it), `/api/network/*`, `/api/git/*` (repositories under a project, identities,
-the written message, commit, revert, pull, push), `/api/agents/*` (the Agent Client
-Protocol agents: catalog, install, sign-in, forking, renaming and deleting sessions, and their
-category and manual order, kept in `agent_session_placement` beside Claude's; reading or
-changing their environment variables takes the security key), `/api/packs/*` (the server's pack library and its
-previews; deleting from it takes the security key; `fetch` downloads a pack link, https only,
-and hands it back without keeping it), `/api/databases/*` (connections, their drivers, schemas,
-objects and tables, a page of rows, SQL, row edits and exports; see *Databases* below). Live streams: `WS /api/chat/ws`,
-`WS /api/list/ws` (chat/project list), `WS /api/agents/ws` (an agent's chats: `watch`
-names the agent and the folder, the server pushes `sessions` snapshots and `activity`
-changes), `WS /api/system/ws`, `WS /api/shared/ws`,
-`WS /api/packs/ws`, `WS /api/network/speedtest/ws`, `WS /api/browser/ws` (frames and state
-of the server's Chromium; `watch` decides whether it runs, and an opening without it
-watches, which is what an app older than 1.10.3 sends; `home` loads the blank page, so Back
-returns to the page before it).
+Everything returns `api_response()`; routers are auto-discovered from `routers/`. A route that
+answers with a file uses `FILE_HEADERS` (`Cache-Control: no-cache`), or a rewritten file shows
+its old copy. Transcript slices are cursor-based (`before_index`), and while a live session has
+events to replay the tail is cut at `turn_start_index` so a turn never arrives twice. Uploads
+stream to disk, so `PUT` is outside `MAX_BODY_SIZE`.
 
-A route that answers with a file uses `FILE_HEADERS` (`core/responses.py`): without
-`Cache-Control: no-cache`, the `last-modified` of a `FileResponse` lets a browser keep a copy
-for a tenth of the file's age without asking, and a file rewritten under the same name shows
-its old version.
+## Chat socket (`/api/chat/ws`)
 
-Transcript slices are cursor-based (`before_index`), and while a live session still has
-events to replay the tail is cut at its `turn_start_index` so the same turn never arrives
-twice — once from disk and once from the replay.
-
-## WebSocket protocol (`/api/chat/ws`)
-
-Client → server: `start` (with `channel` + `last_seq` to re-attach, and the app's `locale`, which
-the plan usage's names follow), `prompt`, `unqueue`,
-`set_generation`, `set_permission_mode`, `interrupt`, `interaction_response`, `load_history` (with
-`until` for the messages before a compaction),
-`ask`, `usage`, `session_info` (`/status`, answered with the same fields the `session_info` tool
-gives Claude), `stop_task`, `reload`, `close_resident`, for mods `mod_render`, `mod_act`,
-`mod_answer`, `mod_client_module`, and for an ACP agent (a `start` that names one) `set_option`,
-`agent_login`, `agent_logout`, `agent_retry` and `history`. An agent's chat gets `agent_state`
-(status, options, commands, sign-in methods) and `history` (its rows, paged like a transcript)
-outside the seq'd stream. Those rows come from the agent itself, replayed by `session/load`:
-the server stores no agent messages, only the session ids of agents without `session/list`
-(`agent_known_sessions`) and the titles the user gives sessions (`agent_session_titles`), which ACP
-has no request for and which win over the agent's in the list and in `agent_state`. A new agent chat creates its session with the first message once the
-agent's options are remembered (`agent_defaults`); delegation creates it at once
-(`create_now`).
-
-A socket re-attaching with a `channel` and `last_seq` only gets a replay when the replay can fill
-it in. When the server no longer has that channel (it restarted, or released the chat) or the
-outbox already trimmed events after `last_seq` (`LiveSession.covers`), `ready` says `stale` and
-the app reopens the chat from its transcript, the way picking it from the list does. Otherwise
-a device that came back after a restart, once another device had reopened the chat, was attached
-to that one as `resumed`, got only the turn in progress and kept a view with a hole in it.
-
-Re-attaching never changes the live chat's account: `ready` carries the one it runs on and
-the app adopts it, and only `set_generation` changes it. A tab that had not loaded its
-account yet used to send the default on reconnect and restart the CLI on it. Model, effort and
-permission mode are the tab's own: a change answers only the socket that sent it.
-
-Every event the server sends is typed in `schemas/chat_events.py`. `python -m schemas.contract`
-writes `schemas/chat_events.json`, which the app's `npm run check` turns into its own types; the
-release workflow runs it with `--check`, and `CCONNECT_CONTRACT_CHECK=1` validates each event as
-it is sent.
-
-Server → client, all seq'd per session except the control ones (`ready`, `permission_mode`,
-`history_chunk`, `usage`, `session_info`, `ask_*`, `activity`) and the mods ones:
-
-| event | notes |
-|---|---|
-| `assistant_text` / `thinking` / `todos` / `task` | streamed content and indicators |
-| `anchor` | the transcript uuid of a top-level reply with text, which forking from that reply goes up to |
-| `tool_use` / `tool_result` | `file_change` replaces them for Edit/Write/MultiEdit/NotebookEdit, with the diff already classified; `db_query` and `db_execute` add `query` (the connection, its name, the database, the SQL, `saved`) and, with the result, `statements` read back from it (`mcps/databases.statements_of`), each with its `kind` and `effect`, which the app draws as its query block. Like shared files, those two always arrive whole, whatever `show_tool_use` says (`mcps/databases.tool_mode`, and the socket filter lets an event with `query` or `statements` through) |
-| `interaction_request` | permissions, and `kind: "component"` for forms (`ask_component` and `AskUserQuestion` share one renderer) |
-| `compacting` / `compact` / `compact_summary` | `compacting` follows the CLI's `status` frame (`compacting_ended` when it clears); `compact` comes from the live `compact_boundary`, whose metadata is `compact_metadata` with `pre_tokens`/`post_tokens`, not the transcript's camelCase, and carries `earlier`, the boundary's uuid, which `load_history` takes as `until` |
-| `context` | context size; see below |
-| `status` (`retrying`/`ok`) | `retrying` follows the CLI's `api_retry` with the attempt, the delay and the cause; a turn that fails arrives as an `api_error` whose `severity` tells a warning from an error |
-| `rate_limit` / `cache` | the plan's session and weekly windows as the CLI reports them (ids `session` and `week`), and the prompt cache's expiry for the context ring. A CLI reports the windows only on its first turn, so the server keeps the last ones per account (`usage.live_windows`) and sends them, unsequenced, to every socket that attaches |
-| `task_running` / `agent_result` | a backgrounded agent or task started, and its end; the app shows the block as running in between, lists it under Running and stops it with `stop_task` |
-| `reloaded` | what `/reload-plugins` or `/reload-skills` brought in |
-| `commands` | the session's slash commands, sent again when `/reload-plugins` changes them |
-| `activity` | per-chat state, rides the channel so a brand-new chat reports before it has an id |
-| `queued` / `dequeued` | message queue |
-| `attached` | replay finished — the client publishes the conversation in one step |
-| `mods` | the whole mods surface (attached, panes, status lines, commands), sent on every attach and on each change |
-| `mod_tree` / `mod_reply` | answer the socket that asked; every `mod_render` gets a `mod_tree`, with a null tree when no CLI is attached |
-| `mod_toast` / `mod_invalidate` / `mod_focus` / `mod_scroll` / `mod_request` | live only, never replayed |
-| `system`, `result`, `done`, `interrupted`, `error` | |
-
-**Context size** travels only in `context` — `result` does not carry it, and the clients
-*assign* the value, so a `null` clears the ring. The live number is
-`input_tokens + cache_read + cache_creation` from each `AssistantMessage.usage` and from the
-main conversation's `message_delta` stream event, emitted only when it changes: a model
-provider can send `0` in `message_start`, which is what the `AssistantMessage` carries, and the
-real counts only in `message_delta`. On a live `compact_boundary` it is
-`compact_metadata.post_tokens`. A manual
-`/compact` emits no live boundary, so the router derives it from `latest_compact()` after
-the turn. Opening a session that isn't running still takes it from the transcript
-(`sessions.last_context_tokens`), which reports the last usage in the file — so a session
-compacted with no turn after it reads pre-compaction until the next message.
+- Every event is typed in `schemas/chat_events.py`. `python -m schemas.contract` writes
+  `schemas/chat_events.json`, which the app's `npm run check` turns into types; the release runs
+  it with `--check`, and `CCONNECT_CONTRACT_CHECK=1` validates each event as it is sent.
+- Events are seq'd per session except the control ones (`ready`, `permission_mode`,
+  `history_chunk`, `usage`, `session_info`, `ask_*`, `activity`) and the mods ones.
+  `mod_toast` / `mod_invalidate` / `mod_focus` / `mod_scroll` / `mod_request` are never replayed,
+  and every `mod_render` gets a `mod_tree`, null when no CLI is attached.
+- Re-attaching with `channel` + `last_seq` replays only when the outbox covers it
+  (`LiveSession.covers`); otherwise `ready` says `stale` and the app reopens from the transcript.
+  Re-attaching never changes the chat's account (`ready` carries it, only `set_generation`
+  changes it). Model, effort and permission mode answer only the socket that set them.
+- `file_change` replaces `tool_use` / `tool_result` for Edit, Write, MultiEdit and NotebookEdit.
+  `db_query` / `db_execute` carry `query` and `statements` (`mcps/databases.statements_of`) and,
+  like shared files, always arrive whole whatever `show_tool_use` says.
+- The live `compact_boundary` uses `compact_metadata` with `pre_tokens` / `post_tokens`, not the
+  transcript's camelCase, and `compact` carries `earlier` for `load_history(until=…)`.
+- The plan windows (`rate_limit`) come only on a CLI's first turn, so `usage.live_windows` keeps
+  the last ones per account and sends them to every socket that attaches.
+- An ACP agent's chat (a `start` that names one) gets `agent_state` and `history` outside the
+  seq'd stream. Its rows come from the agent (`session/load`); the server stores only session ids
+  of agents without `session/list` and the titles the user gives.
+- **Context size** travels only in `context`, and clients assign it, so `null` clears the ring.
+  It is `input_tokens + cache_read + cache_creation` from each `AssistantMessage.usage` and from
+  the main conversation's `message_delta` (a provider can send `0` in `message_start`), and
+  `post_tokens` on a live boundary. A manual `/compact` has no live boundary, so the router reads
+  `latest_compact()` after the turn; a closed session reads `sessions.last_context_tokens`.
 
 ## Transcripts and compaction
 
-`services/sessions.get_session_messages` normalizes the JSONL so resume == live (stripped
-text, `tool_use` formatted the same way, TodoWrite/Task dropped, `AskUserQuestion` and
-`ask_component` rebuilt as interaction blocks, rewind branches honoured).
+`services/sessions.get_session_messages` normalizes the JSONL so resume equals live. The CLI's
+format is not a contract; what currently holds:
 
-The CLI's format is not a contract and it moves. What currently holds:
-
-- `_active_entries` walks `parentUuid` (falling back to `logicalParentUuid`) back from the
-  last entry to drop rewound branches, but only when some node has 2+ children.
-- **Compaction markers survive that walk unconditionally** (`_is_compact_marker`). The CLI
-  hangs the `isCompactSummary` entry off the boundary while the conversation continues from
-  `compactMetadata.preservedSegment` — a uuid from *before* the compaction — so the pair
-  looks like a dead sibling branch. Dropping it left a resumed chat with no compaction block
-  and no summary.
-- Reading starts at `_last_compact_offset(file)`: only the tail after the last boundary.
-  `session_segment(..., until=<boundary uuid>)` reads the stretch before that boundary instead,
-  back to the one before it, and every page says `earlier`: the boundary its stretch starts after
-  when the conversation had messages before it (`logicalParentUuid`). The app asks for it only
-  when the user picks «Earlier messages», never on scroll. A closed stretch never changes, so its
-  cache stamp is its offsets, and `_boundaries` only reads what was appended since the last call.
-  `list_checkpoints(..., until=…)` walks the same stretches for Rewind and answers
-  `{points, earlier}`, skipping a stretch whose only prompt has no reply to anchor on. The CLI
-  rewinds nothing before the last boundary (neither files nor `--resume-session-at`), so those
-  points only fork, which the SDK does by slicing the file.
-- `compactMetadata.postTokens` **is** present in the current CLI; `latest_compact` still
-  falls back to the first post-boundary entry with usage.
-- Non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,
-  `custom-title`, `mode`, `last-prompt`…) are everywhere: filter by type, never by position.
-- The SDK writes `"entrypoint":"sdk-py"`, which hides a session from `claude --resume`.
-  Every turn rewrites it to `"cli"` padded with spaces to the same length, in place, only
-  over the bytes that turn wrote, and in a worker thread. A transcript runs to hundreds of
-  MB, and rewriting it whole on the event loop froze the server for ~10 s at the end of
-  every turn (and could drop lines the CLI appended meanwhile).
+- `_active_entries` walks `parentUuid` (then `logicalParentUuid`) back from the last entry to
+  drop rewound branches, only when some node has two or more children.
+- Compaction markers survive that walk (`_is_compact_marker`): the summary hangs off the boundary
+  while the conversation continues from `compactMetadata.preservedSegment`, so it looks like a
+  dead branch.
+- Reading starts at `_last_compact_offset(file)`. `session_segment(..., until=<boundary>)` reads
+  the stretch before a boundary, only when the user asks for earlier messages, and
+  `list_checkpoints(..., until=…)` answers `{points, earlier}`. The CLI rewinds nothing before
+  the last boundary, so those points only fork.
+- Filter non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,
+  `custom-title`, `mode`, `last-prompt`…) by type, never by position.
+- The SDK writes `"entrypoint":"sdk-py"`, which hides a session from `claude --resume`. Each turn
+  rewrites it to a space-padded `"cli"` in place, only over the bytes it wrote, in a worker thread.
 
 ## Message queue
 
-A prompt sent mid-turn is queued and injected into the same turn instead of refused.
-`run_prompt` runs the SDK in streaming-input mode and drains the session queue; each item
-is rendered **from the transcript** (`_flush_users` greedily matches new user entries
-against the leading chips), which is what makes resume and live agree when the CLI joins
-several messages into one entry. The turn is held open until the queue drains and the
-final `result` lands.
-
-A task's notification is written twice, as the queued entry and as the delivered user
-message, and the queued one carries no uuid. The tail sends whichever exists when it wakes,
-and the turn the CLI then adopts would carry the other: `LiveSession.shown_notices` keeps the
-texts the tail already sent and `_flush_users` skips them, along with the `agent_result` they
-bring. Cutting by byte offset (`shown_size`) is not enough, since the entry can land between
-the stamp and the read.
+A prompt sent mid-turn is injected into the same turn: `run_prompt` runs the SDK in
+streaming-input mode and drains the queue, rendering each item **from the transcript**
+(`_flush_users`), so resume and live agree when the CLI joins messages. A task notification is
+written twice, so `LiveSession.shown_notices` keeps what the tail already sent and
+`_flush_users` skips it; a byte offset is not enough.
 
 ## Persistent sessions and mods
 
-With `persistent_sessions` on, the default, a chat keeps its CLI between turns. `persistent_sessions.pool`
-holds one `PersistentSession` per channel, a `ClaudeSDKClient` owned by its own task and
-keyed by cwd, the resolved account and scope. `session_limit` (10 by default) caps the
-chats holding a process, persistent CLIs and ACP agents together, and `registry.trim`
-releases the least recently used idle ones past it; the live session releases its own
-`session_grace` seconds (300 by default) after the last socket detaches, once nothing runs in the background (`working` counts the
-tasks the CLI reported). That grace is one timer, started when the last socket goes or, if work is still
-running then, when the work ends (`_schedule_cooldown` from the turn's end and each background task's);
-nothing checks on it in between. A turn whose options differ from the ones the CLI started with
-(`mark`: model, effort, permission mode, mods, capabilities) closes it and starts a fresh one, and so does
-another account, since the account is the CLI's credentials. Stopping or
-restarting the server closes the persistent CLIs and the agents' processes first
-(`live_sessions.close_processes`). When the CLI
-starts a turn on its own, a mod sending a prompt or a background task finishing,
-`own_turn` makes the live session adopt it so it streams like any other; an adopted turn
-keeps the running CLI (`resident(keep=True)`) and never reshapes it, or it would kill the
-process that started the turn.
-
-`memory_reserve` (2048 MB by default, 0 turns it off) is the free memory the chats leave the machine. It
-is read only when something is about to start a process, a chat's CLI or an ACP agent, and from the
-system's own low-memory signal (`services/memory_pressure.py`: PSI on Linux, `EVFILT_MEMORYSTATUS` on
-macOS, `LowMemoryResourceNotification` on Windows, which only fires near exhaustion), waited on in a
-sleeping thread, never polled. Below the reserve, `registry.relieve` stops the local MCP servers no call
-is using, then releases the chats holding a process that do nothing, oldest first, including ones still
-open on a device, and stops as soon as the reserve is free again; a turn that would start a CLI and
-still finds memory short runs as a one-shot. A one-shot CLI never outlives its turn, so its turn gets
-the no-background environment and hook (`_background_guard(kept=False)`), whatever the setting says.
-
-Mods ride on the CLI's internal UI protocol (`services/mods.py`): `ui_attach` as the
-`desktop` surface, `ui_render` per site, and the CLI's notifications, which fold into one
-`Surface` per live session and reach the app as the `mods` snapshot. `mod_surfaces`, on by
-default, gates all of it. What a mod writes to the transcript shows in any chat, while panes and the band
-need the resident CLI. A chat without one keeps its last surface between turns and no CLI is left
-to redraw it, so uninstalling or disabling a plugin drops what it left there (`forget_plugin`)
-once the turn that still loads it ends. The protocol is not public and moves between CLI versions, so every
-request goes through `mods.request`, which turns a failure into `None` instead of raising.
-
-An MCP server's elicitation reaches the host as the CLI's `elicitation` control request, which the
-SDK rejects as unknown, so every form used to come back cancelled. `control_requests` answers it,
-and the mods' `ui_*` requests, on both kinds of chat: `serve` wraps a persistent CLI's query, and
-`Answering` wraps the transport of a one-shot turn. `elicitation` turns the schema into the chat's
-form and the answer back into `accept` / `decline` / `cancel`, the same mapping an ACP agent's
-`elicitation/create` goes through.
+- With `persistent_sessions` on, `persistent_sessions.pool` keeps one `ClaudeSDKClient` per
+  channel, keyed by cwd, account and scope. `session_limit` caps chats holding a process (CLIs
+  and ACP agents together) and `registry.trim` releases the least recently used idle ones.
+- The grace (`session_grace`) is one timer, started when the last socket leaves or, if work is
+  running, when it ends (`_schedule_cooldown`); nothing polls it.
+- A turn whose `mark` differs (model, effort, permission mode, mods, capabilities) or whose
+  account differs restarts the CLI. A turn the CLI starts on its own is adopted (`own_turn`)
+  with `resident(keep=True)` and never reshapes the process.
+- `memory_reserve` is read only before starting a process and on the system's low-memory signal
+  (`services/memory_pressure.py`), never polled. Below it, `registry.relieve` stops idle MCP
+  servers, then releases idle chats, oldest first. A one-shot CLI always gets the no-background
+  environment (`_background_guard(kept=False)`).
+- Mods use the CLI's internal UI protocol (`services/mods.py`), which moves between versions:
+  every request goes through `mods.request`, which returns `None` on failure. `forget_plugin`
+  drops a disabled plugin's surface once its turn ends.
+- `control_requests` answers what the SDK rejects as unknown: MCP `elicitation` (turned into the
+  chat's form by `elicitation`) and the mods' `ui_*`. `serve` wraps a persistent CLI's query and
+  `Answering` a one-shot's transport.
+- Stopping the server closes the CLIs and agents first (`live_sessions.close_processes`).
 
 ## Local MCP servers on demand (`services/mcp_lazy.py`)
 
-The CLI starts every stdio MCP server it is configured with when it starts, one copy per CLI, and keeps
-the launcher alive above each one (`uv.exe` for `uvx`, the `node` of `npx`). A chat's CLI gets them from
-the backend instead: each stdio server of user, local or plugin scope goes in `mcp_servers` as
-`{"type": "http", "url": ".../api/mcp/lazy/<token>"}` under the same name, which the CLI takes over the
-configured one (scope `dynamic`) while claude.ai connectors and remote servers stay as they were.
-Project servers (`.mcp.json`), the ones turned off for the folder and any whose config keeps an
-unresolved `${…}` are left to the CLI.
+Each stdio MCP server of user, local or plugin scope reaches a chat's CLI as
+`{"type": "http", "url": ".../api/mcp/lazy/<token>"}` under its own name. Project servers, the
+disabled ones and any config with an unresolved `${…}` stay with the CLI.
 
-- **Lists come from a catalog.** `mcp_catalogs` keeps what each server answered the last time it ran:
-  its `initialize` result, tools, prompts, resources and templates, keyed by its command, arguments and
-  environment. `initialize` and every list are answered from it, so the CLI starts with no server
-  process at all. The first chat with a server that has no catalog yet starts it as before while the
-  backend reads one in the background, two at a time.
-- **The process starts on the first call.** `tools/call`, `prompts/get`, `resources/read`,
-  completions and subscriptions start the real server for that CLI session (`_Link`), with the
-  environment the CLI would give it: its own minus `CLAUDE_CODE_SDK_READS_SESSION_STATE` and the OTEL
-  temporality, plus `CLAUDECODE`, `CLAUDE_PROJECT_DIR`, `CLAUDE_CODE_SESSION_ID` and, for a plugin,
-  `CLAUDE_PLUGIN_ROOT` and `CLAUDE_PLUGIN_DATA`. Every start reads the lists again; when they changed,
-  the catalog is rewritten and the CLI gets `list_changed`.
-- **Launchers are skipped after the first start.** The first start of each server in a backend run goes
-  through its launcher, so `uvx` and `npx` still pick up new versions; the process it ended up running
-  (found by the `CCONNECT_MCP_SPAWN` marker in its environment) and the environment the launcher added
-  are kept, and later starts run it directly. A direct start that fails falls back to the launcher.
-- **The handshake era only.** The CLI speaks protocol 2026-07-28 to a server that accepts it, and that
-  era has no server→client requests. The real servers are spoken to over stdio in the handshake era, so
-  the proxy answers a newer `mcp-protocol-version` with the 400 an older server gives and the CLI
-  negotiates the same version it would with the server itself. Accepting it left the CLI with no tools.
-- **mcp 2.3 specifics.** One stateful `StreamableHTTPSessionManager` per server and CLI, with
-  `json_response=False` (with JSON, progress, logs and forms of a call are lost) and
-  `session_idle_timeout=None`. `_Proxy` overrides `get_capabilities` with the server's own, since the
-  manager would derive them from the handlers. Server→client requests and logs ride the stream of the
-  call in flight, or the session's own stream between calls; the `Connection` is only reachable as
-  `ctx.session._connection`. `stdio_client` lays the given environment over a short allow-list, so the
-  whole environment is passed.
-- **Lifetime.** A persistent CLI's servers close with it (`PersistentSession.lazy`), a one-shot's at the
-  end of the turn; closing the CLI's session ends the process. `release_idle` stops the processes no
-  call is using when memory runs short, and the next call starts them again. The processes carry the
-  chat's `CCONNECT_CHANNEL`, so the process list files them under their chat.
+- `initialize` and every list come from `mcp_catalogs` (keyed by command, arguments and
+  environment), so the CLI starts with no server process. A server with no catalog starts as
+  before while one is read in the background.
+- The real process starts on the first call (`_Link`) with the environment the CLI would give
+  it. Every start rereads the lists and sends `list_changed` when they changed.
+- The first start per backend run goes through the launcher (`uvx`, `npx`); later ones run the
+  process it spawned directly (`CCONNECT_MCP_SPAWN` marker), falling back to the launcher.
+- The proxy speaks the handshake era: it answers a newer `mcp-protocol-version` with the 400 an
+  older server gives.
+- mcp 2.3: one stateful `StreamableHTTPSessionManager` per server and CLI, `json_response=False`
+  (JSON drops progress, logs and forms) and `session_idle_timeout=None`. `_Proxy` overrides
+  `get_capabilities`. `stdio_client` needs the whole environment passed.
+- A persistent CLI's servers close with it, a one-shot's at the end of the turn, and
+  `release_idle` stops unused ones when memory runs short.
 
-## Database
+## Database (`data/config/cconnect.db`)
 
-Everything the server keeps as records lives in `data/config/cconnect.db` (SQLite in WAL), never in a
-loose JSON file rewritten whole: settings, chat placement and categories, the trash, database
-connections, agents and their chats' state, disabled MCP servers and the catalogs of the local ones,
-pending rewinds, task lists and the steps of each delegation. Files are only for what is not a record: prompts edited by hand, packs, the
-CLI's account folders, caches, logs and the process files (`.runtime`, `.detached.*`).
+Every record the server keeps lives in SQLite (WAL), never in a loose JSON file. Files are only
+for prompts, packs, account folders, caches, logs and process files.
 
-- **The migrations are the schema.** `core/migrations/versions/` holds them, each with a working
-  `downgrade()`; `init_db()` runs them to `head` on every start. A new one is scaffolded from
-  `backend/` with `alembic revision -m "<what>"` and written by hand: nothing is generated from the
-  models, and `create_all` is never called. `core/models.py` mirrors the result, and a change to
-  one is a change to the other.
-- **Applied migrations are held to their source.** `schema_migrations` keeps the SHA-256 of each
-  one as it ran, and a start that finds the file changed logs it. While developing a migration is
-  fixed in place (downgrade, edit, upgrade, then the whole set from scratch on a throwaway
-  database); once released it is immutable and changes go forward in a new one.
-- **Every table and column carries an English comment**, in the migration and in the model.
-- **Timestamps are UTC instants** stored as ISO 8601 text (`Timestamp`, the same form `NOW`
-  writes as a column default), so they sort as they read. The API still answers epoch seconds
-  where it did.
-- **Derived values come from the database.** Triggers, all of them listed here:
-  `session_todos_touched` stamps `session_todos.updated_at` whenever `items` changes.
+- **The migrations are the schema** (`core/migrations/versions/`), each with a working
+  `downgrade()`, run to `head` on every start. Scaffold with `alembic revision -m "<what>"` and
+  write it by hand; `create_all` is never called and `core/models.py` mirrors the result.
+- `schema_migrations` stores each migration's SHA-256. A released migration is immutable.
+- Every table and column carries an English comment, in the migration and in the model.
+- Timestamps are UTC ISO 8601 text (`Timestamp`); the API answers epoch seconds where it did.
+- Triggers (all of them): `session_todos_touched` stamps `session_todos.updated_at`.
 
 ## Settings and visibility
 
-Model, effort, permission mode, streaming, CLI source and per-block visibility live in the
-`settings` table of `cconnect.db` and are **backend-owned**, so every client shares one config.
-`show_thinking` / `show_tool_use` / `show_file_change` / `show_compact` take
-`full | label | off` and are applied identically on the live stream and on resume. `label`
-strips a tool's result, never an agent's subtasks: those still arrive, with their `parent`.
-Simple mode forces thinking, tools and hooks off and compaction to a label; what the user
-cannot afford to miss is exempt — file changes, shared files, the query blocks and the forms —
-and so are `task_running` / `task_progress` / `agent_result`, which feed Running in the header
-rather than a block, and without them a task could not be seen or stopped there.
+Model, effort, permission mode, streaming, CLI source and block visibility are backend-owned, in
+the `settings` table. `show_thinking` / `show_tool_use` / `show_file_change` / `show_compact` take
+`full | label | off`, applied the same live and on resume; `label` never strips an agent's
+subtasks. Simple mode never hides file changes, shared files, query blocks, forms or the
+`task_*` / `agent_result` events Running needs.
 
 ## MCP server (`mcps/`)
 
-Tools auto-register. Each one is declared once, at module level, as a `Definition`
-(`mcps/definition.py`: name, description, input schema, `eager`, `guide`) named after the tool in
-capitals (`TERMINAL_OPEN`, `DB_QUERY`); `make_tools(context)` binds it to its handler by using it
-as a decorator, runs fresh on every turn and returns `[]` to remove the module's tools from that
-turn (the safest gate). A description or schema that depends on the turn is a `replace` of the
-definition (the forms' previews, `delegate`'s destinations), and every text answer goes through
-`reply`. A module whose tools reach what the security key guards declares `needs_key(name, args)`,
-and the PreToolUse hook denies those calls when the message came without the key.
-Bundled: `check_progress`, `compact`, `usage`, `history` (the chat's own messages, numbered,
-before a compaction too, without the tool calls), `session_info`, `show_component`,
-`ask_component`, `share_files`, `packs` (writes a pack into the server's library),
-`delegate` (runs a task on a destination, or registers one), `reload` (persistent chats
-only), `db_inspect` / `db_query` / `db_execute` / `db_manage` (only in turns with the `databases`
-capability, which needs the key; `db_query` refuses anything that writes), and the
-browser and terminal tools behind their settings.
-
-What a turn gets is decided in layers. A family behind a setting is left out while it is off (the
-browser), one that reaches the machine needs the key (the terminal and the database tools), and
-what remains is **deferred behind tool search**: only the names reach the prompt, and Claude loads
-a definition with `ToolSearch` the first time it needs it. A definition with `eager` is loaded up
-front instead (`share_files` and the chat's own tools): `_load_up_front` marks it with `_meta`
-`anthropic/alwaysLoad`, which Claude Code reads per tool and the SDK's listing does not set yet,
-by wrapping the server's `tools/list` through mcp 2's handler API (hence `mcp>=2`). A definition
-with `guide` stays deferred, and the opening paragraph of its description, which has to say what it
-does and when to reach for it, goes in the system prompt through `TOOLS.md` (`tool_guides`, only
-for the tools the turn offers and the user has not disabled). That is how the forms stay deferred:
-without that line, an Opus turn asked to help pick a stack answered in prose, and with it, it loaded
-`ask_component` and opened a form. Measured on 07/11 with everything on: the deferred families saved
-~5,400 tokens of context per turn, and deferring the forms with their guide another ~4,800
-(27,887 → 23,116, read from the CLI's own context breakdown).
-
-`ask_component` and `show_component` share one element list (`mcps/components.py`). The
-contract is flat: every value travels as a string, an `id` means the element carries a
-value, control labels travel as keys for the client to translate, `show_if` hides an
-element *and* leaves it out of `values`, and validation is client-side. `mcps/media.py` is
-the single table of what the app renders inline.
-
-**Adding an element** touches several files and there is no generator, so this is the checklist:
-
-1. `TYPES` + `LEAF` in `mcps/components.py`, and its line in `DESCRIPTION` / `SHOW_DESCRIPTION`.
-2. `ComponentElement` in `client/.../data/chatModels.ts` and `toElement` in `.../services/chatSocket.ts`.
-3. The `{#if}` chain in `client/.../chat/blocks/ComponentBlock.svelte`.
-4. **The summary** (`componentSummary` / the derived `summary`) — the one everybody forgets;
-   skipping it is what printed `secret` values into the chat.
-5. The validation (`componentMissing` / `missing`) if it can be required.
-6. `en.json` if it brings text of its own, and the other catalogs with it (a key they lack
-   falls back to English).
+- Each tool is a module-level `Definition` (`mcps/definition.py`) named in capitals
+  (`DB_QUERY`). `make_tools(context)` runs every turn and binds it to its handler; returning
+  `[]` removes the module's tools from that turn. A turn-dependent description is a `replace`,
+  and every text answer goes through `reply`. A module whose tools reach key-gated things
+  declares `needs_key(name, args)`.
+- Families behind a setting are left out while it is off, key-gated ones need the key, and the
+  rest are **deferred behind tool search**. `eager` loads a tool up front (`_meta`
+  `anthropic/alwaysLoad`, through mcp 2's handler API). `guide` puts the first paragraph of the
+  description in the system prompt (`TOOLS.md`), which is what makes Claude reach for it.
+- `ask_component` and `show_component` share `mcps/components.py`: every value is a string, an
+  `id` means the element carries a value, labels travel as keys, `show_if` also drops the value,
+  validation is client-side. `mcps/media.py` is the one table of what renders inline.
+- **Adding an element** (no generator): `TYPES` + `LEAF` and its line in `DESCRIPTION` /
+  `SHOW_DESCRIPTION`; `ComponentElement` in `client/.../data/chatModels.ts` and `toElement` in
+  `.../services/chatSocket.ts`; the `{#if}` chain in `ComponentBlock.svelte`; the summary
+  (`componentSummary` / `summary`), which must keep `secret` values out of the chat; the
+  validation (`componentMissing` / `missing`); `en.json` and the other catalogs.
 
 ## Databases
 
-The engines are data: `core/databases/engines.json` lists every one a connection can use (its
-SQLAlchemy dialect, the pip packages of its driver, default port, read-only preludes, timeout,
-binary literal, hidden schemas and the options its URL usually takes), with `defaults` and
-`extends` so the PostgreSQL and MySQL families inherit their driver and rules.
-`database_engines` only loads it. Three forms: `file` (a path), `server` (host, port, database,
-user, password and `options`, the URL's query) and `url`, the `custom` engine: any SQLAlchemy URL
-plus the pip packages its driver needs, which borrows the catalog's rules for its backend
-(`spec_of`) and loses its password to the connection's own field when saved.
+`core/databases/engines.json` is the engine catalog (dialect, driver packages, port, read-only
+preludes, timeout, binary literal, hidden schemas, URL options, `quote`, `auto_increment`,
+`identity_sync`, `identity_insert_on/off`), with `defaults` and `extends` for the families.
+Connections are `file`, `server` or `url` (`custom`, which borrows its backend's rules through
+`spec_of`). Every data call takes a `Scope` (connection and database), one engine per scope.
 
-- **A driver install never moves the server's own packages.** `install_packages` pins every
-  requirement of the `cconnect` distribution at its installed version, so a dialect that needs
-  another SQLAlchemy resolves to an older release of itself or fails with the resolver's reason.
-  Dialects whose every release pins an older SQLAlchemy are left out of the catalog; databases
-  that speak PostgreSQL's or MySQL's protocol use those dialects instead.
-- **The drivers dialog lists packages, not engines.** Engines with the same `packages` share one
-  driver (`driver_of`): uninstalling it closes all of their engines and keeps only the
-  distributions another installed driver still needs.
-- **A connection that names no database lists the server's.** The catalog's `databases` query
-  lists them and `home` is where such a connection lands (PostgreSQL's `postgres`). Every data
-  call takes a `Scope`, the connection and one of those databases, and each scope gets an engine
-  of its own; a listing that fails falls back to the schemas of the home database.
-- **A database file opens without a connection.** `open_file` resolves a file of the shared
-  folder or of a project (a project's ignored files only with the key), takes the engine from
-  the file's header (`signature`; the `extensions` only decide for an empty file) and keeps the
-  entry in memory under a `file:` id. File engines use `NullPool`, so the server holds no lock on
-  the file between queries. The client reads the same `extensions` at build time.
-
-Every SQL statement goes through `database_data`, and nothing there trusts the client:
-
-- **Every statement answers on its own** (`results`), and the flat fields keep describing the
-  last result set for the console. Each one says what it did (`kind`: `rows`, `changed`,
-  `structure` or `done`, plus `effect`, the action and the object read from its SQL by sqlglot):
-  an INSERT, UPDATE or DELETE brings back the rows it touched where the engine's `returning` allows
-  it (`clause` appends `RETURNING *`; `cte`, the PostgreSQL family, wraps it as
-  `WITH … SELECT … LIMIT`, so a change of millions of rows still ships only the first ones and its
-  total from a window count), and a CREATE or ALTER of a table or view is followed by its
-  reflected columns, each statement reflected on its own connection right after it runs — read at
-  the end of the batch, a CREATE came back with the columns a later ALTER had added. An ALTER also
-  carries `changes`, the columns added, removed or changed against the reflection taken before it,
-  which the app shows instead of the whole table again. A batch holding a statement no transaction admits (CREATE or
-  DROP DATABASE, VACUUM, CREATE INDEX CONCURRENTLY…, `OUTSIDE_TRANSACTION`) runs in autocommit and
-  cannot be undone; before it runs, the server closes its own pooled sessions on the connection's
-  other databases (`release_others`), which DROP DATABASE would otherwise count as users.
-- **Claude's tools answer in text, not JSON** (`mcps/databases.render`): a header per statement
-  (`[1] 50 rows, more from offset 50`, `[2] 120 rows inserted into items, 50 shown`,
-  `[3] created table items, 3 columns`, `[4] altered table items, 1 column change`,
-  `[5] dropped table old`, `[6] done`), the columns and rows
-  tab-separated with `\\`, `\t`, `\n` and `\r` escaped, NULL as `\N`, cells cut at 200 characters,
-  50 rows by default with `limit` and `offset`. `statements_of` reads it back for the query block, so
-  the two change together.
-- **Reads and writes are told apart by sqlglot, failing closed.** The text is split on the
-  tokenizer's semicolons, and a statement only reads when it parses as SELECT, a set operation,
-  DESCRIBE, SHOW, EXPLAIN of a read or a PRAGMA without `=`. Anything else, or anything that does
-  not parse, writes, and writing takes the key. A read runs in a transaction that is always rolled
-  back, after the engine's read-only preludes (`PRAGMA query_only`, `SET TRANSACTION READ ONLY`).
-- **The WHERE filter** is wrapped as `SELECT * FROM t WHERE …` and must be one reading statement;
-  its colons are escaped so `text()` takes no bind parameters, and it closes on a newline so a
-  trailing `--` cannot swallow the ORDER BY and LIMIT.
-- **Every query has a deadline.** The engine's own statement timeout where it has one, and a
-  timer that calls the DBAPI's `cancel` / `interrupt` otherwise; the error then says how long it ran.
-- **Optional reflection runs in a session of its own** (`_probe`). A failed statement aborts the
-  rest of the transaction in PostgreSQL and DuckDB, so a missing comment or foreign key lookup
-  used to fail the whole table.
-- **duckdb-engine cannot reflect under SQLAlchemy 2.1**: it reuses PostgreSQL's column and primary
-  key queries, which now read `pg_collation` and `REGCLASS`. The engine table carries DuckDB's
-  own `columns` and `primary_key` queries over `duckdb_columns()` / `duckdb_constraints()`, and
-  declared types become SQLAlchemy types through sqlglot (`declared_type`). Tables are rebuilt from
-  columns and primary key for every engine instead of autoloaded.
-- **A driver counts as installed when its distributions are on disk**
-  (`importlib.metadata`), not when the module can be found: an uninstalled module stays in
-  `sys.modules` until the server restarts.
-- Values leave as JSON-safe cells (`cell`): integers past 2^53, decimals, dates and UUIDs as text,
-  binary as a short hex preview. Exports keep the full values: CSV with a BOM, and SQL inserts
-  rendered by each column's own literal processor, binary through the engine's `binary`
-  template.
+- A driver install pins every requirement of `cconnect` at its installed version, so it never
+  moves the server's packages. Engines with the same `packages` share one driver (`driver_of`).
+  A driver counts as installed when its distributions are on disk (`importlib.metadata`).
+- A database file opens without a connection (`open_file`): the engine comes from the file's
+  header (`signature`), the entry lives in memory under a `file:` id, and `NullPool` holds no lock.
+- Nothing in `database_data` trusts the client. Reads and writes are told apart by sqlglot,
+  failing closed: only SELECT, set operations, DESCRIBE, SHOW, EXPLAIN of a read and a PRAGMA
+  without `=` read; anything else writes and takes the key. A read runs in a transaction that is
+  rolled back, after the engine's read-only preludes.
+- Each statement answers on its own (`results`, with `kind` and `effect`). Writes return the rows
+  touched where `returning` allows (`clause` or `cte`). A CREATE or ALTER is reflected on its own
+  connection right after it runs; an ALTER also carries `changes`. A statement no transaction
+  admits (`OUTSIDE_TRANSACTION`) runs in autocommit after `release_others`.
+- The WHERE filter must be one reading statement, with colons escaped and closed on a newline.
+- Every query has a deadline: the engine's statement timeout, or a timer that calls the DBAPI's
+  `cancel` / `interrupt`.
+- Optional reflection runs in its own session (`_probe`): a failed statement aborts the rest of
+  the transaction in PostgreSQL and DuckDB.
+- Tables are rebuilt from columns and primary key, never autoloaded: duckdb-engine cannot reflect
+  under SQLAlchemy 2.1, so the catalog carries DuckDB's own `columns` / `primary_key` queries and
+  `declared_type` maps types through sqlglot.
+- Claude's tools answer in text (`mcps/databases.render`), read back by `statements_of`, so the
+  two change together.
+- Cells leave JSON-safe (`cell`); exports keep full values: CSV with a BOM, SQL through each
+  column's literal processor.
+- A SQL export is a dump built from the catalog, never `pg_dump` (`export_dump`, for a table, a
+  schema or the database): tables in foreign key order, indexes, streamed inserts, then views.
+  Function defaults go in parentheses (SQLite). Sequence-fed columns use `auto_increment`,
+  `identity_sync` moves the sequence, `identity_insert_on/off` wrap SQL Server's inserts.
 
 ## Configuration
 
-Everything comes from environment variables; `core/config.py` declares them and auto-loads
-`backend/.env` for local dev. The full table (defaults and meaning) is in the root
-`README.md` — it is what the user configures, so keep it there and don't duplicate it.
+Environment variables, declared in `core/config.py`, which loads `backend/.env` in a checkout.
+The table lives in the root `README.md` only.
 
 ## Conventions
 
 1. **Routers stay thin**; logic lives in `services/`, new integrations get their own module.
-2. **No comments.** A one-line descriptive docstring only when a constraint cannot be
-   expressed in code; rationale goes in the answer or the commit.
-3. **Imports at the top.** The only exception is the deferred `claude_agent_sdk` import.
-4. **Subprocesses that print text use `encoding="utf-8", errors="replace"`** — Windows
-   defaults to cp1252 and mojibakes CLI output.
-5. **Auto-reload only in a checkout on Linux/macOS,** never in the installed package, whose
-   watched folder would be the whole site-packages, so any `pip install` (the SDK update, a
-   database driver) restarted the server. It excludes the data folder and the Python
-   environment (`sys.prefix`). On Windows it breaks the CLI subprocess, so a checkout there
-   has to be restarted by hand after editing it.
+2. **No comments.** A one-line descriptive docstring only when a constraint cannot be expressed
+   in code.
+3. **Imports at the top**, except the deferred `claude_agent_sdk`.
+4. **Subprocesses that print text use `encoding="utf-8", errors="replace"`** (Windows is cp1252).
+5. **Auto-reload only in a checkout on Linux/macOS**, never in the installed package (every
+   `pip install` would restart it), excluding the data folder and `sys.prefix`. On Windows it
+   breaks the CLI subprocess, so restart by hand.

@@ -51,6 +51,7 @@
             {#if onSort}
               <button
                 type="button"
+                data-press="off"
                 onclick={() => onSort(column)}
                 class="flex w-full cursor-pointer items-center gap-1 whitespace-nowrap {alignOf(column) ? 'justify-end' : ''}"
               >

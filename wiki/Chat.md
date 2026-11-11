@@ -29,8 +29,11 @@ box first: files and images become attachments, text goes into the message.
 **Rewind** takes a conversation back to an earlier point. Pick the moment,
 preview exactly what would change on disk (`+added −removed • files`), and
 choose whether to roll back the conversation alone or code and conversation
-together. **Earlier points** at the end of the list reaches the stretches
-before each compaction; Claude Code cannot roll those back, so they only fork.
+together. The conversation goes back with your next message: until then the
+chat shows a notice with **Undo**, which brings the rest of it back and leaves
+the files as Rewind left them. **Earlier points** at the end of the list
+reaches the stretches before each compaction; Claude Code cannot roll those
+back, so they only fork.
 
 **Fork** copies a chat into a new one and leaves the original as it is: the
 whole conversation from the chat's menu, or up to a point from Rewind or from

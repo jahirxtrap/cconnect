@@ -1,19 +1,9 @@
 # CConnect
 
-Mobile, desktop and web interface for Claude Code. The apps drive Claude Code running
-on the user's PC — chats in tabs, projects and sessions, file edits, permission prompts
-and forms, rich blocks, plan proposals, subagents, attachments, a message queue, rewind
-and forking, replies read aloud, persistent sessions that keep a chat's CLI running
-along with its background tasks, chats with ACP agents in either panel, delegating a
-task to another AI or agent, and the panes and band Claude Code mods draw — over
-HTTP/WS, reachable on the tailnet or publicly through a Tailscale Funnel. They also manage
-the Claude install itself (CLI, plugins, marketplaces, MCP servers, skills, memories, also
-from `cconnect://install` links and the cards Claude offers), a file manager over the shared
-folder, an explorer of the project that shows its git diff and commits it, a browser that
-opens pages on the device or on the PC, a PC monitor with the processes the server runs, an
-SSH client, notes and database connections (a paged grid, row edits and a SQL console, with
-drivers installed on demand), with themes, fonts and chat backgrounds installed from `.ccpack`
-packs, in ten languages.
+Mobile, desktop and web interface for Claude Code running on the user's PC, over HTTP/WS on
+the tailnet or publicly through a Tailscale Funnel. Besides the chats it manages the Claude
+install, the shared folder, the project's git, a browser, a PC monitor, SSH, notes, databases
+and `.ccpack` packs, in ten languages; the README lists what each one does.
 
 **Monorepo with two modules that must stay in sync:**
 
@@ -64,12 +54,9 @@ files: `backend/core/release.py` (`VERSION`, and the two floors when they move),
 lightweight and unprefixed (`1.6.1`). An Android build rewrites the Cargo files
 from `tauri.conf.json` on its own.
 
-A release that only touches the client leaves `backend/core/release.py` where it is, so
-the server keeps the version it shipped with while the app moves on. The `pypi` job asks
-PyPI for that version before doing anything and skips building and publishing when it is
-already there — otherwise `uv publish` rebuilds the same wheel, finds the filename taken
-with a different hash and fails the release. `SUPPORTED_SERVER` only moves when the app
-genuinely needs a newer backend.
+A release that only touches the client leaves `backend/core/release.py` alone, and the
+`pypi` job skips a version PyPI already has. `SUPPORTED_SERVER` only moves when the app needs
+a newer backend.
 
 `CHANGELOG.md` is replaced whole: no headers, versions or dates, one bullet per
 user-visible change written as what the user sees, minor work collapsed into the closing

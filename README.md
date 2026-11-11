@@ -112,10 +112,11 @@ with the tailnet mode or a public one.
   installed from the app. A connection without a database lists every database on the server and
   loads one only when it is opened, and a database file in the shared folder or a project opens in
   its preview. Tables open in a paged grid with sorting and a WHERE filter, rows are edited in a
-  form, a SQL console runs anything else, and all of it exports to CSV or SQL. On a public server the
-  saved connections open with the security key, and Claude gets them as tools in turns sent with
-  it: it queries, changes data, manages connections and drivers, and each query shows in the chat
-  with its rows.
+  form, a SQL console runs anything else, a table or a query exports to CSV, and a table, a schema or
+  the whole database exports as SQL with its structure. On a public server the saved connections
+  open with the security key, and Claude gets them as tools in turns sent with it: it queries,
+  changes data, exports, manages connections and drivers, and each query shows in the chat with
+  its rows.
 - **Notes.** A Markdown editor with formatting, search and syntax highlighting.
 
 ### The PC

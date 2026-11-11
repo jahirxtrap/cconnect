@@ -165,7 +165,7 @@ with the same name sets how it shows:
 
 | Field | Range |
 |---|---|
-| `fit` | `cover` or `contain` |
+| `fit` | `cover`, `contain` or `tile`, which repeats the image at its own size |
 | `opacity` | 0 to 100 |
 | `brightness` | 0 to 180 |
 | `blur` | 0 to 20 |

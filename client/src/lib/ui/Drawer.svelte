@@ -20,6 +20,7 @@
   const SLOP = 6;
   const HALF = 2;
   const FLING_SPEED = 350;
+  const VELOCITY_WINDOW_MS = 100;
 
   let offset = $state(0);
   let dragging = $state(false);
@@ -28,9 +29,16 @@
   let startY = 0;
   let tracking = false;
   let decided = false;
-  let lastX = 0;
-  let lastAt = 0;
-  let speed = 0;
+  let trail: { x: number; at: number }[] = [];
+
+  const recentTrail = (until: number) => trail.filter((sample) => sample.at >= until - VELOCITY_WINDOW_MS);
+
+  const releaseSpeed = (endedAt: number) => {
+    const recent = recentTrail(endedAt);
+    const first = recent[0];
+    const last = recent.at(-1);
+    return first && last && last.at > first.at ? ((last.x - first.x) / (last.at - first.at)) * 1000 : 0;
+  };
 
   const scrollsHorizontally = (target: EventTarget | null) => {
     let node = target as HTMLElement | null;
@@ -69,15 +77,14 @@
     dragging = false;
     startX = touch.clientX;
     startY = touch.clientY;
-    lastX = touch.clientX;
-    lastAt = event.timeStamp;
-    speed = 0;
+    trail = [{ x: touch.clientX, at: event.timeStamp }];
     offset = open ? sheetWidth : 0;
   };
 
   const onMove = (event: TouchEvent) => {
     if (!tracking) return;
     const touch = event.touches[0];
+    trail = [...recentTrail(event.timeStamp), { x: touch.clientX, at: event.timeStamp }];
     const dx = touch.clientX - startX;
     const dy = touch.clientY - startY;
     if (!decided) {
@@ -90,20 +97,17 @@
       }
       guardTaps(true);
     }
-    const elapsed = event.timeStamp - lastAt;
-    if (elapsed > 0) speed = ((touch.clientX - lastX) / elapsed) * 1000;
-    lastX = touch.clientX;
-    lastAt = event.timeStamp;
     offset = Math.min(sheetWidth, Math.max(0, (open ? sheetWidth : 0) + dx));
     event.preventDefault();
   };
 
-  const onEnd = () => {
+  const onEnd = (event: TouchEvent) => {
     guardTaps(false);
     if (!tracking) return;
     tracking = false;
     if (!dragging) return;
     dragging = false;
+    const speed = releaseSpeed(event.timeStamp);
     const flung = Math.abs(speed) > FLING_SPEED;
     const opening = flung ? speed > 0 : offset > sheetWidth / HALF;
     if (opening) onOpen?.();
@@ -114,15 +118,16 @@
     if (!isTouch) return;
     const start = onStart as EventListener;
     const move = onMove as EventListener;
+    const end = onEnd as EventListener;
     window.addEventListener("touchstart", start, { passive: true });
     window.addEventListener("touchmove", move, { passive: false });
-    window.addEventListener("touchend", onEnd);
-    window.addEventListener("touchcancel", onEnd);
+    window.addEventListener("touchend", end);
+    window.addEventListener("touchcancel", end);
     return () => {
       window.removeEventListener("touchstart", start);
       window.removeEventListener("touchmove", move);
-      window.removeEventListener("touchend", onEnd);
-      window.removeEventListener("touchcancel", onEnd);
+      window.removeEventListener("touchend", end);
+      window.removeEventListener("touchcancel", end);
       guardTaps(false);
     };
   });

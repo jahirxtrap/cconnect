@@ -3,8 +3,8 @@
 The shared folder grew into a full file manager. Browse `~/.cconnect/data/shared/` from
 the app: upload files (with per-file progress you can cancel), create folders,
 rename, sort by name/date/type/size, and long-press (or right-click on desktop)
-to multi-select — then move, copy, share, delete, save to Downloads, or copy a
-file's PC path. Open a file to preview it in place — images with zoom, video,
+to multi-select — then move, copy, share, delete, save to Downloads, mention
+the files in the chat, or copy a file's PC path. Open a file to preview it in place — images with zoom, video,
 audio, PDF, SVG, Markdown, source code, HTML and database files — and delete it
 right from the preview if it's no longer needed.
 
@@ -34,8 +34,9 @@ one to the next. An eye in the file's header moves it to the centre pane, where
 it takes the place of the chat, and from either side it expands to the whole
 window. A toggle folds the tree down to only what changed. An archive opens in
 the tree like a folder, and a file inside it previews without extracting
-anything. From a file you can
-mention its full path in the chat or copy it. What git ignores stays hidden
+anything. Hold a file or a folder in the tree, or right-click it, for its
+menu: a file opens, saves, shares or gets referenced in Shared, and both
+mention their full path in the chat or copy it. What git ignores stays hidden
 until you unlock it with the security key.
 
 With that changed view open, a bar at the bottom carries the branch, how far
@@ -71,8 +72,8 @@ type a new one. **Test connection** answers with
 the server's version before you save, and **Read only** keeps every query in a
 transaction that is rolled back and hides the row editor.
 
-Each engine needs its driver on the server. The plug in the panel's header
-lists the drivers, each with the engines it serves, installs one with a tap and
+Each engine needs its driver on the server. The plug in the panel's header,
+or **Databases** in the Server settings, lists the drivers, each with the engines it serves, installs one with a tap and
 uninstalls it again; a connection whose driver is missing says so in the tree
 and offers the install right there. Installing a driver never changes the
 server's own packages: one that needs other versions of them fails with the
@@ -86,7 +87,8 @@ connects to `postgres` (or its family's own, such as CockroachDB's `defaultdb`).
 centre pane with the eye, and from either side it expands to the whole window.
 Rows come in a paged grid (25 to 1,000 a page) with the row number and the
 primary key marked; a column header sorts by it, and a WHERE bar filters with
-any condition the database understands. **Structure** shows the columns with
+any condition the database understands. The page, the order and the filter
+stay when the table expands or moves to the other pane. **Structure** shows the columns with
 their types, defaults and comments, the foreign keys, the indexes and a view's
 definition. A row opens in a form with a field per column, a NULL toggle where
 the column allows it, and buttons to duplicate or delete it; the add button
@@ -96,9 +98,16 @@ primary key, views and read-only connections open the same form to read.
 The console runs one statement or several separated by semicolons, with Ctrl +
 Enter (⌘ + Enter on a Mac), a shortcut you can change with the others. A query shows its rows (the first 1,000) and how long
 it took; anything else shows the rows it changed. Its text and last result stay
-per connection and database while the app is open. Tables export to CSV or to SQL inserts in
-the database's own dialect, and a query to CSV; the file is written to the
-server's shared folder and downloads like any other.
+per connection and database while the app is open.
+
+Every row of the tree has a menu, held down, right-clicked or from its ⋮. A
+database or a schema exports as SQL: its tables in the order their foreign
+keys need, with their columns, defaults, keys and indexes, then the rows and
+the views, in the database's own dialect. A table exports the same way, with
+its filter and order, or to CSV, and **Query in console** opens the console
+with its `SELECT` written. A query exports to CSV from the console. The file
+is written to the server's shared folder and downloads like any other.
+Triggers, functions and permissions stay out of a dump.
 
 A database file opens the same tree in the preview of the shared folder and of
 Project files, with its console, tables and views, without saving a connection:
@@ -120,8 +129,8 @@ key: it lists the connections and looks inside them, runs queries, whose
 statements answer one by one with their first 50 rows and page on from there,
 runs SQL that writes, creating and dropping databases included, creates, edits,
 tests and deletes connections, installs and uninstalls drivers, opens a database
-file and exports a table or a query to the shared folder, handed over in the
-chat. Each query shows in the chat as a block with the connection, its SQL and what
+file and exports a table, a query, a schema or the whole database to the
+shared folder, handed over in the chat. Each query shows in the chat as a block with the connection, its SQL and what
 each statement did: the rows it read, the rows it inserted, updated or deleted, the
 columns of the table it created, or the ones an `ALTER` added, removed or changed. The block shows whatever the tool
 setting says, like shared files. Each table it touched ends the block as a chip
