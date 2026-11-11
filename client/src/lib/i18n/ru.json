@@ -1250,6 +1250,7 @@
   "DATABASE_INSTALL_DRIVER": "Установить драйвер",
   "DATABASE_CONSOLE": "Консоль SQL",
   "DATABASE_NEW_CONSOLE": "Открыть консоль SQL",
+  "DATABASE_QUERY_IN_CONSOLE": "Запрос в консоли",
   "DATABASE_TABLES": "Таблицы",
   "DATABASE_VIEWS": "Представления",
   "DATABASE_NO_TABLES": "Нет таблиц",

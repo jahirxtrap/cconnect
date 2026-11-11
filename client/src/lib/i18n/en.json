@@ -1188,6 +1188,7 @@
   "DATABASE_INSTALL_DRIVER": "Install driver",
   "DATABASE_CONSOLE": "SQL console",
   "DATABASE_NEW_CONSOLE": "Open SQL console",
+  "DATABASE_QUERY_IN_CONSOLE": "Query in console",
   "DATABASE_TABLES": "Tables",
   "DATABASE_VIEWS": "Views",
   "DATABASE_NO_TABLES": "No tables",

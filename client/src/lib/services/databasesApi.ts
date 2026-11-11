@@ -179,6 +179,13 @@ export const createDatabasesApi = (profile: () => Profile) => {
         pathOf,
       );
     },
+
+    async exportDump(scope: DatabaseScope, schema: string | null) {
+      return outcome(
+        await client.call<Wire>("POST", `${base(scope.connection)}/export/dump`, undefined, { database: scope.database, schema }),
+        pathOf,
+      );
+    },
   };
 };
 

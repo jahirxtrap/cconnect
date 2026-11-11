@@ -1188,6 +1188,7 @@
   "DATABASE_INSTALL_DRIVER": "ドライバーをインストール",
   "DATABASE_CONSOLE": "SQL コンソール",
   "DATABASE_NEW_CONSOLE": "SQL コンソールを開く",
+  "DATABASE_QUERY_IN_CONSOLE": "コンソールで照会",
   "DATABASE_TABLES": "テーブル",
   "DATABASE_VIEWS": "ビュー",
   "DATABASE_NO_TABLES": "テーブルはありません",

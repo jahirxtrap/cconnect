@@ -40,8 +40,16 @@ export interface DatabaseEngine {
   port: number | null;
   packages: string[];
   options: string[];
+  quote: string;
   installed: boolean;
 }
+
+export const SQL_QUOTE = '"';
+
+const PLAIN_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+
+export const sqlIdentifier = (name: string, quote: string) =>
+  PLAIN_IDENTIFIER.test(name) ? name : `${quote}${name.replaceAll(quote, quote + quote)}${quote}`;
 
 export interface SshTunnel {
   host: string;
@@ -190,6 +198,7 @@ export const toDatabaseEngine = (raw: Wire): DatabaseEngine => ({
   port: number(raw, "port"),
   packages: strings(raw, "packages"),
   options: strings(raw, "options"),
+  quote: text(raw, "quote") || SQL_QUOTE,
   installed: flag(raw, "installed"),
 });
 

@@ -1188,6 +1188,7 @@
   "DATABASE_INSTALL_DRIVER": "Installa driver",
   "DATABASE_CONSOLE": "Console SQL",
   "DATABASE_NEW_CONSOLE": "Apri console SQL",
+  "DATABASE_QUERY_IN_CONSOLE": "Interroga in console",
   "DATABASE_TABLES": "Tabelle",
   "DATABASE_VIEWS": "Viste",
   "DATABASE_NO_TABLES": "Nessuna tabella",

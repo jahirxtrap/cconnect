@@ -1188,6 +1188,7 @@
   "DATABASE_INSTALL_DRIVER": "Instalar controlador",
   "DATABASE_CONSOLE": "Consola SQL",
   "DATABASE_NEW_CONSOLE": "Abrir consola SQL",
+  "DATABASE_QUERY_IN_CONSOLE": "Consultar en consola",
   "DATABASE_TABLES": "Tablas",
   "DATABASE_VIEWS": "Vistas",
   "DATABASE_NO_TABLES": "Sin tablas",

@@ -1,3 +1,13 @@
+<script module lang="ts">
+  import type { DatabaseConnection, DatabaseScope } from "$lib/data/databaseModels";
+
+  export type TreeMenuTarget =
+    | { kind: "connection"; key: string; connection: DatabaseConnection }
+    | { kind: "database"; key: string; scope: DatabaseScope }
+    | { kind: "schema"; key: string; scope: DatabaseScope; schema: string }
+    | { kind: "object"; key: string; scope: DatabaseScope; schema: string | null; name: string };
+</script>
+
 <script lang="ts">
   import ChevronRight from "@lucide/svelte/icons/chevron-right";
   import Database from "@lucide/svelte/icons/database";
@@ -9,13 +19,7 @@
   import View from "@lucide/svelte/icons/view";
   import { untrack, type Snippet } from "svelte";
   import { sameObject, type DatabaseObjectKind, type DatabaseObjectRef, type OpenedObject } from "$lib/app/viewer.svelte";
-  import {
-    databaseFailureText,
-    engineLabel,
-    type DatabaseConnection,
-    type DatabaseFailure,
-    type DatabaseScope,
-  } from "$lib/data/databaseModels";
+  import { databaseFailureText, engineLabel, type DatabaseFailure } from "$lib/data/databaseModels";
   import { formatDecimal } from "$lib/data/format";
   import type { KeyGate } from "$lib/data/keyGate.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -33,8 +37,8 @@
     gate: KeyGate;
     onOpen: (target: DatabaseObjectRef) => void;
     onError: (text: string) => void;
-    onMenu?: (connection: DatabaseConnection) => void;
-    menu?: Snippet<[DatabaseConnection]>;
+    onMenu?: (target: TreeMenuTarget) => void;
+    menu?: Snippet<[TreeMenuTarget]>;
   }
 
   const { connections, rooted = true, selected, gate, onOpen, onError, onMenu, menu }: Props = $props();
@@ -201,41 +205,72 @@
   <span class="min-w-0 flex-1 truncate text-body-md">{text}</span>
 {/snippet}
 
+{#snippet branch(held: TreeMenuTarget, onclick: () => void, children: Snippet, chosen: boolean)}
+  <div class="group relative">
+    <Pressable
+      {onclick}
+      onlongclick={onMenu ? () => onMenu(held) : undefined}
+      oncontextmenu={onMenu ? () => onMenu(held) : undefined}
+      hover={!chosen}
+      class="{menu ? MENU_ROW_CLASS : ROW_CLASS} {chosen ? 'bg-surface-variant' : ''}"
+    >
+      {@render children()}
+    </Pressable>
+    {@render menu?.(held)}
+  </div>
+{/snippet}
+
 {#snippet row(item: Row)}
   {#if item.type === "connection"}
     {@const engine = databases.engine(profile, item.connection.engine)}
-    <div class="group relative">
-      <Pressable
-        onclick={() => toggle(item.connection.id)}
-        onlongclick={onMenu ? () => onMenu(item.connection) : undefined}
-        oncontextmenu={onMenu ? () => onMenu(item.connection) : undefined}
-        class={menu ? MENU_ROW_CLASS : ROW_CLASS}
-      >
-        {@render chevron(0, isOpen(item.connection.id), true)}
-        {@render label(DatabaseZap, item.connection.name)}
-        {#if item.connection.readOnly}
-          <Lock size={12} class="shrink-0 text-on-surface-variant" />
-        {/if}
-        <span class="shrink-0 text-caption text-faint">{engineLabel(engine, item.connection.engine)}</span>
-      </Pressable>
-      {@render menu?.(item.connection)}
-    </div>
-  {:else if item.type === "console" || item.type === "object"}
+    {#snippet connectionLabel()}
+      {@render chevron(0, isOpen(item.connection.id), true)}
+      {@render label(DatabaseZap, item.connection.name)}
+      {#if item.connection.readOnly}
+        <Lock size={12} class="shrink-0 text-on-surface-variant" />
+      {/if}
+      <span class="shrink-0 text-caption text-faint">{engineLabel(engine, item.connection.engine)}</span>
+    {/snippet}
+    {@render branch({ kind: "connection", key: item.key, connection: item.connection }, () => toggle(item.connection.id), connectionLabel, false)}
+  {:else if item.type === "console"}
     {@const chosen = current(item)}
     <Pressable onclick={() => onOpen(target(item))} hover={!chosen} class="{ROW_CLASS} {chosen ? 'bg-surface-variant' : ''}">
       {@render chevron(item.depth, false, false)}
-      {@render label(KIND_ICONS[target(item).kind], item.type === "console" ? t("DATABASE_CONSOLE") : item.name)}
+      {@render label(KIND_ICONS[target(item).kind], t("DATABASE_CONSOLE"))}
     </Pressable>
+  {:else if item.type === "object"}
+    {#snippet objectLabel()}
+      {@render chevron(item.depth, false, false)}
+      {@render label(KIND_ICONS[item.kind], item.name)}
+    {/snippet}
+    {@render branch(
+      { kind: "object", key: item.key, scope: item.scope, schema: item.schema, name: item.name },
+      () => onOpen(target(item)),
+      objectLabel,
+      current(item),
+    )}
   {:else if item.type === "database"}
-    <Pressable onclick={() => toggle(item.connection.id, item.database)} class={ROW_CLASS}>
+    {#snippet databaseLabel()}
       {@render chevron(item.depth, isOpen(item.connection.id, item.database), true)}
       {@render label(Database, item.database)}
-    </Pressable>
+    {/snippet}
+    {@render branch(
+      { kind: "database", key: item.key, scope: { connection: item.connection.id, database: item.database } },
+      () => toggle(item.connection.id, item.database),
+      databaseLabel,
+      false,
+    )}
   {:else if item.type === "schema"}
-    <Pressable onclick={() => toggle(item.scope.connection, item.scope.database, item.schema)} class={ROW_CLASS}>
+    {#snippet schemaLabel()}
       {@render chevron(item.depth, isOpen(item.scope.connection, item.scope.database, item.schema), true)}
       {@render label(Layers, item.schema)}
-    </Pressable>
+    {/snippet}
+    {@render branch(
+      { kind: "schema", key: item.key, scope: item.scope, schema: item.schema },
+      () => toggle(item.scope.connection, item.scope.database, item.schema),
+      schemaLabel,
+      false,
+    )}
   {:else if item.type === "group"}
     {@const open = isOpen(item.scope.connection, item.scope.database, item.schema, item.group)}
     <Pressable onclick={() => toggle(item.scope.connection, item.scope.database, item.schema, item.group)} class={ROW_CLASS}>

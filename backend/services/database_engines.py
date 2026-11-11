@@ -133,6 +133,7 @@ def listed() -> list[dict]:
             "port": item["port"],
             "packages": item["packages"],
             "options": item["options"],
+            "quote": item["quote"],
             "installed": installed(engine),
         }
         for engine, item in ENGINES.items()

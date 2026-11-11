@@ -1188,6 +1188,7 @@
   "DATABASE_INSTALL_DRIVER": "Installer le pilote",
   "DATABASE_CONSOLE": "Console SQL",
   "DATABASE_NEW_CONSOLE": "Ouvrir la console SQL",
+  "DATABASE_QUERY_IN_CONSOLE": "Interroger en console",
   "DATABASE_TABLES": "Tables",
   "DATABASE_VIEWS": "Vues",
   "DATABASE_NO_TABLES": "Aucune table",

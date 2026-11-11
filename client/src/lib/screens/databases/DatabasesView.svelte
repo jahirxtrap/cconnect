@@ -1,5 +1,6 @@
 <script lang="ts">
   import Database from "@lucide/svelte/icons/database";
+  import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Pencil from "@lucide/svelte/icons/pencil";
   import Plug from "@lucide/svelte/icons/plug";
@@ -10,7 +11,15 @@
   import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import { closeDatabaseObject, openDatabaseObject, openedObject } from "$lib/app/viewer.svelte";
-  import { databaseFailureText, type DatabaseConnection } from "$lib/data/databaseModels";
+  import {
+    databaseFailureText,
+    EXPORT_FORMATS,
+    SQL_QUOTE,
+    sqlIdentifier,
+    type DatabaseConnection,
+    type DatabaseScope,
+    type ExportFormat,
+  } from "$lib/data/databaseModels";
   import { KeyGate, keyRefused } from "$lib/data/keyGate.svelte";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
@@ -27,6 +36,7 @@
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
+  import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ScrollCard from "$lib/ui/ScrollCard.svelte";
@@ -35,8 +45,9 @@
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ConnectionDialog from "./ConnectionDialog.svelte";
   import DatabaseObjectView from "./DatabaseObjectView.svelte";
-  import DatabaseTree from "./DatabaseTree.svelte";
+  import DatabaseTree, { type TreeMenuTarget } from "./DatabaseTree.svelte";
   import DriversDialog from "./DriversDialog.svelte";
+  import { deliverExport } from "./exportDelivery";
 
   interface Props {
     elsewhere?: boolean;
@@ -55,6 +66,7 @@
   let removing = $state<DatabaseConnection | null>(null);
   let menuId = $state<string | null>(null);
   let failed = $state<string | null>(null);
+  let exporting = $state(false);
   let unlocking = $state(false);
   let rejected = $state(false);
 
@@ -96,6 +108,34 @@
   const refreshAll = async () => {
     for (const connection of connections) databases.forget(profile, connection.id);
     await databases.refresh(profile);
+  };
+
+  const exportable = (connection: DatabaseConnection) =>
+    databases.schemasOf(profile, { connection: connection.id, database: null })?.value?.databases === null;
+
+  const EXPORT_LABELS: Record<ExportFormat, string> = { csv: "DATABASE_EXPORT_CSV", sql: "DATABASE_EXPORT_SQL" };
+
+  const deliver = async (found: Promise<Awaited<ReturnType<typeof api.exportDump>>>) => {
+    menuId = null;
+    failed = null;
+    exporting = true;
+    const problem = await deliverExport(await found);
+    exporting = false;
+    if (problem) failed = databaseFailureText(problem.failure);
+  };
+
+  const exportDump = (scope: DatabaseScope, schema: string | null) => deliver(api.exportDump(scope, schema));
+
+  const exportObject = (scope: DatabaseScope, schema: string | null, name: string, format: ExportFormat) =>
+    deliver(api.exportTable(scope, { schema, name, sort: null, descending: false, where: "" }, format));
+
+  const queryInConsole = (scope: DatabaseScope, schema: string | null, name: string) => {
+    menuId = null;
+    const engine = databases.engine(profile, databases.find(profile, scope.connection)?.engine ?? "");
+    const quote = engine?.quote ?? SQL_QUOTE;
+    const table = [schema, name].filter((part) => part !== null).map((part) => sqlIdentifier(part, quote));
+    databases.saveDraft(profile, scope, { sql: `SELECT * FROM ${table.join(".")};` });
+    openDatabaseObject({ connection: scope.connection, database: scope.database, schema: null, name: "", kind: "console" });
   };
 
   const remove = async (connection: DatabaseConnection) => {
@@ -151,11 +191,15 @@
   <ActionButton text={t("UNLOCK")} onclick={askKey} />
 {/snippet}
 
-{#snippet connectionMenu(connection: DatabaseConnection)}
-  <div class="absolute top-1 right-1 {isTouch || menuId === connection.id ? '' : 'opacity-0 group-hover:opacity-100'}">
+{#snippet exportItem(scope: DatabaseScope, schema: string | null)}
+  <MenuItem icon={Download} text={t("DATABASE_EXPORT_SQL")} enabled={!exporting} onclick={() => void exportDump(scope, schema)} />
+{/snippet}
+
+{#snippet treeMenu(target: TreeMenuTarget)}
+  <div class="absolute top-1 right-1 {isTouch || menuId === target.key ? '' : 'opacity-0 group-hover:opacity-100'}">
     <PopupMenu
-      open={menuId === connection.id}
-      onOpenChange={(open) => (menuId = open ? connection.id : null)}
+      open={menuId === target.key}
+      onOpenChange={(open) => (menuId = open ? target.key : null)}
       label={t("MORE_OPTIONS")}
       align="end"
     >
@@ -164,15 +208,42 @@
           <EllipsisVertical />
         </TooltipIconButton>
       {/snippet}
-      <MenuItem icon={SquareCode} text={t("DATABASE_NEW_CONSOLE")} onclick={() => openConsole(connection)} />
-      <MenuItem icon={Pencil} text={t("EDIT")} onclick={() => (editing = connection)} />
-      <MenuItem icon={RotateCw} text={t("REFRESH")} onclick={() => databases.forget(profile, connection.id)} />
-      <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => (removing = connection)} />
+      {#if target.kind === "connection"}
+        {@const connection = target.connection}
+        <MenuItem icon={SquareCode} text={t("DATABASE_NEW_CONSOLE")} onclick={() => openConsole(connection)} />
+        <MenuItem icon={Pencil} text={t("EDIT")} onclick={() => (editing = connection)} />
+        <MenuItem icon={RotateCw} text={t("REFRESH")} onclick={() => databases.forget(profile, connection.id)} />
+        {#if exportable(connection)}
+          {@render exportItem({ connection: connection.id, database: null }, null)}
+        {/if}
+        <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => (removing = connection)} />
+      {:else if target.kind === "database"}
+        {@render exportItem(target.scope, null)}
+      {:else if target.kind === "schema"}
+        {@render exportItem(target.scope, target.schema)}
+      {:else}
+        <MenuItem
+          icon={SquareCode}
+          text={t("DATABASE_QUERY_IN_CONSOLE")}
+          onclick={() => queryInConsole(target.scope, target.schema, target.name)}
+        />
+        {#each EXPORT_FORMATS as format (format)}
+          <MenuItem
+            icon={Download}
+            text={t(EXPORT_LABELS[format])}
+            enabled={!exporting}
+            onclick={() => void exportObject(target.scope, target.schema, target.name, format)}
+          />
+        {/each}
+      {/if}
     </PopupMenu>
   </div>
 {/snippet}
 
 <div class="relative flex h-full min-h-0 flex-col">
+  {#if exporting}
+    <LinearProgress class="absolute inset-x-0 top-0 z-30" />
+  {/if}
   <PaneHeader title={t("DATABASES")} actions={headerActions} />
   <div class="flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset) pb-(--page-inset)">
     {#if failed}
@@ -200,8 +271,8 @@
           {gate}
           onOpen={openDatabaseObject}
           onError={(text) => (failed = text)}
-          onMenu={(connection) => (menuId = connection.id)}
-          menu={connectionMenu}
+          onMenu={(target) => (menuId = target.key)}
+          menu={treeMenu}
         />
       </ScrollCard>
     {/if}

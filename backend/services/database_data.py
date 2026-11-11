@@ -738,16 +738,161 @@ def _renderer(column: Any, engine: Engine, binary: str) -> Callable[[Any], str]:
     return render
 
 
-def _write_inserts(target: Path, engine: Engine, entry: dict, reflected: Table, source: Any) -> None:
-    binary = database_engines.spec_of(entry)["binary"]
+def _quoted(engine: Engine, schema: Optional[str], name: str) -> str:
     quote = engine.dialect.identifier_preparer.quote
-    name = ".".join(quote(part) for part in (reflected.schema, reflected.name) if part)
-    columns = ", ".join(quote(column.name) for column in reflected.columns)
+    return ".".join(quote(part) for part in (schema, name) if part)
+
+
+def _names(engine: Engine, names: list[str]) -> str:
+    quote = engine.dialect.identifier_preparer.quote
+    return ", ".join(quote(name) for name in names)
+
+
+def _optional(read: Callable[[], Any], fallback: Any = None) -> Any:
+    try:
+        return read()
+    except (NotImplementedError, SQLAlchemyError):
+        return fallback
+
+
+def _insert_lines(handle: Any, engine: Engine, entry: dict, reflected: Table, source: Any) -> None:
+    binary = database_engines.spec_of(entry)["binary"]
+    name = _quoted(engine, reflected.schema, reflected.name)
+    columns = _names(engine, [column.name for column in reflected.columns])
     renderers = [_renderer(column, engine, binary) for column in reflected.columns]
-    with target.open("w", encoding="utf-8", newline="\n") as handle:
-        for row in source:
-            values = ", ".join(render(value) for render, value in zip(renderers, row))
-            handle.write(f"INSERT INTO {name} ({columns}) VALUES ({values});\n")
+    for row in source:
+        values = ", ".join(render(value) for render, value in zip(renderers, row))
+        handle.write(f"INSERT INTO {name} ({columns}) VALUES ({values});\n")
+
+
+def _default_ddl(default: str) -> str:
+    expression = default.strip()
+    if "(" in expression and not (expression.startswith("(") and expression.endswith(")")):
+        return f"({expression})"
+    return expression
+
+
+def _column_ddl(engine: Engine, column: dict, auto_increment: str) -> str:
+    parts = [_names(engine, [column["name"]])]
+    if column["type"]:
+        parts.append(column["type"])
+    if not column["nullable"]:
+        parts.append("NOT NULL")
+    if column["auto"] and auto_increment:
+        parts.append(auto_increment)
+    elif column["default"] is not None:
+        parts.append(f"DEFAULT {_default_ddl(column['default'])}")
+    return " ".join(parts)
+
+
+def _table_ddl(engine: Engine, item: dict, connection: Connection, schema: Optional[str], name: str) -> tuple[list[str], list[str]]:
+    inspector = inspect(connection)
+    primary = _optional(lambda: _primary(connection, item, schema, name), [])
+    columns = [_column(column, primary) for column in _columns(connection, item, schema, name)]
+    lines = [_column_ddl(engine, column, item["auto_increment"]) for column in columns]
+    if primary:
+        lines.append(f"PRIMARY KEY ({_names(engine, primary)})")
+    for key in (_foreign(found) for found in _optional(lambda: inspector.get_foreign_keys(name, schema=schema), [])):
+        if key["columns"] and key["table"] and key["referred"]:
+            referred = _quoted(engine, key["schema"], key["table"])
+            lines.append(f"FOREIGN KEY ({_names(engine, key['columns'])}) REFERENCES {referred} ({_names(engine, key['referred'])})")
+    target = _quoted(engine, schema, name)
+    statements = ["CREATE TABLE " + target + " (\n  " + ",\n  ".join(lines) + "\n);"]
+    for index in (_index(found) for found in _optional(lambda: inspector.get_indexes(name, schema=schema), [])):
+        if index["name"] and index["columns"] and index["columns"] != primary:
+            unique = "UNIQUE " if index["unique"] else ""
+            statements.append(f"CREATE {unique}INDEX {_names(engine, [index['name']])} ON {target} ({_names(engine, index['columns'])});")
+    return statements, [column["name"] for column in columns if column["auto"]]
+
+
+def _identity_lines(item: dict, key: str, table: str, columns: list[str]) -> list[str]:
+    template = item[key]
+    if not template or not columns:
+        return []
+    return [template.format(table=table, column=column) for column in columns]
+
+
+def _view_ddl(engine: Engine, connection: Connection, schema: Optional[str], name: str) -> Optional[str]:
+    definition = _optional(lambda: inspect(connection).get_view_definition(name, schema=schema))
+    if not definition:
+        return None
+    body = str(definition).strip().rstrip(";")
+    if re.match(r"(?is)\s*create\s", body):
+        return f"{body};"
+    return f"CREATE VIEW {_quoted(engine, schema, name)} AS {body};"
+
+
+def _dependency_order(connection: Connection, schema: Optional[str], names: list[str]) -> list[str]:
+    inspector = inspect(connection)
+    needs = {
+        name: {
+            str(key.get("referred_table"))
+            for key in _optional(lambda: inspector.get_foreign_keys(name, schema=schema), [])
+            if key.get("referred_table") in names and key.get("referred_table") != name
+        }
+        for name in names
+    }
+    ordered: list[str] = []
+    while needs:
+        ready = sorted(name for name, wanted in needs.items() if wanted <= set(ordered)) or sorted(needs)
+        ordered.extend(ready)
+        for name in ready:
+            del needs[name]
+    return ordered
+
+
+def _catalog(connection: Connection, scope: databases.Scope, schema: Optional[str]) -> tuple[list[str], list[str]]:
+    inspector = inspect(connection)
+    tables = sorted(inspector.get_table_names(schema=schema))
+    views = sorted({*inspector.get_view_names(schema=schema), *_materialized(scope, schema)})
+    return tables, views
+
+
+def _dump_schemas(scope: databases.Scope, schema: Optional[str], name: Optional[str]) -> list[Optional[str]]:
+    listed = schemas(scope)
+    if listed["databases"] is not None:
+        raise databases.DatabaseError(INVALID)
+    chosen = [schema] if schema or name else (listed["schemas"] or [None])
+    return [None if place in (None, listed["default"]) else place for place in chosen]
+
+
+def export_dump(
+    scope: databases.Scope,
+    schema: Optional[str] = None,
+    name: Optional[str] = None,
+    sort: Optional[str] = None,
+    descending: bool = False,
+    where: str = "",
+    folder: Optional[Path] = None,
+) -> str:
+    engine, entry = databases.engine_for(scope)
+    item = database_engines.spec_of(entry)
+    places = _dump_schemas(scope, schema, name)
+    target = _export_file(entry, name or schema or scope.database or entry["name"], SQL, folder)
+    with _reading(scope, EXPORT_SECONDS) as connection, target.open("w", encoding="utf-8", newline="\n") as handle:
+        for place in places:
+            tables, views = _catalog(connection, scope, place)
+            if name:
+                tables, views = ([] if name in views else [name]), ([name] if name in views else [])
+            elif place:
+                handle.write(f"CREATE SCHEMA {_names(engine, [place])};\n\n")
+            for table in _dependency_order(connection, place, tables):
+                statements, auto = _table_ddl(engine, item, connection, place, table)
+                qualified = _quoted(engine, place, table)
+                for statement in statements + _identity_lines(item, "identity_insert_on", qualified, auto[:1]):
+                    handle.write(f"{statement}\n")
+                reflected = _reflect(scope, connection, place, table)
+                selected = _ordered(_filtered(scope, reflected, where), reflected, sort, descending)
+                result = connection.execution_options(stream_results=True).execute(selected)
+                _insert_lines(handle, engine, entry, reflected, result)
+                for statement in _identity_lines(item, "identity_insert_off", qualified, auto[:1]) + _identity_lines(item, "identity_sync", qualified, auto):
+                    handle.write(f"{statement}\n")
+                handle.write("\n")
+            for view in views:
+                statement = _view_ddl(engine, connection, place, view)
+                if statement:
+                    handle.write(f"{statement}\n\n")
+    return _relative(target)
 
 
 def export_table(
@@ -762,16 +907,15 @@ def export_table(
 ) -> str:
     if format not in TABLE_FORMATS:
         raise databases.DatabaseError(INVALID, format)
-    engine, entry = databases.engine_for(scope)
-    target = _export_file(entry, name, format, folder)
+    if format == SQL:
+        return export_dump(scope, schema, name, sort, descending, where, folder)
+    entry = databases.require(scope.connection)
+    target = _export_file(entry, name, CSV, folder)
     with _reading(scope, EXPORT_SECONDS) as connection:
         reflected = _reflect(scope, connection, schema, name)
         selected = _ordered(_filtered(scope, reflected, where), reflected, sort, descending)
         result = connection.execution_options(stream_results=True).execute(selected)
-        if format == CSV:
-            _write_csv(target, list(result.keys()), result)
-        else:
-            _write_inserts(target, engine, entry, reflected, result)
+        _write_csv(target, list(result.keys()), result)
     return _relative(target)
 
 

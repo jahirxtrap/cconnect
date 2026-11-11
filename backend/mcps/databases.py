@@ -105,7 +105,8 @@ DB_MANAGE = Definition(
     " a connection and update changes the fields given; remove deletes the connection, never the database; test"
     " connects without saving. install and uninstall put an engine's driver on the server or take it off. open"
     " opens a SQLite or DuckDB file as a connection for this session. export writes a table or a query to the"
-    " shared folder as CSV, or a table as SQL inserts, and shows the file to the user.",
+    " shared folder as CSV, or a table, a schema or the whole database as SQL with its structure and rows, and"
+    " shows the file to the user.",
     {
         "type": "object",
         "properties": {
@@ -141,10 +142,10 @@ DB_MANAGE = Definition(
                 },
                 "description": "add and update: an SSH tunnel through another machine, with the server's ssh client.",
             },
-            "schema": {"type": "string", "description": "export: the table's schema, the default one when left out."},
-            "table": {"type": "string", "description": "export: the table to write."},
+            "schema": {"type": "string", "description": "export: the schema to write, or the table's; the default one when left out."},
+            "table": {"type": "string", "description": "export: the table to write. Without table and sql, the schema or the whole database is written."},
             "sql": {"type": "string", "description": "export: a query that reads, written instead of a table."},
-            "format": {"type": "string", "enum": list(database_data.TABLE_FORMATS), "description": "export: csv, or sql for a table's inserts; csv when left out."},
+            "format": {"type": "string", "enum": list(database_data.TABLE_FORMATS), "description": "export: csv or sql for a table, csv when left out; a schema or a database is always sql."},
         },
         "required": ["action"],
     },
@@ -499,10 +500,12 @@ def _export_file(args: dict, folder: Path) -> str:
     scope = _scope(args)
     if args.get("sql"):
         written = database_data.export_query(scope, args["sql"], folder)
-    else:
+    elif args.get("table"):
         written = database_data.export_table(
-            scope, args.get("schema") or None, args.get("table") or "", None, False, "", args.get("format") or database_data.CSV, folder,
+            scope, args.get("schema") or None, args["table"], None, False, "", args.get("format") or database_data.CSV, folder,
         )
+    else:
+        written = database_data.export_dump(scope, args.get("schema") or None, folder=folder)
     return Path(written).name
 
 

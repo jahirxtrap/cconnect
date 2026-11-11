@@ -1188,6 +1188,7 @@
   "DATABASE_INSTALL_DRIVER": "Treiber installieren",
   "DATABASE_CONSOLE": "SQL-Konsole",
   "DATABASE_NEW_CONSOLE": "SQL-Konsole öffnen",
+  "DATABASE_QUERY_IN_CONSOLE": "In Konsole abfragen",
   "DATABASE_TABLES": "Tabellen",
   "DATABASE_VIEWS": "Ansichten",
   "DATABASE_NO_TABLES": "Keine Tabellen",

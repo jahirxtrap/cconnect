@@ -86,6 +86,10 @@ class TableExport(Browse):
     format: Literal[database_data.CSV, database_data.SQL] = database_data.CSV
 
 
+class SchemaExport(Scoped):
+    schema_name: Optional[str] = Field(None, alias="schema")
+
+
 def _failed(exc: Exception) -> Response:
     if isinstance(exc, databases.DatabaseError) and exc.reason == database_data.WRITES:
         return api_response(status=403)
@@ -236,3 +240,10 @@ async def export_table(connection_id: str, body: TableExport, x_security_key: st
 @router.post("/databases/{connection_id}/export/query")
 async def export_query(connection_id: str, body: Statement, x_security_key: str = Header("")):
     return await _reading(connection_id, x_security_key, lambda: {"path": database_data.export_query(databases.Scope(connection_id, body.database), body.sql)})
+
+
+@router.post("/databases/{connection_id}/export/dump")
+async def export_dump(connection_id: str, body: SchemaExport, x_security_key: str = Header("")):
+    return await _reading(
+        connection_id, x_security_key, lambda: {"path": database_data.export_dump(databases.Scope(connection_id, body.database), body.schema_name)},
+    )
