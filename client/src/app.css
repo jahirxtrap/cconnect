@@ -83,7 +83,7 @@ html[data-theme="dark"] {
   translate: min(0px, var(--bits-floating-available-width, 100%) - 100%);
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .menu-surface [data-highlighted] {
     @apply bg-hover;
   }
@@ -410,7 +410,7 @@ html.pdf-screen .pdf-screen-root {
     pointer-events: none;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .ripple:hover:not(:disabled):not([data-disabled])::after {
       opacity: 0.08;
     }

@@ -4,6 +4,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import { FIELD_PORT_CLASS, FIELD_ROW_CLASS, FIELD_WIDE_CLASS } from "$lib/ui/field";
   import InputField from "$lib/ui/InputField.svelte";
 
   interface Props {
@@ -44,13 +45,22 @@
   {/snippet}
   <div class="flex flex-col gap-2">
     <InputField value={name} oninput={(value) => (name = value)} label={t("SSH_NAME")} optional singleLine />
-    <InputField value={host} oninput={(value) => (host = value)} label={t("HOST")} singleLine />
-    <InputField
-      value={port}
-      oninput={(value) => (port = value.replace(/\D/g, ""))}
-      label={t("PORT")}
-      singleLine
-    />
+    <div class={FIELD_ROW_CLASS}>
+      <InputField
+        value={host}
+        oninput={(value) => (host = value)}
+        label={t("HOST")}
+        singleLine
+        class={FIELD_WIDE_CLASS}
+      />
+      <InputField
+        value={port}
+        oninput={(value) => (port = value.replace(/\D/g, ""))}
+        label={t("PORT")}
+        singleLine
+        class={FIELD_PORT_CLASS}
+      />
+    </div>
     <InputField value={user} oninput={(value) => (user = value)} label={t("SSH_USER")} singleLine />
     <InputField
       value={password}

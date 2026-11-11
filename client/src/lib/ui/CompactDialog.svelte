@@ -1,7 +1,7 @@
 <script module lang="ts">
-  export const DIALOG_PAGE_CLASS = "scrollbar-thin overflow-y-auto px-5 py-1";
+  export const DIALOG_PAGE_CLASS = "scrollbar-thin overflow-y-auto px-5";
 
-  export const DIALOG_LIST_CLASS = "scrollbar-thin flex max-h-[420px] flex-col overflow-y-auto py-1";
+  export const DIALOG_LIST_CLASS = "scrollbar-thin flex max-h-[420px] flex-col overflow-y-auto";
 </script>
 
 <script lang="ts">
@@ -47,7 +47,7 @@
     <Dialog.Content
       data-instant={instant || undefined}
       onOpenAutoFocus={(event) => event.preventDefault()}
-      class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-[min(40rem,calc(var(--safe-height)_-_2rem))] w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
+      class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-(--dialog-max-height) w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
       <div class="flex items-center">
         <div class="min-w-0 flex-1">

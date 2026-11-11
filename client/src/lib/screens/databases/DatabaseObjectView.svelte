@@ -179,8 +179,15 @@
   };
 
   const sortBy = (column: string) => {
-    descending = sort === column && !descending;
-    sort = column;
+    if (sort !== column) {
+      sort = column;
+      descending = false;
+    } else if (!descending) {
+      descending = true;
+    } else {
+      sort = null;
+      descending = false;
+    }
     page = 1;
     void load();
   };

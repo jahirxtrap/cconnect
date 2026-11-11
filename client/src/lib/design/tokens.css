@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@custom-variant hover {
+  @media (hover: hover) and (pointer: fine) {
+    &:hover {
+      @slot;
+    }
+  }
+}
+
 @font-face {
   font-family: "DejaVu Sans";
   src: url("./fonts/dejavu_sans_symbols.woff2") format("woff2");
@@ -144,6 +152,7 @@
   --page-inset: 16px;
   --page-inset-compact: 8px;
   --pane-gap: 0.375rem;
+  --dialog-max-height: min(40rem, calc(var(--safe-height) - 2rem));
   --dot-size: 8px;
   --hairline: 1px;
   --mod-border-bold: 2px;
@@ -165,5 +174,30 @@
     --dot-size: round(8px, var(--px-grid, 1px));
     --hairline: max(var(--px-grid, 1px), round(down, 1px, var(--px-grid, 1px)));
     --pane-gap: round(0.375rem, var(--px-grid, 1px));
+    --dialog-max-height: calc(
+      var(--safe-height) -
+        round(
+          up,
+          calc(var(--safe-height) - min(40rem, calc(var(--safe-height) - 2rem))),
+          calc(2 * var(--px-grid, 1px))
+        )
+    );
+    --text-body-lg--line-height: round(24px, var(--px-grid, 1px));
+    --text-body-md--line-height: round(20px, var(--px-grid, 1px));
+    --text-body-sm--line-height: round(16px, var(--px-grid, 1px));
+    --text-caption--line-height: round(16px, var(--px-grid, 1px));
+    --text-label-lg--line-height: round(20px, var(--px-grid, 1px));
+    --text-label-md--line-height: round(16px, var(--px-grid, 1px));
+    --text-label-sm--line-height: round(16px, var(--px-grid, 1px));
+    --text-item-title--line-height: round(20px, var(--px-grid, 1px));
+    --text-section--line-height: round(18px, var(--px-grid, 1px));
+    --text-block--line-height: round(20px, var(--px-grid, 1px));
+    --text-title-md--line-height: round(20px, var(--px-grid, 1px));
+    --text-title-lg--line-height: round(24px, var(--px-grid, 1px));
+    --text-topbar-title--line-height: round(22px, var(--px-grid, 1px));
+    --text-topbar-subtitle--line-height: round(14px, var(--px-grid, 1px));
+    --text-dialog-title--line-height: round(22px, var(--px-grid, 1px));
+    --text-headline--line-height: round(28px, var(--px-grid, 1px));
+    --text-metric--line-height: round(32px, var(--px-grid, 1px));
   }
 }

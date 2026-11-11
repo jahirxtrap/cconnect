@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ArrowDown from "@lucide/svelte/icons/arrow-down";
-  import ArrowUp from "@lucide/svelte/icons/arrow-up";
+  import ChevronDown from "@lucide/svelte/icons/chevron-down";
+  import ChevronUp from "@lucide/svelte/icons/chevron-up";
   import KeyRound from "@lucide/svelte/icons/key-round";
   import { cellText, type CellValue, type ColumnKind } from "$lib/data/databaseModels";
   import { formatDecimal } from "$lib/data/format";
@@ -93,9 +93,9 @@
   <span>{column}</span>
   {#if sort === column}
     {#if descending}
-      <ArrowDown size={12} class="shrink-0" />
+      <ChevronDown size={14} class="shrink-0" />
     {:else}
-      <ArrowUp size={12} class="shrink-0" />
+      <ChevronUp size={14} class="shrink-0" />
     {/if}
   {/if}
 {/snippet}

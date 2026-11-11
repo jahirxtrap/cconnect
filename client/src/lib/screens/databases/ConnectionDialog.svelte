@@ -1,5 +1,5 @@
 <script lang="ts">
-  import FolderSearch from "@lucide/svelte/icons/folder-search";
+  import Folder from "@lucide/svelte/icons/folder";
   import { untrack } from "svelte";
   import {
     databaseFailureText,
@@ -19,6 +19,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
+  import { FIELD_PORT_CLASS, FIELD_ROW_CLASS, FIELD_WIDE_CLASS } from "$lib/ui/field";
   import InputField from "$lib/ui/InputField.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
@@ -152,7 +153,7 @@
 
 {#snippet browse(target: "path" | "key")}
   <TooltipIconButton label={t("BROWSE")} onclick={() => (picking = target)}>
-    <FolderSearch />
+    <Folder />
   </TooltipIconButton>
 {/snippet}
 
@@ -226,10 +227,16 @@
       <p class="mt-1.5 text-body-sm text-on-surface-variant">{t("DATABASE_PACKAGES_HINT")}</p>
     </div>
   {:else}
-    <div class="mt-3">
-      <InputField value={host} oninput={(value) => (host = value)} label={t("HOST")} optional={!selected?.host} singleLine url />
-    </div>
-    <div class="mt-3">
+    <div class="mt-3 {FIELD_ROW_CLASS}">
+      <InputField
+        value={host}
+        oninput={(value) => (host = value)}
+        label={t("HOST")}
+        optional={!selected?.host}
+        singleLine
+        url
+        class={FIELD_WIDE_CLASS}
+      />
       <InputField
         value={port}
         oninput={(value) => (port = digits(value))}
@@ -238,6 +245,7 @@
         optional
         singleLine
         numeric
+        class={FIELD_PORT_CLASS}
       />
     </div>
     <div class="mt-3">
@@ -283,10 +291,15 @@
       />
     </div>
     {#if tunnel}
-      <div class="mt-3">
-        <InputField value={sshHost} oninput={(value) => (sshHost = value)} label={t("DATABASE_SSH_HOST")} singleLine url />
-      </div>
-      <div class="mt-3">
+      <div class="mt-3 {FIELD_ROW_CLASS}">
+        <InputField
+          value={sshHost}
+          oninput={(value) => (sshHost = value)}
+          label={t("DATABASE_SSH_HOST")}
+          singleLine
+          url
+          class={FIELD_WIDE_CLASS}
+        />
         <InputField
           value={sshPort}
           oninput={(value) => (sshPort = digits(value))}
@@ -295,6 +308,7 @@
           optional
           singleLine
           numeric
+          class={FIELD_PORT_CLASS}
         />
       </div>
       <div class="mt-3">

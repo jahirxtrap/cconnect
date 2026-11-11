@@ -13,6 +13,12 @@ export const FIELD_RING_CLASS = `ring-(length:--hairline) transition-shadow ring
 
 export const FIELD_BOX_CLASS = `relative flex w-full items-center rounded-md bg-surface-variant px-3 py-2 ${FIELD_RING_CLASS}`;
 
+export const FIELD_ROW_CLASS = "flex items-end gap-2";
+
+export const FIELD_WIDE_CLASS = "min-w-0 flex-1";
+
+export const FIELD_PORT_CLASS = "w-40 shrink-0";
+
 export const selectField = (field: HTMLInputElement | HTMLTextAreaElement) => {
   field.focus();
   field.select();

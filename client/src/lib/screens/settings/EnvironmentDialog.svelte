@@ -18,6 +18,7 @@
   import AccentDialog from "./AccentDialog.svelte";
   import { accentLabel } from "./settingsValues";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import { FIELD_PORT_CLASS, FIELD_ROW_CLASS, FIELD_WIDE_CLASS } from "$lib/ui/field";
   import InputField from "$lib/ui/InputField.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
@@ -161,15 +162,18 @@
   <div class="flex w-full flex-col gap-2">
     <SelectField label={t("ENVIRONMENT_KIND")} selected={kind} options={KIND_OPTIONS} onSelect={onKind} />
     <InputField value={name} oninput={(value) => (name = value)} label={t("ENVIRONMENT_NAME")} optional singleLine autofocus />
-    <InputField value={host} oninput={onHost} label={t("HOST")} singleLine />
-    {#if kind === "http"}
-      <InputField
-        value={port}
-        oninput={(value) => (port = value.replace(/\D/g, ""))}
-        label={t("PORT")}
-        singleLine
-      />
-    {/if}
+    <div class={FIELD_ROW_CLASS}>
+      <InputField value={host} oninput={onHost} label={t("HOST")} singleLine class={FIELD_WIDE_CLASS} />
+      {#if kind === "http"}
+        <InputField
+          value={port}
+          oninput={(value) => (port = value.replace(/\D/g, ""))}
+          label={t("PORT")}
+          singleLine
+          class={FIELD_PORT_CLASS}
+        />
+      {/if}
+    </div>
     <AuthFields value={auth} kinds={ENVIRONMENT_AUTH_KINDS} onChange={(next) => (auth = next)} />
     <InputField
       value={directory}
