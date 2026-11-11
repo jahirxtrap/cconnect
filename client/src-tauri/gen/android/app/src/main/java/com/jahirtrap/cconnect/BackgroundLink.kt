@@ -20,6 +20,7 @@ import org.json.JSONObject
 
 private const val CHANNEL_ID = "cconnect.chat"
 private const val PING_SECONDS = 20L
+private const val REOPEN_WINDOW_MS = PING_SECONDS * 2 * 1000
 private const val QUEUE_LIMIT = 2000
 private const val BATCH_LIMIT = 200
 private const val ACTIVITY = "activity"
@@ -31,6 +32,16 @@ private const val EXTRA_SOCKET = "cconnect.notification.socket"
 private const val EXTRA_SESSION = "cconnect.notification.session"
 private val BUSY = setOf("working", "retrying", "compacting")
 
+object LinkPulse {
+  private val beats = ConcurrentHashMap<String, Long>()
+
+  fun beat(host: String) {
+    beats[host] = System.currentTimeMillis()
+  }
+
+  fun recent(host: String, withinMs: Long) = System.currentTimeMillis() - (beats[host] ?: 0L) < withinMs
+}
+
 class BackgroundLink(private val context: Context, private val view: () -> WebView?) {
   private val client = OkHttpClient.Builder()
     .pingInterval(PING_SECONDS, TimeUnit.SECONDS)
@@ -38,6 +49,8 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     .build()
 
   private val sockets = ConcurrentHashMap<String, WebSocket>()
+  private val urls = ConcurrentHashMap<String, String>()
+  private val reopened = ConcurrentHashMap.newKeySet<String>()
   private val queued = ConcurrentHashMap<String, MutableList<String>>()
   private val activity = ConcurrentHashMap<String, String>()
   private val titles = ConcurrentHashMap<String, String>()
@@ -67,6 +80,8 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   fun closeAll() {
     for (socket in sockets.values) socket.cancel()
     sockets.clear()
+    urls.clear()
+    reopened.clear()
     queued.clear()
     agents.clear()
     subjects.clear()
@@ -87,24 +102,48 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   fun open(id: String, url: String, agent: String) {
     close(id)
     if (agent.isNotEmpty()) agents[id] = agent
+    urls[id] = url
+    connect(id, url)
+  }
+
+  private fun connect(id: String, url: String) {
+    val request = Request.Builder().url(url.replaceFirst("ws", "http")).build()
+    val host = request.url.host
     sockets[id] = client.newWebSocket(
-      Request.Builder().url(url.replaceFirst("ws", "http")).build(),
+      request,
       object : WebSocketListener() {
-        override fun onOpen(webSocket: WebSocket, response: Response) = emit(id, "open", "")
+        override fun onOpen(webSocket: WebSocket, response: Response) {
+          if (sockets[id] !== webSocket) return
+          reopened.remove(id)
+          emit(id, "open", "")
+        }
         override fun onMessage(webSocket: WebSocket, text: String) {
+          if (sockets[id] !== webSocket) return
+          LinkPulse.beat(host)
           if (agents.containsKey(id) && text.contains(ACTIVITY)) follow(id, text)
           if (!awake) watch(id, text)
           emit(id, "message", text)
         }
-        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) = emit(id, "close", reason)
-        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) =
+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+          if (sockets[id] !== webSocket) return
+          emit(id, "close", reason)
+        }
+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+          if (sockets[id] !== webSocket) return
+          if (response == null && reopened.add(id) && LinkPulse.recent(host, REOPEN_WINDOW_MS)) {
+            connect(id, url)
+            return
+          }
+          reopened.remove(id)
           emit(id, "close", t.message ?: "failed")
+        }
       },
     )
   }
 
   @JavascriptInterface
   fun send(id: String, text: String) {
+    if (reopened.contains(id)) return
     sockets[id]?.send(text)
   }
 
@@ -116,6 +155,8 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   @JavascriptInterface
   fun close(id: String) {
     sockets.remove(id)?.cancel()
+    urls.remove(id)
+    reopened.remove(id)
     queued.remove(id)
     agents.remove(id)
     subjects.remove(id)

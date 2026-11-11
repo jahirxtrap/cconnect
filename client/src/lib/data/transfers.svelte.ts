@@ -29,6 +29,7 @@ class TransferManager {
   #nextId = 0;
   #cancelled = new Set<number>();
   #aborts = new Map<number, AbortController>();
+  #progressAt = new Map<number, number>();
 
   get active() {
     return this.items.filter((item) => item.status === "active");
@@ -42,6 +43,13 @@ class TransferManager {
     if (!this.items.length) return 0;
     const total = this.items.reduce((sum, item) => sum + (item.status === "active" ? item.progress : 1), 0);
     return total / this.items.length;
+  }
+
+  flowingTo(prefix: string, withinMs: number) {
+    const since = Date.now() - withinMs;
+    return this.items.some(
+      (item) => item.status === "active" && item.url.startsWith(prefix) && (this.#progressAt.get(item.id) ?? 0) > since,
+    );
   }
 
   upload(file: File, dir: string, policy: ClashPolicy = "keep", profile: Profile = backend.active) {
@@ -106,11 +114,13 @@ class TransferManager {
 
   #settle(id: number, saved: boolean) {
     this.#aborts.delete(id);
+    this.#progressAt.delete(id);
     if (this.#cancelled.delete(id)) return;
     this.#patch(id, { progress: 1, status: saved ? "done" : "failed" });
   }
 
   #patch(id: number, patch: Partial<Transfer>) {
+    if (patch.progress !== undefined) this.#progressAt.set(id, Date.now());
     this.items = this.items.map((item) => (item.id === id ? { ...item, ...patch } : item));
   }
 }

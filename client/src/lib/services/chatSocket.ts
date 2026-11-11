@@ -46,11 +46,12 @@ import {
   type ModState,
 } from "$lib/data/modModels";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
+import { transfers } from "$lib/data/transfers.svelte";
 import { flag, list, number, strings, text, type Wire } from "$lib/data/wire";
 import type * as Contract from "$lib/contract/chatEvents";
 import { describeSocket, nativeSockets, onSocketTap, openSocket } from "$lib/platform/androidSocket";
 import type { TerminalInfo } from "./terminalApi";
-import { backend, socketUrlOf, type Profile } from "./backend.svelte";
+import { backend, baseUrlOf, socketUrlOf, type Profile } from "./backend.svelte";
 import { toCommands, type CommandOption, type CommandWire } from "./capabilitiesApi";
 import { Redial } from "./socket";
 import type { VisibilityPrefs } from "$lib/data/settings.svelte";
@@ -453,7 +454,7 @@ export class ChatSocket {
       const socket = this.#socket;
       if (socket?.readyState !== WebSocket.OPEN) return;
       const idle = now - this.#lastSeen;
-      if (idle > STALE_MS && !throttled) {
+      if (idle > STALE_MS && !throttled && !transfers.flowingTo(baseUrlOf(this.profile()), STALE_MS)) {
         socket.close();
         return;
       }

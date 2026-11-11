@@ -173,7 +173,7 @@ class Downloads(
         val connection = connect(url, headersJson)
         progress.total = connection.contentLengthLong
         return connection.inputStream.use { stream ->
-            writeToDownloads(filename) { out -> pump(stream, out, progress) }
+            writeToDownloads(filename) { out -> pump(stream, out, progress, connection.url.host) }
         }
     }
 
@@ -192,7 +192,7 @@ class Downloads(
         true
     }.getOrDefault(false)
 
-    private fun pump(stream: InputStream, out: OutputStream, progress: Progress) {
+    private fun pump(stream: InputStream, out: OutputStream, progress: Progress, host: String) {
         val buffer = ByteArray(BUFFER_SIZE)
         while (true) {
             if (progress.cancelled) throw InterruptedException()
@@ -200,6 +200,7 @@ class Downloads(
             if (read < 0) break
             out.write(buffer, 0, read)
             progress.bytes += read
+            LinkPulse.beat(host)
             report(progress)
         }
     }
