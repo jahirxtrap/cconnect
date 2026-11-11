@@ -1,6 +1,7 @@
 """Git operations the commit panel performs, on top of the single git runner."""
 
 import re
+import subprocess
 import threading
 from pathlib import Path
 from typing import Optional
@@ -30,7 +31,10 @@ def lock_for(repo: Path) -> threading.Lock:
 
 
 def _read(repo: Path, *args: str, timeout: int = _TIMEOUT) -> Optional[str]:
-    result = git.run(repo, *args, timeout=timeout)
+    try:
+        result = git.run(repo, *args, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return None
     return result.stdout.strip() if result.returncode == 0 else None
 
 

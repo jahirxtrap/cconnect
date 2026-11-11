@@ -611,8 +611,14 @@
     return () => watch.close();
   });
 
+  const openFolders = $derived(
+    Object.keys(expanded)
+      .filter((path) => expanded[path] && !path.includes(ARCHIVE_MARK))
+      .sort(),
+  );
+
   $effect(() => {
-    if (projectKey) watch.watch(projectKey);
+    if (projectKey) watch.watch(projectKey, openFolders);
   });
 
   $effect(() => {

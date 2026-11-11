@@ -27,6 +27,8 @@ _SESSION_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 _ASK_ANSWERS_RE = re.compile(r'"([^"]+)"="([^"]*)"')
 
 _COMMAND_META_RE = re.compile(r"<command-(name|message|args)>|<local-command-stdout>")
+_UNSELECTABLE_RE = re.compile(r"<(?:local-command-stderr|bash-stdout|bash-stderr|task-notification|tick)>")
+_SYSTEM_PROMPT = "system"
 _COMMAND_NAME_RE = re.compile(r"<command-name>\s*([^<]+?)\s*</command-name>")
 _COMPACT_MARK = b'"compact_boundary"'
 _INTERRUPT_RE = re.compile(r"^\[Request interrupted by user")
@@ -1271,9 +1273,9 @@ def _points_of(entries: list[dict]) -> list[dict]:
             ).strip()
         else:
             continue
-        if not text or _COMMAND_META_RE.search(text) or _INTERRUPT_RE.match(text):
+        if not text or _COMMAND_META_RE.search(text) or _UNSELECTABLE_RE.search(text) or _INTERRUPT_RE.match(text):
             continue
-        if last_anchor is None:
+        if entry.get("promptSource") == _SYSTEM_PROMPT or last_anchor is None:
             continue
         points.append({
             "id": uuid,

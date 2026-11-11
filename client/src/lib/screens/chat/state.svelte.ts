@@ -444,6 +444,8 @@ export class ChatState {
     serverStatus.link === "connected" ? this.connection : serverStatus.link,
   );
   readonly connected = $derived(this.connection === "connected");
+  #everConnected = $state(false);
+  readonly reconnecting = $derived(this.connection === "connecting" && this.#everConnected);
   switching = $state(false);
   #switchStarted = false;
   #settling = $state<HeldView | null>(null);
@@ -2457,6 +2459,7 @@ export class ChatState {
         void this.#consumeInitialSession(event.project);
         if (this.#switchStarted) this.#endSwitch();
         this.connection = "connected";
+        this.#everConnected = true;
         this.mods.rebind();
         this.#attaching = true;
         this.#arrivingMods = null;

@@ -27,6 +27,7 @@
     type TableQuery,
   } from "$lib/data/databaseModels";
   import { formatDecimal, formatDuration, joined } from "$lib/data/format";
+  import { holdRefresh } from "$lib/data/inflight";
   import { KeyGate, keyRefused } from "$lib/data/keyGate.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
@@ -116,34 +117,31 @@
     failure = databaseFailureText(found);
   };
 
-  const load = async () => {
+  const load = async (describe = false) => {
     const current = ++run;
     const target = query;
     loading = true;
-    const [table, found] = await Promise.all([
-      info ? Promise.resolve(null) : api.table(scope, schema, name),
+    const fetching = Promise.all([
+      info && !describe ? Promise.resolve(null) : api.table(scope, schema, name),
       api.browse(scope, target, page, pageSize),
     ]);
-    if (current !== run) return;
-    loading = false;
-    if (table && table.ok) info = table.value;
-    if (table && !table.ok) {
-      report(table.failure);
-      return;
+    const held = holdRefresh(fetching);
+    const [table, found] = await fetching;
+    if (current === run) {
+      if (table && table.ok) info = table.value;
+      if (table && !table.ok) report(table.failure);
+      else if (!found.ok) report(found.failure);
+      else {
+        failure = null;
+        rows = found.value;
+        page = found.value.page;
+      }
     }
-    if (!found.ok) {
-      report(found.failure);
-      return;
-    }
-    failure = null;
-    rows = found.value;
-    page = found.value.page;
+    await held;
+    if (current === run) loading = false;
   };
 
-  const reload = () => {
-    info = null;
-    void load();
-  };
+  const reload = () => void load(true);
 
   $effect(() => {
     void connection;
@@ -287,11 +285,9 @@
     <TooltipIconButton label={t("DATABASE_STRUCTURE")} active={showInfo} enabled={!!info} onclick={() => (showInfo = !showInfo)}>
       <Info />
     </TooltipIconButton>
-    {#if info?.editable}
-      <TooltipIconButton label={t("DATABASE_ADD_ROW")} onclick={() => (adding = true)}>
-        <Plus />
-      </TooltipIconButton>
-    {/if}
+    <TooltipIconButton label={t("DATABASE_ADD_ROW")} enabled={!!info?.editable} onclick={() => (adding = true)}>
+      <Plus />
+    </TooltipIconButton>
     <PopupMenu open={exportMenu} onOpenChange={(value) => (exportMenu = value)} label={t("EXPORT")}>
       {#snippet triggerChild(props)}
         <TooltipIconButton label={t("EXPORT")} enabled={!!rows && !exporting} {...props}>

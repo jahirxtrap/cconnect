@@ -69,6 +69,7 @@ def _discover(context: dict) -> list[tuple[Any, Any]]:
 def _probe(capabilities: Iterable[str]) -> dict:
     return {
         "request_compact": lambda *_args: None,
+        "reload": lambda *_args: None,
         "session_info": lambda: {},
         "emit": lambda *_args, **_kwargs: None,
         "ask_user": lambda *_args, **_kwargs: None,

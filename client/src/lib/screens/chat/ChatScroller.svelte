@@ -85,6 +85,16 @@
     else holdAt(target);
   };
 
+  export const tailGap = () =>
+    container && content ? content.getBoundingClientRect().bottom - container.getBoundingClientRect().bottom : 0;
+
+  export const holdTail = (gap: number) => {
+    if (!container) return;
+    const target = container.scrollTop + (tailGap() - gap);
+    if (pendingTop === null) scrollTo(target);
+    else holdAt(target);
+  };
+
   export const offsetOf = (node: HTMLElement) => node.offsetTop - (content?.offsetTop ?? 0);
 
   export const topEdge = () => container?.getBoundingClientRect().top;

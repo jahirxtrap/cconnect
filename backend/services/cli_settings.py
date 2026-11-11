@@ -5,11 +5,14 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from services import files
 
 _SETTINGS_FILE = "settings.json"
+_ATTRIBUTION = "attribution"
+_ATTRIBUTION_PARTS = ("commit", "pr")
+_LEGACY_ATTRIBUTION = "includeCoAuthoredBy"
 
 MAX_SAFE_INTEGER = 9007199254740991
 
@@ -23,6 +26,31 @@ class CliSettingDef:
     minimum: Optional[int] = None
     maximum: Optional[int] = None
     unset_by: Any = None
+    read: Optional[Callable[[dict], Any]] = None
+    write: Optional[Callable[[dict, Any], None]] = None
+
+
+def _attributed(data: dict) -> Optional[bool]:
+    """Whether commits carry the trailer: the CLI hides it with empty commit and pr texts."""
+    stored = data.get(_ATTRIBUTION)
+    if isinstance(stored, dict):
+        return any(stored.get(part) != "" for part in _ATTRIBUTION_PARTS)
+    if isinstance(stored, bool):
+        return stored
+    legacy = data.get(_LEGACY_ATTRIBUTION)
+    return legacy if isinstance(legacy, bool) else None
+
+
+def _attribute(data: dict, enabled: Optional[bool]) -> None:
+    stored = data.get(_ATTRIBUTION)
+    kept = {key: value for key, value in stored.items() if key not in _ATTRIBUTION_PARTS} if isinstance(stored, dict) else {}
+    data.pop(_LEGACY_ATTRIBUTION, None)
+    if enabled is False:
+        data[_ATTRIBUTION] = {**kept, **dict.fromkeys(_ATTRIBUTION_PARTS, "")}
+    elif kept:
+        data[_ATTRIBUTION] = kept
+    else:
+        data.pop(_ATTRIBUTION, None)
 
 
 SETTINGS: dict[str, CliSettingDef] = {
@@ -67,11 +95,13 @@ SETTINGS: dict[str, CliSettingDef] = {
         description="Let a session started here be taken over from claude.ai",
     ),
     "co_authored": CliSettingDef(
-        json_key="attribution",
+        json_key=_ATTRIBUTION,
         default=True,
         type=bool,
         description="Add the Co-Authored-By trailer to the commits and pull requests Claude writes",
         unset_by=True,
+        read=_attributed,
+        write=_attribute,
     ),
     "session_upload": CliSettingDef(
         json_key="autoUploadSessions",
@@ -153,7 +183,7 @@ def _valid(value: Any, expected: type) -> bool:
 
 def _stored(key: str) -> Any:
     defn = SETTINGS[key]
-    value = lookup(_read(), defn.json_key)
+    value = defn.read(_read()) if defn.read else lookup(_read(), defn.json_key)
     return value if _valid(value, defn.type) else None
 
 
@@ -217,7 +247,9 @@ def set(key: str, value: Any) -> None:
         if defn.maximum is not None and value > defn.maximum:
             raise ValueError(f"{key} must be at most {defn.maximum}")
     data = _read()
-    if not blank:
+    if defn.write:
+        defn.write(data, None if blank else value)
+    elif not blank:
         assign(data, defn.json_key, value)
     elif value is None or _valid(lookup(data, defn.json_key), defn.type):
         discard(data, defn.json_key)

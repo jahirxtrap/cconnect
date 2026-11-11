@@ -677,7 +677,7 @@
     <ChatToolbar
       capabilities={chat.capabilities}
       ready={chat.capabilitiesReady}
-      connecting={chat.link === "connecting"}
+      connecting={chat.link === "connecting" && !chat.reconnecting}
       disconnected={chat.link === "disconnected"}
       loading={chat.transcriptLoading}
       model={chat.effectiveModel}

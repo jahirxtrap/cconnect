@@ -1,9 +1,10 @@
 """Live updates for the project explorer over WebSocket.
 
-One recursive watcher per project a client is looking at, started on the first subscriber
-and stopped with the last, so nothing runs while the explorer is closed. A burst drops the
-git caches of the repositories it touched, every one of them once it is truncated past
-`_MAX_PATHS`, and carries the paths.
+One watcher per project a client is looking at, started on the first subscriber and stopped
+with the last, so nothing runs while the explorer is closed. It never recurses: it watches the
+folders the clients have open, the folders git tracks and the `.git` of each repository, and
+starts again when that set changes. A burst drops the git caches of the repositories it
+touched, every one of them once it is truncated past `_MAX_PATHS`, and carries the paths.
 """
 
 import asyncio
@@ -15,10 +16,11 @@ from loguru import logger
 from watchfiles import Change, watch
 
 from core import paths
-from services import project_files
+from services import files, project_files
 
 _DEBOUNCE_MS = 400
 _MAX_PATHS = 200
+_GIT_FOLDER = ".git"
 _GIT_INTERNALS = {"index", "HEAD"}
 _STRUCTURE = {Change.added, Change.deleted}
 
@@ -36,8 +38,8 @@ def _tracked(path: str) -> bool:
     if target.is_relative_to(paths.DATA_DIR):
         return False
     parts = target.parts
-    if ".git" in parts:
-        tail = parts[parts.index(".git") + 1 :]
+    if _GIT_FOLDER in parts:
+        tail = parts[parts.index(_GIT_FOLDER) + 1 :]
         return len(tail) == 1 and tail[0] in _GIT_INTERNALS
     repo = project_files.repo_of(target.parent)
     index = project_files.index_of(repo) if repo else None
@@ -48,6 +50,24 @@ def _tracked(path: str) -> bool:
     except ValueError:
         return True
     return folder in ("", ".") or f"{folder}/" in index
+
+
+def _targets(root: Path, folders: frozenset[str]) -> tuple[str, ...]:
+    """What to watch without recursion: the open folders, the ones git tracks and the .git of each repository."""
+    wanted = {root}
+    for folder in folders:
+        try:
+            files.resolve(root, folder)
+        except (OSError, ValueError):
+            continue
+        wanted.add(root / folder)
+    repos = {repo for repo in map(project_files.repo_of, list(wanted)) if repo} | set(project_files._repos_under(root))
+    own = project_files.repo_of(root)
+    if own is not None:
+        tracked = (own / name for name in project_files.index_of(own) or () if name.endswith("/"))
+        wanted.update(folder for folder in tracked if folder == root or root in folder.parents)
+    wanted.update(repo / _GIT_FOLDER for repo in repos)
+    return tuple(sorted(str(folder) for folder in wanted if folder.is_dir()))
 
 
 def _folders(root: Path, appeared: list[str]) -> list[str]:
@@ -61,9 +81,9 @@ def _folders(root: Path, appeared: list[str]) -> list[str]:
 
 class ProjectWatchHub:
     def __init__(self):
-        self._subscribers: dict[asyncio.Queue, str] = {}
+        self._subscribers: dict[asyncio.Queue, tuple[str, frozenset[str]]] = {}
         self._stops: dict[str, threading.Event] = {}
-        self._roots: dict[str, Path] = {}
+        self._watching: dict[str, tuple[str, ...]] = {}
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._lock = threading.Lock()
         self._lifecycle = threading.Lock()
@@ -81,69 +101,77 @@ class ProjectWatchHub:
     def subscribe(self) -> asyncio.Queue:
         queue: asyncio.Queue = asyncio.Queue()
         with self._lock:
-            self._subscribers[queue] = ""
+            self._subscribers[queue] = ("", frozenset())
         return queue
 
     def unsubscribe(self, queue: asyncio.Queue):
         with self._lifecycle:
             with self._lock:
-                previous = self._subscribers.pop(queue, "")
-            self._prune(previous)
+                previous = self._subscribers.pop(queue, ("", frozenset()))[0]
+            self._sync(previous)
 
-    def watch(self, queue: asyncio.Queue, project_key: str):
+    def watch(self, queue: asyncio.Queue, project_key: str, folders: frozenset[str] = frozenset()):
         with self._lifecycle:
             with self._lock:
                 if queue not in self._subscribers:
                     return
-                previous = self._subscribers[queue]
-                self._subscribers[queue] = project_key
+                previous = self._subscribers[queue][0]
+                self._subscribers[queue] = (project_key, folders)
             if previous != project_key:
-                self._prune(previous)
-                self._acquire(project_key)
+                self._sync(previous)
+            self._sync(project_key)
 
-    def _watched_by(self, project_key: str) -> int:
+    def _open_folders(self, project_key: str) -> Optional[frozenset[str]]:
         with self._lock:
-            return sum(1 for key in self._subscribers.values() if key == project_key)
+            held = [folders for key, folders in self._subscribers.values() if key == project_key]
+        return frozenset().union(*held) if held else None
 
-    def _prune(self, project_key: str):
-        if project_key and self._watched_by(project_key) == 0:
-            self._release(project_key)
-
-    def _acquire(self, project_key: str):
-        if not project_key or project_key in self._stops:
+    def _sync(self, project_key: str):
+        if not project_key:
             return
-        root = project_files.root_for(project_key)
+        folders = self._open_folders(project_key)
+        root = project_files.root_for(project_key) if folders is not None else None
         if root is None:
+            self._release(project_key)
             return
-        project_files.forget(root)
+        if project_key not in self._stops:
+            project_files.forget(root)
+        targets = _targets(root, folders)
+        if self._watching.get(project_key) == targets:
+            return
+        self._release(project_key)
         stop = threading.Event()
         with self._lock:
             self._stops[project_key] = stop
-            self._roots[project_key] = root
+            self._watching[project_key] = targets
         threading.Thread(
-            target=self._watch, args=(project_key, root, stop), name=f"project-{root.name}", daemon=True
+            target=self._watch, args=(project_key, root, targets, stop), name=f"project-{root.name}", daemon=True
         ).start()
 
     def _release(self, project_key: str):
         with self._lock:
             stop = self._stops.pop(project_key, None)
-            self._roots.pop(project_key, None)
+            self._watching.pop(project_key, None)
         if stop is not None:
             stop.set()
 
-    def _watch(self, project_key: str, root: Path, stop: threading.Event):
+    def _watch(self, project_key: str, root: Path, targets: tuple[str, ...], stop: threading.Event):
         try:
             for changes in watch(
-                root,
+                *targets,
                 watch_filter=None,
                 debounce=_DEBOUNCE_MS,
                 stop_event=stop,
                 raise_interrupt=False,
+                recursive=False,
                 ignore_permission_denied=True,
             ):
                 tracked = [path for _, path in changes if _tracked(path)]
                 appeared = [path for change, path in changes if change in _STRUCTURE and not _tracked(path)]
                 self._publish(project_key, root, tracked, _folders(root, appeared))
+                with self._lifecycle:
+                    if not stop.is_set():
+                        self._sync(project_key)
         except Exception as exc:
             logger.info(f"project_watch: {root} cannot be watched ({exc}); the tree needs a refresh")
 
@@ -158,8 +186,8 @@ class ProjectWatchHub:
         if loop is None:
             return
         with self._lock:
-            targets = [queue for queue, key in self._subscribers.items() if key == project_key]
-        for queue in targets:
+            listeners = [queue for queue, held in self._subscribers.items() if held[0] == project_key]
+        for queue in listeners:
             loop.call_soon_threadsafe(queue.put_nowait, {
                 "type": "changed",
                 "project_key": project_key,

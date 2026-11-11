@@ -12,6 +12,8 @@ export class ProjectWatch {
 
   #socket: ReconnectingSocket;
   #projectKey = "";
+  #folders: string[] = [];
+  #sent = "";
   #dropped = false;
 
   constructor(profile: () => Profile = () => backend.active) {
@@ -34,8 +36,9 @@ export class ProjectWatch {
     this.#socket.close();
   }
 
-  watch(projectKey: string) {
+  watch(projectKey: string, folders: string[]) {
     this.#projectKey = projectKey;
+    this.#folders = folders;
     this.#sendWatch();
   }
 
@@ -44,13 +47,19 @@ export class ProjectWatch {
   }
 
   #resume() {
+    this.#sent = "";
     this.#sendWatch();
     if (this.#dropped) this.refresh();
     this.#dropped = false;
   }
 
   #sendWatch() {
-    if (this.#projectKey) this.#socket.send({ type: "watch", project_key: this.#projectKey });
+    if (!this.#projectKey) return;
+    const message = { type: "watch", project_key: this.#projectKey, folders: this.#folders };
+    const wire = JSON.stringify(message);
+    if (wire === this.#sent) return;
+    this.#sent = wire;
+    this.#socket.send(message);
   }
 
   #apply(message: Record<string, unknown>) {

@@ -1,7 +1,7 @@
-import { isDesktop } from "./index";
+import { isDesktop, isTauri } from "./index";
 
 const nativeCopy = async (text: string): Promise<boolean> => {
-  if (!isDesktop) return false;
+  if (!isTauri) return false;
   try {
     const { writeText } = await import("@tauri-apps/plugin-clipboard-manager");
     await writeText(text);
@@ -34,7 +34,7 @@ export const copyText = async (text: string): Promise<boolean> => {
 };
 
 const nativePaste = async (): Promise<string | null> => {
-  if (!isDesktop) return null;
+  if (!isTauri) return null;
   try {
     const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
     return await readText();

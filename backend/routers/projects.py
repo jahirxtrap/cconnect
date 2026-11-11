@@ -66,7 +66,13 @@ async def projects_ws(ws: WebSocket):
         while True:
             msg = await ws.receive_json()
             if msg.get("type") == "watch":
-                await asyncio.to_thread(project_watch.hub.watch, queue, str(msg.get("project_key") or ""))
+                folders = msg.get("folders")
+                await asyncio.to_thread(
+                    project_watch.hub.watch,
+                    queue,
+                    str(msg.get("project_key") or ""),
+                    frozenset(map(str, folders)) if isinstance(folders, list) else frozenset(),
+                )
     except WebSocketDisconnect:
         pass
     except Exception as exc:

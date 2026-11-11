@@ -2,6 +2,8 @@
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
+use tauri::utils::{config::BundleType, platform::bundle_type};
+
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -171,8 +173,22 @@ pub fn install_update(app: tauri::AppHandle, path: String) -> Result<(), String>
     Ok(())
 }
 
+fn stamped_kind() -> Option<&'static str> {
+    Some(match bundle_type()? {
+        BundleType::Msi => ".msi",
+        BundleType::Nsis => ".exe",
+        BundleType::Deb => ".deb",
+        BundleType::Rpm => ".rpm",
+        BundleType::AppImage => APPIMAGE_EXTENSION,
+        BundleType::App | BundleType::Dmg => ".dmg",
+    })
+}
+
 #[tauri::command]
 pub fn installer_kind() -> &'static str {
+    if let Some(kind) = stamped_kind() {
+        return kind;
+    }
     if cfg!(windows) {
         let per_machine = std::env::current_exe()
             .ok()

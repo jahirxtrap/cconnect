@@ -288,15 +288,15 @@
     const previous = headId;
     headId = head;
     if (previous === null || head === null || head === previous) return;
-    heldFromEnd = scroller?.distanceToBottom() ?? null;
+    heldFromEnd = scroller?.tailGap() ?? null;
   });
 
   $effect(() => {
     void messages;
     if (heldFromEnd === null) return;
-    const distance = heldFromEnd;
+    const gap = heldFromEnd;
     heldFromEnd = null;
-    scroller?.scrollFromEnd(distance);
+    scroller?.holdTail(gap);
   });
 
   $effect(() => {
