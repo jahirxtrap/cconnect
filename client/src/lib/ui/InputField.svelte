@@ -117,9 +117,9 @@
           bind:this={field}
           type={masked ? "password" : "text"}
           inputmode={numeric ? "decimal" : url ? "url" : undefined}
-          autocapitalize={url ? "off" : undefined}
-          autocorrect={url ? "off" : undefined}
-          spellcheck={url ? false : undefined}
+          autocapitalize={url || mono ? "off" : undefined}
+          autocorrect={url || mono ? "off" : undefined}
+          spellcheck={url || mono ? false : undefined}
           enterkeyhint={enterKeyHint}
           disabled={!enabled}
           {readonly}
@@ -146,6 +146,8 @@
           {readonly}
           {value}
           {onkeydown}
+          autocapitalize={mono ? "off" : undefined}
+          spellcheck={mono ? false : undefined}
           rows={Math.max(1, Math.round(minLines))}
           oninput={handle}
           style="min-height: {minLines * LINE_HEIGHT}px{maxLines

@@ -9,6 +9,8 @@ import {
   type DatabaseSchemas,
   type DatabaseScope,
   type QueryResult,
+  type RowsPage,
+  type TableInfo,
 } from "$lib/data/databaseModels";
 import { keyRefused, type KeyGate } from "$lib/data/keyGate.svelte";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
@@ -29,6 +31,18 @@ export interface ConsoleDraft {
 
 const EMPTY_DRAFT: ConsoleDraft = { sql: "", result: null, ran: "" };
 
+export interface TableView {
+  info: TableInfo | null;
+  rows: RowsPage | null;
+  page: number;
+  size: number;
+  sort: string | null;
+  descending: boolean;
+  where: string;
+}
+
+const EMPTY_TABLE_VIEW: TableView = { info: null, rows: null, page: 1, size: 0, sort: null, descending: false, where: "" };
+
 const slotOf = (profile: Profile, ...parts: (string | null)[]) => [profile?.id ?? "", ...parts.map((part) => part ?? "")].join("|");
 
 const scopeSlot = (profile: Profile, scope: DatabaseScope, ...parts: (string | null)[]) =>
@@ -43,6 +57,7 @@ class Databases {
   #objects = $state<Record<string, Loaded<DatabaseObjects>>>({});
   #expanded = $state<Record<string, boolean>>({});
   #drafts = $state<Record<string, ConsoleDraft>>({});
+  #tables = $state<Record<string, TableView>>({});
 
   listOf(profile: Profile): DatabaseList | null {
     return profile ? (this.#lists[profile.id] ?? null) : null;
@@ -138,6 +153,7 @@ class Databases {
       Object.fromEntries(Object.entries(store).filter(([slot]) => slot !== slotOf(profile, id) && !slot.startsWith(prefix)));
     this.#schemas = kept(this.#schemas);
     this.#objects = kept(this.#objects);
+    this.#tables = kept(this.#tables);
   }
 
   expanded(profile: Profile, ...path: (string | null)[]): boolean {
@@ -155,6 +171,15 @@ class Databases {
   saveDraft(profile: Profile, scope: DatabaseScope, draft: Partial<ConsoleDraft>) {
     const slot = scopeSlot(profile, scope);
     this.#drafts = { ...this.#drafts, [slot]: { ...(this.#drafts[slot] ?? EMPTY_DRAFT), ...draft } };
+  }
+
+  tableViewOf(profile: Profile, scope: DatabaseScope, schema: string | null, name: string): TableView {
+    return this.#tables[scopeSlot(profile, scope, schema, name)] ?? EMPTY_TABLE_VIEW;
+  }
+
+  saveTableView(profile: Profile, scope: DatabaseScope, schema: string | null, name: string, view: Partial<TableView>) {
+    const slot = scopeSlot(profile, scope, schema, name);
+    this.#tables = { ...this.#tables, [slot]: { ...(this.#tables[slot] ?? EMPTY_TABLE_VIEW), ...view } };
   }
 }
 

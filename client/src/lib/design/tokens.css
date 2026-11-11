@@ -149,7 +149,8 @@
 
 :root {
   --font-terminal: var(--family-mono), monospace, var(--family-emoji), var(--family-symbols);
-  --page-inset: 16px;
+  --page-inset-full: 16px;
+  --page-inset: var(--page-inset-full);
   --page-inset-compact: 8px;
   --pane-gap: 0.375rem;
   --dialog-max-height: min(40rem, calc(var(--safe-height) - 2rem));

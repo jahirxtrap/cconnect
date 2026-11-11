@@ -22,8 +22,6 @@
     type DatabaseFailure,
     type DatabaseScope,
     type ExportFormat,
-    type RowsPage,
-    type TableInfo,
     type TableQuery,
   } from "$lib/data/databaseModels";
   import { formatDecimal, formatDuration, joined } from "$lib/data/format";
@@ -32,13 +30,13 @@
   import { t } from "$lib/i18n/index.svelte";
   import { shortcuts, signature } from "$lib/platform/shortcuts.svelte";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
+  import { FULL_INSET_CLASS } from "$lib/screens/chat/paneChrome";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
   import { paneRole } from "$lib/screens/chat/paneSurface";
   import { backend } from "$lib/services/backend.svelte";
-  import { databases } from "$lib/services/databases.svelte";
-  import { createDatabasesApi } from "$lib/services/databasesApi";
-  import { downloadUrl } from "$lib/services/sharedApi";
-  import { downloadShared } from "$lib/services/sharedFiles";
+  import { databases, type TableView } from "$lib/services/databases.svelte";
+  import { createDatabasesApi, type DatabaseOutcome } from "$lib/services/databasesApi";
+  import { deliverExport } from "./exportDelivery";
   import { BAR_DOCK_CLASS, BAR_REGION_CLASS } from "$lib/ui/actionBar";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import AppTopBar from "$lib/ui/AppTopBar.svelte";
@@ -87,15 +85,8 @@
   const consoleView = $derived(kind === "console");
   const title = $derived(consoleView ? joined(t("DATABASE_CONSOLE"), database) : qualifiedName(database, schema, name));
 
-  let info = $state<TableInfo | null>(null);
-  let rows = $state<RowsPage | null>(null);
   let failure = $state<string | null>(null);
   let loading = $state(false);
-  let page = $state(1);
-  let size = $state(0);
-  let sort = $state<string | null>(null);
-  let descending = $state(false);
-  let where = $state("");
   let whereDraft = $state("");
   let showInfo = $state(false);
   let editing = $state<number | null>(null);
@@ -108,9 +99,17 @@
   const draft = $derived(databases.draftOf(profile, scope));
   const sql = $derived(draft.sql);
   const result = $derived(draft.result);
+  const view = $derived(databases.tableViewOf(profile, scope, schema, name));
+  const info = $derived(view.info);
+  const rows = $derived(view.rows);
+  const page = $derived(view.page);
+  const sort = $derived(view.sort);
+  const descending = $derived(view.descending);
+  const where = $derived(view.where);
+  const keep = (next: Partial<TableView>) => databases.saveTableView(profile, scope, schema, name, next);
   const kinds = $derived(Object.fromEntries((info?.columns ?? []).map((column) => [column.name, column.kind])) as Record<string, ColumnKind>);
   const query = $derived<TableQuery>({ schema, name, sort, descending, where });
-  const pageSize = $derived(size || listed?.pageSize || 0);
+  const pageSize = $derived(view.size || listed?.pageSize || 0);
   const exportable = $derived(!!result?.rows && result.statements === 1 && !result.wrote && !!draft.ran.trim());
 
   const report = (found: DatabaseFailure | null) => {
@@ -128,13 +127,12 @@
     const held = holdRefresh(fetching);
     const [table, found] = await fetching;
     if (current === run) {
-      if (table && table.ok) info = table.value;
+      if (table && table.ok) keep({ info: table.value });
       if (table && !table.ok) report(table.failure);
       else if (!found.ok) report(found.failure);
       else {
         failure = null;
-        rows = found.value;
-        page = found.value.page;
+        keep({ rows: found.value, page: found.value.page });
       }
     }
     await held;
@@ -151,59 +149,44 @@
     void kind;
     untrack(() => {
       run++;
-      info = null;
-      rows = null;
       failure = null;
-      page = 1;
-      sort = null;
-      descending = false;
-      where = "";
-      whereDraft = "";
+      whereDraft = view.where;
       editing = null;
       adding = false;
-      if (kind !== "console") void load();
     });
   });
 
+  $effect(() => {
+    if (kind !== "console" && view.rows === null) untrack(() => void load());
+  });
+
   const goTo = (next: number) => {
-    page = next;
+    keep({ page: next });
     void load();
   };
 
   const resize = (next: number) => {
-    size = next;
-    page = 1;
+    keep({ size: next, page: 1 });
     void load();
   };
 
   const sortBy = (column: string) => {
-    if (sort !== column) {
-      sort = column;
-      descending = false;
-    } else if (!descending) {
-      descending = true;
-    } else {
-      sort = null;
-      descending = false;
-    }
-    page = 1;
+    if (sort !== column) keep({ sort: column, descending: false, page: 1 });
+    else if (!descending) keep({ descending: true, page: 1 });
+    else keep({ sort: null, descending: false, page: 1 });
     void load();
   };
 
   const applyWhere = (value: string) => {
     whereDraft = value;
-    where = value.trim();
-    page = 1;
+    keep({ where: value.trim(), page: 1 });
     void load();
   };
 
-  const download = async (found: { ok: boolean; value: string | null; failure: DatabaseFailure | null }) => {
+  const download = async (found: DatabaseOutcome<string>) => {
     exporting = false;
-    if (!found.ok || !found.value) {
-      report(found.failure);
-      return;
-    }
-    await downloadShared(downloadUrl(found.value), found.value.split("/").at(-1) ?? found.value);
+    const problem = await deliverExport(found);
+    if (problem) report(problem.failure);
   };
 
   const exportTable = async (format: ExportFormat) => {
@@ -223,15 +206,18 @@
     const text = sql.trim();
     if (!text || running) return;
     running = true;
-    failure = null;
-    const found = await gate.run((key) => api.query(scope, text, key));
-    running = false;
+    const querying = gate.run((key) => api.query(scope, text, key));
+    const held = holdRefresh(querying);
+    const found = await querying;
     if (!found.ok) {
       if (!keyRefused(found)) report(found.failure);
-      return;
+    } else {
+      failure = null;
+      databases.saveDraft(profile, scope, { result: found.value, ran: text });
+      if (found.value.wrote) databases.forget(profile, connection);
     }
-    databases.saveDraft(profile, scope, { result: found.value, ran: text });
-    if (found.value.wrote) databases.forget(profile, connection);
+    await held;
+    running = false;
   };
 
   const clear = () => {
@@ -423,7 +409,7 @@
     {@render content()}
   </div>
 {:else}
-  <div class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface">
+  <div class="safe-area above-keyboard fixed inset-0 z-50 flex flex-col bg-background text-on-surface {FULL_INSET_CLASS}">
     <AppTopBar title={entry?.name ?? t("DATABASES")} subtitle={title} actions={toolbar}>
       {#snippet navigationIcon()}
         <TooltipIconButton label={t("BACK")} onclick={onClose}>
