@@ -1,6 +1,6 @@
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { authHeadersOf, backend, baseUrlOf, type Profile } from "./backend.svelte";
-import { createHttp, type HttpClient } from "./http";
+import { createHttp } from "./http";
 
 export interface ProjectEntry {
   name: string;
@@ -93,46 +93,49 @@ export const projectFolderUrl = (url: string, profile: Profile = backend.active)
   return `${route}?${PATH_PARAM}=${encodeURIComponent(path.slice(0, path.lastIndexOf("/") + 1))}`;
 };
 
-export const createProjectFilesApi = (client: HttpClient) => ({
-  async tree(projectKey: string, path = ""): Promise<ProjectListing | null> {
-    const data = await client.get<Wire>(`${projectBase(projectKey)}/tree`, { path });
-    if (!data) return null;
-    return {
-      path: data.path ?? "",
-      entries: Array.isArray(data.entries) ? data.entries.map(parseEntry) : [],
-      tracked: data.tracked === true,
-      unlocked: data.unlocked === true,
-    };
-  },
+export const createProjectFilesApi = (profile: () => Profile) => {
+  const keyed = (key: string) => createHttp(profile, () => securityKeys.headers(key));
+  const client = createHttp(profile, () => securityKeys.headersFor(profile()));
 
-  async archive(projectKey: string, path: string, inner = ""): Promise<ProjectEntry[] | null> {
-    const data = await client.get<Wire[]>(`${projectBase(projectKey)}/archive`, { path, inner });
-    return Array.isArray(data) ? data.map(parseEntry) : null;
-  },
+  return {
+    async tree(projectKey: string, path = "", key = securityKeys.keyFor(profile())): Promise<ProjectListing | null> {
+      const target = profile();
+      const data = await keyed(key).get<Wire>(`${projectBase(projectKey)}/tree`, { path });
+      if (!data) return null;
+      const listing = {
+        path: data.path ?? "",
+        entries: Array.isArray(data.entries) ? data.entries.map(parseEntry) : [],
+        tracked: data.tracked === true,
+        unlocked: data.unlocked === true,
+      };
+      securityKeys.judge(target, key, listing.unlocked);
+      return listing;
+    },
 
-  async search(projectKey: string, query: string): Promise<ProjectEntry[] | null> {
-    const data = await client.get<Wire[]>(`${projectBase(projectKey)}/search`, { q: query });
-    return Array.isArray(data) ? data.map(parseEntry) : null;
-  },
+    async archive(projectKey: string, path: string, inner = ""): Promise<ProjectEntry[] | null> {
+      const data = await client.get<Wire[]>(`${projectBase(projectKey)}/archive`, { path, inner });
+      return Array.isArray(data) ? data.map(parseEntry) : null;
+    },
 
-  async changes(projectKey: string): Promise<ProjectEntry[] | null> {
-    const data = await client.get<Wire[]>(`${projectBase(projectKey)}/changes`);
-    return Array.isArray(data) ? data.map(parseEntry) : null;
-  },
+    async search(projectKey: string, query: string): Promise<ProjectEntry[] | null> {
+      const data = await client.get<Wire[]>(`${projectBase(projectKey)}/search`, { q: query });
+      return Array.isArray(data) ? data.map(parseEntry) : null;
+    },
 
-  async diff(projectKey: string, path: string): Promise<ProjectDiff | null> {
-    const data = await client.get<Wire>(`${projectBase(projectKey)}/diff`, { path });
-    if (!data) return null;
-    return {
-      added: Array.isArray(data.added) ? data.added : [],
-      removed: (data.removed ?? {}) as Record<number, string[]>,
-    };
-  },
-});
+    async changes(projectKey: string): Promise<ProjectEntry[] | null> {
+      const data = await client.get<Wire[]>(`${projectBase(projectKey)}/changes`);
+      return Array.isArray(data) ? data.map(parseEntry) : null;
+    },
 
-export const projectFilesApi = createProjectFilesApi(
-  createHttp(
-    () => backend.active,
-    () => securityKeys.headersFor(backend.active),
-  ),
-);
+    async diff(projectKey: string, path: string): Promise<ProjectDiff | null> {
+      const data = await client.get<Wire>(`${projectBase(projectKey)}/diff`, { path });
+      if (!data) return null;
+      return {
+        added: Array.isArray(data.added) ? data.added : [],
+        removed: (data.removed ?? {}) as Record<number, string[]>,
+      };
+    },
+  };
+};
+
+export const projectFilesApi = createProjectFilesApi(() => backend.active);

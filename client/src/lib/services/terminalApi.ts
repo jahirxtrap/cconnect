@@ -1,3 +1,4 @@
+import { judgeKey } from "$lib/data/keyGate.svelte";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { backend } from "./backend.svelte";
 import { createHttp } from "./http";
@@ -30,10 +31,12 @@ export interface TerminalRequest {
 
 const api = createHttp(() => backend.active, () => securityKeys.headersFor(backend.active));
 
-export const listTerminals = () => api.get<TerminalInfo[]>("/terminal/sessions");
-
-export const listTerminalsWith = (key: string) =>
-  createHttp(() => backend.active, () => securityKeys.headers(key)).get<TerminalInfo[]>("/terminal/sessions");
+export const listTerminals = async (key = securityKeys.current): Promise<TerminalInfo[] | null> => {
+  const profile = backend.active;
+  const result = await createHttp(() => profile, () => securityKeys.headers(key)).call<TerminalInfo[]>("GET", "/terminal/sessions");
+  judgeKey(profile, key, result);
+  return result.ok ? (result.data ?? []) : null;
+};
 
 export const openTerminal = (request: TerminalRequest) => api.post<TerminalInfo>("/terminal/sessions", request);
 

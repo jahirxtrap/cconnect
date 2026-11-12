@@ -16,6 +16,7 @@ import {
   type SshTunnel,
   type TableQuery,
 } from "$lib/data/databaseModels";
+import { judgeKey } from "$lib/data/keyGate.svelte";
 import { securityKeys } from "$lib/data/securityKeys.svelte";
 import { list } from "$lib/data/wire";
 import type { Profile } from "./backend.svelte";
@@ -62,7 +63,10 @@ export const createDatabasesApi = (profile: () => Profile) => {
     },
 
     async connections(key: string) {
-      return outcome(await keyed(key).call<Wire>("GET", "/databases"), (data) => list(data, "connections").map(toDatabaseConnection));
+      const target = profile();
+      const result = await keyed(key).call<Wire>("GET", "/databases");
+      judgeKey(target, key, result);
+      return outcome(result, (data) => list(data, "connections").map(toDatabaseConnection));
     },
 
     async add(fields: ConnectionFields, key: string) {

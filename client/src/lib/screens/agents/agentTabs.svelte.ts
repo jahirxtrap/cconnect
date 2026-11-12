@@ -275,7 +275,7 @@ class AgentTabs {
   }
 
   selectProject(chat: ChatState, projectKey: string | null) {
-    chat.historyProjectKey = projectKey;
+    chat.chooseHistoryProject(projectKey);
     const folder = chat.historyPath ?? chat.defaultCwd;
     if (!folder) return;
     this.#folders[chat.environmentId ?? ""] = folder;

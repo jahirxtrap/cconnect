@@ -8,6 +8,7 @@ import { packs } from "$lib/design/packs/registry.svelte";
 import { archiveBlob } from "$lib/design/packs/storage";
 import { FONT_KINDS, THEME_KINDS, type FontKind } from "$lib/design/packs/schema";
 import { theme, type ThemeMode } from "$lib/design/theme.svelte";
+import { panes } from "$lib/screens/chat/panes.svelte";
 import { notes, type Note } from "$lib/screens/notes/notes.svelte";
 import { backend, type EnvironmentProfile } from "$lib/services/backend.svelte";
 import { shortcuts } from "$lib/platform/shortcuts.svelte";
@@ -302,7 +303,7 @@ export const importSettings = (raw: string): boolean => {
   if (backup.environments.length) backend.save(backup.environments);
   for (const [profile, key] of backup.keys) securityKeys.setFor(profile, key);
   for (const [id, keys] of backup.bindings) shortcuts.set(id, keys);
-  if (backup.active) backend.select(backup.active);
+  if (backup.active) panes.focusedChat.selectEnvironment(backup.active);
   if (backup.ssh.length) sshStore.replaceAll(backup.ssh);
   if (backup.notes) notes.replaceAll(backup.notes);
   if (backup.backgrounds.length || backup.background) void adoptBackgrounds(backup.backgrounds, backup.background);

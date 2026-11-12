@@ -34,6 +34,14 @@
   import NetworkPage from "./NetworkPage.svelte";
   import ProcessesPage from "./ProcessesPage.svelte";
 
+  interface Graph {
+    icon: IconSource;
+    title: string;
+    detail: string;
+    percent: number;
+    history: number[];
+  }
+
   const pane = inPane();
 
   const FOLLOW_SLACK_PX = 24;
@@ -41,6 +49,8 @@
   const PERCENT = 100;
   const BATTERY_LEVELS = [BatteryLow, BatteryMedium, BatteryFull];
   const WIDE_WIDTH = 880;
+  const GRAPH_COLUMNS = { wide: 4, other: 3, narrow: 2 };
+  const BAR_COLUMNS = { wide: 3, other: 2, narrow: 1 };
   const INSET = "px-(--page-inset) pb-(--page-inset)";
   const CARD_CLASS = "rounded-panel bg-card p-3.5";
   const ICON_CLASS = "shrink-0 text-on-surface-variant";
@@ -54,8 +64,71 @@
 
   const OsIcon = $derived(osIcon(monitor.info?.osId));
   const narrow = $derived(width < COMPACT_WIDTH);
-  const pairColumns = $derived(narrow ? "" : "grid-cols-2");
+  const wide = $derived(width >= WIDE_WIDTH);
   const hasNetwork = $derived(monitor.network?.supported === true);
+
+  const graphs = $derived.by((): Graph[] => {
+    const current = monitor.info;
+    const gpu = monitor.gpu;
+    if (!current) return [];
+    return [
+      {
+        icon: Cpu,
+        title: "CPU",
+        detail: plural("CORES_COUNT", current.cpuCores),
+        percent: current.cpuPercent,
+        history: monitor.cpuHistory,
+      },
+      ...(gpu
+        ? [
+            {
+              icon: Gpu,
+              title: "GPU",
+              detail: joined(gpu.name.replace("NVIDIA GeForce ", ""), gpu.temp === null ? null : formatUnit(gpu.temp, "celsius")),
+              percent: gpu.percent,
+              history: monitor.gpuHistory,
+            },
+          ]
+        : []),
+      {
+        icon: MemoryStick,
+        title: t("MEMORY"),
+        detail: `${formatSize(current.memoryUsed)} / ${formatSize(current.memoryTotal)}`,
+        percent: current.memoryPercent,
+        history: monitor.memHistory,
+      },
+      ...(gpu
+        ? [
+            {
+              icon: Layers,
+              title: "VRAM",
+              detail: `${formatSize(gpu.memUsed)} / ${formatSize(gpu.memTotal)}`,
+              percent: gpu.memPercent,
+              history: monitor.vramHistory,
+            },
+          ]
+        : []),
+    ];
+  });
+
+  const columnsFor = (count: number, limit: number) => {
+    for (let columns = Math.min(count, limit); columns > 1; columns--) {
+      if (count % columns === 0) return columns;
+    }
+    return 1;
+  };
+
+  const gridOf = (columns: number) => `grid-template-columns: repeat(${columns}, minmax(0, 1fr))`;
+
+  const graphColumns = $derived(
+    narrow
+      ? Math.min(graphs.length, GRAPH_COLUMNS.narrow)
+      : columnsFor(graphs.length, wide ? GRAPH_COLUMNS.wide : GRAPH_COLUMNS.other),
+  );
+  const barCount = $derived((monitor.info?.battery ? 1 : 0) + (monitor.info?.disks.length ?? 0));
+  const barColumns = $derived(
+    columnsFor(barCount, narrow ? BAR_COLUMNS.narrow : wide ? BAR_COLUMNS.wide : BAR_COLUMNS.other),
+  );
 
   const batteryIcon = (percent: number, plugged: boolean) =>
     plugged
@@ -110,37 +183,14 @@
     <div class={TAB_PAGE_CLASS}>
       <div use:viewportScrollbar class="rounded-viewport min-h-0 flex-1 overflow-y-auto {INSET}">
         <div class="flex flex-col gap-2.5">
-          <div class="grid gap-2.5 {width >= WIDE_WIDTH ? 'grid-cols-4' : 'grid-cols-2'}">
-            {@render graph(Cpu, "CPU", plural("CORES_COUNT", current.cpuCores), current.cpuPercent, monitor.cpuHistory)}
-            {#if gpu}
-              {@render graph(
-                Gpu,
-                "GPU",
-                joined(gpu.name.replace("NVIDIA GeForce ", ""), gpu.temp === null ? null : formatUnit(gpu.temp, "celsius")),
-                gpu.percent,
-                monitor.gpuHistory,
-              )}
-            {/if}
-            {@render graph(
-              MemoryStick,
-              t("MEMORY"),
-              `${formatSize(current.memoryUsed)} / ${formatSize(current.memoryTotal)}`,
-              current.memoryPercent,
-              monitor.memHistory,
-            )}
-            {#if gpu}
-              {@render graph(
-                Layers,
-                "VRAM",
-                `${formatSize(gpu.memUsed)} / ${formatSize(gpu.memTotal)}`,
-                gpu.memPercent,
-                monitor.vramHistory,
-              )}
-            {/if}
+          <div class="grid gap-2.5" style={gridOf(graphColumns)}>
+            {#each graphs as item (item.title)}
+              {@render graph(item)}
+            {/each}
           </div>
 
-          {#if current.battery || current.disks.length}
-            <div class="grid gap-2.5 {pairColumns}">
+          {#if barCount}
+            <div class="grid gap-2.5" style={gridOf(barColumns)}>
               {#if current.battery}
                 {@const battery = current.battery}
                 <MetricBar
@@ -253,18 +303,18 @@
   {/if}
 </div>
 
-{#snippet graph(Icon: IconSource, title: string, detail: string, percent: number, history: number[])}
+{#snippet graph(item: Graph)}
   <div class="min-w-0 {CARD_CLASS}">
     <div class="flex min-w-0 {narrow ? 'flex-col' : 'items-center gap-2'}">
       <div class="flex shrink-0 items-center gap-2">
-        <Icon size={16} class={ICON_CLASS} />
-        <p class="text-item-title">{title}</p>
+        <item.icon size={16} class={ICON_CLASS} />
+        <p class="text-item-title">{item.title}</p>
       </div>
-      <p class="min-w-0 truncate text-body-sm text-on-surface-variant {narrow ? '' : 'flex-1 text-right'}">{detail}</p>
+      <p class="min-w-0 truncate text-body-sm text-on-surface-variant {narrow ? '' : 'flex-1 text-right'}">{item.detail}</p>
     </div>
     <p class="mt-2 text-metric">
-      {formatDecimal(percent, 0)}<span class="ml-0.5 text-body-md text-on-surface-variant">%</span>
+      {formatDecimal(item.percent, 0)}<span class="ml-0.5 text-body-md text-on-surface-variant">%</span>
     </p>
-    <Sparkline points={history} capacity={monitor.historyCap} class="mt-2 h-14 w-full" />
+    <Sparkline points={item.history} capacity={monitor.historyCap} class="mt-2 h-14 w-full" />
   </div>
 {/snippet}

@@ -95,6 +95,7 @@
   const projects = $derived(list?.visibleProjects ?? []);
 
   let children = $state.raw<Record<string, ProjectEntry[]>>({});
+  let listedWith: string | null = null;
   let listingRun = 0;
   const listingRuns: Record<string, number> = {};
   let expanded = $state.raw<Record<string, boolean>>({});
@@ -102,7 +103,7 @@
   let query = $state("");
   let results = $state.raw<ProjectEntry[] | null>(null);
   let tracked = $state(false);
-  let locked = $state(false);
+  const locked = $derived(securityKeys.unlocked(backend.active) === false);
   let showChanged = $state(settings.projectChangedOnly);
   let changed = $state<ProjectEntry[] | null>(null);
   let changesSlot = "";
@@ -337,10 +338,15 @@
 
   $effect(() => (engaged ? navigation.intercept(stepBack) : undefined));
 
-  const unlock = (key: string) => {
+  const unlock = async (key: string) => {
+    const listing = projectKey ? await projectFilesApi.tree(projectKey, "", key) : null;
+    if (!listing?.unlocked) {
+      rejected = true;
+      return;
+    }
     securityKeys.set(key);
+    unlocking = false;
     rejected = false;
-    watch.refresh();
   };
 
   interface Row {
@@ -536,7 +542,7 @@
       repos,
       repoRoot,
       tracked,
-      locked,
+      listedWith,
     });
   };
 
@@ -557,7 +563,7 @@
       repos = saved?.repos ?? null;
       repoRoot = saved?.repoRoot ?? null;
       tracked = saved?.tracked ?? false;
-      locked = saved?.locked ?? false;
+      listedWith = saved?.listedWith ?? null;
       if (saved?.path) opened.path = saved.path;
       else closeFile();
     });
@@ -566,6 +572,7 @@
   $effect(() => {
     const key = projectKey;
     const environment = backend.activeId;
+    const secret = securityKeys.current;
     const burst = watch.burst;
     const known = untrack(() => Object.keys(children)).filter((path) => !insideArchive(path) && !isArchive(path));
     if (!key) {
@@ -574,7 +581,7 @@
     }
     const listed = known.length ? known : [""];
     const targets =
-      burst.truncated || !known.length
+      burst.truncated || !known.length || secret !== listedWith
         ? listed
         : listed.filter((path) => burst.paths.some((changed) => folderOf(changed) === path));
     if (!targets.length) return;
@@ -582,10 +589,11 @@
     const run = ++listingRun;
     for (const path of targets) listingRuns[path] = run;
     void Promise.all(
-      targets.map((path) => projectFilesApi.tree(key, path).then((listing) => [path, listing] as const)),
+      targets.map((path) => projectFilesApi.tree(key, path, secret).then((listing) => [path, listing] as const)),
     ).then((arrived) => {
-      if (projectKey !== key || backend.activeId !== environment) return;
+      if (projectKey !== key || backend.activeId !== environment || securityKeys.current !== secret) return;
       loading = false;
+      listedWith = secret;
       const loaded = arrived.filter(([path]) => listingRuns[path] === run);
       const root = loaded.find(([path]) => path === "")?.[1];
       const updates = loaded
@@ -596,9 +604,6 @@
       }
       if (!root) return;
       tracked = root.tracked;
-      locked = !root.unlocked;
-      if (unlocking) rejected = locked;
-      unlocking = unlocking && locked;
       if (!tracked) {
         searching = false;
         query = "";

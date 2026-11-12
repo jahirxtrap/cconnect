@@ -23,7 +23,7 @@
 >
   <p class="min-w-0 flex-1 pr-1 text-body-md">{text}</p>
   {#if actionLabel && onAction}
-    <Button onclick={onAction} variant="accent" small>{actionLabel}</Button>
+    <Button onclick={onAction} variant="accent">{actionLabel}</Button>
   {/if}
   {#if !isTouch && onDismiss}
     <TooltipIconButton label={t("CLOSE")} onclick={onDismiss}>

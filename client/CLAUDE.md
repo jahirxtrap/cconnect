@@ -93,8 +93,8 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   per environment, so they survive remounts. The tree derives its missing loads (`pending`), a
   load marks its node before awaiting, and `forget` reloads what is expanded. A table keeps its
   view there (`tableViewOf` / `saveTableView`) and loads only while `rows` is `null`.
-- On a gated server even listing connections needs the key; a 403 leaves the panel `locked`, and
-  every change goes through a `KeyGate`.
+- On a gated server even listing connections needs the key, so the list is kept per stored key,
+  and every change goes through a `KeyGate`.
 - The console's text is its draft (`draftOf(...).sql`). It clears its previous failure only once a
   run succeeds.
 - Tree rows hand a `TreeMenuTarget` to `DatabasesView.treeMenu`. **Query in console** quotes with
@@ -178,6 +178,9 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 - `ZoomPane`: zoom anchors at the pointer, panning is unclamped, `<img draggable="false">`, and
   `touch-action: none` only while zoomed.
 - `hasFiles(event)` gates every drag handler, or dragging text raises the file overlay.
+- Whether a server accepts its stored key is `securityKeys.unlocked(profile)`, recorded only by
+  answers that prove it (`judgeKey`, the project tree's `unlocked`): a read-only database also
+  answers 403. Screens derive their lock from it and reload what they listed with another key.
 - `field-auto` with the `platform/fieldSizing.ts` polyfill and `keepCaretInView`: test the
   composer before touching it.
 - The service worker (`public/sw.js`) caches nothing; it exists so Chrome offers the install.

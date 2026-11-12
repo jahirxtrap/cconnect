@@ -136,6 +136,11 @@ interface HeldView {
   runningToolIds: string[];
 }
 
+interface Chosen<T> {
+  value: T;
+  under: string;
+}
+
 interface SideChat {
   messages: ChatMessage[];
   sessionId: string | null;
@@ -270,7 +275,12 @@ export class ChatState {
   sessionId = $state<string | null>(null);
   projectKey = $state<string | null>(null);
   sessionColor = $state<string | null>(null);
-  cwd = $state("");
+  #folder = $state<Chosen<string> | null>(null);
+  readonly cwd = $derived.by(() =>
+    this.#folder && (this.sessionId || this.agent || this.#folder.under === this.#defaults)
+      ? this.#folder.value
+      : this.defaultCwd,
+  );
 
   permissionMode = $state(DEFAULTS.permissionMode);
   model = $state(DEFAULTS.model);
@@ -339,7 +349,7 @@ export class ChatState {
   capabilitiesReady = $state(false);
   #serverInfoRequest = 0;
 
-  historyProjectKey = $state<string | null>(null);
+  #chosenProject = $state<Chosen<string | null> | null>(null);
   viewOnly = $state<TrashedSession | null>(null);
   pendingCategoryId: string | null = null;
   draft = $state("");
@@ -400,6 +410,9 @@ export class ChatState {
     return this.agentState?.title || opening || null;
   }
   readonly defaultCwd = $derived(this.environment?.directory ?? "");
+  readonly #defaults = $derived(
+    `${settings.lockedProjectRevision}\n${this.environment?.id ?? ""}\n${backend.directoryRevisionOf(this.environment)}`,
+  );
   readonly list = $derived(chatListFor(this.environment));
   readonly listed = $derived(this.list?.sessions.find((session) => session.sessionId === this.sessionId) ?? null);
   readonly liveActivity = $derived(this.activity === undefined ? (this.listed?.activity ?? null) : this.activity);
@@ -416,7 +429,13 @@ export class ChatState {
   readonly chatOrder = $derived(this.list?.chatOrder ?? "auto");
   readonly defaultCategory = $derived(this.list?.defaultCategory ?? "");
   readonly trashEnabled = $derived(this.list?.trashEnabled ?? false);
-  readonly historyProject = $derived(settings.lockedProject || this.historyProjectKey);
+  readonly #defaultProject = $derived.by(() =>
+    this.agent ? projectKeyOf(this.cwd) : this.defaultCwd ? this.defaultProjectKey() : null,
+  );
+  readonly historyProject = $derived(
+    settings.lockedProject ||
+      (this.#chosenProject?.under === this.#defaults ? this.#chosenProject.value : this.#defaultProject),
+  );
   readonly historySessions = $derived(this.list?.sessionsOf(this.historyProject) ?? []);
   readonly historyProjects = $derived.by(() => {
     const visible = this.list?.visibleProjects ?? [];
@@ -518,7 +537,7 @@ export class ChatState {
     this.sessionId = context.sessionId;
     this.projectKey = context.projectKey;
     this.sessionColor = context.color ?? null;
-    this.cwd = context.cwd || this.defaultCwd;
+    if (context.cwd) this.#moveTo(context.cwd);
     this.#initial =
       context.sessionId && context.projectKey && !this.agent
         ? sessionInfo({
@@ -530,7 +549,6 @@ export class ChatState {
         : null;
     this.transcriptLoading = this.#initial !== null || (this.agent !== null && context.sessionId !== null);
     this.#loadOverrides(context.overrides);
-    this.#applyDefaultProject();
     this.#connect();
   }
 
@@ -552,7 +570,7 @@ export class ChatState {
     this.environmentId = id;
     this.#endSwitch();
     backend.select(id);
-    this.cwd = this.defaultCwd;
+    this.#folder = null;
     this.#uploadAbort?.abort();
     this.#socket.close();
     this.connection = "disconnected";
@@ -562,8 +580,7 @@ export class ChatState {
     this.sessionColor = null;
     this.streaming = false;
     this.#resetTranscript();
-    this.historyProjectKey = null;
-    this.#applyDefaultProject();
+    this.#chosenProject = null;
     this.onContextChange?.();
     this.#connect();
   }
@@ -608,10 +625,12 @@ export class ChatState {
     return projects.find((item) => item.projectKey === target || item.path === directory)?.projectKey ?? target;
   }
 
-  #applyDefaultProject() {
-    if (settings.lockedProject) this.historyProjectKey = settings.lockedProject;
-    else if (this.agent) this.historyProjectKey = projectKeyOf(this.cwd);
-    else if (this.defaultCwd) this.historyProjectKey = this.defaultProjectKey();
+  #moveTo(path: string) {
+    this.#folder = { value: path, under: this.#defaults };
+  }
+
+  chooseHistoryProject(projectKey: string | null) {
+    this.#chosenProject = { value: projectKey, under: this.#defaults };
   }
 
   withDefaultProject(projects: ProjectInfo[]): ProjectInfo[] {
@@ -1059,14 +1078,14 @@ export class ChatState {
   }
 
   startAgentSession(cwd: string) {
-    this.cwd = cwd;
-    this.#applyDefaultProject();
+    this.#moveTo(cwd);
+    this.#chosenProject = null;
     this.newSession();
   }
 
   openAgentSession(sessionId: string, cwd: string) {
     if (sessionId === this.sessionId) return;
-    this.cwd = cwd;
+    this.#moveTo(cwd);
     this.#socket.resetResume();
     this.#resetTranscript();
     this.sessionId = sessionId;
@@ -1414,11 +1433,11 @@ export class ChatState {
   }
 
   selectHistoryProject(projectKey: string | null) {
-    this.historyProjectKey = projectKey;
+    this.chooseHistoryProject(projectKey);
     if (this.busy || (!projectKey && this.sessionId)) return;
     const path = projectKey ? this.#projectPath(projectKey) : this.defaultCwd;
     if (path === null || path === this.cwd) return;
-    this.cwd = path;
+    this.#moveTo(path);
     this.onContextChange?.();
     if (!this.sessionId && !this.busy) this.#pushGeneration({ cwd: path });
   }
@@ -1778,7 +1797,7 @@ export class ChatState {
   async deleteProject(projectKey: string) {
     if (!(await this.#sessions.deleteProject(projectKey))) return;
     this.list?.forgetProject(projectKey);
-    if (this.historyProjectKey === projectKey) this.selectHistoryProject(null);
+    if (this.historyProject === projectKey) this.selectHistoryProject(null);
     if (this.projectKey === projectKey) this.newSession();
   }
 
@@ -1790,7 +1809,7 @@ export class ChatState {
     const known = this.list?.sessions.find((item) => item.sessionId === session.sessionId);
     if (known) this.list?.upsertSession({ ...known, projectKey: movedKey, path: cwd });
     if (this.sessionId === session.sessionId) {
-      this.cwd = cwd;
+      this.#moveTo(cwd);
       this.projectKey = movedKey;
     }
     return true;
@@ -2043,7 +2062,7 @@ export class ChatState {
     this.#interrupting = false;
     this.#pendingTrim = null;
     if (session.path && session.path !== this.cwd) {
-      this.cwd = session.path;
+      this.#moveTo(session.path);
       this.onContextChange?.();
     }
     if (this.#frozen === null) this.mods.showTranscript(session.sessionId);
@@ -2466,7 +2485,7 @@ export class ChatState {
         this.sessionId = event.sessionId ?? this.sessionId;
         this.projectKey = event.project ?? this.projectKey;
         if (event.cwd && event.cwd !== this.cwd) {
-          this.cwd = event.cwd;
+          this.#moveTo(event.cwd);
           this.onContextChange?.();
         }
         this.streaming = event.running;

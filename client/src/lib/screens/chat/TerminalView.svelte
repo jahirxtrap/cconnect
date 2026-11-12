@@ -18,7 +18,8 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
-  import { listTerminals, listTerminalsWith, type TerminalInfo } from "$lib/services/terminalApi";
+  import { backend } from "$lib/services/backend.svelte";
+  import { listTerminals } from "$lib/services/terminalApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -41,7 +42,6 @@
 
   const { cwd }: Props = $props();
 
-  let sessions = $state<TerminalInfo[]>([]);
   let menuOpen = $state(false);
   let unlocking = $state(false);
   let rejected = $state(false);
@@ -64,16 +64,12 @@
     focusActive();
   };
 
-  const unlocked = $derived(terminalTabs.unlocked);
+  const unlocked = $derived(securityKeys.unlocked(backend.active));
 
-  const refresh = async () => {
+  const refresh = async (key = securityKeys.current) => {
     if (!online) return;
-    const environment = terminalTabs.environment;
-    const listed = await listTerminals();
-    terminalTabs.markUnlocked(environment, listed !== null);
-    if (!listed) return;
-    sessions = listed;
-    terminalTabs.sync(listed);
+    const listed = await listTerminals(key);
+    if (listed) terminalTabs.sync(listed);
   };
 
   const create = async () => {
@@ -83,13 +79,11 @@
       unlocking = true;
       return;
     }
-    const created = await terminalTabs.create(cwd);
-    if (!created) {
+    if (!(await terminalTabs.create(cwd))) {
       rejected = true;
       unlocking = true;
       return;
     }
-    sessions = [...sessions, created];
     focusActive();
   };
 
@@ -102,13 +96,11 @@
   };
 
   const unlock = async (key: string) => {
-    const listed = await listTerminalsWith(key);
-    if (listed === null) {
+    if (!(await listTerminals(key))) {
       rejected = true;
       return;
     }
     securityKeys.set(key);
-    sessions = listed;
     unlocking = false;
     rejected = false;
   };
@@ -149,7 +141,7 @@
   );
 
   $effect(() => {
-    void refresh();
+    void refresh(securityKeys.current);
   });
 </script>
 

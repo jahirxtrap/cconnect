@@ -3,6 +3,7 @@
   import { isTouch } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { dismissMenus, menusOpen } from "./MenuScrim.svelte";
+  import { FLING_SPEED, Velocity } from "./velocity";
   import { pushDismiss } from "$lib/app/dismissStack";
 
   interface Props {
@@ -19,8 +20,6 @@
 
   const SLOP = 6;
   const HALF = 2;
-  const FLING_SPEED = 350;
-  const VELOCITY_WINDOW_MS = 100;
 
   let offset = $state(0);
   let dragging = $state(false);
@@ -29,16 +28,7 @@
   let startY = 0;
   let tracking = false;
   let decided = false;
-  let trail: { x: number; at: number }[] = [];
-
-  const recentTrail = (until: number) => trail.filter((sample) => sample.at >= until - VELOCITY_WINDOW_MS);
-
-  const releaseSpeed = (endedAt: number) => {
-    const recent = recentTrail(endedAt);
-    const first = recent[0];
-    const last = recent.at(-1);
-    return first && last && last.at > first.at ? ((last.x - first.x) / (last.at - first.at)) * 1000 : 0;
-  };
+  const velocity = new Velocity();
 
   const scrollsHorizontally = (target: EventTarget | null) => {
     let node = target as HTMLElement | null;
@@ -77,14 +67,14 @@
     dragging = false;
     startX = touch.clientX;
     startY = touch.clientY;
-    trail = [{ x: touch.clientX, at: event.timeStamp }];
+    velocity.start(touch.clientX, event.timeStamp);
     offset = open ? sheetWidth : 0;
   };
 
   const onMove = (event: TouchEvent) => {
     if (!tracking) return;
     const touch = event.touches[0];
-    trail = [...recentTrail(event.timeStamp), { x: touch.clientX, at: event.timeStamp }];
+    velocity.add(touch.clientX, event.timeStamp);
     const dx = touch.clientX - startX;
     const dy = touch.clientY - startY;
     if (!decided) {
@@ -107,7 +97,7 @@
     tracking = false;
     if (!dragging) return;
     dragging = false;
-    const speed = releaseSpeed(event.timeStamp);
+    const speed = velocity.at(event.timeStamp);
     const flung = Math.abs(speed) > FLING_SPEED;
     const opening = flung ? speed > 0 : offset > sheetWidth / HALF;
     if (opening) onOpen?.();

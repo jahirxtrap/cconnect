@@ -1,3 +1,4 @@
+import { untrack } from "svelte";
 import { store } from "$lib/platform/storage";
 import { CLIENT_DEFAULTS, CLIENT_SETTINGS, LEGACY_KEYS } from "./settingsRegistry";
 
@@ -65,6 +66,7 @@ const DISCORD_KEYS: Record<keyof DiscordPrefs, string> = {
 };
 
 const KINDS = new Map(CLIENT_SETTINGS.map((setting) => [setting.key, setting.kind]));
+const LOCKED_PROJECT = "locked_project";
 
 class Settings {
   #values = $state<Record<string, unknown>>(
@@ -76,11 +78,16 @@ class Settings {
     ),
   );
 
+  #revisions = $state<Record<string, number>>({});
+
   #read<T>(key: string): T {
     return this.#values[key] as T;
   }
 
   #write(key: string, value: unknown) {
+    untrack(() => {
+      if (this.#values[key] !== value) this.#revisions[key] = (this.#revisions[key] ?? 0) + 1;
+    });
     this.#values[key] = value;
     store.set(key, value);
   }
@@ -481,10 +488,13 @@ class Settings {
   }
 
   get lockedProject() {
-    return this.#read<string>("locked_project");
+    return this.#read<string>(LOCKED_PROJECT);
   }
   set lockedProject(value: string) {
-    this.#write("locked_project", value);
+    this.#write(LOCKED_PROJECT, value);
+  }
+  get lockedProjectRevision() {
+    return this.#revisions[LOCKED_PROJECT] ?? 0;
   }
 
   get skippedRelease() {

@@ -1,3 +1,5 @@
+import { FLING_SPEED, Velocity } from "./velocity";
+
 const SLOP = 10;
 const DISMISS_RATIO = 0.35;
 const MIN_DISMISS = 80;
@@ -14,6 +16,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
   let tracking = false;
   let dragging = false;
   let pointer: number | null = null;
+  const velocity = new Velocity();
 
   const paint = (value: number, animate = false) => {
     node.style.transition = animate ? `transform ${SWIPE_MS}ms ease-out, opacity ${SWIPE_MS}ms ease-out` : "";
@@ -34,10 +37,12 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
     startX = event.clientX;
     tracking = true;
     pointer = event.pointerId;
+    velocity.start(event.clientX, event.timeStamp);
   };
 
   const onPointerMove = (event: PointerEvent) => {
     if (!tracking) return;
+    velocity.add(event.clientX, event.timeStamp);
     const delta = event.clientX - startX;
     if (!dragging) {
       if (Math.abs(delta) <= SLOP) return;
@@ -48,10 +53,12 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
     paint(offset);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (event: PointerEvent) => {
     if (!tracking) return;
     const threshold = Math.max(MIN_DISMISS, node.offsetWidth * DISMISS_RATIO);
-    const gone = Math.abs(offset) >= threshold;
+    const speed = velocity.at(event.timeStamp);
+    const flung = Math.abs(speed) > FLING_SPEED && Math.sign(speed) === Math.sign(offset);
+    const gone = flung || Math.abs(offset) >= threshold;
     const target = offset > 0 ? node.offsetWidth : -node.offsetWidth;
     const wasDragging = dragging;
     release();

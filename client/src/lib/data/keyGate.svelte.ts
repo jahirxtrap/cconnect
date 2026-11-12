@@ -1,3 +1,4 @@
+import type { Profile } from "$lib/services/backend.svelte";
 import { securityKeys } from "./securityKeys.svelte";
 import { serverStatus } from "./serverStatus.svelte";
 
@@ -9,6 +10,11 @@ interface Answered {
 }
 
 export const keyRefused = (result: Answered): boolean => result.status === FORBIDDEN;
+
+/** Only for a route that answers nothing without the key, so its success proves the key and its 403 refuses it. */
+export const judgeKey = (profile: Profile, key: string, result: Answered) => {
+  if (result.ok || keyRefused(result)) securityKeys.judge(profile, key, result.ok);
+};
 
 export class KeyGate {
   asking = $state(false);

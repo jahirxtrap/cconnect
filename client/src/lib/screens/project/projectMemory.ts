@@ -12,7 +12,7 @@ export interface ProjectPosition {
   repos: GitRepo[] | null;
   repoRoot: string | null;
   tracked: boolean;
-  locked: boolean;
+  listedWith: string | null;
 }
 
 const positions = new Recent<string, ProjectPosition>(REMEMBERED);

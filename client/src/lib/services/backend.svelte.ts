@@ -1,3 +1,4 @@
+import { untrack } from "svelte";
 import type { AuthKind } from "$lib/data/auth";
 import { withQuery } from "$lib/data/url";
 import { isTauri } from "$lib/platform";
@@ -107,6 +108,11 @@ class Backend {
   environments = $state<EnvironmentProfile[]>(secureStore.get<EnvironmentProfile[]>("environments", []).map(adopted));
   activeId = $state<string | null>(store.get("environments.active", null));
   schemes = $state<Record<string, string>>({});
+  #directoryRevisions = $state<Record<string, number>>({});
+
+  directoryRevisionOf(profile: Profile): number {
+    return profile ? (this.#directoryRevisions[profile.id] ?? 0) : 0;
+  }
 
   rememberScheme(profile: Profile, scheme: string) {
     if (profile && scheme) this.schemes[profile.id] = scheme;
@@ -149,6 +155,14 @@ class Backend {
   }
 
   save(environments: EnvironmentProfile[]) {
+    untrack(() => {
+      for (const profile of environments) {
+        const before = this.environments.find((item) => item.id === profile.id);
+        if (before && before.directory !== profile.directory) {
+          this.#directoryRevisions[profile.id] = this.directoryRevisionOf(profile) + 1;
+        }
+      }
+    });
     this.environments = environments;
     secureStore.set("environments", environments);
   }

@@ -7,6 +7,7 @@ import {
   type BackgroundEffects,
 } from "$lib/design/backgrounds";
 import { packs } from "$lib/design/packs/registry.svelte";
+import { BACKGROUND_FITS } from "$lib/design/packs/schema";
 import { packFile, packImageKey } from "$lib/design/packs/storage";
 import { blobStore } from "$lib/platform/blobStore";
 import { store } from "$lib/platform/storage";
@@ -52,7 +53,9 @@ class ChatBackground {
   }
 
   effectsOf(id: string): BackgroundEffects {
-    return this.saved[id] ?? this.defaultsOf(id);
+    const saved = this.saved[id];
+    if (!saved) return this.defaultsOf(id);
+    return BACKGROUND_FITS.includes(saved.fit) ? saved : { ...saved, fit: this.defaultsOf(id).fit };
   }
 
   #imageKey(id: string): string | null {

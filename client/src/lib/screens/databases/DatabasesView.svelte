@@ -72,7 +72,7 @@
 
   const profile = $derived(backend.active);
   const listed = $derived(databases.listOf(profile));
-  const locked = $derived(databases.locked(profile));
+  const locked = $derived(securityKeys.unlocked(profile) === false);
   const connections = $derived(listed?.connections ?? []);
   const expandable = $derived(!layout.mobile);
   const fullObject = $derived(openedObject.full && expandable);

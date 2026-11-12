@@ -48,10 +48,11 @@ const slotOf = (profile: Profile, ...parts: (string | null)[]) => [profile?.id ?
 const scopeSlot = (profile: Profile, scope: DatabaseScope, ...parts: (string | null)[]) =>
   slotOf(profile, scope.connection, scope.database, ...parts);
 
+const listSlot = (profile: Profile, key = securityKeys.keyFor(profile)) => slotOf(profile, key);
+
 class Databases {
   #lists = $state<Record<string, DatabaseList>>({});
   #failed = $state<Record<string, boolean>>({});
-  #locked = $state<Record<string, boolean>>({});
   #files = $state<Record<string, DatabaseConnection>>({});
   #schemas = $state<Record<string, Loaded<DatabaseSchemas>>>({});
   #objects = $state<Record<string, Loaded<DatabaseObjects>>>({});
@@ -60,15 +61,11 @@ class Databases {
   #tables = $state<Record<string, TableView>>({});
 
   listOf(profile: Profile): DatabaseList | null {
-    return profile ? (this.#lists[profile.id] ?? null) : null;
+    return profile ? (this.#lists[listSlot(profile)] ?? null) : null;
   }
 
   failed(profile: Profile): boolean {
     return profile ? this.#failed[profile.id] === true : false;
-  }
-
-  locked(profile: Profile): boolean {
-    return profile ? this.#locked[profile.id] === true : false;
   }
 
   find(profile: Profile, id: string | null): DatabaseConnection | null {
@@ -87,15 +84,14 @@ class Databases {
     const [catalog, saved] = await Promise.all([api.catalog(), api.connections(key)]);
     const refused = keyRefused(saved);
     const answered = catalog.ok && (saved.ok || refused);
-    if (answered) this.#lists = { ...this.#lists, [profile.id]: { ...catalog.value, connections: saved.value ?? [] } };
-    this.#locked = { ...this.#locked, [profile.id]: refused };
+    if (answered) this.#lists = { ...this.#lists, [listSlot(profile, key)]: { ...catalog.value, connections: saved.value ?? [] } };
     this.#failed = { ...this.#failed, [profile.id]: !answered };
     return !refused;
   }
 
   adoptEngines(profile: Profile, engines: DatabaseEngine[]) {
     const current = this.listOf(profile);
-    if (profile && current) this.#lists = { ...this.#lists, [profile.id]: { ...current, engines } };
+    if (profile && current) this.#lists = { ...this.#lists, [listSlot(profile)]: { ...current, engines } };
   }
 
   adoptFile(profile: Profile, connection: DatabaseConnection) {

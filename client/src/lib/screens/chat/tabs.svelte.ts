@@ -71,6 +71,9 @@ const readEnvironment = (): string | null | undefined => {
   return backend.environments.find((item) => item.id === id)?.id ?? null;
 };
 
+const showsLocation = (tab: Tab, location: ChatLocation) =>
+  tab.sessionId === location.sessionId && (location.environmentId === null || tab.environmentId === location.environmentId);
+
 export const readChatLocation = (): ChatLocation | null => {
   if (!onChatRoute()) return null;
   const query = new URLSearchParams(window.location.search);
@@ -110,7 +113,7 @@ class Tabs {
 
     const location = readChatLocation();
     if (location && !location.view) {
-      const known = opened.find((tab) => tab.sessionId === location.sessionId);
+      const known = opened.find((tab) => showsLocation(tab, location));
       if (known) {
         activeId = known.id;
       } else {
@@ -186,7 +189,7 @@ class Tabs {
       void chat.openTrashed(location.sessionId, location.projectKey);
       return;
     }
-    const open = this.list.find((tab) => tab.sessionId === location.sessionId);
+    const open = [this.active, ...this.list].find((tab) => showsLocation(tab, location));
     if (open) {
       this.select(open.id);
       return;
