@@ -19,6 +19,9 @@ inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_up
   `run.py` is the checkout's entry. Always **one worker**: every registry lives in memory. With
   `CCONNECT_LIFELINE=1` the server stops when its stdin pipe closes, so it never outlives the
   desktop app; uvicorn gets `stdin=DEVNULL`, or Windows deadlocks on the inherited pipe.
+  The runtime record names the supervisor (`SUPERVISOR`). `--detach` over a running server stops
+  it with the stop flag and waits for that supervisor to exit, whose `atexit` drops the funnel,
+  before exposing again; it reports success once the recorded server itself listens on the port.
 - `core/` — `paths` (**the** path table; `INSTALLED` picks the data folder), `release`,
   `config`, `db` / `models` / `migrations/`, `settings_defs` / `settings_store`, `responses`
   (**the** envelope `{success, status, message, data}`), `ws` (**the** handshake:

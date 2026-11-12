@@ -94,3 +94,9 @@ usual, then hands the terminal back and keeps the server running in its own
 process — closing the session (or the terminal) no longer takes it down. Output
 goes to `~/.cconnect/data/logs/detached.log`, the funnel stays up, and `cconnect stop`
 shuts both down. It survives the terminal, not a reboot.
+
+If a server is already running in another terminal, `--detach` moves it to the
+background: it stops that one and starts the detached server in its place, so
+the apps reconnect on their own and only a turn in progress is cut. It reports
+`Detached` once the new server answers, and the error if it does not. Starting a
+second server in the foreground while one is running is refused instead.

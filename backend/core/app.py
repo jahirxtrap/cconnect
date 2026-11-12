@@ -13,7 +13,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from core import paths
-from core.config import PORT
+from core.config import PORT, SUPERVISOR_VAR
 from core.db import init_db
 from core.rate_limit import limiter
 from core.responses import api_response
@@ -31,7 +31,9 @@ async def lifespan(app: FastAPI):
     settings_store.load()
     from services import accounts
     await asyncio.to_thread(accounts.purge_forgotten)
-    paths.RUNTIME_FILE.write_text(f"PORT={PORT}\nPID={os.getpid()}\n", encoding="utf-8")
+    paths.RUNTIME_FILE.write_text(
+        f"PORT={PORT}\nPID={os.getpid()}\nSUPERVISOR={os.environ.get(SUPERVISOR_VAR, '')}\n", encoding="utf-8"
+    )
     system_monitor.setup_log_capture()
     ensure_subscription_auth()
     await ensure_sdk_installed()

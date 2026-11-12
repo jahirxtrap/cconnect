@@ -26,6 +26,7 @@ CLAUDE_PROJECTS_DIR = os.environ.get(
 )
 
 RESTART_EXIT_CODE = 42
+SUPERVISOR_VAR = "CCONNECT_SUPERVISOR"
 
 DEFAULT_CWD = os.environ.get(
     "DEFAULT_CWD", str(Path.home() if paths.INSTALLED else paths.BACKEND_DIR.parent)

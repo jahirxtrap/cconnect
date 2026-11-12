@@ -25,7 +25,7 @@ import qrcode
 from dotenv import set_key
 
 from core import cli_manager, paths, process_tree, release, sdk
-from core.config import PORT, RESTART_EXIT_CODE
+from core.config import PORT, RESTART_EXIT_CODE, SUPERVISOR_VAR
 from services import agent_registry, repo, system_monitor
 
 _ENV_PATH = paths.ENV_FILE
@@ -331,7 +331,7 @@ def _spawn_detached() -> int:
         "close_fds": True,
     }
     if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
     process = subprocess.Popen([sys.executable, "-m", _MODULE], **kwargs)
@@ -341,6 +341,68 @@ def _spawn_detached() -> int:
 
 def _terminate_tree(pid: int) -> None:
     process_tree.terminate(pid, _STOP_TIMEOUT)
+
+
+def _close_exposure() -> None:
+    detached = _detached_provider()
+    if detached == "tailscale":
+        _stop_tailscale_funnel()
+    elif detached == "tailnet":
+        _stop_tailscale_serve()
+    paths.DETACHED_PROVIDER_FILE.unlink(missing_ok=True)
+
+
+def _serving(port: int) -> bool:
+    """True once the recorded server itself listens on the port, not whatever else took it."""
+    with suppress(psutil.Error, KeyError, ValueError):
+        sockets = psutil.Process(int(_runtime()["PID"])).net_connections(kind="tcp")
+        return any(sock.status == psutil.CONN_LISTEN and sock.laddr.port == port for sock in sockets)
+    return False
+
+
+def _await_start(pid: int, port: int) -> None:
+    while not _serving(port):
+        if not psutil.pid_exists(pid):
+            paths.DETACHED_PID_FILE.unlink(missing_ok=True)
+            _close_exposure()
+            _abort(f"the detached backend stopped while starting. See {paths.DETACHED_LOG_FILE}")
+        time.sleep(_POLL_SECONDS)
+
+
+def _supervisor(live: dict[str, str]) -> psutil.Process | None:
+    """The process that runs the recorded server; one started after the record is a reused pid."""
+    with suppress(psutil.Error, KeyError, ValueError, OSError):
+        process = psutil.Process(int(live["SUPERVISOR"]))
+        if process.create_time() <= paths.RUNTIME_FILE.stat().st_mtime:
+            return process
+    return None
+
+
+def _hand_over() -> None:
+    live = _runtime()
+    if not live:
+        return
+    supervisor = _supervisor(live)
+    if supervisor is None:
+        _abort(
+            f"a backend is already running (pid {live['PID']}) and cannot be moved to the background. Stop it first."
+        )
+    print(f"\n  Moving the backend (pid {live['PID']}) to the background.")
+    paths.STOP_FLAG.touch()
+    with suppress(psutil.NoSuchProcess):
+        supervisor.wait()
+
+
+def _refuse_second() -> None:
+    live = _runtime()
+    if not live:
+        return
+    how = (
+        f"It runs in the background: stop it with {_invocation()} stop."
+        if _running_pid() is not None
+        else "Stop it in its terminal, or move it to the background with --detach."
+    )
+    _abort(f"a backend is already running (pid {live['PID']} on port {live.get('PORT', '?')}). {how}")
 
 
 def _stop_detached() -> None:
@@ -353,12 +415,7 @@ def _stop_detached() -> None:
             _abort(f"could not stop pid {pid}.")
         print(f"Stopped detached backend (pid {pid}).")
     paths.DETACHED_PID_FILE.unlink(missing_ok=True)
-    detached = _detached_provider()
-    if detached == "tailscale":
-        _stop_tailscale_funnel()
-    elif detached == "tailnet":
-        _stop_tailscale_serve()
-    paths.DETACHED_PROVIDER_FILE.unlink(missing_ok=True)
+    _close_exposure()
 
 
 def _invocation() -> str:
@@ -517,14 +574,17 @@ def _watch_lifeline() -> None:
     threading.Thread(target=wait, name="lifeline", daemon=True).start()
 
 
+def _port_taken(port: int) -> bool:
+    with socket.socket() as probe:
+        probe.settimeout(1)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
 def _port_state(port: int) -> str:
     live = _runtime()
     if live and int(live.get("PORT") or 0) == port:
         return f"{port}, this backend (pid {live['PID']})"
-    with socket.socket() as probe:
-        probe.settimeout(1)
-        taken = probe.connect_ex(("127.0.0.1", port)) == 0
-    return f"{port}, taken by another program" if taken else f"{port}, free"
+    return f"{port}, taken by another program" if _port_taken(port) else f"{port}, free"
 
 
 def _doctor(port: int) -> None:
@@ -596,6 +656,9 @@ def main():
         running = _running_pid()
         if running is not None:
             _abort(f"a detached backend is already running (pid {running}). Use --stop first.")
+        _hand_over()
+        if _port_taken(port):
+            _abort(f"port {port} is taken by another program.")
         system_monitor.reset_log_file()
         key_generated = _ensure_security_key()
         if args.expose:
@@ -604,6 +667,7 @@ def main():
         else:
             _print_security_key(key_generated)
         pid = _spawn_detached()
+        _await_start(pid, port)
         print(
             f"  Detached   : pid {pid}"
             f"\n  Log        : {paths.DETACHED_LOG_FILE}"
@@ -611,6 +675,7 @@ def main():
         )
         return
 
+    _refuse_second()
     system_monitor.reset_log_file()
     key_generated = _ensure_security_key()
     if args.expose:
@@ -628,6 +693,7 @@ def main():
 
     paths.RESTART_FLAG.unlink(missing_ok=True)
     paths.STOP_FLAG.unlink(missing_ok=True)
+    os.environ[SUPERVISOR_VAR] = str(os.getpid())
     if os.environ.pop(_LIFELINE_VAR, None):
         _watch_lifeline()
     while True:
