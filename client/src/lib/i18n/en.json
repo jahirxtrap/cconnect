@@ -35,7 +35,6 @@
   "BACKGROUND_FIT": "Framing",
   "BACKGROUND_FIT_COVER": "Fill",
   "BACKGROUND_FIT_CONTAIN": "Fit",
-  "BACKGROUND_FIT_TILE": "Tile",
   "BACKGROUND_X": "Horizontal position",
   "BACKGROUND_Y": "Vertical position",
   "ENVIRONMENTS": "Environments",

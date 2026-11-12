@@ -106,7 +106,7 @@
     "x": { "min": 0, "max": 100 },
     "y": { "min": 0, "max": 100 }
   },
-  "backgroundFits": ["cover", "contain", "tile"],
+  "backgroundFits": ["cover", "contain"],
   "accentSources": { "dynamic": "dynamic", "theme": "theme" },
   "fontKinds": ["text", "mono", "symbols", "emoji"],
   "fontFormats": ["woff2", "woff", "ttf", "otf"],

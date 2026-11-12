@@ -26,9 +26,8 @@
   const bleed = $derived(effects.blur * BLEED_PER_BLUR);
   const pixels = $derived(thumbnail && width && height ? devicePixels(Math.max(width, height) + bleed * 2) : 0);
 
-  const tiled = $derived(effects.fit === "tile");
-  const wanted = $derived(thumbnail && !tiled ? pixels : undefined);
-  const measured = $derived(!thumbnail || tiled || pixels > 0);
+  const wanted = $derived(thumbnail ? pixels : undefined);
+  const measured = $derived(!thumbnail || pixels > 0);
 
   $effect(() => {
     if (!file && measured) chatBackground.loadImage(id, wanted);
@@ -70,9 +69,6 @@
     <div class="absolute flex items-center justify-center" style={frame}>
       <svg viewBox="0 0 108 108" class="size-[min(60%,24rem)]"><LogoGlyph ring="stroke-outline" mark="stroke-on-background" /></svg>
     </div>
-  {:else if url && tiled}
-    <img src={url} alt="" use:cached onload={() => (loaded = url)} class="hidden" />
-    <div class="absolute" style="{frame}; background-image: url({JSON.stringify(url)}); background-repeat: repeat"></div>
   {:else if url}
     <img
       src={url}

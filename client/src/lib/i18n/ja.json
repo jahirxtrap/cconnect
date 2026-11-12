@@ -35,7 +35,6 @@
   "BACKGROUND_FIT": "表示方法",
   "BACKGROUND_FIT_COVER": "全面に表示",
   "BACKGROUND_FIT_CONTAIN": "全体を表示",
-  "BACKGROUND_FIT_TILE": "並べて表示",
   "BACKGROUND_X": "水平位置",
   "BACKGROUND_Y": "垂直位置",
   "ENVIRONMENTS": "環境",

@@ -6,8 +6,7 @@ GitHub to Dracula and Nord — and **Appearance** chooses between them or follow
 the system. The accent colour can come from the theme, **Font** sets the
 typefaces for text, code, symbols and emoji, and **Chat background** puts the
 CConnect logo, a background from a pack or a picture of your own behind the
-conversation, covering it, fitting inside it or repeated as tiles, as the
-Doodles background of CConnect Extras does.
+conversation.
 
 All of that travels as a `.ccpack` pack. **Packs** installs one from a file or
 from those available on the server — Claude can write one for you and leave it

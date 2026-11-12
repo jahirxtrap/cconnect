@@ -72,6 +72,7 @@ export type SettingsDialog =
   | "packs"
   | "accent"
   | "chat_background"
+  | "background_settings"
   | "shortcuts"
   | "discord"
   | "browser"

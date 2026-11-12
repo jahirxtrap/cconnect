@@ -16,13 +16,16 @@
   import Type from "@lucide/svelte/icons/type";
   import Volume2 from "@lucide/svelte/icons/volume-2";
   import { useHighlight } from "$lib/app/useHighlight.svelte";
+  import { chatBackground } from "$lib/data/chatBackground.svelte";
   import { settings } from "$lib/data/settings.svelte";
+  import { NO_BACKGROUND } from "$lib/design/backgrounds";
   import { theme, type ThemeMode } from "$lib/design/theme.svelte";
   import { i18n, t, type Locale } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { layout } from "$lib/platform/layout.svelte";
   import { speech } from "$lib/platform/speech.svelte";
   import { deviceBrowsing } from "$lib/screens/browser/deviceEngine";
+  import ChatBackdrop from "$lib/screens/chat/ChatBackdrop.svelte";
   import PacksDialog from "$lib/screens/packs/PacksDialog.svelte";
   import { useServerPacks } from "$lib/services/serverPacks.svelte";
   import CompactSwitch from "$lib/ui/CompactSwitch.svelte";
@@ -35,6 +38,7 @@
   import AccentDialog from "./AccentDialog.svelte";
   import AccentPicker from "./AccentPicker.svelte";
   import BackgroundActions from "./BackgroundActions.svelte";
+  import BackgroundPickDialog from "./BackgroundPickDialog.svelte";
   import BackgroundPicker from "./BackgroundPicker.svelte";
   import BrowserDialog from "./BrowserDialog.svelte";
   import ChatBackgroundDialog from "./ChatBackgroundDialog.svelte";
@@ -90,7 +94,17 @@
       title={t("CHAT_BACKGROUND")}
       summary={rowSummary("chat_background")}
       onclick={() => (dialog = "chat_background")}
-    />
+    >
+      {#snippet trailing()}
+        {#if chatBackground.current !== NO_BACKGROUND}
+          <span class="flex h-7 w-9 items-center justify-center">
+            <span class="relative size-6 overflow-hidden rounded-md border border-outline-variant bg-background">
+              <ChatBackdrop thumbnail id={chatBackground.current} effects={chatBackground.effects} />
+            </span>
+          </span>
+        {/if}
+      {/snippet}
+    </PreferenceRow>
   {:else}
     <PreferenceRow icon={appearanceIcon} title={t("APPEARANCE")} flash={highlight.is("appearance")}>
       {#snippet trailing()}
@@ -274,8 +288,15 @@
   <FontDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "packs"}
   <PacksDialog onDismiss={() => (dialog = null)} />
-{:else if dialog === "chat_background"}
-  <ChatBackgroundDialog adjustOnly={!layout.mobile} onDismiss={() => (dialog = null)} />
+{:else if dialog === "chat_background" || dialog === "background_settings"}
+  {#if layout.mobile}
+    <BackgroundPickDialog onAdjust={() => (dialog = "background_settings")} onDismiss={() => (dialog = null)} />
+    {#if dialog === "background_settings"}
+      <ChatBackgroundDialog onDismiss={() => (dialog = "chat_background")} />
+    {/if}
+  {:else}
+    <ChatBackgroundDialog onDismiss={() => (dialog = null)} />
+  {/if}
 {:else if dialog === "shortcuts"}
   <ShortcutsDialog onDismiss={() => (dialog = null)} />
 {:else if dialog === "discord"}
