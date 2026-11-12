@@ -3,6 +3,7 @@
 import shutil
 import subprocess
 import sys
+from itertools import chain
 from pathlib import Path
 
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -29,10 +30,10 @@ def uninstall_command(*distributions: str) -> list[str]:
     return [sys.executable, "-m", "pip", "uninstall", "-y", *distributions]
 
 
-def upgrade_command(distribution: str) -> list[str]:
+def upgrade_command(distribution: str, kept: list[str] = ()) -> list[str]:
     uv = uv_tool()
     if uv:
-        return [uv, "tool", "upgrade", distribution]
+        return [uv, "tool", "install", "--upgrade", distribution, *chain.from_iterable(("--with", item) for item in kept)]
     return [sys.executable, "-m", "pip", "install", "--upgrade", distribution]
 
 

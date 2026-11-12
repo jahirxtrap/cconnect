@@ -165,6 +165,12 @@ def install(engine: str) -> None:
     install_packages(spec(engine)["packages"])
 
 
+def kept_packages(entries: list[dict]) -> list[str]:
+    catalog = {name for engine, item in ENGINES.items() if item["packages"] and installed(engine) for name in item["packages"]}
+    custom = {name for entry in entries if entry.get("url") and _loadable(entry["url"]) for name in entry["packages"]}
+    return sorted(catalog | custom)
+
+
 def driver_of(engine: str) -> list[str]:
     wanted = spec(engine)["packages"]
     return [other for other, item in ENGINES.items() if wanted and item["packages"] == wanted]

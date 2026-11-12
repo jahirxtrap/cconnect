@@ -196,6 +196,11 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
   download chunks) reopens once, silently. `chatSocket` keeps a stale socket while
   `transfers.flowingTo` sees a transfer to that server. Never raise the deadlines.
 - `setOnReceiveContentListener` takes no MIME type starting with `*`: it kills the app on launch.
+- The WebView only learns about window focus changes that come with `onPause` / `onResume`
+  (`WindowFocusGate`, called from the `onWindowFocusChanged` override in the class extension).
+  Chromium 157+ forgets the focused field when the window loses focus and asks the renderer again
+  when it returns, which hides the keyboard that a system overlay such as the notification shade
+  only borrowed. Chrome itself loses the keyboard that way on this device.
 - Keyboard images reach the composer through `PastedContent.inputConnection`, injected into the
   generated `RustWebView.kt` from `WRY_RUSTWEBVIEW_CLASS_EXTENSION` in `client/.cargo/config.toml`
   (both cargo runs need it). Check the compiled class with `dexdump`, never the generated file.

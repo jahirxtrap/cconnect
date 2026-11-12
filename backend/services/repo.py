@@ -6,9 +6,10 @@ from typing import Optional
 
 import httpx
 from packaging.version import InvalidVersion, Version
+from sqlalchemy.exc import OperationalError
 
 from core import packages, paths, release
-from services import git
+from services import database_engines, databases, git
 
 _TIMEOUT = 120
 _RELEASE_TIMEOUT = 10
@@ -29,8 +30,16 @@ def _released() -> Optional[str]:
     return latest if newer else ""
 
 
+def _kept_packages() -> list[str]:
+    try:
+        entries = databases.load()
+    except OperationalError:
+        entries = []
+    return database_engines.kept_packages(entries)
+
+
 def upgrade_command() -> list[str]:
-    return packages.upgrade_command(DISTRIBUTION)
+    return packages.upgrade_command(DISTRIBUTION, _kept_packages())
 
 
 def _on_disk() -> str:

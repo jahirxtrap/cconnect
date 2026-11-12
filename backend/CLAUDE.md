@@ -223,6 +223,9 @@ Connections are `file`, `server` or `url` (`custom`, which borrows its backend's
 - A driver install pins every requirement of `cconnect` at its installed version, so it never
   moves the server's packages. Engines with the same `packages` share one driver (`driver_of`).
   A driver counts as installed when its distributions are on disk (`importlib.metadata`).
+- An update keeps the drivers. `uv tool upgrade` removes everything its receipt does not list,
+  so `repo.upgrade_command` runs `uv tool install --upgrade --with <installed drivers>`
+  (`kept_packages`), which also writes them into the receipt.
 - A database file opens without a connection (`open_file`): the engine comes from the file's
   header (`signature`), the entry lives in memory under a `file:` id, and `NullPool` holds no lock.
 - Nothing in `database_data` trusts the client. Reads and writes are told apart by sqlglot,
