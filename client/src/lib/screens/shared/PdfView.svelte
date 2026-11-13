@@ -6,6 +6,7 @@
   import { nativePdfAvailable, openNativePdf, type NativePdf } from "$lib/platform/androidPdf";
   import { arrivesLater, serveFile, type ServedFile } from "$lib/services/mediaSource";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
+  import { OWN_LINKS } from "$lib/ui/linkOwner";
   import { wheelZoomFactor } from "$lib/ui/wheelZoom";
   import { nativePages, paintless, type Gesture } from "./pdfNativePages";
 
@@ -376,7 +377,7 @@
   });
 </script>
 
-<div class="relative min-h-0 flex-1">
+<div {...OWN_LINKS} class="relative min-h-0 flex-1">
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div
     bind:this={container}

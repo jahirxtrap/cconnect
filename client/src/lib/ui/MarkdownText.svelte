@@ -24,6 +24,7 @@
   import CconnectBlockView from "./CconnectBlockView.svelte";
   import CodeBlock from "./CodeBlock.svelte";
   import ExternalLinkDialog from "./ExternalLinkDialog.svelte";
+  import { linkOwner, OWN_LINKS } from "./linkOwner";
   import MarkdownImage from "./MarkdownImage.svelte";
   import { menuPointOf, type SharedMenuHandler } from "./menuSurface";
   import { hscrollbar } from "./scrollbar";
@@ -82,7 +83,8 @@
   };
 
   const onClick = (event: MouseEvent) => {
-    const url = (event.target as HTMLElement).closest("a")?.getAttribute("href");
+    const anchor = (event.target as HTMLElement).closest("a");
+    const url = anchor && linkOwner(anchor) === event.currentTarget ? anchor.getAttribute("href") : null;
     if (!url) return;
     event.preventDefault();
     open(url);
@@ -135,7 +137,7 @@
         quote.prepend(title);
       }
       for (const anchor of within<HTMLAnchorElement>("a")) {
-        if (anchor.dataset.decorated) continue;
+        if (anchor.dataset.decorated || linkOwner(anchor) !== node) continue;
         anchor.dataset.decorated = "true";
         anchor.dataset.press = "off";
         const url = anchor.getAttribute("href") ?? "";
@@ -185,6 +187,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
+  {...OWN_LINKS}
   class="markdown chat-gap flex w-full flex-col {dense ? 'markdown-dense' : ''} {flavor === 'chat' ? '' : 'markdown-document'} {className}"
   onclickcapture={onClick}
   oncontextmenu={onContextMenu}

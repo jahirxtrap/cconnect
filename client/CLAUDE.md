@@ -239,6 +239,8 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
   `dismissStack`), never `history` directly.
 - An element that drags sideways by itself declares `OWN_SWIPE` (`ui/swipe.ts`), and every
   hand-made swipe leaves it alone.
+- `MarkdownText` decorates and handles only the links it owns (`linkOwner`, `ui/linkOwner.ts`); a
+  component whose DOM brings its own links, like pdf.js's annotation layer, declares `OWN_LINKS`.
 - `hasFiles(event)` gates every drag handler, or dragging text raises the file overlay.
 - Whether a server accepts its stored key is `securityKeys.unlocked(profile)`, recorded only by
   answers that prove it (`judgeKey`, the project tree's `unlocked`): a read-only database also
