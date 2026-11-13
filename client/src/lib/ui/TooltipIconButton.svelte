@@ -4,6 +4,7 @@
   import { isTouch } from "$lib/platform";
   import { shortcuts } from "$lib/platform/shortcuts.svelte";
   import { keyboardNavigation } from "./keyboardNavigation.svelte";
+  import { ON_MEDIA_CLASS } from "./mediaFrame";
   import { TOOLTIP_CLASS } from "./menuSurface";
   import { LONG_PRESS_MS, NEUTRAL_PRESS_CLASS } from "./press";
   import TouchTip from "./TouchTip.svelte";
@@ -16,6 +17,7 @@
     tooltip?: boolean;
     active?: boolean;
     selected?: boolean;
+    onMedia?: boolean;
     class?: string;
     children: Snippet;
     [key: string]: unknown;
@@ -29,6 +31,7 @@
     tooltip = true,
     active = false,
     selected = false,
+    onMedia = false,
     class: className = "",
     children,
     ...rest
@@ -39,6 +42,7 @@
   const ACTIVE_CLASS = `text-accent enabled:hover:bg-hover ${NEUTRAL_PRESS_CLASS}`;
   const SELECTED_CLASS = `bg-surface-variant text-accent ${NEUTRAL_PRESS_CLASS}`;
   const IDLE_CLASS = "text-on-surface-variant enabled:hover:bg-hover enabled:hover:text-on-surface";
+  const MEDIA_CLASS = `${ON_MEDIA_CLASS} enabled:hover:bg-white/15`;
   const PRESS_SLOP = 10;
   const TOUCH_HIDE_MS = 1500;
   const HALF = 2;
@@ -53,7 +57,7 @@
   );
 
   const TRIGGER_CLASS = $derived(
-    `${BASE_CLASS} ${selected ? SELECTED_CLASS : active ? ACTIVE_CLASS : IDLE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
+    `${BASE_CLASS} ${selected ? SELECTED_CLASS : active ? ACTIVE_CLASS : onMedia ? MEDIA_CLASS : IDLE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
   );
 
   const hint = $derived(shortcut ? shortcuts.hint(shortcut) : "");

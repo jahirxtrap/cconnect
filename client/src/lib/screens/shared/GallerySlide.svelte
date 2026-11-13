@@ -1,7 +1,7 @@
 <script module lang="ts">
   import type { PreviewKind } from "$lib/data/previewKind";
 
-  export const GALLERY_KINDS: PreviewKind[] = ["image", "video"];
+  export const GALLERY_KINDS: PreviewKind[] = ["image", "video", "audio"];
 </script>
 
 <script lang="ts">
@@ -10,20 +10,24 @@
   import { fallbackOf, revised, withoutFallback } from "$lib/data/url";
   import { t } from "$lib/i18n/index.svelte";
   import { devicePixels, sizedImage } from "$lib/services/imageSize";
-  import { imageSrc, posterSrc, servedSrc } from "$lib/services/mediaSource";
+  import { imageSrc } from "$lib/services/mediaSource";
   import { videoStillOf } from "$lib/services/sharedApi";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
+  import MediaPlayer from "$lib/ui/MediaPlayer.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
+  import AudioStage from "./AudioStage.svelte";
 
   interface Props {
     item: PreviewRequest;
     active: boolean;
     revision: number;
+    autoplay?: boolean;
+    onEnded?: () => void;
   }
 
-  const { item, active, revision }: Props = $props();
+  const { item, active, revision, autoplay = false, onEnded }: Props = $props();
 
   const kind = $derived(item.kind ?? previewKindOf(item.name));
   const base = $derived(withoutFallback(item.url));
@@ -64,19 +68,25 @@
       {/if}
     </ZoomPane>
   {:else if kind === "video" && active}
-    <!-- svelte-ignore a11y_media_has_caption -->
-    <video
-      use:servedSrc={{ url: source }}
-      use:posterSrc={{ url: frame ?? "" }}
-      controls
-      class="min-h-0 flex-1"
-    ></video>
+    <MediaPlayer url={source} kind="video" poster={frame} zoomable class="min-h-0 flex-1" />
   {:else if kind === "video"}
     <div class="flex min-h-0 flex-1 items-center justify-center">
       {#if frame}
         <img use:imageSrc={{ url: frame }} alt="" draggable="false" class="h-full w-full object-contain" />
       {/if}
     </div>
+  {:else if kind === "audio" && failed}
+    <EmptyState icon={fileIcon(item.name)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
+  {:else if kind === "audio"}
+    <AudioStage
+      url={source}
+      {base}
+      filename={item.name}
+      {active}
+      {autoplay}
+      onerror={() => (failedFor = source)}
+      onended={onEnded}
+    />
   {:else}
     <EmptyState icon={fileIcon(item.name)} text={item.name} class="flex-1" />
   {/if}

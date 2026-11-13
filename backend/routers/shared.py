@@ -10,9 +10,9 @@ from starlette.requests import ClientDisconnect
 from pydantic import BaseModel
 
 from core.access import key_matches
-from core.responses import api_response, derived_response, file_response
+from core.responses import api_response, file_response, rendition_response
 from core.ws import stream_watch
-from services import attachments
+from services import attachments, file_info
 from services import shared as shared_service
 from services.shared_watch import hub as watch_hub
 
@@ -178,6 +178,17 @@ def extract_shared(body: ExtractBody):
     return api_response(data={"path": rel})
 
 
+@router.get("/shared-info")
+def shared_info(path: str):
+    try:
+        resolved = shared_service.resolve_file(path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="file not found")
+    return api_response(data=file_info.describe(resolved))
+
+
 @router.get("/shared-archive")
 def list_archive(path: str, inner: str = ""):
     try:
@@ -219,28 +230,15 @@ def download_shared(
     size: int | None = Query(None, ge=1),
     fit: int | None = Query(None, ge=1),
 ):
-    cover = size is not None
-    limit = attachments.thumbnail_size(size or fit)
     try:
         resolved = shared_service.resolve_file(path)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if resolved is None:
         raise HTTPException(status_code=404, detail="file not found")
-    if limit and attachments.is_image(resolved.name):
-        small = derived_response(
-            request,
-            resolved,
-            f"{limit}" if cover else f"fit{limit}",
-            lambda: attachments.shrunk(resolved, limit, cover=cover, stills_only=True, reduce_only=True),
-        )
-        if small is not None:
-            return small
-    if cover and attachments.is_video(resolved.name):
-        still = derived_response(request, resolved, f"{limit}", lambda: attachments.video_still(resolved, limit))
-        if still is None:
-            raise HTTPException(status_code=404, detail="no still for this video")
-        return still
+    rendition = rendition_response(request, resolved, attachments.rendering(resolved, size, fit))
+    if rendition is not None:
+        return rendition
     return file_response(
         request,
         resolved,

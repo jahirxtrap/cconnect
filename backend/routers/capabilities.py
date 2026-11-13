@@ -50,6 +50,8 @@ async def get_capabilities(capabilities: str = Query(""), account: str = Query("
         "pack_schema": PACK_SCHEMA["schema"],
         "git": git.available(),
         "video_stills": True,
+        "audio_covers": True,
+        "file_info": True,
         "rendition_limit": attachments.RENDITION_LIMIT,
         "output_styles": cli_info.output_styles(info),
         "fast_mode": cli_info.fast_mode(info),

@@ -3,6 +3,7 @@ export const CLIENT_CAPABILITIES = [
   "media.gallery",
   "media.video",
   "media.audio",
+  "media.markdown_audio",
   "media.pdf",
   "media.html",
   "components",

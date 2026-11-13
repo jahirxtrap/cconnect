@@ -8,6 +8,7 @@ import FolderArchive from "@lucide/svelte/icons/folder-archive";
 import FolderInput from "@lucide/svelte/icons/folder-input";
 import FolderOpen from "@lucide/svelte/icons/folder-open";
 import HardDriveDownload from "@lucide/svelte/icons/hard-drive-download";
+import Info from "@lucide/svelte/icons/info";
 import Link2 from "@lucide/svelte/icons/link-2";
 import Package from "@lucide/svelte/icons/package";
 import PackageOpen from "@lucide/svelte/icons/package-open";
@@ -29,6 +30,7 @@ import {
 import type { IconSource } from "./icons";
 
 export const FILE_ACTION_ORDER = [
+  "info",
   "bring",
   "extract",
   "install",
@@ -53,6 +55,7 @@ export const FILE_ACTION_ORDER = [
 export type FileActionId = (typeof FILE_ACTION_ORDER)[number];
 
 export const FILE_ACTION_LOOK: Record<FileActionId, { label: string; icon: IconSource }> = {
+  info: { label: "INFORMATION", icon: Info },
   bring: { label: "BRING_HERE", icon: HardDriveDownload },
   extract: { label: "EXTRACT", icon: PackageOpen },
   install: { label: "PACK_INSTALL", icon: Package },

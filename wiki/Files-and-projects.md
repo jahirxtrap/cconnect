@@ -8,6 +8,22 @@ the files in the chat, or copy a file's PC path. Open a file to preview it in pl
 audio, PDF, SVG, Markdown, source code, HTML and database files — and delete it
 right from the preview if it's no longer needed.
 
+Video and audio play in CConnect's own player, the same in the preview, the
+gallery and the chat: seek, volume, playback speed and full screen. On a phone,
+or where the player is narrow, the speaker opens a volume menu, and full screen
+turns the video sideways unless auto-rotate is on. In the preview, the gallery
+and full screen a video zooms like an image, with the mouse wheel or a pinch. An audio
+file opened in the preview shows its cover, title and artist, or a placeholder
+when it has no cover. A song Claude sends on its own shows in the chat as a card
+with its title and the player, the way a lone image or video shows; inside a
+gallery of images and videos it takes the same frame as they do, with its cover
+or a music note. A playlist
+plays its tracks one after another with a single player, and expanding it opens
+them as a gallery, where the next track also starts when one ends; a video or a
+track you expand carries on from where it was. Information, first in the preview's menu, lists what the file itself
+records: an image's dimensions and camera, the codecs, duration and tags of
+audio and video, a PDF's pages and document properties.
+
 With the side panel open the preview lands there instead of covering the chat,
 so you can watch a file while Claude rewrites it — it reloads on its own when it
 changes on disk. A button blows it up to full screen, and closing it gives you

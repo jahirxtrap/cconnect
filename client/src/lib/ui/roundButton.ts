@@ -3,4 +3,6 @@ export const ROUND_BUTTON_CLASS =
 
 export const ROUND_ARROW_CLASS = `${ROUND_BUTTON_CLASS} bg-surface-variant text-on-surface disabled:cursor-default disabled:opacity-50`;
 
+export const ROUND_ACCENT_CLASS = `${ROUND_BUTTON_CLASS} bg-accent text-on-accent`;
+
 export const ROUND_ICON_SIZE = 18;

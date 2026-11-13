@@ -65,6 +65,8 @@ export interface Capabilities extends VersionInfo {
   packSchema: number | null;
   git: boolean;
   videoStills: boolean;
+  audioCovers: boolean;
+  fileInfo: boolean;
   renditionLimit: number | null;
   outputStyles: string[];
   fastMode: FastMode;
@@ -124,6 +126,8 @@ interface CapabilitiesWire extends VersionWire {
   pack_schema?: number;
   git?: boolean;
   video_stills?: boolean;
+  audio_covers?: boolean;
+  file_info?: boolean;
   rendition_limit?: number;
   output_styles?: string[];
   fast_mode?: { state?: string; disabled_reason?: string | null };
@@ -221,6 +225,8 @@ export const createCapabilitiesApi = (http: HttpClient) => ({
       packSchema: data.pack_schema ?? null,
       git: data.git !== false,
       videoStills: data.video_stills === true,
+      audioCovers: data.audio_covers === true,
+      fileInfo: data.file_info === true,
       renditionLimit: data.rendition_limit ?? null,
       outputStyles: data.output_styles ?? [],
       fastMode: {

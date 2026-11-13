@@ -8,11 +8,14 @@
   import type { DatabaseFileSource } from "$lib/data/databaseModels";
   import { extensionOf, previewKindOf, readsAsText, type PreviewKind } from "$lib/data/previewKind";
   import { wikiLinks } from "$lib/markdown/render";
+  import { serverSettings } from "$lib/data/serverSettings.svelte";
   import { settings } from "$lib/data/settings.svelte";
   import { fallbackOf, revised, withoutFallback } from "$lib/data/url";
   import { t } from "$lib/i18n/index.svelte";
+  import { fileInfoAvailable } from "$lib/services/fileInfo";
+  import { devicePixels, sizedImage } from "$lib/services/imageSize";
   import { fetchFile, imageSrc, servedSrc } from "$lib/services/mediaSource";
-  import { relativeFromUrl, sharedApi } from "$lib/services/sharedApi";
+  import { relativeFromUrl, sharedApi, videoStillOf } from "$lib/services/sharedApi";
   import { copyText } from "$lib/platform/clipboard";
   import CenterViewToggle from "$lib/screens/chat/CenterViewToggle.svelte";
   import DatabaseFile from "$lib/screens/databases/DatabaseFile.svelte";
@@ -43,6 +46,9 @@
   import { useShortcut } from "$lib/platform/useShortcut.svelte";
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
+  import MediaPlayer from "$lib/ui/MediaPlayer.svelte";
+  import AudioStage from "./AudioStage.svelte";
+  import FileInfoDialog from "./FileInfoDialog.svelte";
   import GallerySlide, { GALLERY_KINDS } from "./GallerySlide.svelte";
   import GalleryStrip from "./GalleryStrip.svelte";
   import NativePdfScreen from "./NativePdfScreen.svelte";
@@ -144,6 +150,9 @@
   let formatted = $state(settings.markdownPreviewFormatted);
   let menu = $state(false);
   let confirmingDelete = $state(false);
+  let describing = $state(false);
+  let continuing = $state(false);
+  let stageHeight = $state(0);
 
   const BODY_CLASS = "flex min-h-0 flex-1 flex-col";
   const FRAME_CLASS = `${BODY_CLASS} overflow-hidden rounded-panel`;
@@ -165,8 +174,14 @@
       : null,
   );
 
-  const pickPage = (index: number) => {
-    if (strip && index !== strip.index && index >= 0 && index < strip.items.length) strip.onPick(index);
+  const pickPage = (index: number, carry = false) => {
+    if (!strip || index === strip.index || index < 0 || index >= strip.items.length) return;
+    continuing = carry;
+    strip.onPick(index);
+  };
+
+  const advance = () => {
+    if (strip) pickPage(strip.index + 1, true);
   };
 
   const stepGallery = (step: number) => {
@@ -204,6 +219,7 @@
 
   const menuActions = $derived.by(() => {
     const entries: FileActionEntry[] = [...extraActions, ...fileEntries(FILE_ACTIONS, { url }, filename)];
+    if (describable) entries.push({ id: "info", run: () => (describing = true) });
     if (attach) entries.push({ id: "attach", run: attach });
     if (mention) entries.push({ id: "mention", run: mention });
     if (copyPath) entries.push({ id: "copyPath", run: copyPath });
@@ -215,6 +231,11 @@
   const source = $derived(revised(base, stamp));
   const fallback = $derived(fallbackOf(url));
   const loaded = $derived(loadedFor === source);
+  const describable = $derived(fileInfoAvailable(base));
+  const still = $derived(kind === "video" ? videoStillOf(base) : null);
+  const videoPoster = $derived(still && stageHeight ? sizedImage(still, devicePixels(stageHeight)) : null);
+
+  $effect(() => serverSettings.ensure());
 
   $effect(() => {
     const target = source;
@@ -348,20 +369,26 @@
       {/if}
     </ZoomPane>
   {:else if kind === "video"}
-    <!-- svelte-ignore a11y_media_has_caption -->
-    <video
-      use:servedSrc={{ url: source, onerror: () => (failed = true) }}
-      controls
-      class="min-h-0 flex-1"
-    ></video>
+    {#if failed}
+      <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
+    {:else}
+      <div bind:clientHeight={stageHeight} class="flex min-h-0 flex-1 flex-col">
+        <MediaPlayer
+          url={source}
+          kind="video"
+          poster={videoPoster}
+          zoomable
+          onerror={() => (failed = true)}
+          class="min-h-0 flex-1"
+        />
+      </div>
+    {/if}
   {:else if kind === "audio"}
-    <div class="flex min-h-0 flex-1 items-center justify-center p-6">
-      <audio
-        use:servedSrc={{ url: source, onerror: () => (failed = true) }}
-        controls
-        class="w-full max-w-lg"
-      ></audio>
-    </div>
+    {#if failed}
+      <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
+    {:else}
+      <AudioStage url={source} {base} {filename} onerror={() => (failed = true)} />
+    {/if}
   {:else if kind === "pdf"}
     {#if failed}
       <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
@@ -437,7 +464,13 @@
                 {@render body()}
               {/key}
             {:else if near}
-              <GallerySlide {item} active={position === strip.index} revision={position === strip.index ? stamp : 0} />
+              <GallerySlide
+                {item}
+                active={position === strip.index}
+                revision={position === strip.index ? stamp : 0}
+                autoplay={continuing && position === strip.index}
+                onEnded={advance}
+              />
             {/if}
           </div>
         {/each}
@@ -449,7 +482,7 @@
     {/if}
   </div>
   {#if strip}
-    <GalleryStrip items={strip.items} index={strip.index} onStep={stepGallery} onPick={strip.onPick} />
+    <GalleryStrip items={strip.items} index={strip.index} onStep={stepGallery} onPick={(index) => pickPage(index)} />
   {/if}
 {/snippet}
 
@@ -474,6 +507,10 @@
     </AppTopBar>
     {@render content()}
   </div>
+{/if}
+
+{#if describing && describable}
+  <FileInfoDialog url={base} {filename} onDismiss={() => (describing = false)} />
 {/if}
 
 {#if confirmingDelete && onDelete}

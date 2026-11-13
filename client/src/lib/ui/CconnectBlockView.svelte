@@ -4,13 +4,12 @@
   import type { GalleryFile } from "$lib/data/chatModels";
   import type { CconnectBlock, SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { layout } from "$lib/platform/layout.svelte";
-  import { servedSrc } from "$lib/services/mediaSource";
   import { awaitSharedFile } from "$lib/services/sharedArrival.svelte";
   import InstallCards from "$lib/screens/install/InstallCards.svelte";
   import PdfView from "$lib/screens/shared/PdfView.svelte";
+  import AudioCard from "./AudioCard.svelte";
   import MarkdownImage from "./MarkdownImage.svelte";
   import PageFrame from "./PageFrame.svelte";
-  import CardPanel from "./CardPanel.svelte";
   import ExpandButton from "./ExpandButton.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
   import { ROUND_ARROW_CLASS, ROUND_ICON_SIZE } from "./roundButton";
@@ -78,13 +77,13 @@
   <ExpandButton label={fileName(url)} onclick={() => onOpen(url, fileName(url))} />
 {/snippet}
 
-{#snippet media(item: { url: string; alt?: string; poster?: string })}
-  <MarkdownImage url={item.url} alt={item.alt ?? ""} poster={item.poster} onOpen={openInGallery} {compact} />
+{#snippet media(item: { url: string; alt?: string; poster?: string }, framed: boolean)}
+  <MarkdownImage url={item.url} alt={item.alt ?? ""} poster={item.poster} onOpen={openInGallery} {compact} {framed} />
 {/snippet}
 
 {#if data.type === "gallery"}
   {#if data.items.length === 1}
-    <div class="flex w-full justify-center select-none">{@render media(data.items[0])}</div>
+    <div class="flex w-full justify-center select-none">{@render media(data.items[0], false)}</div>
   {:else}
     <div class="flex w-full flex-col items-center gap-2 select-none">
       <div class="relative flex items-center" style="width: {RAIL_WIDTH}">
@@ -99,7 +98,7 @@
               class="flex shrink-0 snap-center justify-center"
               style="width: min({IMAGE_WIDTH}, 100%)"
             >
-              {@render media(item)}
+              {@render media(item, true)}
             </div>
           {/each}
         </div>
@@ -139,14 +138,7 @@
     </div>
   {/if}
 {:else if data.type === "playlist"}
-  <CardPanel dense class="w-full gap-2 {MEDIA_FRAME_CLASS}">
-    {#each data.items as item (item.url)}
-      <div class="flex w-full min-w-0 flex-col gap-1">
-        <span class="truncate text-body-sm text-on-surface-variant">{item.title ?? fileName(item.url)}</span>
-        <audio use:servedSrc={{ url: item.url }} controls class="w-full"></audio>
-      </div>
-    {/each}
-  </CardPanel>
+  <AudioCard tracks={data.items.map((item) => ({ ...item, name: fileName(item.url) }))} {onOpen} />
 {:else if data.type === "suggestions"}
   <SuggestionChips items={data.items} onSelect={onSuggest} />
 {:else if data.type === "install"}

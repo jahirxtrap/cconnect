@@ -35,7 +35,7 @@
   import ProgressRing from "$lib/ui/ProgressRing.svelte";
   import { hasFiles } from "$lib/ui/fileDrop";
   import { hscrollbar, SCROLL_ROW_CLASS, viewportScrollbar } from "$lib/ui/scrollbar";
-  import { ROUND_BUTTON_CLASS, ROUND_ICON_SIZE } from "$lib/ui/roundButton";
+  import { ROUND_ACCENT_CLASS, ROUND_BUTTON_CLASS, ROUND_ICON_SIZE } from "$lib/ui/roundButton";
   import StopButton from "$lib/ui/StopButton.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
   import type { Attachment, ComposerElement } from "./state.svelte";
@@ -700,7 +700,7 @@
             onclick={toggleVoice}
             aria-label={t(listening ? "VOICE_STOP" : "VOICE_START")}
             title={t(listening ? "VOICE_STOP" : "VOICE_START")}
-            class={listening ? `${ROUND_BUTTON_CLASS} bg-accent text-on-accent` : ACTION_CLASS}
+            class={listening ? ROUND_ACCENT_CLASS : ACTION_CLASS}
           >
             <Mic size={ROUND_ICON_SIZE} />
           </button>

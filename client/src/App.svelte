@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { BitsConfig } from "bits-ui";
   import { dismissOpen } from "$lib/app/dismissStack";
   import { activeScope } from "$lib/app/activeScope.svelte";
   import CommandPalette from "$lib/app/CommandPalette.svelte";
@@ -16,6 +17,7 @@
   import { listenOpenedLinks } from "$lib/platform/openedLinks";
   import { listenNativeFiles } from "$lib/platform/pastedContent";
   import { desktop } from "$lib/platform/desktop.svelte";
+  import { fullscreen } from "$lib/platform/fullscreen.svelte";
   import { watchPresence } from "$lib/platform/discordPresence.svelte";
   import { mirrorNativeCopy } from "$lib/platform/clipboard";
   import { layout } from "$lib/platform/layout.svelte";
@@ -156,50 +158,52 @@
   ondrop={blockFileOpen}
 />
 
-<div
-  class="safe-area bg-background text-on-background"
-  style="height: calc(100% - var(--keyboard, 0px))"
->
-  <div class="h-full {screenCovers ? "hidden" : ""}" inert={screenCovers}>
-    <ChatScreen />
+<BitsConfig defaultPortalTo={fullscreen.portalTarget}>
+  <div
+    class="safe-area bg-background text-on-background"
+    style="height: calc(100% - var(--keyboard, 0px))"
+  >
+    <div class="h-full {screenCovers ? "hidden" : ""}" inert={screenCovers}>
+      <ChatScreen />
+    </div>
+    {#if screenCovers}
+      <RouteScreen />
+    {/if}
   </div>
-  {#if screenCovers}
-    <RouteScreen />
+
+  {#if commandPalette.open}
+    <CommandPalette onDismiss={() => (commandPalette.open = false)} />
   {/if}
-</div>
 
-{#if commandPalette.open}
-  <CommandPalette onDismiss={() => (commandPalette.open = false)} />
-{/if}
+  <TransfersPanel />
 
-<TransfersPanel />
+  <UndoToast />
 
-<UndoToast />
+  <QrCameraOverlay />
 
-<QrCameraOverlay />
+  {#if packOffers.current}
+    {#key packOffers.current.id}
+      <PackOfferDialog offer={packOffers.current} onDismiss={() => packOffers.dismiss()} />
+    {/key}
+  {/if}
 
-{#if packOffers.current}
-  {#key packOffers.current.id}
-    <PackOfferDialog offer={packOffers.current} onDismiss={() => packOffers.dismiss()} />
-  {/key}
-{/if}
+  {#if installOffers.current}
+    {#key installOffers.current.id}
+      <InstallDialog request={installOffers.current.request} onDismiss={() => installOffers.dismiss()} />
+    {/key}
+  {/if}
 
-{#if installOffers.current}
-  {#key installOffers.current.id}
-    <InstallDialog request={installOffers.current.request} onDismiss={() => installOffers.dismiss()} />
-  {/key}
-{/if}
-
-{#if navigation.previewOverlay && navigation.preview}
-  {@const request = navigation.preview}
-  <FilePreview
-    url={request.url}
-    filename={request.name}
-    forcedKind={request.kind}
-    onDelete={request.onDelete}
-    links={request.links}
-    gallery={request.gallery}
-    onPick={showGalleryItem}
-    onClose={() => navigation.closePreview()}
-  />
-{/if}
+  {#if navigation.previewOverlay && navigation.preview}
+    {@const request = navigation.preview}
+    <FilePreview
+      url={request.url}
+      filename={request.name}
+      forcedKind={request.kind}
+      onDelete={request.onDelete}
+      links={request.links}
+      gallery={request.gallery}
+      onPick={showGalleryItem}
+      onClose={() => navigation.closePreview()}
+    />
+  {/if}
+</BitsConfig>

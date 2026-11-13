@@ -11,7 +11,9 @@
   import { mediaDuration } from "$lib/services/mediaDuration";
   import { imageSrc, servedSrc } from "$lib/services/mediaSource";
   import { videoStillOf } from "$lib/services/sharedApi";
+  import AudioCover from "$lib/ui/AudioCover.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
+  import { MEDIA_SCRIM_CLASS, ON_MEDIA_CLASS } from "$lib/ui/mediaFrame";
   import { ROUND_ARROW_CLASS, ROUND_ICON_SIZE } from "$lib/ui/roundButton";
   import { nearView } from "$lib/ui/nearView";
   import { HSCROLL_CLASS, hscrollbar } from "$lib/ui/scrollbar";
@@ -83,14 +85,18 @@
         onclick={() => onPick(position)}
         class="{TILE_FRAME_CLASS} size-14 shrink-0 cursor-pointer"
       >
-        {#if still}
+        {#if kind === "audio"}
+          {#if ready}
+            <AudioCover url={item.url} class="size-full" />
+          {/if}
+        {:else if still}
           {#if ready}
             <img
               use:imageSrc={{
                 url: sizedImage(still, pixels),
                 borrow: true,
                 onerror: () => {
-                  if (kind === "video") stillMissing[item.url] = true;
+                  if (kind !== "image") stillMissing[item.url] = true;
                 },
               }}
               alt=""
@@ -109,7 +115,7 @@
           {#await mediaDuration(item.url) then seconds}
             {#if seconds !== null}
               <span
-                class="pointer-events-none absolute bottom-1 left-1/2 max-w-[calc(100%-0.5rem)] -translate-x-1/2 truncate rounded-sm bg-black/60 px-0.5 text-body-sm text-white tabular-nums"
+                class="pointer-events-none absolute bottom-1 left-1/2 max-w-[calc(100%-0.5rem)] -translate-x-1/2 truncate rounded-sm {MEDIA_SCRIM_CLASS} px-0.5 text-body-sm {ON_MEDIA_CLASS} tabular-nums"
                 >{formatMediaTime(seconds)}</span
               >
             {/if}

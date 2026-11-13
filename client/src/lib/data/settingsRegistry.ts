@@ -23,6 +23,8 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "speech_auto_read", kind: "string", fallback: "off", backup: true },
   { key: "speech_voice", kind: "string", fallback: "", backup: true },
   { key: "speech_rate", kind: "number", fallback: 1, backup: true },
+  { key: "media_volume", kind: "number", fallback: 1, backup: false },
+  { key: "media_muted", kind: "boolean", fallback: false, backup: false },
   { key: "mod_band_handle", kind: "boolean", fallback: true, backup: true },
   { key: "pane_bar", kind: "strings", fallback: "", backup: true },
   { key: "pane_menu", kind: "strings", fallback: "", backup: true },

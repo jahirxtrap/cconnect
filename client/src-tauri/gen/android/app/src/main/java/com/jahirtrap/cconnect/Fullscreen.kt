@@ -1,8 +1,10 @@
 package com.jahirtrap.cconnect
 
+import android.content.pm.ActivityInfo
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Message
+import android.provider.Settings
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.ConsoleMessage
@@ -23,6 +25,10 @@ import androidx.core.view.WindowInsetsControllerCompat
 class Fullscreen(private val activity: ComponentActivity, private val inner: WebChromeClient) : WebChromeClient() {
   private var shown: View? = null
   private var callback: CustomViewCallback? = null
+  private var orientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+
+  private val autoRotate: Boolean
+    get() = Settings.System.getInt(activity.contentResolver, Settings.System.ACCELEROMETER_ROTATION, 0) == 1
 
   private val back = object : OnBackPressedCallback(false) {
     override fun handleOnBackPressed() = onHideCustomView()
@@ -49,12 +55,15 @@ class Fullscreen(private val activity: ComponentActivity, private val inner: Web
     bars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     bars.hide(WindowInsetsCompat.Type.systemBars())
     back.isEnabled = true
+    orientation = activity.requestedOrientation
+    if (!autoRotate) activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
   }
 
   override fun onHideCustomView() {
     val view = shown ?: return
     (activity.window.decorView as ViewGroup).removeView(view)
     bars.show(WindowInsetsCompat.Type.systemBars())
+    activity.requestedOrientation = orientation
     back.isEnabled = false
     shown = null
     callback?.onCustomViewHidden()

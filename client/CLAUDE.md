@@ -144,7 +144,10 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   `cache: "no-cache"`).
 - Video, audio, large images and PDFs go through `serveFile`: in the apps a loopback server
   (`media.rs`) forwards range requests, one port per file because Chromium allows six connections
-  per origin. A custom protocol cannot do it on Android. Android allows cleartext only to
+  per origin, and one upstream connection per request so a request nobody reads never holds back
+  another. While a file is open in a player, the bytes already fetched stay in the app's cache
+  folder and are served from there again; closing its last player deletes them. A custom protocol
+  cannot do it on Android. Android allows cleartext only to
   `127.0.0.1` (`network_security_config.xml`).
 - HTML goes through `ui/PageFrame.svelte` and the server's `/api/pages`, on its own origin. The
   apps fall back to `preview_open` and the `preview` protocol (`preview.rs`), since a `blob:` page
@@ -152,6 +155,47 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
 - A file linked before it exists waits on its shared folder (`services/sharedArrival.svelte.ts`).
   A loaded image follows its file (`followSharedFile`) and swaps in off screen.
 - Media blocks share `.media-frame` (`ui/mediaFrame.ts`).
+
+## Media player (`ui/MediaPlayer.svelte`)
+
+- Every audio and video plays in `MediaPlayer` (file preview, gallery, chat card, playlist); no native
+  `controls`. Icons are lucide with `fill="currentColor"`; `SpeakerIcon` fills only the speaker.
+- The video controls span the whole frame, like the native ones, not just the picture. On touch,
+  `pointerleave` fires on every lift, before the `click`, so leaving only hides them for a mouse;
+  hiding them there sent the tap on a button to the video underneath.
+- The poster is an `imageSrc` layer until playback starts, so a still already painted in the gallery
+  shows in the same frame; there is no `poster` attribute.
+- A chat player hands its position over when it expands (`handOff`, `ui/mediaHandoff.ts`); the
+  player that mounts with that URL resumes there.
+- `AudioCard` is the chat's audio: one track (a lone `![](x.mp3)` through `MarkdownImage`, or a
+  `playlist` of one) shows its title and the player, like a lone image or video; more tracks list
+  their rows above one player, which moves on when a track ends. Capability `media.markdown_audio`
+  tells the server to offer `![](x.mp3)` to Claude. Inside a chat gallery of several items an audio
+  file takes the media frame instead (`MarkdownImage framed`): `MediaPlayer`'s `artwork` snippet puts
+  its `AudioCover` where a video's picture goes, under the same controls, which never hide for audio.
+- `ui/AudioCover.svelte` is the one cover-or-note render: the preview's stage, the chat frame and the
+  strip's tiles.
+- Volume: a slider beside the speaker where a pointer has room (`@sm`); on touch or in a narrow
+  player the speaker opens a menu with a `MenuSlider`. Both move in 1 % steps.
+- The gallery takes audio too (`AudioStage`, cover tiles in the strip) and moves on the same way,
+  playing the next track only when the previous one ended (`continuing` in `FilePreview`).
+- A gallery's neighbouring audio slides mount their player too (`active={false}`: paused, metadata
+  read), so the seek bar never drops out mid-swipe. A playlist track passes its `duration` until the
+  file reports its own; until then the seek bar is `pending`, which waits without looking disabled.
+- Full screen is the frame itself. `platform/fullscreen.svelte.ts` feeds `BitsConfig defaultPortalTo`
+  in `App.svelte`, so every bits-ui portal (menus, tooltips, dialogs) lands inside the element that is
+  full screen.
+- Full screen turns a phone sideways: the Android app forces landscape unless auto-rotate is on
+  (`Fullscreen.kt`), mobile web locks `screen.orientation` until it leaves. The expanded preview never
+  turns.
+- A video's picture zooms like an image (`ZoomPane`, `doubleTap={false}`) in the preview and the gallery
+  (`zoomable`) and in full screen, by wheel and pinch only: click and double click stay play and full
+  screen. Leaving full screen resets it. `ZoomPane` captures the pointer only past `TOUCH_SLOP`, so a
+  tap on a zoomed video still reaches it.
+- The audio preview shows the cover the server extracts (`audioCoverOf`, `?size=`, capability
+  `audio_covers`) or `AudioCover`'s placeholder, and the tags from `services/fileInfo.ts`.
+- **Information**, first in the preview's menu (`FileInfoDialog`, rows in `fileInfoSections.ts`), reads `/shared-info` or
+  `/projects/<key>/info` when the server offers `file_info`.
 
 ## Install links (`data/installRequest.ts`, `screens/install/`)
 

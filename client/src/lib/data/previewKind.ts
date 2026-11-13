@@ -86,8 +86,6 @@ export const previewKindOf = (filename: string): PreviewKind => {
 
 const RENDERED_KINDS: PreviewKind[] = ["image", "video", "audio", "pdf", "html", "database"];
 
-export const isVideo = (filename: string): boolean => previewKindOf(filename) === "video";
-
 export const readsAsText = (kind: PreviewKind): boolean => !RENDERED_KINDS.includes(kind);
 
 export const isPreviewable = (filename: string): boolean =>

@@ -345,14 +345,3 @@ export function imageSrc(node: HTMLImageElement, options: SourceOptions) {
     },
   };
 }
-
-export function posterSrc(node: HTMLVideoElement, options: SourceOptions) {
-  return sourceAction(
-    options,
-    (resolved) => fetchObjectUrl(resolved),
-    (resolved) => {
-      node.poster = resolved;
-    },
-    revoke,
-  );
-}

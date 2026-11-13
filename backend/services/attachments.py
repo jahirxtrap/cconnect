@@ -7,10 +7,12 @@ import io
 from math import ceil
 from pathlib import Path
 
+from core.responses import Rendering
 from services import shared as shared_service
 
 _IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp"}
 _VIDEO_EXTENSIONS = {".mp4", ".webm", ".ogv", ".mov", ".mkv"}
+_AUDIO_EXTENSIONS = {".mp3", ".wav", ".ogg", ".oga", ".opus", ".m4a", ".aac", ".flac"}
 _MAX_DIMENSION = 1568
 _STILL_AT = 0.1
 RENDITION_LIMIT = 1024
@@ -26,6 +28,10 @@ def is_image(name: str) -> bool:
 
 def is_video(name: str) -> bool:
     return Path(name).suffix.lower() in _VIDEO_EXTENSIONS
+
+
+def is_audio(name: str) -> bool:
+    return Path(name).suffix.lower() in _AUDIO_EXTENSIONS
 
 
 def _side(img, cover: bool) -> int:
@@ -76,12 +82,45 @@ def video_still(path: Path, limit: int) -> tuple[str, bytes] | None:
         import av
         with av.open(str(path)) as container:
             stream = container.streams.video[0]
-            if stream.duration and stream.time_base:
-                container.seek(int(stream.duration * _STILL_AT), stream=stream)
-            frame = next(container.decode(stream), None)
-            return _encoded(frame.to_image(), limit, cover=True) if frame else None
+            target = (stream.start_time or 0) + int((stream.duration or 0) * _STILL_AT)
+            if target:
+                container.seek(target, stream=stream)
+            still = None
+            for frame in container.decode(stream):
+                still = frame
+                if frame.pts is None or frame.pts >= target:
+                    break
+            return _encoded(still.to_image(), limit, cover=True) if still else None
     except Exception:
         return None
+
+
+def audio_cover(path: Path, limit: int) -> tuple[str, bytes] | None:
+    """The picture an audio file carries, such as its album cover."""
+    try:
+        import av
+        with av.open(str(path)) as container:
+            picture = next((s for s in container.streams if s.disposition & av.stream.Disposition.attached_pic), None)
+            packet = next(container.demux(picture), None) if picture is not None else None
+            return shrunk(bytes(packet), limit, cover=True) if packet is not None and packet.size else None
+    except Exception:
+        return None
+
+
+def rendering(path: Path, size: int | None, fit: int | None) -> Rendering | None:
+    """What `?size=` (a square cover) or `?fit=` (the long side) makes of a file; None serves the file itself."""
+    limit = thumbnail_size(size or fit)
+    if not limit:
+        return None
+    cover = size is not None
+    if is_image(path.name):
+        variant = f"{limit}" if cover else f"fit{limit}"
+        return variant, lambda: shrunk(path, limit, cover=cover, stills_only=True, reduce_only=True), True
+    if cover and is_video(path.name):
+        return f"still{limit}", lambda: video_still(path, limit), False
+    if cover and is_audio(path.name):
+        return f"cover{limit}", lambda: audio_cover(path, limit), False
+    return None
 
 
 def encode_image(path: Path) -> tuple[str, str] | None:

@@ -127,6 +127,10 @@ export const createProjectFilesApi = (profile: () => Profile) => {
       return Array.isArray(data) ? data.map(parseEntry) : null;
     },
 
+    async info(projectKey: string, path: string): Promise<Wire | null> {
+      return await client.get<Wire>(`${projectBase(projectKey)}/info`, { path });
+    },
+
     async diff(projectKey: string, path: string): Promise<ProjectDiff | null> {
       const data = await client.get<Wire>(`${projectBase(projectKey)}/diff`, { path });
       if (!data) return null;

@@ -9,9 +9,9 @@ from fastapi.responses import StreamingResponse
 from loguru import logger
 
 from core.access import key_matches
-from core.responses import api_response, file_response
+from core.responses import api_response, file_response, rendition_response
 from core.ws import accept_authorized, send_event
-from services import project_files, project_watch
+from services import attachments, file_info, project_files, project_watch
 
 router = APIRouter()
 
@@ -107,8 +107,26 @@ def project_archive_file(project_key: str, path: str, inner: str, x_security_key
     return StreamingResponse(chunks, headers=headers, media_type="application/octet-stream")
 
 
+@router.get("/projects/{project_key}/info")
+def project_info(project_key: str, path: str, x_security_key: str = Header("")):
+    try:
+        resolved = project_files.resolve_file(_root(project_key), path, key_matches(x_security_key))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if resolved is None:
+        raise HTTPException(status_code=404, detail="file not found")
+    return api_response(data=file_info.describe(resolved))
+
+
 @router.get("/projects/{project_key}/file")
-def project_file(project_key: str, path: str, request: Request, x_security_key: str = Header("")):
+def project_file(
+    project_key: str,
+    path: str,
+    request: Request,
+    size: int | None = Query(None, ge=1),
+    fit: int | None = Query(None, ge=1),
+    x_security_key: str = Header(""),
+):
     try:
         resolved = project_files.resolve_file(_root(project_key), path, key_matches(x_security_key))
     except ValueError as exc:
@@ -117,6 +135,9 @@ def project_file(project_key: str, path: str, request: Request, x_security_key: 
         if project_files.deleted_at_head(_root(project_key), path):
             return Response(content=b"", media_type="text/plain")
         raise HTTPException(status_code=404, detail="file not found")
+    rendition = rendition_response(request, resolved, attachments.rendering(resolved, size, fit))
+    if rendition is not None:
+        return rendition
     return file_response(
         request,
         resolved,

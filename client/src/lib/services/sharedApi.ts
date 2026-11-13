@@ -4,6 +4,7 @@ import { backend, baseUrlOf, type Profile } from "./backend.svelte";
 import type { Capabilities } from "./capabilitiesApi";
 import { createHttp, http, type HttpClient } from "./http";
 import { fittedImage } from "./imageSize";
+import { projectFileOf } from "./projectFilesApi";
 
 export interface SharedEntry {
   name: string;
@@ -57,22 +58,39 @@ export const relativeFromUrl = (url: string, profile: Profile = backend.sharedPr
   return url.slice(prefix.length).split("?")[0].split("/").map(decodeSegment).join("/");
 };
 
-const sharedCapabilitiesOf = (url: string): Capabilities | null | undefined => {
+export const servedProfileOf = (url: string): Profile => {
   const profile = backend.sharedProfileOf(url);
-  if (relativeFromUrl(url, profile) === null) return null;
+  if (relativeFromUrl(url, profile) !== null) return profile;
+  return projectFileOf(url) ? backend.active : null;
+};
+
+const servedCapabilitiesOf = (url: string): Capabilities | null | undefined => {
+  const profile = servedProfileOf(url);
+  if (!profile) return null;
   const capabilities = serverSettings.capabilitiesFor(profile);
-  if (capabilities === undefined) return profile?.id === backend.active?.id ? undefined : null;
+  if (capabilities === undefined) return profile.id === backend.active?.id ? undefined : null;
   return capabilities;
 };
 
 export const videoStillOf = (url: string): string | null | undefined => {
-  const capabilities = sharedCapabilitiesOf(url);
+  const capabilities = servedCapabilitiesOf(url);
   if (capabilities === undefined) return undefined;
   return capabilities?.videoStills ? url : null;
 };
 
+export const audioCoverOf = (url: string): string | null | undefined => {
+  const capabilities = servedCapabilitiesOf(url);
+  if (capabilities === undefined) return undefined;
+  return capabilities?.audioCovers ? url : null;
+};
+
+export const fileInfoServed = (url: string): boolean | undefined => {
+  const capabilities = servedCapabilitiesOf(url);
+  return capabilities === undefined ? undefined : capabilities?.fileInfo === true;
+};
+
 export const fittedImageOf = (url: string, pixels: number): string | undefined => {
-  const capabilities = sharedCapabilitiesOf(url);
+  const capabilities = servedCapabilitiesOf(url);
   if (capabilities === undefined) return undefined;
   const limit = capabilities?.renditionLimit;
   return limit ? fittedImage(url, Math.min(pixels, limit)) : url;
@@ -99,6 +117,10 @@ export const createSharedApi = (client: HttpClient) => ({
   async search(path: string, query: string): Promise<SharedEntry[] | null> {
     const data = await client.get<Wire[]>("/shared-search", { q: query, path });
     return Array.isArray(data) ? data.map(parseEntry) : null;
+  },
+
+  async info(path: string): Promise<Wire | null> {
+    return await client.get<Wire>("/shared-info", { path });
   },
 
   async archiveList(path: string, inner = ""): Promise<SharedEntry[] | null> {

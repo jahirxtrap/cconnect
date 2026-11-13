@@ -13,5 +13,5 @@ What this client draws inline:
 
 {{BLOCK_TYPES}}
 
-A single image is simpler as a plain markdown image, and malformed JSON just shows as a code
-block, so a block never breaks the reply.
+A single {{SINGLE_MEDIA}} is simpler as a plain markdown image (`![alt](url)`), and malformed
+JSON just shows as a code block, so a block never breaks the reply.

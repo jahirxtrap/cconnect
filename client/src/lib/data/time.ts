@@ -13,6 +13,9 @@ export const formatDateShort = (millis: number): string =>
 
 export const formatDay = (millis: number): string => dates("day", { dateStyle: "medium" }).format(millis);
 
+export const formatDateTime = (millis: number): string =>
+  dates("datetime", { dateStyle: "medium", timeStyle: "short" }).format(millis);
+
 export const MILLIS_PER_SECOND = 1000;
 export const SECONDS_PER_MINUTE = 60;
 export const SECONDS_PER_HOUR = 3_600;

@@ -169,6 +169,7 @@ pub fn run() {
 
     builder
         .setup(|_app| {
+            media::prepare(_app.handle());
             #[cfg(windows)]
             hide_helper_windows();
             #[cfg(windows)]

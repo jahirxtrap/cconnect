@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Optional
 
 import orjson
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import FileResponse, JSONResponse, Response
 from starlette.staticfiles import NotModifiedResponse
@@ -38,6 +38,20 @@ def derived_response(request: Request, source: Path, variant: str, render: Rende
     stat = os.stat(source)
     etag = f'"{stat.st_mtime_ns:x}-{stat.st_size:x}-{variant}"'
     return _rendered(request, {**FILE_HEADERS, "ETag": etag, "Last-Modified": formatdate(stat.st_mtime, usegmt=True)}, render)
+
+
+Rendering = tuple[str, Render, bool]
+
+
+def rendition_response(request: Request, source: Path, rendering: Optional[Rendering]) -> Optional[Response]:
+    """The rendition of `source`, keyed by its variant; None serves the file itself when the rendering allows it."""
+    if rendering is None:
+        return None
+    variant, render, original_allowed = rendering
+    made = derived_response(request, source, variant, render)
+    if made is None and not original_allowed:
+        raise HTTPException(status_code=404, detail="no rendition of this file")
+    return made
 
 
 def fixed_response(request: Request, name: str, render: Render) -> Optional[Response]:

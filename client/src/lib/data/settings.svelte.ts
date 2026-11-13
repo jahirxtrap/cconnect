@@ -161,6 +161,20 @@ class Settings {
     this.#write("code_line_numbers", value);
   }
 
+  get mediaVolume() {
+    return this.#read<number>("media_volume");
+  }
+  set mediaVolume(value: number) {
+    this.#write("media_volume", value);
+  }
+
+  get mediaMuted() {
+    return this.#read<boolean>("media_muted");
+  }
+  set mediaMuted(value: boolean) {
+    this.#write("media_muted", value);
+  }
+
   get projectDiff() {
     return this.#read<boolean>("project_diff");
   }

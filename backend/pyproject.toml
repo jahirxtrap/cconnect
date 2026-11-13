@@ -45,6 +45,7 @@ dependencies = [
     "py7zz>=1.5.0",
     "rarfile>=4.2",
     "av>=18.1",
+    "pypdf>=7.0.1",
     "watchfiles>=1.2.0",
     "pywinpty>=2.0.13; sys_platform == 'win32'",
     "ptyprocess>=0.7.0; sys_platform != 'win32'",

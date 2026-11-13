@@ -1,16 +1,25 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { TOUCH_SLOP } from "./press";
   import { wheelZoomFactor } from "./wheelZoom";
 
   interface Props {
     minScale?: number;
     maxScale?: number;
     active?: boolean;
+    doubleTap?: boolean;
     class?: string;
     children: Snippet;
   }
 
-  const { minScale = 1, maxScale = 6, active = true, class: className = "", children }: Props = $props();
+  const {
+    minScale = 1,
+    maxScale = 6,
+    active = true,
+    doubleTap = true,
+    class: className = "",
+    children,
+  }: Props = $props();
 
   const DOUBLE_TAP_SCALE = 2.5;
   const HALF = 2;
@@ -25,10 +34,13 @@
   let pinchScale = 1;
   let dragX = 0;
   let dragY = 0;
+  let originX = 0;
+  let originY = 0;
+  let dragging = false;
 
   const clamp = (value: number) => Math.min(maxScale, Math.max(minScale, value));
 
-  const reset = () => {
+  export const reset = () => {
     scale = minScale;
     offsetX = 0;
     offsetY = 0;
@@ -75,17 +87,13 @@
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    const target = event.currentTarget as HTMLElement;
+    if (!active) return;
     if (event.isPrimary) points.clear();
     points.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    dragX = event.clientX;
-    dragY = event.clientY;
-    if (points.size >= 2) {
-      regrip();
-      return;
-    }
-    if (scale <= minScale) return;
-    target.setPointerCapture(event.pointerId);
+    dragX = originX = event.clientX;
+    dragY = originY = event.clientY;
+    dragging = false;
+    if (points.size >= 2) regrip();
   };
 
   const onPointerMove = (event: PointerEvent) => {
@@ -99,6 +107,11 @@
       return;
     }
     if (scale <= minScale) return;
+    if (!dragging) {
+      if (Math.hypot(event.clientX - originX, event.clientY - originY) <= TOUCH_SLOP) return;
+      dragging = true;
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    }
     event.preventDefault();
     offsetX += event.clientX - dragX;
     offsetY += event.clientY - dragY;
@@ -112,11 +125,13 @@
   };
 
   const onWheel = (event: WheelEvent) => {
+    if (!active) return;
     event.preventDefault();
     zoomAt(scale * wheelZoomFactor(event), event.clientX, event.clientY);
   };
 
   const onDoubleClick = (event: MouseEvent) => {
+    if (!active || !doubleTap) return;
     if (scale > minScale) reset();
     else zoomAt(DOUBLE_TAP_SCALE, event.clientX, event.clientY);
   };
@@ -125,7 +140,7 @@
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
   bind:this={host}
-  class="relative overflow-hidden {scale > minScale ? 'touch-none' : 'touch-pan-x touch-pan-y'} {className}"
+  class="relative overflow-hidden {!active ? '' : scale > minScale ? 'touch-none' : 'touch-pan-x touch-pan-y'} {className}"
   onpointerdown={onPointerDown}
   onpointermove={onPointerMove}
   onpointerup={release}

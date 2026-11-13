@@ -17,7 +17,7 @@ from core import cli_manager, paths
 from core.config import SHARED_SCHEME, ULTRACODE_EFFORT
 from mcps import build_cconnect_server, needs_key, tool_guides
 from mcps import databases as database_tools
-from mcps.media import block_types
+from mcps.media import block_types, single_media
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
 from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
@@ -107,7 +107,8 @@ def _blocks_guide(capabilities: list[str]) -> str:
         guide = (paths.PROMPTS_DIR / "BLOCKS.md").read_text(encoding="utf-8")
     except OSError:
         return ""
-    return guide.replace("{{BLOCK_TYPES}}", types)
+    guide = guide.replace("{{BLOCK_TYPES}}", types)
+    return guide.replace("{{SINGLE_MEDIA}}", single_media(capabilities))
 
 
 def _tools_guide(capabilities: list[str]) -> str:

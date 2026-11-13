@@ -51,6 +51,8 @@ type MeasureUnit =
   | "month"
   | "year"
   | "celsius"
+  | "millimeter"
+  | "kilobit-per-second"
   | "byte"
   | "kilobyte"
   | "megabyte"

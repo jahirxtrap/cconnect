@@ -71,7 +71,14 @@ inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_up
 
 Everything returns `api_response()`; routers are auto-discovered from `routers/`. A route that
 answers with a file uses `FILE_HEADERS` (`Cache-Control: no-cache`), or a rewritten file shows
-its old copy. Transcript slices are cursor-based (`before_index`), and while a live session has
+its old copy.
+
+The shared and project file routes share their renditions: `attachments.rendering` decides what
+`?size=` and `?fit=` make (image, `still` of a video, `cover` of an audio file) and
+`responses.rendition_response` answers it with an ETag keyed by that variant, so a change in how one
+is made needs a new variant name. `services/file_info.describe` reads a file's own metadata
+(Pillow, PyAV, pypdf); PyAV also opens text and images, so media counts only with an audio stream or
+a video stream with a duration. Transcript slices are cursor-based (`before_index`), and while a live session has
 events to replay the tail is cut at `turn_start_index` so a turn never arrives twice. Uploads
 stream to disk, so `PUT` is outside `MAX_BODY_SIZE`.
 
