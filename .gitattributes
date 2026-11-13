@@ -1,0 +1,2 @@
+backend/schemas/chat_events.json text eol=lf
+client/src/lib/contract/chatEvents.ts text eol=lf
