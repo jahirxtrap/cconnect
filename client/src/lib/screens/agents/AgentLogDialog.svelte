@@ -5,7 +5,7 @@
   import { createAgentsApi } from "$lib/services/agentsApi";
   import { backend } from "$lib/services/backend.svelte";
   import Button from "$lib/ui/Button.svelte";
-  import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_STATE_CLASS } from "$lib/ui/CompactDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import OutputPanel from "$lib/ui/OutputPanel.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -47,6 +47,6 @@
   {#if !loading && lines.length}
     <OutputPanel text={lines.join("\n")} />
   {:else}
-    <EmptyState {loading} text={failed ?? t("AGENT_LOG_EMPTY")} class="h-[72px]" />
+    <EmptyState {loading} text={failed ?? t("AGENT_LOG_EMPTY")} class={DIALOG_STATE_CLASS} />
   {/if}
 </CompactDialog>

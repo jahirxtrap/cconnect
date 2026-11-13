@@ -20,12 +20,18 @@
   }
 
   const { text, detail = null, icon: IconComponent, loading = false, class: className = "", action }: Props = $props();
+
+  const BLOCK_PADDING_CLASS = /(^|\s)py-\S+/;
 </script>
 
 {#if loading}
   <CenteredProgress class={className} />
 {:else}
-  <div class="flex flex-col items-center justify-center gap-3 px-6 py-4 text-center {className}">
+  <div
+    class="flex flex-col items-center justify-center gap-3 px-6 {BLOCK_PADDING_CLASS.test(className)
+      ? ''
+      : 'py-4'} text-center {className}"
+  >
     {#if IconComponent}
       <IconTile icon={IconComponent} />
     {/if}

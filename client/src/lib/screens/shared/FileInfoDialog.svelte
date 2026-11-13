@@ -2,7 +2,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { loadFileInfo, type FileInfo } from "$lib/services/fileInfo";
   import Button from "$lib/ui/Button.svelte";
-  import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_STATE_CLASS } from "$lib/ui/CompactDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import InfoRow from "$lib/ui/InfoRow.svelte";
   import SettingsGroup from "$lib/ui/SettingsGroup.svelte";
@@ -38,7 +38,7 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
   {#if !info}
-    <EmptyState loading={info === undefined} text={t("FILE_INFO_UNAVAILABLE")} class="h-[72px]" />
+    <EmptyState loading={info === undefined} text={t("FILE_INFO_UNAVAILABLE")} class={DIALOG_STATE_CLASS} />
   {:else}
     <div class="flex flex-col gap-1 pb-1">
       {#each sections as group (group.title)}

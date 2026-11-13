@@ -2,6 +2,8 @@
   export const DIALOG_PAGE_CLASS = "scrollbar-thin overflow-y-auto px-5";
 
   export const DIALOG_LIST_CLASS = "scrollbar-thin flex max-h-[420px] flex-col overflow-y-auto";
+
+  export const DIALOG_STATE_CLASS = "h-18";
 </script>
 
 <script lang="ts">

@@ -4,7 +4,7 @@
   import { pluginKey, type ClaudeApi, type Plugin } from "$lib/services/claudeApi";
   import PluginOptionsDialog from "$lib/screens/claude/PluginOptionsDialog.svelte";
   import Button from "$lib/ui/Button.svelte";
-  import CompactDialog from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_STATE_CLASS } from "$lib/ui/CompactDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
@@ -61,7 +61,7 @@
     <EmptyState
       loading={!mods && !error}
       text={error ?? t(mods?.length ? "NO_RESULTS" : "NO_MODS_OPTIONS")}
-      class="h-[72px]"
+      class={DIALOG_STATE_CLASS}
     />
   {/if}
 </CompactDialog>

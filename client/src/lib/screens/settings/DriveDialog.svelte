@@ -14,9 +14,10 @@
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import CompactDialog, { DIALOG_LIST_CLASS } from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_LIST_CLASS, DIALOG_STATE_CLASS } from "$lib/ui/CompactDialog.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
+  import EmptyState from "$lib/ui/EmptyState.svelte";
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
@@ -128,7 +129,7 @@
       />
     </div>
     {#if googleSession.connecting}
-      <CenteredProgress class="h-[72px]" />
+      <CenteredProgress class={DIALOG_STATE_CLASS} />
     {/if}
   {:else}
     <div use:viewportScrollbar class="{DIALOG_LIST_CLASS} gap-1">
@@ -166,10 +167,8 @@
           </TooltipIconButton>
         </div>
       {/each}
-      {#if driveBackups.loading && driveBackups.copies.length === 0}
-        <CenteredProgress class="h-[72px]" />
-      {:else if driveBackups.copies.length === 0}
-        <p class="px-3 py-2.5 text-body-md text-on-surface-variant">{t("DRIVE_NO_COPIES")}</p>
+      {#if driveBackups.copies.length === 0}
+        <EmptyState loading={driveBackups.loading} text={t("DRIVE_NO_COPIES")} class={DIALOG_STATE_CLASS} />
       {/if}
     </div>
     <div class="mt-2">

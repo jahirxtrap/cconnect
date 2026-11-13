@@ -3,8 +3,7 @@
   import Trash from "@lucide/svelte/icons/trash";
   import { t } from "$lib/i18n/index.svelte";
   import Button from "$lib/ui/Button.svelte";
-  import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import CompactDialog, { DIALOG_LIST_CLASS } from "$lib/ui/CompactDialog.svelte";
+  import CompactDialog, { DIALOG_LIST_CLASS, DIALOG_STATE_CLASS } from "$lib/ui/CompactDialog.svelte";
   import { viewportScrollbar } from "$lib/ui/scrollbar";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
@@ -50,10 +49,8 @@
     <Button onclick={onDismiss} variant="outlined">{t("CLOSE")}</Button>
   {/snippet}
   <div use:viewportScrollbar class="{DIALOG_LIST_CLASS} gap-0.5">
-    {#if loading}
-      <CenteredProgress class="h-[72px]" />
-    {:else if items.length === 0}
-      <EmptyState text={t("TRASH_EMPTY")} class="py-6" />
+    {#if loading || items.length === 0}
+      <EmptyState {loading} text={t("TRASH_EMPTY")} class={DIALOG_STATE_CLASS} />
     {/if}
     {#each items as item (item.sessionId)}
       <div data-press class="flex min-h-10 items-center rounded-md pr-1 transition-colors hover:bg-hover">
