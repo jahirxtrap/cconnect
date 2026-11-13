@@ -327,7 +327,7 @@ html[data-theme="dark"] {
 }
 
 .behind-keyboard {
-  bottom: calc(var(--keyboard, 0px) * -1);
+  bottom: calc((var(--keyboard, 0px) + var(--safe-bottom)) * -1);
 }
 
 .safe-inset {

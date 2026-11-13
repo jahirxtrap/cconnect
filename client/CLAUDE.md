@@ -242,8 +242,8 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 - `field-auto` with the `platform/fieldSizing.ts` polyfill and `keepCaretInView`: test the
   composer before touching it.
 - The service worker (`public/sw.js`) caches nothing; it exists so Chrome offers the install.
-- The app shrinks by `--keyboard` while the keyboard is up. The chat background reaches under it
-  (`behind-keyboard`, the pair of `above-keyboard`), so its size and framing never change.
+- The app shrinks by `--keyboard` while the keyboard is up. The chat background reaches under it and
+  under `--safe-bottom` (`behind-keyboard`, the pair of `above-keyboard`), so its size never changes.
 
 ## Android
 
@@ -259,11 +259,12 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
   download chunks) reopens once, silently. `chatSocket` keeps a stale socket while
   `transfers.flowingTo` sees a transfer to that server. Never raise the deadlines.
 - `setOnReceiveContentListener` takes no MIME type starting with `*`: it kills the app on launch.
-- The WebView only learns about window focus changes that come with `onPause` / `onResume`
-  (`WindowFocusGate`, called from the `onWindowFocusChanged` override in the class extension).
-  Chromium 157+ forgets the focused field when the window loses focus and asks the renderer again
-  when it returns, which hides the keyboard that a system overlay such as the notification shade
-  only borrowed. Chrome itself loses the keyboard that way on this device.
+- The WebView gets only its window's first focus gain (the `onWindowFocusChanged` override in the
+  class extension): Chromium 157+ drops the focused field on any later focus change and loses the
+  keyboard.
+- `MainActivity` is `stateUnchanged|adjustResize`, so the keyboard comes back with the app. `layout`
+  blurs the field only when the keyboard closes with the page visible, and ignores insets that shrink
+  the keyboard while the page is hidden with a field focused.
 - Keyboard images reach the composer through `PastedContent.inputConnection`, injected into the
   generated `RustWebView.kt` from `WRY_RUSTWEBVIEW_CLASS_EXTENSION` in `client/.cargo/config.toml`
   (both cargo runs need it). Check the compiled class with `dexdump`, never the generated file.

@@ -1,3 +1,4 @@
+import { isEditing } from "$lib/data/paneFocus.svelte";
 import { watchAndroidInsets } from "./androidInsets";
 import { isTouch } from "./index";
 
@@ -40,6 +41,7 @@ class Layout {
 
   start() {
     const native = watchAndroidInsets((insets) => {
+      if (this.#leftWithKeyboard(insets.keyboard)) return;
       const root = document.documentElement.style;
       root.setProperty("--safe-top", `${insets.top}px`);
       root.setProperty("--safe-bottom", `${insets.bottom}px`);
@@ -93,13 +95,17 @@ class Layout {
     });
   }
 
+  #leftWithKeyboard(height: number) {
+    return document.visibilityState !== "visible" && Math.round(height) < this.keyboard && isEditing();
+  }
+
   #applyKeyboard(height: number) {
     const next = Math.round(height);
-    if (next === this.keyboard) return;
-    const gone = next === 0 && this.keyboard > 0;
+    if (next === this.keyboard || this.#leftWithKeyboard(next)) return;
+    const dismissed = next === 0 && this.keyboard > 0 && document.visibilityState === "visible";
     this.keyboard = next;
     document.documentElement.style.setProperty("--keyboard", `${next}px`);
-    if (gone && isTouch && document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (dismissed && isTouch && document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
 
   #measureSafeArea() {

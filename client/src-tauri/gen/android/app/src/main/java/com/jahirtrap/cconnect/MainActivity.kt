@@ -204,7 +204,6 @@ class MainActivity : TauriActivity() {
 
   override fun onResume() {
     super.onResume()
-    WindowFocusGate.resumed = true
     link.onForeground()
     browser.resume()
     content?.evaluateJavascript("window.__cconnectResume && window.__cconnectResume()", null)
@@ -212,7 +211,6 @@ class MainActivity : TauriActivity() {
 
   override fun onPause() {
     super.onPause()
-    WindowFocusGate.resumed = false
     link.onBackground()
     browser.pause()
   }
