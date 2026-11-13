@@ -127,6 +127,8 @@ class PersistentSession:
             elif not isinstance(exc, asyncio.CancelledError):
                 logger.warning(f"persistent session ended: {type(exc).__name__}: {exc}")
         finally:
+            if self.client is not None and self._owner is asyncio.current_task():
+                logger.info(f"persistent CLI of chat {self.shape['scope']} ended by itself")
             self.client = None
             lazy, self.lazy = self.lazy, None
             if lazy is not None:
@@ -217,7 +219,14 @@ class PersistentSession:
     async def reload(self, subtype: str, hold: bool = False) -> Optional[dict]:
         return await self.request(subtype, **({"hold_on_cache_impact": True} if hold else {}))
 
-    async def close(self) -> None:
+    async def retune(self, changes: dict) -> None:
+        """Switch the running CLI's model or permission mode; it answers each with a line of its own, so a turn must be bound."""
+        if "model" in changes:
+            await self.client.set_model(changes["model"])
+        if "permission_mode" in changes:
+            await self.client.set_permission_mode(changes["permission_mode"])
+
+    async def close(self, reason: str) -> None:
         self.turn = None
         self.mark = None
         owner = self._owner
@@ -225,6 +234,7 @@ class PersistentSession:
         self.client = None
         if owner is None:
             return
+        logger.info(f"persistent CLI of chat {self.shape['scope']} closed: {reason}")
         self._stop.set()
         done, _ = await asyncio.wait({owner}, timeout=CLOSE_TIMEOUT)
         if not done:
@@ -265,23 +275,24 @@ class SessionPool:
     async def take(self, key: str, shape: dict) -> PersistentSession:
         session = self._sessions.get(key)
         if session is not None and session.shape != shape:
-            await self.drop(key)
+            changed = ", ".join(f"{name} {session.shape.get(name)!r} -> {value!r}" for name, value in shape.items() if session.shape.get(name) != value)
+            await self.drop(key, f"{changed} changed")
             session = None
         if session is None:
             session = PersistentSession(shape)
             self._sessions[key] = session
         return session
 
-    async def drop(self, key: str) -> bool:
+    async def drop(self, key: str, reason: str) -> bool:
         session = self._sessions.pop(key, None)
         if session is None:
             return False
-        await session.close()
+        await session.close(reason)
         return True
 
-    async def close_all(self) -> None:
+    async def close_all(self, reason: str) -> None:
         for key in list(self._sessions):
-            await self.drop(key)
+            await self.drop(key, reason)
 
 
 pool = SessionPool()

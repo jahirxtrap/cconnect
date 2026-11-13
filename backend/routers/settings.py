@@ -30,7 +30,7 @@ async def update_settings(body: dict[str, Any]):
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     if not persistent_sessions.enabled():
-        await persistent_sessions.pool.close_all()
+        await persistent_sessions.pool.close_all("persistent sessions turned off")
     return api_response(data=_all())
 
 
@@ -39,5 +39,5 @@ async def reset_settings():
     settings_store.reset()
     cli_settings.reset()
     if not persistent_sessions.enabled():
-        await persistent_sessions.pool.close_all()
+        await persistent_sessions.pool.close_all("persistent sessions turned off")
     return api_response(data=_all())

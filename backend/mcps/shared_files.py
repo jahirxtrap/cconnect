@@ -74,10 +74,10 @@ def make_tools(context: dict) -> list:
     async def share_files(args):
         wanted = [str(item) for item in (args.get("paths") or []) if str(item).strip()]
         if not wanted:
-            return reply("Pass the path of at least one file.")
+            return reply("Pass the path of at least one file.", error=True)
         rename = (args.get("name") or "").strip()
         if rename and len(wanted) > 1:
-            return reply("A name can only be given when sharing a single file.")
+            return reply("A name can only be given when sharing a single file.", error=True)
 
         cwd = (session_info() or {}).get("cwd") if session_info else None
         project_key = sessions.project_key_for(cwd) if cwd else ""
@@ -89,7 +89,7 @@ def make_tools(context: dict) -> list:
             if not source.is_absolute() and cwd:
                 source = Path(cwd, source)
             if not source.is_file():
-                return reply(f"{source} is not a file that exists.")
+                return reply(f"{source} is not a file that exists.", error=True)
             if linked and not shared.inside(source):
                 shared.create_link(str(source), project_key, handed["name"], replace=True)
                 continue

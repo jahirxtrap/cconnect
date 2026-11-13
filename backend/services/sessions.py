@@ -739,7 +739,7 @@ async def move_session(project_key: str, session_id: str, target_cwd: str) -> Op
     moved = await asyncio.to_thread(_move_transcript, project_key, session_id, cwd)
     if moved is not None and live is not None:
         live.state.cwd = cwd
-        await live.release_resident()
+        await live.release_resident("chat moved to another project")
     return moved
 
 
@@ -840,6 +840,11 @@ def _parse_ask_result(content: object, qtexts: list[str]) -> dict[str, tuple[str
             note = re.sub(r",\s*$", "", note)
         out[qt] = (answer, note)
     return out
+
+
+def _ran(call_id: object, results: dict, errors: dict) -> bool:
+    """A call that answered without an error; the live stream only shows what such a call emitted."""
+    return isinstance(call_id, str) and call_id in results and not errors.get(call_id)
 
 
 def _parse_component_result(content: object) -> Optional[dict]:
@@ -1972,6 +1977,8 @@ def _normalize(
                 if name.endswith("show_component") and isinstance(inp, dict):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
+                    if not _ran(bid, tool_result_by_id, tool_errors):
+                        continue
                     messages.append({
                         "type": "interaction",
                         "kind": "component",
@@ -2064,7 +2071,7 @@ def _normalize(
                 if name == _SHARE_RULE and isinstance(inp, dict):
                     if isinstance(bid, str):
                         hidden_ids.add(bid)
-                    handed = shared_files.listing(inp, project_key)
+                    handed = shared_files.listing(inp, project_key) if _ran(bid, tool_result_by_id, tool_errors) else []
                     if handed:
                         messages.append({"type": "shared", "files": handed, "id": bid})
                     continue
@@ -2090,7 +2097,12 @@ def _normalize(
                         })
                         continue
                 pack_id = str(inp.get("id") or "").strip() if isinstance(inp, dict) else ""
-                exported = name == _PACKS_RULE and inp.get("action") == "export" and pack_id
+                exported = (
+                    name == _PACKS_RULE
+                    and inp.get("action") == "export"
+                    and pack_id
+                    and _ran(bid, tool_result_by_id, tool_errors)
+                )
                 shown = database_tools.tool_mode(name, vis["tool_use"])
                 if shown == "off":
                     _working(messages, vis)

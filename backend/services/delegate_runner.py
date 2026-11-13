@@ -116,11 +116,12 @@ def _account_options(destination: dict, turn: Turn, **extra):
     from claude_agent_sdk import ClaudeAgentOptions
 
     account = accounts.resolve(destination["account"])
+    model = _model_of(account, turn.model)
     return ClaudeAgentOptions(
         cwd=turn.cwd,
-        model=_model_of(account, turn.model),
+        model=model,
         cli_path=cli_manager.resolve_cli_path(),
-        env=_cli_env(account),
+        env=_cli_env(account, model=model),
         **extra,
     )
 

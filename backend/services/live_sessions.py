@@ -140,6 +140,10 @@ class LiveSession:
         return self.running or bool(self._owned) or bool(self._background)
 
     @property
+    def tasks_alive(self):
+        return bool(self._background)
+
+    @property
     def attached(self):
         return len(self._sinks) > 0
 
@@ -186,6 +190,7 @@ class LiveSession:
                 for running in list(self._background.values()):
                     await self._send_one(sink, {**running, "channel": self.channel, "replay": True})
             await self._send_one(sink, self._mods_snapshot())
+            await self._send_one(sink, self._activity_event(self.activity, self.resident_alive))
         self._watch_transcript()
 
     def covers(self, last_seq):
@@ -310,13 +315,13 @@ class LiveSession:
     async def resident(self, keep=False):
         """The standing client this chat writes to, created on demand while the mode is on, or the running one with ``keep``."""
         if not persistent_sessions.enabled():
-            await self.release_resident()
+            await self.release_resident("persistent sessions turned off")
             return None
         self._cancel_cooldown()
         if keep and self.resident_alive:
             return self._resident
         if not self.resident_alive and await registry.relieve(self.channel):
-            await self.release_resident()
+            await self.release_resident("memory below the reserve")
             return None
         shape = persistent_sessions.shape_of(self.state.cwd, accounts.resolve(self.state.account), self.channel)
         self._resident = await persistent_sessions.pool.take(self.channel, shape)
@@ -405,17 +410,17 @@ class LiveSession:
         await self._emit({"type": "reloaded", **report})
         return report
 
-    async def release_resident(self):
+    async def release_resident(self, reason: str):
         self._cancel_cooldown()
         self._resident = None
         self._end_background()
-        await persistent_sessions.pool.drop(self.channel)
+        await persistent_sessions.pool.drop(self.channel, reason)
         self._publish_activity(self.activity)
 
     async def retire(self):
         from services import sessions as sessions_service
 
-        await self.release_resident()
+        await self.release_resident("chat retired")
         if self.agent is not None:
             await self.agent.release()
             return
@@ -439,15 +444,15 @@ class LiveSession:
             return
         self._cooldown = None
         if not self._sinks and not self.working:
-            await self.release_process()
+            await self.release_process("idle past the grace period")
 
-    async def release_process(self):
+    async def release_process(self, reason: str):
         """Let go of the process this chat holds: its persistent CLI, or its agent."""
         if self.agent is not None:
             self._cancel_cooldown()
             await self.agent.release(linger=False)
             return
-        await self.release_resident()
+        await self.release_resident(reason)
 
     async def _emit(self, event):
         kind = event.get("type")
@@ -684,14 +689,17 @@ class LiveSession:
         except RuntimeError:
             pass
 
-    async def _send_activity(self, activity, resident):
-        payload = {
+    def _activity_event(self, activity, resident):
+        return {
             "type": "activity",
             "state": activity or "idle",
             "resident": resident,
             "account": None if self.agent is not None else accounts.resolve(self.state.account),
             "channel": self.channel,
         }
+
+    async def _send_activity(self, activity, resident):
+        payload = self._activity_event(activity, resident)
         for sink in list(self._sinks):
             await self._send_one(sink, payload)
 
@@ -1108,7 +1116,7 @@ class SessionRegistry:
         if session.working:
             return False
         if session.resident_alive:
-            await session.release_resident()
+            await session.release_resident("chat forked")
         return True
 
     async def end_session(self, session_id):
@@ -1118,7 +1126,7 @@ class SessionRegistry:
             del self._sessions[channel]
             self._idle_since.pop(channel, None)
             await session.interrupt()
-            await session.release_resident()
+            await session.release_resident("chat deleted")
 
     def residents(self):
         return [session for session in self._sessions.values() if session.resident_alive]
@@ -1167,7 +1175,7 @@ class SessionRegistry:
         idle = sorted((session for session in holding if session.channel not in busy), key=lambda session: session.used_at)
         excess = len(holding) - max(persistent_sessions.limit(), len(holding) - len(idle))
         for session in idle[:max(excess, 0)]:
-            await session.release_process()
+            await session.release_process("over the session limit")
 
     async def relieve(self, keep=None):
         """Below the memory reserve, release the chats holding a process that do nothing, oldest first; whether memory stays short."""
@@ -1191,7 +1199,7 @@ class SessionRegistry:
                 key=lambda session: session.used_at,
             )
             for session in idle:
-                await session.release_process()
+                await session.release_process("memory below the reserve")
                 if not persistent_sessions.memory_short():
                     return False
             return True
@@ -1199,16 +1207,16 @@ class SessionRegistry:
     def on_account(self, account_id):
         return [session for session in self._sessions.values() if session.agent is None and accounts.resolve(session.state.account) == account_id]
 
-    async def release_all(self, sessions):
+    async def release_all(self, sessions, reason):
         for session in sessions:
             if session.running:
                 await session.interrupt()
-            await session.release_process()
+            await session.release_process(reason)
 
 
 registry = SessionRegistry()
 
 
 async def close_processes() -> None:
-    await persistent_sessions.pool.close_all()
+    await persistent_sessions.pool.close_all("server stopping")
     await agent_connections.pool.close_all()

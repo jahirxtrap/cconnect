@@ -38,14 +38,18 @@ inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_up
 - `routers/` — thin: validate, call a service, return `api_response()`.
 - `services/` — all the logic, one module per integration. Watchers (`chat_list`,
   `directory_watch`, `project_watch`) run `watchfiles` in their own thread, never on the event
-  loop. `project_watch` never recurses (on Linux that is an inotify watch per folder): it watches
-  the folders the clients send as open, the ones git tracks and each `.git`.
+  loop. `chat_list` merges a chat's live state (`activity`, `resident`) under its lock when it
+  stores a scan, never while scanning. `project_watch` never recurses (on Linux that is an
+  inotify watch per folder): it watches the folders the clients send as open, the ones git tracks
+  and each `.git`.
 - `services/accounts` / `cli_login` — an account is only its credentials: the CLI runs on the
   primary config with `CLAUDE_SECURESTORAGE_CONFIG_DIR` set to the account folder. Sign-in and the
   models, plan and fast mode CConnect offers use `identity_env` (the account folder as the whole
   config). Sign-in goes through the CLI's control requests (`claude_authenticate`,
   `mcp_authenticate`), never a pseudo-terminal. `wait_mcp` watches `.credentials.json` because the
   CLI reports no event when an MCP login finishes. `login_expiry` caches per `.credentials.json`.
+- Every conversation CLI gets its environment from `claude_runtime._cli_env`; a provider model
+  without a known window gets `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`.
 - `mcps/` — the in-process MCP server Claude sees as `cconnect`.
 
 ## Auth
@@ -127,6 +131,9 @@ format is not a contract; what currently holds:
   the last boundary, so those points only fork.
 - Filter non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,
   `custom-title`, `mode`, `last-prompt`…) by type, never by position.
+- A block a tool emits live when it runs (shared files, a pack export, `show_component`) is rebuilt
+  only when its call answered without an error (`_ran`), so a call a hook refused shows nothing on
+  resume either. Tools mark their failures with `reply(..., error=True)`.
 - The SDK writes `"entrypoint":"sdk-py"`, which hides a session from `claude --resume`. Each turn
   rewrites it to a space-padded `"cli"` in place, only over the bytes it wrote, in a worker thread.
 
@@ -138,6 +145,12 @@ streaming-input mode and drains the queue, rendering each item **from the transc
 written twice, so `LiveSession.shown_notices` keeps what the tail already sent and
 `_flush_users` skips it; a byte offset is not enough.
 
+The turn's own prompt is handed over with a `uuid` like the drained ones, and the CLI replays it
+(`replay-user-messages`) before that prompt's `result`, slash commands included. A `result`
+that arrives before the replay belongs to a turn the CLI ran first on its own (a new CLI's
+"didn't finish before the previous session ended" notice), so the turn goes on; ending there
+left the prompt to arrive as a `tail` and the sender saw it twice.
+
 ## Persistent sessions and mods
 
 - With `persistent_sessions` on, `persistent_sessions.pool` keeps one `ClaudeSDKClient` per
@@ -148,6 +161,11 @@ written twice, so `LiveSession.shown_notices` keeps what the tail already sent a
 - A turn whose `mark` differs (model, effort, permission mode, mods, capabilities) or whose
   account differs restarts the CLI. A turn the CLI starts on its own is adopted (`own_turn`)
   with `resident(keep=True)` and never reshapes the process.
+- A restart kills the CLI's background tasks, so while `LiveSession.tasks_alive` a differing
+  `mark` does not restart: the model and permission mode change live (`PersistentSession.retune`)
+  and the rest waits for a turn without tasks. `retune` runs inside the bound turn, before
+  `settle()`: the CLI answers `set_model` with a user line of its own, which an unbound pump
+  takes for a turn of the CLI's and waits out.
 - `memory_reserve` is read only before starting a process and on the system's low-memory signal
   (`services/memory_pressure.py`), never polled. Below it, `registry.relieve` stops idle MCP
   servers, then releases idle chats, oldest first. A one-shot CLI always gets the no-background

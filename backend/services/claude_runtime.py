@@ -36,6 +36,7 @@ _MIN_OUTPUT_TOKENS = 1024
 CHANNEL_ENV = "CCONNECT_CHANNEL"
 _CLI_DIAGNOSTIC_MARKERS = ("[ede_diagnostic]", "[session_crash]")
 _TURN_CLOCK_SKEW_MS = 5000
+_LIVE_MARK = ("model", "permission_mode")
 _RETRY_FIELDS = ("attempt", "max_retries", "retry_delay_ms", "error_status", "error", "no_response")
 
 
@@ -674,7 +675,19 @@ _NO_BACKGROUND_ENV = {
 }
 
 
-def _cli_env(account_id: Optional[str], kept: Optional[bool] = None) -> dict[str, str]:
+def _window_env(account_id: Optional[str], model: Optional[str]) -> dict[str, str]:
+    if not cli_info.provider_model(model, account_id):
+        return {}
+    window = cli_info.provider_window(model, account_id)
+    if not window:
+        return {"CLAUDE_CODE_DISABLE_1M_CONTEXT": "1"}
+    return {
+        "CLAUDE_CODE_MAX_CONTEXT_TOKENS": str(window),
+        "CLAUDE_CODE_MAX_OUTPUT_TOKENS": str(max(window // _OUTPUT_SHARE, _MIN_OUTPUT_TOKENS)),
+    }
+
+
+def _cli_env(account_id: Optional[str], kept: Optional[bool] = None, model: Optional[str] = None) -> dict[str, str]:
     from services import accounts
 
     env = dict(accounts.env_for(account_id))
@@ -682,6 +695,7 @@ def _cli_env(account_id: Optional[str], kept: Optional[bool] = None) -> dict[str
         env["HOME"] = str(Path.home())
     if not (persistent_sessions.enabled() if kept is None else kept):
         env.update(_NO_BACKGROUND_ENV)
+    env.update(_window_env(account_id, model))
     return env
 
 
@@ -816,7 +830,7 @@ class CliControls:
         return True
 
 
-async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=False) -> AsyncIterator[Any]:
+async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=False, retune=None) -> AsyncIterator[Any]:
     """Write the turn to the standing client and read until the session closes the input; adopting reads the turn the CLI already started."""
     fresh = not resident.connected
     if fresh:
@@ -830,6 +844,8 @@ async def _resident_stream(resident, options, prompt_arg, on_transport, adopt=Fa
     inbox = resident.listen()
     if fresh:
         await resident.attach_surface()
+    if retune:
+        await resident.retune(retune)
     if not adopt:
         await resident.settle()
     writer = asyncio.create_task(client.query(prompt_arg))
@@ -883,6 +899,7 @@ async def run_prompt(
     session_info: Optional[Callable[[], dict]] = None,
     on_transport: Optional[Callable[[Any], None]] = None,
     resident: Optional[Any] = None,
+    tasks_alive: bool = False,
     adopt: bool = False,
     read_from: Optional[int] = None,
     seen_notices: Optional[set] = None,
@@ -965,15 +982,11 @@ async def run_prompt(
     if tools is not True:
         allowed = tools if isinstance(tools, list) else []
         options_kwargs["tools"] = [*allowed, _SHARE_RULE] if scope["guides"] else allowed
-    session_env = _cli_env(account, resident is not None)
+    session_env = _cli_env(account, resident is not None, model)
     if channel:
         session_env[CHANNEL_ENV] = channel
     if scope["search"]:
         session_env["ENABLE_TOOL_SEARCH"] = "true"
-    window = cli_info.provider_window(model, account)
-    if window:
-        session_env["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = str(window)
-        session_env["CLAUDE_CODE_MAX_OUTPUT_TOKENS"] = str(max(window // _OUTPUT_SHARE, _MIN_OUTPUT_TOKENS))
     if settings_store.get("todo_tools"):
         session_env["CLAUDE_CODE_ENABLE_TODO_TOOLS"] = "1"
     if settings_store.get("browser_view"):
@@ -1008,6 +1021,7 @@ async def run_prompt(
         options_kwargs["hooks"] = hooks_map
     options = ClaudeAgentOptions(**options_kwargs)
 
+    retune: dict = {}
     if resident is not None and not adopt:
         mark = {
             "model": model,
@@ -1020,15 +1034,25 @@ async def run_prompt(
             "mods": mods.enabled(),
             "capabilities": sorted(capabilities or ()),
         }
-        if resident.connected and (resident.mark != mark or resume_at or fork):
-            await resident.close()
+        if resident.connected and (resume_at or fork):
+            await resident.close("rewinding" if resume_at else "forking")
+        elif resident.connected and resident.mark != mark:
+            running = resident.mark or {}
+            if tasks_alive:
+                retune = {key: mark[key] for key in _LIVE_MARK if running.get(key) != mark[key]}
+                mark = {**running, **retune}
+            else:
+                await resident.close(", ".join(sorted(key for key in mark if running.get(key) != mark[key])) + " changed")
         resident.mark = mark
 
     content = [{"type": "text", "text": prompt}, *images] if images else prompt
 
-    chips: list[dict] = [] if adopt else [{"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000)}]
+    seed: Optional[dict] = None if adopt else {"cli_uuid": str(uuid.uuid4())}
+    chips: list[dict] = [] if seed is None else [
+        {"id": seed_id, "sent": prompt, "drained": False, "ts": int(time.time() * 1000), "item": seed},
+    ]
     pending_announce: list[dict] = list(chips)
-    handed: dict[str, dict] = {}
+    handed: dict[str, dict] = {} if seed is None else {seed["cli_uuid"]: seed}
     seen_users: set[str] = set()
     shown_notices: set[str] = set(seen_notices or ())
     carried_seen: set[str] = set()
@@ -1154,8 +1178,8 @@ async def run_prompt(
         return events + _flush_users(current_sid)
 
     async def _prompt_stream():
-        if not adopt:
-            yield {"type": "user", "message": {"role": "user", "content": content}}
+        if seed is not None:
+            yield {"type": "user", "message": {"role": "user", "content": content}, "uuid": seed["cli_uuid"]}
         if drain is not None:
             from services import attachments as attachments_service
             async for item in drain:
@@ -1193,7 +1217,7 @@ async def run_prompt(
         current_sid: str | None = None
         if resident is not None:
             resident.bind(persistent_sessions.TurnBinding(emit, ask_user, vis, request_compact, reload, session_info))
-            source = _resident_stream(resident, options, prompt_arg, on_transport, adopt)
+            source = _resident_stream(resident, options, prompt_arg, on_transport, adopt, retune)
         else:
             lazy = await mcp_lazy.open_for(options, lambda: current_sid or resume)
             if lazy is not None:
@@ -1387,6 +1411,8 @@ async def run_prompt(
                 awaiting_cycle = True
                 for ev in _flush_users(getattr(message, "session_id", None) or current_sid):
                     yield ev
+                if seed is not None and drain is not None and not seed.get("taken"):
+                    continue
                 _cmd = [c for c in chips if str(c.get("sent") or "").lstrip().startswith("/")]
                 if _cmd:
                     chips[:] = [c for c in chips if not str(c.get("sent") or "").lstrip().startswith("/")]
@@ -1425,16 +1451,17 @@ async def fast_reply(prompt: str, system_prompt: str, account: Optional[str]) ->
     from services import accounts
 
     target = accounts.resolve(account)
+    model = accounts.model_for(target, "haiku")
     options = ClaudeAgentOptions(
         cwd=str(paths.AI_WORKDIR),
         permission_mode="default",
-        model=accounts.model_for(target, "haiku"),
+        model=model,
         system_prompt=system_prompt,
         setting_sources=[],
         tools=[],
         strict_mcp_config=True,
         cli_path=cli_manager.resolve_cli_path(),
-        env=_cli_env(target),
+        env=_cli_env(target, model=model),
     )
 
     parts: list[str] = []
@@ -1494,13 +1521,14 @@ async def ask_side_question(
     if shared:
         system = f"{system}\n\n{shared}"
     prompt = f"<session_context>\n{context}\n</session_context>\n\n{question}" if (context and not resume_id) else question
-    side_env = _cli_env(accounts.resolve(account))
+    side_model = model or "sonnet"
+    side_env = _cli_env(accounts.resolve(account), model=side_model)
     if channel:
         side_env[CHANNEL_ENV] = channel
     options_kwargs: dict[str, Any] = dict(
         cwd=str(paths.AI_WORKDIR),
         permission_mode=permission_mode,
-        model=model or "sonnet",
+        model=side_model,
         system_prompt=None if resume_id else system,
         setting_sources=[],
         include_partial_messages=partial,

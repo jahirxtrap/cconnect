@@ -106,17 +106,17 @@ def make_tools(context: dict) -> list:
         if not source.is_absolute() and cwd():
             source = Path(cwd(), source)
         if not source.exists():
-            return reply(f"{source} does not exist.")
+            return reply(f"{source} does not exist.", error=True)
         try:
             info = await asyncio.to_thread(packs.save, source)
         except PackFormatError as exc:
-            return reply(f"The pack is not valid: {exc}.")
+            return reply(f"The pack is not valid: {exc}.", error=True)
         return reply(f"Saved to the library, where the app offers it: {_summary(info)}.")
 
     async def export(pack_id: str) -> dict:
         target = packs.file_of(f"{pack_id}{EXTENSION}")
         if target is None:
-            return reply(f"No pack with id {pack_id} in the library.")
+            return reply(f"No pack with id {pack_id} in the library.", error=True)
         project_key = sessions.project_key_for(cwd()) if cwd() else ""
         shutil.copy2(target, shared.project_dir(project_key) / target.name)
         delivered = exported(pack_id, project_key)
@@ -134,15 +134,17 @@ def make_tools(context: dict) -> list:
             return reply("\n".join(_summary(entry) for entry in entries) or "The library is empty.")
         if action == "save":
             raw = (args.get("path") or "").strip()
-            return await save(raw) if raw else reply("Pass the path of the pack folder or .ccpack file.")
+            return await save(raw) if raw else reply("Pass the path of the pack folder or .ccpack file.", error=True)
         pack_id = (args.get("id") or "").strip()
         if not pack_id:
-            return reply("Pass the id of the pack.")
+            return reply("Pass the id of the pack.", error=True)
         if action == "remove":
             removed = packs.remove(f"{pack_id}{EXTENSION}")
-            return reply(f"Removed {pack_id}." if removed else f"No pack with id {pack_id} in the library.")
+            if not removed:
+                return reply(f"No pack with id {pack_id} in the library.", error=True)
+            return reply(f"Removed {pack_id}.")
         if action == "export":
             return await export(pack_id)
-        return reply(f"action is one of {', '.join(ACTIONS)}.")
+        return reply(f"action is one of {', '.join(ACTIONS)}.", error=True)
 
     return [packs_tool]

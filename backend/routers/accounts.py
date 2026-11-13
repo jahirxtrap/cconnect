@@ -120,7 +120,7 @@ _pending_purges: set[asyncio.Task] = set()
 
 async def _purge(account_id: str, holders: list) -> None:
     try:
-        await live_sessions.registry.release_all(holders)
+        await live_sessions.registry.release_all(holders, "account removed")
         for _ in range(_PURGE_ATTEMPTS):
             if await asyncio.to_thread(accounts.purge, account_id):
                 return

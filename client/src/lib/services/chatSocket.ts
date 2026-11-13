@@ -412,6 +412,8 @@ export class ChatSocket {
   #lastSeen = 0;
   #channel: string | null = null;
   #lastSeq = 0;
+  #unansweredStarts = 0;
+  #abandonedStarts = 0;
   #sideChannel: string | null = null;
   #sideLastSeq = 0;
   #sideResume: string | null = null;
@@ -479,7 +481,15 @@ export class ChatSocket {
   resetResume() {
     this.#channel = null;
     this.#lastSeq = 0;
+    this.#abandonedStarts = this.#unansweredStarts;
     this.forgetSide();
+  }
+
+  #answersCurrentStart() {
+    if (this.#unansweredStarts > 0) this.#unansweredStarts--;
+    if (this.#abandonedStarts === 0) return true;
+    this.#abandonedStarts--;
+    return false;
   }
 
   forgetSide() {
@@ -489,7 +499,7 @@ export class ChatSocket {
   }
 
   sendStart(options: StartOptions) {
-    this.#send({
+    const sent = this.#send({
       type: "start",
       cwd: options.cwd,
       permission_mode: options.permissionMode,
@@ -509,6 +519,7 @@ export class ChatSocket {
       ...(this.#sideChannel ? { side_channel: this.#sideChannel, side_last_seq: this.#sideLastSeq } : {}),
       ...(this.#sideResume ? { side_resume: this.#sideResume } : {}),
     });
+    if (sent) this.#unansweredStarts++;
   }
 
   get channel(): string | null {
@@ -663,6 +674,8 @@ export class ChatSocket {
     const url = socketUrlOf(this.profile(), "/chat/ws");
     if (!url) return;
     const generation = ++this.#generation;
+    this.#unansweredStarts = 0;
+    this.#abandonedStarts = 0;
     this.#socket?.close();
     this.onEvent(false, null, { type: "connecting", resumed });
     const socket = openSocket(url, true, this.agent());
@@ -711,7 +724,9 @@ export class ChatSocket {
     }
     const event = wire as unknown as Contract.ChatEvent;
     if (event.type === "pong") return;
+    if (event.type === "rejected" && event.request === "start" && !this.#answersCurrentStart()) return;
     if (event.type === "ready") {
+      if (!this.#answersCurrentStart()) return;
       const channel = event.channel ?? null;
       if (channel && channel !== this.#channel) {
         this.#channel = channel;

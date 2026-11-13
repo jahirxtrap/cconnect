@@ -347,5 +347,5 @@ async def stop(pid: int, unlocked: bool) -> str:
     if session is None:
         return UNKNOWN
     await session.interrupt()
-    await session.release_resident()
+    await session.release_resident("stopped from Processes")
     return STOPPED

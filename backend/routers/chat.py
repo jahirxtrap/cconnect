@@ -101,6 +101,7 @@ def _build_turn_runner(session, text: str, attachments: list[str] | None = None,
             try:
                 async for event in run_prompt(
                     resident=resident,
+                    tasks_alive=session.tasks_alive,
                     channel=session.channel,
                     unlocked=lambda: session.unlocked,
                     prompt=prompt_text,
@@ -440,6 +441,8 @@ async def chat_ws(ws: WebSocket):
                 seen["offered"] = msg.capabilities
                 seen["capabilities"] = authorize(msg.capabilities, msg.security_key)
                 existing = registry.get(msg.channel) if msg.channel else None
+                if existing is not None and msg.resume and existing.state.session_id != msg.resume:
+                    existing = None
                 stale = bool(msg.channel and msg.last_seq) and (existing is None or not existing.covers(msg.last_seq))
                 by_session = None
                 if existing is None and msg.resume:
@@ -591,7 +594,7 @@ async def chat_ws(ws: WebSocket):
 
             elif mtype == "close_resident":
                 if session is not None:
-                    await session.release_resident()
+                    await session.release_resident("closed from the app")
 
             elif mtype == "mod_render":
                 if session is not None:

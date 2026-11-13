@@ -30,7 +30,7 @@ Folder = tuple[Optional[dict], dict[str, dict], set[str]]
 
 def _session_sig(s: dict) -> tuple:
     return (s.get("title"), s.get("color"), s.get("preview"), s.get("last_active"),
-            s.get("size"), s.get("path"), s.get("project_key"), s.get("activity"), s.get("rewind"))
+            s.get("size"), s.get("path"), s.get("project_key"), s.get("activity"), s.get("resident"), s.get("rewind"))
 
 
 def _project_sig(p: dict) -> tuple:
@@ -324,7 +324,7 @@ class ChatListHub:
                 if known is None or meta["last_active"] > known["last_active"]:
                     newest[sid] = meta
         for sid, meta in newest.items():
-            sessions[sid] = self._with_activity(sid, sessions_service.with_pinned(sid, meta))
+            sessions[sid] = sessions_service.with_pinned(sid, meta)
         if len(self._sig_cache) > len(seen):
             self._sig_cache = {k: v for k, v in self._sig_cache.items() if k in seen}
         for key, meta in projects_service.snapshot().items():
@@ -361,7 +361,7 @@ class ChatListHub:
             events.append({"type": "placement_removed", "session_id": gone})
         with self._lock:
             old_projects, old_sessions = self._projects, self._sessions
-            new_sessions = {sid: s for sid, s in new_sessions.items() if sid not in self._hidden}
+            new_sessions = {sid: self._with_activity(sid, s) for sid, s in new_sessions.items() if sid not in self._hidden}
             if broadcast:
                 for key, p in new_projects.items():
                     if key not in old_projects or _project_sig(p) != _project_sig(old_projects[key]):
