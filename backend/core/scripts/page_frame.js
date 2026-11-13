@@ -14,6 +14,7 @@
       .filter(Boolean)
       .join('+');
   const tell = (message) => parent.postMessage({ [CHANNEL]: message }, '*');
+  tell({ shown: true });
   addEventListener('message', (event) => {
     const message = event.source === parent && event.data && event.data[CHANNEL];
     if (!message) return;

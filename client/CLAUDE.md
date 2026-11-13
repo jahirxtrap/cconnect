@@ -160,6 +160,10 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
 - HTML goes through `ui/PageFrame.svelte` and the server's `/api/pages`, on its own origin. The
   apps fall back to `preview_open` and the `preview` protocol (`preview.rs`), since a `blob:` page
   inherits the app's CSP. `tauri dev` applies no CSP: check CSP in a build.
+- `PageFrame` never leaves a browser error page in view: a navigation to a page or file the server
+  (or `preview.rs`) does not know gets a page that posts `missing` on the `cconnect-frame` channel.
+  A forgotten page is opened again; a missing file shows the app's own state. While its server is
+  unavailable the frame shows `ServerUnavailable` and reopens when it is back.
 - A file linked before it exists waits on its shared folder (`services/sharedArrival.svelte.ts`).
   A loaded image follows its file (`followSharedFile`) and swaps in off screen.
 - Media blocks share `.media-frame` (`ui/mediaFrame.ts`).

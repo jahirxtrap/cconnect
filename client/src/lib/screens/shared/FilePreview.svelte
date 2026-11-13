@@ -411,14 +411,7 @@
       <EmptyState icon={fileIcon(filename)} text={t("FILE_BINARY")} class="flex-1" />
     {/if}
   {:else if kind === "html"}
-    <PageFrame
-      url={source}
-      name={filename}
-      title={filename}
-      zoomable
-      onerror={() => (failed = true)}
-      class="min-h-0 w-full flex-1 border-0"
-    />
+    <PageFrame url={source} name={filename} title={filename} zoomable class="min-h-0 w-full flex-1" />
   {:else if failed}
     <EmptyState icon={fileIcon(filename)} text={t("FILE_UNAVAILABLE")} class="flex-1" />
   {:else if shown === null}

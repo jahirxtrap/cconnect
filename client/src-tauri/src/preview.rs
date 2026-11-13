@@ -37,6 +37,18 @@ fn filled(status: u16, kind: String, body: Vec<u8>) -> Response<Vec<u8>> {
         .unwrap_or_else(|_| empty(StatusCode::INTERNAL_SERVER_ERROR))
 }
 
+fn missing(reason: &str) -> Response<Vec<u8>> {
+    let page = format!(
+        "<!doctype html><meta charset=\"utf-8\"><script>parent.postMessage({{\"cconnect-frame\":{{\"missing\":\"{reason}\"}}}},\"*\")</script>"
+    );
+    filled(StatusCode::NOT_FOUND.as_u16(), MimeType::Html.to_string(), page.into_bytes())
+}
+
+fn is_page(path: &str) -> bool {
+    let lower = path.to_ascii_lowercase();
+    lower.ends_with(".html") || lower.ends_with(".htm")
+}
+
 impl Previews {
     fn page(&self, id: &str) -> Option<Page> {
         self.pages.lock().ok()?.get(id).cloned()
@@ -47,7 +59,7 @@ impl Previews {
             return empty(StatusCode::NOT_FOUND);
         };
         let Some(page) = self.page(id) else {
-            return empty(StatusCode::NOT_FOUND);
+            return missing("page");
         };
         if rest == page.entry {
             return filled(200, MimeType::Html.to_string(), page.html);
@@ -56,8 +68,10 @@ impl Previews {
         for (name, value) in &page.headers {
             request = request.header(name, value);
         }
-        let Ok(response) = request.send().await else {
-            return empty(StatusCode::BAD_GATEWAY);
+        let response = match request.send().await {
+            Ok(response) if response.status().is_success() || !is_page(rest) => response,
+            _ if is_page(rest) => return missing("file"),
+            _ => return empty(StatusCode::BAD_GATEWAY),
         };
         let status = response.status().as_u16();
         match response.bytes().await {

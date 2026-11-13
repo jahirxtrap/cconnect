@@ -33,16 +33,22 @@ def close_page(page_id: str):
     return api_response()
 
 
+def _missing(request: Request, reason: str):
+    if request.headers.get("sec-fetch-dest") not in pages.NAVIGATIONS:
+        raise HTTPException(status_code=404, detail=f"{reason} not found")
+    return HTMLResponse(pages.MISSING_PAGE % reason.encode(), status_code=404, headers=FILE_HEADERS)
+
+
 @router.get("/pages/{page_id}/{rest:path}")
 def page_file(page_id: str, rest: str, request: Request):
     found = pages.page(page_id)
     if found is None:
-        raise HTTPException(status_code=404, detail="page not found")
+        return _missing(request, "page")
     if rest == found.entry:
         return HTMLResponse(pages.framed(found.html.encode("utf-8")), headers=FILE_HEADERS)
     resolved = pages.file_of(found, rest)
     if resolved is None:
-        raise HTTPException(status_code=404, detail="file not found")
+        return _missing(request, "file")
     if resolved.suffix.lower() in pages.HTML_SUFFIXES:
         return HTMLResponse(pages.framed(resolved.read_bytes()), headers=FILE_HEADERS)
     return file_response(request, resolved)

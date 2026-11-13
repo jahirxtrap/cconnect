@@ -15,7 +15,9 @@ from services import project_files, shared
 PATH = "/api/pages"
 LIMIT = 256
 HTML_SUFFIXES = (".html", ".htm")
+NAVIGATIONS = ("document", "iframe", "frame")
 FRAME_SCRIPT = b"<script>" + (paths.SCRIPTS_DIR / "page_frame.js").read_bytes() + b"</script>"
+MISSING_PAGE = b'<!doctype html><meta charset="utf-8"><script>parent.postMessage({"cconnect-frame":{"missing":"%b"}},"*")</script>'
 ANCHORS = (re.compile(rb"<head\b[^>]*>", re.IGNORECASE), re.compile(rb"<!doctype[^>]*>", re.IGNORECASE))
 
 Resolver = Callable[[str], Optional[Path]]
