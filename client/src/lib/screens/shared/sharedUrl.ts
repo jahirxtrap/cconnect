@@ -1,3 +1,5 @@
+import { navigation } from "$lib/app/navigation.svelte";
+
 export interface SharedLocation {
   path: string;
   archive: string | null;
@@ -36,7 +38,5 @@ export const readSharedLocation = (): SharedLocation | null => {
 export const syncSharedLocation = (location: SharedLocation) => {
   if (!onSharedRoute()) return;
   const target = buildUrl(location);
-  if (target !== window.location.pathname + window.location.search) {
-    window.history.replaceState(null, "", target);
-  }
+  if (target !== window.location.pathname + window.location.search) navigation.replace(null, target);
 };

@@ -550,7 +550,7 @@ class Tabs {
     const search = query.toString();
     const target = search ? `/?${search}` : "/";
     if (target === window.location.pathname + window.location.search) return;
-    if (navigation.previewOverlay) window.history.replaceState(window.history.state, "", target);
+    if (navigation.previewOverlay) navigation.replace(window.history.state, target);
     else navigation.push(null, target);
   }
 }

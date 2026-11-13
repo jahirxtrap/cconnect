@@ -1,5 +1,6 @@
 import { backend } from "$lib/services/backend.svelte";
-import { consumingDismiss, dismissTop } from "$lib/app/dismissStack";
+import { dismissTop } from "$lib/app/dismissStack";
+import { advance, landed, pushEntry, replaceEntry, retreat } from "$lib/app/historyLedger";
 import type { PreviewKind } from "$lib/data/previewKind";
 import { isTauri } from "$lib/platform";
 import { layout } from "$lib/platform/layout.svelte";
@@ -77,44 +78,17 @@ class Navigation {
 
   routeLocked = $state(false);
 
-  #mark = window.history.length;
-  #settled = window.history.length;
-  #forward = 0;
-  #retreating = false;
-
   push(state: unknown, url: string) {
-    window.history.pushState(state, "", url);
-    this.#mark = window.history.length;
-    this.#settled = this.#mark;
-    this.#forward = 0;
+    pushEntry(state, url);
   }
 
-  #retreat() {
-    const length = window.history.length;
-    const stale = length === this.#settled ? this.#forward : 0;
-    const foreign = Math.max(0, length - this.#mark - stale);
-    const steps = Math.min(foreign + 1, length - 1);
-    if (steps <= 0) return;
-    this.#forward = steps;
-    this.#mark = Math.max(1, this.#mark - 1);
-    this.#settled = length;
-    this.#retreating = true;
-    window.history.go(-steps);
-  }
-
-  #landed() {
-    if (this.#retreating) {
-      this.#retreating = false;
-      return;
-    }
-    this.#forward += 1;
-    this.#mark = Math.max(1, this.#mark - 1);
-    this.#settled = window.history.length;
+  replace(state: unknown, url: string) {
+    replaceEntry(state, url);
   }
 
   start() {
     if (blocked(baseOf(window.location.pathname))) {
-      window.history.replaceState(null, "", "/");
+      replaceEntry(null, "/");
     }
     if (!backend.configured) {
       if (window.location.pathname === "/") this.push(null, "/settings");
@@ -127,16 +101,16 @@ class Navigation {
       if (this.route === "/") return false;
       this.settingsHighlight = null;
       this.sharedTarget = null;
-      this.#retreat();
+      retreat();
       return true;
     };
 
     $effect(() => {
       const onPopState = () => {
-        this.#landed();
+        const rewound = landed();
         const leaving = this.#leaving;
         this.#leaving = false;
-        if (consumingDismiss()) return;
+        if (rewound) return;
         if (dismissTop()) return;
         if (this.previewOverlay) {
           this.endPreview();
@@ -160,7 +134,7 @@ class Navigation {
     const sibling = this.centered && target !== "/";
     this.sub = null;
     this.#leaving = false;
-    if (sibling) window.history.replaceState(null, "", target);
+    if (sibling) replaceEntry(null, target);
     else this.push(null, target);
     this.route = target;
   }
@@ -178,17 +152,17 @@ class Navigation {
   showSub(value: string) {
     if (this.sub === value) return;
     this.sub = value;
-    window.history.replaceState(null, "", `${this.route}/${encodeURIComponent(value)}`);
+    replaceEntry(null, `${this.route}/${encodeURIComponent(value)}`);
   }
 
   closeSub() {
-    if (this.sub !== null) this.#retreat();
+    if (this.sub !== null) retreat();
   }
 
   clearSub() {
     if (this.sub === null) return;
     this.sub = null;
-    window.history.replaceState(null, "", this.route);
+    replaceEntry(null, this.route);
   }
 
   openSettings(highlight: string | null = null) {
@@ -234,7 +208,7 @@ class Navigation {
   }
 
   closePreview() {
-    if (this.previewOverlay) this.#retreat();
+    if (this.previewOverlay) retreat();
   }
 
   intercept(handler: () => boolean, { system = false }: { system?: boolean } = {}) {
@@ -255,7 +229,7 @@ class Navigation {
 
   forward() {
     if (this.routeLocked) return;
-    window.history.forward();
+    advance();
   }
 
   back() {
@@ -264,7 +238,7 @@ class Navigation {
     this.settingsHighlight = null;
     this.sharedTarget = null;
     this.#leaving = true;
-    this.#retreat();
+    retreat();
   }
 
   #url(): string {

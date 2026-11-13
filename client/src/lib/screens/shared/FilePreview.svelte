@@ -47,7 +47,7 @@
   import TabPager, { TAB_PAGE_CLASS } from "$lib/ui/TabPager.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
   import MediaPlayer from "$lib/ui/MediaPlayer.svelte";
-  import AudioStage from "./AudioStage.svelte";
+  import AudioStage from "$lib/ui/AudioStage.svelte";
   import FileInfoDialog from "./FileInfoDialog.svelte";
   import GallerySlide, { GALLERY_KINDS } from "./GallerySlide.svelte";
   import GalleryStrip from "./GalleryStrip.svelte";

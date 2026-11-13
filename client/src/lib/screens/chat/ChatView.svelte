@@ -526,7 +526,7 @@
   <div class="relative min-h-0 flex-1 overflow-hidden">
     {#if opening}
       <CenteredProgress class="absolute inset-0 z-10" />
-    {:else if !chat.view.length && (chat.agent || !chat.sessionId) && !chat.streaming}
+    {:else if !chat.view.length && (chat.agent || !chat.sessionId || chat.link === "disconnected") && !chat.streaming}
       <ChatWelcome
         project={welcomeProject}
         link={welcomeLink}

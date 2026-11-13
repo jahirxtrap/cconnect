@@ -1,3 +1,5 @@
+import { pendingRewind, pushEntry, replaceEntry, rewind } from "./historyLedger";
+
 type Handler = () => void;
 
 interface Layer {
@@ -7,19 +9,16 @@ interface Layer {
 
 const stack: Layer[] = [];
 
-const rewinding: number[] = [];
 let settling = false;
 
 const depth = () => (window.history.state as { dismiss?: number } | null)?.dismiss ?? 0;
 
-const surplus = () => depth() - rewinding.reduce((sum, steps) => sum + steps, 0) - stack.length;
+const surplus = () => depth() - pendingRewind() - stack.length;
 
 const settle = () => {
   settling = false;
   const extra = surplus();
-  if (extra <= 0) return;
-  rewinding.push(extra);
-  window.history.go(-extra);
+  if (extra > 0) rewind(extra);
 };
 
 export const pushDismiss = (handler: Handler, { modal = true }: { modal?: boolean } = {}) => {
@@ -27,8 +26,8 @@ export const pushDismiss = (handler: Handler, { modal = true }: { modal?: boolea
   const reuse = surplus() > 0;
   stack.push(layer);
   const entry = { dismiss: stack.length };
-  if (reuse) window.history.replaceState(entry, "", window.location.href);
-  else window.history.pushState(entry, "", window.location.href);
+  if (reuse) replaceEntry(entry, window.location.href);
+  else pushEntry(entry, window.location.href);
   return () => {
     const index = stack.lastIndexOf(layer);
     if (index < 0) return;
@@ -45,7 +44,5 @@ export const dismissTop = () => {
   layer.handler();
   return true;
 };
-
-export const consumingDismiss = () => rewinding.shift() !== undefined;
 
 export const dismissOpen = () => stack.some((layer) => layer.modal);

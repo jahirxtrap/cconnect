@@ -4,6 +4,12 @@ const SLOP = 10;
 const DISMISS_RATIO = 0.35;
 const MIN_DISMISS = 80;
 export const SWIPE_MS = 180;
+const SWIPE_ATTRIBUTE = "data-swipe";
+
+export const OWN_SWIPE = { [SWIPE_ATTRIBUTE]: "" };
+
+export const swipeOwner = (target: EventTarget | null) =>
+  target instanceof Element ? target.closest(`[${SWIPE_ATTRIBUTE}]`) : null;
 
 export interface SwipeDismissOptions {
   onDismiss: (() => void) | null;
@@ -34,6 +40,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
 
   const onPointerDown = (event: PointerEvent) => {
     if (dismiss === null || (event.pointerType === "mouse" && event.button !== 0)) return;
+    if (swipeOwner(event.target) !== node) return;
     startX = event.clientX;
     tracking = true;
     pointer = event.pointerId;
@@ -79,7 +86,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
   };
 
   node.style.touchAction = "pan-y";
-  node.dataset.swipe = "";
+  node.setAttribute(SWIPE_ATTRIBUTE, "");
   node.addEventListener("pointerdown", onPointerDown);
   node.addEventListener("pointermove", onPointerMove);
   node.addEventListener("pointerup", onPointerUp);
@@ -95,7 +102,7 @@ export function swipeDismiss(node: HTMLElement, options: SwipeDismissOptions) {
     },
     destroy() {
       release();
-      delete node.dataset.swipe;
+      node.removeAttribute(SWIPE_ATTRIBUTE);
       node.removeEventListener("pointerdown", onPointerDown);
       node.removeEventListener("pointermove", onPointerMove);
       node.removeEventListener("pointerup", onPointerUp);

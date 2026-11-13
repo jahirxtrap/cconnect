@@ -15,9 +15,9 @@
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { fileIcon } from "$lib/ui/fileIcons";
+  import AudioStage from "$lib/ui/AudioStage.svelte";
   import MediaPlayer from "$lib/ui/MediaPlayer.svelte";
   import ZoomPane from "$lib/ui/ZoomPane.svelte";
-  import AudioStage from "./AudioStage.svelte";
 
   interface Props {
     item: PreviewRequest;

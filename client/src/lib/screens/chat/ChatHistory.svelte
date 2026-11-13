@@ -58,7 +58,7 @@
 />
 <CategoryGroups
   {chat}
-  items={searching ? found : chat.historySessions}
+  items={chat.historyUnavailable ? [] : searching ? found : chat.historySessions}
   keyOf={(session) => session.sessionId}
   recency={(session) => session.lastActive ?? 0}
   placementOf={(session) => chat.placement[session.sessionId]}
@@ -119,12 +119,12 @@
     />
   {/snippet}
   {#snippet fallback()}
-    {#if searching}
+    {#if chat.historyUnavailable}
+      <ServerUnavailable class="h-full" />
+    {:else if searching}
       <EmptyState icon={NO_RESULTS_ICON} text={t("NO_RESULTS")} class="h-full" />
     {:else if chat.historyLoading}
       <CenteredProgress class="h-full" />
-    {:else if chat.historyUnavailable}
-      <ServerUnavailable class="h-full" />
     {:else}
       <EmptyState icon={History} text={t("NO_CHATS")} class="h-full" />
     {/if}

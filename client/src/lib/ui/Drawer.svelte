@@ -4,6 +4,7 @@
   import { layout } from "$lib/platform/layout.svelte";
   import { dismissMenus, menusOpen } from "./MenuScrim.svelte";
   import { FLING_SPEED, Velocity } from "./velocity";
+  import { swipeOwner } from "./swipe";
   import { pushDismiss } from "$lib/app/dismissStack";
 
   interface Props {
@@ -42,9 +43,6 @@
     return false;
   };
 
-  const handlesSwipe = (target: EventTarget | null) =>
-    target instanceof Element && target.closest("[data-swipe]") !== null;
-
   const blockTap = (event: Event) => {
     event.preventDefault();
     event.stopPropagation();
@@ -61,7 +59,7 @@
     if (menusOpen() || document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
     const touch = event.touches[0];
     if (!open && !onOpen) return;
-    if (scrollsHorizontally(event.target) || handlesSwipe(event.target)) return;
+    if (scrollsHorizontally(event.target) || swipeOwner(event.target) !== null) return;
     tracking = true;
     decided = false;
     dragging = false;

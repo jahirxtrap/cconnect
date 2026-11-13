@@ -179,8 +179,8 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   `playlist` of one) shows its title and the player, like a lone image or video; more tracks list
   their rows above one player, which moves on when a track ends. Capability `media.markdown_audio`
   tells the server to offer `![](x.mp3)` to Claude. Inside a chat gallery of several items an audio
-  file takes the media frame instead (`MarkdownImage framed`): `MediaPlayer`'s `artwork` snippet puts
-  its `AudioCover` where a video's picture goes, under the same controls, which never hide for audio.
+  file takes the media frame instead (`MarkdownImage framed`), drawn by `ui/AudioStage.svelte`
+  with `mini`.
 - `ui/AudioCover.svelte` is the one cover-or-note render: the preview's stage, the chat frame and the
   strip's tiles.
 - Volume: a slider beside the speaker where a pointer has room (`@sm`); on touch or in a narrow
@@ -231,6 +231,10 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 
 - `ZoomPane`: zoom anchors at the pointer, panning is unclamped, `<img draggable="false">`, and
   `touch-action: none` only while zoomed.
+- Every history write goes through `app/historyLedger.ts` (`navigation.push` / `replace`,
+  `dismissStack`), never `history` directly.
+- An element that drags sideways by itself declares `OWN_SWIPE` (`ui/swipe.ts`), and every
+  hand-made swipe leaves it alone.
 - `hasFiles(event)` gates every drag handler, or dragging text raises the file overlay.
 - Whether a server accepts its stored key is `securityKeys.unlocked(profile)`, recorded only by
   answers that prove it (`judgeKey`, the project tree's `unlocked`): a read-only database also

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack, type Snippet } from "svelte";
+  import { untrack } from "svelte";
   import FastForward from "@lucide/svelte/icons/fast-forward";
   import Gauge from "@lucide/svelte/icons/gauge";
   import Maximize from "@lucide/svelte/icons/maximize";
@@ -42,7 +42,6 @@
     onerror?: () => void;
     onPosterError?: () => void;
     onended?: () => void;
-    artwork?: Snippet;
     class?: string;
   }
 
@@ -60,7 +59,6 @@
     onerror,
     onPosterError,
     onended,
-    artwork,
     class: className = "",
   }: Props = $props();
 
@@ -93,7 +91,6 @@
   let woke = $state(0);
 
   const video = $derived(kind === "video");
-  const framed = $derived(video || artwork !== undefined);
   const volume = $derived(settings.mediaVolume);
   const muted = $derived(settings.mediaMuted);
   const duration = $derived(Number.isFinite(length) && length > 0 ? length : (known ?? given ?? 0));
@@ -289,7 +286,7 @@
   ></audio>
 {/if}
 
-{#if framed}
+{#if video}
   <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
   <div
     bind:this={frame}
@@ -303,54 +300,47 @@
       ? 'bg-black'
       : ''} {className}"
   >
-    {#if video}
-      <ZoomPane bind:this={zoom} active={zoomable || expanded} doubleTap={false} class="size-full">
-        <!-- svelte-ignore a11y_media_has_caption -->
-        <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-        <video
-          bind:this={media}
-          use:servedSrc={{ url, onerror }}
-          {preload}
-          playsinline
-          bind:paused
-          bind:currentTime={current}
-          bind:duration={length}
-          bind:buffered={ranges}
-          bind:volume={() => settings.mediaVolume, (value) => (settings.mediaVolume = value)}
-          bind:muted={() => settings.mediaMuted, (value) => (settings.mediaMuted = value)}
-          bind:playbackRate={rate}
-          onloadedmetadata={begin}
-          onplay={wake}
-          onwaiting={() => (waiting = true)}
-          onplaying={() => {
-            settle();
-            started = true;
-          }}
-          onseeked={() => (started = true)}
-          oncanplay={settle}
-          onpause={settle}
-          {onended}
-          onclick={tapSurface}
-          ondblclick={() => canExpand && expand()}
-          class="size-full object-contain"
-        ></video>
+    <ZoomPane bind:this={zoom} active={zoomable || expanded} doubleTap={false} class="size-full">
+      <!-- svelte-ignore a11y_media_has_caption -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
+      <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+      <video
+        bind:this={media}
+        use:servedSrc={{ url, onerror }}
+        {preload}
+        playsinline
+        bind:paused
+        bind:currentTime={current}
+        bind:duration={length}
+        bind:buffered={ranges}
+        bind:volume={() => settings.mediaVolume, (value) => (settings.mediaVolume = value)}
+        bind:muted={() => settings.mediaMuted, (value) => (settings.mediaMuted = value)}
+        bind:playbackRate={rate}
+        onloadedmetadata={begin}
+        onplay={wake}
+        onwaiting={() => (waiting = true)}
+        onplaying={() => {
+          settle();
+          started = true;
+        }}
+        onseeked={() => (started = true)}
+        oncanplay={settle}
+        onpause={settle}
+        {onended}
+        onclick={tapSurface}
+        ondblclick={() => canExpand && expand()}
+        class="size-full object-contain"
+      ></video>
 
-        {#if poster && !started}
-          <img
-            use:imageSrc={{ url: poster, onerror: onPosterError }}
-            alt=""
-            draggable="false"
-            class="pointer-events-none absolute inset-0 size-full object-contain"
-          />
-        {/if}
-      </ZoomPane>
-    {:else}
-      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div onclick={toggle} class="flex size-full cursor-pointer items-center justify-center">
-        {@render artwork?.()}
-      </div>
-    {/if}
+      {#if poster && !started}
+        <img
+          use:imageSrc={{ url: poster, onerror: onPosterError }}
+          alt=""
+          draggable="false"
+          class="pointer-events-none absolute inset-0 size-full object-contain"
+        />
+      {/if}
+    </ZoomPane>
 
     {#if waiting && !paused}
       <CenteredProgress class="pointer-events-none absolute inset-0" />

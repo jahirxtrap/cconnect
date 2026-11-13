@@ -7,7 +7,7 @@
   import { imageSrc } from "$lib/services/mediaSource";
   import { fittedImageOf, videoStillOf } from "$lib/services/sharedApi";
   import AudioCard from "./AudioCard.svelte";
-  import AudioCover from "./AudioCover.svelte";
+  import AudioStage from "./AudioStage.svelte";
   import CenteredProgress from "./CenteredProgress.svelte";
   import ExpandButton from "./ExpandButton.svelte";
   import { MEDIA_FRAME_CLASS } from "./mediaFrame";
@@ -29,6 +29,7 @@
 
   let status = $state<"loading" | "ready" | "error">("loading");
   let player = $state<MediaPlayer | null>(null);
+  let stage = $state<AudioStage | null>(null);
   let near = $state(false);
 
   const resolved = $derived(url);
@@ -65,10 +66,6 @@
   });
 </script>
 
-{#snippet cover()}
-  <AudioCover url={resolved} class="h-full" />
-{/snippet}
-
 {#if audio && !framed}
   <AudioCard tracks={[{ url: resolved, name: filename, title: alt }]} {onOpen} />
 {:else}
@@ -83,7 +80,7 @@
     {#if video || audio}
       {#if audio}
         {#if near}
-          <MediaPlayer bind:this={player} url={resolved} kind="audio" artwork={cover} class="size-full" />
+          <AudioStage bind:this={stage} url={resolved} base={resolved} {filename} title={alt || undefined} mini />
         {/if}
       {:else if near && frameHeight && served !== undefined}
         {#key stillMissing}
@@ -102,6 +99,7 @@
         label={filename}
         onclick={() => {
           player?.handOff();
+          stage?.handOff();
           onOpen(resolved, filename);
         }}
       />
