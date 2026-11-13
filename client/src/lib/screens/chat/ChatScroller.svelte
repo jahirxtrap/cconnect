@@ -6,6 +6,7 @@
   import { dockArea } from "$lib/ui/dockArea.svelte";
   import { LOAD_MORE_PX } from "$lib/ui/paging";
   import { scrollbarWidth, viewportScrollbar } from "$lib/ui/scrollbar";
+  import type { BlockExpansion } from "./blockExpansion.svelte";
   import { provideStickyHeads } from "./blocks/stickyHeads";
 
   interface Props {
@@ -153,15 +154,28 @@
 
   export const refreshHeader = () => updatePinned();
 
-  export const collapsePinned = async (id: number, collapse: () => void) => {
+  export const grow = async (change: () => void) => {
+    const pinnedToEnd = atBottom();
+    change();
+    if (!pinnedToEnd) return;
+    await tick();
+    scrollToEnd();
+  };
+
+  const collapsePinned = async (id: number, expansion: BlockExpansion) => {
     if (pinned?.dataset.mid !== String(id)) return false;
-    collapse();
+    expansion.set(id, false);
     await tick();
     const node = find(`[data-mid="${id}"]`);
     const block = node?.querySelector<HTMLElement>("[data-block]") ?? node;
     if (block) bringToTop(block);
     updatePinned();
     return true;
+  };
+
+  export const toggleBlock = async (id: number, expansion: BlockExpansion) => {
+    if (await collapsePinned(id, expansion)) return;
+    void grow(() => expansion.set(id, !expansion.isOpen(id)));
   };
 
   const measureScrollbar = () => {

@@ -599,6 +599,7 @@ class HistoryChunk(Event):
     start_index: int
     has_more: bool
     earlier: Optional[str] = None
+    earlier_prompts: list[str] = []
 
 
 class Tail(Event):

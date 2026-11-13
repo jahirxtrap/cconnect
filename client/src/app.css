@@ -326,6 +326,10 @@ html[data-theme="dark"] {
   bottom: var(--keyboard, 0px);
 }
 
+.behind-keyboard {
+  bottom: calc(var(--keyboard, 0px) * -1);
+}
+
 .safe-inset {
   top: var(--safe-top);
   right: var(--safe-right);

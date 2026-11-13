@@ -936,6 +936,7 @@ export interface HistoryChunk {
   start_index: number;
   has_more: boolean;
   earlier?: string | null;
+  earlier_prompts?: string[];
 }
 export interface Tail {
   seq?: number | null;

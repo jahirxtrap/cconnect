@@ -74,8 +74,16 @@ One component owns the viewport for `MessageList` and `SidePanel`, with an expor
 - `atBottom()` is also true when nothing scrolls.
 - Long block heads use native `position: sticky`; `updatePinned()` marks the stuck one with
   `data-stuck`.
+- Which blocks are open is a `BlockExpansion` owned by the chat state (or the quick chat), never a
+  prop the list writes into. A head opens and closes through `toggleBlock(id, expansion)`, and
+  anything that grows goes through `grow`, which keeps the end pinned when it was there.
 - History pages in on scroll but never across a compaction: past it only **Earlier messages**
   loads (`loadEarlier`), and those messages carry `beforeCompaction`, which drops Fork.
+- The composer's ↑/↓ history keeps no list of its own: `userHistory()` is the server's
+  `earlier_prompts` (the prompts before the loaded page, sent with every page) followed by the user
+  messages on screen and the queue, so it follows paging, Earlier messages, compaction and what
+  other devices send. A long press on Send (`contextmenu`) lists the same history. Send is
+  `aria-disabled`, never `disabled`: a disabled button gets no `contextmenu`.
 
 ## Panels (`screens/chat/panes.svelte.ts`)
 
@@ -209,7 +217,9 @@ Android from `MainActivity` (`window.__cconnectOpenLink`).
 
 `MarkdownText` takes a `flavor`: `chat` renders no HTML; `note` and `document` render GitHub's
 allowed HTML, cleaned by `markdown/githubHtml.ts`. Relative images load beside the file through
-`imageSrc`. A list holding a fenced block becomes a `list` segment drawn by `MarkdownText`.
+`imageSrc`. A list holding a fenced block becomes a `list` segment drawn by `MarkdownText`. A tight
+item's hidden paragraph is rendered as a `<div>` (`blockTightParagraphs`): bare inline HTML in the
+item's flex column would put every run on its own row.
 
 ## PDF (`screens/shared/PdfView.svelte`)
 
@@ -228,6 +238,8 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 - `field-auto` with the `platform/fieldSizing.ts` polyfill and `keepCaretInView`: test the
   composer before touching it.
 - The service worker (`public/sw.js`) caches nothing; it exists so Chrome offers the install.
+- The app shrinks by `--keyboard` while the keyboard is up. The chat background reaches under it
+  (`behind-keyboard`, the pair of `above-keyboard`), so its size and framing never change.
 
 ## Android
 

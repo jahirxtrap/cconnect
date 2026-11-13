@@ -196,6 +196,7 @@ export type ServerEvent =
       items: Record<string, unknown>[];
       hasMore: boolean;
       earlier: string | null;
+      earlierPrompts: string[];
     }
   | { type: "tail"; items: Record<string, unknown>[] }
   | ({
@@ -1075,6 +1076,7 @@ export class ChatSocket {
           items: event.items ?? [],
           hasMore: event.has_more === true,
           earlier: event.earlier ?? null,
+          earlierPrompts: event.earlier_prompts ?? [],
         };
       case "interaction_request":
         return {

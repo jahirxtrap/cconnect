@@ -689,6 +689,7 @@ async def chat_ws(ws: WebSocket):
                     "start_index": start,
                     "has_more": start > 0,
                     "earlier": earlier,
+                    "earlier_prompts": sessions_service.user_prompts(items[:start]),
                 })
 
             elif mtype == "ping":

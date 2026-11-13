@@ -34,6 +34,7 @@ const ALERT_LOOKAHEAD = 2;
 const BULLETS = ["•", "◦", "▪"];
 const LIST_OPEN = new Set(["bullet_list_open", "ordered_list_open"]);
 const LIST_CLOSE = new Set(["bullet_list_close", "ordered_list_close"]);
+const PARAGRAPH = new Set(["paragraph_open", "paragraph_close"]);
 
 const markerOf = (token: Token): string => String(token.meta?.marker ?? "");
 
@@ -226,16 +227,26 @@ const closing = (tokens: Token[], index: number): number => {
   return tokens.length;
 };
 
+const blockTightParagraphs = (tokens: Token[], level: number): Token[] => {
+  for (const token of tokens) {
+    if (!PARAGRAPH.has(token.type) || token.level !== level || !token.hidden) continue;
+    token.hidden = false;
+    token.tag = "div";
+  }
+  return tokens;
+};
+
 const listSegment = (open: Token, inner: Token[], flavor: MarkdownFlavor): Segment => {
   const items: ListItem[] = [];
   for (let at = 0; at < inner.length; at++) {
     const token = inner[at];
     if (token.type !== "list_item_open" || token.level !== open.level + 1) continue;
     const end = closing(inner, at);
+    const body = token.level + 1;
     items.push({
       marker: markerOf(token),
       className: String(token.attrGet("class") ?? ""),
-      children: fromTokens(inner.slice(at + 1, end), flavor, token.level + 1),
+      children: fromTokens(blockTightParagraphs(inner.slice(at + 1, end), body), flavor, body),
     });
     at = end;
   }

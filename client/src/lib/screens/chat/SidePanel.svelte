@@ -1,12 +1,12 @@
 <script lang="ts">
   import Eraser from "@lucide/svelte/icons/eraser";
-  import { tick } from "svelte";
   import { QUICK_CHAT_ICON } from "$lib/app/screens";
   import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { t } from "$lib/i18n/index.svelte";
   import PanelHandle from "$lib/ui/PanelHandle.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { BlockExpansion } from "./blockExpansion.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import MessageItem from "./blocks/MessageItem.svelte";
   import { cubicOut } from "svelte/easing";
@@ -99,21 +99,9 @@
   let follow = $state(true);
   let scroller = $state<ChatScroller | null>(null);
 
-  const expandedIds = $state<Record<number, boolean>>({});
+  const expansion = new BlockExpansion();
 
-  const anchorGrowth = async (grow: () => void) => {
-    const pinnedToEnd = scroller?.atBottom() ?? false;
-    grow();
-    if (!pinnedToEnd) return;
-    await tick();
-    follow = true;
-    scroller?.scrollToEnd();
-  };
-
-  const toggleExpanded = async (id: number) => {
-    if (await scroller?.collapsePinned(id, () => (expandedIds[id] = false))) return;
-    void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
-  };
+  const grow = (change: () => void) => void scroller?.grow(change);
 
   let lastPrompt: number | null = null;
   let exitFrom = 0;
@@ -188,9 +176,9 @@
             prevRole={messages[index - 1]?.role ?? null}
             nextRole={messages[index + 1]?.role ?? null}
             running={item.role === "working" && index === messages.length - 1 && streaming}
-            expanded={expandedIds[item.id] ?? false}
-            onToggle={() => toggleExpanded(item.id)}
-            onGrow={anchorGrowth}
+            expanded={expansion.isOpen(item.id)}
+            onToggle={() => scroller?.toggleBlock(item.id, expansion)}
+            onGrow={grow}
             {onAnswer}
             {component}
             onSuggest={index > lastUserAt ? onSuggest : null}

@@ -24,7 +24,7 @@ export interface MessagesPage {
   cache: PromptCache | null;
   requestBytes: number | null;
   mediaBytes: number | null;
-  prompts: string[] | null;
+  earlierPrompts: string[];
 }
 
 export interface RewindPoint {
@@ -84,7 +84,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       cache?: unknown;
       request_bytes?: number;
       media_bytes?: number;
-      prompts?: string[] | null;
+      earlier_prompts?: string[];
     }>(`/sessions/${sessionId}/messages`, {
       project,
       limit,
@@ -112,7 +112,7 @@ export const createSessionsApi = (http: HttpClient) => ({
       cache: promptCacheOf(data.cache),
       requestBytes: data.request_bytes ?? null,
       mediaBytes: data.media_bytes ?? null,
-      prompts: Array.isArray(data.prompts) ? data.prompts : null,
+      earlierPrompts: Array.isArray(data.earlier_prompts) ? data.earlier_prompts : [],
     };
   },
 

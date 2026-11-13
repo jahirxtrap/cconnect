@@ -2654,6 +2654,13 @@
             }
           ],
           "default": null
+        },
+        "earlier_prompts": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
         }
       },
       "required": [

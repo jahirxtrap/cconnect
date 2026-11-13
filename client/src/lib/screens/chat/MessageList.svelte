@@ -12,6 +12,7 @@
   import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { SharedMenuHandler } from "$lib/ui/menuSurface";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
+  import type { BlockExpansion } from "./blockExpansion.svelte";
   import ChatScroller from "./ChatScroller.svelte";
   import Collapsible from "./blocks/Collapsible.svelte";
   import ChatSeparator from "./blocks/ChatSeparator.svelte";
@@ -46,7 +47,7 @@
     onSharedMenu?: SharedMenuHandler | null;
     onSuggest?: SuggestionPicker | null;
     sessionId: string | null;
-    expandedIds: Record<number, boolean>;
+    expansion: BlockExpansion;
     savedTop: number;
     onScrollTop: (top: number) => void;
     component: import("svelte").Snippet<[InteractionData, (grow: () => void, anchor: HTMLElement | null) => void]>;
@@ -78,7 +79,7 @@
     onSharedMenu = null,
     onSuggest = null,
     sessionId,
-    expandedIds,
+    expansion,
     savedTop,
     onScrollTop,
     component,
@@ -247,27 +248,15 @@
     return `padding-top: ${top}; padding-bottom: ${bottom}`;
   };
 
-  const toggleGroup = (id: string) => void anchorGrowth(() => (openGroups[id] = !openGroups[id]));
-
   let scroller = $state<ChatScroller | null>(null);
   let lastId: number | null = null;
   let headId: number | null = null;
   let shownSession: string | null = untrack(() => sessionId);
   let heldFromEnd: number | null = null;
 
-  const anchorGrowth = async (grow: () => void) => {
-    const pinnedToEnd = scroller?.atBottom() ?? false;
-    grow();
-    if (!pinnedToEnd) return;
-    await tick();
-    follow = true;
-    scroller?.scrollToEnd();
-  };
+  const grow = (change: () => void) => void scroller?.grow(change);
 
-  const toggleExpanded = async (id: number) => {
-    if (await scroller?.collapsePinned(id, () => (expandedIds[id] = false))) return;
-    void anchorGrowth(() => (expandedIds[id] = !expandedIds[id]));
-  };
+  const toggleGroup = (id: string) => grow(() => (openGroups[id] = !openGroups[id]));
 
   const newDays = $derived.by(() => {
     const opened = new Set<number>();
@@ -324,7 +313,7 @@
 
   $effect(() => {
     void visible;
-    void expandedIds;
+    void expansion.open;
     scroller?.refreshHeader();
   });
 
@@ -347,9 +336,9 @@
     gluedTop={separated}
     spaced={spacedAt(index)}
     labelMode={modeFor(item.role) === "label"}
-    expanded={expandedIds[item.id] ?? false}
-    onToggle={() => toggleExpanded(item.id)}
-    onGrow={anchorGrowth}
+    expanded={expansion.isOpen(item.id)}
+    onToggle={() => scroller?.toggleBlock(item.id, expansion)}
+    onGrow={grow}
     {onAnswer}
     {onSharedLink}
     {onSharedMenu}

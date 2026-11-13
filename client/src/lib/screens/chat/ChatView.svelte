@@ -185,6 +185,7 @@
     if (!canAttach || dialogOpen) return;
     event.preventDefault();
     chat.addAttachments(files);
+    composer?.focusEnd();
   };
 
   $effect(() => {
@@ -519,7 +520,7 @@
   class="relative isolate flex min-h-0 flex-1 flex-col"
 >
   {#if chatBackground.current !== NO_BACKGROUND}
-    <ChatBackdrop id={chatBackground.current} effects={chatBackground.effects} class="-z-10" />
+    <ChatBackdrop id={chatBackground.current} effects={chatBackground.effects} class="-z-10 behind-keyboard" />
   {/if}
   <DropOverlay />
   <div class="relative min-h-0 flex-1 overflow-hidden">
@@ -565,7 +566,7 @@
           replies={replyCommands}
           {repliesBusy}
           mods={chat.mods}
-          expandedIds={chat.expandedIds}
+          expansion={chat.expansion}
           savedTop={chat.scrollTop}
           onScrollTop={(top) => (chat.scrollTop = top)}
           {component}

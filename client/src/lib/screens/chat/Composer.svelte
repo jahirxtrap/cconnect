@@ -216,6 +216,25 @@
     return true;
   };
 
+  let sendButton = $state<HTMLButtonElement | null>(null);
+  let earlier = $state<string[]>([]);
+  let earlierOpen = $state(false);
+
+  const newestFirst = $derived(earlier.map((text, index) => ({ text, index })).reverse());
+
+  const openEarlier = (event: MouseEvent) => {
+    event.preventDefault();
+    earlier = history();
+    earlierOpen = earlier.length > 0;
+  };
+
+  const pickEarlier = (index: number) => {
+    if (recalledAt < 0) savedDraft = draft;
+    recalled = earlier;
+    recall(index);
+    focusEnd();
+  };
+
   let dismissed = $state(false);
   let highlighted = $state(0);
   let preview = $state<{ from: string; shown: string } | null>(null);
@@ -239,6 +258,12 @@
   export const caret = (): number => field?.selectionStart ?? draft.length;
 
   export const holdsKeys = (): boolean => !!field && document.activeElement === field;
+
+  export const focusEnd = () => {
+    if (!field) return;
+    field.focus();
+    field.setSelectionRange(field.value.length, field.value.length);
+  };
 
   export const adopt = (text: string, cursor: number) => {
     offer(text);
@@ -483,9 +508,8 @@
   };
 
   const focusField = (event: MouseEvent) => {
-    if (!field || (event.target as HTMLElement).closest("button, a, input, textarea")) return;
-    field.focus();
-    field.setSelectionRange(field.value.length, field.value.length);
+    if ((event.target as HTMLElement).closest("button, a, input, textarea")) return;
+    focusEnd();
   };
 
   const ondragenter = (event: DragEvent) => {
@@ -709,16 +733,31 @@
           <StopButton onclick={onInterrupt} />
         {/if}
         <button
+          bind:this={sendButton}
           type="button"
-          disabled={!canSubmit}
+          aria-disabled={!canSubmit}
           use:keepFocus
           onclick={submit}
+          oncontextmenu={openEarlier}
           aria-label={t("SEND")}
           title={t("SEND")}
-          class="{ROUND_BUTTON_CLASS} {canSubmit ? 'bg-accent text-on-accent' : 'bg-surface-variant text-faint'} disabled:cursor-default"
+          class="{ROUND_BUTTON_CLASS} {canSubmit
+            ? 'bg-accent text-on-accent'
+            : 'bg-surface-variant text-faint'} aria-disabled:cursor-default"
         >
           <ArrowUp size={ROUND_ICON_SIZE} />
         </button>
+        <PopupMenu
+          open={earlierOpen}
+          onOpenChange={(open) => (earlierOpen = open)}
+          anchor={sendButton}
+          side="top"
+          align="end"
+        >
+          {#each newestFirst as entry (entry.index)}
+            <MenuItem text={entry.text} onclick={() => pickEarlier(entry.index)} />
+          {/each}
+        </PopupMenu>
       </div>
     </div>
   </div>

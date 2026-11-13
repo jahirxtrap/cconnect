@@ -175,6 +175,7 @@ import {
 import type { SharedFile } from "$lib/app/dragPayload.svelte";
 import { uploadAttachment, UPLOAD_DIR } from "$lib/services/uploadApi";
 import { ModSurface } from "$lib/screens/mods/modSurface.svelte";
+import { BlockExpansion } from "./blockExpansion.svelte";
 
 const DEFAULTS = {
   permissionMode: "bypassPermissions",
@@ -210,7 +211,6 @@ const optionNotificationLabel = (option: InteractionOption): string | null => {
 };
 const MESSAGE_TAIL_CAP = 500;
 const MESSAGE_INITIAL_CAP = 100;
-const HISTORY_LIMIT = 100;
 
 
 interface AttachmentBase {
@@ -363,7 +363,7 @@ export class ChatState {
   transcriptLoading = $state(false);
   transcriptPaging = $state(false);
   scrollTop = $state(0);
-  expandedIds = $state<Record<number, boolean>>({});
+  readonly expansion = new BlockExpansion();
   transcriptExhausted = $state(false);
   earlierCompaction = $state<string | null>(null);
   #segment: string | null = null;
@@ -525,7 +525,7 @@ export class ChatState {
   #opening = 0;
   #loads = 0;
   #reloads = 0;
-  #history: string[] = [];
+  #earlierPrompts: string[] = [];
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
   #attaching = false;
@@ -696,13 +696,14 @@ export class ChatState {
   }
 
   userHistory(): string[] {
-    return this.#history;
-  }
-
-  #rememberPrompt(text: string) {
-    const body = text.trim();
-    if (!body || body === this.#history[this.#history.length - 1]) return;
-    this.#history = [...this.#history, body].slice(-HISTORY_LIMIT);
+    const sent = [
+      ...this.#earlierPrompts,
+      ...this.messages.filter((item) => item.role === "user").map((item) => item.text),
+      ...this.queue.map((item) => item.text),
+    ];
+    return sent
+      .map((text) => text.trim())
+      .reduce<string[]>((kept, text) => (text && text !== kept[kept.length - 1] ? [...kept, text] : kept), []);
   }
 
   submit(text: string) {
@@ -769,7 +770,6 @@ export class ChatState {
     this.attachments = [];
     this.elements = [];
     if (channel !== null && channel !== this.#socket.channel) {
-      this.#rememberPrompt(body);
       this.#describeAgent();
       this.#socket.sendPrompt(body, uploaded, this.#nextOutgoingId(), channel);
       return;
@@ -792,8 +792,6 @@ export class ChatState {
       this.#optimisticMessageId = null;
       this.queue = this.queue.filter((item) => item.uploading);
     }
-
-    this.#rememberPrompt(body);
 
     const silent = !this.streaming && !this.queue.length && !this.#sent.size;
     const id = this.#nextOutgoingId();
@@ -1215,7 +1213,12 @@ export class ChatState {
     this.#segment = segment;
   }
 
-  #prependPage(page: Pick<MessagesPage, "items" | "startIndex" | "hasMore" | "earlier">, until: string | null, sessionId: string, projectKey: string | null) {
+  #prependPage(
+    page: Pick<MessagesPage, "items" | "startIndex" | "hasMore" | "earlier" | "earlierPrompts">,
+    until: string | null,
+    sessionId: string,
+    projectKey: string | null,
+  ) {
     const older = page.items.filter(isVisible);
     const prepended = this.#nest(
       older.map((item, index) => this.#fromSession(item, this.#nextId + index, sessionId, projectKey, until)),
@@ -1223,6 +1226,7 @@ export class ChatState {
     this.#nextId += older.length;
     const kept = until === null && prepended.some((item) => item.role === "compact") ? withoutLiveCompact(this.messages) : this.messages;
     this.messages = [...prepended, ...kept];
+    this.#earlierPrompts = page.earlierPrompts;
     this.#setPaging(page.startIndex, !page.hasMore, page.earlier, until);
   }
 
@@ -1733,7 +1737,7 @@ export class ChatState {
       visible.map((message, index) => this.#fromSession(message, index, item.sessionId, item.projectKey)),
     );
     this.#nextId = visible.length;
-    this.expandedIds = {};
+    this.expansion.clear();
     this.#setPaging(page && page.items.length ? page.startIndex : null, !page?.hasMore, page?.earlier ?? null, null);
     this.contextTokens = page?.contextTokens ?? null;
     this.promptCache = page?.cache ?? null;
@@ -2015,8 +2019,8 @@ export class ChatState {
     this.mods.showTranscript(null);
     this.messages = [];
     this.#held = [];
-    this.#history = [];
-    this.expandedIds = {};
+    this.#earlierPrompts = [];
+    this.expansion.clear();
     this.todos = [];
     this.queue = [];
     this.contextTokens = null;
@@ -2052,7 +2056,7 @@ export class ChatState {
       visible.map((item, index) => this.#fromSession(item, index, session.sessionId, project)),
     );
     this.#nextId = visible.length;
-    this.expandedIds = {};
+    this.expansion.clear();
     this.#breakStream();
     this.#optimisticChipId = null;
     this.#optimisticMessageId = null;
@@ -2080,7 +2084,7 @@ export class ChatState {
     this.promptCache = page.cache;
     this.requestBytes = page.requestBytes;
     this.mediaBytes = page.mediaBytes;
-    if (page.prompts) this.#history = page.prompts;
+    this.#earlierPrompts = page.earlierPrompts;
     return true;
   }
 
@@ -2111,7 +2115,7 @@ export class ChatState {
     const visible = page.items.filter(isVisible);
     const loaded = this.#nest(visible.map((item, index) => this.#fromSession(item, index, sessionId, project)));
     this.#nextId = visible.length;
-    this.expandedIds = {};
+    this.expansion.clear();
     if (!keepLive) {
       this.#breakStream();
     }
@@ -2136,7 +2140,7 @@ export class ChatState {
     this.transcriptPaging = false;
     this.pendingToolIds = [];
     this.backgroundTasks = [];
-    if (page.prompts) this.#history = page.prompts;
+    this.#earlierPrompts = page.earlierPrompts;
   }
 
   #imageUrls(item: SessionMessage, sessionId: string, projectKey: string | null): string[] | null {
@@ -2340,7 +2344,10 @@ export class ChatState {
     }
   }
 
-  #onHistoryChunk(sessionId: string, page: Pick<MessagesPage, "items" | "startIndex" | "hasMore" | "earlier">) {
+  #onHistoryChunk(
+    sessionId: string,
+    page: Pick<MessagesPage, "items" | "startIndex" | "hasMore" | "earlier" | "earlierPrompts">,
+  ) {
     if (!this.transcriptPaging) return;
     this.transcriptLoading = false;
     this.transcriptPaging = false;
@@ -2754,7 +2761,7 @@ export class ChatState {
         );
         this.#nextId = visible.length;
         this.#breakStream();
-        this.expandedIds = {};
+        this.expansion.clear();
         this.#setPaging(event.startIndex, !event.hasMore, null, null);
         this.transcriptPaging = false;
         this.transcriptLoading = this.#awaitingHistory();
@@ -2773,7 +2780,7 @@ export class ChatState {
         this.#breakStream();
         this.messages = [newMessage(this.#nextId++, "compact", { compact: compactOf(event) })];
         this.compacting = false;
-        this.#history = [];
+        this.#earlierPrompts = [];
         this.#setPaging(0, true, event.earlier, null);
         this.transcriptPaging = false;
         break;
@@ -2810,6 +2817,7 @@ export class ChatState {
           startIndex: event.startIndex,
           hasMore: event.hasMore,
           earlier: event.earlier,
+          earlierPrompts: event.earlierPrompts,
         });
         break;
       case "context":

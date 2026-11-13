@@ -396,4 +396,5 @@ def get_session_messages(
         "request_bytes": weight[0],
         "media_bytes": weight[1],
         "prompts": None if before_index is not None or until else sessions_service.user_prompts(items),
+        "earlier_prompts": sessions_service.user_prompts(items[:start]),
     })
