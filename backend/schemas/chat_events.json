@@ -850,6 +850,21 @@
             }
           ],
           "default": null
+        },
+        "resume": {
+          "anyOf": [
+            {
+              "enum": [
+                "continue",
+                "retry"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [

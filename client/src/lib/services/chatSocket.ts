@@ -21,6 +21,7 @@ import {
   type QueryCall,
   type QueryStatement,
   type QueuedMessage,
+  type Resume,
   type SharedFile,
   type TodoItem,
 } from "$lib/data/chatModels";
@@ -184,7 +185,7 @@ export type ServerEvent =
   | { type: "interrupted" }
   | { type: "attached" }
   | { type: "error"; message: string }
-  | { type: "api_error"; message: string; severity: string | null }
+  | { type: "api_error"; message: string; severity: string | null; resume: Resume | null }
   | { type: "closed"; reason: string }
   | { type: "queued"; id: string | null; text: string; replay: boolean }
   | { type: "queue"; items: QueuedMessage[] }
@@ -1065,7 +1066,12 @@ export class ChatSocket {
       case "error":
         return { type: "error", message: event.message ?? "error" };
       case "api_error":
-        return { type: "api_error", message: event.text ?? "", severity: event.severity ?? null };
+        return {
+          type: "api_error",
+          message: event.text ?? "",
+          severity: event.severity ?? null,
+          resume: event.resume ?? null,
+        };
       case "tail":
         return { type: "tail", items: event.items ?? [] };
       case "history_chunk":

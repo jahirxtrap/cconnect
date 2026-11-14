@@ -78,6 +78,7 @@
     <ConversationRow
       {sortable}
       title={sessionLabel(session)}
+      sessionId={session.sessionId}
       selected={navigation.route === "/" && session.sessionId === chat.sessionId}
       color={sessionColorOf(session.color) ?? null}
       onOpen={() => {

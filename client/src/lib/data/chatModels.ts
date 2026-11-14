@@ -246,6 +246,13 @@ export interface InteractionMod {
   drawn: ModDrawn;
 }
 
+const RESUMES = ["continue", "retry"] as const;
+
+export type Resume = (typeof RESUMES)[number];
+
+export const resumeOf = (value: unknown): Resume | null =>
+  RESUMES.find((resume) => resume === value) ?? null;
+
 export interface ChatMessage {
   id: number;
   role: Role;
@@ -270,6 +277,7 @@ export interface ChatMessage {
   sourceIndex: number;
   labelOnly: boolean;
   result: string | null;
+  resume: Resume | null;
   ephemeral: boolean;
   attachments: string[] | null;
   images: string[] | null;
@@ -517,6 +525,7 @@ export const message = (id: number, role: Role, patch: Partial<ChatMessage> = {}
   sourceIndex: -1,
   labelOnly: false,
   result: null,
+  resume: null,
   ephemeral: false,
   attachments: null,
   images: null,

@@ -52,6 +52,7 @@
       <ConversationRow
         {sortable}
         title={sessionTitle(session)}
+        sessionId={session.sessionId}
         selected={session.sessionId === chat.sessionId}
         activity={session.activity}
         onOpen={() => list.open(session)}

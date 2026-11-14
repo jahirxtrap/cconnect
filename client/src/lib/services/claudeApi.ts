@@ -14,6 +14,7 @@ export interface Plugin {
   mod: boolean;
   options: boolean;
   local: boolean;
+  icon: string | null;
 }
 
 export const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
@@ -80,6 +81,7 @@ export interface McpServer {
   source: string;
   oauth: boolean;
   signedIn: string[];
+  icon: string | null;
 }
 
 export interface Hook {
@@ -244,6 +246,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
           mod: item.mod === true,
           options: item.options === true,
           local: item.local === true,
+          icon: item.icon ?? null,
         })),
       marketplaces: (data.marketplaces ?? [])
         .filter((item: Wire) => item.name)
@@ -346,7 +349,20 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
         source: item.source || MCP_USER_SOURCE,
         oauth: item.oauth === true,
         signedIn: Array.isArray(item.signed_in) ? item.signed_in : [],
+        icon: item.icon ?? null,
       }));
+  },
+
+  pluginIconUrl(plugin: Plugin): string | null {
+    if (!plugin.icon) return null;
+    const query = new URLSearchParams({ plugin: pluginKey(plugin), v: plugin.icon });
+    return `${baseUrlOf(profile())}/claude/plugins/icon?${query}`;
+  },
+
+  mcpIconUrl(server: McpServer, cwd: string | null): string | null {
+    if (!server.icon) return null;
+    const query = new URLSearchParams({ name: server.name, v: server.icon, ...(cwd ? { cwd } : {}) });
+    return `${baseUrlOf(profile())}/claude/mcp/icon?${query}`;
   },
 
   async hooks(cwd: string | null = null): Promise<Hook[] | null> {

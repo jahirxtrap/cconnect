@@ -19,6 +19,7 @@
     onDismiss: () => void;
     subtitle?: string | null;
     description?: string | null;
+    titleLeading?: Snippet;
     titleTrailing?: Snippet;
     header?: Snippet;
     buttons?: Snippet;
@@ -31,6 +32,7 @@
     onDismiss,
     subtitle,
     description,
+    titleLeading,
     titleTrailing,
     header,
     buttons,
@@ -51,7 +53,8 @@
       onOpenAutoFocus={(event) => event.preventDefault()}
       class="{DIALOG_SURFACE_CLASS} safe-inset fixed z-60 m-auto flex h-max max-h-(--dialog-max-height) w-[min(42rem,calc(100vw-2rem))] flex-col p-5"
     >
-      <div class="flex items-center">
+      <div class="flex items-center {titleLeading ? 'gap-3' : ''}">
+        {@render titleLeading?.()}
         <div class="min-w-0 flex-1">
           <Dialog.Title class="truncate text-dialog-title">{title}</Dialog.Title>
           {#if subtitle}

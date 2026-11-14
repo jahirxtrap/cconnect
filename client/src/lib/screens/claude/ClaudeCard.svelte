@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts">
+  import type { Snippet } from "svelte";
   import { t } from "$lib/i18n/index.svelte";
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import { REPAINT_EDGE_CLASS } from "$lib/ui/field";
@@ -15,6 +16,7 @@
     source?: string | null;
     description?: string | null;
     selected?: boolean;
+    leading?: Snippet;
     onclick: () => void;
   }
 
@@ -25,11 +27,12 @@
     source = null,
     description = null,
     selected = false,
+    leading,
     onclick,
   }: Props = $props();
 </script>
 
-<CardPanel {onclick} class="min-w-0 gap-1.5 {REPAINT_EDGE_CLASS} {selected ? 'ring-(length:--hairline) ring-accent-ring ring-inset' : ''}">
+{#snippet body()}
   <span class="flex min-w-0 items-center gap-2">
     <span class="min-w-0 truncate text-label-lg">{title}</span>
     {#if tag}
@@ -47,5 +50,18 @@
   {/if}
   {#if description}
     <span class="line-clamp-2 wrap-anywhere text-body-sm text-on-surface-variant">{description}</span>
+  {/if}
+{/snippet}
+
+<CardPanel {onclick} class="min-w-0 gap-1.5 {REPAINT_EDGE_CLASS} {selected ? 'ring-(length:--hairline) ring-accent-ring ring-inset' : ''}">
+  {#if leading}
+    <span class="flex min-w-0 items-center gap-3">
+      {@render leading()}
+      <span class="flex min-w-0 flex-1 flex-col gap-1.5">
+        {@render body()}
+      </span>
+    </span>
+  {:else}
+    {@render body()}
   {/if}
 </CardPanel>

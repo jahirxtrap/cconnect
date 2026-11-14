@@ -135,6 +135,7 @@
   import CardPanel from "$lib/ui/CardPanel.svelte";
   import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import SelectChip from "$lib/ui/SelectChip.svelte";
+  import ServedIconTile from "$lib/ui/ServedIconTile.svelte";
   import ClaudeCard, { TAG_CLASS } from "./ClaudeCard.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -882,7 +883,11 @@
                   description={plugin.description}
                   selected={sidePanel && !!pluginMenu && pluginKey(pluginMenu) === pluginKey(plugin)}
                   onclick={() => (pluginMenu = plugin)}
-                />
+                >
+                  {#snippet leading()}
+                    {@render pluginIcon(plugin)}
+                  {/snippet}
+                </ClaudeCard>
               {/each}
             {:else if kind === "skills"}
               {#each filteredSkills as skill (skillKey(skill))}
@@ -905,7 +910,11 @@
                   description={server.detail}
                   selected={sidePanel && !!mcpMenu && mcpKey(mcpMenu) === mcpKey(server)}
                   onclick={() => (mcpMenu = server)}
-                />
+                >
+                  {#snippet leading()}
+                    {@render mcpIcon(server)}
+                  {/snippet}
+                </ClaudeCard>
               {/each}
             {:else if kind === "hooks"}
               {#each filteredHooks as hook}
@@ -946,6 +955,11 @@
             <ScrollCard frame="flex-1 rounded-panel" class="scrollbar-thin">
               <div class="flex min-h-full flex-col gap-3.5 px-2.5 py-2">
                 <div class="flex items-center gap-2.5">
+                  {#if kind === "plugins" && pluginMenu}
+                    {@render pluginIcon(pluginMenu)}
+                  {:else if kind === "mcp" && mcpMenu}
+                    {@render mcpIcon(mcpMenu)}
+                  {/if}
                   <p class="min-w-0 truncate text-title-lg">{panelTitle}</p>
                   {#if kind === "plugins" && pluginMenu}
                     {#if pluginMenu.mod}
@@ -1089,6 +1103,14 @@
   />
 {/snippet}
 
+{#snippet pluginIcon(plugin: Plugin)}
+  <ServedIconTile url={claudeApi.pluginIconUrl(plugin)} icon={CLAUDE_ICONS.plugins} />
+{/snippet}
+
+{#snippet mcpIcon(server: McpServer)}
+  <ServedIconTile url={claudeApi.mcpIconUrl(server, chat.workingPath)} icon={CLAUDE_ICONS.mcp} />
+{/snippet}
+
 {#snippet pluginBody(plugin: Plugin)}
   {#if plugin.mod && !pluginReview}
     <CenteredProgress class="py-6" />
@@ -1143,6 +1165,9 @@
 {#if pluginMenu && !sidePanel}
   {@const plugin = pluginMenu}
   <CompactDialog title={plugin.name} onDismiss={() => { cancelAction(); pluginMenu = null; }}>
+    {#snippet titleLeading()}
+      {@render pluginIcon(plugin)}
+    {/snippet}
     {#snippet titleTrailing()}
       {@render pluginSwitch(plugin)}
     {/snippet}
@@ -1511,6 +1536,9 @@
 {#if mcpMenu && !sidePanel}
   {@const server = mcpMenu}
   <CompactDialog title={server.label} onDismiss={() => { cancelAction(); mcpMenu = null; }}>
+    {#snippet titleLeading()}
+      {@render mcpIcon(server)}
+    {/snippet}
     {#snippet titleTrailing()}
       {@render mcpSwitch(server)}
     {/snippet}

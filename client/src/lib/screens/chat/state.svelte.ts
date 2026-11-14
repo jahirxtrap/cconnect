@@ -2181,6 +2181,7 @@ export class ChatState {
         sourceIndex: item.index,
         labelOnly: item.labelOnly,
         result: item.result,
+        resume: item.resume,
         images: this.#imageUrls(item, sessionId, projectKey),
         timestamp: item.timestamp,
         uuid: item.uuid,
@@ -2908,7 +2909,9 @@ export class ChatState {
       case "api_error":
         this.#breakStream();
         this.streamStatus = null;
-        this.#append(newMessage(this.#nextId++, "api_error", { text: event.message, result: event.severity }));
+        this.#append(
+          newMessage(this.#nextId++, "api_error", { text: event.message, result: event.severity, resume: event.resume }),
+        );
         break;
       case "interaction_request":
         if (!this.messages.some((item) => item.interaction?.requestId === event.requestId)) {

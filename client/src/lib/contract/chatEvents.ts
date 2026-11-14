@@ -891,6 +891,7 @@ export interface ApiError {
   type: "api_error";
   text: string;
   severity?: string | null;
+  resume?: ("continue" | "retry") | null;
 }
 export interface Queued {
   seq?: number | null;

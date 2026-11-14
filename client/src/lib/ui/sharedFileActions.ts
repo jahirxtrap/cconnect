@@ -1,6 +1,6 @@
 import AtSign from "@lucide/svelte/icons/at-sign";
-import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
 import Copy from "@lucide/svelte/icons/copy";
+import CopyPlus from "@lucide/svelte/icons/copy-plus";
 import Download from "@lucide/svelte/icons/download";
 import ExternalLink from "@lucide/svelte/icons/external-link";
 import Eye from "@lucide/svelte/icons/eye";
@@ -65,7 +65,7 @@ export const FILE_ACTION_LOOK: Record<FileActionId, { label: string; icon: IconS
   rename: { label: "RENAME", icon: Pencil },
   move: { label: "MOVE", icon: FolderInput },
   copy: { label: "COPY", icon: Copy },
-  duplicate: { label: "DUPLICATE", icon: Copy },
+  duplicate: { label: "DUPLICATE", icon: CopyPlus },
   compress: { label: "COMPRESS", icon: FolderArchive },
   save: { label: "SAVE", icon: Download },
   saveAs: { label: "SAVE_AS", icon: Save },
@@ -73,7 +73,7 @@ export const FILE_ACTION_LOOK: Record<FileActionId, { label: string; icon: IconS
   attach: { label: "ATTACH_TO_CHAT", icon: Paperclip },
   mention: { label: "MENTION_IN_CHAT", icon: AtSign },
   link: { label: "LINK_TO_SHARED", icon: Link2 },
-  copyPath: { label: "COPY_PATH", icon: ClipboardCopy },
+  copyPath: { label: "COPY_PATH", icon: Copy },
   delete: { label: "DELETE", icon: Trash },
 };
 

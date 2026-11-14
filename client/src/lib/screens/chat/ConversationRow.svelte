@@ -1,5 +1,6 @@
 <script lang="ts">
   import AppWindow from "@lucide/svelte/icons/app-window";
+  import Copy from "@lucide/svelte/icons/copy";
   import FolderInput from "@lucide/svelte/icons/folder-input";
   import GitFork from "@lucide/svelte/icons/git-fork";
   import Palette from "@lucide/svelte/icons/palette";
@@ -11,6 +12,7 @@
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { isBusyActivity, isPersistentSession, projectLabel, type ChatCategory, type ProjectInfo } from "$lib/data/models";
   import { t } from "$lib/i18n/index.svelte";
+  import { copyText } from "$lib/platform/clipboard";
   import MenuItem from "$lib/ui/MenuItem.svelte";
   import MenuSub from "$lib/ui/MenuSub.svelte";
   import Pressable from "$lib/ui/Pressable.svelte";
@@ -19,6 +21,7 @@
 
   interface Props {
     title: string;
+    sessionId: string;
     selected: boolean;
     color?: string | null;
     activity?: string | null;
@@ -44,6 +47,7 @@
 
   const {
     title,
+    sessionId,
     selected,
     color = null,
     activity = null,
@@ -69,11 +73,7 @@
 
   const busy = $derived(isBusyActivity(activity));
 
-  const actionable = $derived(
-    [onRename, onAutoRename, onColor, onOpenNewTab, onOpenRight, onFork, onMove, onPlace, onDelete].some(Boolean),
-  );
-
-  const holdMenu = $derived(sortable || !actionable ? undefined : () => (menu = true));
+  const holdMenu = $derived(sortable ? undefined : () => (menu = true));
 
   const SPINNERS: Record<string, string> = {
     renaming: "text-purple",
@@ -104,7 +104,7 @@
   onpointerdown={(event) => (pointer = event.pointerType)}
   oncontextmenu={(event) => {
     event.preventDefault();
-    if (pointer === "touch" || !actionable) return;
+    if (pointer === "touch") return;
     menu = true;
   }}
   role="presentation"
@@ -130,65 +130,64 @@
   >
     {title}
   </Pressable>
-  {#if actionable}
-    <RowMenu open={menu} onOpenChange={(value) => (menu = value)} shown={selected}>
-      {#if onRename}
-        <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => run(onRename)} />
-      {/if}
-      {#if onAutoRename}
-        <MenuItem icon={Sparkles} text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
-      {/if}
-      {#if onColor}
-        <MenuItem icon={Palette} text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
-      {/if}
-      {#if onOpenNewTab}
-        <MenuItem icon={AppWindow} text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
-      {/if}
-      {#if onOpenRight}
-        <MenuItem icon={PanelRight} text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
-      {/if}
-      {#if onFork}
-        <MenuItem icon={GitFork} text={t("CHAT_FORK")} enabled={!busy} onclick={() => run(onFork)} />
-      {/if}
-      {#if onPlace}
-        <MenuSub icon={Tag} text={t("CATEGORY")}>
-          {#snippet footer()}
-            <MenuItem icon={Plus} text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)} />
-          {/snippet}
-          {#if categories.length}
+  <RowMenu open={menu} onOpenChange={(value) => (menu = value)} shown={selected}>
+    {#if onRename}
+      <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => run(onRename)} />
+    {/if}
+    {#if onAutoRename}
+      <MenuItem icon={Sparkles} text={t("AUTO_RENAME")} onclick={() => run(onAutoRename)} />
+    {/if}
+    {#if onColor}
+      <MenuItem icon={Palette} text={t("CONVERSATION_COLOR")} onclick={() => run(onColor)} />
+    {/if}
+    {#if onOpenNewTab}
+      <MenuItem icon={AppWindow} text={t("OPEN_IN_NEW_TAB")} onclick={() => run(onOpenNewTab)} />
+    {/if}
+    {#if onOpenRight}
+      <MenuItem icon={PanelRight} text={t("OPEN_IN_RIGHT_PANE")} onclick={() => run(onOpenRight)} />
+    {/if}
+    {#if onFork}
+      <MenuItem icon={GitFork} text={t("CHAT_FORK")} enabled={!busy} onclick={() => run(onFork)} />
+    {/if}
+    {#if onPlace}
+      <MenuSub icon={Tag} text={t("CATEGORY")}>
+        {#snippet footer()}
+          <MenuItem icon={Plus} text={t("ADD_CATEGORY")} onclick={() => run(onNewCategory)} />
+        {/snippet}
+        {#if categories.length}
+          <MenuItem
+            text={t("NO_CATEGORY")}
+            selected={currentCategoryId === null}
+            onclick={() => run(() => onPlace(null))}
+          />
+          {#each categories as category (category.id)}
             <MenuItem
-              text={t("NO_CATEGORY")}
-              selected={currentCategoryId === null}
-              onclick={() => run(() => onPlace(null))}
-            />
-            {#each categories as category (category.id)}
-              <MenuItem
-                text={category.name}
-                selected={currentCategoryId === category.id}
-                onclick={() => run(() => onPlace(category.id))}
-              />
-            {/each}
-          {/if}
-        </MenuSub>
-      {/if}
-      {#if onMove}
-        <MenuSub icon={FolderInput} text={t("PROJECT")} enabled={!busy}>
-          {#snippet footer()}
-            <MenuItem icon={Plus} text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))} />
-          {/snippet}
-          {#each projects as project (project.projectKey)}
-            {@const current = project.projectKey === currentProjectKey}
-            <MenuItem
-              text={projectLabel(project)}
-              selected={current}
-              onclick={() => run(() => (current || !project.path ? undefined : onMove(project.path)))}
+              text={category.name}
+              selected={currentCategoryId === category.id}
+              onclick={() => run(() => onPlace(category.id))}
             />
           {/each}
-        </MenuSub>
-      {/if}
-      {#if onDelete}
-        <MenuItem icon={Trash2} danger text={t(trash ? "TRASH" : "DELETE")} onclick={() => run(onDelete)} />
-      {/if}
-    </RowMenu>
-  {/if}
+        {/if}
+      </MenuSub>
+    {/if}
+    {#if onMove}
+      <MenuSub icon={FolderInput} text={t("PROJECT")} enabled={!busy}>
+        {#snippet footer()}
+          <MenuItem icon={Plus} text={t("ADD_PROJECT")} onclick={() => run(() => onMove(null))} />
+        {/snippet}
+        {#each projects as project (project.projectKey)}
+          {@const current = project.projectKey === currentProjectKey}
+          <MenuItem
+            text={projectLabel(project)}
+            selected={current}
+            onclick={() => run(() => (current || !project.path ? undefined : onMove(project.path)))}
+          />
+        {/each}
+      </MenuSub>
+    {/if}
+    <MenuItem icon={Copy} text={t("COPY_SESSION_ID")} onclick={() => run(() => void copyText(sessionId))} />
+    {#if onDelete}
+      <MenuItem icon={Trash2} danger text={t(trash ? "TRASH" : "DELETE")} onclick={() => run(onDelete)} />
+    {/if}
+  </RowMenu>
 </div>

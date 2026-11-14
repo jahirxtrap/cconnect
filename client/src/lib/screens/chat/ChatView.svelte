@@ -13,7 +13,7 @@
   import { screenFor } from "$lib/app/screens";
   import { isEditing } from "$lib/data/paneFocus.svelte";
   import { agentUp } from "$lib/data/agentModels";
-  import { type ChatMessage, type GalleryFile, type InteractionData } from "$lib/data/chatModels";
+  import { type ChatMessage, type GalleryFile, type InteractionData, type Resume } from "$lib/data/chatModels";
   import { isArchive } from "$lib/data/format";
   import { liveLimits } from "$lib/data/liveLimits.svelte";
   import { projectNameOf, sessionIdPreview } from "$lib/data/models";
@@ -57,6 +57,7 @@
   import { chatBackground } from "$lib/data/chatBackground.svelte";
   import { NO_BACKGROUND } from "$lib/design/backgrounds";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
+  import { RESUME_LOOK } from "./blocks/resume";
   import AgentStatusCard from "./AgentStatusCard.svelte";
   import AgentToolbar from "./AgentToolbar.svelte";
   import ChatBackdrop from "./ChatBackdrop.svelte";
@@ -262,6 +263,10 @@
   );
 
   const repliesBusy = $derived(!idle || running);
+
+  const resumeTurn = $derived(
+    idle && !blocked && !chat.viewOnly ? (resume: Resume) => chat.submitText(t(RESUME_LOOK[resume].prompt)) : null,
+  );
   const chatsWindow = $derived(
     !panes.historyInList(pane) &&
       (!chat.agent || (!!chat.agentState && (chat.agentState.sessions.load || chat.agentState.sessions.resume))),
@@ -565,6 +570,7 @@
           timestamps={!chat.agent}
           replies={replyCommands}
           {repliesBusy}
+          onResume={resumeTurn}
           mods={chat.mods}
           expansion={chat.expansion}
           savedTop={chat.scrollTop}

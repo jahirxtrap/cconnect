@@ -8,7 +8,7 @@
   import SquareMousePointer from "@lucide/svelte/icons/square-mouse-pointer";
   import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
   import type { Snippet } from "svelte";
-  import type { ChatMessage, InteractionData, Role } from "$lib/data/chatModels";
+  import type { ChatMessage, InteractionData, Resume, Role } from "$lib/data/chatModels";
   import { formatTokens } from "$lib/data/format";
   import { fileIcon } from "$lib/ui/fileIcons";
   import type { SharedMenuHandler } from "$lib/ui/menuSurface";
@@ -44,6 +44,8 @@
   import SessionFacts from "./SessionFacts.svelte";
   import ToolBlock from "./ToolBlock.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./gaps";
+  import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import { RESUME_LOOK } from "./resume";
   import { rowSite } from "./rowSite";
   import { TINT_CLASS } from "./tint";
 
@@ -67,6 +69,7 @@
     mods?: ModSurface | null;
     timestamps?: boolean;
     reply?: ReplyHandlers | null;
+    onResume?: ((resume: Resume) => void) | null;
   }
 
   const SPINNER_ID = "spinner";
@@ -91,7 +94,12 @@
     mods = null,
     timestamps = true,
     reply = null,
+    onResume = null,
   }: Props = $props();
+
+  const resume = $derived(
+    onResume ? (message.role === "interrupted" ? "continue" : message.role === "api_error" ? message.resume : null) : null,
+  );
 
   const server = contextServer();
 
@@ -103,6 +111,18 @@
   );
   const bottom = $derived(nested ? NO_GAP : gapBelow(nextRole));
 </script>
+
+{#snippet resumeButton(color: string)}
+  {#if resume && onResume}
+    {@const kind = resume}
+    {@const look = RESUME_LOOK[kind]}
+    <span class="flex shrink-0 self-center {color}">
+      <TooltipIconButton label={t(look.label)} inheritColor class="size-7" onclick={() => onResume(kind)}>
+        <look.icon />
+      </TooltipIconButton>
+    </span>
+  {/if}
+{/snippet}
 
 {#snippet working(props: Record<string, unknown>)}
   <Collapsible
@@ -487,9 +507,10 @@
     {@const warning = message.result === "warning"}
     {@const color = warning ? "text-orange" : "text-red"}
     <div class="w-full px-(--page-inset)">
-      <div class="flex items-start gap-2 rounded-panel px-2.5 py-1.5 {TINT_CLASS[warning ? 'orange' : 'red']}">
-        <span class="flex h-5 shrink-0 items-center"><TriangleAlert size={14} class={color} /></span>
-        <p class="min-w-0 flex-1 text-block wrap-anywhere whitespace-pre-wrap {color}">{message.text}</p>
+      <div class="flex gap-2 rounded-panel pl-2.5 {resume ? 'pr-1' : 'pr-2.5'} {TINT_CLASS[warning ? 'orange' : 'red']}">
+        <span class="flex h-8 shrink-0 items-center"><TriangleAlert size={14} class={color} /></span>
+        <p class="min-w-0 flex-1 py-1.5 text-block wrap-anywhere whitespace-pre-wrap {color}">{message.text}</p>
+        {@render resumeButton(color)}
       </div>
     </div>
   {:else if message.role === "info"}
@@ -497,9 +518,10 @@
     <NoticeCard tone="blue" icon={Info} {title} detail={detail.join("\n") || null} />
   {:else if message.role === "interrupted"}
     <div class="w-full px-(--page-inset)">
-      <div class="flex h-7 items-center gap-2 rounded-panel px-2.5 {TINT_CLASS.orange}">
+      <div class="flex h-7 items-center gap-2 rounded-panel pl-2.5 {resume ? 'pr-1' : 'pr-2.5'} {TINT_CLASS.orange}">
         <TriangleAlert size={14} class="shrink-0 text-orange" />
         <p class="min-w-0 flex-1 text-block text-orange">{t("INTERRUPTED")}</p>
+        {@render resumeButton("text-orange")}
       </div>
     </div>
   {:else if message.role === "system"}

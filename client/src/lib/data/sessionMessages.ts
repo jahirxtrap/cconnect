@@ -6,6 +6,7 @@ import {
   emptyInteraction,
   notebookCellOf,
   queryOf,
+  resumeOf,
   sharedFilesFrom,
   statementsOf,
   VALUE_SEPARATOR,
@@ -34,6 +35,7 @@ type MessageFields =
   | "toolBlockedBy"
   | "labelOnly"
   | "result"
+  | "resume"
   | "images"
   | "timestamp"
   | "toolUseId"
@@ -182,6 +184,7 @@ export const parseSessionMessage = (raw: Wire): SessionMessage => {
     index: number(raw, "index") ?? -1,
     labelOnly: raw.label === true || (type === "hook" && !body),
     result: text(raw, RESULT_FIELD[type ?? ""] ?? "result"),
+    resume: resumeOf(raw.resume),
     images: images.length ? images : null,
     timestamp: number(raw, "ts"),
     parent: text(raw, "parent"),

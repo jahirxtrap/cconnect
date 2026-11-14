@@ -1,14 +1,15 @@
 """Claude Code management: user prompt, plugins, marketplaces, skills, hooks, MCP and memories."""
 
 import asyncio
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from core.responses import api_response
+from core.responses import api_response, derived_response, fixed_response
 from schemas.accounts import ProviderAuth
-from services import accounts, claude_assets, claude_manage, cli_login
+from services import accounts, asset_icons, claude_assets, claude_manage, cli_login
 from services import claude_status
 from services import usage as usage_service
 
@@ -149,6 +150,28 @@ async def get_plugins():
         "marketplaces": claude_assets.list_marketplaces(),
         "chat_mods": claude_assets.list_chat_mods({plugin["name"] for plugin in plugins}),
     })
+
+
+def _icon_response(request: Request, icon: Path | str | None) -> Response:
+    if isinstance(icon, Path):
+        made = derived_response(request, icon, "icon", lambda: asset_icons.rendered(icon.read_bytes()))
+    elif icon:
+        made = fixed_response(request, asset_icons.uri_version(icon), lambda: asset_icons.rendered(asset_icons.fetched(icon)))
+    else:
+        made = None
+    if made is None:
+        raise HTTPException(status_code=404, detail="no icon")
+    return made
+
+
+@router.get("/claude/plugins/icon")
+def plugin_icon(request: Request, plugin: str):
+    return _icon_response(request, claude_assets.plugin_icon(plugin))
+
+
+@router.get("/claude/mcp/icon")
+def mcp_icon(request: Request, name: str, cwd: str | None = None):
+    return _icon_response(request, claude_assets.mcp_icon(name, cwd))
 
 
 @router.post("/claude/plugins/action")

@@ -12,7 +12,7 @@ import yaml
 from core import paths
 from core.config import DEFAULT_CWD
 from core.display import joined
-from services import accounts, claude_manage, cli_settings
+from services import accounts, asset_icons, claude_manage, cli_settings
 
 _CLAUDE_DIR = Path.home() / ".claude"
 SKILLS_DIR = _CLAUDE_DIR / "skills"
@@ -179,6 +179,7 @@ def _is_mod(root: Path, manifest: dict) -> bool:
 def _plugin_item(name: str, marketplace: str, root: Path | None, manifest: dict | None = None, **fields) -> dict:
     if manifest is None:
         manifest = read_manifest(root) if root else {}
+    icon = asset_icons.file_of(root, manifest) if root else None
     return {
         "name": name,
         "marketplace": marketplace,
@@ -187,6 +188,7 @@ def _plugin_item(name: str, marketplace: str, root: Path | None, manifest: dict 
         "mod": root is not None and _is_mod(root, manifest),
         "options": bool(manifest.get("userConfig")),
         "local": marketplace == LOCAL_MARKETPLACE,
+        "icon": asset_icons.file_version(icon) if icon else None,
     }
 
 
@@ -240,6 +242,14 @@ def plugin_root(plugin: str) -> Path | None:
     installs = _read_json(_INSTALLED_PLUGINS).get("plugins", {}).get(plugin)
     path = installs[0].get("installPath") if isinstance(installs, list) and installs else None
     return Path(path) if path else None
+
+
+def _plugin_icon(root: Path | None) -> Path | None:
+    return asset_icons.file_of(root, read_manifest(root)) if root else None
+
+
+def plugin_icon(plugin: str) -> Path | None:
+    return _plugin_icon(plugin_root(plugin))
 
 
 def list_chat_mods(installed: set[str]) -> list[dict]:
@@ -515,7 +525,9 @@ class _McpLogins:
     tokens: dict[str, dict[str, str]]
 
 
-def _mcp_entry(name: str, label: str, cfg: dict, enabled: bool, source: str, logins: _McpLogins) -> dict:
+def _mcp_entry(
+    name: str, label: str, cfg: dict, enabled: bool, source: str, logins: _McpLogins, icon: Path | str | None
+) -> dict:
     kind = cfg.get("type") or ("http" if cfg.get("url") else "stdio")
     detail = cfg.get("url") or " ".join([cfg.get("command", ""), *cfg.get("args", [])]).strip()
     return {
@@ -529,7 +541,21 @@ def _mcp_entry(name: str, label: str, cfg: dict, enabled: bool, source: str, log
             bool(cfg.get("oauth")) or name in logins.needs_auth or any(name in tokens for tokens in logins.tokens.values())
         ),
         "signed_in": sorted(account for account, tokens in logins.tokens.items() if tokens.get(name)),
+        "icon": _icon_version(icon),
     }
+
+
+def _icon_version(icon: Path | str | None) -> str | None:
+    if icon is None:
+        return None
+    return asset_icons.file_version(icon) if isinstance(icon, Path) else asset_icons.uri_version(icon)
+
+
+def _mcp_icon(name: str, plugin: dict | None, uris: dict[str, str]) -> Path | str | None:
+    if name in uris:
+        return uris[name]
+    root = plugin.get("install_path") if plugin else None
+    return _plugin_icon(Path(root)) if root else None
 
 
 def _mcp_map(servers: object) -> dict:
@@ -613,15 +639,26 @@ def list_mcp_servers(cwd: str | None = None) -> list[dict]:
         needs_auth=set(_read_json(_MCP_AUTH_CACHE)),
         tokens={account: accounts.mcp_tokens(account) for account in accounts.known_ids()},
     )
+    declared = _declared_mcp(folder)
+    disabled = {name: cfg for name, cfg in claude_manage.disabled_mcp_servers().items() if isinstance(cfg, dict)}
+    uris = asset_icons.declared_uris([server.name for server in declared] + list(disabled))
     items = [
-        _mcp_entry(server.name, server.label, server.config, server.enabled, server.source, logins)
-        for server in _declared_mcp(folder)
+        _mcp_entry(
+            server.name, server.label, server.config, server.enabled, server.source, logins,
+            _mcp_icon(server.name, server.plugin, uris),
+        )
+        for server in declared
     ]
-    for name, cfg in claude_manage.disabled_mcp_servers().items():
-        if isinstance(cfg, dict) and not any(i["name"] == name for i in items):
-            items.append(_mcp_entry(name, name, cfg, False, _MCP_USER_SOURCE, logins))
+    for name, cfg in disabled.items():
+        if not any(i["name"] == name for i in items):
+            items.append(_mcp_entry(name, name, cfg, False, _MCP_USER_SOURCE, logins, _mcp_icon(name, None, uris)))
     items.sort(key=lambda s: (not s["enabled"], s["name"]))
     return items
+
+
+def mcp_icon(name: str, cwd: str | None = None) -> Path | str | None:
+    server = next((declared for declared in _declared_mcp(_mcp_folder(cwd)) if declared.name == name), None)
+    return _mcp_icon(name, server.plugin if server else None, asset_icons.declared_uris([name]))
 
 
 def _modified(path: Path) -> float:

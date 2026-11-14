@@ -1,6 +1,6 @@
 <script lang="ts">
-  import ClipboardCopy from "@lucide/svelte/icons/clipboard-copy";
   import Cookie from "@lucide/svelte/icons/cookie";
+  import Copy from "@lucide/svelte/icons/copy";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import ExternalLink from "@lucide/svelte/icons/external-link";
   import Monitor from "@lucide/svelte/icons/monitor";
@@ -84,7 +84,7 @@
     <MenuItem icon={Paperclip} text={t("BROWSER_CAPTURE")} enabled={!!url} onclick={onCapture} />
   {/if}
   <MenuItem icon={ExternalLink} text={t("OPEN_EXTERNALLY")} enabled={!!url} onclick={onOpen} />
-  <MenuItem icon={ClipboardCopy} text={t("COPY_LINK")} enabled={!!url} onclick={onCopy} />
+  <MenuItem icon={Copy} text={t("COPY_LINK")} enabled={!!url} onclick={onCopy} />
   <MenuItem
     icon={favorite ? StarOff : Star}
     text={t(favorite ? "BROWSER_FAVORITE_REMOVE" : "BROWSER_FAVORITE_ADD")}

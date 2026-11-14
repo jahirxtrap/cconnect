@@ -572,6 +572,7 @@ class ApiError(Event):
     type: Literal["api_error"]
     text: str
     severity: Optional[str] = None
+    resume: Optional[Literal["continue", "retry"]] = None
 
 
 class Queued(Event):

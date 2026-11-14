@@ -86,6 +86,12 @@ a video stream with a duration. Transcript slices are cursor-based (`before_inde
 events to replay the tail is cut at `turn_start_index` so a turn never arrives twice. Uploads
 stream to disk, so `PUT` is outside `MAX_BODY_SIZE`.
 
+A plugin's icon (`icon` in its `plugin.json`, inside the plugin) and an MCP server's (`icons` in
+the `serverInfo` its stored catalog holds, else its plugin's) reach the apps only through
+`/claude/plugins/icon` and `/claude/mcp/icon` (`services/asset_icons`). An SVG goes as it is, any
+other image is decoded and encoded again, and an `https:` icon is fetched by the server, without
+credentials or redirects; the apps never fetch an icon's own URL.
+
 ## Chat socket (`/api/chat/ws`)
 
 - Every event is typed in `schemas/chat_events.py`. `python -m schemas.contract` writes
@@ -102,6 +108,9 @@ stream to disk, so `PUT` is outside `MAX_BODY_SIZE`.
 - `file_change` replaces `tool_use` / `tool_result` for Edit, Write, MultiEdit and NotebookEdit.
   `db_query` / `db_execute` carry `query` and `statements` (`mcps/databases.statements_of`) and,
   like shared files, always arrive whole whatever `show_tool_use` says.
+- An `api_error` takes its `severity` and its `resume` (`continue` or `retry`) from the CLI's error
+  category, in `services/api_errors` alone, live and on resume. The app offers that action, and
+  Continue after `interrupted`, only on the last row of an idle chat.
 - The live `compact_boundary` uses `compact_metadata` with `pre_tokens` / `post_tokens`, not the
   transcript's camelCase, and `compact` carries `earlier` for `load_history(until=…)`.
 - The plan windows (`rate_limit`) come only on a CLI's first turn, so `usage.live_windows` keeps

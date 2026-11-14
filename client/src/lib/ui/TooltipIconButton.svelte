@@ -18,6 +18,7 @@
     active?: boolean;
     selected?: boolean;
     onMedia?: boolean;
+    inheritColor?: boolean;
     class?: string;
     children: Snippet;
     [key: string]: unknown;
@@ -32,6 +33,7 @@
     active = false,
     selected = false,
     onMedia = false,
+    inheritColor = false,
     class: className = "",
     children,
     ...rest
@@ -43,6 +45,7 @@
   const SELECTED_CLASS = `bg-surface-variant text-accent ${NEUTRAL_PRESS_CLASS}`;
   const IDLE_CLASS = "text-on-surface-variant enabled:hover:bg-hover enabled:hover:text-on-surface";
   const MEDIA_CLASS = `${ON_MEDIA_CLASS} enabled:hover:bg-white/15`;
+  const INHERIT_CLASS = `enabled:hover:bg-hover ${NEUTRAL_PRESS_CLASS}`;
   const PRESS_SLOP = 10;
   const TOUCH_HIDE_MS = 1500;
   const HALF = 2;
@@ -57,7 +60,7 @@
   );
 
   const TRIGGER_CLASS = $derived(
-    `${BASE_CLASS} ${selected ? SELECTED_CLASS : active ? ACTIVE_CLASS : onMedia ? MEDIA_CLASS : IDLE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
+    `${BASE_CLASS} ${selected ? SELECTED_CLASS : active ? ACTIVE_CLASS : onMedia ? MEDIA_CLASS : inheritColor ? INHERIT_CLASS : IDLE_CLASS} ${SIZE_CLASS.test(className) ? "" : DEFAULT_SIZE} ${iconSize} ${className}`,
   );
 
   const hint = $derived(shortcut ? shortcuts.hint(shortcut) : "");

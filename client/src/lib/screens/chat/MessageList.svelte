@@ -2,7 +2,7 @@
   import FileSearch from "@lucide/svelte/icons/file-search";
   import { tick, untrack } from "svelte";
   import type { ApiRetry } from "$lib/data/apiRetry";
-  import { isPending, type ChatMessage, type InteractionData } from "$lib/data/chatModels";
+  import { isPending, type ChatMessage, type InteractionData, type Resume } from "$lib/data/chatModels";
   import { settings } from "$lib/data/settings.svelte";
   import { dayIndex } from "$lib/data/time";
   import { copyText } from "$lib/platform/clipboard";
@@ -56,6 +56,7 @@
     timestamps?: boolean;
     replies?: ReplyCommands | null;
     repliesBusy?: boolean;
+    onResume?: ((resume: Resume) => void) | null;
   }
 
   interface ReplyCommands {
@@ -88,6 +89,7 @@
     timestamps = true,
     replies = null,
     repliesBusy = false,
+    onResume = null,
   }: Props = $props();
 
   const modeFor = (role: ChatMessage["role"]) =>
@@ -347,6 +349,7 @@
     {mods}
     {timestamps}
     reply={replyOf(item, index)}
+    onResume={index === visible.length - 1 && !streaming ? onResume : null}
   />
 {/snippet}
 
