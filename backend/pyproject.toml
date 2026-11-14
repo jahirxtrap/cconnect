@@ -2,13 +2,7 @@
 name = "cconnect"
 dynamic = ["version"]
 description = "Remote bridge between the CConnect client and Claude Code"
-readme = { text = """
-CConnect drives Claude Code running on your PC from an Android app, a desktop app
-for Windows, Linux and macOS, or any browser.
-
-This is the backend: install it and run `cconnect`. The apps, the docs and the
-install one-liners are at https://cconnect.dev
-""", content-type = "text/markdown" }
+readme = "README.md"
 license = "MIT"
 authors = [{ name = "jahirtrap" }]
 keywords = ["claude", "claude-code", "anthropic", "remote", "mobile"]

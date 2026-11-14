@@ -23,6 +23,7 @@ desktop.ini
 *.log
 dist/
 build/
+backend/README.md
 
 # Everything the backend owns at runtime (config, state, logs, shared, trash, caches)
 backend/data/

@@ -158,6 +158,9 @@ jobs:
 
       - uses: astral-sh/setup-uv@v10.1.0
 
+      - name: Take the README into the backend package
+        run: cp README.md backend/README.md
+
       - name: Check the chat event contract
         working-directory: backend
         run: uv run python -m schemas.contract --check

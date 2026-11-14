@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/assets/banner.png" alt="CConnect" width="760">
+  <img src="https://raw.githubusercontent.com/jahirxtrap/cconnect/master/.github/assets/banner.png" alt="CConnect" width="760">
 </p>
 
 Mobile, desktop and web interface for **Claude Code**. Drive Claude Code running
@@ -200,4 +200,4 @@ Everything the backend reads comes from environment variables, taken from the pr
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](https://github.com/jahirxtrap/cconnect/blob/master/LICENSE).
