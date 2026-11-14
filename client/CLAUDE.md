@@ -171,7 +171,8 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
 ## Media player (`ui/MediaPlayer.svelte`)
 
 - Every audio and video plays in `MediaPlayer` (file preview, gallery, chat card, playlist); no native
-  `controls`. Icons are lucide with `fill="currentColor"`; `SpeakerIcon` fills only the speaker.
+  `controls`. Icons are lucide; play, pause and the skips take `fill="currentColor"`, and
+  `SpeakerIcon` fills only the speaker.
 - The video controls span the whole frame, like the native ones, not just the picture. On touch,
   `pointerleave` fires on every lift, before the `click`, so leaving only hides them for a mouse;
   hiding them there sent the tap on a button to the video underneath.
@@ -205,7 +206,8 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   screen. Leaving full screen resets it. `ZoomPane` captures the pointer only past `TOUCH_SLOP`, so a
   tap on a zoomed video still reaches it.
 - The audio preview shows the cover the server extracts (`audioCoverOf`, `?size=`, capability
-  `audio_covers`) or `AudioCover`'s placeholder, and the tags from `services/fileInfo.ts`.
+  `audio_covers`) or `AudioCover`'s placeholder, and the tags from `services/fileInfo.ts`; it asks
+  for the cover only when that file info says there is one.
 - **Information**, first in the preview's menu (`FileInfoDialog`, rows in `fileInfoSections.ts`), reads `/shared-info` or
   `/projects/<key>/info` when the server offers `file_info`.
 

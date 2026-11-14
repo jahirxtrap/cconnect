@@ -46,7 +46,14 @@ work is done, always or only while the app is in the background.
 
 **Arrow up walks back** through what you already sent in this chat, straight
 from the composer, and arrow down comes forward again — with what you were
-writing kept aside and handed back at the end.
+writing kept aside and handed back at the end. It reaches the messages before
+the page on screen and the ones sent from other devices, and holding **Send**
+(right-click on the desktop) lists them to pick one.
+
+**Continue** sits in a turn that stopped halfway — interrupted, or a reply that
+ran out of length — and a passing error from Anthropic's servers offers
+**Retry** instead. Either sends a short message in the app's language, and only
+on the last card of a chat that is not working.
 
 **Dictate instead of typing.** The microphone next to Send writes what you say
 into the composer — words appear as you speak and each finished sentence lands
@@ -86,6 +93,7 @@ cycle). Chats and ACP agents open in either panel, each panel with its own
 tabs: a tab drags from one bar to the other, **Swap panels** in the panel menu
 trades the two, and the list on the left shows the chats of the panel you are
 in. The tabs you had open come back when you reopen the app, each
-loading only once you switch to it. The side panel's views — terminal, browser,
+loading only once you switch to it. A chat's menu in the list — long-press or
+right-click — also copies its session ID, for ACP agents too. The side panel's views — terminal, browser,
 project files, mods and ACP agents — sit in a bar you reorder by dragging, moving
 any of them into or out of its menu.

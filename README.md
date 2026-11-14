@@ -102,8 +102,9 @@ with the tailnet mode or a public one.
 ### Files and code
 
 - **Shared files.** A file manager over the server's shared folder: upload with progress, organize,
-  and preview images, video, audio, PDF, Markdown, code, HTML and SQLite or DuckDB databases. What
-  Claude writes there arrives as a link in the chat.
+  and preview images, video, audio, PDF, Markdown, code, HTML and SQLite or DuckDB databases, with
+  audio and video in CConnect's own player and each file's details under Information. What Claude
+  writes there arrives as a link in the chat.
 - **Project files.** Browse the chat's project with git colours and each change painted on its
   lines, then commit, pull and push from the same panel.
 - **Databases.** Over fifty engines (SQLite, PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, DuckDB,

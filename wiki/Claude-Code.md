@@ -9,6 +9,9 @@ PC:
   enable, disable, update, or uninstall the ones you have.
 - Add or remove **MCP servers**, with the credentials or environment variables
   they need, and marketplaces.
+- Each plugin and MCP server shows its own **icon** when it declares one — `icon`
+  in the plugin's `plugin.json`, pointing at an image inside the plugin, or the
+  `icons` an MCP server announces — and the section's icon when it doesn't.
 - **Install from a link** an MCP server, a plugin, a marketplace, an ACP agent or
   a pack, from a web page, a message or a card Claude offers; the app shows what
   it runs before installing anything. The syntax is in the
