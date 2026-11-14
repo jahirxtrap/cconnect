@@ -1,2 +1,3 @@
 backend/schemas/chat_events.json text eol=lf
 client/src/lib/contract/chatEvents.ts text eol=lf
+client/src-tauri/gen/android/app/src/main/AndroidManifest.xml text eol=lf

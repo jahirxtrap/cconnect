@@ -210,7 +210,9 @@
 
   const dragAgentTab = (id: string, pointerX: number) => panes.dragAgentTab(id, paneAt(pointerX));
 
-  const dockLift = $derived(Math.max(0, layout.dockInset - composerHeight - layout.safeBottom - paneGap));
+  const dockLift = $derived(
+    Math.max(0, layout.dockInset - composerHeight - layout.safeBottom - layout.keyboard - paneGap),
+  );
 
   $effect(() => {
     const environmentIds = [...new Set(tabs.list.map((tab) => tab.environmentId))];

@@ -59,11 +59,9 @@ class DockSpot {
   );
 
   readonly bottom = $derived(
-    this.#edge(
-      this.#area && !this.#area.screen
-        ? layout.height - this.#area.box.bottom
-        : Math.max(layout.bottomInset, layout.safeBottom),
-    ) + layout.keyboard,
+    this.#area && !this.#area.screen
+      ? this.#edge(layout.height - this.#area.box.bottom)
+      : this.#edge(layout.bottomInset + layout.safeBottom) + layout.keyboard,
   );
 
   #edge(distance: number): number {
