@@ -152,7 +152,7 @@ import { agents } from "$lib/services/agents.svelte";
 import { createAgentsApi } from "$lib/services/agentsApi";
 import { backend, baseUrlOf } from "$lib/services/backend.svelte";
 import {
-  commandFor,
+  commandIn,
   createCapabilitiesApi,
   effortLevelsFor,
   optionLabel,
@@ -714,10 +714,15 @@ export class ChatState {
     this.#dispatch(text, (body) => this.send(body));
   }
 
+  get commands(): CommandOption[] {
+    return (this.agent ? this.agentState?.commands : this.capabilities?.commands) ?? [];
+  }
+
   #dispatch(text: string, deliver: (body: string) => void) {
-    const command = this.agent ? null : commandFor(this.capabilities, text);
-    if (command && command.kind !== "prompt") this.runCommand(command, deliver);
-    else deliver(text);
+    const command = commandIn(this.commands, text);
+    if (!command) deliver(text);
+    else if (command.kind === "prompt") this.send(text);
+    else this.runCommand(command);
   }
 
   async sendPrompt(text: string) {
@@ -1526,7 +1531,7 @@ export class ChatState {
     this.#pushGeneration({ partial: next ?? this.streamTokens });
   }
 
-  runCommand(command: CommandOption, deliver: (body: string) => void = (body) => void this.sendPrompt(body)) {
+  runCommand(command: CommandOption) {
     if (command.kind === "usage" || command.kind === "session_info" || command.kind === "reload") {
       this.#appendLocal(newMessage(this.#nextId++, "user", { text: `/${command.name}`, ephemeral: true }));
       if (command.kind === "usage") this.#socket.sendUsage();
@@ -1538,7 +1543,7 @@ export class ChatState {
       this.clearConversation();
       return;
     }
-    deliver(`/${command.name}`);
+    this.send(`/${command.name}`);
   }
 
   clearConversation() {

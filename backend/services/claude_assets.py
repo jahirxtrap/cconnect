@@ -164,7 +164,6 @@ class _Marketplace:
 
 
 def _marketplace(info: object) -> _Marketplace:
-    """A known marketplace's root and catalog; one added from a local file reads that file where it is."""
     location = info.get("installLocation") if isinstance(info, dict) else None
     if not location:
         return _Marketplace(None, {}, False)
@@ -185,7 +184,6 @@ def _catalog_entry(market: _Marketplace, name: str) -> dict:
 
 
 def _in_place(market: _Marketplace, entry: dict) -> Path | None:
-    """Where the CLI loads a relative-path plugin of a marketplace added from a local path, instead of its cached copy."""
     source = entry.get("source")
     if not market.local or market.root is None or not isinstance(source, str):
         return None
@@ -210,7 +208,6 @@ def plugin_id(plugin: dict) -> str:
 
 
 def _declared(manifest: dict, key: str, default: str) -> list:
-    """The plugin's default file for a component, then each shape its manifest declares, in the CLI's load order."""
     declared = manifest.get(key)
     return [default, *(declared if isinstance(declared, list) else [declared])]
 
@@ -299,7 +296,6 @@ def list_plugins() -> list[dict]:
 
 
 def listed_plugins() -> list[dict]:
-    """The plugins, each with the Claude Code version range the CLI refuses to load it for, if it does."""
     plugins = list_plugins()
     refused = claude_manage.version_refused() if any(plugin["engine"] for plugin in plugins) else set()
     return [{**plugin, "needs_cli": plugin["engine"] if plugin_id(plugin) in refused else None} for plugin in plugins]
@@ -628,7 +624,6 @@ def _mcp_map(servers: object) -> dict:
 
 
 def _bundle_manifest(root: Path, source: str) -> dict:
-    """A bundle's manifest, from the archive the plugin ships or from the copy the CLI extracted from a URL."""
     if source.startswith(_BUNDLE_URL):
         records = (_read_json(path) for path in _BUNDLES_DIR.glob(_BUNDLE_RECORDS))
         extracted = next((record.get("extractedPath") for record in records if record.get("source") == source), None)

@@ -1,5 +1,3 @@
-"""What the running server and a detached launcher left on disk, read by the command and by the update."""
-
 from contextlib import suppress
 
 import psutil
@@ -10,7 +8,6 @@ CLI_MODULE = "core.cli"
 
 
 def runtime() -> dict[str, str]:
-    """What the running server recorded, empty when the pid it wrote is gone."""
     try:
         recorded = dict(
             entry.split("=", 1)
@@ -24,7 +21,6 @@ def runtime() -> dict[str, str]:
 
 
 def running_pid() -> int | None:
-    """PID of a live detached launcher, or None when the recorded one is gone."""
     try:
         pid = int(paths.DETACHED_PID_FILE.read_text(encoding="utf-8").strip())
     except (OSError, ValueError):
@@ -40,7 +36,6 @@ def running_pid() -> int | None:
 
 
 def provider() -> str:
-    """The provider the detached run exposed with."""
     with suppress(OSError):
         return paths.DETACHED_PROVIDER_FILE.read_text(encoding="utf-8").strip()
     return ""

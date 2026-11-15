@@ -1,5 +1,3 @@
-"""Updating an installed release on Windows, where nothing may still run from the environment the update replaces."""
-
 import shutil
 import subprocess
 import sys
@@ -21,7 +19,6 @@ def needed() -> bool:
 
 
 def restart_command() -> list[str] | None:
-    """How the detached backend starts again once updated, None when none runs."""
     if detached.running_pid() is None:
         return None
     exposed = detached.provider()
@@ -43,7 +40,6 @@ def _call(command: list[str]) -> str:
 
 
 def hand_over(upgrade: list[str], restart: list[str] | None) -> None:
-    """Runs the upgrade from a detached shell once no process of this install is left, then the restart."""
     held = [str(Path(sys.prefix)) + "\\"]
     launcher = shutil.which("cconnect")
     if launcher:

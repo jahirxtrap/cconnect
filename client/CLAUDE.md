@@ -245,6 +245,8 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 - `MarkdownText` decorates and handles only the links it owns (`linkOwner`, `ui/linkOwner.ts`); a
   component whose DOM brings its own links, like pdf.js's annotation layer, declares `OWN_LINKS`.
 - `hasFiles(event)` gates every drag handler, or dragging text raises the file overlay.
+- A command, typed or picked, goes out as bare text like a suggestion (`chat.send`, through
+  `commandIn(chat.commands, text)`): pending attachments and picked elements stay in the composer.
 - Whether a server accepts its stored key is `securityKeys.unlocked(profile)`, recorded only by
   answers that prove it (`judgeKey`, the project tree's `unlocked`): a read-only database also
   answers 403. Screens derive their lock from it and reload what they listed with another key.

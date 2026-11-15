@@ -27,7 +27,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import { isTouch, systemName } from "$lib/platform";
   import { startDictation, voiceAvailable } from "$lib/platform/voice";
-  import { commandText, commandToken, takesArguments, type CommandOption } from "$lib/services/capabilitiesApi";
+  import { commandIn, commandText, commandToken, takesArguments, type CommandOption } from "$lib/services/capabilitiesApi";
   import { OUTLINE_CLASS } from "$lib/ui/Button.svelte";
   import Chip from "$lib/ui/Chip.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
@@ -338,26 +338,13 @@
     return alias ? 3 : null;
   };
 
-  const resolve = (text: string) => {
-    const body = text.trim();
-    if (!body.startsWith("/")) return null;
-    const token = body.slice(1).split(/\s+/)[0].toLowerCase();
-    return (
-      commands.find(
-        (command) =>
-          command.name.toLowerCase() === token ||
-          command.aliases.some((alias) => alias.toLowerCase() === token),
-      ) ?? null
-    );
-  };
-
   const query = $derived(preview && draft === preview.shown ? preview.from : draft);
 
   const typed = $derived(dismissed ? null : commandToken(query));
 
   const argumentFor = $derived.by(() => {
     if (dismissed || typed !== null) return null;
-    const command = resolve(query);
+    const command = commandIn(commands, query);
     return command?.argumentHint ? command : null;
   });
 

@@ -274,8 +274,8 @@
   const canAttach = $derived(!chat.sideOpen && actionsEnabled);
 
   const availableCommands = $derived.by(() => {
-    if (chat.agent) return chat.connected ? (chat.agentState?.commands ?? []) : [];
-    const all = chat.capabilities?.commands ?? [];
+    if (chat.agent) return chat.connected ? chat.commands : [];
+    const all = chat.commands;
     if (chat.sideOpen || !chat.connected) return [];
     const outsideTurn = (command: CommandOption) => OUTSIDE_TURN.includes(command.kind);
     const usable = chat.sessionId !== null ? all : all.filter(outsideTurn);

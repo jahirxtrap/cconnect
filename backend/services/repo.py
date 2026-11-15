@@ -51,7 +51,6 @@ def _on_disk() -> str:
 
 
 def _upgrade_after_stop() -> dict:
-    """On Windows the package changes only once this server has stopped, so only a detached one can update itself."""
     restart = self_update.restart_command()
     if restart is None:
         return {
@@ -66,7 +65,6 @@ def _upgrade_after_stop() -> dict:
 
 
 def upgrade() -> dict:
-    """Replaces the installed package with the newest release."""
     if self_update.needed():
         return _upgrade_after_stop()
     try:

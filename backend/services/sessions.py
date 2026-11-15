@@ -1495,7 +1495,6 @@ def _session_message_item(text: str) -> dict | None:
 
 
 def _peer_message(entry: dict) -> dict | None:
-    """A message from another Claude session, as the CLI records it on the meta entry that delivers it."""
     origin = entry.get("origin")
     if not isinstance(origin, dict) or origin.get("kind") != _PEER_ORIGIN:
         return None
@@ -1825,7 +1824,6 @@ def _normalize(
     reported: set[str] = set()
 
     def _once(items: list[dict]) -> list[dict]:
-        """A hand-back or a peer's message is written twice, once queued and once delivered."""
         kept = []
         for item in items:
             if item.get("type") in _WRITTEN_TWICE:

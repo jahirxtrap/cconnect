@@ -177,13 +177,13 @@ export const commandToken = (text: string): string | null => {
   return body.length > token.length + 1 && /\s/.test(body[token.length + 1]) ? null : token;
 };
 
-export const commandFor = (capabilities: Capabilities | null, text: string): CommandOption | null => {
+export const commandIn = (commands: CommandOption[], text: string): CommandOption | null => {
   const body = text.trim();
   if (!body.startsWith("/")) return null;
   const token = body.slice(1).split(/\s+/)[0].toLowerCase();
   if (!token) return null;
   return (
-    capabilities?.commands.find(
+    commands.find(
       (command) =>
         command.name.toLowerCase() === token ||
         command.aliases.some((alias) => alias.toLowerCase() === token),

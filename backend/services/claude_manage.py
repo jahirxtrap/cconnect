@@ -60,7 +60,6 @@ def _run(args: list[str], timeout: int = 300, cwd: str | None = None, stdin: str
 
 
 def _report(args: list[str], cwd: str | None = None) -> dict | None:
-    """The CLI's JSON report, read whatever its exit code says."""
     try:
         data = json.loads(_exec([*args, "--json"], _REPORT_TIMEOUT, cwd, None).stdout)
     except (OSError, subprocess.SubprocessError, ValueError):
@@ -69,7 +68,6 @@ def _report(args: list[str], cwd: str | None = None) -> dict | None:
 
 
 def version_refused() -> set[str]:
-    """The plugins the CLI does not load because their Claude Code version range leaves it out."""
     try:
         listed = json.loads(_exec(["plugin", "list", "--json"], _REPORT_TIMEOUT, None, None).stdout)
     except (OSError, subprocess.SubprocessError, ValueError):

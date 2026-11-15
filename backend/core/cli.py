@@ -37,6 +37,11 @@ _PROVIDERS = ("tailscale", "tailnet", "caddy")
 _PRIVATE_PROVIDERS = ("tailnet",)
 _STOP_TIMEOUT = 10
 _POLL_SECONDS = 0.5
+_WINDOWS_APP = "tailscale-ipn.exe"
+_MAC_APP = "Tailscale"
+_TAILSCALE_WAIT = 30
+_SIGNED_OUT = ("NeedsLogin", "NoState")
+_NOT_UP = ("", *_SIGNED_OUT)
 _APP = "core.app:app"
 _COMMANDS = ("run", "expose", "stop", "restart", "status", "logs", "doctor", "update", "key")
 _TOP_FLAGS = ("-h", "--help", "-v", "--version")
@@ -105,14 +110,41 @@ def _tailscale_status() -> dict:
         return {}
 
 
+def _app_running(name: str) -> bool:
+    return any(process.info["name"] == name for process in psutil.process_iter(["name"]))
+
+
+def _open_app(tailscale: str) -> bool:
+    if sys.platform == "win32":
+        app = Path(tailscale).with_name(_WINDOWS_APP)
+        if not app.is_file() or _app_running(_WINDOWS_APP):
+            return False
+        os.startfile(app)
+    elif sys.platform == "darwin":
+        if _app_running(_MAC_APP) or subprocess.run(["open", "-a", _MAC_APP], capture_output=True).returncode != 0:
+            return False
+    else:
+        return False
+    with suppress(OSError, subprocess.SubprocessError):
+        subprocess.run(
+            ["tailscale", "wait", "--timeout", f"{_TAILSCALE_WAIT}s"],
+            capture_output=True, text=True, timeout=_TAILSCALE_WAIT + _STOP_TIMEOUT,
+        )
+    return True
+
+
 def _require_tailscale() -> dict:
-    if shutil.which("tailscale") is None:
+    tailscale = shutil.which("tailscale")
+    if tailscale is None:
         _abort("Tailscale is not installed. Get it from https://tailscale.com/download and try again.")
     status = _tailscale_status()
     state = status.get("BackendState") or ""
+    if state in _NOT_UP and _open_app(tailscale):
+        status = _tailscale_status()
+        state = status.get("BackendState") or ""
     if not state:
         _abort("Tailscale is installed but not running. Start the Tailscale app or service and try again.")
-    if state in ("NeedsLogin", "NoState"):
+    if state in _SIGNED_OUT:
         _abort("Tailscale is not signed in. Run 'tailscale up', then try again.")
     if state == "Stopped":
         subprocess.run(["tailscale", "up"], capture_output=True, text=True, timeout=60)
@@ -329,7 +361,6 @@ def _close_exposure() -> None:
 
 
 def _serving(port: int) -> bool:
-    """True once the recorded server itself listens on the port, not whatever else took it."""
     with suppress(psutil.Error, KeyError, ValueError):
         sockets = psutil.Process(int(detached.runtime()["PID"])).net_connections(kind="tcp")
         return any(sock.status == psutil.CONN_LISTEN and sock.laddr.port == port for sock in sockets)
@@ -399,7 +430,6 @@ def _invocation() -> str:
 
 
 def _flag_parser() -> argparse.ArgumentParser:
-    """The launcher's original flags, accepted alongside the subcommands."""
     parser = argparse.ArgumentParser(description="CConnect backend launcher.")
     parser.add_argument("--expose", choices=list(_PROVIDERS), default="",
                         help="Serve the backend through the given provider: tailnet keeps it "

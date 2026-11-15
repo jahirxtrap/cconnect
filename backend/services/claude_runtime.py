@@ -582,8 +582,6 @@ def _build_can_use_tool(
     ask_user: Callable[[dict], Awaitable[dict]],
     render_site: Optional[Callable[[str, str, dict], Awaitable[Optional[dict]]]] = None,
 ):
-    """can_use_tool callback routing AskUserQuestion + permission prompts through ``ask_user``.
-    Shared by the main chat and the quick chat, so every interaction type works in both."""
     from claude_agent_sdk import PermissionResultAllow, PermissionResultDeny
 
     async def _can_use_tool(tool_name: str, tool_input: dict, ctx) -> Any:
