@@ -17,7 +17,6 @@ import shutil
 import subprocess
 import sys
 import threading
-import time
 import urllib.error
 import urllib.request
 from contextlib import suppress
@@ -30,6 +29,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
 from core import paths, process_job, process_tree
+from services import frames
 from core.config import (
     BROWSER_DEBUG_PORT,
     BROWSER_EXECUTABLE,
@@ -634,7 +634,7 @@ class BrowserSession:
 
     def video(self, chunk: bytes):
         self._feed_chunks += 1
-        self._publish(("video", (chunk[:1] == b"\x01", chunk)))
+        self._publish(("video", (frames.is_key(chunk), chunk)))
 
     def stream_info(self, info: dict):
         self._stream_info = info

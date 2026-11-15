@@ -9,6 +9,7 @@ import MessagesSquare from "@lucide/svelte/icons/messages-square";
 import Network from "@lucide/svelte/icons/network";
 import NotepadText from "@lucide/svelte/icons/notepad-text";
 import Puzzle from "@lucide/svelte/icons/puzzle";
+import Smartphone from "@lucide/svelte/icons/smartphone";
 import SquareTerminal from "@lucide/svelte/icons/square-terminal";
 import { isTauri } from "$lib/platform";
 import { panes, type RightKind } from "$lib/screens/chat/panes.svelte";
@@ -78,9 +79,16 @@ export const SCREENS: ScreenEntry[] = [
     open: () => panes.show("databases"),
     paneOnly: true,
   },
+  {
+    kind: "devices",
+    label: "DEVICES",
+    icon: Smartphone,
+    open: () => panes.show("devices"),
+    paneOnly: true,
+  },
 ];
 
-export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods", "agents", "databases"];
+export const DEFAULT_PANE_BAR: RightKind[] = ["terminal", "browser", "project", "mods", "agents", "databases", "devices"];
 
 export const NAV_SCREENS = SCREENS.filter(
   (screen) => !screen.paneOnly && (isTauri || !screen.nativeScreen),

@@ -10,9 +10,10 @@
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import StatusDot from "$lib/ui/StatusDot.svelte";
+  import SoftKeys from "$lib/ui/SoftKeys.svelte";
   import { SURFACE_FRAME_CLASS, SURFACE_KEYS_CLASS } from "$lib/ui/surfaceFrame";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
-  import SoftKeys from "./SoftKeys.svelte";
+  import { TERMINAL_KEYS } from "./terminalKeys";
   import type TerminalSurface from "./TerminalSurface.svelte";
 
   interface Props {
@@ -87,7 +88,7 @@
       </div>
       {#if isTouch}
         <div class={SURFACE_KEYS_CLASS}>
-          <SoftKeys onKey={(bytes) => pane?.sendKey(bytes)} />
+          <SoftKeys keys={TERMINAL_KEYS} onKey={(bytes) => pane?.sendKey(bytes)} />
           <TooltipIconButton
             label={t("KEYBOARD")}
             tooltip={false}

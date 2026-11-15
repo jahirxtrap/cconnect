@@ -1,4 +1,10 @@
-import type { StreamInfo } from "$lib/services/browserSocket";
+export interface StreamInfo {
+  codec: string;
+  width: number;
+  height: number;
+}
+
+export const videoDecodable = typeof VideoDecoder !== "undefined";
 
 interface FrameContext {
   drawImage(image: CanvasImageSource, x: number, y: number, width: number, height: number): void;

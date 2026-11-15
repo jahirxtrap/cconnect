@@ -1,4 +1,5 @@
 import type { ElementPick } from "$lib/data/pickedElements";
+import { videoDecodable, type StreamInfo } from "$lib/ui/frameSurface";
 import { http } from "./http";
 import { ReconnectingSocket } from "./socket";
 
@@ -25,12 +26,6 @@ export interface BrowserState {
   device: string;
   picking: boolean;
   stream: string;
-}
-
-export interface StreamInfo {
-  codec: string;
-  width: number;
-  height: number;
 }
 
 export interface BrowserHooks {
@@ -73,8 +68,6 @@ export interface BrowserLink {
   keyframe: () => void;
   close: () => void;
 }
-
-export const videoDecodable = typeof VideoDecoder !== "undefined";
 
 export const browserLink = (hooks: BrowserHooks, viewport: () => BrowserViewport): BrowserLink => {
   let watched = false;

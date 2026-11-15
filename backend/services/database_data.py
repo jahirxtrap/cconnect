@@ -676,19 +676,9 @@ def delete_row(scope: databases.Scope, schema: Optional[str], name: str, key: di
         _one(connection.execute(delete(reflected).where(_keyed(reflected, key))))
 
 
-def _file_safe(name: str) -> str:
-    return re.sub(r"[^A-Za-z0-9._-]+", "_", name).strip("._-")
-
-
 def _export_file(entry: dict, base: str, extension: str, folder: Optional[Path] = None) -> Path:
-    folder = folder or shared.project_dir("") / EXPORTS_FOLDER / _file_safe(entry["id"])
-    folder.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return folder / f"{_file_safe(base) or _file_safe(entry['id'])}-{stamp}.{extension}"
-
-
-def _relative(target: Path) -> str:
-    return target.relative_to(shared.project_dir("")).as_posix()
+    folder = folder or shared.project_dir("") / EXPORTS_FOLDER / shared.file_safe(entry["id"])
+    return shared.dated_file(folder, shared.file_safe(base) or shared.file_safe(entry["id"]), extension)
 
 
 def _csv_value(value: Any) -> Any:
@@ -892,7 +882,7 @@ def export_dump(
                 statement = _view_ddl(engine, connection, place, view)
                 if statement:
                     handle.write(f"{statement}\n\n")
-    return _relative(target)
+    return shared.relative(target)
 
 
 def export_table(
@@ -916,7 +906,7 @@ def export_table(
         selected = _ordered(_filtered(scope, reflected, where), reflected, sort, descending)
         result = connection.execution_options(stream_results=True).execute(selected)
         _write_csv(target, list(result.keys()), result)
-    return _relative(target)
+    return shared.relative(target)
 
 
 def export_query(scope: databases.Scope, sql: str, folder: Optional[Path] = None) -> str:
@@ -931,4 +921,4 @@ def export_query(scope: databases.Scope, sql: str, folder: Optional[Path] = None
         if not result.returns_rows:
             raise databases.DatabaseError(INVALID)
         _write_csv(target, list(result.keys()), result)
-    return _relative(target)
+    return shared.relative(target)

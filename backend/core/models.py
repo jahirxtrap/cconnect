@@ -428,3 +428,37 @@ class McpCatalog(Base):
         server_default=text(NOW),
         comment="When it was last read from the running server, in UTC",
     )
+
+
+class Device(Base):
+    __tablename__ = "devices"
+    __table_args__ = {"comment": "Android devices the Devices panel has seen authorized, so one paired over Wi-Fi keeps its name and can be connected again"}
+
+    id: Mapped[str] = mapped_column(
+        primary_key=True,
+        comment="Slug of the name the device was first saved with, used in the app's routes",
+    )
+    serial: Mapped[str] = mapped_column(
+        unique=True,
+        comment="Hardware serial the device reports (ro.serialno), the same over USB and Wi-Fi",
+    )
+    name: Mapped[str] = mapped_column(
+        comment="Name the panel shows: the device's marketing name until the user renames it",
+    )
+    model: Mapped[str] = mapped_column(
+        comment="Model the device reports (ro.product.model)",
+    )
+    address: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="host:port it was last reached at over Wi-Fi, to connect it again where mDNS does not reach; NULL for a device only seen over USB",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When it was first seen authorized, in UTC",
+    )
+    seen_at: Mapped[datetime] = mapped_column(
+        Timestamp,
+        server_default=text(NOW),
+        comment="When it was last connected, in UTC; the panel lists saved devices newest first",
+    )

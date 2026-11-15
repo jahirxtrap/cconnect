@@ -33,6 +33,7 @@ SCRIPTS_DIR = PACKAGE_DIR / "scripts"
 CAPTURE_DIR = PACKAGE_DIR / "capture"
 BUILTIN_PACKS_DIR = PACKAGE_DIR / "packs"
 DATABASE_ENGINES_FILE = PACKAGE_DIR / "databases" / "engines.json"
+DEVICE_TOOLS_FILE = PACKAGE_DIR / "devices" / "tools.json"
 MIGRATIONS_DIR = PACKAGE_DIR / "migrations"
 ENV_FILE = (CONFIG_DIR if INSTALLED else BACKEND_DIR) / ".env"
 
@@ -53,6 +54,7 @@ AI_WORKDIR = Path(os.environ.get("AI_WORKDIR") or STATE_DIR / "internal_task")
 NETWORK_STATE_FILE = CACHE_DIR / "network_state.json"
 CONTEXT_WINDOWS_FILE = CACHE_DIR / "context_windows.json"
 BROWSER_PROFILE_DIR = Path(os.environ.get("BROWSER_PROFILE_DIR") or CACHE_DIR / "browser")
+ANDROID_TOOLS_DIR = CACHE_DIR / "android"
 
 SERVER_LOG_FILE = LOGS_DIR / "server.jsonl"
 PREVIOUS_SERVER_LOG_FILE = LOGS_DIR / "server.prev.jsonl"

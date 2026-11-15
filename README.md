@@ -118,6 +118,13 @@ with the tailnet mode or a public one.
   open with the security key, and Claude gets them as tools in turns sent with it: it queries,
   changes data, exports, manages connections and drivers, and each query shows in the chat with
   its rows.
+- **Devices.** The Android phones, tablets and emulators the server reaches with adb, listed as
+  they appear: plugged in over USB, paired over Wi‑Fi with a QR code or a pairing code, or
+  started from the machine's Android SDK. Tapping one mirrors its screen live through scrcpy,
+  with touch, keyboard, the navigation keys, rotation, screenshots, APK installs and logcat in a
+  terminal. The server uses the adb it has, or downloads adb and scrcpy's server with one tap;
+  nothing else is bundled. Behind the security key, and Claude gets the same devices as tools in
+  turns sent with it: list, screenshot, shell, logcat, tap and type, install and manage.
 - **Notes.** A Markdown editor with formatting, search and syntax highlighting.
 
 ### The PC

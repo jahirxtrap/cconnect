@@ -305,6 +305,32 @@ Connections are `file`, `server` or `url` (`custom`, which borrows its backend's
   Function defaults go in parentheses (SQLite). Sequence-fed columns use `auto_increment`,
   `identity_sync` moves the sequence, `identity_insert_on/off` wrap SQL Server's inserts.
 
+## Devices
+
+`core/devices/tools.json` pins the tools: Google's platform-tools archive per platform and
+scrcpy's server, each with its URL, size and SHA-256. `services/device_tools` finds adb on the
+PATH, in the SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT`, the default folders) or in
+`paths.ANDROID_TOOLS_DIR`, where `install()` downloads what is missing; nothing is bundled.
+
+- `services/adb` speaks adb's host protocol on its socket (`%04x` length, `OKAY`/`FAIL`), starting
+  the server when nothing listens. Pushes, installs, pairing's crypto and the emulator console go
+  through the binary (`run`).
+- `services/devices.hub` is **the** state: `host:track-devices-l` and `host:track-mdns-services`
+  are push streams, so the panel never polls. Each authorized device is described once with
+  `getprop` and remembered in `devices` by its hardware serial (`ro.serialno`), the same over USB
+  and Wi-Fi; emulators are never saved. A QR pairing waits for the `_adb-tls-pairing._tcp` service
+  whose instance name is the one in the code, then pairs; adb connects the device itself.
+- Emulators come from the AVD folder (`ANDROID_AVD_HOME`, else `~/.android/avd`), never from a
+  process, and start detached from the server.
+- `services/device_screen` runs scrcpy's server on the device (`adb reverse` first, `adb forward`
+  with a bounded connect retry when the device refuses reverse) and turns its stream into the
+  browser pane's frame wire (`services/frames`): the config packet is prepended to every key
+  frame, the codec string comes from the SPS, and viewers without WebCodecs get JPEGs decoded on
+  a thread with PyAV. One session per device, shared by its viewers, stopped with the last one.
+- Every route and tool takes the key (`devices` in `KEYED_CAPABILITIES`); the panel's socket and
+  each screen socket read it from their opening message. An APK to install is an absolute path on
+  the machine (the panel's picker, the tool) or a path inside Shared or a project.
+
 ## Configuration
 
 Environment variables, declared in `core/config.py`, which loads `backend/.env` in a checkout.

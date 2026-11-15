@@ -30,7 +30,8 @@
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { sshLink } from "$lib/screens/terminal/sshLink";
-  import SoftKeys from "$lib/screens/terminal/SoftKeys.svelte";
+  import { TERMINAL_KEYS } from "$lib/screens/terminal/terminalKeys";
+  import SoftKeys from "$lib/ui/SoftKeys.svelte";
   import TerminalSurface from "$lib/screens/terminal/TerminalSurface.svelte";
   import SshHostsList from "$lib/screens/terminal/SshHostsList.svelte";
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
@@ -260,7 +261,7 @@
 
   {#if layout.touch && terminalTabs.activeId}
     <div class={SURFACE_KEYS_CLASS}>
-      <SoftKeys onKey={(bytes) => panes[terminalTabs.activeId ?? ""]?.sendKey(bytes)} />
+      <SoftKeys keys={TERMINAL_KEYS} onKey={(bytes) => panes[terminalTabs.activeId ?? ""]?.sendKey(bytes)} />
       <TooltipIconButton
         label={t("KEYBOARD")}
         tooltip={false}

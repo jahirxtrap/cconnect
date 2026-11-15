@@ -19,7 +19,8 @@ export type RightKind =
   | "browser"
   | "mods"
   | "agents"
-  | "databases";
+  | "databases"
+  | "devices";
 
 const KINDS: RightKind[] = [
   "terminal",
@@ -33,6 +34,7 @@ const KINDS: RightKind[] = [
   "mods",
   "agents",
   "databases",
+  "devices",
 ];
 
 const DEFAULT_TOOL: RightKind = "terminal";
@@ -61,6 +63,7 @@ const SCOPE: Record<RightKind, Pane> = {
   mods: "mods",
   agents: "chat",
   databases: "chat",
+  devices: "chat",
 };
 
 interface StoredRight {

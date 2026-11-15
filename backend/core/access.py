@@ -1,4 +1,4 @@
-"""The security key gating what belongs to the machine itself: shells, ignored files and database connections."""
+"""The security key gating what belongs to the machine itself: shells, ignored files, database connections and Android devices."""
 
 import hmac
 from typing import Optional
@@ -6,7 +6,7 @@ from typing import Optional
 from core.config import PUBLIC_ACCESS_TOKEN, SECURITY_KEY
 
 KEY_HEADER = "X-Security-Key"
-KEYED_CAPABILITIES = ("terminal", "databases")
+KEYED_CAPABILITIES = ("terminal", "databases", "devices")
 
 
 def gated() -> bool:

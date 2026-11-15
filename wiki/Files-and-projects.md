@@ -153,6 +153,41 @@ setting says, like shared files. Each table it touched ends the block as a chip
 that opens it in Databases, and a query that only reads goes to the panel's
 console with **Open SQL console**.
 
+## Devices
+
+The Devices panel, after Databases in the panel bar, lists the Android devices the
+server reaches with adb, as adb reports them: the phones and tablets plugged in over
+USB with debugging on, the ones paired over Wi‑Fi, and the emulators of the
+machine's Android SDK. It needs no setup when the machine already has adb; otherwise
+**Install** downloads Google's platform-tools and scrcpy's server, both pinned by
+CConnect, into its cache. Nothing else is bundled, and nothing polls: the list
+changes when adb says so.
+
+**Pair device** opens the dialog with the two ways Android offers under Developer
+options → Wireless debugging: a QR code the phone scans, which works when the phone
+and the server share a network, or the IP address, port and six-digit code of
+*Pair device with pairing code*, which also works through Tailscale with the
+phone's tailnet address. A third tab, **Address**, connects a device already paired
+that the server cannot find by itself, such as one on the tailnet. Devices seen
+authorized are remembered under **Saved** with the name the device gives, which
+you can rename; tapping a saved one connects it again at its last address, and the
+bin forgets it. A device still waiting for the debugging prompt on its screen shows
+as not authorized until you accept it.
+
+Tapping a connected device shows its screen live, mirrored with scrcpy at the size
+of the panel: touch and drag, type with the keyboard, scroll with the wheel, and the
+row under the picture gives Back, Home, Recents, Power and the volume keys, with the
+keyboard button on touch screens. The menu rotates the device, installs an APK
+picked from this device, opens its logcat in a terminal tab, turns the screen off
+and back on, and disconnects a Wi‑Fi device or shuts an emulator down; the camera
+saves a screenshot to the shared folder and downloads it. Emulators start from
+their row and appear under Connected once booted.
+
+On a public server the panel opens with the security key, like Databases, and
+Claude gets the same devices as tools in turns sent with it: it lists them,
+takes a screenshot, runs shell commands, reads logcat, taps and types, installs an
+APK, and pairs, connects, renames, forgets, starts and stops them.
+
 ## Notes
 
 A built-in Markdown editor keeps as many notes as you need, shown as a list or

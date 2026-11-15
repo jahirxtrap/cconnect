@@ -10,10 +10,9 @@ from core.responses import api_response
 from core.ws import opening_message, send_event
 from services import browser
 from services.browser import BrowserSession
+from services.frames import JPEG_KIND
 
 router = APIRouter(tags=["browser"])
-
-JPEG_KIND = b"\x00"
 
 
 @router.get("/browser/status")

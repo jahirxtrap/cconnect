@@ -11,7 +11,7 @@ from sqlalchemy.pool import NullPool
 from core.db import Session
 from core.models import DatabaseConnection
 from core.slugs import slug, unique
-from services import database_engines, database_tunnels, project_files, shared
+from services import database_engines, database_tunnels, project_files
 
 FIELDS = ("name", "engine", "host", "port", "database", "user", "password", "path", "url", "packages", "options", "read_only", "ssh")
 FALLBACK_ID = "database"
@@ -189,13 +189,6 @@ def require(connection_id: str) -> dict:
     return _required(find(connection_id), connection_id)
 
 
-def _located(project: Optional[str], relpath: str, unlocked: bool) -> Optional[Path]:
-    if project is None:
-        return shared.resolve_file(relpath)
-    root = project_files.root_for(project)
-    return project_files.resolve_file(root, relpath, unlocked) if root else None
-
-
 def is_file(connection_id: str) -> bool:
     return connection_id.startswith(FILE_PREFIX)
 
@@ -212,7 +205,7 @@ def open_path(found: Path) -> dict:
 
 def open_file(project: Optional[str], relpath: str, unlocked: bool) -> dict:
     try:
-        found = _located(project, relpath, unlocked)
+        found = project_files.located(project, relpath, unlocked)
     except ValueError as exc:
         raise DatabaseError(INVALID, relpath) from exc
     if found is None:

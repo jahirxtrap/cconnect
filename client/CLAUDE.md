@@ -116,6 +116,22 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
 - A database file's preview (`DatabaseFile`) reuses `DatabaseTree`; the extensions come from the
   backend's `engines.json` at build time.
 
+## Devices (`screens/devices/`)
+
+- The panel's state is the server's `state` snapshot, kept per environment and per stored key in
+  `services/devices.svelte.ts` and pushed over `/devices/ws`; the list has no refresh. Locking
+  and the `KeyGate` follow Databases.
+- `DeviceScreen` paints with `ui/framePainter` like the server browser and talks to
+  `/devices/<serial>/screen` through `services/deviceScreenSocket.ts`; touches go out in the
+  video's pixels, so the canvas scales them from its own box. The keys row is `ui/SoftKeys` with
+  `deviceKeys.ts`, the same component the terminal uses.
+- The pair dialog's QR is `ui/QrCode` with the `WIFI:T:ADB;…` text the server makes. A pairing
+  (QR or code) moves the dialog to the Address tab with the phone's IP, since adb only connects
+  by itself where mDNS works; the dialog closes once a device with that address is listed.
+- Install APK takes the file from the server (`ui/PathPickerDialog`, an absolute path) or from
+  the client device (an upload to Shared); the header button asks which device when several are
+  ready. An action's failure is shown until the server's next snapshot, which makes it stale.
+
 ## Mods (`screens/mods/`)
 
 `ModSurface` (one per chat) holds the snapshot, `ModSite` measures a site and asks for its tree,

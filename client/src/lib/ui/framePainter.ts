@@ -1,5 +1,4 @@
-import type { StreamInfo } from "$lib/services/browserSocket";
-import { surfacePainter } from "./frameSurface";
+import { surfacePainter, type StreamInfo } from "./frameSurface";
 
 export interface FramePainter {
   frame: (buffer: ArrayBuffer) => void;

@@ -287,6 +287,13 @@ def resolve_file(root: Path, relpath: str, unlocked: bool = False) -> Optional[P
     return path
 
 
+def located(project: Optional[str], relpath: str, unlocked: bool) -> Optional[Path]:
+    if project is None:
+        return shared.resolve_file(relpath)
+    root = root_for(project)
+    return resolve_file(root, relpath, unlocked) if root else None
+
+
 def archive_listing(root: Path, relpath: str, inner: str = "", unlocked: bool = False) -> list[dict]:
     path = resolve_file(root, relpath, unlocked)
     if path is None:

@@ -23,8 +23,8 @@
   import BrowserTabIcon from "./BrowserTabIcon.svelte";
   import { boundsOf, BrowserLayer, coverOf } from "./browserLayer";
   import { rememberBrowser, takeBrowser } from "./browserMemory";
-  import { framePainter, type FramePainter } from "./framePainter";
-  import { JPEG_KIND } from "./frameSurface";
+  import { framePainter, type FramePainter } from "$lib/ui/framePainter";
+  import { JPEG_KIND } from "$lib/ui/frameSurface";
   import type { BrowserEntry, BrowserSide } from "./browserTabs";
   import {
     androidBrowsing,

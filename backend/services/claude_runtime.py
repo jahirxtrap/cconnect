@@ -142,6 +142,10 @@ def _browser_guide(capabilities: list[str]) -> str:
         return ""
 
 
+def _devices_guide(capabilities: list[str]) -> str:
+    return _prompt_file("DEVICES.md") if "devices" in capabilities else ""
+
+
 def _prompt_file(name: str) -> str:
     try:
         return (paths.PROMPTS_DIR / name).read_text(encoding="utf-8").strip()
@@ -161,6 +165,7 @@ def _extra_guides(cwd: Optional[str], capabilities: Optional[list[str]], scope: 
         _blocks_guide(caps),
         _tools_guide(caps) if scope["cconnect"] else "",
         _browser_guide(caps) if scope["cconnect"] else "",
+        _devices_guide(caps) if scope["cconnect"] else "",
         _install_guide(caps) if scope["cconnect"] else "",
         _suggestions_guide(),
         _mods_guide() if scope["project_files"] else "",

@@ -2,6 +2,7 @@
 
 import functools
 import os
+import re
 import shutil
 import subprocess
 import tarfile
@@ -9,6 +10,7 @@ import tempfile
 import time
 import zipfile
 from contextlib import suppress
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -23,11 +25,26 @@ from services import files, shared_links
 COMPRESS_FORMATS = {"zip": ".zip", "7z": ".7z", "rar": ".rar", "tar.gz": ".tar.gz", "tar.xz": ".tar.xz"}
 _ARCHIVE_SUFFIXES = (".zip", ".7z", ".rar", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz")
 _CHUNK_BYTES = 64 * 1024
+_UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+_STAMP = "%Y%m%d-%H%M%S"
 
 
 def _base() -> Path:
     paths.SHARED_DIR.mkdir(parents=True, exist_ok=True)
     return paths.SHARED_DIR
+
+
+def file_safe(name: str) -> str:
+    return _UNSAFE.sub("_", name).strip("._-")
+
+
+def dated_file(folder: Path, base: str, extension: str) -> Path:
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder / f"{base}-{datetime.now().strftime(_STAMP)}.{extension}"
+
+
+def relative(target: Path) -> str:
+    return target.relative_to(_base()).as_posix()
 
 
 def project_dir(project_key: str) -> Path:
