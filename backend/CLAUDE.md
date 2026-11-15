@@ -189,8 +189,11 @@ left the prompt to arrive as a `tail` and the sender saw it twice.
   and ACP agents together) and `registry.trim` releases the least recently used idle ones.
 - The grace (`session_grace`) is one timer, started when the last socket leaves or, if work is
   running, when it ends (`_schedule_cooldown`); nothing polls it.
-- A turn whose `mark` differs (model, effort, permission mode, mods, capabilities) or whose
-  account differs restarts the CLI. A turn the CLI starts on its own is adopted (`own_turn`)
+- A turn whose `mark` differs only in model or permission mode changes them live
+  (`PersistentSession.retune`, inside the bound turn); any other difference (effort, mods,
+  capabilities, scope…) or another account restarts the CLI. A change sent mid-turn
+  (`set_model`, `set_permission_mode`) updates the resident's mark too, so the next turn does not
+  repeat it. A turn the CLI starts on its own is adopted (`own_turn`)
   with `resident(keep=True)` and never reshapes the process.
 - A restart kills the CLI's background tasks, so while `LiveSession.tasks_alive` a differing
   `mark` does not restart: the model and permission mode change live (`PersistentSession.retune`)

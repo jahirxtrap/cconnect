@@ -1033,11 +1033,13 @@ async def run_prompt(
             await resident.close("rewinding" if resume_at else "forking")
         elif resident.connected and resident.mark != mark:
             running = resident.mark or {}
-            if tasks_alive:
-                retune = {key: mark[key] for key in _LIVE_MARK if running.get(key) != mark[key]}
-                mark = {**running, **retune}
+            changed = [key for key in mark if running.get(key) != mark[key]]
+            if tasks_alive or all(key in _LIVE_MARK for key in changed):
+                retune = {key: mark[key] for key in _LIVE_MARK if key in changed}
+                if tasks_alive:
+                    mark = {**running, **retune}
             else:
-                await resident.close(", ".join(sorted(key for key in mark if running.get(key) != mark[key])) + " changed")
+                await resident.close(", ".join(sorted(changed)) + " changed")
         resident.mark = mark
 
     content = [{"type": "text", "text": prompt}, *images] if images else prompt

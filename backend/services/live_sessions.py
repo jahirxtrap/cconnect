@@ -930,12 +930,22 @@ class LiveSession:
     async def _send_stop(self):
         return await self._send_control("interrupt")
 
+    def _retuned(self, key: str, value) -> None:
+        if self._resident is not None and self._resident.mark:
+            self._resident.mark = {**self._resident.mark, key: value}
+
     async def set_model(self, model: str | None) -> bool:
         """Retarget the model of the turn already running."""
-        return await self._send_control("set_model", model=model)
+        changed = await self._send_control("set_model", model=model)
+        if changed:
+            self._retuned("model", model)
+        return changed
 
     async def set_permission_mode(self, mode: str) -> bool:
-        return await self._send_control("set_permission_mode", mode=mode)
+        changed = await self._send_control("set_permission_mode", mode=mode)
+        if changed:
+            self._retuned("permission_mode", mode)
+        return changed
 
     async def stop_task(self, tool_use_id: str) -> bool:
         owned = self._owned.get(tool_use_id)
