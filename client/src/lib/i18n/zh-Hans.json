@@ -409,6 +409,8 @@
   "MOD_AREA_AUDIO": "音频",
   "MOD_AREA_SESSION": "会话",
   "PLUGIN_LOCAL": "本地",
+  "PLUGIN_NOT_LOADED": "未加载",
+  "PLUGIN_NEEDS_CLI": "需要 Claude Code {1}",
   "PLUGIN_OPTIONS": "选项",
   "PLUGIN_OPTION_KEPT": "已保存；输入内容即可替换",
   "PLUGIN_FROM_FOLDER": "从文件夹",

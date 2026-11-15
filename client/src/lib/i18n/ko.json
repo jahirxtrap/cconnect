@@ -409,6 +409,8 @@
   "MOD_AREA_AUDIO": "오디오",
   "MOD_AREA_SESSION": "세션",
   "PLUGIN_LOCAL": "로컬",
+  "PLUGIN_NOT_LOADED": "로드 안 됨",
+  "PLUGIN_NEEDS_CLI": "Claude Code {1} 필요",
   "PLUGIN_OPTIONS": "옵션",
   "PLUGIN_OPTION_KEPT": "저장됨. 바꾸려면 새로 입력하세요",
   "PLUGIN_FROM_FOLDER": "폴더에서",

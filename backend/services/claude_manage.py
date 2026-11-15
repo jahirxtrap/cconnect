@@ -31,6 +31,8 @@ _COPY_SKIPS = (".git", "node_modules")
 _SECURE_GIT = "https://"
 _SKILL_FILE = "SKILL.md"
 _CLONE_TIMEOUT = 120
+_REPORT_TIMEOUT = 60
+_VERSION_REFUSED = "engine-range-unsatisfied"
 
 
 def _cli() -> str | None:
@@ -60,10 +62,24 @@ def _run(args: list[str], timeout: int = 300, cwd: str | None = None, stdin: str
 def _report(args: list[str], cwd: str | None = None) -> dict | None:
     """The CLI's JSON report, read whatever its exit code says."""
     try:
-        data = json.loads(_exec([*args, "--json"], 60, cwd, None).stdout)
+        data = json.loads(_exec([*args, "--json"], _REPORT_TIMEOUT, cwd, None).stdout)
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def version_refused() -> set[str]:
+    """The plugins the CLI does not load because their Claude Code version range leaves it out."""
+    try:
+        listed = json.loads(_exec(["plugin", "list", "--json"], _REPORT_TIMEOUT, None, None).stdout)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return set()
+    return {
+        entry["id"]
+        for entry in (listed if isinstance(listed, list) else ())
+        if isinstance(entry, dict) and isinstance(entry.get("id"), str)
+        and any(isinstance(detail, dict) and detail.get("type") == _VERSION_REFUSED for detail in entry.get("errorDetails") or ())
+    }
 
 
 def _plugin_install_info(plugin: str) -> tuple[str | None, str | None]:

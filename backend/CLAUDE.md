@@ -97,6 +97,13 @@ the `serverInfo` its stored catalog holds, else its plugin's) reach the apps onl
 other image is decoded and encoded again, and an `https:` icon is fetched by the server, without
 credentials or redirects; the apps never fetch an icon's own URL.
 
+A relative-path plugin of a marketplace added from a local path is read where the CLI loads it, in
+place (`_in_place`), not from its copy in `cache/`. A plugin's MCP servers are read in the CLI's order: its `.mcp.json`, then each `mcpServers` shape
+(a JSON file, an inline map, a `.mcpb`/`.dxt` bundle named by its own manifest, or a list of them).
+A bundle's config keeps `${__dirname}`, so it stays with the CLI. `listed_plugins` asks
+`claude plugin list --json` which plugins the CLI refuses for their `engines["claude-code"]` range,
+and only when one declares it.
+
 ## Chat socket (`/api/chat/ws`)
 
 - Every event is typed in `schemas/chat_events.py`. `python -m schemas.contract` writes

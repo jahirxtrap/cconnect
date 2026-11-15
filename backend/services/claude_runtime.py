@@ -624,29 +624,21 @@ def _build_can_use_tool(
             tool_display = (tool_input.get("plan") or "").strip()
         else:
             tool_display = _format_tool_input(tool_input)
+        persist = [
+            suggestion for suggestion in (getattr(ctx, "suggestions", []) or [])
+            if getattr(suggestion, "destination", None) == "localSettings"
+        ]
+        always = [{"id": "allow_always"}] if persist and tool_name != "ExitPlanMode" else []
         response = await ask_user({
             "kind": "permission",
             "tool_name": _display_tool_name(tool_name),
             "tool_use_id": getattr(ctx, "tool_use_id", None),
             "input": tool_display,
-            "options": (
-                [{"id": "allow"}, {"id": "deny"}, {"id": "different"}]
-                if tool_name == "ExitPlanMode"
-                else [
-                    {"id": "allow"},
-                    {"id": "allow_always"},
-                    {"id": "deny"},
-                    {"id": "different"},
-                ]
-            ),
+            "options": [{"id": "allow"}, *always, {"id": "deny"}, {"id": "different"}],
             "free_text": "off",
         })
         option = response.get("option_id")
         if option == "allow_always":
-            persist = [
-                s for s in (getattr(ctx, "suggestions", []) or [])
-                if getattr(s, "destination", None) == "localSettings"
-            ]
             return PermissionResultAllow(updated_input=tool_input, updated_permissions=persist)
         if option == "allow":
             return PermissionResultAllow(updated_input=tool_input)

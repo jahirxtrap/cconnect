@@ -15,6 +15,7 @@ export interface Plugin {
   options: boolean;
   local: boolean;
   icon: string | null;
+  needsCli: string | null;
 }
 
 export const pluginKey = (plugin: Plugin) => `${plugin.name}@${plugin.marketplace}`;
@@ -247,6 +248,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
           options: item.options === true,
           local: item.local === true,
           icon: item.icon ?? null,
+          needsCli: item.needs_cli ?? null,
         })),
       marketplaces: (data.marketplaces ?? [])
         .filter((item: Wire) => item.name)

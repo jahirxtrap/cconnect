@@ -409,6 +409,8 @@
   "MOD_AREA_AUDIO": "Audio",
   "MOD_AREA_SESSION": "Sitzung",
   "PLUGIN_LOCAL": "Lokal",
+  "PLUGIN_NOT_LOADED": "Nicht geladen",
+  "PLUGIN_NEEDS_CLI": "Benötigt Claude Code {1}",
   "PLUGIN_OPTIONS": "Optionen",
   "PLUGIN_OPTION_KEPT": "Gespeichert; zum Ersetzen neu eingeben",
   "PLUGIN_FROM_FOLDER": "Aus einem Ordner",

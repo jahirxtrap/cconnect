@@ -144,7 +144,7 @@ def set_project_prompt(body: ProjectPromptBody):
 @router.get("/claude/plugins")
 async def get_plugins():
     await claude_manage.ensure_official_marketplace()
-    plugins = claude_assets.list_plugins()
+    plugins = await asyncio.to_thread(claude_assets.listed_plugins)
     return api_response(data={
         "plugins": plugins,
         "marketplaces": claude_assets.list_marketplaces(),

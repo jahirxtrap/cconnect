@@ -4,6 +4,7 @@ plus the user prompt (USER.md) appended after the system context (CCONNECT.md)."
 import json
 import os
 import re
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,19 +17,32 @@ from services import accounts, asset_icons, claude_manage, cli_settings
 
 _CLAUDE_DIR = Path.home() / ".claude"
 SKILLS_DIR = _CLAUDE_DIR / "skills"
-KNOWN_MARKETPLACES = _CLAUDE_DIR / "plugins" / "known_marketplaces.json"
+_PLUGINS_DIR = _CLAUDE_DIR / "plugins"
+KNOWN_MARKETPLACES = _PLUGINS_DIR / "known_marketplaces.json"
+_PLUGIN_META_DIR = Path(".claude-plugin")
+_CATALOG_FILE = _PLUGIN_META_DIR / "marketplace.json"
+_FILE_MARKETPLACE = "file"
+_LOCAL_MARKETPLACES = (_FILE_MARKETPLACE, "directory")
+_MARKETPLACE_ROOT = "."
+_RELATIVE_SOURCE = "./"
 LOCAL_MARKETPLACE = "skills-dir"
 _CHAT_MODS_DIR = _CLAUDE_DIR / "dev-mods"
-_MANIFEST = Path(".claude-plugin") / "plugin.json"
+_MANIFEST = _PLUGIN_META_DIR / "plugin.json"
 _HOOKS_FILE = "hooks/hooks.json"
 _PROJECT_KEY_RE = re.compile(r"^[A-Za-z0-9-]+$")
 _CLAUDE_JSON = Path.home() / ".claude.json"
 _SETTINGS_FILE = _CLAUDE_DIR / "settings.json"
 _SETTINGS_LOCAL_FILE = "settings.local.json"
-_INSTALLED_PLUGINS = _CLAUDE_DIR / "plugins" / "installed_plugins.json"
+_INSTALLED_PLUGINS = _PLUGINS_DIR / "installed_plugins.json"
+_ENGINE = "claude-code"
 _MCP_USER_SOURCE = "user"
 _MCP_OAUTH_TYPES = ("http", "sse")
 _MCP_FILE = ".mcp.json"
+_BUNDLES_DIR = _PLUGINS_DIR / "mcpb"
+_BUNDLE_SUFFIXES = (".mcpb", ".dxt")
+_BUNDLE_URL = "https://"
+_BUNDLE_MANIFEST = "manifest.json"
+_BUNDLE_RECORDS = "*.metadata.json"
 _MCP_AUTH_CACHE = _CLAUDE_DIR / "mcp-needs-auth-cache.json"
 _MCP_TOOL_CHARS = re.compile(r"[^A-Za-z0-9_-]")
 _CLAUDEAI_CONNECTED = "claudeAiMcpEverConnected"
@@ -142,28 +156,75 @@ def list_marketplaces() -> list[dict]:
     return items
 
 
-def _catalog_descriptions(marketplace: str) -> dict[str, str]:
-    known = known_marketplaces()
-    location = (known.get(marketplace) or {}).get("installLocation")
+@dataclass(frozen=True)
+class _Marketplace:
+    root: Path | None
+    catalog: dict
+    local: bool
+
+
+def _marketplace(info: object) -> _Marketplace:
+    """A known marketplace's root and catalog; one added from a local file reads that file where it is."""
+    location = info.get("installLocation") if isinstance(info, dict) else None
     if not location:
-        return {}
-    data = _read_json(Path(location) / ".claude-plugin" / "marketplace.json")
-    return {
-        p["name"]: p.get("description")
-        for p in data.get("plugins", [])
-        if isinstance(p, dict) and p.get("name") and p.get("description")
-    }
+        return _Marketplace(None, {}, False)
+    source = info.get("source")
+    kind = source.get("source") if isinstance(source, dict) else None
+    named = source.get("path") if kind == _FILE_MARKETPLACE else None
+    catalog = Path(named) if named else Path(location) / _CATALOG_FILE
+    return _Marketplace(Path(location), _read_json(catalog), kind in _LOCAL_MARKETPLACES)
+
+
+def _catalog_plugins(catalog: dict) -> list[dict]:
+    plugins = catalog.get("plugins")
+    return [entry for entry in plugins if isinstance(entry, dict) and entry.get("name")] if isinstance(plugins, list) else []
+
+
+def _catalog_entry(market: _Marketplace, name: str) -> dict:
+    return next((entry for entry in _catalog_plugins(market.catalog) if entry["name"] == name), {})
+
+
+def _in_place(market: _Marketplace, entry: dict) -> Path | None:
+    """Where the CLI loads a relative-path plugin of a marketplace added from a local path, instead of its cached copy."""
+    source = entry.get("source")
+    if not market.local or market.root is None or not isinstance(source, str):
+        return None
+    if source == _MARKETPLACE_ROOT or source.startswith(_RELATIVE_SOURCE):
+        return market.root / source
+    metadata = market.catalog.get("metadata")
+    base = metadata.get("pluginRoot") if isinstance(metadata, dict) else None
+    return market.root / base / source if isinstance(base, str) and "/" not in source else None
+
+
+def _install_root(market: _Marketplace, entry: dict, install: dict) -> Path | None:
+    path = install.get("installPath")
+    return _in_place(market, entry) or (Path(path) if path else None)
 
 
 def read_manifest(root: Path) -> dict:
     return _read_json(root / _MANIFEST)
 
 
+def plugin_id(plugin: dict) -> str:
+    return f"{plugin['name']}@{plugin['marketplace']}"
+
+
+def _declared(manifest: dict, key: str, default: str) -> list:
+    """The plugin's default file for a component, then each shape its manifest declares, in the CLI's load order."""
+    declared = manifest.get(key)
+    return [default, *(declared if isinstance(declared, list) else [declared])]
+
+
+def _engine_range(manifest: dict) -> str | None:
+    engines = manifest.get("engines")
+    wanted = engines.get(_ENGINE) if isinstance(engines, dict) else None
+    return wanted if isinstance(wanted, str) else None
+
+
 def _hook_configs(root: Path, manifest: dict) -> list[dict]:
-    declared = manifest.get("hooks")
     configs = []
     seen: set[Path] = set()
-    for source in [_HOOKS_FILE, *(declared if isinstance(declared, list) else [declared])]:
+    for source in _declared(manifest, "hooks", _HOOKS_FILE):
         if isinstance(source, dict):
             configs.append(source)
         elif isinstance(source, str) and (path := (root / source).resolve()) not in seen:
@@ -187,6 +248,7 @@ def _plugin_item(name: str, marketplace: str, root: Path | None, manifest: dict 
         "install_path": str(root) if root else None,
         "mod": root is not None and _is_mod(root, manifest),
         "options": bool(manifest.get("userConfig")),
+        "engine": _engine_range(manifest),
         "local": marketplace == LOCAL_MARKETPLACE,
         "icon": asset_icons.file_version(icon) if icon else None,
     }
@@ -213,26 +275,34 @@ def _local_plugins(taken: set[str], enabled: dict) -> list[dict]:
 def list_plugins() -> list[dict]:
     installed = _read_json(_INSTALLED_PLUGINS).get("plugins", {})
     enabled = _enabled_plugins()
-    descriptions: dict[str, dict[str, str]] = {}
+    known = known_marketplaces()
+    markets: dict[str, _Marketplace] = {}
     items = []
     for key, installs in installed.items():
         if not isinstance(installs, list) or not installs:
             continue
         name, _, marketplace = key.partition("@")
         info = installs[0]
-        if marketplace not in descriptions:
-            descriptions[marketplace] = _catalog_descriptions(marketplace)
-        path = info.get("installPath")
+        if marketplace not in markets:
+            markets[marketplace] = _marketplace(known.get(marketplace))
+        entry = _catalog_entry(markets[marketplace], name)
         items.append(_plugin_item(
-            name, marketplace, Path(path) if path else None,
+            name, marketplace, _install_root(markets[marketplace], entry, info),
             version=(info.get("version") or "").replace("unknown", "") or None,
             scope=info.get("scope"),
             enabled=bool(enabled.get(key, True)),
-            description=descriptions[marketplace].get(name),
+            description=entry.get("description"),
         ))
     items += _local_plugins({item["name"] for item in items}, enabled)
     items.sort(key=lambda p: (not p["enabled"], p["name"]))
     return items
+
+
+def listed_plugins() -> list[dict]:
+    """The plugins, each with the Claude Code version range the CLI refuses to load it for, if it does."""
+    plugins = list_plugins()
+    refused = claude_manage.version_refused() if any(plugin["engine"] for plugin in plugins) else set()
+    return [{**plugin, "needs_cli": plugin["engine"] if plugin_id(plugin) in refused else None} for plugin in plugins]
 
 
 def plugin_root(plugin: str) -> Path | None:
@@ -240,8 +310,10 @@ def plugin_root(plugin: str) -> Path | None:
     if marketplace == LOCAL_MARKETPLACE:
         return next((Path(item["install_path"]) for item in _local_plugins(set(), {}) if item["name"] == name), None)
     installs = _read_json(_INSTALLED_PLUGINS).get("plugins", {}).get(plugin)
-    path = installs[0].get("installPath") if isinstance(installs, list) and installs else None
-    return Path(path) if path else None
+    if not isinstance(installs, list) or not installs:
+        return None
+    market = _marketplace(known_marketplaces().get(marketplace))
+    return _install_root(market, _catalog_entry(market, name), installs[0])
 
 
 def _plugin_icon(root: Path | None) -> Path | None:
@@ -317,7 +389,7 @@ def list_skills() -> list[dict]:
                 "name": name,
                 "id": skill_file.parent.name,
                 "description": meta.get("description"),
-                "plugin": f"{plugin['name']}@{plugin['marketplace']}",
+                "plugin": plugin_id(plugin),
                 "plugin_name": plugin["name"],
                 "enabled": plugin["enabled"],
             })
@@ -355,7 +427,7 @@ def _hook_entries(config: dict, source: str, plugin: dict | None = None) -> list
                     "url": hook.get("url"),
                     "timeout": hook.get("timeout"),
                     "source": source,
-                    "plugin": f"{plugin['name']}@{plugin['marketplace']}" if plugin else None,
+                    "plugin": plugin_id(plugin) if plugin else None,
                     "plugin_name": plugin["name"] if plugin else None,
                 })
     return items
@@ -422,19 +494,12 @@ def read_skill(plugin: str | None, skill_id: str, file: str = "SKILL.md") -> str
 
 
 def marketplace_catalog(name: str) -> list[dict]:
-    known = known_marketplaces()
-    info = known.get(name)
+    info = known_marketplaces().get(name)
     if not isinstance(info, dict):
         raise ValueError("unknown marketplace")
-    location = info.get("installLocation")
-    if not location:
-        return []
-    data = _read_json(Path(location) / ".claude-plugin" / "marketplace.json")
     installed = {(p["name"], p["marketplace"]) for p in list_plugins()}
     items = []
-    for plugin in data.get("plugins", []):
-        if not isinstance(plugin, dict) or not plugin.get("name"):
-            continue
+    for plugin in _catalog_plugins(_marketplace(info).catalog):
         items.append({
             "name": plugin["name"],
             "description": plugin.get("description"),
@@ -562,12 +627,44 @@ def _mcp_map(servers: object) -> dict:
     return {name: cfg for name, cfg in servers.items() if isinstance(cfg, dict)} if isinstance(servers, dict) else {}
 
 
-def _plugin_mcp(root: Path) -> dict:
-    declared = read_manifest(root).get("mcpServers")
-    if isinstance(declared, dict):
-        return _mcp_map(declared)
-    data = _read_json(root / (declared if isinstance(declared, str) else _MCP_FILE))
+def _bundle_manifest(root: Path, source: str) -> dict:
+    """A bundle's manifest, from the archive the plugin ships or from the copy the CLI extracted from a URL."""
+    if source.startswith(_BUNDLE_URL):
+        records = (_read_json(path) for path in _BUNDLES_DIR.glob(_BUNDLE_RECORDS))
+        extracted = next((record.get("extractedPath") for record in records if record.get("source") == source), None)
+        return _read_json(Path(extracted) / _BUNDLE_MANIFEST) if extracted else {}
+    try:
+        with zipfile.ZipFile(root / source) as archive:
+            manifest = json.loads(archive.read(_BUNDLE_MANIFEST))
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile):
+        return {}
+    return manifest if isinstance(manifest, dict) else {}
+
+
+def _bundle_mcp(root: Path, source: str) -> dict:
+    manifest = _bundle_manifest(root, source)
+    server = manifest.get("server")
+    config = server.get("mcp_config") if isinstance(server, dict) else None
+    name = manifest.get("name")
+    return {name: config} if isinstance(name, str) and isinstance(config, dict) else {}
+
+
+def _mcp_source(root: Path, source: object) -> dict:
+    if isinstance(source, dict):
+        return _mcp_map(source)
+    if not isinstance(source, str):
+        return {}
+    if source.lower().endswith(_BUNDLE_SUFFIXES):
+        return _bundle_mcp(root, source)
+    data = _read_json(root / source)
     return _mcp_map(data.get("mcpServers", data))
+
+
+def _plugin_mcp(root: Path) -> dict:
+    servers: dict = {}
+    for source in _declared(read_manifest(root), "mcpServers", _MCP_FILE):
+        servers.update(_mcp_source(root, source))
+    return servers
 
 
 def _same_folder(first: str, second: str) -> bool:

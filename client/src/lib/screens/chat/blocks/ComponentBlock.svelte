@@ -275,7 +275,9 @@
     </div>
   {:else}
     {#if pages.length === 1 && pages[0].label?.trim()}
-      <SelectChip label={pages[0].label} selected />
+      <div class="flex">
+        <SelectChip label={pages[0].label} selected />
+      </div>
       <div class="h-1"></div>
     {/if}
     <div class="chat-gap flex flex-col">

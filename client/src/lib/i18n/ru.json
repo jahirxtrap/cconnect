@@ -421,6 +421,8 @@
   "MOD_AREA_AUDIO": "Аудио",
   "MOD_AREA_SESSION": "Сеанс",
   "PLUGIN_LOCAL": "Локальный",
+  "PLUGIN_NOT_LOADED": "Не загружен",
+  "PLUGIN_NEEDS_CLI": "Нужен Claude Code {1}",
   "PLUGIN_OPTIONS": "Параметры",
   "PLUGIN_OPTION_KEPT": "Сохранено; введите новое значение, чтобы заменить",
   "PLUGIN_FROM_FOLDER": "Из папки",

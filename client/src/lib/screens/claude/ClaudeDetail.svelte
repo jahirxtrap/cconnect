@@ -877,7 +877,7 @@
               {#each filteredPlugins as plugin (pluginKey(plugin))}
                 <ClaudeCard
                   title={plugin.name}
-                  tag={plugin.mod ? t("MOD") : null}
+                  tag={plugin.needsCli ? t("PLUGIN_NOT_LOADED") : plugin.mod ? t("MOD") : null}
                   enabled={plugin.enabled}
                   source={joined(plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace, plugin.version, plugin.scope)}
                   description={plugin.description}
@@ -1123,6 +1123,9 @@
     ].filter((fact) => fact.text)}
     {#if plugin.description}
       <p class="text-body-md text-on-surface-variant">{plugin.description}</p>
+    {/if}
+    {#if plugin.needsCli}
+      <ErrorText text={t("PLUGIN_NEEDS_CLI", plugin.needsCli)} />
     {/if}
     <FactList {rows} />
     {#if plugin.mod && pluginReview}
