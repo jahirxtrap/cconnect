@@ -105,6 +105,19 @@ def set(key: str, value: Any) -> None:
         _overrides.pop(key, None)
     else:
         _overrides[key] = value
+    announce()
+
+
+def everything() -> dict[str, dict]:
+    from services import cli_settings
+
+    return {**describe(), **cli_settings.describe()}
+
+
+def announce() -> None:
+    from services import chat_list
+
+    chat_list.hub.publish([{"type": "settings_changed", "settings": everything()}])
 
 
 def reset() -> None:
@@ -115,3 +128,4 @@ def reset() -> None:
             row.value = None
         s.commit()
     _overrides.clear()
+    announce()

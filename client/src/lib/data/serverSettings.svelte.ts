@@ -1,5 +1,6 @@
 import { untrack } from "svelte";
 import { loads } from "$lib/data/inflight";
+import { serverDefaults } from "$lib/data/serverDefaults.svelte";
 import { backend, type Profile } from "$lib/services/backend.svelte";
 import { capabilitiesApi, type Capabilities } from "$lib/services/capabilitiesApi";
 import { settingsApi, type SettingsPatch, type SettingsSnapshot } from "$lib/services/settingsApi";
@@ -54,6 +55,12 @@ class ServerSettings {
     const result = await settingsApi.update(patch);
     if (result) this.snapshot = result;
     return result;
+  }
+
+  adopt(profile: Profile, snapshot: SettingsSnapshot) {
+    if (!profile || profile.id !== this.#loadedFor) return;
+    this.snapshot = snapshot;
+    serverDefaults.bump();
   }
 }
 

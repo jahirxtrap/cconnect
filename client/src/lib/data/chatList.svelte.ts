@@ -9,11 +9,12 @@ import {
   type ProjectInfo,
   type SessionInfo,
 } from "./models";
+import { serverSettings } from "./serverSettings.svelte";
 import { settings } from "./settings.svelte";
 import { backend, isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
 import { createHttp } from "$lib/services/http";
 import { notifier } from "$lib/services/notifier.svelte";
-import { createSettingsApi, type SettingsSnapshot } from "$lib/services/settingsApi";
+import { createSettingsApi, parseSettings, type SettingsSnapshot, type SettingsWire } from "$lib/services/settingsApi";
 import { ReconnectingSocket } from "$lib/services/socket";
 
 const byLastActive = <T extends { lastActive: number | null }>(items: T[]) =>
@@ -49,8 +50,10 @@ export class ChatListStore {
 
   #socket: ReconnectingSocket;
   #settings: ReturnType<typeof createSettingsApi>;
+  #profile: Profile;
 
   constructor(profile: Profile) {
+    this.#profile = profile;
     this.#settings = createSettingsApi(createHttp(() => profile));
     void this.#loadSettings();
     this.#socket = new ReconnectingSocket(
@@ -245,6 +248,12 @@ export class ChatListStore {
       case "project_removed":
         this.forgetProject(message.project_key as string);
         break;
+      case "settings_changed": {
+        const snapshot = parseSettings((message.settings as SettingsWire) ?? {});
+        this.applySettings(snapshot);
+        serverSettings.adopt(this.#profile, snapshot);
+        break;
+      }
     }
   }
 }

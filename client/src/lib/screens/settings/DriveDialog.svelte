@@ -138,7 +138,7 @@
         <div
           data-press
           class="flex min-h-10 items-center rounded-md pr-1 transition-colors hover:bg-hover {driveBackups.busy
-            ? 'opacity-50'
+            ? 'opacity-40'
             : ''}"
         >
           <div class="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5">

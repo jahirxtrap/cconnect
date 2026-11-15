@@ -242,7 +242,9 @@ Model, effort, permission mode, streaming, CLI source and block visibility are b
 the `settings` table. `show_thinking` / `show_tool_use` / `show_file_change` / `show_compact` take
 `full | label | off`, applied the same live and on resume; `label` never strips an agent's
 subtasks. Simple mode never hides file changes, shared files, query blocks, forms or the
-`task_*` / `agent_result` events Running needs.
+`task_*` / `agent_result` events Running needs. Every write (`settings_store.set` / `reset`,
+`cli_settings.set` / `reset`) ends in `settings_store.announce`, which pushes the whole
+`settings_changed` payload on the list socket, so no client keeps a stale copy.
 
 ## MCP server (`mcps/`)
 
@@ -333,8 +335,9 @@ PATH, in the SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT`, the default folders) or in
 
 ## Configuration
 
-Environment variables, declared in `core/config.py`, which loads `backend/.env` in a checkout.
-The table lives in the root `README.md` only.
+Environment variables, declared in `core/config.py`. A checkout's `backend/.env` is loaded by
+`core/paths` before any path is computed, so the supervisor and the server it runs agree on the
+data folder and `cconnect restart` reaches both. The table lives in the root `README.md` only.
 
 ## Conventions
 

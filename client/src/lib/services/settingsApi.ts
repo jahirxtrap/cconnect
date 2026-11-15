@@ -92,15 +92,15 @@ export interface SettingsPatch {
 export const RETENTION_FOREVER_DAYS = 36500;
 
 type Field = { effective?: unknown; default?: unknown; minimum?: unknown; maximum?: unknown };
-type Wire = Record<string, Field | undefined>;
+export type SettingsWire = Record<string, Field | undefined>;
 
-const boundOf = (wire: Wire, key: string, bound: "minimum" | "maximum"): number | null =>
+const boundOf = (wire: SettingsWire, key: string, bound: "minimum" | "maximum"): number | null =>
   typeof wire[key]?.[bound] === "number" ? (wire[key]![bound] as number) : null;
 
-const boundNum = (wire: Wire, key: string, bound: "minimum" | "maximum", fallback: number): number =>
+const boundNum = (wire: SettingsWire, key: string, bound: "minimum" | "maximum", fallback: number): number =>
   boundOf(wire, key, bound) ?? fallback;
 
-const effective = <T>(wire: Wire, key: string, kind: string, fallback: T): T => {
+const effective = <T>(wire: SettingsWire, key: string, kind: string, fallback: T): T => {
   const field = wire[key];
   if (!field) return fallback;
   if (typeof field.effective === kind) return field.effective as T;
@@ -108,21 +108,21 @@ const effective = <T>(wire: Wire, key: string, kind: string, fallback: T): T => 
   return fallback;
 };
 
-const effectiveStr = (wire: Wire, key: string, fallback: string): string =>
+const effectiveStr = (wire: SettingsWire, key: string, fallback: string): string =>
   effective(wire, key, "string", fallback);
 
-const effectiveBool = (wire: Wire, key: string, fallback: boolean): boolean =>
+const effectiveBool = (wire: SettingsWire, key: string, fallback: boolean): boolean =>
   effective(wire, key, "boolean", fallback);
 
-const configured = <T>(wire: Wire, key: string, kind: string): T | null =>
+const configured = <T>(wire: SettingsWire, key: string, kind: string): T | null =>
   typeof wire[key]?.effective === kind ? (wire[key]!.effective as T) : null;
 
-const effectiveFlag = (wire: Wire, key: string): boolean | null => configured(wire, key, "boolean");
+const effectiveFlag = (wire: SettingsWire, key: string): boolean | null => configured(wire, key, "boolean");
 
-const effectiveNum = (wire: Wire, key: string, fallback: number): number =>
+const effectiveNum = (wire: SettingsWire, key: string, fallback: number): number =>
   effective(wire, key, "number", fallback);
 
-const parse = (wire: Wire): SettingsSnapshot => ({
+export const parseSettings = (wire: SettingsWire): SettingsSnapshot => ({
   account: effectiveStr(wire, "account", ""),
   model: effectiveStr(wire, "model", "opus[1m]"),
   effort: effectiveStr(wire, "effort", "xhigh"),
@@ -170,20 +170,20 @@ const parse = (wire: Wire): SettingsSnapshot => ({
 
 export const createSettingsApi = (http: HttpClient) => ({
   async get(): Promise<SettingsSnapshot | null> {
-    const data = await http.get<Wire>("/settings");
-    return data && parse(data);
+    const data = await http.get<SettingsWire>("/settings");
+    return data && parseSettings(data);
   },
 
   async update(patch: SettingsPatch): Promise<SettingsSnapshot | null> {
-    const data = await http.post<Wire>("/settings", patch);
+    const data = await http.post<SettingsWire>("/settings", patch);
     if (data) serverDefaults.bump();
-    return data && parse(data);
+    return data && parseSettings(data);
   },
 
   async reset(): Promise<SettingsSnapshot | null> {
-    const data = await http.post<Wire>("/settings/reset");
+    const data = await http.post<SettingsWire>("/settings/reset");
     if (data) serverDefaults.bump();
-    return data && parse(data);
+    return data && parseSettings(data);
   },
 });
 

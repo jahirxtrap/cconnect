@@ -7,11 +7,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PACKAGE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = PACKAGE_DIR.parent
 
 INSTALLED = not (BACKEND_DIR / "pyproject.toml").exists()
 """True when imported from a wheel rather than from a source tree."""
+
+if not INSTALLED:
+    load_dotenv(BACKEND_DIR / ".env")
 
 HOME_DATA_DIR = Path.home() / ".cconnect" / "data"
 

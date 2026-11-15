@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from services import files
+from services import files, settings_store
 
 _SETTINGS_FILE = "settings.json"
 _ATTRIBUTION = "attribution"
@@ -234,7 +234,7 @@ def describe() -> dict[str, dict]:
     }
 
 
-def set(key: str, value: Any) -> None:
+def _apply(key: str, value: Any) -> None:
     if key not in SETTINGS:
         raise KeyError(key)
     defn = SETTINGS[key]
@@ -256,6 +256,12 @@ def set(key: str, value: Any) -> None:
     _write(data)
 
 
+def set(key: str, value: Any) -> None:
+    _apply(key, value)
+    settings_store.announce()
+
+
 def reset() -> None:
     for key in SETTINGS:
-        set(key, None)
+        _apply(key, None)
+    settings_store.announce()

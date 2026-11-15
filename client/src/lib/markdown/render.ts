@@ -151,6 +151,28 @@ export const speakableParagraphs = (markdown: string): string[] => {
   return paragraphs;
 };
 
+const BLANK_RUN_RE = /\n{3,}/g;
+
+const fenceLang = (token: Token): string | null => token.info.trim().split(/\s+/)[0] || null;
+
+const fenceBlock = (token: Token): CconnectBlock | null =>
+  token.type === "fence" && fenceLang(token) === CCONNECT_LANG ? parseCconnectBlock(token.content) : null;
+
+export const withoutSuggestions = (markdown: string): string => {
+  const dropped = new Set<number>();
+  for (const token of md.parse(markdown, {})) {
+    if (!token.map || fenceBlock(token)?.type !== "suggestions") continue;
+    for (let line = token.map[0]; line < token.map[1]; line++) dropped.add(line);
+  }
+  if (!dropped.size) return markdown;
+  return markdown
+    .split("\n")
+    .filter((_line, index) => !dropped.has(index))
+    .join("\n")
+    .replace(BLANK_RUN_RE, "\n\n")
+    .trim();
+};
+
 const PLAIN_TEXT = new Set(["text", "text_special", "code_inline"]);
 const LINE_BREAKS = new Set(["softbreak", "hardbreak"]);
 const CODE_BLOCKS = new Set(["fence", "code_block"]);
@@ -268,9 +290,8 @@ const fromTokens = (tokens: Token[], flavor: MarkdownFlavor, level = 0): Segment
     const token = tokens[index];
     if (token.type === "fence" && token.level === level) {
       flush();
-      const lang = token.info.trim().split(/\s+/)[0] || null;
-      const block = lang === CCONNECT_LANG ? parseCconnectBlock(token.content) : null;
-      result.push(block ? { kind: "block", data: block } : { kind: "code", code: token.content, lang });
+      const block = fenceBlock(token);
+      result.push(block ? { kind: "block", data: block } : { kind: "code", code: token.content, lang: fenceLang(token) });
       continue;
     }
     if (LIST_OPEN.has(token.type) && token.level === level) {

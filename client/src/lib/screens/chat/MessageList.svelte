@@ -9,6 +9,7 @@
   import { speech, speechKey } from "$lib/platform/speech.svelte";
   import { plainTextSharing, sharePlainText } from "$lib/services/sharedFiles";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
+  import { withoutSuggestions } from "$lib/markdown/render";
   import ModInline from "$lib/screens/mods/ModInline.svelte";
   import type { SharedMenuHandler } from "$lib/ui/menuSurface";
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
@@ -172,8 +173,8 @@
       speaking: speech.speaking === speakKey(item) || speech.speaking === selectionKey(item),
       selection: selected !== null,
       onArm: () => (armed = selected),
-      onCopy: () => void copyText(item.text),
-      onShare: plainTextSharing() ? () => void sharePlainText(item.text) : null,
+      onCopy: () => void copyText(withoutSuggestions(item.text)),
+      onShare: plainTextSharing() ? () => void sharePlainText(withoutSuggestions(item.text)) : null,
       onSpeak: speech.available ? () => toggleSpeech(item) : null,
       onFork: replies && item.beforeCompaction === null && (item.uuid || last) ? () => replies.fork(item) : null,
       forkReady: !repliesBusy,

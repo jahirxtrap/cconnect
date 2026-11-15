@@ -12,13 +12,9 @@ from services import cli_settings, persistent_sessions, settings_store
 router = APIRouter(tags=["Settings"])
 
 
-def _all() -> dict[str, dict]:
-    return {**settings_store.describe(), **cli_settings.describe()}
-
-
 @router.get("/settings")
 def get_settings():
-    return api_response(data=_all())
+    return api_response(data=settings_store.everything())
 
 
 @router.post("/settings")
@@ -31,7 +27,7 @@ async def update_settings(body: dict[str, Any]):
         raise HTTPException(status_code=400, detail=str(exc))
     if not persistent_sessions.enabled():
         await persistent_sessions.pool.close_all("persistent sessions turned off")
-    return api_response(data=_all())
+    return api_response(data=settings_store.everything())
 
 
 @router.post("/settings/reset")
@@ -40,4 +36,4 @@ async def reset_settings():
     cli_settings.reset()
     if not persistent_sessions.enabled():
         await persistent_sessions.pool.close_all("persistent sessions turned off")
-    return api_response(data=_all())
+    return api_response(data=settings_store.everything())

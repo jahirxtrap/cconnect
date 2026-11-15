@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Bot from "@lucide/svelte/icons/bot";
+  import CirclePlay from "@lucide/svelte/icons/circle-play";
   import type { BackgroundTask } from "$lib/data/chatModels";
   import { formatDuration, formatTokens, joined } from "$lib/data/format";
   import { t } from "$lib/i18n/index.svelte";
@@ -22,7 +22,7 @@
 {#if tasks.length}
   <HeaderListMenu label={t("RUNNING_TASKS")} count={String(tasks.length)}>
     {#snippet trigger()}
-      <Bot size={18} class="text-accent" />
+      <CirclePlay size={18} class="text-accent" />
     {/snippet}
     {#each tasks as task (task.id)}
       <div class="flex min-h-8 items-center gap-2 py-0.5 pr-0.5 pl-2.5">

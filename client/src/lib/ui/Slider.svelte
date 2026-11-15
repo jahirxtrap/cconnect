@@ -37,7 +37,7 @@
 </script>
 
 <div class="flex items-center gap-3 {className}">
-  <div {...OWN_SWIPE} class="relative flex h-4 min-w-0 flex-1 items-center {enabled ? '' : 'opacity-50'}">
+  <div {...OWN_SWIPE} class="relative flex h-4 min-w-0 flex-1 items-center {enabled ? '' : 'opacity-40'}">
     <div class="relative h-1 w-full overflow-hidden rounded-full bg-outline-variant">
       {#if loaded !== null}
         <div class="absolute inset-y-0 left-0 rounded-full bg-faint" style="width: {reachOf(loaded)}"></div>
