@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from core.responses import api_response, derived_response, fixed_response
 from schemas.accounts import ProviderAuth
-from services import accounts, asset_icons, claude_assets, claude_manage, cli_login
+from services import accounts, asset_icons, claude_assets, claude_manage, cli_login, plugin_updates
 from services import claude_status
 from services import usage as usage_service
 
@@ -149,6 +149,7 @@ async def get_plugins():
         "plugins": plugins,
         "marketplaces": claude_assets.list_marketplaces(),
         "chat_mods": claude_assets.list_chat_mods({plugin["name"] for plugin in plugins}),
+        "updates": plugin_updates.updates.snapshot(),
     })
 
 
@@ -176,7 +177,11 @@ def mcp_icon(request: Request, name: str, cwd: str | None = None):
 
 @router.post("/claude/plugins/action")
 async def plugin_action(body: PluginActionBody):
-    result = await asyncio.to_thread(claude_manage.plugin_action, body.action, body.plugin)
+    if body.action == plugin_updates.UPDATE:
+        return api_response(data={"ok": True, "message": "", "updates": plugin_updates.updates.enqueue(body.plugin)})
+    plugin_updates.updates.forget(body.plugin)
+    async with plugin_updates.updates.lock:
+        result = await asyncio.to_thread(claude_manage.plugin_action, body.action, body.plugin)
     return api_response(data=await claude_manage.after_plugin_action(body.action, body.plugin, result))
 
 
@@ -213,8 +218,9 @@ async def add_local_plugin(body: LocalPluginBody):
 
 
 @router.post("/claude/marketplaces/action")
-def marketplace_action(body: MarketplaceActionBody):
-    return api_response(data=claude_manage.marketplace_action(body.action, body.target))
+async def marketplace_action(body: MarketplaceActionBody):
+    async with plugin_updates.updates.lock:
+        return api_response(data=await asyncio.to_thread(claude_manage.marketplace_action, body.action, body.target))
 
 
 @router.post("/claude/marketplaces/auto-update")

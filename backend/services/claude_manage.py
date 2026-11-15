@@ -13,8 +13,10 @@ from core.db import Session
 from core.models import DisabledMcpServer
 from services import accounts, claude_assets, cli_settings, files, git
 
-_PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", "update"})
+UPDATE = "update"
+_PLUGIN_ACTIONS = frozenset({"install", "uninstall", "enable", "disable", UPDATE})
 _PLUGIN_REMOVALS = frozenset({"uninstall", "disable"})
+_UP_TO_DATE = "up_to_date"
 _MARKETPLACE_ACTIONS = frozenset({"add", "remove", "update"})
 _MCP_REMOTE = ("http", "sse")
 
@@ -32,6 +34,7 @@ _SECURE_GIT = "https://"
 _SKILL_FILE = "SKILL.md"
 _CLONE_TIMEOUT = 120
 _REPORT_TIMEOUT = 60
+_ACTION_TIMEOUT = 300
 _VERSION_REFUSED = "engine-range-unsatisfied"
 
 
@@ -50,7 +53,7 @@ def _exec(args: list[str], timeout: int, cwd: str | None, stdin: str | None) -> 
     )
 
 
-def _run(args: list[str], timeout: int = 300, cwd: str | None = None, stdin: str | None = None) -> dict:
+def _run(args: list[str], timeout: int = _ACTION_TIMEOUT, cwd: str | None = None, stdin: str | None = None) -> dict:
     try:
         result = _exec(args, timeout, cwd, stdin)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -59,12 +62,23 @@ def _run(args: list[str], timeout: int = 300, cwd: str | None = None, stdin: str
     return {"ok": result.returncode == 0, "message": output}
 
 
-def _report(args: list[str], cwd: str | None = None) -> dict | None:
+def _report(args: list[str], cwd: str | None = None, timeout: int = _REPORT_TIMEOUT) -> dict | None:
     try:
-        data = json.loads(_exec([*args, "--json"], _REPORT_TIMEOUT, cwd, None).stdout)
+        data = json.loads(_exec([*args, "--json"], timeout, cwd, None).stdout)
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def _update(plugin: str, flags: list[str], cwd: str | None) -> dict:
+    report = _report(["plugin", UPDATE, plugin, *flags], cwd, _ACTION_TIMEOUT)
+    if report is None:
+        return _run(["plugin", UPDATE, plugin, *flags], cwd=cwd)
+    return {
+        "ok": report.get("outcome") == "ok",
+        "message": report.get("message") or "",
+        "changed": report.get("updateOutcome") != _UP_TO_DATE,
+    }
 
 
 def version_refused() -> set[str]:
@@ -115,7 +129,7 @@ async def after_plugin_action(action: str, plugin: str, result: dict) -> dict:
         name = plugin.partition("@")[0]
         for live in registry.live():
             await live.forget_plugin(name)
-    return await reload_after(result)
+    return await reload_after(result) if result.get("changed", True) else result
 
 
 def plugin_action(action: str, plugin: str) -> dict:
@@ -126,6 +140,8 @@ def plugin_action(action: str, plugin: str) -> dict:
     if action == "install":
         return _run(["plugin", action, plugin])
     flags, cwd = _plugin_place(plugin)
+    if action == UPDATE:
+        return _update(plugin, flags, cwd)
     return _run(["plugin", action, plugin, *flags], cwd=cwd)
 
 

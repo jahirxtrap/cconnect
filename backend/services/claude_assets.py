@@ -283,9 +283,12 @@ def list_plugins() -> list[dict]:
         if marketplace not in markets:
             markets[marketplace] = _marketplace(known.get(marketplace))
         entry = _catalog_entry(markets[marketplace], name)
+        version = (info.get("version") or "").replace("unknown", "") or None
+        offered = entry.get("version")
         items.append(_plugin_item(
             name, marketplace, _install_root(markets[marketplace], entry, info),
-            version=(info.get("version") or "").replace("unknown", "") or None,
+            version=version,
+            latest=offered if isinstance(offered, str) and offered != version else None,
             scope=info.get("scope"),
             enabled=bool(enabled.get(key, True)),
             description=entry.get("description"),

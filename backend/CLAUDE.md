@@ -102,7 +102,15 @@ place (`_in_place`), not from its copy in `cache/`. A plugin's MCP servers are r
 (a JSON file, an inline map, a `.mcpb`/`.dxt` bundle named by its own manifest, or a list of them).
 A bundle's config keeps `${__dirname}`, so it stays with the CLI. `listed_plugins` asks
 `claude plugin list --json` which plugins the CLI refuses for their `engines["claude-code"]` range,
-and only when one declares it.
+and only when one declares it. A plugin's `latest` is its marketplace catalog's version when it differs
+from the installed one, read from the local copy, so it moves only when that marketplace is updated.
+
+A plugin update is queued in `services/plugin_updates` and runs one CLI command at a time; its lock
+also serializes the other plugin and marketplace actions, which write the same files. The update
+runs with `--json`, and one the CLI reports as `up_to_date` reloads no chat. Each plugin's
+state (`queued`, `updating`, `failed` with the CLI's message) travels in `/claude/plugins` and as
+`plugin_updates` on the list socket, with `finished` naming the ones just done and whether a reload
+was held.
 
 ## Chat socket (`/api/chat/ws`)
 

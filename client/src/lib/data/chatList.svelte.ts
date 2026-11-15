@@ -9,9 +9,11 @@ import {
   type ProjectInfo,
   type SessionInfo,
 } from "./models";
+import { pluginUpdates } from "./pluginUpdates.svelte";
 import { serverSettings } from "./serverSettings.svelte";
 import { settings } from "./settings.svelte";
 import { backend, isConfigured, profileKey, type Profile } from "$lib/services/backend.svelte";
+import { parsePluginFinished, parsePluginUpdates } from "$lib/services/claudeApi";
 import { createHttp } from "$lib/services/http";
 import { notifier } from "$lib/services/notifier.svelte";
 import { createSettingsApi, parseSettings, type SettingsSnapshot, type SettingsWire } from "$lib/services/settingsApi";
@@ -254,6 +256,9 @@ export class ChatListStore {
         serverSettings.adopt(this.#profile, snapshot);
         break;
       }
+      case "plugin_updates":
+        pluginUpdates.adopt(this.#profile, parsePluginUpdates(message.updates), parsePluginFinished(message.finished));
+        break;
     }
   }
 }

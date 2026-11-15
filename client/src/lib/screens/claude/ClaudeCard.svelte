@@ -9,10 +9,17 @@
   import { REPAINT_EDGE_CLASS } from "$lib/ui/field";
   import StatusDot from "$lib/ui/StatusDot.svelte";
 
+  export interface CardProgress {
+    text: string;
+    loading: boolean;
+    tone: string;
+  }
+
   interface Props {
     title: string;
     tag?: string | null;
     enabled?: boolean | null;
+    progress?: CardProgress | null;
     source?: string | null;
     description?: string | null;
     selected?: boolean;
@@ -24,6 +31,7 @@
     title,
     tag = null,
     enabled = null,
+    progress = null,
     source = null,
     description = null,
     selected = false,
@@ -38,7 +46,12 @@
     {#if tag}
       <span class={TAG_CLASS}>{tag}</span>
     {/if}
-    {#if enabled !== null}
+    {#if progress}
+      <span class="ml-auto flex shrink-0 items-center gap-1.5 text-caption text-faint">
+        <StatusDot class={progress.tone} loading={progress.loading} />
+        {progress.text}
+      </span>
+    {:else if enabled !== null}
       <span class="ml-auto flex shrink-0 items-center gap-1.5 text-caption text-faint">
         <StatusDot class={enabled ? "bg-green" : "bg-faint"} />
         {t(enabled ? "OPTION_ON" : "OPTION_OFF")}

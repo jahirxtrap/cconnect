@@ -8,6 +8,7 @@ export interface Plugin {
   name: string;
   marketplace: string | null;
   version: string | null;
+  latest: string | null;
   scope: string | null;
   enabled: boolean;
   description: string | null;
@@ -39,6 +40,7 @@ export interface Extensions {
   plugins: Plugin[];
   marketplaces: Marketplace[];
   chatMods: ChatMod[];
+  updates: Record<string, PluginUpdate>;
 }
 
 export interface PluginReview {
@@ -128,6 +130,7 @@ export interface ActionResult {
 
 export interface PluginChange extends ActionResult {
   held: number;
+  updates: Record<string, PluginUpdate> | null;
 }
 
 export interface ActionOutcome extends ActionResult {
@@ -165,6 +168,36 @@ export interface Prompts {
 
 type Wire = Record<string, any>;
 
+export type PluginUpdateStatus = "queued" | "updating" | "failed";
+
+export interface PluginUpdate {
+  status: PluginUpdateStatus;
+  message: string;
+}
+
+export interface PluginFinished {
+  plugin: string;
+  held: boolean;
+}
+
+const UPDATE_STATUSES: PluginUpdateStatus[] = ["queued", "updating", "failed"];
+
+export const parsePluginUpdates = (raw: unknown): Record<string, PluginUpdate> =>
+  Object.fromEntries(
+    Object.entries(raw && typeof raw === "object" ? (raw as Wire) : {}).map(([plugin, state]) => [
+      plugin,
+      {
+        status: UPDATE_STATUSES.find((status) => status === state?.status) ?? "queued",
+        message: typeof state?.message === "string" ? state.message : "",
+      },
+    ]),
+  );
+
+export const parsePluginFinished = (raw: unknown): PluginFinished[] =>
+  Array.isArray(raw)
+    ? raw.filter((item) => typeof item?.plugin === "string").map((item) => ({ plugin: item.plugin, held: item.held === true }))
+    : [];
+
 const toAction = (data: Wire | null): ActionResult => ({
   ok: data?.ok === true,
   message: data?.message ?? "",
@@ -172,7 +205,11 @@ const toAction = (data: Wire | null): ActionResult => ({
 
 const heldOf = (data: Wire | null): number => (typeof data?.held === "number" ? data.held : 0);
 
-const toPluginChange = (data: Wire | null): PluginChange => ({ ...toAction(data), held: heldOf(data) });
+const toPluginChange = (data: Wire | null): PluginChange => ({
+  ...toAction(data),
+  held: heldOf(data),
+  updates: data?.updates ? parsePluginUpdates(data.updates) : null,
+});
 
 export const createClaudeApi = (client: HttpClient, profile: () => Profile) => ({
   async usage(language: string, account: string | null = null): Promise<Usage | null> {
@@ -241,6 +278,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
           name: item.name,
           marketplace: item.marketplace ?? null,
           version: item.version ?? null,
+          latest: item.latest ?? null,
           scope: item.scope ?? null,
           enabled: item.enabled !== false,
           description: item.description ?? null,
@@ -263,6 +301,7 @@ export const createClaudeApi = (client: HttpClient, profile: () => Profile) => (
           sessionId: item.session_id ?? "",
           installed: item.installed === true,
         })),
+      updates: parsePluginUpdates(data.updates),
     };
   },
 

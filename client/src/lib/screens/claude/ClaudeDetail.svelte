@@ -87,7 +87,10 @@
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { matchesLabel } from "$lib/data/textMatch";
   import { formatDateShort, parseIsoMillis } from "$lib/data/time";
+  import { untrack } from "svelte";
+  import { pluginUpdates } from "$lib/data/pluginUpdates.svelte";
   import { t } from "$lib/i18n/index.svelte";
+  import { backend } from "$lib/services/backend.svelte";
   import { isTouch, openExternal } from "$lib/platform";
   import { useRefreshTick } from "$lib/platform/useRefreshTick.svelte";
   import { accountsStore } from "$lib/data/accountsStore.svelte";
@@ -136,7 +139,7 @@
   import ScrollCard from "$lib/ui/ScrollCard.svelte";
   import SelectChip from "$lib/ui/SelectChip.svelte";
   import ServedIconTile from "$lib/ui/ServedIconTile.svelte";
-  import ClaudeCard, { TAG_CLASS } from "./ClaudeCard.svelte";
+  import ClaudeCard, { TAG_CLASS, type CardProgress } from "./ClaudeCard.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
   import SearchBar from "$lib/ui/SearchBar.svelte";
@@ -272,7 +275,10 @@
   );
 
   const load = async () => {
-    if (kind === "plugins" || kind === "marketplaces") extensions = await claudeApi.extensions();
+    if (kind === "plugins" || kind === "marketplaces") {
+      extensions = await claudeApi.extensions();
+      if (extensions && backend.active) pluginUpdates.adopt(backend.active, extensions.updates);
+    }
     else if (kind === "skills") skills = await claudeApi.skills();
     else if (kind === "mcp") {
       accountsStore.ensure();
@@ -312,6 +318,45 @@
     mcpMenu = shownMcp ? (mcpServers?.find((item) => mcpKey(item) === mcpKey(shownMcp)) ?? null) : null;
     marketMenu = marketMenu ? (extensions?.marketplaces.find((item) => item.name === marketMenu?.name) ?? null) : null;
   };
+
+  const updates = $derived(pluginUpdates.of(backend.active));
+  const finished = $derived(pluginUpdates.finishedOf(backend.active));
+
+  const updateOf = (plugin: Plugin) => updates[pluginKey(plugin)] ?? null;
+
+  const pendingOf = (plugin: Plugin) => {
+    const status = updateOf(plugin)?.status;
+    return status === "queued" || status === "updating";
+  };
+
+  const updateLabel = (plugin: Plugin) => {
+    const status = updateOf(plugin)?.status;
+    return status === "updating" ? "PLUGIN_UPDATING" : status === "queued" ? "PLUGIN_QUEUED" : "UPDATE_ACTION";
+  };
+
+  const progressOf = (plugin: Plugin): CardProgress | null => {
+    const state = updateOf(plugin);
+    if (!state) return null;
+    return {
+      text: t(state.status === "failed" ? "PLUGIN_UPDATE_FAILED" : updateLabel(plugin)),
+      loading: state.status === "updating",
+      tone: state.status === "failed" ? "bg-red" : "bg-faint",
+    };
+  };
+
+  const queueUpdate = async (plugin: Plugin) => {
+    const result = await claudeApi.pluginAction("update", pluginKey(plugin));
+    if (!result.ok) actionError = result.message || t("CONNECTION_ERROR");
+    else if (result.updates && backend.active) pluginUpdates.adopt(backend.active, result.updates);
+  };
+
+  $effect(() => {
+    if (!finished.count) return;
+    untrack(() => {
+      if (kind === "plugins") void reload();
+      if (finished.held) reloadHeld = true;
+    });
+  });
 
   const runAction = async (action: () => Promise<ActionResult | PluginChange>) => {
     const run = ++actionRun;
@@ -877,8 +922,9 @@
               {#each filteredPlugins as plugin (pluginKey(plugin))}
                 <ClaudeCard
                   title={plugin.name}
-                  tag={plugin.needsCli ? t("PLUGIN_NOT_LOADED") : plugin.mod ? t("MOD") : null}
+                  tag={plugin.needsCli ? t("PLUGIN_NOT_LOADED") : plugin.latest ? t("UPDATE_TAG") : plugin.mod ? t("MOD") : null}
                   enabled={plugin.enabled}
+                  progress={progressOf(plugin)}
                   source={joined(plugin.local ? t("PLUGIN_LOCAL") : plugin.marketplace, plugin.version, plugin.scope)}
                   description={plugin.description}
                   selected={sidePanel && !!pluginMenu && pluginKey(pluginMenu) === pluginKey(plugin)}
@@ -1095,7 +1141,7 @@
 {#snippet pluginSwitch(plugin: Plugin)}
   <CompactSwitch
     checked={plugin.enabled}
-    enabled={!busy}
+    enabled={!busy && !pendingOf(plugin)}
     onCheckedChange={() => {
       dialogBusy = "toggle";
       void runAction(() => claudeApi.pluginAction(plugin.enabled ? "disable" : "enable", pluginKey(plugin)));
@@ -1124,8 +1170,14 @@
     {#if plugin.description}
       <p class="text-body-md text-on-surface-variant">{plugin.description}</p>
     {/if}
+    {#if plugin.latest}
+      <p class="text-body-sm text-accent">{t("UPDATE_AVAILABLE", plugin.latest)}</p>
+    {/if}
     {#if plugin.needsCli}
       <ErrorText text={t("PLUGIN_NEEDS_CLI", plugin.needsCli)} />
+    {/if}
+    {#if updateOf(plugin)?.status === "failed"}
+      <ErrorText text={updateOf(plugin)?.message || t("PLUGIN_UPDATE_FAILED")} />
     {/if}
     <FactList {rows} />
     {#if plugin.mod && pluginReview}
@@ -1136,7 +1188,7 @@
         <p class="text-body-sm text-on-surface-variant">{t("MOD_REVIEW_EMPTY")}</p>
       {/if}
     {/if}
-    {#if dialogBusy}
+    {#if dialogBusy || updateOf(plugin)?.status === "updating"}
       <LinearProgress />
     {/if}
     <div class="mt-auto flex flex-col gap-2.5">
@@ -1145,18 +1197,15 @@
       {/if}
       {#if !plugin.local}
         <ActionButton
-          text={t("UPDATE_ACTION")}
-          enabled={!busy}
-          onclick={() => {
-            dialogBusy = "update";
-            void runAction(() => claudeApi.pluginAction("update", pluginKey(plugin)));
-          }}
+          text={t(updateLabel(plugin))}
+          enabled={!busy && !pendingOf(plugin)}
+          onclick={() => void queueUpdate(plugin)}
           class="w-full"
         />
       {/if}
       <ActionButton
         text={t("UNINSTALL")}
-        enabled={!busy}
+        enabled={!busy && !pendingOf(plugin)}
         danger
         onclick={() => (confirmUninstall = plugin)}
         class="w-full"

@@ -252,6 +252,10 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
 
 ## Small rules
 
+- Plugin updates run on the server: `data/pluginUpdates.svelte.ts` keeps each environment's
+  `plugin_updates` map from the list socket (and from `/claude/plugins` on load). A card shows the
+  plugin's state in place of its on/off label, the detail disables its actions meanwhile, and
+  `finished` reloads the list. `latest` draws the update tag and the accent line in the detail.
 - `ZoomPane`: zoom anchors at the pointer, panning is unclamped, `<img draggable="false">`, and
   `touch-action: none` only while zoomed.
 - Every history write goes through `app/historyLedger.ts` (`navigation.push` / `replace`,
