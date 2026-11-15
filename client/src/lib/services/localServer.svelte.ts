@@ -37,8 +37,9 @@ const STATUS_EVENT = "local-server://status";
 
 const LOCAL_HOSTS = ["localhost", "127.0.0.1", "::1"];
 
-export const isLocalProfile = (profile: Profile, port: number) =>
-  !!profile && LOCAL_HOSTS.includes(profile.host.toLowerCase()) && profile.port === port;
+export const isLoopback = (profile: Profile) => !!profile && LOCAL_HOSTS.includes(profile.host.toLowerCase());
+
+export const isLocalProfile = (profile: Profile, port: number) => isLoopback(profile) && profile?.port === port;
 
 const empty: LocalServerInfo = {
   managed: false,

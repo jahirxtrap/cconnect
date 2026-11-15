@@ -1,5 +1,5 @@
 import { untrack } from "svelte";
-import type { AuthKind } from "$lib/data/auth";
+import type { AuthInput, AuthKind } from "$lib/data/auth";
 import { withQuery } from "$lib/data/url";
 import { isTauri } from "$lib/platform";
 import { secureStore } from "$lib/platform/secureStorage";
@@ -28,7 +28,10 @@ export interface EnvironmentProfile {
 
 const adopted = (profile: EnvironmentProfile): EnvironmentProfile => ({ ...profile, accent: profile.accent ?? null });
 
-const DEFAULT_PORT = 8723;
+export const DEFAULT_PORT = 8723;
+export const HTTPS_PORT = 443;
+const PLAIN_PORT = 80;
+const RADIX = 10;
 
 export const blankEnvironment = (): EnvironmentProfile => ({
   id: crypto.randomUUID(),
@@ -60,13 +63,60 @@ const secure = (profile: EnvironmentProfile) => profile.kind === "https";
 
 const portSuffix = (profile: EnvironmentProfile) => {
   if (profile.port === null) return "";
-  return profile.port === (secure(profile) ? 443 : 80) ? "" : `:${profile.port}`;
+  return profile.port === (secure(profile) ? HTTPS_PORT : PLAIN_PORT) ? "" : `:${profile.port}`;
 };
 
 const origin = (profile: EnvironmentProfile, socket: boolean) => {
   const scheme = socket ? (secure(profile) ? "wss" : "ws") : secure(profile) ? "https" : "http";
   return `${scheme}://${profile.host}${portSuffix(profile)}`;
 };
+
+export const originOf = (profile: EnvironmentProfile) => origin(profile, false);
+
+export interface HostAddress {
+  kind: EnvironmentProfile["kind"];
+  host: string;
+  port: string;
+}
+
+export const parseHostInput = (input: string): HostAddress | null => {
+  const raw = input.trim();
+  const separator = raw.indexOf("://");
+  if (separator <= 0) return null;
+  const scheme = raw.slice(0, separator).toLowerCase();
+  const kind = scheme === "https" || scheme === "wss" ? "https" : scheme === "http" || scheme === "ws" ? "http" : null;
+  if (kind === null) return null;
+  const fallback = String(kind === "https" ? HTTPS_PORT : PLAIN_PORT);
+  const rest = raw.slice(separator + 3).split("/")[0].split("?")[0];
+  const colon = rest.indexOf(":");
+  if (colon < 0) return { host: rest, port: fallback, kind };
+  const digits = rest.slice(colon + 1).replace(/\D/g, "");
+  return { host: rest.slice(0, colon), port: digits || fallback, kind };
+};
+
+export const addressFields = ({ kind, host, port }: HostAddress): Pick<EnvironmentProfile, "kind" | "host" | "port"> => ({
+  kind,
+  host,
+  port: kind === "https" ? null : Number.parseInt(port, RADIX) || DEFAULT_PORT,
+});
+
+export const authOf = (profile: EnvironmentProfile): AuthInput => ({
+  kind: profile.authKind,
+  token: profile.authToken,
+  user: profile.authUser,
+  password: profile.authPassword,
+  headerName: profile.authHeaderName,
+  headerValue: profile.authHeaderValue,
+});
+
+export const authFields = (auth: AuthInput) => ({
+  authKind: auth.kind,
+  authToken: auth.token.trim(),
+  authUser: auth.user.trim(),
+  authPassword: auth.password,
+  authHeaderName: auth.headerName.trim(),
+  authHeaderValue: auth.headerValue.trim(),
+});
 
 export const isConfigured = (profile: Profile): profile is EnvironmentProfile => !!profile?.host;
 

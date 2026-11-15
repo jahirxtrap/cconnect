@@ -6,12 +6,20 @@
   import { untrack } from "svelte";
   import { AUTH_KINDS, type AuthInput } from "$lib/data/auth";
   import { projectKeyOf } from "$lib/data/models";
-  import { parseQrPayload } from "$lib/data/qrPayload";
+  import { parseEnvironmentQr } from "$lib/data/qrPayload";
   import { settings } from "$lib/data/settings.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import { isTauri } from "$lib/platform";
-  import type { EnvironmentProfile } from "$lib/services/backend.svelte";
+  import {
+    addressFields,
+    authFields,
+    authOf,
+    DEFAULT_PORT,
+    HTTPS_PORT,
+    parseHostInput,
+    type EnvironmentProfile,
+  } from "$lib/services/backend.svelte";
   import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
   import AuthFields from "$lib/ui/AuthFields.svelte";
   import Button from "$lib/ui/Button.svelte";
@@ -34,10 +42,6 @@
 
   const { profile, isNew, isActive, onSave, onDismiss }: Props = $props();
 
-  const HTTP_PORT = "8723";
-  const HTTPS_PORT = "443";
-  const RADIX = 10;
-
   const KIND_OPTIONS = isTauri
     ? [
         { value: "http", label: "HTTP" },
@@ -47,28 +51,7 @@
 
   const ENVIRONMENT_AUTH_KINDS = AUTH_KINDS.filter((kind) => kind !== "api_key");
 
-  const defaultPortFor = (kind: string) => (kind === "https" ? HTTPS_PORT : HTTP_PORT);
-
-  interface ParsedHost {
-    host: string;
-    port: string;
-    kind: EnvironmentProfile["kind"];
-  }
-
-  const parseHostInput = (input: string): ParsedHost | null => {
-    const raw = input.trim();
-    const separator = raw.indexOf("://");
-    if (separator <= 0) return null;
-    const scheme = raw.slice(0, separator).toLowerCase();
-    const kind = scheme === "https" || scheme === "wss" ? "https" : scheme === "http" || scheme === "ws" ? "http" : null;
-    if (kind === null) return null;
-    const secure = kind === "https";
-    const rest = raw.slice(separator + 3).split("/")[0].split("?")[0];
-    const colon = rest.indexOf(":");
-    if (colon < 0) return { host: rest, port: secure ? HTTPS_PORT : "80", kind };
-    const digits = rest.slice(colon + 1).replace(/\D/g, "");
-    return { host: rest.slice(0, colon), port: digits || (secure ? HTTPS_PORT : "80"), kind };
-  };
+  const defaultPortFor = (kind: string) => String(kind === "https" ? HTTPS_PORT : DEFAULT_PORT);
 
   const initial = untrack(() => profile);
 
@@ -76,14 +59,7 @@
   let kind = $state<EnvironmentProfile["kind"]>(initial.kind);
   let host = $state(initial.host);
   let port = $state(initial.port === null ? defaultPortFor(initial.kind) : String(initial.port));
-  let auth = $state<AuthInput>({
-    kind: initial.authKind,
-    token: initial.authToken,
-    user: initial.authUser,
-    password: initial.authPassword,
-    headerName: initial.authHeaderName,
-    headerValue: initial.authHeaderValue,
-  });
+  let auth = $state<AuthInput>(authOf(initial));
   const qrAvailable = qrScanAvailable();
 
   const startScan = async () => {
@@ -92,14 +68,13 @@
   };
 
   const applyQr = (raw: string) => {
-    const payload = parseQrPayload(raw);
-    if (!payload) return;
-    const parsed = parseHostInput(payload.url);
-    if (!parsed) return;
-    kind = parsed.kind;
-    host = parsed.host;
-    port = parsed.kind === "https" ? "" : parsed.port;
-    auth = { ...auth, kind: "bearer", token: payload.token };
+    const scanned = parseEnvironmentQr(raw);
+    if (!scanned) return;
+    kind = scanned.address.kind;
+    host = scanned.address.host;
+    port = scanned.address.kind === "https" ? "" : scanned.address.port;
+    auth = scanned.auth;
+    if (!name.trim()) name = scanned.name;
   };
   let directory = $state(initial.directory);
   let accent = $state<string | null>(initial.accent);
@@ -124,22 +99,12 @@
   };
 
   const save = () => {
-    const parsed = parseHostInput(host);
-    const finalKind = parsed?.kind ?? kind;
-    const finalHost = parsed?.host ?? host.trim().replace(/\/+$/, "");
-    const finalPort = parsed?.port ?? port;
+    const target = addressFields(parseHostInput(host) ?? { kind, host: host.trim().replace(/\/+$/, ""), port });
     onSave({
       ...initial,
-      name: name.trim() || finalHost,
-      kind: finalKind,
-      host: finalHost,
-      port: finalKind === "https" ? null : (Number.parseInt(finalPort, RADIX) || Number.parseInt(HTTP_PORT, RADIX)),
-      authKind: auth.kind,
-      authToken: auth.token.trim(),
-      authUser: auth.user.trim(),
-      authPassword: auth.password,
-      authHeaderName: auth.headerName.trim(),
-      authHeaderValue: auth.headerValue.trim(),
+      ...target,
+      name: name.trim() || target.host,
+      ...authFields(auth),
       directory: directory.trim(),
       accent,
     });

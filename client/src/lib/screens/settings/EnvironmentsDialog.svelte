@@ -1,21 +1,34 @@
 <script lang="ts">
+  import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
   import Lock from "@lucide/svelte/icons/lock";
   import LockOpen from "@lucide/svelte/icons/lock-open";
   import Pencil from "@lucide/svelte/icons/pencil";
+  import QrCode from "@lucide/svelte/icons/qr-code";
   import ScanQrCode from "@lucide/svelte/icons/scan-qr-code";
   import Trash2 from "@lucide/svelte/icons/trash-2";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
-  import { parseQrPayload } from "$lib/data/qrPayload";
+  import { environmentQr, parseEnvironmentQr } from "$lib/data/qrPayload";
   import { qrScanAvailable, scanQr } from "$lib/services/qrScanner.svelte";
   import { panes } from "$lib/screens/chat/panes.svelte";
-  import { address, backend, blankEnvironment, type EnvironmentProfile } from "$lib/services/backend.svelte";
+  import {
+    address,
+    addressFields,
+    authFields,
+    backend,
+    blankEnvironment,
+    type EnvironmentProfile,
+  } from "$lib/services/backend.svelte";
+  import { isLoopback } from "$lib/services/localServer.svelte";
   import ActionButton from "$lib/ui/ActionButton.svelte";
   import Button from "$lib/ui/Button.svelte";
   import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
+  import MenuItem from "$lib/ui/MenuItem.svelte";
+  import PopupMenu from "$lib/ui/PopupMenu.svelte";
+  import QrDialog from "$lib/ui/QrDialog.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import EnvironmentDialog from "./EnvironmentDialog.svelte";
 
@@ -33,15 +46,17 @@
   };
 
   const applyQr = (raw: string) => {
-    const payload = parseQrPayload(raw);
-    if (!payload) return;
-    editing = { ...blankEnvironment(), host: payload.url, authKind: "bearer", authToken: payload.token };
+    const scanned = parseEnvironmentQr(raw);
+    if (!scanned) return;
+    editing = { ...blankEnvironment(), ...addressFields(scanned.address), ...authFields(scanned.auth), name: scanned.name };
     isNew = true;
   };
 
   let editing = $state<EnvironmentProfile | null>(null);
   let isNew = $state(false);
   let deleting = $state<EnvironmentProfile | null>(null);
+  let sharing = $state<EnvironmentProfile | null>(null);
+  let menuId = $state<string | null>(null);
 
   const save = (profile: EnvironmentProfile) => {
     const known = backend.environments.some((item) => item.id === profile.id);
@@ -101,18 +116,30 @@
               {/if}
             </TooltipIconButton>
           {/if}
-          <TooltipIconButton
-            label={t("EDIT_ENVIRONMENT")}
-            onclick={() => {
-              editing = { ...profile };
-              isNew = false;
-            }}
+          <PopupMenu
+            open={menuId === profile.id}
+            onOpenChange={(open) => (menuId = open ? profile.id : null)}
+            label={t("MORE_OPTIONS")}
+            align="end"
           >
-            <Pencil />
-          </TooltipIconButton>
-          <TooltipIconButton label={t("DELETE")} onclick={() => (deleting = profile)}>
-            <Trash2 />
-          </TooltipIconButton>
+            {#snippet triggerChild(props)}
+              <TooltipIconButton label={t("MORE_OPTIONS")} tooltip={false} {...props}>
+                <EllipsisVertical />
+              </TooltipIconButton>
+            {/snippet}
+            <MenuItem
+              icon={Pencil}
+              text={t("EDIT_ENVIRONMENT")}
+              onclick={() => {
+                editing = { ...profile };
+                isNew = false;
+              }}
+            />
+            {#if !isLoopback(profile)}
+              <MenuItem icon={QrCode} text={t("SHOW_QR")} onclick={() => (sharing = profile)} />
+            {/if}
+            <MenuItem icon={Trash2} danger text={t("DELETE")} onclick={() => (deleting = profile)} />
+          </PopupMenu>
         {/snippet}
       </DialogSelectItem>
     {/each}
@@ -139,6 +166,15 @@
     isActive={!isNew && profile.id === backend.activeId}
     onSave={save}
     onDismiss={() => (editing = null)}
+  />
+{/if}
+
+{#if sharing}
+  {@const profile = sharing}
+  <QrDialog
+    title={profile.name}
+    choices={[{ label: t("ENVIRONMENT"), text: environmentQr(profile), hint: t("QR_ENVIRONMENT_HINT") }]}
+    onDismiss={() => (sharing = null)}
   />
 {/if}
 

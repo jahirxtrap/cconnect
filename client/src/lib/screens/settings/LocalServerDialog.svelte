@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { emptyAuth, type AuthInput } from "$lib/data/auth";
+  import { environmentQrText, securityKeyQr } from "$lib/data/qrPayload";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import Folder from "@lucide/svelte/icons/folder";
+  import QrCode from "@lucide/svelte/icons/qr-code";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import { pickPath } from "$lib/ui/pathPicker.svelte";
   import { localServer } from "$lib/services/localServer.svelte";
@@ -10,6 +13,7 @@
   import ErrorText from "$lib/ui/ErrorText.svelte";
   import InputField from "$lib/ui/InputField.svelte";
   import OutputPanel from "$lib/ui/OutputPanel.svelte";
+  import QrDialog, { type QrChoice } from "$lib/ui/QrDialog.svelte";
   import SelectField from "$lib/ui/SelectField.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
 
@@ -82,6 +86,19 @@
     return lines.join("\n");
   });
 
+  const codes = $derived.by((): QrChoice[] => {
+    if (!info.publicUrl) return [];
+    const auth: AuthInput = { ...emptyAuth(), kind: info.token ? "bearer" : "none", token: info.token ?? "" };
+    return [
+      { label: t("ENVIRONMENT"), text: environmentQrText(info.publicUrl, "", auth), hint: t("QR_ENVIRONMENT_HINT") },
+      ...(info.token && info.securityKey
+        ? [{ label: t("SECURITY_KEY"), text: securityKeyQr(info.securityKey), hint: t("QR_SECURITY_KEY_HINT") }]
+        : []),
+    ];
+  });
+
+  let showingCodes = $state(false);
+
   const save = () => {
     settings.localServerSource = source;
     settings.localServerCommandPath = commandPath.trim();
@@ -95,6 +112,13 @@
 </script>
 
 <CompactDialog title={t("LOCAL_SERVER")} {onDismiss}>
+  {#snippet titleTrailing()}
+    {#if codes.length}
+      <TooltipIconButton label={t("SHOW_QR")} onclick={() => (showingCodes = true)}>
+        <QrCode />
+      </TooltipIconButton>
+    {/if}
+  {/snippet}
   {#snippet buttons()}
     <Button onclick={onDismiss} variant="outlined">{t("CANCEL")}</Button>
     <Button onclick={save}>{t("SAVE")}</Button>
@@ -171,6 +195,10 @@
     {/if}
   </div>
 </CompactDialog>
+
+{#if showingCodes && codes.length}
+  <QrDialog title={t("LOCAL_SERVER")} choices={codes} onDismiss={() => (showingCodes = false)} />
+{/if}
 
 {#if browsing}
   {@const target = browsing}

@@ -57,6 +57,10 @@ Open Settings → Environments and add the server: on mobile, scan the QR
 paste the address and token by hand, or let the local server add itself. The
 connection becomes active immediately and the chat reconnects.
 
+An app can show that QR too: each environment's row has Show QR, and so does
+the Local server dialog while the server is exposed, where a second code
+carries the security key for the dialog that asks for it.
+
 Each environment can carry its own colour, which takes over the whole app while
 it's the active one — a glance tells you whether you're driving your laptop or a
 VPS. Leave it unset to keep the accent you picked in Settings, or set it to
