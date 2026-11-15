@@ -8,7 +8,7 @@ import httpx
 from packaging.version import InvalidVersion, Version
 from sqlalchemy.exc import OperationalError
 
-from core import packages, paths, release
+from core import packages, paths, release, self_update
 from services import database_engines, databases, git
 
 _TIMEOUT = 120
@@ -50,8 +50,25 @@ def _on_disk() -> str:
         return release.VERSION
 
 
+def _upgrade_after_stop() -> dict:
+    """On Windows the package changes only once this server has stopped, so only a detached one can update itself."""
+    restart = self_update.restart_command()
+    if restart is None:
+        return {
+            **_package_status(),
+            "ok": False,
+            "message": "This server can only update itself when it runs with --detach. "
+                       "Stop it and run cconnect update.",
+            "changed": False,
+        }
+    self_update.hand_over(upgrade_command(), restart)
+    return {**_package_status(), "ok": True, "message": "", "changed": False, "handover": True}
+
+
 def upgrade() -> dict:
     """Replaces the installed package with the newest release."""
+    if self_update.needed():
+        return _upgrade_after_stop()
     try:
         result = packages.run(upgrade_command(), _TIMEOUT)
     except (OSError, subprocess.SubprocessError) as exc:

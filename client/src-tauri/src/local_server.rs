@@ -8,6 +8,7 @@ use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -52,6 +53,11 @@ pub struct LocalServerConfig {
 struct NativeStatus {
     data: String,
     env: String,
+}
+
+#[derive(Deserialize)]
+struct UpgradePlan {
+    command: Vec<String>,
 }
 
 static NATIVE_STATUS: OnceLock<Mutex<HashMap<PathBuf, NativeStatus>>> = OnceLock::new();
@@ -167,12 +173,53 @@ fn native_status(command: &Path) -> Option<NativeStatus> {
     probe.arg("status").arg("--json").stdin(Stdio::null());
     #[cfg(windows)]
     probe.creation_flags(CREATE_NO_WINDOW);
-    let output = probe.output().ok()?;
-    let printed = String::from_utf8_lossy(&output.stdout);
-    let line = printed.lines().rev().find(|line| line.trim_start().starts_with('{'))?;
-    let status: NativeStatus = serde_json::from_str(line).ok()?;
+    let status: NativeStatus = printed_json(&probe.output().ok()?.stdout)?;
     cache.lock().unwrap().insert(command.to_path_buf(), status.clone());
     Some(status)
+}
+
+fn printed_json<T: DeserializeOwned>(stdout: &[u8]) -> Option<T> {
+    let printed = String::from_utf8_lossy(stdout);
+    let line = printed.lines().rev().find(|line| line.trim_start().starts_with('{'))?;
+    serde_json::from_str(line).ok()
+}
+
+fn upgrade_plan(command: &Path) -> Result<Command, String> {
+    let mut probe = Command::new(command);
+    probe.arg("update").arg("--plan").stdin(Stdio::null());
+    #[cfg(windows)]
+    probe.creation_flags(CREATE_NO_WINDOW);
+    let output = probe.output().map_err(|_| "launch_failed".to_string())?;
+    let plan: UpgradePlan = printed_json(&output.stdout)
+        .ok_or_else(|| String::from_utf8_lossy(&output.stderr).trim().to_string())?;
+    let (program, args) = plan.command.split_first().ok_or("no_command")?;
+    let mut upgrade = Command::new(program);
+    upgrade.args(args);
+    Ok(upgrade)
+}
+
+fn upgrade_command(command: &Path, stopped: bool) -> Result<Command, String> {
+    if cfg!(windows) && stopped {
+        return upgrade_plan(command);
+    }
+    let mut upgrade = Command::new(command);
+    upgrade.arg("update");
+    Ok(upgrade)
+}
+
+fn run_upgrade(command: &Path, stopped: bool) -> Result<String, String> {
+    let mut upgrade = upgrade_command(command, stopped)?;
+    upgrade.stdin(Stdio::null());
+    #[cfg(windows)]
+    upgrade.creation_flags(CREATE_NO_WINDOW);
+    let output = upgrade.output().map_err(|_| "launch_failed".to_string())?;
+    let printed = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let failed = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if output.status.success() {
+        Ok(printed)
+    } else {
+        Err(if failed.is_empty() { printed } else { failed })
+    }
 }
 
 fn data_paths(config: &LocalServerConfig) -> Option<(PathBuf, PathBuf)> {
@@ -770,22 +817,12 @@ pub fn local_server_update(
     if managed {
         stop_inner(&app, &state, &config);
     }
-    let mut upgrade = Command::new(&command);
-    upgrade.arg("update").stdin(Stdio::null());
-    #[cfg(windows)]
-    upgrade.creation_flags(CREATE_NO_WINDOW);
-    let output = upgrade.output().map_err(|_| "launch_failed".to_string())?;
+    let outcome = run_upgrade(&command, managed);
     NATIVE_STATUS.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap().remove(&command);
-    let printed = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let failed = String::from_utf8_lossy(&output.stderr).trim().to_string();
     if managed {
         start_inner(&app, &state, &config)?;
     }
-    if output.status.success() {
-        Ok(printed)
-    } else {
-        Err(if failed.is_empty() { printed } else { failed })
-    }
+    outcome
 }
 
 #[tauri::command(async)]

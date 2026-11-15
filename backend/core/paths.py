@@ -57,6 +57,7 @@ BROWSER_PROFILE_DIR = Path(os.environ.get("BROWSER_PROFILE_DIR") or CACHE_DIR / 
 SERVER_LOG_FILE = LOGS_DIR / "server.jsonl"
 PREVIOUS_SERVER_LOG_FILE = LOGS_DIR / "server.prev.jsonl"
 DETACHED_LOG_FILE = LOGS_DIR / "detached.log"
+UPDATE_LOG_FILE = LOGS_DIR / "update.log"
 
 
 def is_link(path: Path) -> bool:

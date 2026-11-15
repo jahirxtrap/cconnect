@@ -24,7 +24,7 @@ import psutil
 import qrcode
 from dotenv import set_key
 
-from core import cli_manager, paths, process_tree, release, sdk
+from core import cli_manager, detached, paths, process_tree, release, sdk, self_update
 from core.config import PORT, RESTART_EXIT_CODE, SUPERVISOR_VAR
 from services import agent_registry, repo, system_monitor
 
@@ -37,7 +37,6 @@ _PROVIDERS = ("tailscale", "tailnet", "caddy")
 _PRIVATE_PROVIDERS = ("tailnet",)
 _STOP_TIMEOUT = 10
 _POLL_SECONDS = 0.5
-_MODULE = "core.cli"
 _APP = "core.app:app"
 _COMMANDS = ("run", "expose", "stop", "restart", "status", "logs", "doctor", "update", "key")
 _TOP_FLAGS = ("-h", "--help", "-v", "--version")
@@ -297,29 +296,6 @@ def _expose(
     _print_qr(json.dumps(payload, separators=(",", ":")))
 
 
-def _running_pid() -> int | None:
-    """PID of a live detached launcher, or None when the recorded one is gone."""
-    try:
-        pid = int(paths.DETACHED_PID_FILE.read_text(encoding="utf-8").strip())
-    except (OSError, ValueError):
-        return None
-    try:
-        process = psutil.Process(pid)
-        if _MODULE in " ".join(process.cmdline()):
-            return pid
-    except (psutil.Error, OSError):
-        pass
-    paths.DETACHED_PID_FILE.unlink(missing_ok=True)
-    return None
-
-
-def _detached_provider() -> str:
-    """The provider the detached run exposed with."""
-    with suppress(OSError):
-        return paths.DETACHED_PROVIDER_FILE.read_text(encoding="utf-8").strip()
-    return ""
-
-
 def _spawn_detached() -> int:
     handle = paths.DETACHED_LOG_FILE.open("ab")
     kwargs: dict = {
@@ -334,7 +310,7 @@ def _spawn_detached() -> int:
         kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
     else:
         kwargs["start_new_session"] = True
-    process = subprocess.Popen([sys.executable, "-m", _MODULE], **kwargs)
+    process = subprocess.Popen([sys.executable, "-m", detached.CLI_MODULE], **kwargs)
     paths.DETACHED_PID_FILE.write_text(str(process.pid), encoding="utf-8")
     return process.pid
 
@@ -344,10 +320,10 @@ def _terminate_tree(pid: int) -> None:
 
 
 def _close_exposure() -> None:
-    detached = _detached_provider()
-    if detached == "tailscale":
+    exposed = detached.provider()
+    if exposed == "tailscale":
         _stop_tailscale_funnel()
-    elif detached == "tailnet":
+    elif exposed == "tailnet":
         _stop_tailscale_serve()
     paths.DETACHED_PROVIDER_FILE.unlink(missing_ok=True)
 
@@ -355,7 +331,7 @@ def _close_exposure() -> None:
 def _serving(port: int) -> bool:
     """True once the recorded server itself listens on the port, not whatever else took it."""
     with suppress(psutil.Error, KeyError, ValueError):
-        sockets = psutil.Process(int(_runtime()["PID"])).net_connections(kind="tcp")
+        sockets = psutil.Process(int(detached.runtime()["PID"])).net_connections(kind="tcp")
         return any(sock.status == psutil.CONN_LISTEN and sock.laddr.port == port for sock in sockets)
     return False
 
@@ -379,7 +355,7 @@ def _supervisor(live: dict[str, str]) -> psutil.Process | None:
 
 
 def _hand_over() -> None:
-    live = _runtime()
+    live = detached.runtime()
     if not live:
         return
     supervisor = _supervisor(live)
@@ -394,19 +370,19 @@ def _hand_over() -> None:
 
 
 def _refuse_second() -> None:
-    live = _runtime()
+    live = detached.runtime()
     if not live:
         return
     how = (
         f"It runs in the background: stop it with {_invocation()} stop."
-        if _running_pid() is not None
+        if detached.running_pid() is not None
         else "Stop it in its terminal, or move it to the background with --detach."
     )
     _abort(f"a backend is already running (pid {live['PID']} on port {live.get('PORT', '?')}). {how}")
 
 
 def _stop_detached() -> None:
-    pid = _running_pid()
+    pid = detached.running_pid()
     if pid is None:
         print("No detached backend is running.")
     else:
@@ -440,7 +416,7 @@ def _flag_parser() -> argparse.ArgumentParser:
                         help="Print the key that unlocks the terminal and ignored files, generating it the first time.")
     parser.add_argument("--rotate", action="store_true",
                         help="With --security-key, replace the existing key instead of printing it.")
-    parser.set_defaults(command="", source="", force=False, json=False, follow=False)
+    parser.set_defaults(command="", source="", force=False, json=False, follow=False, plan=False)
     return parser
 
 
@@ -449,7 +425,7 @@ def _command_parser() -> argparse.ArgumentParser:
     parser.add_argument("-v", "--version", action="version", version=f"cconnect {release.VERSION}")
     parser.set_defaults(
         expose="", public_host="", detach=False, port=None,
-        security_key=False, rotate=False, source="", force=False, json=False, follow=False,
+        security_key=False, rotate=False, source="", force=False, json=False, follow=False, plan=False,
     )
     commands = parser.add_subparsers(dest="command")
 
@@ -479,7 +455,9 @@ def _command_parser() -> argparse.ArgumentParser:
 
     commands.add_parser("doctor", help="Check what the backend needs on this machine.")
 
-    commands.add_parser("update", help="Upgrade this install to the latest release.")
+    update = commands.add_parser("update", help="Upgrade this install to the latest release.")
+    update.add_argument("--plan", action="store_true",
+                        help="Print the upgrade command as JSON instead of running it, for the desktop app.")
 
     key = commands.add_parser("key", help="Print the key that unlocks the terminal and ignored files.")
     key.add_argument("--rotate", action="store_true",
@@ -499,23 +477,9 @@ def _parse(argv: list[str]) -> argparse.Namespace:
     return args
 
 
-def _runtime() -> dict[str, str]:
-    """What the running server recorded, empty when the pid it wrote is gone."""
-    try:
-        recorded = dict(
-            entry.split("=", 1)
-            for entry in paths.RUNTIME_FILE.read_text(encoding="utf-8").split()
-            if "=" in entry
-        )
-    except OSError:
-        return {}
-    pid = int(recorded.get("PID") or 0)
-    return recorded if pid and psutil.pid_exists(pid) else {}
-
-
 def _print_status(as_json: bool) -> None:
-    live = _runtime()
-    detached = _running_pid()
+    live = detached.runtime()
+    launcher = detached.running_pid()
     if as_json:
         print(json.dumps({
             "version": release.VERSION,
@@ -524,7 +488,7 @@ def _print_status(as_json: bool) -> None:
             "port": int(live.get("PORT") or PORT),
             "pid": int(live.get("PID") or 0) or None,
             "running": bool(live),
-            "detached": detached,
+            "detached": launcher,
         }))
         return
     rows = [
@@ -532,8 +496,8 @@ def _print_status(as_json: bool) -> None:
         ("Data", str(paths.DATA_DIR)),
         ("Server", f"pid {live['PID']} on port {live.get('PORT', '?')}" if live else "not running"),
     ]
-    if detached is not None:
-        rows.append(("Detached", f"pid {detached}"))
+    if launcher is not None:
+        rows.append(("Detached", f"pid {launcher}"))
     _print_rows(rows)
 
 
@@ -553,7 +517,7 @@ def _print_logs(follow: bool) -> None:
 
 
 def _restart() -> None:
-    live = _runtime()
+    live = detached.runtime()
     if not live:
         _abort("No backend is running.")
     paths.RESTART_FLAG.touch()
@@ -581,7 +545,7 @@ def _port_taken(port: int) -> bool:
 
 
 def _port_state(port: int) -> str:
-    live = _runtime()
+    live = detached.runtime()
     if live and int(live.get("PORT") or 0) == port:
         return f"{port}, this backend (pid {live['PID']})"
     return f"{port}, taken by another program" if _port_taken(port) else f"{port}, free"
@@ -604,16 +568,45 @@ def _doctor(port: int) -> None:
     ])
 
 
-def _update() -> None:
+def _print_upgrade(command: list[str]) -> None:
+    print(f"\n  {' '.join(command)}\n")
+
+
+def _update_after_exit(command: list[str]) -> None:
+    live = detached.runtime()
+    if live and detached.running_pid() is None:
+        _abort(
+            f"a backend is running (pid {live['PID']}) from the files the update replaces. "
+            "Stop it first, or start it with --detach and the update restarts it."
+        )
+    _print_upgrade(command)
+    restart = self_update.restart_command()
+    self_update.hand_over(command, restart)
+    if restart:
+        _stop_detached()
+    print(f"\n  The upgrade runs once this command exits. Log: {paths.UPDATE_LOG_FILE}")
+    if restart:
+        print("  The backend starts again when it finishes.")
+    print()
+
+
+def _update(plan: bool) -> None:
     if not paths.INSTALLED:
         _abort("this is a git checkout, not an installed release: update it with git pull.")
-    print(f"\n  {' '.join(repo.upgrade_command())}\n")
+    command = repo.upgrade_command()
+    if plan:
+        print(json.dumps({"command": command}))
+        return
+    if self_update.needed():
+        _update_after_exit(command)
+        return
+    _print_upgrade(command)
     result = repo.upgrade()
     if result["message"]:
         print(f"{result['message']}\n")
     if not result["ok"]:
         _abort(f"the upgrade failed. Stop the server and try again: {_invocation()} stop")
-    if result["changed"] and _runtime():
+    if result["changed"] and detached.runtime():
         print("  The server that is running keeps the old version until it restarts.\n")
 
 
@@ -645,7 +638,7 @@ def main():
         return
 
     if args.command == "update":
-        _update()
+        _update(args.plan)
         return
 
     if args.command == "stop":
@@ -653,7 +646,7 @@ def main():
         return
 
     if args.detach:
-        running = _running_pid()
+        running = detached.running_pid()
         if running is not None:
             _abort(f"a detached backend is already running (pid {running}). Use --stop first.")
         _hand_over()

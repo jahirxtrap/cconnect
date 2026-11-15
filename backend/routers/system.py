@@ -70,7 +70,10 @@ async def check_update():
 
 @router.post("/system/update")
 async def update_server():
-    return api_response(data=await asyncio.to_thread(repo.pull))
+    result = await asyncio.to_thread(repo.pull)
+    if result.get("handover"):
+        _exit_after(0)
+    return api_response(data=result)
 
 
 @router.get("/system/dirs")
