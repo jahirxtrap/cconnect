@@ -4,6 +4,7 @@
   import Folder from "@lucide/svelte/icons/folder";
   import FolderSearch from "@lucide/svelte/icons/folder-search";
   import HardDrive from "@lucide/svelte/icons/hard-drive";
+  import Upload from "@lucide/svelte/icons/upload";
   import { t } from "$lib/i18n/index.svelte";
   import { isDesktop } from "$lib/platform";
   import { systemApi, type DirListing } from "$lib/services/systemApi";
@@ -20,15 +21,26 @@
   interface Props {
     mode?: "dir" | "file";
     start?: string;
+    accept?: string;
+    onUpload?: ((file: File) => void) | null;
     onConfirm: (path: string) => void;
     onDismiss: () => void;
   }
 
-  const { mode = "dir", start = "", onConfirm, onDismiss }: Props = $props();
+  const { mode = "dir", start = "", accept = "", onUpload = null, onConfirm, onDismiss }: Props = $props();
+
+  let uploadInput = $state<HTMLInputElement | null>(null);
 
   const local = async () => {
     const selected = await pickPath(mode);
     if (selected && selected !== "fallback") onConfirm(selected);
+  };
+
+  const uploaded = (event: Event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (file) onUpload?.(file);
   };
 
   let listing = $state<DirListing | null>(null);
@@ -50,7 +62,12 @@
 
 <CompactDialog title={t("CHOOSE")} subtitle={listing?.path ?? ""} {onDismiss}>
   {#snippet titleTrailing()}
-    {#if isDesktop}
+    {#if onUpload}
+      <TooltipIconButton label={t("DEVICE_APK_LOCAL")} onclick={() => uploadInput?.click()}>
+        <Upload />
+      </TooltipIconButton>
+      <input bind:this={uploadInput} type="file" {accept} onchange={uploaded} class="hidden" />
+    {:else if isDesktop}
       <TooltipIconButton label={t("BROWSE")} onclick={() => void local()}>
         <FolderSearch />
       </TooltipIconButton>

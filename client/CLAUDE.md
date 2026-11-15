@@ -128,9 +128,13 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
 - The pair dialog's QR is `ui/QrCode` with the `WIFI:T:ADB;…` text the server makes. A pairing
   (QR or code) moves the dialog to the Address tab with the phone's IP, since adb only connects
   by itself where mDNS works; the dialog closes once a device with that address is listed.
-- Install APK takes the file from the server (`ui/PathPickerDialog`, an absolute path) or from
-  the client device (an upload to Shared); the header button asks which device when several are
-  ready. An action's failure is shown until the server's next snapshot, which makes it stale.
+- Install APK, in a device's menu, opens `ui/PathPickerDialog` on the server's files, whose
+  `onUpload` button takes a file from the client device instead (an upload to Shared). Logcat
+  opens inside the pane (`DeviceLogcat`, the terminal surface
+  without keys or tabs) and closes its session on the way back. An action's failure is a red
+  `ui/AlertTip` in the pane header, a tooltip that opens on hover or on a tap like the context
+  ring; it clears once read or with the server's next snapshot. adb being down is the list's
+  empty state with Retry.
 
 ## Mods (`screens/mods/`)
 

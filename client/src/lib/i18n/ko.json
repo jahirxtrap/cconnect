@@ -1371,7 +1371,6 @@
   "DEVICE_NOT_CONNECTED": "연결되지 않음",
   "DEVICE_SCREENSHOT": "스크린샷",
   "DEVICE_INSTALL_APK": "APK 설치",
-  "DEVICE_APK_SERVER": "서버에서",
   "DEVICE_APK_LOCAL": "이 기기에서",
   "DEVICE_LOGCAT": "Logcat",
   "DEVICE_ROTATE": "회전",

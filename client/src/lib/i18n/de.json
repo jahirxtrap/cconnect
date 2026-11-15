@@ -1371,7 +1371,6 @@
   "DEVICE_NOT_CONNECTED": "Nicht verbunden",
   "DEVICE_SCREENSHOT": "Screenshot",
   "DEVICE_INSTALL_APK": "APK installieren",
-  "DEVICE_APK_SERVER": "Vom Server",
   "DEVICE_APK_LOCAL": "Von diesem Gerät",
   "DEVICE_LOGCAT": "Logcat",
   "DEVICE_ROTATE": "Drehen",

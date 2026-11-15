@@ -1371,7 +1371,6 @@
   "DEVICE_NOT_CONNECTED": "未接続",
   "DEVICE_SCREENSHOT": "スクリーンショット",
   "DEVICE_INSTALL_APK": "APK をインストール",
-  "DEVICE_APK_SERVER": "サーバーから",
   "DEVICE_APK_LOCAL": "このデバイスから",
   "DEVICE_LOGCAT": "Logcat",
   "DEVICE_ROTATE": "回転",

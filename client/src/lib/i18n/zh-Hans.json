@@ -1371,7 +1371,6 @@
   "DEVICE_NOT_CONNECTED": "未连接",
   "DEVICE_SCREENSHOT": "截屏",
   "DEVICE_INSTALL_APK": "安装 APK",
-  "DEVICE_APK_SERVER": "来自服务器",
   "DEVICE_APK_LOCAL": "来自此设备",
   "DEVICE_LOGCAT": "Logcat",
   "DEVICE_ROTATE": "旋转",

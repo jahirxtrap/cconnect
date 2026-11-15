@@ -1,7 +1,6 @@
 <script lang="ts">
   import Camera from "@lucide/svelte/icons/camera";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import FolderSearch from "@lucide/svelte/icons/folder-search";
   import Keyboard from "@lucide/svelte/icons/keyboard";
   import Moon from "@lucide/svelte/icons/moon";
   import PackagePlus from "@lucide/svelte/icons/package-plus";
@@ -10,8 +9,7 @@
   import Smartphone from "@lucide/svelte/icons/smartphone";
   import Sun from "@lucide/svelte/icons/sun";
   import Unplug from "@lucide/svelte/icons/unplug";
-  import Upload from "@lucide/svelte/icons/upload";
-  import { deviceFailureText, type ApkSource, type DeviceInfo, type DeviceScreenState } from "$lib/data/deviceModels";
+  import { deviceFailureText, type DeviceInfo, type DeviceScreenState } from "$lib/data/deviceModels";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
   import { t } from "$lib/i18n/index.svelte";
@@ -23,7 +21,6 @@
   import EmptyState from "$lib/ui/EmptyState.svelte";
   import { framePainter, type FramePainter } from "$lib/ui/framePainter";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import MenuSub from "$lib/ui/MenuSub.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import SoftKeys from "$lib/ui/SoftKeys.svelte";
@@ -36,7 +33,7 @@
     busy: boolean;
     onBack: () => void;
     onScreenshot: () => void;
-    onInstall: (source: ApkSource) => void;
+    onInstall: () => void;
     onLogcat: () => void;
     onDisconnect: (() => void) | null;
   }
@@ -233,10 +230,7 @@
       </TooltipIconButton>
     {/snippet}
     <MenuItem icon={RotateCw} text={t("DEVICE_ROTATE")} enabled={ready} onclick={rotate} />
-    <MenuSub icon={PackagePlus} text={t("DEVICE_INSTALL_APK")} enabled={!busy}>
-      <MenuItem icon={FolderSearch} text={t("DEVICE_APK_SERVER")} onclick={picked(() => onInstall("server"))} />
-      <MenuItem icon={Upload} text={t("DEVICE_APK_LOCAL")} onclick={picked(() => onInstall("local"))} />
-    </MenuSub>
+    <MenuItem icon={PackagePlus} text={t("DEVICE_INSTALL_APK")} enabled={!busy} onclick={picked(onInstall)} />
     <MenuItem icon={ScrollText} text={t("DEVICE_LOGCAT")} onclick={picked(onLogcat)} />
     <MenuItem icon={displayOff ? Sun : Moon} text={t(displayOff ? "DEVICE_SCREEN_ON" : "DEVICE_SCREEN_OFF")} enabled={ready} onclick={toggleDisplay} />
     {#if onDisconnect}

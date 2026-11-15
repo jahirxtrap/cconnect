@@ -19,7 +19,7 @@ from core.db import Session
 from core.models import Device
 from core.packages import NO_WINDOW
 from core.slugs import slug, unique
-from services import adb, device_tools
+from services import adb, device_tools, discovery
 
 MISSING = "missing"
 INVALID = "invalid"
@@ -46,10 +46,11 @@ FAILED = "failed"
 
 FALLBACK_ID = "device"
 TRACK_DEVICES = "host:track-devices-l"
-TRACK_SERVICES = "host:track-mdns-services"
-PAIRING_SERVICE = "_adb-tls-pairing._tcp"
-CONNECT_SERVICE = "_adb-tls-connect._tcp"
+PAIRING_SERVICE = discovery.PAIRING_SERVICE
+CONNECT_SERVICE = discovery.CONNECT_SERVICE
 _CONNECT_SUFFIX = f".{CONNECT_SERVICE}"
+_INSTANCE_PREFIX = "adb-"
+_AVD_NAME_COMMAND = "avd name"
 _EMULATOR_PREFIX = "emulator-"
 _EMULATOR_PROGRAMS = ("emulator", "qemu-system")
 _AVD_FLAG = "-avd"
@@ -170,13 +171,13 @@ def _rows(payload: str) -> dict[str, dict]:
     return rows
 
 
-def _services(payload: str) -> list[dict]:
-    found = []
-    for line in payload.splitlines():
-        parts = line.split("\t")
-        if len(parts) == 3:
-            found.append({"instance": parts[0], "service": parts[1], "address": parts[2]})
-    return found
+def _hardware_of(instance: str) -> str:
+    end = instance.rfind("-")
+    return instance[len(_INSTANCE_PREFIX):end] if instance.startswith(_INSTANCE_PREFIX) and end > len(_INSTANCE_PREFIX) else ""
+
+
+def _host_of(address: str) -> str:
+    return address.rpartition(":")[0]
 
 
 def _label(words: str) -> str:
@@ -230,6 +231,7 @@ def start_emulator(name: str) -> None:
         )
     except OSError as exc:
         raise DeviceError(EMULATOR_FAILED, str(exc)) from exc
+    hub.note_launch(name)
 
 
 def _emulator_processes() -> list[tuple[psutil.Process, str]]:
@@ -268,6 +270,7 @@ async def pair(address: str, code: str) -> str:
         raise DeviceError(PAIR_FAILED, exc.detail) from exc
     if not answer.startswith(_PAIRED_REPLY):
         raise DeviceError(PAIR_FAILED, answer.strip())
+    hub.note_paired(_address(address))
     return answer.strip()
 
 
@@ -316,7 +319,14 @@ class DevicesHub:
         self._rows: dict[str, dict] = {}
         self._info: dict[str, dict[str, str]] = {}
         self._describing: dict[str, asyncio.Task] = {}
+        self._naming: dict[str, asyncio.Task] = {}
+        self._avds: dict[str, str] = {}
+        self._named: set[str] = set()
+        self._launched: list[str] = []
         self._services: list[dict] = []
+        self._discovery = discovery.Discovery(self._services_changed)
+        self._tried: set[str] = set()
+        self._paired_hosts: set[str] = set()
         self._trackers: list[asyncio.Task] = []
         self._listed = asyncio.Event()
         self._failure: Optional[str] = None
@@ -342,10 +352,8 @@ class DevicesHub:
         if any(not task.done() for task in self._trackers) or device_tools.adb_path() is None:
             return
         self._failure = None
-        self._trackers = [
-            asyncio.create_task(self._track(TRACK_DEVICES, self._devices_changed)),
-            asyncio.create_task(self._track(TRACK_SERVICES, self._services_changed)),
-        ]
+        self._trackers = [asyncio.create_task(self._track(TRACK_DEVICES, self._devices_changed))]
+        self._discovery.start()
 
     async def ready(self) -> None:
         self.start()
@@ -353,10 +361,22 @@ class DevicesHub:
             await self._listed.wait()
 
     def close(self) -> None:
-        for task in [*self._trackers, *self._describing.values()]:
+        for task in [*self._trackers, *self._describing.values(), *self._naming.values()]:
             task.cancel()
         self._trackers = []
         self._describing = {}
+        self._naming = {}
+        asyncio.create_task(self._discovery.close())
+
+    def note_paired(self, address: str) -> None:
+        self._paired_hosts.add(_host_of(address))
+        self._auto_connect()
+
+    def address_for(self, entry: dict) -> Optional[str]:
+        return next(
+            (item["address"] for item in self._services if item["service"] == CONNECT_SERVICE and _hardware_of(item["instance"]) == entry["serial"]),
+            entry["address"],
+        )
 
     def reload_saved(self) -> None:
         self._saved = saved()
@@ -385,6 +405,9 @@ class DevicesHub:
         self._pairing = None
         self._publish()
 
+    def note_launch(self, avd: str) -> None:
+        self._launched.append(avd)
+
     def device(self, serial: str) -> dict:
         found = self._rows.get(serial)
         if found is None:
@@ -404,10 +427,20 @@ class DevicesHub:
         for serial in [serial for serial in self._describing if serial not in rows or rows[serial]["state"] != READY]:
             self._describing.pop(serial).cancel()
         for serial, row in rows.items():
+            if row["kind"] == EMULATOR and serial not in self._rows and serial not in self._avds and self._launched:
+                self._avds[serial] = self._launched.pop(0)
             if row["state"] == READY and serial not in self._info and serial not in self._describing:
                 self._describing[serial] = asyncio.create_task(self._describe(serial))
+            elif row["kind"] == EMULATOR and row["state"] != READY and serial not in self._named and serial not in self._naming:
+                self._naming[serial] = asyncio.create_task(self._name_emulator(serial))
+        for serial in [serial for serial in self._avds if serial not in rows]:
+            del self._avds[serial]
+            self._named.discard(serial)
+        for serial in [serial for serial in self._naming if serial not in rows]:
+            self._naming.pop(serial).cancel()
         self._rows = rows
         self._listed.set()
+        self._auto_connect()
 
     def _emulators(self) -> list[dict]:
         return avds() if device_tools.emulator_path() else []
@@ -415,9 +448,16 @@ class DevicesHub:
     def _labels(self, emulators: list[dict]) -> dict[str, str]:
         return {item["name"]: item["label"] for item in emulators}
 
+    def _connected(self) -> set[str]:
+        return {self._info[serial][SERIAL] for serial in self._rows if serial in self._info and self._info[serial].get(SERIAL)}
+
+    def _avd_of(self, serial: str) -> str:
+        info = self._info.get(serial, {})
+        return info.get(AVD_NAME) or info.get(LEGACY_AVD_NAME) or self._avds.get(serial, "")
+
     def snapshot(self) -> dict:
-        connected = {self._info[serial][SERIAL] for serial in self._rows if serial in self._info and self._info[serial].get(SERIAL)}
-        running = {info.get(AVD_NAME) or info.get(LEGACY_AVD_NAME): serial for serial, info in self._info.items() if kind_of(serial) == EMULATOR}
+        connected = self._connected()
+        running = {self._avd_of(serial): serial for serial in self._rows if kind_of(serial) == EMULATOR}
         emulators = self._emulators()
         labels = self._labels(emulators)
         return {
@@ -425,7 +465,7 @@ class DevicesHub:
             "tools": {**device_tools.status(), "installing": self._installing},
             "failure": self._failure,
             "devices": [self._device(row, labels) for row in self._rows.values()],
-            "saved": [{**entry, "connected": entry["serial"] in connected} for entry in self._saved],
+            "saved": [{**entry, "address": self.address_for(entry), "connected": entry["serial"] in connected} for entry in self._saved],
             "emulators": [{**item, "serial": running.get(item["name"])} for item in emulators],
             "pairing": {key: value for key, value in self._pairing.items() if key != "password"} if self._pairing else None,
         }
@@ -443,7 +483,7 @@ class DevicesHub:
         info = self._info.get(row["serial"], {})
         kept = self._saved_for(info.get(SERIAL, ""))
         sdk = info.get(SDK, "")
-        avd = info.get(AVD_NAME) or info.get(LEGACY_AVD_NAME) or ""
+        avd = self._avd_of(row["serial"])
         if row["state"] != READY:
             state = BOOTING if row["kind"] == EMULATOR and row["state"] == OFFLINE else row["state"]
         elif not info:
@@ -484,13 +524,54 @@ class DevicesHub:
                 logger.debug(f"{service} ended: {exc}")
             await asyncio.sleep(_RECONNECT_SECONDS)
 
-    def _services_changed(self, payload: str) -> None:
-        self._services = _services(payload)
+    def _services_changed(self, found: list[dict]) -> None:
+        self._services = found
+        self._tried &= {item["address"] for item in found}
         pairing = self._pairing
         if pairing and pairing["status"] == WAITING:
-            offered = next((item for item in self._services if item["service"] == PAIRING_SERVICE and item["instance"] == pairing["name"]), None)
+            offered = next((item for item in found if item["service"] == PAIRING_SERVICE and item["instance"] == pairing["name"]), None)
             if offered:
                 asyncio.create_task(self._pair_offered(pairing, offered["address"]))
+        self._auto_connect()
+        self._publish()
+
+    def _auto_connect(self) -> None:
+        connected = self._connected()
+        for item in self._services:
+            if item["service"] != CONNECT_SERVICE or item["address"] in self._tried:
+                continue
+            hardware = _hardware_of(item["instance"])
+            known = bool(hardware) and self._saved_for(hardware) is not None and hardware not in connected
+            if known or _host_of(item["address"]) in self._paired_hosts:
+                self._tried.add(item["address"])
+                asyncio.create_task(self._reconnect(item["address"]))
+
+    async def _reconnect(self, address: str) -> None:
+        try:
+            await connect(address)
+        except DeviceError as exc:
+            logger.debug(f"{address} could not be connected: {exc}")
+            return
+        self._paired_hosts.discard(_host_of(address))
+
+    async def _name_emulator(self, serial: str) -> None:
+        try:
+            port = int(serial[len(_EMULATOR_PREFIX):])
+            while serial in self._rows and self._rows[serial]["state"] != READY:
+                try:
+                    name = await adb.console(port, _AVD_NAME_COMMAND)
+                except (adb.AdbError, asyncio.IncompleteReadError, OSError):
+                    await asyncio.sleep(_RECONNECT_SECONDS)
+                    continue
+                if name:
+                    self._avds[serial] = name
+                    self._named.add(serial)
+                    self._publish()
+                return
+        except ValueError:
+            return
+        finally:
+            self._naming.pop(serial, None)
 
     async def _pair_offered(self, pairing: dict, address: str) -> None:
         self._pairing = {**pairing, "status": PAIRING, "address": address}
@@ -501,6 +582,7 @@ class DevicesHub:
             outcome = {"status": FAILED, "detail": exc.detail or exc.reason}
         else:
             outcome = {"status": PAIRED, "detail": ""}
+            self.note_paired(address)
         if self._pairing and self._pairing["name"] == pairing["name"]:
             self._pairing = {**self._pairing, **outcome}
             self._publish()

@@ -73,10 +73,10 @@ async def _saved_changed(work: Callable[[], Any]) -> dict:
 
 
 async def _connect_saved(device_id: str) -> None:
-    found = await asyncio.to_thread(devices.find_saved, device_id)
-    if not found["address"]:
+    address = hub.address_for(await asyncio.to_thread(devices.find_saved, device_id))
+    if not address:
         raise devices.DeviceError(devices.INVALID, device_id)
-    await devices.connect(found["address"])
+    await devices.connect(address)
 
 
 async def _screenshot(serial: str) -> dict:

@@ -325,13 +325,18 @@ PATH, in the SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT`, the default folders) or in
 - `services/adb` speaks adb's host protocol on its socket (`%04x` length, `OKAY`/`FAIL`), starting
   the server when nothing listens. Pushes, installs, pairing's crypto and the emulator console go
   through the binary (`run`).
-- `services/devices.hub` is **the** state: `host:track-devices-l` and `host:track-mdns-services`
-  are push streams, so the panel never polls. Each authorized device is described once with
-  `getprop` and remembered in `devices` by its hardware serial (`ro.serialno`), the same over USB
-  and Wi-Fi; emulators are never saved. A QR pairing waits for the `_adb-tls-pairing._tcp` service
-  whose instance name is the one in the code, then pairs; adb connects the device itself.
+- `services/devices.hub` is **the** state: `host:track-devices-l` is a push stream and
+  `services/discovery` browses the Wi-Fi debugging services itself with zeroconf on every
+  interface (adb's own discovery misses them on a machine with several adapters), so the panel
+  never polls. Each authorized device is described once with `getprop` and remembered in
+  `devices` by its hardware serial (`ro.serialno`), the same over USB and Wi-Fi; emulators are
+  never saved. A QR pairing waits for the `_adb-tls-pairing._tcp` service whose instance name is
+  the one in the code, then pairs. A `_adb-tls-connect._tcp` service named after a saved serial,
+  or on a host paired this run, is connected once per address (`_auto_connect`), and a saved
+  entry answers with the discovered address, so the port Android changes never has to be typed.
 - Emulators come from the AVD folder (`ANDROID_AVD_HOME`, else `~/.android/avd`), never from a
-  process, and start detached from the server.
+  process, and start detached from the server with no snapshot. While one boots, its AVD name
+  comes from the emulator console (`adb.console`), since `getprop` needs adbd.
 - `services/device_screen` runs scrcpy's server on the device (`adb reverse` first, `adb forward`
   with a bounded connect retry when the device refuses reverse) and turns its stream into the
   browser pane's frame wire (`services/frames`): the config packet is prepended to every key

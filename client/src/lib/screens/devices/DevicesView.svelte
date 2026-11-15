@@ -2,7 +2,6 @@
   import Camera from "@lucide/svelte/icons/camera";
   import Download from "@lucide/svelte/icons/download";
   import EllipsisVertical from "@lucide/svelte/icons/ellipsis-vertical";
-  import FolderSearch from "@lucide/svelte/icons/folder-search";
   import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import PackagePlus from "@lucide/svelte/icons/package-plus";
   import Pencil from "@lucide/svelte/icons/pencil";
@@ -12,15 +11,14 @@
   import Smartphone from "@lucide/svelte/icons/smartphone";
   import Trash from "@lucide/svelte/icons/trash";
   import Unplug from "@lucide/svelte/icons/unplug";
-  import Upload from "@lucide/svelte/icons/upload";
   import { untrack } from "svelte";
   import { navigation } from "$lib/app/navigation.svelte";
   import {
     DEVICE_READY,
     deviceFailureText,
+    failureDetail,
     deviceKindText,
     deviceStateText,
-    type ApkSource,
     type DeviceInfo,
     type DevicesState,
     type EmulatorInfo,
@@ -30,28 +28,24 @@
   import { KeyGate, keyRefused } from "$lib/data/keyGate.svelte";
   import { securityKeys } from "$lib/data/securityKeys.svelte";
   import { serverStatus } from "$lib/data/serverStatus.svelte";
-  import { terminalTabs } from "$lib/data/terminalTabs.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import PaneHeader from "$lib/screens/chat/PaneHeader.svelte";
-  import { panes } from "$lib/screens/chat/panes.svelte";
   import { backend } from "$lib/services/backend.svelte";
   import { devices } from "$lib/services/devices.svelte";
   import { createDevicesApi, type DeviceOutcome } from "$lib/services/devicesApi";
+  import type { TerminalInfo } from "$lib/services/terminalApi";
   import { downloadUrl } from "$lib/services/sharedApi";
   import { downloadShared } from "$lib/services/sharedFiles";
   import { uploadAttachment } from "$lib/services/uploadApi";
   import ActionButton from "$lib/ui/ActionButton.svelte";
+  import AlertTip from "$lib/ui/AlertTip.svelte";
   import CenteredProgress from "$lib/ui/CenteredProgress.svelte";
-  import CompactDialog from "$lib/ui/CompactDialog.svelte";
   import ConfirmDialog from "$lib/ui/ConfirmDialog.svelte";
   import ConnectionError from "$lib/ui/ConnectionError.svelte";
-  import DialogSelectItem from "$lib/ui/DialogSelectItem.svelte";
   import EmptyState from "$lib/ui/EmptyState.svelte";
-  import ErrorText from "$lib/ui/ErrorText.svelte";
   import LinearProgress from "$lib/ui/LinearProgress.svelte";
   import ListRow from "$lib/ui/ListRow.svelte";
   import MenuItem from "$lib/ui/MenuItem.svelte";
-  import MenuSub from "$lib/ui/MenuSub.svelte";
   import PathPickerDialog from "$lib/ui/PathPickerDialog.svelte";
   import PopupMenu from "$lib/ui/PopupMenu.svelte";
   import RenameDialog from "$lib/ui/RenameDialog.svelte";
@@ -60,12 +54,12 @@
   import SecurityKeyDialog from "$lib/ui/SecurityKeyDialog.svelte";
   import ServerUnavailable from "$lib/ui/ServerUnavailable.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
+  import DeviceLogcat from "./DeviceLogcat.svelte";
   import DeviceScreen from "./DeviceScreen.svelte";
   import PairDialog from "./PairDialog.svelte";
 
   const LIST_FRAME = "flex-1 rounded-panel";
   const APK_TYPES = ".apk,application/vnd.android.package-archive";
-  const APK_MENU = "apk";
   const PATH_SEPARATORS = /[\\/]/;
 
   const api = createDevicesApi(() => backend.active);
@@ -81,10 +75,9 @@
   let renaming = $state<DeviceInfo | null>(null);
   let unlocking = $state(false);
   let rejected = $state(false);
-  let apkPicker = $state<HTMLInputElement | null>(null);
   let apkTarget: DeviceInfo | null = null;
   let browsing = $state(false);
-  let choosing = $state<string | null>(null);
+  let log = $state<{ device: DeviceInfo; session: TerminalInfo } | null>(null);
 
   const profile = $derived(backend.active);
   const snapshot = $derived(devices.stateOf(profile));
@@ -97,7 +90,6 @@
   const tools = $derived(snapshot?.tools ?? null);
   const ready = $derived(tools !== null && tools.missing.length === 0);
   const connected = $derived(snapshot?.devices ?? []);
-  const usable = $derived(connected.filter((device) => device.state === DEVICE_READY));
   const failure = $derived(failed && failed.on === snapshot ? failed.text : null);
   const saved = $derived((snapshot?.saved ?? []).filter((entry) => !entry.connected));
   const emulators = $derived((snapshot?.emulators ?? []).filter((emulator) => !emulator.serial));
@@ -168,20 +160,16 @@
   const logcat = async (device: DeviceInfo) => {
     menuId = null;
     const session = await run((key) => api.logcat(device.serial, key));
-    if (!session) return;
-    terminalTabs.openLocal(session);
-    panes.show("terminal");
+    if (session) log = { device, session };
   };
 
-  const pickApk = (source: ApkSource, device: DeviceInfo | null) => {
+  const pickApk = (device: DeviceInfo) => {
     menuId = null;
     apkTarget = device;
-    if (source === "server") browsing = true;
-    else apkPicker?.click();
+    browsing = true;
   };
 
   const install = async (path: string, device: DeviceInfo) => {
-    choosing = null;
     busy = true;
     await run((key) => api.install(device.serial, { project: null, path }, key));
     busy = false;
@@ -189,16 +177,11 @@
 
   const deliver = (path: string) => {
     browsing = false;
-    const target = apkTarget ?? (usable.length === 1 ? usable[0] : null);
-    if (target) void install(path, target);
-    else choosing = path;
+    if (apkTarget) void install(path, apkTarget);
   };
 
-  const uploadApk = async (event: Event) => {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = "";
-    if (!file) return;
+  const uploadApk = async (file: File) => {
+    browsing = false;
     busy = true;
     failed = null;
     const path = await uploadAttachment(file, () => {}, profile);
@@ -231,26 +214,14 @@
   const emulatorSubtitle = (emulator: EmulatorInfo) => joined(emulator.device, emulator.api !== null && t("DEVICE_API", emulator.api));
 </script>
 
-{#snippet apkSources(device: DeviceInfo | null)}
-  <MenuItem icon={FolderSearch} text={t("DEVICE_APK_SERVER")} enabled={!busy} onclick={() => pickApk("server", device)} />
-  <MenuItem icon={Upload} text={t("DEVICE_APK_LOCAL")} enabled={!busy} onclick={() => pickApk("local", device)} />
-{/snippet}
-
 {#snippet headerActions()}
+  {#if failure}
+    <AlertTip label={t("TOOL_FAILED")} text={failure} onSeen={() => (failed = null)} />
+  {/if}
   {#if ready}
     <TooltipIconButton label={t("DEVICE_PAIR")} onclick={unlocked(() => (pairing = true))}>
       <Plus />
     </TooltipIconButton>
-  {/if}
-  {#if ready && !locked && usable.length}
-    <PopupMenu open={menuId === APK_MENU} onOpenChange={(open) => (menuId = open ? APK_MENU : null)} label={t("DEVICE_INSTALL_APK")} align="end">
-      {#snippet triggerChild(props)}
-        <TooltipIconButton label={t("DEVICE_INSTALL_APK")} tooltip={false} {...props}>
-          <PackagePlus />
-        </TooltipIconButton>
-      {/snippet}
-      {@render apkSources(null)}
-    </PopupMenu>
   {/if}
 {/snippet}
 
@@ -266,6 +237,10 @@
   <ActionButton text={t("DEVICE_PAIR")} onclick={() => (pairing = true)} />
 {/snippet}
 
+{#snippet retryAction()}
+  <ActionButton text={t("RETRY")} onclick={() => void devices.refresh(profile)} />
+{/snippet}
+
 {#snippet deviceMenu(device: DeviceInfo)}
   <PopupMenu open={menuId === device.serial} onOpenChange={(open) => (menuId = open ? device.serial : null)} label={t("MORE_OPTIONS")} align="end">
     {#snippet triggerChild(props)}
@@ -274,9 +249,7 @@
       </TooltipIconButton>
     {/snippet}
     <MenuItem icon={Camera} text={t("DEVICE_SCREENSHOT")} enabled={!busy} onclick={() => void screenshot(device)} />
-    <MenuSub icon={PackagePlus} text={t("DEVICE_INSTALL_APK")} enabled={!busy}>
-      {@render apkSources(device)}
-    </MenuSub>
+    <MenuItem icon={PackagePlus} text={t("DEVICE_INSTALL_APK")} enabled={!busy} onclick={() => pickApk(device)} />
     <MenuItem icon={ScrollText} text={t("DEVICE_LOGCAT")} onclick={() => void logcat(device)} />
     {#if device.saved}
       <MenuItem icon={Pencil} text={t("RENAME")} onclick={() => (renaming = device)} />
@@ -291,25 +264,22 @@
   {#if busy || tools?.installing}
     <LinearProgress class="absolute inset-x-0 top-0 z-30" />
   {/if}
-  {#if openedDevice}
+  {#if log}
+    <DeviceLogcat device={log.device} session={log.session} onBack={() => (log = null)} />
+  {:else if openedDevice}
     {@const device = openedDevice}
     <DeviceScreen
       {device}
       {busy}
       onBack={() => devices.open(profile, null)}
       onScreenshot={() => void screenshot(device)}
-      onInstall={(source) => pickApk(source, device)}
+      onInstall={() => pickApk(device)}
       onLogcat={() => void logcat(device)}
       onDisconnect={device.kind === "usb" ? null : () => void disconnect(device)}
     />
   {:else}
     <PaneHeader title={t("DEVICES")} actions={headerActions} />
     <div class="flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset) pb-(--page-inset)">
-      {#if failure}
-        <ErrorText text={failure} class="shrink-0 px-1" />
-      {:else if snapshot?.failure}
-        <ErrorText text={deviceFailureText({ reason: "adb", detail: snapshot.failure })} class="shrink-0 px-1" />
-      {/if}
       {#if serverStatus.unavailable}
         <ServerUnavailable class="min-h-0 flex-1" />
       {:else if !snapshot && !devices.failed(profile)}
@@ -320,6 +290,8 @@
         <EmptyState icon={Smartphone} text={t("DEVICES_LOCKED")} action={unlockAction} class="min-h-0 flex-1" />
       {:else if !ready}
         <EmptyState icon={Smartphone} text={t("DEVICES_TOOLS_MISSING")} detail={toolsDetail} action={installAction} class="min-h-0 flex-1" />
+      {:else if snapshot.failure}
+        <EmptyState icon={Smartphone} text={t("DEVICE_REASON_ADB")} detail={failureDetail(snapshot.failure)} action={retryAction} class="min-h-0 flex-1" />
       {:else if empty}
         <EmptyState icon={Smartphone} text={t("DEVICES_NONE")} detail={t("DEVICES_NONE_DETAIL")} action={pairAction} class="min-h-0 flex-1" />
       {:else}
@@ -391,19 +363,8 @@
   {/if}
 </div>
 
-<input bind:this={apkPicker} type="file" accept={APK_TYPES} onchange={uploadApk} class="hidden" />
-
 {#if browsing}
-  <PathPickerDialog mode="file" onConfirm={deliver} onDismiss={() => (browsing = false)} />
-{/if}
-
-{#if choosing}
-  {@const path = choosing}
-  <CompactDialog title={t("DEVICE_INSTALL_APK")} subtitle={fileName(path)} onDismiss={() => (choosing = null)}>
-    {#each usable as device (device.serial)}
-      <DialogSelectItem label={device.name} subtitle={subtitleOf(device)} selected={false} onclick={() => void install(path, device)} />
-    {/each}
-  </CompactDialog>
+  <PathPickerDialog mode="file" accept={APK_TYPES} onUpload={(file) => void uploadApk(file)} onConfirm={deliver} onDismiss={() => (browsing = false)} />
 {/if}
 
 {#if pairing}

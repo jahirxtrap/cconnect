@@ -3,8 +3,6 @@ import { flag, list, number, record, strings, text, type Wire } from "./wire";
 
 export type DeviceKind = "usb" | "wifi" | "emulator";
 
-export type ApkSource = "server" | "local";
-
 export const DEVICE_READY = "device";
 export const DEVICE_UNAUTHORIZED = "unauthorized";
 
@@ -185,11 +183,13 @@ const REASON_KEYS: Record<string, string> = {
   booting: "DEVICE_BOOTING",
 };
 
+export const failureDetail = (detail: string): string => detail.trim().split("\n").at(-1)?.trim() ?? "";
+
 export const deviceFailureText = (failure: DeviceFailure | null): string => {
   if (!failure) return t("CONNECTION_ERROR");
   const key = REASON_KEYS[failure.reason];
   const reason = key ? t(key) : null;
-  return [reason, WITHOUT_DETAIL.has(failure.reason) ? "" : failure.detail].filter(Boolean).join("\n");
+  return [reason, WITHOUT_DETAIL.has(failure.reason) ? "" : failureDetail(failure.detail)].filter(Boolean).join("\n");
 };
 
 const KIND_KEYS: Record<DeviceKind, string> = { usb: "DEVICE_USB", wifi: "DEVICE_WIFI", emulator: "DEVICE_EMULATOR" };

@@ -2,6 +2,7 @@
 
 import asyncio
 import subprocess
+from pathlib import Path
 from typing import AsyncIterator
 
 from core.packages import NO_WINDOW
@@ -16,6 +17,10 @@ _FAIL = b"FAIL"
 _LENGTH_DIGITS = 4
 _COMMAND_TIMEOUT = 120
 _OUTPUT_TAIL = 2000
+_CONSOLE_TOKEN_FILE = Path.home() / ".emulator_console_auth_token"
+_CONSOLE_OK = b"OK"
+_CONSOLE_KO = b"KO:"
+_CONSOLE_TIMEOUT = 10
 
 
 class AdbError(Exception):
@@ -207,4 +212,37 @@ async def install(serial: str, apk: str) -> str:
 
 async def kill_emulator(serial: str) -> None:
     await run("-s", serial, "emu", "kill")
+
+
+async def _console_reply(reader: asyncio.StreamReader) -> str:
+    lines = []
+    while True:
+        line = await asyncio.wait_for(reader.readline(), _CONSOLE_TIMEOUT)
+        if not line:
+            raise AdbError(FAILED, "the emulator console closed")
+        if line.rstrip(b"\r\n") == _CONSOLE_OK:
+            return "".join(lines)
+        if line.startswith(_CONSOLE_KO):
+            raise AdbError(FAILED, line.decode("utf-8", "replace").strip())
+        lines.append(line.decode("utf-8", "replace"))
+
+
+async def console(port: int, command: str) -> str:
+    try:
+        reader, writer = await asyncio.open_connection(HOST, port)
+    except OSError as exc:
+        raise AdbError(FAILED, f"the emulator console on {port} is not listening") from exc
+    try:
+        await _console_reply(reader)
+        if _CONSOLE_TOKEN_FILE.is_file():
+            writer.write(f"auth {_CONSOLE_TOKEN_FILE.read_text(encoding='utf-8').strip()}\n".encode("utf-8"))
+            await writer.drain()
+            await _console_reply(reader)
+        writer.write(f"{command}\n".encode("utf-8"))
+        await writer.drain()
+        return (await _console_reply(reader)).strip()
+    except asyncio.TimeoutError as exc:
+        raise AdbError(FAILED, f"the emulator console on {port} did not answer") from exc
+    finally:
+        writer.close()
 

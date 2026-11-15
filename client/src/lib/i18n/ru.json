@@ -1449,7 +1449,6 @@
   "DEVICE_NOT_CONNECTED": "Не подключено",
   "DEVICE_SCREENSHOT": "Снимок экрана",
   "DEVICE_INSTALL_APK": "Установить APK",
-  "DEVICE_APK_SERVER": "С сервера",
   "DEVICE_APK_LOCAL": "С этого устройства",
   "DEVICE_LOGCAT": "Logcat",
   "DEVICE_ROTATE": "Повернуть",
