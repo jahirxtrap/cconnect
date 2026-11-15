@@ -374,6 +374,9 @@ def _user_row(entry: dict) -> Optional[dict]:
             return None
         text = _text_from_content(att.get("prompt")).strip()
         source = att.get("source_uuid")
+    elif etype == "user" and entry.get("isMeta") and (peer := _peer_message(entry)) is not None:
+        uid = entry.get("uuid")
+        return {"uuid": uid, "text": peer["text"], "ts": _parse_ts(entry.get("timestamp")), "source": None, "carried": peer} if uid else None
     elif etype != "user" or entry.get("isMeta") or entry.get("isSidechain") or entry.get("isCompactSummary") or entry.get("isVisibleInTranscriptOnly"):
         return None
     else:
@@ -1471,6 +1474,8 @@ _PLUGIN_MESSAGE_RE = re.compile(
     re.DOTALL,
 )
 _INCOMING_LEAD = "Another Claude session sent a message:"
+_PEER_ORIGIN = "peer"
+_WRITTEN_TWICE = frozenset({"agent_report", "session_message"})
 _REPORT_LEAD_RE = re.compile(r"^.*?The report follows:[ \t]*\n", re.DOTALL)
 _ATTRIBUTE_RE = re.compile(r'([\w-]+)="([^"]*)"')
 
@@ -1487,6 +1492,14 @@ def _session_message(match: re.Match) -> dict:
 def _session_message_item(text: str) -> dict | None:
     match = _SESSION_MESSAGE_RE.match(text.strip())
     return _session_message(match) if match else None
+
+
+def _peer_message(entry: dict) -> dict | None:
+    """A message from another Claude session, as the CLI records it on the meta entry that delivers it."""
+    origin = entry.get("origin")
+    if not isinstance(origin, dict) or origin.get("kind") != _PEER_ORIGIN:
+        return None
+    return {"type": "session_message", "name": str(origin.get("name") or ""), "text": str(origin.get("body") or "").strip()}
 
 
 def _plugin_message_item(text: str) -> dict | None:
@@ -1812,13 +1825,14 @@ def _normalize(
     reported: set[str] = set()
 
     def _once(items: list[dict]) -> list[dict]:
-        """A hand-back is written twice, once queued and once delivered."""
+        """A hand-back or a peer's message is written twice, once queued and once delivered."""
         kept = []
         for item in items:
-            if item.get("type") == "agent_report":
-                if item["text"] in reported:
+            if item.get("type") in _WRITTEN_TWICE:
+                key = (item["type"], item.get("name"), item["text"])
+                if key in reported:
                     continue
-                reported.add(item["text"])
+                reported.add(key)
             kept.append(item)
         return kept
 
@@ -1851,7 +1865,9 @@ def _normalize(
                 messages.append({"type": "summary", "text": text})
             continue
         if entry.get("isMeta"):
-            if i >= last_boundary:
+            if i >= last_boundary and (peer := _peer_message(entry)) is not None:
+                messages.extend(_once([peer]))
+            elif i >= last_boundary:
                 meta_text = _text_from_content(entry.get("message", {}).get("content"))
                 feedback = hook_events.from_feedback(meta_text)
                 if feedback is None:

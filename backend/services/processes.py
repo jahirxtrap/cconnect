@@ -9,6 +9,7 @@ from services import browser, chat_list, sessions, terminal
 from services.agent_connections import pool as agent_pool
 from services.claude_runtime import CHANNEL_ENV
 from services.live_sessions import registry
+from services.mcp_lazy import SPAWN_MARKER
 
 KINDS = ("server", "chat", "agent", "terminal", "browser", "other")
 _SERVER = {"kind": "server", "title": None, "detail": None, "project_key": None, "stop": None}
@@ -25,7 +26,10 @@ _SHELLS = frozenset({"bash", "sh", "zsh", "dash", "fish"})
 _SHELL_LABEL = "Bash"
 _LAUNCHERS = frozenset({"uvx", "uv", "npx", "npm", "pnpm", "bunx", "bun", "yarn", "node", "python", "python3", "py", "deno", "pipx"})
 _LAUNCH_WORDS = frozenset({"tool", "run", "exec", "dlx", "x", "uvx"})
-_VALUE_FLAGS = frozenset({"--from", "--with", "-p", "--package", "--python", "-c"})
+_VALUE_FLAGS = frozenset({
+    "--from", "--with", "--with-editable", "--with-requirements", "--constraints", "--overrides", "-p", "--package",
+    "--python", "-c", "--index", "--index-url", "--extra-index-url", "--directory", "--project", "--env-file",
+})
 _GENERIC_SCRIPTS = frozenset({"server", "main", "index", "app", "cli", "__main__", "run", "start"})
 _NPX_SCRIPTS = frozenset({"npx-cli", "npm-cli"})
 _DETAIL_LIMIT = 80
@@ -185,6 +189,8 @@ def _launched(cmdline: list[str], fallback: str) -> tuple[str, Optional[str]]:
             continue
         if arg.startswith("-") or arg in _LAUNCH_WORDS:
             continue
+        if _program(arg).lower() in _LAUNCHERS:
+            return _launched(args[index:], fallback)
         if arg.startswith("@"):
             return _package(arg), None
         if "/" in arg or "\\" in arg:
@@ -219,11 +225,15 @@ def _part(root: psutil.Process, usages: list[dict]) -> dict:
     }
 
 
-def _channel_of(process: psutil.Process) -> Optional[str]:
+def _environ(process: psutil.Process) -> dict[str, str]:
     try:
-        return process.environ().get(CHANNEL_ENV)
+        return process.environ()
     except psutil.Error:
-        return None
+        return {}
+
+
+def _channel_of(process: psutil.Process) -> Optional[str]:
+    return _environ(process).get(CHANNEL_ENV)
 
 
 def _owner(process: psutil.Process, channel: Optional[str], found: dict) -> tuple[int | str, dict]:
@@ -283,23 +293,28 @@ def snapshot(found: dict) -> dict:
     def measured(processes: list[psutil.Process]) -> list[dict]:
         return [entry for entry in (usage_of(process) for process in processes) if entry is not None]
 
-    channels = {process.pid: _channel_of(process) for process in tops}
+    environs = {process.pid: _environ(process) for process in tops}
+    channels = {pid: environ.get(CHANNEL_ENV) for pid, environ in environs.items()}
     grouped: dict[int | str, dict] = {}
     for process in sorted(tops, key=lambda top: channels[top.pid] in found["sides"]):
         usage = usage_of(process)
         if usage is None:
             continue
-        root = _part(process, [usage])
-        if channels[process.pid] in found["sides"]:
-            root["role"] = QUICK_CHAT
-        parts = [root]
-        for child in children.get(process.pid, []):
-            branch = measured([child, *below(child.pid)])
-            if branch:
-                parts.append(_part(child, branch))
+        whole = measured([process, *below(process.pid)])
+        if SPAWN_MARKER in environs[process.pid]:
+            parts = [_part(process, whole)]
+        else:
+            root = _part(process, [usage])
+            if channels[process.pid] in found["sides"]:
+                root["role"] = QUICK_CHAT
+            parts = [root]
+            for child in children.get(process.pid, []):
+                branch = measured([child, *below(child.pid)])
+                if branch:
+                    parts.append(_part(child, branch))
         key, owner = _owner(process, channels[process.pid], found)
         item = grouped.setdefault(key, {**owner, **usage, "processes": [], "parts": []})
-        item["processes"].extend(measured([process, *below(process.pid)]))
+        item["processes"].extend(whole)
         item["parts"].extend(parts)
     items = [
         {

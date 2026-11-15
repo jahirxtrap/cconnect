@@ -255,11 +255,11 @@ class _Upstream:
         self.done = anyio.Event()
 
     def _params(self) -> tuple[StdioServerParameters, Optional[str]]:
+        marker = uuid.uuid4().hex
         direct = _direct.get(self.spec.key)
         if direct is not None and Path(direct.command).is_file():
-            env = {**self.env, **direct.env}
+            env = {**self.env, **direct.env, SPAWN_MARKER: marker}
             return StdioServerParameters(command=direct.command, args=list(direct.args), env=env, cwd=self.cwd, encoding_error_handler="replace"), None
-        marker = uuid.uuid4().hex
         env = {**self.env, SPAWN_MARKER: marker}
         return StdioServerParameters(command=self.spec.command, args=list(self.spec.args), env=env, cwd=self.cwd, encoding_error_handler="replace"), marker
 

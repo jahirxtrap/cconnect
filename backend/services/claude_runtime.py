@@ -1091,7 +1091,8 @@ async def run_prompt(
                 continue
             text = u["text"]
             carried = (
-                _q._notification_item(text)
+                u.get("carried")
+                or _q._notification_item(text)
                 or _q._plugin_message_item(text)
                 or _q._session_message_item(text)
                 or _q._agent_report_item(text)

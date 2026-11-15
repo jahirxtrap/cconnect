@@ -152,6 +152,8 @@ format is not a contract; what currently holds:
   the last boundary, so those points only fork.
 - Filter non-conversation entries (`queue-operation`, `attachment`, `file-history-snapshot`,
   `custom-title`, `mode`, `last-prompt`…) by type, never by position.
+- A message from another Claude session is a meta `user` entry with `origin.kind: "peer"`; it is
+  read from `origin` (`name`, `body`) live and on resume, never from the text around it.
 - A block a tool emits live when it runs (shared files, a pack export, `show_component`) is rebuilt
   only when its call answered without an error (`_ran`), so a call a hook refused shows nothing on
   resume either. Tools mark their failures with `reply(..., error=True)`.
@@ -211,7 +213,8 @@ disabled ones and any config with an unresolved `${…}` stay with the CLI.
 - The real process starts on the first call (`_Link`) with the environment the CLI would give
   it. Every start rereads the lists and sends `list_changed` when they changed.
 - The first start per backend run goes through the launcher (`uvx`, `npx`); later ones run the
-  process it spawned directly (`CCONNECT_MCP_SPAWN` marker), falling back to the launcher.
+  process it spawned directly (`CCONNECT_MCP_SPAWN` marker), falling back to the launcher. Every
+  start carries the marker, and Processes shows a marked tree as one part, like the CLI's own MCPs.
 - The proxy speaks the handshake era: it answers a newer `mcp-protocol-version` with the 400 an
   older server gives.
 - mcp 2.3: one stateful `StreamableHTTPSessionManager` per server and CLI, `json_response=False`
