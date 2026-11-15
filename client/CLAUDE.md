@@ -102,7 +102,8 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   load marks its node before awaiting, and `forget` reloads what is expanded. A table keeps its
   view there (`tableViewOf` / `saveTableView`) and loads only while `rows` is `null`.
 - On a gated server even listing connections needs the key, so the list is kept per stored key,
-  and every change goes through a `KeyGate`.
+  and every change goes through a `KeyGate`. A list that key was refused for stops counting once
+  the key is accepted anywhere (`securityKeys.unlocked`), so the screen asks for it again.
 - The console's text is its draft (`draftOf(...).sql`). It clears its previous failure only once a
   run succeeds.
 - Tree rows hand a `TreeMenuTarget` to `DatabasesView.treeMenu`. **Query in console** quotes with

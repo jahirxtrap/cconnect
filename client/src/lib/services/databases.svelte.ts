@@ -52,6 +52,7 @@ const listSlot = (profile: Profile, key = securityKeys.keyFor(profile)) => slotO
 
 class Databases {
   #lists = $state<Record<string, DatabaseList>>({});
+  #refused = $state<Record<string, boolean>>({});
   #failed = $state<Record<string, boolean>>({});
   #files = $state<Record<string, DatabaseConnection>>({});
   #schemas = $state<Record<string, Loaded<DatabaseSchemas>>>({});
@@ -61,7 +62,10 @@ class Databases {
   #tables = $state<Record<string, TableView>>({});
 
   listOf(profile: Profile): DatabaseList | null {
-    return profile ? (this.#lists[listSlot(profile)] ?? null) : null;
+    if (!profile) return null;
+    const slot = listSlot(profile);
+    const stale = this.#refused[slot] === true && securityKeys.unlocked(profile) !== false;
+    return stale ? null : (this.#lists[slot] ?? null);
   }
 
   failed(profile: Profile): boolean {
@@ -84,7 +88,11 @@ class Databases {
     const [catalog, saved] = await Promise.all([api.catalog(), api.connections(key)]);
     const refused = keyRefused(saved);
     const answered = catalog.ok && (saved.ok || refused);
-    if (answered) this.#lists = { ...this.#lists, [listSlot(profile, key)]: { ...catalog.value, connections: saved.value ?? [] } };
+    if (answered) {
+      const slot = listSlot(profile, key);
+      this.#lists = { ...this.#lists, [slot]: { ...catalog.value, connections: saved.value ?? [] } };
+      this.#refused = { ...this.#refused, [slot]: refused };
+    }
     this.#failed = { ...this.#failed, [profile.id]: !answered };
     return !refused;
   }

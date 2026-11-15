@@ -81,6 +81,7 @@ class PdfScreen(private val activity: AppCompatActivity, private val content: ()
         close()
         val parent = content()?.parent as? ViewGroup ?: return report(false)
         val pdf = PdfView(activity)
+        pdf.verticalAlignment = PdfView.VERTICAL_ALIGNMENT_TOP
         ViewCompat.setOnApplyWindowInsetsListener(pdf) { _, _ -> WindowInsetsCompat.CONSUMED }
         pdf.outlineProvider = object : ViewOutlineProvider() {
             override fun getOutline(view: View, outline: Outline) {
