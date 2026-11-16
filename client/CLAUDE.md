@@ -298,6 +298,9 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
   response on a host that showed life within two pings (`LinkPulse`, beaten by messages and
   download chunks) reopens once, silently. `chatSocket` keeps a stale socket while
   `transfers.flowingTo` sees a transfer to that server. Never raise the deadlines.
+- The list socket raises a notification only for a session `publishWatchedSessions` handed over
+  (`AndroidLink.watched`): the chats open in a tab, and only the locked project's while one is
+  locked. `notifier` applies the same lock on the web and the desktop.
 - `setOnReceiveContentListener` takes no MIME type starting with `*`: it kills the app on launch.
 - The WebView gets only its window's first focus gain (the `onWindowFocusChanged` override in the
   class extension): Chromium 157+ drops the focused field on any later focus change and loses the

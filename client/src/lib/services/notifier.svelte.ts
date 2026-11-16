@@ -1,4 +1,5 @@
 import type { SessionInfo } from "$lib/data/models";
+import { settings } from "$lib/data/settings.svelte";
 import { isMobile, isTauri } from "$lib/platform";
 import type { ChatState } from "$lib/screens/chat/state.svelte";
 import { http } from "./http";
@@ -48,6 +49,7 @@ class Notifier {
     actions: NotificationAction[] = [],
   ) {
     if (this.#foreground || !this.granted) return;
+    if (source && settings.lockedProject && source.projectKey !== settings.lockedProject) return;
     this.#pending = source;
     if (isTauri) {
       const { registerActionTypes, sendNotification } = await import("@tauri-apps/plugin-notification");

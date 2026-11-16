@@ -13,7 +13,7 @@
   import { backend } from "$lib/services/backend.svelte";
   import { theme } from "$lib/design/theme.svelte";
   import { restorePacks } from "$lib/design/packs/library";
-  import { publishNotificationTitles } from "$lib/platform/androidNotify";
+  import { publishNotificationTitles, publishWatchedSessions } from "$lib/platform/androidNotify";
   import { listenOpenedLinks } from "$lib/platform/openedLinks";
   import { listenNativeFiles } from "$lib/platform/pastedContent";
   import { desktop } from "$lib/platform/desktop.svelte";
@@ -65,6 +65,7 @@
     (session, environmentId) => panes.revealSession(session, environmentId),
   );
   $effect(() => publishNotificationTitles());
+  $effect(() => publishWatchedSessions());
   void desktop.start();
 
   useShortcut("tab.new", () => void panes.newTab());

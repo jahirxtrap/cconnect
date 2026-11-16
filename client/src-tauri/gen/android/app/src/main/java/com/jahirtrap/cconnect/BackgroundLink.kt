@@ -16,6 +16,7 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import org.json.JSONArray
 import org.json.JSONObject
 
 private const val CHANNEL_ID = "cconnect.chat"
@@ -57,6 +58,7 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
   private val agents = ConcurrentHashMap<String, String>()
   private val subjects = ConcurrentHashMap<String, String>()
   private val states = ConcurrentHashMap<String, String>()
+  private val watched = ConcurrentHashMap.newKeySet<String>()
   private val outbox = ArrayDeque<String>()
   private var draining = false
 
@@ -96,6 +98,14 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     doneTitle = done
     waitingTitle = waiting
     claudeName = claude
+  }
+
+  @JavascriptInterface
+  fun watched(ids: String) {
+    val parsed = runCatching { JSONArray(ids) }.getOrNull() ?: return
+    val next = (0 until parsed.length()).map { parsed.optString(it) }.filter { it.isNotEmpty() }
+    watched.clear()
+    watched.addAll(next)
   }
 
   @JavascriptInterface
@@ -216,6 +226,7 @@ class BackgroundLink(private val context: Context, private val view: () -> WebVi
     val before = activity[id] ?: ""
     val now = session.optString("activity")
     remember(session)
+    if (id !in watched) return
     changed(socket, id, before, now, claudeName, titles[id].orEmpty())
   }
 
