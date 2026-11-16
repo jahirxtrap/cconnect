@@ -18,7 +18,7 @@ _RELEASE_URL = "https://pypi.org/pypi/cconnect/json"
 DISTRIBUTION = "cconnect"
 
 
-def _released() -> tuple[Optional[str], str]:
+def released() -> tuple[Optional[str], str]:
     """The newer version on PyPI, empty when there is none, or None and why PyPI gave none."""
     try:
         answer = httpx.get(_RELEASE_URL, timeout=_RELEASE_TIMEOUT)
@@ -135,7 +135,7 @@ def status() -> dict:
 
 def check() -> dict:
     if paths.INSTALLED:
-        latest, problem = _released()
+        latest, problem = released()
         return {**_package_status(), "latest": latest or "", "ok": latest is not None, "message": problem}
     if not revision():
         return status()

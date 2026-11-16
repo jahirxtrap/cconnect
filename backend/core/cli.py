@@ -624,10 +624,6 @@ def _doctor(port: int) -> None:
     ])
 
 
-def _print_upgrade(command: list[str]) -> None:
-    print(f"\n  {' '.join(command)}\n")
-
-
 def _stop_running(live: dict[str, str]) -> None:
     if detached.running_pid() is not None:
         _stop_detached()
@@ -635,7 +631,7 @@ def _stop_running(live: dict[str, str]) -> None:
     supervisor = _supervisor(live)
     if supervisor is None:
         return
-    print(f"  Stopping the backend (pid {live['PID']}).")
+    print(f"Stopping the backend (pid {live['PID']}).")
     paths.STOP_FLAG.touch()
     with suppress(psutil.NoSuchProcess):
         supervisor.wait()
@@ -643,15 +639,13 @@ def _stop_running(live: dict[str, str]) -> None:
 
 def _update_after_exit(command: list[str]) -> None:
     live = detached.runtime()
-    _print_upgrade(command)
     restart = self_update.restart_command()
     self_update.hand_over(command, restart)
     if live:
         _stop_running(live)
-    print(f"\n  The upgrade runs once this command exits. Log: {paths.UPDATE_LOG_FILE}")
+    print(f"The update runs once this command exits. Log: {paths.UPDATE_LOG_FILE}")
     if restart:
-        print("  The backend starts again in the background when it finishes.")
-    print()
+        print("The backend starts again in the background when it finishes.")
 
 
 def _refuse_during_update() -> None:
@@ -667,17 +661,26 @@ def _update(plan: bool) -> None:
         print(json.dumps({"command": command}))
         return
     _refuse_during_update()
+    print(f"Current version: {release.VERSION}")
+    print("Checking for updates to latest version...")
+    latest, problem = repo.released()
+    if latest is None:
+        _abort(f"could not check for updates. {problem}")
+    if not latest:
+        print(f"CConnect is up to date ({release.VERSION})")
+        return
+    print(f"Updating to {latest}...")
     if self_update.needed():
         _update_after_exit(command)
         return
-    _print_upgrade(command)
     result = repo.upgrade()
-    if result["message"]:
-        print(f"{result['message']}\n")
     if not result["ok"]:
-        _abort(f"the upgrade failed. Stop the server and try again: {_invocation()} stop")
-    if result["changed"] and detached.runtime():
-        print("  The server that is running keeps the old version until it restarts.\n")
+        if result["message"]:
+            print(result["message"])
+        _abort(f"the update failed. Stop the server and try again: {_invocation()} stop")
+    print(f"CConnect updated to {latest}")
+    if detached.runtime():
+        print("The backend that is running keeps the old version until it restarts.")
 
 
 def main():
