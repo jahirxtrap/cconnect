@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import psutil
+
 from core import detached, paths
 from core.config import PORT
 
@@ -18,17 +20,23 @@ def needed() -> bool:
     return sys.platform == "win32" and paths.INSTALLED
 
 
+def pending() -> bool:
+    try:
+        shell = psutil.Process(int(paths.UPDATING_FLAG.read_text(encoding="utf-8").strip()))
+        if shell.create_time() <= paths.UPDATING_FLAG.stat().st_mtime:
+            return True
+    except (OSError, ValueError, psutil.Error):
+        pass
+    paths.UPDATING_FLAG.unlink(missing_ok=True)
+    return False
+
+
 def restart_command() -> list[str] | None:
-    if detached.running_pid() is None:
+    live = detached.runtime()
+    if not live:
         return None
-    exposed = detached.provider()
-    port = detached.runtime().get("PORT")
-    return [
-        sys.executable, "-m", detached.CLI_MODULE,
-        *(["expose", exposed] if exposed else ["run"]),
-        *(["--port", port] if port and int(port) != PORT else []),
-        "--detach",
-    ]
+    serve = detached.serve_args(live) or ["run", "--port", live.get("PORT") or str(PORT)]
+    return [sys.executable, "-m", detached.CLI_MODULE, *serve, "--detach"]
 
 
 def quoted(value: str) -> str:
@@ -44,9 +52,12 @@ def hand_over(upgrade: list[str], restart: list[str] | None) -> None:
     launcher = shutil.which("cconnect")
     if launcher:
         held.append(launcher)
-    steps = [f"$held = @({', '.join(quoted(path) for path in held)})", _HOLDERS, _WAIT, _call(upgrade)]
+    steps = [
+        f"$held = @({', '.join(quoted(path) for path in held)})", _HOLDERS, _WAIT, _call(upgrade),
+        f"Remove-Item -LiteralPath {quoted(str(paths.UPDATING_FLAG))} -ErrorAction SilentlyContinue",
+    ]
     if restart:
-        steps.append(f"if ($LASTEXITCODE -eq 0) {{ {_call(restart)} }}")
+        steps.append(_call(restart))
     command = [*SHELL, "\n".join(steps)]
     flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
     with paths.UPDATE_LOG_FILE.open("wb") as log:
@@ -58,6 +69,7 @@ def hand_over(upgrade: list[str], restart: list[str] | None) -> None:
             "close_fds": True,
         }
         try:
-            subprocess.Popen(command, creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, **options)
+            shell = subprocess.Popen(command, creationflags=flags | subprocess.CREATE_BREAKAWAY_FROM_JOB, **options)
         except OSError:
-            subprocess.Popen(command, creationflags=flags, **options)
+            shell = subprocess.Popen(command, creationflags=flags, **options)
+    paths.UPDATING_FLAG.write_text(str(shell.pid), encoding="utf-8")

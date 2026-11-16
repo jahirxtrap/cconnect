@@ -51,16 +51,7 @@ def _on_disk() -> str:
 
 
 def _upgrade_after_stop() -> dict:
-    restart = self_update.restart_command()
-    if restart is None:
-        return {
-            **_package_status(),
-            "ok": False,
-            "message": "This server can only update itself when it runs with --detach. "
-                       "Stop it and run cconnect update.",
-            "changed": False,
-        }
-    self_update.hand_over(upgrade_command(), restart)
+    self_update.hand_over(upgrade_command(), self_update.restart_command())
     return {**_package_status(), "ok": True, "message": "", "changed": False, "handover": True}
 
 

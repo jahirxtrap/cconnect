@@ -1,3 +1,4 @@
+import json
 from contextlib import suppress
 
 import psutil
@@ -5,6 +6,24 @@ import psutil
 from core import paths
 
 CLI_MODULE = "core.cli"
+_SERVE_SUPERVISOR = "supervisor"
+_SERVE_ARGS = "args"
+
+
+def record_serve(supervisor: int, args: list[str]) -> None:
+    paths.SERVE_FILE.write_text(json.dumps({_SERVE_SUPERVISOR: supervisor, _SERVE_ARGS: args}), encoding="utf-8")
+
+
+def serve_args(live: dict[str, str]) -> list[str] | None:
+    """The command arguments the running server was started with, when its supervisor recorded them."""
+    try:
+        recorded = json.loads(paths.SERVE_FILE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(recorded, dict) or str(recorded.get(_SERVE_SUPERVISOR)) != live.get("SUPERVISOR"):
+        return None
+    args = recorded.get(_SERVE_ARGS)
+    return [str(arg) for arg in args] if isinstance(args, list) else None
 
 
 def runtime() -> dict[str, str]:

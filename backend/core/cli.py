@@ -2,6 +2,7 @@
 
 import argparse
 import atexit
+import ctypes
 import getpass
 import io
 import ipaddress
@@ -25,7 +26,7 @@ import qrcode
 from dotenv import set_key
 
 from core import cli_manager, detached, paths, process_tree, release, sdk, self_update
-from core.config import PORT, RESTART_EXIT_CODE, SUPERVISOR_VAR
+from core.config import PORT, RESTART_EXIT_CODE, SERVE_VAR, SUPERVISOR_VAR
 from services import agent_registry, repo, system_monitor
 
 _ENV_PATH = paths.ENV_FILE
@@ -36,6 +37,7 @@ _LIFELINE_VAR = "CCONNECT_LIFELINE"
 _PROVIDERS = ("tailscale", "tailnet", "caddy")
 _PRIVATE_PROVIDERS = ("tailnet",)
 _STOP_TIMEOUT = 10
+_THREAD_TERMINATE = 0x0001
 _POLL_SECONDS = 0.5
 _WINDOWS_APP = "tailscale-ipn.exe"
 _MAC_APP = "Tailscale"
@@ -330,14 +332,22 @@ def _expose(
     _print_qr(json.dumps(payload, separators=(",", ":")))
 
 
-def _spawn_detached() -> int:
+def _serve_args(args: argparse.Namespace, port: int) -> list[str]:
+    return [
+        *(["expose", args.expose] if args.expose else ["run"]),
+        "--port", str(port),
+        *(["--public-host", args.public_host] if args.public_host else []),
+    ]
+
+
+def _spawn_detached(serve: list[str]) -> int:
     handle = paths.DETACHED_LOG_FILE.open("ab")
     kwargs: dict = {
         "stdin": subprocess.DEVNULL,
         "stdout": handle,
         "stderr": handle,
         "cwd": str(paths.BACKEND_DIR),
-        "env": dict(os.environ),
+        "env": {**os.environ, SERVE_VAR: json.dumps(serve)},
         "close_fds": True,
     }
     if sys.platform == "win32":
@@ -556,10 +566,10 @@ def _restart() -> None:
     print(f"Restarting the backend (pid {live['PID']}).")
 
 
-def _watch_lifeline() -> None:
+def _watch_lifeline() -> threading.Thread | None:
     stream = sys.stdin.buffer if sys.stdin else None
     if stream is None:
-        return
+        return None
 
     def wait() -> None:
         with suppress(OSError, ValueError):
@@ -567,7 +577,21 @@ def _watch_lifeline() -> None:
                 pass
         paths.STOP_FLAG.touch()
 
-    threading.Thread(target=wait, name="lifeline", daemon=True).start()
+    watcher = threading.Thread(target=wait, name="lifeline", daemon=True)
+    watcher.start()
+    return watcher
+
+
+def _end_lifeline(watcher: threading.Thread | None) -> None:
+    """Cancels the watcher's pending pipe read and waits for it to end."""
+    if watcher is None or not watcher.is_alive() or sys.platform != "win32":
+        return
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenThread(_THREAD_TERMINATE, False, watcher.native_id)
+    if handle:
+        kernel32.CancelSynchronousIo(handle)
+        kernel32.CloseHandle(handle)
+    watcher.join(_STOP_TIMEOUT)
 
 
 def _port_taken(port: int) -> bool:
@@ -604,22 +628,35 @@ def _print_upgrade(command: list[str]) -> None:
     print(f"\n  {' '.join(command)}\n")
 
 
+def _stop_running(live: dict[str, str]) -> None:
+    if detached.running_pid() is not None:
+        _stop_detached()
+        return
+    supervisor = _supervisor(live)
+    if supervisor is None:
+        return
+    print(f"  Stopping the backend (pid {live['PID']}).")
+    paths.STOP_FLAG.touch()
+    with suppress(psutil.NoSuchProcess):
+        supervisor.wait()
+
+
 def _update_after_exit(command: list[str]) -> None:
     live = detached.runtime()
-    if live and detached.running_pid() is None:
-        _abort(
-            f"a backend is running (pid {live['PID']}) from the files the update replaces. "
-            "Stop it first, or start it with --detach and the update restarts it."
-        )
     _print_upgrade(command)
     restart = self_update.restart_command()
     self_update.hand_over(command, restart)
-    if restart:
-        _stop_detached()
+    if live:
+        _stop_running(live)
     print(f"\n  The upgrade runs once this command exits. Log: {paths.UPDATE_LOG_FILE}")
     if restart:
-        print("  The backend starts again when it finishes.")
+        print("  The backend starts again in the background when it finishes.")
     print()
+
+
+def _refuse_during_update() -> None:
+    if self_update.pending():
+        _abort(f"CConnect is being updated. The backend starts again by itself when it finishes. Log: {paths.UPDATE_LOG_FILE}")
 
 
 def _update(plan: bool) -> None:
@@ -629,6 +666,7 @@ def _update(plan: bool) -> None:
     if plan:
         print(json.dumps({"command": command}))
         return
+    _refuse_during_update()
     if self_update.needed():
         _update_after_exit(command)
         return
@@ -677,6 +715,7 @@ def main():
         _stop_detached()
         return
 
+    _refuse_during_update()
     if args.detach:
         running = detached.running_pid()
         if running is not None:
@@ -691,7 +730,7 @@ def main():
             paths.DETACHED_PROVIDER_FILE.write_text(args.expose, encoding="utf-8")
         else:
             _print_security_key(key_generated)
-        pid = _spawn_detached()
+        pid = _spawn_detached(_serve_args(args, port))
         _await_start(pid, port)
         print(
             f"  Detached   : pid {pid}"
@@ -719,8 +758,9 @@ def main():
     paths.RESTART_FLAG.unlink(missing_ok=True)
     paths.STOP_FLAG.unlink(missing_ok=True)
     os.environ[SUPERVISOR_VAR] = str(os.getpid())
-    if os.environ.pop(_LIFELINE_VAR, None):
-        _watch_lifeline()
+    handed = os.environ.pop(SERVE_VAR, None)
+    detached.record_serve(os.getpid(), json.loads(handed) if handed else _serve_args(args, port))
+    lifeline = _watch_lifeline() if os.environ.pop(_LIFELINE_VAR, None) else None
     while True:
         process = subprocess.Popen(cmd, cwd=paths.BACKEND_DIR, stdin=subprocess.DEVNULL)
         asked = False
@@ -748,6 +788,10 @@ def main():
             continue
         if process.returncode != RESTART_EXIT_CODE:
             break
+    paths.SERVE_FILE.unlink(missing_ok=True)
+    _end_lifeline(lifeline)
+    if self_update.pending():
+        print(f"\n  CConnect is updating. The backend starts again in the background when it finishes. Log: {paths.UPDATE_LOG_FILE}\n")
 
 
 if __name__ == "__main__":
