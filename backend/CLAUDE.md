@@ -26,7 +26,8 @@ inside `claude_runtime` because the SDK upgrades itself on startup (`sdk_auto_up
   replace the `Scripts` of a running python): `core/self_update` hands the upgrade to a detached
   PowerShell that waits until nothing runs from `sys.prefix`, then restarts a detached backend. A
   server that is not detached refuses, and the desktop app stops its own and runs the command
-  `cconnect update --plan` prints.
+  `cconnect update --plan` prints. The upgrade runs `uv tool install --upgrade --force`: without
+  `--force`, a launcher uv could not delete makes it remove the whole environment.
 - `core/` — `paths` (**the** path table; `INSTALLED` picks the data folder), `release`,
   `config`, `db` / `models` / `migrations/`, `settings_defs` / `settings_store`, `responses`
   (**the** envelope `{success, status, message, data}`), `ws` (**the** handshake:

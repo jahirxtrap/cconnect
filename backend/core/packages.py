@@ -33,7 +33,7 @@ def uninstall_command(*distributions: str) -> list[str]:
 def upgrade_command(distribution: str, kept: list[str] = ()) -> list[str]:
     uv = uv_tool()
     if uv:
-        return [uv, "tool", "install", "--upgrade", distribution, *chain.from_iterable(("--with", item) for item in kept)]
+        return [uv, "tool", "install", "--upgrade", "--force", distribution, *chain.from_iterable(("--with", item) for item in kept)]
     return [sys.executable, "-m", "pip", "install", "--upgrade", distribution]
 
 
