@@ -234,7 +234,7 @@ def start_emulator(name: str) -> None:
     hub.note_launch(name)
 
 
-def _emulator_processes() -> list[tuple[psutil.Process, str]]:
+def emulator_processes() -> list[tuple[psutil.Process, str]]:
     found = []
     for process in psutil.process_iter(["name", "cmdline"]):
         name = (process.info["name"] or "").lower()
@@ -247,7 +247,7 @@ def _emulator_processes() -> list[tuple[psutil.Process, str]]:
 
 
 def kill_emulator_process(avd: Optional[str]) -> bool:
-    running = _emulator_processes()
+    running = emulator_processes()
     targets = [process for process, name in running if name == avd] if avd else [process for process, _name in running]
     if not targets or (not avd and len({name for _process, name in running}) > 1):
         return False
@@ -404,6 +404,9 @@ class DevicesHub:
     def stop_pairing(self) -> None:
         self._pairing = None
         self._publish()
+
+    def has_emulators(self) -> bool:
+        return any(row["kind"] == EMULATOR for row in self._rows.values())
 
     def note_launch(self, avd: str) -> None:
         self._launched.append(avd)

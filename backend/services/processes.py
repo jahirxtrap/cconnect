@@ -5,13 +5,13 @@ from typing import Optional
 
 import psutil
 
-from services import browser, chat_list, sessions, terminal
+from services import browser, chat_list, devices, sessions, terminal
 from services.agent_connections import pool as agent_pool
 from services.claude_runtime import CHANNEL_ENV
 from services.live_sessions import registry
 from services.mcp_lazy import SPAWN_MARKER
 
-KINDS = ("server", "chat", "agent", "terminal", "browser", "other")
+KINDS = ("server", "chat", "agent", "terminal", "browser", "emulator", "other")
 _SERVER = {"kind": "server", "title": None, "detail": None, "project_key": None, "stop": None}
 OPEN = "open"
 KEYED = "key"
@@ -96,7 +96,21 @@ async def owners() -> dict:
         }
     if browser.session.pid is not None:
         pids[browser.session.pid] = {"kind": "browser", "title": None, "detail": None, "project_key": None, "stop": OPEN}
+    if devices.hub.has_emulators():
+        labels = {item["name"]: item["label"] for item in devices.avds()}
+        running = await asyncio.to_thread(devices.emulator_processes)
+        members = {process.pid for process, _avd in running}
+        for process, avd in running:
+            if _parent_pid(process) not in members:
+                pids[process.pid] = {"kind": "emulator", "title": labels.get(avd, avd), "detail": None, "project_key": None, "stop": KEYED}
     return {"chats": chats, "sides": sides, "pids": pids}
+
+
+def _parent_pid(process: psutil.Process) -> Optional[int]:
+    try:
+        return process.ppid()
+    except psutil.Error:
+        return None
 
 
 def _tracked_process(process: psutil.Process) -> psutil.Process:
@@ -357,6 +371,12 @@ async def stop(pid: int, unlocked: bool) -> str:
     if browser.session.pid == pid:
         await browser.session.stop()
         return STOPPED
+    for process, avd in await asyncio.to_thread(devices.emulator_processes):
+        if process.pid == pid:
+            if not unlocked:
+                return LOCKED
+            await devices.stop_emulator(avd)
+            return STOPPED
     channel = await asyncio.to_thread(_chat_channel, pid)
     session = registry.get(channel) if channel else None
     if session is None:

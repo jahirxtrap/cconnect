@@ -63,7 +63,7 @@ export interface LogEntry {
   message: string;
 }
 
-export const PROCESS_KINDS = ["server", "chat", "agent", "terminal", "browser", "other"] as const;
+export const PROCESS_KINDS = ["server", "chat", "agent", "terminal", "browser", "emulator", "other"] as const;
 
 export type ProcessKind = (typeof PROCESS_KINDS)[number];
 

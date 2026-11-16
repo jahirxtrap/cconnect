@@ -339,7 +339,9 @@ PATH, in the SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT`, the default folders) or in
   entry answers with the discovered address, so the port Android changes never has to be typed.
 - Emulators come from the AVD folder (`ANDROID_AVD_HOME`, else `~/.android/avd`), never from a
   process, and start detached from the server with no snapshot. While one boots, its AVD name
-  comes from the emulator console (`adb.console`), since `getprop` needs adbd.
+  comes from the emulator console (`adb.console`), since `getprop` needs adbd. Each emulator adb
+  lists is a row of its own in Processes (`processes.owners`, kind `emulator`, found by its
+  `-avd` argument), stopped through the hub behind the key.
 - `services/device_screen` runs scrcpy's server on the device (`adb reverse` first, `adb forward`
   with a bounded connect retry when the device refuses reverse) and turns its stream into the
   browser pane's frame wire (`services/frames`): the config packet is prepended to every key

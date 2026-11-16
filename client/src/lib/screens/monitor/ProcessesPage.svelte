@@ -1,5 +1,6 @@
 <script lang="ts">
   import Cpu from "@lucide/svelte/icons/cpu";
+  import MonitorSmartphone from "@lucide/svelte/icons/monitor-smartphone";
   import Power from "@lucide/svelte/icons/power";
   import Server from "@lucide/svelte/icons/server";
   import { PANE_VIEWS, QUICK_CHAT_ICON } from "$lib/app/screens";
@@ -50,10 +51,11 @@
     agent: "agents",
     terminal: "terminal",
     browser: "browser",
+    emulator: "devices",
     other: "",
   };
 
-  const OWN_ICONS: Partial<Record<ProcessKind, IconSource>> = { server: Server };
+  const OWN_ICONS: Partial<Record<ProcessKind, IconSource>> = { server: Server, emulator: MonitorSmartphone };
 
   const OTHER_ICON: IconSource = Cpu;
 
@@ -63,6 +65,7 @@
     agent: "AGENTS",
     terminal: "TERMINALS",
     browser: "BROWSER",
+    emulator: "DEVICES_EMULATORS",
     other: "OTHER_PROCESSES",
   };
 
