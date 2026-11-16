@@ -58,8 +58,8 @@ paste the address and token by hand, or let the local server add itself. The
 connection becomes active immediately and the chat reconnects.
 
 An app can show that QR too: each environment's row has Show QR, and so does
-the Local server dialog while the server is exposed, where a second code
-carries the security key for the dialog that asks for it.
+the Local server dialog while the server is exposed. The security key is never
+in a code: `cconnect key` prints it and you type it where it is asked for.
 
 Each environment can carry its own colour, which takes over the whole app while
 it's the active one — a glance tells you whether you're driving your laptop or a

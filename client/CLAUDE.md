@@ -270,8 +270,9 @@ renderer worker (`GlobalWorkerOptions.rendererSrc`) off, or pages blank during a
   component whose DOM brings its own links, like pdf.js's annotation layer, declares `OWN_LINKS`.
 - `hasFiles(event)` gates every drag handler, or dragging text raises the file overlay.
 - Every QR the app draws is `ui/QrCode` (`uqr`), and `ui/QrDialog` shows one or several. The
-  environment and security key codes are written and read in `data/qrPayload.ts`, the same JSON
-  the server command prints; a code with only a URL is an environment without credentials.
+  environment code is written and read in `data/qrPayload.ts`, the same JSON the server command
+  prints; a code with only a URL is an environment without credentials. The security key is
+  typed, never scanned.
 - A command, typed or picked, goes out as bare text like a suggestion (`chat.send`, through
   `commandIn(chat.commands, text)`): pending attachments and picked elements stay in the composer.
 - Whether a server accepts its stored key is `securityKeys.unlocked(profile)`, recorded only by

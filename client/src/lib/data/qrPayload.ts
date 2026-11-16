@@ -58,7 +58,3 @@ export const parseEnvironmentQr = (raw: string): QrEnvironment | null => {
   const auth = data && authIn(data);
   return data && address && auth ? { address, name: text(data.name), auth } : null;
 };
-
-export const securityKeyQr = (key: string) => JSON.stringify({ security_key: key });
-
-export const parseSecurityKeyQr = (raw: string) => text(decoded(raw)?.security_key) || null;

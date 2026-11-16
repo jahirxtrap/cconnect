@@ -63,7 +63,6 @@
   "SHOW_QR": "QR-Code anzeigen",
   "QR_CODE": "QR-Code",
   "QR_ENVIRONMENT_HINT": "Scanne ihn auf einem anderen Gerät unter Umgebungen, um diese Umgebung hinzuzufügen.",
-  "QR_SECURITY_KEY_HINT": "Scanne ihn auf einem anderen Gerät, wenn es nach dem Sicherheitsschlüssel fragt.",
   "TERMINAL": "Terminal",
   "NEW_TERMINAL": "Neues Terminal",
   "NO_TERMINALS": "Keine Terminals geöffnet",

@@ -63,7 +63,6 @@
   "SHOW_QR": "显示二维码",
   "QR_CODE": "二维码",
   "QR_ENVIRONMENT_HINT": "在另一台设备的“环境”中扫描，即可添加此环境。",
-  "QR_SECURITY_KEY_HINT": "当另一台设备要求输入安全密钥时扫描。",
   "TERMINAL": "终端",
   "NEW_TERMINAL": "新建终端",
   "NO_TERMINALS": "暂无打开的终端",

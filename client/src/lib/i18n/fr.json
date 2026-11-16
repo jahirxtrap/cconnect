@@ -63,7 +63,6 @@
   "SHOW_QR": "Afficher le code QR",
   "QR_CODE": "Code QR",
   "QR_ENVIRONMENT_HINT": "Scannez-le sur un autre appareil, depuis Environnements, pour ajouter cet environnement.",
-  "QR_SECURITY_KEY_HINT": "Scannez-le sur un autre appareil lorsqu’il demande la clé de sécurité.",
   "TERMINAL": "Terminal",
   "NEW_TERMINAL": "Nouveau terminal",
   "NO_TERMINALS": "Aucun terminal ouvert",

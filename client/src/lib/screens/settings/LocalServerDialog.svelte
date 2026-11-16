@@ -1,6 +1,6 @@
 <script lang="ts">
   import { emptyAuth, type AuthInput } from "$lib/data/auth";
-  import { environmentQrText, securityKeyQr } from "$lib/data/qrPayload";
+  import { environmentQrText } from "$lib/data/qrPayload";
   import { settings } from "$lib/data/settings.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import Folder from "@lucide/svelte/icons/folder";
@@ -89,12 +89,7 @@
   const codes = $derived.by((): QrChoice[] => {
     if (!info.publicUrl) return [];
     const auth: AuthInput = { ...emptyAuth(), kind: info.token ? "bearer" : "none", token: info.token ?? "" };
-    return [
-      { label: t("ENVIRONMENT"), text: environmentQrText(info.publicUrl, "", auth), hint: t("QR_ENVIRONMENT_HINT") },
-      ...(info.token && info.securityKey
-        ? [{ label: t("SECURITY_KEY"), text: securityKeyQr(info.securityKey), hint: t("QR_SECURITY_KEY_HINT") }]
-        : []),
-    ];
+    return [{ label: t("ENVIRONMENT"), text: environmentQrText(info.publicUrl, "", auth), hint: t("QR_ENVIRONMENT_HINT") }];
   });
 
   let showingCodes = $state(false);

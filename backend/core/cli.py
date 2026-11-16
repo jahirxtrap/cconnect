@@ -87,10 +87,8 @@ def _security_key_row(generated: bool) -> tuple[str, str]:
     return ("Security key", f"{os.environ[_SECURITY_KEY_VAR]}{' [Auto]' if generated else ''}")
 
 
-def _print_security_key(generated: bool, qr: bool = False) -> None:
+def _print_security_key(generated: bool) -> None:
     _print_rows([_security_key_row(generated)])
-    if qr:
-        _print_qr(json.dumps({"security_key": os.environ[_SECURITY_KEY_VAR]}, separators=(",", ":")))
 
 
 def _tailscale_status() -> dict:
@@ -646,7 +644,7 @@ def main():
     os.environ["PORT"] = str(port)
 
     if args.command == "key":
-        _print_security_key(_ensure_security_key(args.rotate), qr=True)
+        _print_security_key(_ensure_security_key(args.rotate))
         if args.rotate:
             print("  Every device has to enter it again, and a running backend needs a restart.\n")
         return

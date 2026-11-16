@@ -63,7 +63,6 @@
   "SHOW_QR": "QR コードを表示",
   "QR_CODE": "QR コード",
   "QR_ENVIRONMENT_HINT": "別のデバイスの「環境」からスキャンすると、この環境を追加できます。",
-  "QR_SECURITY_KEY_HINT": "別のデバイスでセキュリティキーを求められたら、スキャンしてください。",
   "TERMINAL": "ターミナル",
   "NEW_TERMINAL": "新しいターミナル",
   "NO_TERMINALS": "開いているターミナルはありません",
