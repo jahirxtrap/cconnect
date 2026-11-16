@@ -6,7 +6,11 @@ PC:
 - See the active CLI version, switch where it comes from, update it, and read
   the official changelog without leaving the app.
 - Browse any **marketplace** catalog and install **plugins** from the app;
-  enable, disable, update, or uninstall the ones you have.
+  enable, disable, update, or uninstall the ones you have. A plugin whose
+  marketplace has a newer version shows an **Update** tag, with the version in its
+  detail; updates run on the server one at a time, and the card says queued,
+  updating or failed meanwhile, on every device at once. A plugin the CLI does not
+  load, because it needs a newer Claude Code, says so instead of showing as active.
 - Add or remove **MCP servers**, with the credentials or environment variables
   they need, and marketplaces.
 - Each plugin and MCP server shows its own **icon** when it declares one — `icon`

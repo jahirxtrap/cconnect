@@ -15,11 +15,12 @@ reconnects on its own.
 
 A **Processes** tab lists what CConnect runs on the machine — the server, each
 chat with everything it launched (its Claude process, MCP servers, Bash commands
-and quick chat, each with its own memory), the ACP agents, the terminals and the
-browser — with their CPU and memory, under a bar of how much of the machine is
-CConnect's. With a project locked, it lists that project's. Chats, agents,
-terminals and the browser stop from there after a confirmation; a terminal also
-asks for the security key.
+and quick chat, each with its own memory), the ACP agents, the terminals, the
+browser and the emulators started from Devices — with their CPU and memory, under
+a bar of how much of the machine is CConnect's. With a project locked, it lists
+that project's. Chats, agents, terminals, the browser and emulators stop from
+there after a confirmation; a terminal and an emulator also ask for the security
+key.
 
 ### Network
 

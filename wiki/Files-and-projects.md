@@ -167,21 +167,26 @@ changes when adb says so.
 options → Wireless debugging: a QR code the phone scans, which works when the phone
 and the server share a network, or the IP address, port and six-digit code of
 *Pair device with pairing code*, which also works through Tailscale with the
-phone's tailnet address. A third tab, **Address**, connects a device already paired
-that the server cannot find by itself, such as one on the tailnet. Devices seen
-authorized are remembered under **Saved** with the name the device gives, which
-you can rename; tapping a saved one connects it again at its last address, and the
-bin forgets it. A device still waiting for the debugging prompt on its screen shows
-as not authorized until you accept it.
+phone's tailnet address. A phone just paired shows up on its own when the server
+sees it on the network; otherwise the dialog moves to **Address** with the phone's
+IP, where you add the port shown under Wireless debugging. That third tab also
+connects a device already paired that the server cannot find by itself, such as one
+on the tailnet. Devices seen authorized are remembered under **Saved** with the name
+the device gives, which you can rename; a saved one connects again on its own
+whenever the server sees it, at whatever address Android gave it, Connect does the
+same by hand, and the bin forgets it. A device still waiting for the debugging
+prompt on its screen shows as not authorized until you accept it.
 
 Tapping a connected device shows its screen live, mirrored with scrcpy at the size
 of the panel: touch and drag, type with the keyboard, scroll with the wheel, and the
 row under the picture gives Back, Home, Recents, Power and the volume keys, with the
-keyboard button on touch screens. The menu rotates the device, installs an APK
-picked from this device, opens its logcat in a terminal tab, turns the screen off
-and back on, and disconnects a Wi‑Fi device or shuts an emulator down; the camera
-saves a screenshot to the shared folder and downloads it. Emulators start from
-their row and appear under Connected once booted.
+keyboard button on touch screens. The menu rotates the device, installs an APK from
+the server's files or from this device, opens its logcat inside the panel, turns the
+screen off and back on, and disconnects a Wi‑Fi device or shuts an emulator down;
+the camera saves a screenshot to the shared folder and downloads it. Emulators start
+from their row, keep their name while they boot and appear under Connected once
+booted. When adb is down the list says so with Retry, and an action that fails
+leaves a red mark in the panel's header whose tooltip has the reason.
 
 On a public server the panel opens with the security key, like Databases, and
 Claude gets the same devices as tools in turns sent with it: it lists them,
