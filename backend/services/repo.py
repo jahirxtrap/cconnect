@@ -18,16 +18,22 @@ _RELEASE_URL = "https://pypi.org/pypi/cconnect/json"
 DISTRIBUTION = "cconnect"
 
 
-def _released() -> Optional[str]:
-    """The version on PyPI when it is newer than the one running, empty when it is not, None when PyPI did not answer."""
+def _released() -> tuple[Optional[str], str]:
+    """The newer version on PyPI, empty when there is none, or None and why PyPI gave none."""
     try:
         answer = httpx.get(_RELEASE_URL, timeout=_RELEASE_TIMEOUT)
         answer.raise_for_status()
         latest = str(answer.json()["info"]["version"])
         newer = Version(latest) > Version(release.VERSION)
-    except (httpx.HTTPError, ValueError, KeyError, InvalidVersion):
-        return None
-    return latest if newer else ""
+    except httpx.TimeoutException:
+        return None, f"PyPI did not answer within {_RELEASE_TIMEOUT} seconds"
+    except httpx.HTTPStatusError as exc:
+        return None, f"PyPI answered {exc.response.status_code} {exc.response.reason_phrase}"
+    except httpx.HTTPError as exc:
+        return None, f"PyPI could not be reached: {str(exc) or type(exc).__name__}"
+    except (ValueError, KeyError, InvalidVersion) as exc:
+        return None, f"PyPI's answer could not be read: {str(exc) or type(exc).__name__}"
+    return (latest if newer else ""), ""
 
 
 def _kept_packages() -> list[str]:
@@ -129,8 +135,8 @@ def status() -> dict:
 
 def check() -> dict:
     if paths.INSTALLED:
-        latest = _released()
-        return {**_package_status(), "latest": latest or "", "ok": latest is not None, "message": ""}
+        latest, problem = _released()
+        return {**_package_status(), "latest": latest or "", "ok": latest is not None, "message": problem}
     if not revision():
         return status()
     try:
