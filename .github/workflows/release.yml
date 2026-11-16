@@ -9,7 +9,26 @@ permissions:
   contents: write
 
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.version.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare the tag with the apps' version
+        id: version
+        run: |
+          app=$(jq -r .version client/src-tauri/tauri.conf.json)
+          if [ "$GITHUB_REF_TYPE" != tag ] || [ "$GITHUB_REF_NAME" = "$app" ]; then
+            echo "apps=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "apps=false" >> "$GITHUB_OUTPUT"
+          fi
+
   desktop:
+    needs: plan
+    if: needs.plan.outputs.apps == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -80,6 +99,8 @@ jobs:
           done
 
   android:
+    needs: plan
+    if: needs.plan.outputs.apps == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -149,9 +170,10 @@ jobs:
           done
 
   pypi:
+    needs: plan
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -186,7 +208,15 @@ jobs:
         working-directory: backend
         run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/cconnect/
 
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') && needs.plan.outputs.apps == 'false'
+        with:
+          body_path: CHANGELOG.md
+          make_latest: false
+
   web:
+    needs: plan
+    if: needs.plan.outputs.apps == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

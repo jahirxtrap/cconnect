@@ -55,8 +55,11 @@ lightweight and unprefixed (`1.6.1`). An Android build rewrites the Cargo files
 from `tauri.conf.json` on its own.
 
 A release that only touches the client leaves `backend/core/release.py` alone, and the
-`pypi` job skips a version PyPI already has. `SUPPORTED_SERVER` only moves when the app needs
-a newer backend.
+`pypi` job skips a version PyPI already has. A release that only touches the backend bumps
+`backend/core/release.py` alone: when the tag differs from `tauri.conf.json`'s version the
+workflow skips the desktop, Android and web jobs and publishes the GitHub release without
+marking it latest, since the apps offer an update whenever the latest release's tag is newer
+than their own version. `SUPPORTED_SERVER` only moves when the app needs a newer backend.
 
 `CHANGELOG.md` is replaced whole: no headers, versions or dates, one bullet per
 user-visible change written as what the user sees, minor work collapsed into the closing
