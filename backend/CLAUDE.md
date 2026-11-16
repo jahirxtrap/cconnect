@@ -352,8 +352,10 @@ PATH, in the SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT`, the default folders) or in
   frame, the codec string comes from the SPS, and viewers without WebCodecs get JPEGs decoded on
   a thread with PyAV. One session per device, shared by its viewers, stopped with the last one.
 - Every route and tool takes the key (`devices` in `KEYED_CAPABILITIES`); the panel's socket and
-  each screen socket read it from their opening message. An APK to install is an absolute path on
-  the machine (the panel's picker, the tool) or a path inside Shared or a project.
+  each screen socket read it from their opening message. A turn with the capability also gets the
+  folder of that adb first on its CLI's PATH (`claude_runtime._adb_env`), so Bash runs the same
+  adb the panel uses. An APK to install is an absolute path on the machine (the panel's picker,
+  the tool) or a path inside Shared or a project.
 
 ## Configuration
 

@@ -20,7 +20,7 @@ from mcps import databases as database_tools
 from mcps.media import block_types, single_media
 from mcps.packs import TOOL as PACKS_TOOL
 from mcps.shared_files import TOOL as SHARE_TOOL
-from services import claude_assets, cli_info, control_requests, delegates, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
+from services import claude_assets, cli_info, control_requests, delegates, device_tools, diffs, elicitation, hook_events, mcp_lazy, mods, persistent_sessions, prompt_cache, providers, settings_store, tool_calls, visibility
 from services.api_errors import api_error
 from services.questions import DECLINE_MESSAGE, DISMISS, SUBMIT_KEY, answers_from_values, questions_to_blocks
 
@@ -694,6 +694,14 @@ def _cli_env(account_id: Optional[str], kept: Optional[bool] = None, model: Opti
     return env
 
 
+def _adb_env() -> dict[str, str]:
+    adb = device_tools.adb_path()
+    search = os.environ.get("PATH", "")
+    if adb is None or str(Path(adb).parent) in search.split(os.pathsep):
+        return {}
+    return {"PATH": os.pathsep.join([str(Path(adb).parent), search])}
+
+
 def _denied(reason: str) -> dict:
     return {
         "hookSpecificOutput": {
@@ -978,6 +986,8 @@ async def run_prompt(
         allowed = tools if isinstance(tools, list) else []
         options_kwargs["tools"] = [*allowed, _SHARE_RULE] if scope["guides"] else allowed
     session_env = _cli_env(account, resident is not None, model)
+    if "devices" in (capabilities or ()):
+        session_env.update(_adb_env())
     if channel:
         session_env[CHANNEL_ENV] = channel
     if scope["search"]:
