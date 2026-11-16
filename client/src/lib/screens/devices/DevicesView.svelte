@@ -282,16 +282,18 @@
     <div class="flex min-h-0 flex-1 flex-col gap-2 px-(--page-inset) pb-(--page-inset)">
       {#if serverStatus.unavailable}
         <ServerUnavailable class="min-h-0 flex-1" />
+      {:else if locked}
+        <EmptyState icon={Smartphone} text={t("DEVICES_LOCKED")} action={unlockAction} class="min-h-0 flex-1" />
       {:else if !snapshot && !devices.failed(profile)}
         <CenteredProgress class="min-h-0 flex-1" />
       {:else if !snapshot}
         <ConnectionError class="min-h-0 flex-1" />
-      {:else if locked}
-        <EmptyState icon={Smartphone} text={t("DEVICES_LOCKED")} action={unlockAction} class="min-h-0 flex-1" />
       {:else if !ready}
         <EmptyState icon={Smartphone} text={t("DEVICES_TOOLS_MISSING")} detail={toolsDetail} action={installAction} class="min-h-0 flex-1" />
       {:else if snapshot.failure}
         <EmptyState icon={Smartphone} text={t("DEVICE_REASON_ADB")} detail={failureDetail(snapshot.failure)} action={retryAction} class="min-h-0 flex-1" />
+      {:else if snapshot.scanning}
+        <CenteredProgress class="min-h-0 flex-1" />
       {:else if empty}
         <EmptyState icon={Smartphone} text={t("DEVICES_NONE")} detail={t("DEVICES_NONE_DETAIL")} action={pairAction} class="min-h-0 flex-1" />
       {:else}

@@ -467,6 +467,7 @@ class DevicesHub:
             "type": "state",
             "tools": {**device_tools.status(), "installing": self._installing},
             "failure": self._failure,
+            "scanning": not self._listed.is_set(),
             "devices": [self._device(row, labels) for row in self._rows.values()],
             "saved": [{**entry, "address": self.address_for(entry), "connected": entry["serial"] in connected} for entry in self._saved],
             "emulators": [{**item, "serial": running.get(item["name"])} for item in emulators],

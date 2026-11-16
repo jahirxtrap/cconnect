@@ -58,6 +58,7 @@ export interface PairingState {
 export interface DevicesState {
   tools: DeviceTools;
   failure: string | null;
+  scanning: boolean;
   devices: DeviceInfo[];
   saved: SavedDevice[];
   emulators: EmulatorInfo[];
@@ -141,6 +142,7 @@ export const toDevicesState = (raw: Wire): DevicesState => {
       installing: flag(tools, "installing"),
     },
     failure: text(raw, "failure"),
+    scanning: flag(raw, "scanning"),
     devices: list(raw, "devices").map(toDevice),
     saved: list(raw, "saved").map(toSaved),
     emulators: list(raw, "emulators").map(toEmulator),

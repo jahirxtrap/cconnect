@@ -327,12 +327,15 @@ PATH, in the SDK (`ANDROID_HOME`, `ANDROID_SDK_ROOT`, the default folders) or in
 `paths.ANDROID_TOOLS_DIR`, where `install()` downloads what is missing; nothing is bundled.
 
 - `services/adb` speaks adb's host protocol on its socket (`%04x` length, `OKAY`/`FAIL`), starting
-  the server when nothing listens. Pushes, installs, pairing's crypto and the emulator console go
-  through the binary (`run`).
+  the server when nothing listens. A host service such as `host:pair` answers `OKAY` and may still
+  reply `FAIL` with its message, which `Connection.string` raises. Pushes, installs, pairing's
+  crypto and the emulator console go through the binary (`run`).
 - `services/devices.hub` is **the** state: `host:track-devices-l` is a push stream and
   `services/discovery` browses the Wi-Fi debugging services itself with zeroconf on every
   interface (adb's own discovery misses them on a machine with several adapters), so the panel
-  never polls. Each authorized device is described once with `getprop` and remembered in
+  never polls. `GET /devices` answers the snapshot at once, `scanning` until adb's first list
+  arrives; only the tools and pairing wait for it (`ready`). Each authorized device is
+  described once with `getprop` and remembered in
   `devices` by its hardware serial (`ro.serialno`), the same over USB and Wi-Fi; emulators are
   never saved. A QR pairing waits for the `_adb-tls-pairing._tcp` service whose instance name is
   the one in the code, then pairs. A `_adb-tls-connect._tcp` service named after a saved serial,

@@ -57,7 +57,7 @@ async def _keyed(key: str, work: Callable[[], Awaitable[Any]]) -> Response:
 
 
 async def _state() -> dict:
-    await hub.ready()
+    hub.start()
     return hub.snapshot()
 
 

@@ -134,7 +134,8 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
   without keys or tabs) and closes its session on the way back. An action's failure is a red
   `ui/AlertTip` in the pane header, a tooltip that opens on hover or on a tap like the context
   ring; it clears once read or with the server's next snapshot. adb being down is the list's
-  empty state with Retry.
+  empty state with Retry. A refused key shows the locked state before anything else, and the
+  list draws a progress only while the server waits for adb's first list (`scanning`).
 
 ## Mods (`screens/mods/`)
 

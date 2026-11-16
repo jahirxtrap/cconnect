@@ -49,8 +49,10 @@ class Connection:
         raise AdbError(FAILED, f"unexpected reply {head!r}")
 
     async def string(self) -> str:
-        length = int(await self.reader.readexactly(_LENGTH_DIGITS), 16)
-        return (await self.reader.readexactly(length)).decode("utf-8", "replace")
+        head = await self.reader.readexactly(_LENGTH_DIGITS)
+        if head == _FAIL:
+            raise AdbError(FAILED, await self.string())
+        return (await self.reader.readexactly(int(head, 16))).decode("utf-8", "replace")
 
     async def request(self, service: str) -> None:
         await self.send(service)
