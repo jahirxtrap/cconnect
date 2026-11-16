@@ -117,7 +117,11 @@ def _open_app(tailscale: str) -> bool:
         app = Path(tailscale).with_name(_WINDOWS_APP)
         if not app.is_file() or _app_running(_WINDOWS_APP):
             return False
-        os.startfile(app)
+        subprocess.Popen(
+            [*self_update.SHELL, f"Start-Process -FilePath {self_update.quoted(str(app))}"],
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NO_WINDOW,
+        )
     elif sys.platform == "darwin":
         if _app_running(_MAC_APP) or subprocess.run(["open", "-a", _MAC_APP], capture_output=True).returncode != 0:
             return False
