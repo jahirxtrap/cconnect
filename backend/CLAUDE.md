@@ -217,7 +217,11 @@ left the prompt to arrive as a `tail` and the sender saw it twice.
 
 Each stdio MCP server of user, local or plugin scope reaches a chat's CLI as
 `{"type": "http", "url": ".../api/mcp/lazy/<token>"}` under its own name. Project servers, the
-disabled ones and any config with an unresolved `${…}` stay with the CLI.
+disabled ones and any config with an unresolved `${…}` stay with the CLI. A plugin's
+`${user_config.*}` is filled the way the CLI fills it (`claude_assets.option_values`): its
+`pluginConfigs` options in `settings.json`, its `pluginSecrets` in the secure storage's
+`.credentials.json` (on macOS they live in the keychain, so those servers stay with the CLI), the
+manifest's default, and an empty string for an optional field.
 
 - `initialize` and every list come from `mcp_catalogs` (keyed by command, arguments and
   environment), so the CLI starts with no server process. A server with no catalog starts as

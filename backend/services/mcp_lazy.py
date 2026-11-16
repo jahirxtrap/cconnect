@@ -42,6 +42,7 @@ PATH = "/api/mcp/lazy"
 SPAWN_MARKER = "CCONNECT_MCP_SPAWN"
 
 _SOURCES = frozenset({"user", "local", "plugin"})
+_USER_CONFIG = "user_config."
 _PLACEHOLDER = re.compile(r"\$\{([^}]*)\}")
 _FALLBACK = ":-"
 _CLI_DROPPED = ("CLAUDE_CODE_SDK_READS_SESSION_STATE", "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE")
@@ -118,6 +119,13 @@ def _plugin_vars(plugin: Optional[dict]) -> dict[str, str]:
     return {"CLAUDE_PLUGIN_ROOT": str(plugin["install_path"]), "CLAUDE_PLUGIN_DATA": str(data)}
 
 
+def _option_vars(plugin: Optional[dict], env: dict[str, str]) -> dict[str, str]:
+    if not plugin:
+        return {}
+    values = claude_assets.option_values(plugin, env.get(accounts.SECURE_STORAGE_VAR))
+    return {f"{_USER_CONFIG}{key}": value for key, value in values.items()}
+
+
 def _specs(cwd: str, env: dict[str, str]) -> list[Spec]:
     specs = []
     for server in claude_assets.declared_mcp(cwd):
@@ -127,7 +135,7 @@ def _specs(cwd: str, env: dict[str, str]) -> list[Spec]:
         if (cfg.get("type") or "stdio") != "stdio" or not isinstance(cfg.get("command"), str):
             continue
         plugin = _plugin_vars(server.plugin)
-        known = {**env, **plugin}
+        known = {**env, **plugin, **_option_vars(server.plugin, env)}
         command = _expand(cfg["command"], known)
         args = [_expand(str(arg), known) for arg in cfg.get("args") or []]
         own = {str(name): _expand(str(value), known) for name, value in (cfg.get("env") or {}).items()}

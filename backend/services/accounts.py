@@ -12,7 +12,7 @@ import psutil
 from base64 import b64encode
 from contextlib import suppress
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from core import cli_manager, paths
 from core.config import CLAUDE_PROJECTS_DIR
@@ -35,7 +35,9 @@ _META_FILE = "account.json"
 _DELETING = ".deleting"
 _ID_RE = re.compile(r"[^a-z0-9-]+")
 
+SECURE_STORAGE_VAR = "CLAUDE_SECURESTORAGE_CONFIG_DIR"
 _CREDENTIALS_FILE = ".credentials.json"
+_PLUGIN_SECRETS = "pluginSecrets"
 _IDENTITY_FILE = ".claude.json"
 _BUNDLE_FILES = (_CREDENTIALS_FILE, _IDENTITY_FILE, _META_FILE)
 _AUTH_STATUS_TIMEOUT = 20
@@ -113,7 +115,7 @@ def _auth_env(auth: dict) -> dict[str, str]:
 
 def env_for(account_id: Optional[str]) -> dict[str, str]:
     path = config_dir(account_id)
-    env = {"CLAUDE_SECURESTORAGE_CONFIG_DIR": str(path)} if path else {}
+    env = {SECURE_STORAGE_VAR: str(path)} if path else {}
     provider = provider_for(account_id)
     if not provider:
         return env
@@ -138,11 +140,21 @@ def identity_env(account_id: Optional[str]) -> dict[str, str]:
     """The shared .claude.json holds whichever login wrote it last, so each login signs in and reads its own identity, plan and models in a folder of its own."""
     folder = _identity_dir(account_id)
     folder.mkdir(parents=True, exist_ok=True)
-    return {"CLAUDE_CONFIG_DIR": str(folder), "CLAUDE_SECURESTORAGE_CONFIG_DIR": str(credentials_path(account_id).parent)}
+    return {"CLAUDE_CONFIG_DIR": str(folder), SECURE_STORAGE_VAR: str(credentials_path(account_id).parent)}
 
 
 def credentials_path(account_id: Optional[str] = None) -> Path:
-    return (config_dir(account_id) or primary_dir()) / ".credentials.json"
+    return (config_dir(account_id) or primary_dir()) / _CREDENTIALS_FILE
+
+
+def plugin_secrets(plugin: str, storage: Optional[str]) -> dict[str, Any]:
+    try:
+        data = json.loads((Path(storage) / _CREDENTIALS_FILE if storage else credentials_path()).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    kept = data.get(_PLUGIN_SECRETS) if isinstance(data, dict) else None
+    found = kept.get(plugin) if isinstance(kept, dict) else None
+    return found if isinstance(found, dict) else {}
 
 
 def _login_stamp(account_id: str) -> Optional[list[int]]:

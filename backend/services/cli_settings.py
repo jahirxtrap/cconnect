@@ -208,6 +208,13 @@ def env() -> dict[str, str]:
     return {name: value for name, value in declared.items() if isinstance(value, str)} if isinstance(declared, dict) else {}
 
 
+def plugin_options(plugin: str) -> dict[str, Any]:
+    configs = _read().get("pluginConfigs")
+    found = configs.get(plugin) if isinstance(configs, dict) else None
+    options = found.get("options") if isinstance(found, dict) else None
+    return options if isinstance(options, dict) else {}
+
+
 def bypass_disabled() -> bool:
     permissions = _read().get("permissions")
     return isinstance(permissions, dict) and permissions.get("disableBypassPermissionsMode") == "disable"

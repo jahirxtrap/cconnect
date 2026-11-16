@@ -4,9 +4,11 @@ plus the user prompt (USER.md) appended after the system context (CCONNECT.md)."
 import json
 import os
 import re
+import sys
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -35,6 +37,7 @@ _SETTINGS_FILE = _CLAUDE_DIR / "settings.json"
 _SETTINGS_LOCAL_FILE = "settings.local.json"
 _INSTALLED_PLUGINS = _PLUGINS_DIR / "installed_plugins.json"
 _ENGINE = "claude-code"
+_KEYCHAIN = sys.platform == "darwin"
 _MCP_USER_SOURCE = "user"
 _MCP_OAUTH_TYPES = ("http", "sse")
 _MCP_FILE = ".mcp.json"
@@ -201,6 +204,45 @@ def _install_root(market: _Marketplace, entry: dict, install: dict) -> Path | No
 
 def read_manifest(root: Path) -> dict:
     return _read_json(root / _MANIFEST)
+
+
+def _option_text(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    if isinstance(value, list):
+        return ",".join(_option_text(item) for item in value)
+    return str(value)
+
+
+def _option_allowed(field: dict, value: Any) -> bool:
+    choices = field.get("options")
+    if not isinstance(choices, list):
+        return True
+    return all(item in choices for item in value) if isinstance(value, list) else value in choices
+
+
+def option_values(plugin: dict, storage: str | None) -> dict[str, str]:
+    """The text Claude Code puts in a plugin's ${user_config.*}, left out where it is unset and required, or kept in the keychain."""
+    root = plugin.get("install_path")
+    schema = read_manifest(Path(root)).get("userConfig") if root else None
+    if not isinstance(schema, dict):
+        return {}
+    ident = plugin_id(plugin)
+    stored = {**cli_settings.plugin_options(ident), **accounts.plugin_secrets(ident, storage)}
+    values = {}
+    for key, field in schema.items():
+        if not isinstance(field, dict) or (field.get("sensitive") is True and _KEYCHAIN):
+            continue
+        value = stored.get(key)
+        if value is None or not _option_allowed(field, value):
+            value = field.get("default")
+        if value is None and not field.get("required"):
+            value = ""
+        if value is not None:
+            values[key] = _option_text(value)
+    return values
 
 
 def plugin_id(plugin: dict) -> str:
