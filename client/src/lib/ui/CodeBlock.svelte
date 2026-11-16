@@ -13,7 +13,7 @@
 
   const { code, lang }: Props = $props();
 
-  const PRE_CLASS = "px-2.5 py-2 font-mono text-body-sm";
+  const PRE_CLASS = "bg-surface-nested px-2.5 py-2 font-mono text-body-sm";
   const LINE_STYLE = "line-height: var(--chat-line-code)";
 
   const feedback = new CopyFeedback();
@@ -46,9 +46,9 @@
   });
 </script>
 
-<div class="w-full overflow-hidden rounded-panel bg-surface-nested">
+<div data-code-block class="w-full overflow-hidden rounded-panel bg-surface-nested">
   <div
-    class="flex items-center pr-0.5 pl-2.5"
+    class="flex items-center bg-surface-nested pr-0.5 pl-2.5"
     style="padding-top: var(--chat-pad-xs)"
   >
     <span class="flex-1 text-label-md text-on-surface-variant select-none">{lang || "text"}</span>

@@ -49,7 +49,8 @@
   const nested = insideCard();
   provideCardFrame();
 
-  const headClass = sticky ? "group/head sticky top-0 z-20 bg-card data-[stuck]:shadow-sm" : "";
+  const tint = nested ? "bg-surface-nested" : "bg-card";
+  const headClass = sticky ? `group/head sticky top-0 z-20 ${tint} data-[stuck]:shadow-sm` : tint;
 
   let localExpanded = $state(false);
 
@@ -63,7 +64,7 @@
   };
 </script>
 
-<div data-block class="mx-(--page-inset) overflow-clip rounded-panel {nested ? 'bg-surface-nested' : 'bg-card'}">
+<div data-block class="mx-(--page-inset) overflow-clip rounded-panel {tint}">
   <div data-block-head class={headClass}>
     <CollapsibleHead
       {label}
@@ -82,7 +83,7 @@
     />
   </div>
   {#if isExpanded && children && !labelOnly}
-    <div use:gridHeight data-block-body>
+    <div use:gridHeight data-block-body class={tint}>
       <div
         class="{bodyClass} px-2.5 pb-2.5 [--page-inset:0px] {nested
           ? '[--color-surface-nested:var(--c-surface-variant)]'

@@ -872,6 +872,11 @@ a > .md-link-icon:last-child {
   line-height: var(--chat-line-code);
 }
 
+.markdown [data-code-block] pre {
+  background: var(--color-surface-nested);
+  border-radius: 0;
+}
+
 .markdown blockquote {
   display: flex;
   flex-direction: column;

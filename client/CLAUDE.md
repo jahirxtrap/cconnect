@@ -72,11 +72,10 @@ One component owns the viewport for `MessageList` and `SidePanel`, with an expor
 - `follow` sticks to the end; the `ResizeObserver` re-pins to the end, or to `pendingTop` while a
   hold is in place. `ownTop` tells our scroll writes from the user's.
 - `atBottom()` is also true when nothing scrolls.
-- The content stays a column of `--chat-column` at most (`CHAT_COLUMN_CLASS`, through
-  `contentClass` from `MessageList` and the composer's own box) unless `chat_full_width` is on;
-  the scroller itself keeps the panel's width, so the scrollbar stays at the edge, and a column
-  narrower than the scroller is translated by half the scrollbar (`centered`) so it centres on
-  the panel like the composer instead of on the space left of the scrollbar.
+- The content stays a column of `--chat-column` at most (`CHAT_COLUMN_CLASS`) unless
+  `chat_full_width` is on. The scroller keeps the panel's width, a narrower column is translated
+  by half the scrollbar (`centered`), and `--viewport-shift` / `--viewport-inset` move the
+  rounded mask with it.
 - Long block heads use native `position: sticky`; `updatePinned()` marks the stuck one with
   `data-stuck`.
 - Which blocks are open is a `BlockExpansion` owned by the chat state (or the quick chat), never a
@@ -84,11 +83,9 @@ One component owns the viewport for `MessageList` and `SidePanel`, with an expor
   anything that grows goes through `grow`, which keeps the end pinned when it was there.
 - History pages in on scroll but never across a compaction: past it only **Earlier messages**
   loads (`loadEarlier`), and those messages carry `beforeCompaction`, which drops Fork.
-- `#transcriptOwner` names the session whose transcript `messages` holds. Opening a chat
-  whose history request fails still starts the session, and `attached` reloads the transcript
-  it lacks (`#recoverTranscript`, keeping the live replay); the chat in the URL goes the same
-  way when its load before connecting fails. Never load a transcript over a replay that has
-  already arrived: a plain load would drop it.
+- `#transcriptOwner` names the session whose transcript `messages` holds. A chat whose history
+  request fails still starts its session, and `attached` reloads the missing transcript
+  (`#recoverTranscript`) keeping the live replay; never load a transcript over a replay.
 - The composer's ↑/↓ history keeps no list of its own: `userHistory()` is the server's
   `earlier_prompts` (the prompts before the loaded page, sent with every page) followed by the user
   messages on screen and the queue, so it follows paging, Earlier messages, compaction and what
@@ -164,123 +161,46 @@ expands with `fixed inset-0` inside it puts the full one back (`FULL_INSET_CLASS
 - Text uses the interface font; monospace only for art (`monoRun`, `monoText`). Box-drawing
   glyphs are SVG masks per cell, with the arm placed by `ruleAxes`.
 - Android's WebView paints `color-mix(…, transparent)` dark: use `withAlpha`.
-- A mod's look (`$.theme.set`) is the `Theme` site: `ChatView` mounts `theme` and `backdrop`
-  only while the surface is attached and the chat background is **Claude** (`MOD_BACKGROUND`,
-  the default), so another background switches the whole look off at once, colors included
-  (unmounting a `Theme` site drops its drawing, the one lasting site that does), and
-  `mods.look` (`toModLook`) joins both answers. `ModBackdrop` draws it behind the
-  chat: a still ground (a color, a gradient, a vector as inline SVG so named colors can be CSS
-  variables, an image pulled by pieces through `mods.image`) or the scene's `Svg` as an `<img>`,
-  under the same `artFrame` effects as any background, with the scene's glass as one frosted
-  band over the chat column only (`glass-column`: the column plus `--glass-fade` on each
-  side, each layer's edges masked away by `glass-fade` so it melts into the scene; the whole
-  card under full width) that the background's `glass` setting turns off; the rest of the
-  card stays the bare scene, as jahir asked («solo la parte donde hay mensajes»). The mask
-  goes on the blur layer itself, never on an ancestor: an ancestor with a mask is a backdrop
-  root, and the blur samples nothing. `GlassBand` is that band; over the person's own
-  backgrounds it carries `DEFAULT_GLASS` (`card-bg` at 0.6). The centre card keeps the same
-  shape with or without a backdrop (the pane gap all round, every corner rounded); a darkened
-  rim and a band running past the bottom were both tried and dropped. The gutter is what
-  darkens instead: `gutter-veil`, an SVG
-  `<path>` over the backdrop with an even-odd hole the size of the centre card (`holePath`
-  from the pane widths, the gap and `--radius-panel` read from the frame), black at
-  `--gutter-shade`; its `d` transitions with the panes' width, so it follows their animation
-  and `gutter-veil-still` drops the transition while a pane is dragged. A `box-shadow` with a
-  huge spread was tried and darkened inside the card too; a veil plus a
-  `backdrop-filter: brightness()` lift was tried and killed the band's blur; a faint
-  gradient across the tabs and top bar was tried and jahir asked for it to go. **The band
-  never uses `mix-blend-mode`**: a
-  blended sibling makes Chromium render the wrapper as its own surface and the blur then
-  samples nothing (the frost went sharp for hours before anyone measured a star). A scene's
-  tint is screened inside one SVG filter instead (`feGaussianBlur` at half the radius,
-  `feFlood` of the tint at its opacity, `feBlend screen`), used as `backdrop-filter: url(#…)`;
-  a dark tint thus
-  lightens the blur the way Claude Desktop's frost does instead of darkening it. Over the
-  person's own backgrounds the band is a plain blur layer plus a plain tint layer. A mask on
-  each layer is fine; a mask on their wrapper is not. Named colors resolve through `lookColors`, the
-  design system's graph copied from the CLI's `make-colors.js`, from the look's `inputs` in its
-  scheme (`lookScheme`: the override, else the one mode given, else the app's), and fall back
-  to the app's tokens (`APP_COLORS`).
-- The look's `colors` paint the chat screen in the look's own mode: `lookStyle` maps the
-  app's `--c-*` tokens to the design system's names (`CHAT_TOKENS`, the strong borders under
-  `contrast: more`, the derived alphas of the pack format) with the accent, `color` and
-  `color-scheme`, never a `background-color`; `lookCssOf` (`chat/backdrop.svelte.ts`) is the
-  one place that builds it, `ChatScreen` sets it on its root so the gutter, the tabs and the
-  three cards take the owner chat's palette, and `ChatView` sets it on its top bar and body,
-  painting `background` on the body only while no backdrop shows (over a scene the body stays
-  the frost, never an opaque sheet). The color tokens live in `@theme inline`, so a utility reads
-  `var(--c-…)` where it is used; hand-written CSS names `--c-…` too, never `--color-…`. The
-  look's `codeTheme` reaches the code blocks through `syntaxScope` when a pack offers that id.
-- The desktop frame is one structure on every screen: `surface` is the gutter, the centre and
-  right panes are `background` cards (`paneCardClass`) and the left pane is a `surface` card
-  with the pane gap, the same gray expanded or collapsed (`SideList` paints no background of
-  its own). The left pane animates like the right one: the outer clips the width transition,
-  the card follows it, and the list or the rail inside keeps its own fixed width so nothing
-  reflows or scrolls sideways. While a backdrop shows, the gutter is the scene, a card that
-  shows a chat (Claude or ACP, centre or right) drops its background for the band and gets its
-  own hole in the gutter veil, and every other card turns to glass (`paneCardClass(glass,
-  chat)`; `PANE_GLASS_CLASS`: the pack format's derived `panel-bg`, `surface` at 75 %, over
-  the blur; no border, never a ring on a tab). The window has one theme, owned by one chat
-  with the chat list's rule (`owner` in `ChatScreen`): the focused pane's chat if it draws a
-  backdrop and has a look, else the other pane's, else any chat that draws (the person's own
-  background), else none. An ACP chat has no look, so it never owns while a themed chat is on
-  screen, and it never turns the backdrop off. Focusing the other themed chat switches the
-  window at once. `ChatScreen` draws the owner's `ModBackdrop` or `ChatBackdrop` behind the
-  three panes (`backdropOf`, published with the owner as `windowBackdrop` in
-  `chat/backdrop.svelte.ts`), the gutter veil over it, and the column band over each chat
-  card's whole height, tabs and top bar included (`glassOf`: the scene's glass, or
-  `DEFAULT_GLASS` over the person's own background, blended with `screen` only for a mod's
-  tint). `ChatView` draws no backdrop of its own: the owner paints its look as always, every
-  other chat drops its own look and inherits the owner's palette from the root (its code
-  theme too), so two palettes never mix, while each pane keeps its environment's accent. On
-  mobile the secondary pane is a solid layer over the chat screen: while it shows a chat that
-  draws (a themed Claude chat, or any chat, ACP included, over the person's own background) it
-  is the only candidate, owns the window and draws the art, the band and the palette itself
-  (`layerArt`); otherwise nothing owns, it stays solid and its chat ignores the main one's
-  theme. The drawer sits outside the themed root and always keeps the person's theme. The
-  quick chat sheet (`SidePanel`) moves as one piece: its surface (`glass-panel` over a
-  backdrop, `background` otherwise, `shadow-float` as the separator) runs under the composer
-  to the chat's bottom edge through `--composer-height`, set live on the body (a prop freezes
-  during the outro and left a strip uncovered when the composer grew back with its
-  attachments or queue), the sheet translates by `--sheet-under` × (its height + the
-  composer's) so it leaves entirely below the composer, and its content is clipped at the
-  body's bottom edge so nothing shows over the composer, which sits at `z-30`. Files pasted
-  there attach nothing: `onAttach` is null while the quick chat is open. Its header and
-  messages keep the chat column (`CHAT_COLUMN_CLASS`) unless full width is on, like the
-  composer under them. A collapsible's sticky head stays sticky everywhere, and nothing scrolls visibly
-  under it: the block is a `view-timeline` and its body runs a scroll-driven animation over
-  the block's `exit-crossing` range (start edge past the top until the end edge passes it;
-  plain `exit` only begins once a block taller than the scrollport has its end edge inside,
-  so long blocks stayed uncovered) that grows `clip-path: inset(top)` from 0 to
-  `100% + --chat-head`, exactly the stretch of body the stuck head covers
-  (`cover-under-head` in `app.css`). A
-  translucent head cannot hide what passes under it, a frost only smears it and
-  `backdrop-filter: opacity(0)` erases nothing in Chromium; taking the sticky away was
-  refused («y mis colapsables dónde están»).
-- Whatever shows a backdrop carries `over-backdrop` and, inline through `glassRemapStyle`
-  (part of `lookCssOf`, after the look's palette, so it wins over it), turns `surface`, `surface-nested` and
-  `surface-variant` into the pack format's derived `card-bg` (`surface` at 50 %) and `nested-bg`
-  (`surface-variant` at 50 %), so every block, field, chip and the composer take the hue of the
-  frosted scene under them, and `hover`, `on-surface-variant`, `faint`, `outline` and
-  `outline-variant` into their `-glass` versions, derived from the text color, so tabs,
-  timestamps, icons and borders stay visible over any scene. A scene with a glass `tint` tints the blocks with it instead
-  (`glassStyle`). Menus and dialogs are portals outside the scope and stay opaque, and with no
-  background everything stays the opaque surfaces it always was. Inline code uses `code-bg`.
-  `derivedColor` (`design/accents.ts`) is the one reader of a derived rule, for packs and for a
-  mod's look alike.
-- A look without colors, or without colors for its mode (`overrideColorScheme`, or colors for
-  one mode only), paints the chat screen with CConnect's **default** theme of that mode
-  (`DEFAULT_THEMES[scheme]` handed to `lookStyle` as `own`), never the person's chosen theme:
-  a look is a whole design made against the standard palette, and Solarized under a snowy sky
-  was the mix jahir rejected. The person's theme returns as soon as the background is not
-  **Claude** or the mod clears the look. Their own backgrounds keep their theme, by choice.
-- A look lives only while its server does: `ModSurface.look` is null once
-  `serverStatus.unavailable` (the health check answered and the server is down), so a dead
-  server leaves no theme drawn from memory. A reconnection keeps the last drawn look, so a
-  network blip never flashes the whole window, and the session redraws it when it is back.
-- `ChatScroller` centres a narrower column by half the classic scrollbar (`centered`), and
-  tells the viewport mask the same shift (`--viewport-shift`), so the rounded clip keeps
-  hugging both edges of the content instead of cutting one corner and missing the other.
+- A mod's look (`$.theme.set`) is the `Theme` site. `ChatView` mounts its `theme` and
+  `backdrop` sites only while the surface is attached and the chat background is **Claude**
+  (`MOD_BACKGROUND`), and `mods.look` (`toModLook`) joins both answers. It is null while
+  `serverStatus.unavailable`; a reconnection keeps the last one.
+- `ModBackdrop` draws a look's still ground or its scene's `Svg`, `ChatBackdrop` the person's
+  own background, both under `artFrame`. Named colors resolve through `lookColors` (the CLI's
+  `make-colors.js` graph) from the look's `inputs` in its scheme, else `APP_COLORS`.
+- `lookCssOf` (`chat/backdrop.svelte.ts`) builds a look's palette (`lookStyle`: the `--c-*`
+  tokens, the accent, `color` and `color-scheme`, never `background-color`) and appends
+  `glassRemapStyle` over a backdrop. `ChatScreen` sets it on its root and `ChatView` on its top
+  bar and body, which paints `background` only without a backdrop. A look without colors for
+  its mode uses CConnect's default theme of that mode (`DEFAULT_THEMES`), never the person's.
+  Hand-written CSS names `--c-…`, never `--color-…`. A look's `codeTheme` reaches code blocks
+  through `syntaxScope`.
+- The desktop frame: `surface` is the gutter, the centre and right panes are `background` cards
+  (`paneCardClass`), the left pane a `surface` card whose outer clips the width transition while
+  its content keeps a fixed width. Over a backdrop a card showing a chat (Claude or ACP) drops
+  its background for the band and gets a hole in the gutter veil (`holePath`); other cards use
+  `PANE_GLASS_CLASS`. No borders, no rings on tabs.
+- The window has one theme, owned by one chat (`owner` in `ChatScreen`, published in
+  `windowBackdrop`): the focused pane's chat if it draws a backdrop and has a look, else the
+  other pane's, else any chat that draws. Only `ChatScreen` draws backdrops, the veil and the
+  bands. A chat that is not the owner drops its look and inherits the owner's palette; each pane
+  keeps its environment's accent. On mobile the secondary layer, while up, is the only candidate
+  and draws the art itself (`layerArt`); the drawer stays outside the themed root.
+- `GlassBand` covers the chat column (`glass-column`, edges masked by `glass-fade`). No ancestor
+  of a blur layer carries a mask and nothing uses `mix-blend-mode`: either makes Chromium's blur
+  sample nothing. A tint is screened inside an SVG filter used as `backdrop-filter: url(#…)`.
+- Over a backdrop `glassRemapStyle` turns `surface`, `surface-nested` and `surface-variant` into
+  `card-bg` and `nested-bg`, and `hover`, `on-surface-variant`, `faint`, `outline` and
+  `outline-variant` into their `-glass` versions; a scene's glass `tint` tints the blocks instead
+  (`glassStyle`). Translucent tints add up, so every part of a block paints the block's own tint:
+  a collapsible's head and body, a `CodeBlock`'s header and code (inside markdown its `pre`
+  overrides the `.markdown pre` background). `derivedColor` is the one reader of a derived rule.
+- A sticky collapsible head hides what passes under it with the scroll-driven
+  `cover-under-head` clip over the block's `exit-crossing` range.
+- The quick chat sheet (`SidePanel`) moves as one piece: its surface runs under the composer
+  through `--composer-height` (a CSS variable: an outroing component's props freeze), the sheet
+  translates by `--sheet-under` × (its height + the composer's), and its content is clipped at
+  the body's bottom edge. `onAttach` is null while it is open.
 
 ## Browser (`screens/browser/`)
 
