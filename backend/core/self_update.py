@@ -20,15 +20,24 @@ def needed() -> bool:
     return sys.platform == "win32" and paths.INSTALLED
 
 
-def pending() -> bool:
+def updater() -> int | None:
     try:
         shell = psutil.Process(int(paths.UPDATING_FLAG.read_text(encoding="utf-8").strip()))
         if shell.create_time() <= paths.UPDATING_FLAG.stat().st_mtime:
-            return True
+            return shell.pid
     except (OSError, ValueError, psutil.Error):
         pass
     paths.UPDATING_FLAG.unlink(missing_ok=True)
-    return False
+    return None
+
+
+def pending() -> bool:
+    return updater() is not None
+
+
+def spared() -> list[int]:
+    shell = updater()
+    return [shell] if shell is not None else []
 
 
 def restart_command() -> list[str] | None:

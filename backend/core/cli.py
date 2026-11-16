@@ -761,6 +761,7 @@ def main():
     handed = os.environ.pop(SERVE_VAR, None)
     detached.record_serve(os.getpid(), json.loads(handed) if handed else _serve_args(args, port))
     lifeline = _watch_lifeline() if os.environ.pop(_LIFELINE_VAR, None) else None
+    process_tree.adopt_orphans()
     while True:
         process = subprocess.Popen(cmd, cwd=paths.BACKEND_DIR, stdin=subprocess.DEVNULL)
         asked = False
@@ -771,6 +772,7 @@ def main():
                     process.wait(timeout=_POLL_SECONDS)
                     break
                 except subprocess.TimeoutExpired:
+                    process_tree.reap_adopted(process.pid)
                     asked = paths.RESTART_FLAG.exists()
                     stopped = paths.STOP_FLAG.exists()
                     if asked or stopped:
@@ -780,6 +782,7 @@ def main():
         except KeyboardInterrupt:
             _terminate_tree(process.pid)
             break
+        process_tree.terminate_descendants(self_update.spared())
         if stopped or paths.STOP_FLAG.exists():
             paths.STOP_FLAG.unlink(missing_ok=True)
             break
@@ -788,6 +791,7 @@ def main():
             continue
         if process.returncode != RESTART_EXIT_CODE:
             break
+    process_tree.terminate_descendants(self_update.spared())
     paths.SERVE_FILE.unlink(missing_ok=True)
     _end_lifeline(lifeline)
     if self_update.pending():

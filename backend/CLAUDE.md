@@ -223,7 +223,12 @@ left the prompt to arrive as a `tail` and the sender saw it twice.
 - `control_requests` answers what the SDK rejects as unknown: MCP `elicitation` (turned into the
   chat's form by `elicitation`) and the mods' `ui_*`. `serve` wraps a persistent CLI's query and
   `Answering` a one-shot's transport.
-- Stopping the server closes the CLIs and agents first (`live_sessions.close_processes`).
+- Stopping the server closes the CLIs and agents first (`live_sessions.close_processes`), then
+  kills whatever still runs below it (`process_tree.terminate_descendants`), sparing only the
+  Windows update shell (`self_update.spared`): a CLI busy with a background task outlived a
+  restart and kept the port. On Linux the supervisor is the subreaper of its tree
+  (`adopt_orphans`), so what escaped with `setsid` or `nohup`, or survived a crash of the server,
+  comes back to it and dies when the server ends; `reap_adopted` collects the ones that exit first.
 
 ## Local MCP servers on demand (`services/mcp_lazy.py`)
 

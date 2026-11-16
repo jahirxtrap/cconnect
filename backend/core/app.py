@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from core import paths
+from core import paths, process_tree, self_update
 from core.config import PORT, SUPERVISOR_VAR
 from core.db import init_db
 from core.rate_limit import limiter
@@ -62,6 +62,7 @@ async def lifespan(app: FastAPI):
     await device_screen.close_all()
     devices.hub.close()
     await asyncio.to_thread(databases.close_all)
+    await asyncio.to_thread(process_tree.terminate_descendants, self_update.spared())
     paths.RUNTIME_FILE.unlink(missing_ok=True)
 
 
