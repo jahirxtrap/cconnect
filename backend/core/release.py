@@ -1,5 +1,5 @@
 """The version contract, read by the API and by the packaging metadata."""
 
-VERSION = "2.2.6"
+VERSION = "2.2.7"
 SUPPORTED_APP = ">=2.2.0"
 SUPPORTED_CLI = ">=2.1.323"
