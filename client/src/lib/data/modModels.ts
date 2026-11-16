@@ -1,3 +1,5 @@
+import { DEFAULT_GLASS, type GlassLook } from "$lib/design/backgrounds";
+
 export const MOD_COMPONENTS = [
   "Pane",
   "AbovePrompt",
@@ -11,9 +13,69 @@ export const MOD_COMPONENTS = [
   "ToolGroup",
   "CommandOutput",
   "AskUserQuestion",
+  "Theme",
 ] as const;
 
 export type ModComponent = (typeof MOD_COMPONENTS)[number];
+
+export const THEME_LOOK = "theme";
+
+export const THEME_SCENE = "backdrop";
+
+export const themeImageSite = (id: string, index: number): string => `image:${id}:${index}`;
+
+export type ModScheme = "light" | "dark";
+
+export const MOD_SCHEMES: readonly ModScheme[] = ["light", "dark"];
+
+export interface ModLookColors {
+  label: string;
+  inputs: Partial<Record<ModScheme, Record<string, string>>>;
+  codeTheme: Partial<Record<ModScheme, string>>;
+  contrast: "more" | null;
+}
+
+export type ModGlass = GlassLook;
+
+export interface ModGroundStop {
+  at: number | null;
+  color: string;
+}
+
+export interface ModGroundPath {
+  d: string;
+  strokeWidth: number | null;
+  color: string | null;
+}
+
+export type ModGround =
+  | { kind: "color"; color: string }
+  | { kind: "gradient"; stops: ModGroundStop[]; angle: number; radial: boolean; size: [number, number] | null; repeat: boolean }
+  | {
+      kind: "vector";
+      viewBox: [number, number];
+      paths: ModGroundPath[];
+      color: string | null;
+      size: [number, number] | null;
+      repeat: boolean;
+    }
+  | { kind: "image"; id: string; type: "jpeg" | "png"; width: number; height: number; size: [number, number] | null; repeat: boolean };
+
+export interface ModScene {
+  plugin: string;
+  name: string;
+  source: string;
+  alt: string;
+  glass: ModGlass | false;
+}
+
+export interface ModLook {
+  plugin: string;
+  colors: ModLookColors | null;
+  scheme: ModScheme | null;
+  ground: ModGround | null;
+  scene: ModScene | null;
+}
 
 export type ModAction =
   | "press"
@@ -360,6 +422,157 @@ export const toModDrawn = (raw: Wire): ModDrawn => {
       Object.entries(modules).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
     ),
   };
+};
+
+export const lookSite = (instanceId: string): ModRenderSite => ({
+  component: "Theme",
+  instanceId,
+  props: {},
+  columns: 0,
+  rows: 0,
+  offset: 0,
+});
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+const GRADIENT_ANGLE = 180;
+
+const number = (raw: Wire, key: string): number | null => (typeof raw[key] === "number" ? (raw[key] as number) : null);
+
+const pair = (raw: unknown): [number, number] | null =>
+  Array.isArray(raw) && raw.length === 2 && raw.every((side) => typeof side === "number" && side > 0)
+    ? [raw[0], raw[1]]
+    : null;
+
+const toHexes = (raw: unknown): Record<string, string> | null => {
+  const wire = record(raw);
+  if (!wire) return null;
+  const hexes = Object.entries(wire).filter((entry): entry is [string, string] => typeof entry[1] === "string" && HEX_COLOR.test(entry[1]));
+  return hexes.length ? Object.fromEntries(hexes) : null;
+};
+
+const toScheme = (raw: unknown): ModScheme | null => MOD_SCHEMES.find((scheme) => scheme === raw) ?? null;
+
+const toLookColors = (raw: unknown): ModLookColors | null => {
+  const wire = record(raw);
+  const inputs = wire ? record(wire.inputs) : null;
+  if (!wire || !inputs) return null;
+  const modes = MOD_SCHEMES.flatMap((scheme): [ModScheme, Record<string, string>][] => {
+    const hexes = toHexes(inputs[scheme]);
+    return hexes ? [[scheme, hexes]] : [];
+  });
+  if (!modes.length) return null;
+  const code = record(wire.codeTheme) ?? {};
+  return {
+    label: string(wire, "label") ?? "",
+    inputs: Object.fromEntries(modes),
+    codeTheme: Object.fromEntries(MOD_SCHEMES.flatMap((scheme) => (typeof code[scheme] === "string" ? [[scheme, code[scheme]]] : []))),
+    contrast: wire.contrast === "more" ? "more" : null,
+  };
+};
+
+const toStops = (raw: unknown): ModGroundStop[] =>
+  Array.isArray(raw)
+    ? raw.flatMap((item): ModGroundStop[] => {
+        if (typeof item === "string") return item ? [{ at: null, color: item }] : [];
+        const wire = record(item);
+        const color = wire ? string(wire, "color") : null;
+        return wire && color ? [{ at: number(wire, "at"), color }] : [];
+      })
+    : [];
+
+const toPaths = (raw: unknown): ModGroundPath[] =>
+  Array.isArray(raw)
+    ? raw.flatMap((item): ModGroundPath[] => {
+        if (typeof item === "string") return item ? [{ d: item, strokeWidth: null, color: null }] : [];
+        const wire = record(item);
+        const d = wire ? string(wire, "d") : null;
+        return wire && d ? [{ d, strokeWidth: number(wire, "strokeWidth"), color: string(wire, "color") }] : [];
+      })
+    : [];
+
+const toGround = (raw: unknown): ModGround | null => {
+  const wire = record(raw);
+  if (!wire) return null;
+  const color = string(wire, "color");
+  if (color) return { kind: "color", color };
+  const gradient = record(wire.gradient);
+  if (gradient) {
+    const stops = toStops(gradient.stops);
+    if (stops.length < 2) return null;
+    return {
+      kind: "gradient",
+      stops,
+      angle: number(gradient, "angle") ?? GRADIENT_ANGLE,
+      radial: gradient.shape === "radial",
+      size: pair(gradient.size),
+      repeat: gradient.repeat === true,
+    };
+  }
+  const vector = record(wire.vector);
+  if (vector) {
+    const side = number(vector, "viewBox");
+    const viewBox = side !== null && side > 0 ? ([side, side] as [number, number]) : pair(vector.viewBox);
+    const paths = toPaths(vector.paths);
+    if (!viewBox || !paths.length) return null;
+    return { kind: "vector", viewBox, paths, color: string(vector, "color"), size: pair(vector.size), repeat: vector.repeat === true };
+  }
+  const image = record(wire.image);
+  if (image) {
+    const id = string(image, "id");
+    const type = image.type === "jpeg" || image.type === "png" ? image.type : null;
+    const width = number(image, "width");
+    const height = number(image, "height");
+    if (!id || !type || width === null || height === null) return null;
+    return { kind: "image", id, type, width, height, size: pair(image.size), repeat: image.repeat === true };
+  }
+  return null;
+};
+
+const toGlass = (raw: unknown): ModGlass | false => {
+  if (raw === false) return false;
+  const wire = record(raw) ?? {};
+  return {
+    blur: number(wire, "blur") ?? DEFAULT_GLASS.blur,
+    tint: string(wire, "tint") ?? DEFAULT_GLASS.tint,
+    opacity: number(wire, "opacity") ?? DEFAULT_GLASS.opacity,
+  };
+};
+
+const svgOf = (node: ModChild): ModNode | null => {
+  if (typeof node === "string") return null;
+  if (node.type === "Svg") return node;
+  for (const child of node.children) {
+    const found = svgOf(child);
+    if (found) return found;
+  }
+  return null;
+};
+
+export const toModLook = (theme: ModDrawn | null, scene: ModDrawn | null): ModLook | null => {
+  const own = theme?.props ?? {};
+  const drawn = scene?.props ?? {};
+  const svg = scene?.tree ? svgOf(scene.tree) : null;
+  const source = svg ? string(svg.props, "source") : null;
+  const name = string(drawn, "scene");
+  const by = string(drawn, "plugin");
+  const plugin = string(own, "plugin") ?? by;
+  if (!plugin) return null;
+  return {
+    plugin,
+    colors: toLookColors(own.colors),
+    scheme: toScheme(own.overrideColorScheme) ?? toScheme(drawn.overrideColorScheme),
+    ground: toGround(own.backdrop),
+    scene:
+      svg && source && name && by
+        ? { plugin: by, name, source, alt: string(svg.props, "alt") ?? "", glass: toGlass(drawn.glass) }
+        : null,
+  };
+};
+
+export const toModImagePiece = (drawn: ModDrawn | null): { data: string; index: number; of: number } | null => {
+  const props = drawn?.props;
+  if (!props || typeof props.data !== "string" || typeof props.index !== "number" || typeof props.of !== "number") return null;
+  return { data: props.data, index: props.index, of: props.of };
 };
 
 const toModCommand = (raw: unknown): ModCommand | null => {

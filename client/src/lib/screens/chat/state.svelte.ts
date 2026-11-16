@@ -528,6 +528,7 @@ export class ChatState {
   #earlierPrompts: string[] = [];
   #initial: SessionInfo | null = null;
   #initialConsumed = false;
+  #transcriptOwner: string | null = null;
   #attaching = false;
   #arrivingMods: ModState | null = null;
 
@@ -598,15 +599,14 @@ export class ChatState {
     this.#socket.connect();
   }
 
-  async #consumeInitialSession(projectKey: string | null = null) {
+  async #consumeInitialSession() {
     if (this.#initialConsumed) return;
     const initial = this.#initial;
     if (!initial) {
       this.#initialConsumed = true;
       return;
     }
-    const target = projectKey ? { ...initial, projectKey } : initial;
-    if (await this.#loadSessionInto(target)) this.#initialConsumed = true;
+    if (await this.#loadSessionInto(initial)) this.#initialConsumed = true;
   }
 
   #loadOverrides(overrides?: ChatOverrides) {
@@ -1171,10 +1171,8 @@ export class ChatState {
     const loaded = await this.#loadSessionInto(session);
     if (loaded === null || session.sessionId !== this.sessionId) return;
     if (!loaded) {
-      this.#endSwitch();
-      this.#frozen = null;
-      this.transcriptLoading = false;
-      return;
+      this.messages = [];
+      this.#held = [];
     }
     this.#startSession(session.sessionId);
   }
@@ -2024,6 +2022,7 @@ export class ChatState {
     this.mods.showTranscript(null);
     this.messages = [];
     this.#held = [];
+    this.#transcriptOwner = null;
     this.#earlierPrompts = [];
     this.expansion.clear();
     this.todos = [];
@@ -2076,6 +2075,7 @@ export class ChatState {
     }
     if (this.#frozen === null) this.mods.showTranscript(session.sessionId);
     this.messages = loaded;
+    this.#transcriptOwner = session.sessionId;
     this.sessionId = session.sessionId;
     this.projectKey = page.project ?? project;
     this.sessionColor = session.color;
@@ -2103,6 +2103,13 @@ export class ChatState {
     this.#rewindSeen = { sessionId, anchor };
     if (!anchor || seen?.sessionId !== sessionId || seen.anchor === anchor) return;
     void this.#reloadConversation({ keepLive: this.streaming });
+  }
+
+  #recoverTranscript() {
+    this.transcriptLoading = this.messages.length === 0;
+    void this.#reloadConversation({ keepLive: this.streaming }).then(() => {
+      this.transcriptLoading = false;
+    });
   }
 
   async #reloadConversation({ keepLive = false } = {}) {
@@ -2138,6 +2145,7 @@ export class ChatState {
     const settled =
       prompt && lastUser >= 0 && loaded[lastUser].text.trim() === prompt.text.trim() ? loaded.slice(0, lastUser) : loaded;
     this.messages = live.length ? [...settled, ...live] : loaded;
+    this.#transcriptOwner = sessionId;
     this.#nextId = Math.max(this.#nextId, ...live.map((item) => item.id + 1), 0);
     this.todos = [];
     this.#setPaging(page.items.length ? page.startIndex : null, !page.hasMore, page.earlier, null);
@@ -2488,7 +2496,10 @@ export class ChatState {
         break;
       case "ready": {
         if (this.#frozen === null) this.#settling = this.#heldView();
-        void this.#consumeInitialSession(event.project);
+        if (!this.#initialConsumed) {
+          this.#initialConsumed = true;
+          this.sessionColor = this.#initial?.color ?? this.sessionColor;
+        }
         if (this.#switchStarted) this.#endSwitch();
         this.connection = "connected";
         this.#everConnected = true;
@@ -2765,6 +2776,7 @@ export class ChatState {
         this.messages = this.#nest(
           visible.map((item, index) => this.#fromSession(item, index, sessionId, this.projectKey)),
         );
+        this.#transcriptOwner = this.sessionId;
         this.#nextId = visible.length;
         this.#breakStream();
         this.expansion.clear();
@@ -2888,6 +2900,7 @@ export class ChatState {
             this.#thaw();
             this.#settling = null;
             this.transcriptLoading = this.#awaitingHistory();
+            if (this.sessionId && !this.agent && this.#transcriptOwner !== this.sessionId) this.#recoverTranscript();
           });
         break;
       case "interrupted":

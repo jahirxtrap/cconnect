@@ -12,3 +12,7 @@ A mod you write can use what this app adds to the `desktop` surface:
 - When this app attaches, `session.attach` hands the mod `e.clientId === "cconnect"`: switch
   these on there and keep the plain path elsewhere, where the `cconnect` server does not exist
   and `$.mcp.call` throws.
+- This app draws a look set with `$.theme.set` in every chat the session shows: a scene drawn
+  by the mod's `Backdrop` hook or a still ground behind the chat, its `glass` as one veil over
+  it, `colors` on that chat alone and `overrideColorScheme` for its mode. The person chooses
+  whether a chat shows the look's backdrop or a background of their own.

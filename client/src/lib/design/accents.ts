@@ -1,4 +1,4 @@
-import { ACCENT_SOURCES } from "./packs/schema";
+import { ACCENT_SOURCES, type DerivedColor } from "./packs/schema";
 
 export const DYNAMIC_ACCENT = ACCENT_SOURCES.dynamic;
 
@@ -20,3 +20,6 @@ export const withAlpha = (hex: string, alpha: number): string => {
   const channels = channelsOf(hex);
   return channels ? `rgba(${channels.join(", ")}, ${alpha})` : hex;
 };
+
+export const derivedColor = ({ from, alpha }: DerivedColor, colors: Readonly<Record<string, string>>): string | null =>
+  colors[from] ? withAlpha(colors[from], alpha) : null;

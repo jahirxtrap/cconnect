@@ -219,7 +219,12 @@ left the prompt to arrive as a `tail` and the sender saw it twice.
   environment (`_background_guard(kept=False)`).
 - Mods use the CLI's internal UI protocol (`services/mods.py`), which moves between versions:
   every request goes through `mods.request`, which returns `None` on failure. `forget_plugin`
-  drops a disabled plugin's surface once its turn ends.
+  drops a disabled plugin's surface once its turn ends. The attach says CConnect draws `Theme`,
+  what `$.theme.set` sets: a `ui_render` of `Theme` under `theme` is answered by the engine
+  itself with the look's `colors`, `overrideColorScheme` and a still `backdrop` (an image is
+  pulled by pieces under `image:<id>:<n>`), under `backdrop` by the mod's own hook with the
+  scene's `Svg` and its `glass`. The engine never marks those answers rewritten, so `render`
+  hands their props over anyway, and the site has no viewport of its own (`render_in_chat`).
 - `control_requests` answers what the SDK rejects as unknown: MCP `elicitation` (turned into the
   chat's form by `elicitation`) and the mods' `ui_*`. `serve` wraps a persistent CLI's query and
   `Answering` a one-shot's transport.

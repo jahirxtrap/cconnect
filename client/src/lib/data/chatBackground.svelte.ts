@@ -1,6 +1,8 @@
 import {
   DEFAULT_BACKGROUND,
   DEFAULT_EFFECTS,
+  MOD_BACKGROUND,
+  MOD_EFFECTS,
   NO_BACKGROUND,
   sameEffects,
   UPLOAD_EFFECTS,
@@ -36,7 +38,7 @@ class ChatBackground {
   readonly effects = $derived(this.effectsOf(this.current));
 
   exists(id: string): boolean {
-    return id === NO_BACKGROUND || this.uploads.includes(id) || packs.backgroundOf(id) !== undefined;
+    return id === NO_BACKGROUND || id === MOD_BACKGROUND || this.uploads.includes(id) || packs.backgroundOf(id) !== undefined;
   }
 
   isUpload(id: string): boolean {
@@ -48,14 +50,16 @@ class ChatBackground {
   }
 
   defaultsOf(id: string): BackgroundEffects {
+    if (id === MOD_BACKGROUND) return MOD_EFFECTS;
     if (this.isUpload(id)) return UPLOAD_EFFECTS;
     return { ...DEFAULT_EFFECTS, ...packs.backgroundOf(id)?.effects };
   }
 
   effectsOf(id: string): BackgroundEffects {
+    const defaults = this.defaultsOf(id);
     const saved = this.saved[id];
-    if (!saved) return this.defaultsOf(id);
-    return BACKGROUND_FITS.includes(saved.fit) ? saved : { ...saved, fit: this.defaultsOf(id).fit };
+    if (!saved) return defaults;
+    return { ...defaults, ...saved, fit: BACKGROUND_FITS.includes(saved.fit) ? saved.fit : defaults.fit };
   }
 
   #imageKey(id: string): string | null {

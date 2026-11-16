@@ -1,6 +1,7 @@
 <script lang="ts">
   import Clock from "@lucide/svelte/icons/clock";
   import Expand from "@lucide/svelte/icons/expand";
+  import UnfoldHorizontal from "@lucide/svelte/icons/unfold-horizontal";
   import Globe from "@lucide/svelte/icons/globe";
   import ImageIcon from "@lucide/svelte/icons/image";
   import Keyboard from "@lucide/svelte/icons/keyboard";
@@ -226,6 +227,20 @@
         <CompactSwitch
           checked={settings.chatViewFull}
           onCheckedChange={(value) => (settings.chatViewFull = value)}
+        />
+      {/snippet}
+    </PreferenceRow>
+    <PreferenceRow
+      icon={UnfoldHorizontal}
+      title={t("CHAT_FULL_WIDTH")}
+      summary={rowSummary("chat_width")}
+      flash={highlight.is("chat_width")}
+      onclick={() => (settings.chatFullWidth = !settings.chatFullWidth)}
+    >
+      {#snippet trailing()}
+        <CompactSwitch
+          checked={settings.chatFullWidth}
+          onCheckedChange={(value) => (settings.chatFullWidth = value)}
         />
       {/snippet}
     </PreferenceRow>

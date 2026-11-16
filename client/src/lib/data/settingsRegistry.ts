@@ -19,6 +19,7 @@ export const CLIENT_SETTINGS: ClientSetting[] = [
   { key: "project_commit_height", kind: "number", fallback: 40, backup: true },
   { key: "view_in_center", kind: "boolean", fallback: true, backup: true },
   { key: "chat_view_full", kind: "boolean", fallback: false, backup: true },
+  { key: "chat_full_width", kind: "boolean", fallback: false, backup: true },
   { key: "show_timestamps", kind: "boolean", fallback: true, backup: true },
   { key: "speech_auto_read", kind: "string", fallback: "off", backup: true },
   { key: "speech_voice", kind: "string", fallback: "", backup: true },

@@ -18,6 +18,7 @@
   import { FIELD_LABEL_CLASS } from "$lib/ui/field";
   import SelectField from "$lib/ui/SelectField.svelte";
   import Slider from "$lib/ui/Slider.svelte";
+  import SwitchRow from "$lib/ui/SwitchRow.svelte";
   import { BACKGROUND_STYLE_LABELS } from "./settingsValues";
 
   interface Props {
@@ -79,6 +80,12 @@
     <div class="relative aspect-video w-full overflow-hidden rounded-panel border border-outline-variant bg-background">
       <ChatBackdrop thumbnail id={selected} {effects} />
     </div>
+    <SwitchRow
+      title={t("BACKGROUND_GLASS")}
+      summary={t("BACKGROUND_GLASS_SUMMARY")}
+      checked={effects.glass}
+      onChange={(value) => edit({ glass: value })}
+    />
     <SelectField
       label={t("BACKGROUND_STYLE")}
       selected={style ?? ""}

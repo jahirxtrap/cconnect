@@ -11,6 +11,7 @@
   import { t } from "$lib/i18n/index.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import { resizeHandle } from "$lib/ui/resizeHandle";
+  import { PANE_CARD_SHAPE_CLASS, PANE_GLASS_CLASS } from "./paneChrome";
 
   interface Props {
     accent: string;
@@ -22,21 +23,49 @@
     onWidth: (value: number) => void;
     onDragging: (active: boolean) => void;
     onNewChat: () => void;
+    glass?: boolean;
     children: Snippet;
   }
 
-  const { accent, expanded, width, max, onExpanded, resizing, onWidth, onDragging, onNewChat, children }: Props =
-    $props();
+  const {
+    accent,
+    expanded,
+    width,
+    max,
+    onExpanded,
+    resizing,
+    onWidth,
+    onDragging,
+    onNewChat,
+    glass = false,
+    children,
+  }: Props = $props();
+
+  const transition = $derived(resizing ? "" : "transition-[width] duration-200");
+  const shown = $derived(expanded ? width : RAIL_WIDTH);
+  const card = $derived(glass ? PANE_GLASS_CLASS : `${PANE_CARD_SHAPE_CLASS} bg-surface`);
 </script>
 
-<div
-  class="relative h-full shrink-0 overflow-hidden bg-surface {resizing
-    ? ''
-    : 'transition-[width] duration-200'}"
-  style="width: {expanded ? width : RAIL_WIDTH}px; {accent}"
->
+<div class="relative h-full shrink-0 overflow-clip p-(--pane-gap) {transition}" style="width: {shown}px; {accent}">
+  <div class="relative flex h-full flex-col {card} {transition}" style="width: calc({shown}px - 2 * var(--pane-gap))">
+    {#if expanded}
+      <div class="flex h-full min-h-0 flex-col" style="width: calc({width}px - 2 * var(--pane-gap))">
+        {@render children()}
+      </div>
+    {:else}
+      <div class="flex h-full flex-col items-center pt-2.5 pb-2" style="width: calc({RAIL_WIDTH}px - 2 * var(--pane-gap))">
+        <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => onExpanded(true)}>
+          <PanelLeftOpen />
+        </TooltipIconButton>
+        <TooltipIconButton label={t("NEW_CHAT")} onclick={onNewChat}>
+          <SquarePen />
+        </TooltipIconButton>
+        <div class="flex-1"></div>
+        <ScreenBar vertical />
+      </div>
+    {/if}
+  </div>
   {#if expanded}
-    {@render children()}
     <div
       role="separator"
       aria-orientation="vertical"
@@ -50,16 +79,5 @@
         onDragging,
       }}
     ></div>
-  {:else}
-    <div class="flex h-full flex-col items-center pt-2.5 pb-2">
-      <TooltipIconButton label={t("MENU")} shortcut="panel.left" onclick={() => onExpanded(true)}>
-        <PanelLeftOpen />
-      </TooltipIconButton>
-      <TooltipIconButton label={t("NEW_CHAT")} onclick={onNewChat}>
-        <SquarePen />
-      </TooltipIconButton>
-      <div class="flex-1"></div>
-      <ScreenBar vertical />
-    </div>
   {/if}
 </div>

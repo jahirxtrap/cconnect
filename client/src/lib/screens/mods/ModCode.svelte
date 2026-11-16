@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { theme } from "$lib/design/theme.svelte";
+  import { contextSyntax } from "$lib/design/syntaxScope";
   import { highlightLines, resolveLang } from "$lib/markdown/highlighter";
   import { DIFF_LINE, DIFF_SIGN, DIFF_SIGN_COLUMN } from "$lib/ui/diffTones";
 
@@ -78,10 +78,12 @@
   const gutter = $derived(Math.max(0, ...rows.map((row) => (row.number === null ? 0 : String(row.number).length))));
   const numbered = $derived(diff || startLine !== null);
 
+  const syntaxOf = contextSyntax();
+
   $effect(() => {
     const body = text;
     const target = lang;
-    const syntax = theme.syntax;
+    const syntax = syntaxOf();
     highlighted = null;
     if (!target) return;
     let active = true;

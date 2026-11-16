@@ -1,6 +1,6 @@
 import { accountsStore } from "$lib/data/accountsStore.svelte";
 import { chatBackground } from "$lib/data/chatBackground.svelte";
-import { NO_BACKGROUND, type BackgroundArt, type BackgroundStyle } from "$lib/design/backgrounds";
+import { MOD_BACKGROUND, NO_BACKGROUND, type BackgroundArt, type BackgroundStyle } from "$lib/design/backgrounds";
 import { chatListFor } from "$lib/data/chatList.svelte";
 import { claudeStatus } from "$lib/data/claudeStatus.svelte";
 import { projectNameOf } from "$lib/data/models";
@@ -80,6 +80,7 @@ export const packBackgroundLabel = (background: PackBackground): string =>
 
 export const backgroundLabel = (id: string): string => {
   if (id === NO_BACKGROUND) return t("CHAT_BACKGROUND_NONE");
+  if (id === MOD_BACKGROUND) return t("CHAT_BACKGROUND_CLAUDE");
   const background = packs.backgroundOf(id);
   return background ? packBackgroundLabel(background) : t("BACKGROUND_UPLOAD");
 };

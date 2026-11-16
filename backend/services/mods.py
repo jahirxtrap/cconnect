@@ -10,6 +10,7 @@ from services import cli_info, control_requests, settings_store
 
 SURFACE = "desktop"
 CLIENT_ID = "cconnect"
+THEME = "Theme"
 CONTROL_TIMEOUT = 15.0
 ANSWER_TIMEOUT = 4.0
 STATE_EVENTS = frozenset({"mod_surface", "mod_panes", "mod_status", "mod_commands"})
@@ -323,6 +324,7 @@ async def attach(client: Any) -> bool:
         client_id=CLIENT_ID,
         viewport=_viewport(_ATTACH_COLUMNS, _ATTACH_ROWS),
         answers=list(_ANSWERS),
+        draws=[THEME],
     )
     return SURFACE in ((answer or {}).get("surfaces") or [])
 
@@ -369,9 +371,10 @@ async def render(client: Any, component: str, instance_id: str, own: dict, site:
     ) or {}
     tree = answer.get("tree")
     hooked = bool(answer.get("hooked"))
+    told = answer.get("rewritten") or component == THEME
     return {
         "tree": tree if hooked and isinstance(tree, dict) and tree.get("type") != "engine" else None,
-        "props": answer.get("props") if answer.get("rewritten") and isinstance(answer.get("props"), dict) else None,
+        "props": answer.get("props") if told and isinstance(answer.get("props"), dict) else None,
         "hooked": hooked,
         "client_modules": answer.get("client_modules") if isinstance(answer.get("client_modules"), dict) else {},
     }

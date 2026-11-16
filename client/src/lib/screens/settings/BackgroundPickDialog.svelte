@@ -3,7 +3,7 @@
   import SlidersHorizontal from "@lucide/svelte/icons/sliders-horizontal";
   import X from "@lucide/svelte/icons/x";
   import { chatBackground } from "$lib/data/chatBackground.svelte";
-  import { NO_BACKGROUND } from "$lib/design/backgrounds";
+  import { FIXED_BACKGROUNDS, NO_BACKGROUND } from "$lib/design/backgrounds";
   import { packs } from "$lib/design/packs/registry.svelte";
   import { t } from "$lib/i18n/index.svelte";
   import ChatBackdrop from "$lib/screens/chat/ChatBackdrop.svelte";
@@ -68,7 +68,9 @@
     <div>
       <SectionHeader label={t("PACKS_BUILTIN")} />
       <div class={TILE_GRID_CLASS}>
-        {@render tile(NO_BACKGROUND, backgroundLabel(NO_BACKGROUND))}
+        {#each FIXED_BACKGROUNDS as id (id)}
+          {@render tile(id, backgroundLabel(id))}
+        {/each}
         {#each builtinBackgrounds as background (background.id)}
           {@render tile(background.id, backgroundLabel(background.id))}
         {/each}

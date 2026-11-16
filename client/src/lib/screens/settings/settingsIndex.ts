@@ -113,6 +113,7 @@ const SETTINGS_ROWS: SettingsEntry[] = [
   { id: "line_numbers", label: "LINE_NUMBERS", summary: "LINE_NUMBERS_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "mod_band_handle", label: "MOD_BAND_HANDLE", summary: "MOD_BAND_HANDLE_SUMMARY", section: "client", group: "SETTINGS_CLIENT" },
   { id: "chat_files", label: "CHAT_FILES", summary: "CHAT_FILES_SUMMARY", available: () => !layout.mobile, section: "client", group: "SETTINGS_CLIENT" },
+  { id: "chat_width", label: "CHAT_FULL_WIDTH", summary: "CHAT_FULL_WIDTH_SUMMARY", available: () => !layout.mobile, section: "client", group: "SETTINGS_CLIENT" },
   { id: "discord", label: "DISCORD_PRESENCE", value: discordValue, available: () => isDesktop, section: "client", group: "SETTINGS_CLIENT", dialog: "discord" },
   { id: "browser", label: "BROWSER", summary: "BROWSER_SUMMARY", available: () => deviceBrowsing, section: "client", group: "SETTINGS_CLIENT", dialog: "browser" },
   { id: "speech", label: "SPEECH", value: speechValue, available: () => speech.available, section: "client", group: "SETTINGS_CLIENT", dialog: "speech" },

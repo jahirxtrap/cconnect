@@ -11,6 +11,7 @@ export interface BackgroundEffects extends BackgroundLook {
   fit: BackgroundFit;
   x: number;
   y: number;
+  glass: boolean;
 }
 
 export const BACKGROUND_STYLES = {
@@ -21,9 +22,13 @@ export const BACKGROUND_STYLES = {
 
 export type BackgroundStyle = keyof typeof BACKGROUND_STYLES;
 
-export const DEFAULT_EFFECTS: BackgroundEffects = { ...BACKGROUND_STYLES.dark, fit: "cover", x: 50, y: 50 };
+export const DEFAULT_EFFECTS: BackgroundEffects = { ...BACKGROUND_STYLES.dark, fit: "cover", x: 50, y: 50, glass: true };
 
-export const UPLOAD_EFFECTS: BackgroundEffects = { ...DEFAULT_EFFECTS, ...BACKGROUND_STYLES.sharp };
+const SHARP_EFFECTS: BackgroundEffects = { ...DEFAULT_EFFECTS, ...BACKGROUND_STYLES.sharp };
+
+export const UPLOAD_EFFECTS = SHARP_EFFECTS;
+
+export const MOD_EFFECTS = SHARP_EFFECTS;
 
 export type BackgroundArt = "logo";
 
@@ -31,9 +36,40 @@ export const BUILTIN_BACKGROUNDS: readonly { id: BackgroundArt; effects: Partial
   { id: "logo", effects: { ...BACKGROUND_STYLES.sharp, opacity: 8 } },
 ];
 
+export interface GlassLook {
+  blur: number | null;
+  tint: string | null;
+  opacity: number;
+}
+
+export const DEFAULT_GLASS: GlassLook = { blur: null, tint: null, opacity: 0.6 };
+
 export const NO_BACKGROUND = "none";
 
-export const DEFAULT_BACKGROUND = NO_BACKGROUND;
+export const MOD_BACKGROUND = "claude";
+
+export const DEFAULT_BACKGROUND = MOD_BACKGROUND;
+
+export const FIXED_BACKGROUNDS = [MOD_BACKGROUND, NO_BACKGROUND];
+
+const PERCENT = 100;
+const BLEED_PER_BLUR = 2;
+
+export const artBleed = (effects: BackgroundLook): number => effects.blur * BLEED_PER_BLUR;
+
+export const artFilter = (effects: BackgroundLook): string =>
+  [
+    effects.brightness !== PERCENT && `brightness(${effects.brightness / PERCENT})`,
+    effects.saturation !== PERCENT && `saturate(${effects.saturation / PERCENT})`,
+    effects.blur > 0 && `blur(${effects.blur}px)`,
+  ]
+    .filter(Boolean)
+    .join(" ") || "none";
+
+export const artFrame = (effects: BackgroundLook): string => {
+  const bleed = artBleed(effects);
+  return `left: -${bleed}px; top: -${bleed}px; width: calc(100% + ${bleed * 2}px); height: calc(100% + ${bleed * 2}px); opacity: ${effects.opacity / PERCENT}; filter: ${artFilter(effects)}`;
+};
 
 export const sameEffects = (a: BackgroundEffects, b: BackgroundEffects): boolean =>
   (Object.keys(DEFAULT_EFFECTS) as (keyof BackgroundEffects)[]).every((field) => a[field] === b[field]);

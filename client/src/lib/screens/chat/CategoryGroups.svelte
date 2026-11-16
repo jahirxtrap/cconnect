@@ -118,7 +118,7 @@
 <div
   bind:this={list}
   use:viewportScrollbar
-  class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-px overflow-y-auto {LIST_VIEWPORT_CLASS} {drag.active
+  class="scrollbar-thin flex min-h-0 flex-1 flex-col gap-px overflow-x-hidden overflow-y-auto {LIST_VIEWPORT_CLASS} {drag.active
     ? 'cursor-pointer'
     : ''}"
 >

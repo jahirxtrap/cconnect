@@ -48,7 +48,7 @@ const ACCENT_ALPHAS = {
   ring: 0.4,
 };
 
-const accentProperties = (color: string, colors: Readonly<Record<string, string>>): [string, string][] => [
+export const accentProperties = (color: string, colors: Readonly<Record<string, string>>): [string, string][] => [
   ["--c-accent", color],
   ["--c-on-accent", textOn(color, colors)],
   ...Object.entries(ACCENT_ALPHAS).map(([name, alpha]): [string, string] => [`--c-accent-${name}`, withAlpha(color, alpha)]),

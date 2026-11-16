@@ -2,7 +2,13 @@ import { untrack } from "svelte";
 import { SvelteSet } from "svelte/reactivity";
 import {
   emptyModState,
+  lookSite,
+  THEME_LOOK,
+  THEME_SCENE,
+  themeImageSite,
   toModCompletions,
+  toModImagePiece,
+  toModLook,
   toModPromptBox,
   type ModAction,
   type ModActionFields,
@@ -23,6 +29,7 @@ import {
   type ModToast,
 } from "$lib/data/modModels";
 import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
+import { serverStatus } from "$lib/data/serverStatus.svelte";
 import { settings } from "$lib/data/settings.svelte";
 import { ModClients } from "./modClients.svelte";
 
@@ -63,7 +70,11 @@ type Hooked = "probing" | boolean;
 
 const keyOf = (component: ModComponent, instanceId: string) => `${component}:${instanceId}`;
 
-const LASTING_SITES: ModComponent[] = ["Pane", "AbovePrompt", "SessionMode", "PromptHint", "Spinner", "AskUserQuestion"];
+const LASTING_SITES: ModComponent[] = ["Pane", "AbovePrompt", "SessionMode", "PromptHint", "Spinner", "AskUserQuestion", "Theme"];
+
+const IMAGE_TYPES = { jpeg: "image/jpeg", png: "image/png" } as const;
+
+const bytesOf = (base64: string): Uint8Array => Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
 
 const PER_TURN_SITES: ModComponent[] = ["Spinner"];
 
@@ -115,6 +126,8 @@ export class ModSurface {
   #pressing = new Map<string, number>();
   #landing = new Map<string, (() => void)[]>();
   #onDrawn: (() => void)[] = [];
+  #images = new Map<string, Promise<string | null>>();
+  #urls = new Set<string>();
   #rid = 0;
   #toastId = 0;
   #seq = 0;
@@ -128,6 +141,35 @@ export class ModSurface {
   readonly shown = $derived(
     this.state.panes.find((pane) => pane.id === this.state.shownId) ?? this.state.panes[0] ?? null,
   );
+
+  readonly look = $derived(
+    serverStatus.unavailable
+      ? null
+      : toModLook(this.#drawn[keyOf("Theme", THEME_LOOK)] ?? null, this.#drawn[keyOf("Theme", THEME_SCENE)] ?? null),
+  );
+
+  image(id: string, type: keyof typeof IMAGE_TYPES): Promise<string | null> {
+    let loading = this.#images.get(id);
+    if (!loading) {
+      loading = this.#fetchImage(id, IMAGE_TYPES[type]);
+      this.#images.set(id, loading);
+    }
+    return loading;
+  }
+
+  async #fetchImage(id: string, type: string): Promise<string | null> {
+    const parts: Uint8Array[] = [];
+    for (let index = 0, of = 1; index < of; index++) {
+      const answer = await this.#reply((rid) => this.port.render(lookSite(themeImageSite(id, index)), rid));
+      const piece = toModImagePiece(answer as ModDrawn | null);
+      if (!piece || piece.index !== index) return null;
+      of = piece.of;
+      parts.push(bytesOf(piece.data));
+    }
+    const url = URL.createObjectURL(new Blob(parts as BlobPart[], { type }));
+    this.#urls.add(url);
+    return url;
+  }
 
   get seq(): number {
     return this.#seq;
@@ -166,6 +208,7 @@ export class ModSurface {
       if (this.#mounted.get(key) !== site) return;
       this.#mounted.delete(key);
       if (PER_TURN_SITES.includes(site.component)) this.#signatures.delete(key);
+      if (site.component === "Theme") delete this.#drawn[key];
       this.#waiting.get(site.component)?.delete(key);
     };
   }
@@ -269,6 +312,10 @@ export class ModSurface {
   }
 
   receive(rid: number, component: ModComponent, instanceId: string, drawn: ModDrawn) {
+    if (this.#replies.has(rid)) {
+      this.reply(rid, drawn);
+      return;
+    }
     const key = keyOf(component, instanceId);
     if (this.#latest.get(key) !== rid) return;
     this.#drawn[key] = drawn;
@@ -360,6 +407,9 @@ export class ModSurface {
     this.#stale = false;
     this.#transcript = null;
     this.#drawn = {};
+    for (const url of this.#urls) URL.revokeObjectURL(url);
+    this.#urls.clear();
+    this.#images.clear();
     this.clients.reset();
     this.state = emptyModState();
   }

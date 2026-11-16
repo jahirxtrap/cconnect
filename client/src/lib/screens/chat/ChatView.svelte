@@ -49,18 +49,22 @@
   import StatusDot from "$lib/ui/StatusDot.svelte";
   import TooltipIconButton from "$lib/ui/TooltipIconButton.svelte";
   import ModBand from "$lib/screens/mods/ModBand.svelte";
-  import type { ModCompletions, ModDecoration, ModStroke } from "$lib/data/modModels";
+  import { lookSite, THEME_LOOK, THEME_SCENE, type ModCompletions, type ModDecoration, type ModStroke } from "$lib/data/modModels";
   import { BAND_ID, type ModHost } from "$lib/screens/mods/modSurface.svelte";
   import type { SuggestionPicker } from "$lib/markdown/cconnectBlock";
   import { copyText } from "$lib/platform/clipboard";
   import VisibilityDialog from "$lib/screens/settings/VisibilityDialog.svelte";
   import { chatBackground } from "$lib/data/chatBackground.svelte";
-  import { NO_BACKGROUND } from "$lib/design/backgrounds";
+  import { MOD_BACKGROUND } from "$lib/design/backgrounds";
   import ComponentBlock from "./blocks/ComponentBlock.svelte";
   import { RESUME_LOOK } from "./blocks/resume";
   import AgentStatusCard from "./AgentStatusCard.svelte";
   import AgentToolbar from "./AgentToolbar.svelte";
-  import ChatBackdrop from "./ChatBackdrop.svelte";
+  import { packs } from "$lib/design/packs/registry.svelte";
+  import { provideSyntax } from "$lib/design/syntaxScope";
+  import { theme } from "$lib/design/theme.svelte";
+  import { lookScheme } from "$lib/screens/mods/lookColors";
+  import { lookCssOf, windowBackdrop } from "./backdrop.svelte";
   import ChatToolbar from "./ChatToolbar.svelte";
   import ChatWelcome from "./ChatWelcome.svelte";
   import Composer from "./Composer.svelte";
@@ -121,6 +125,29 @@
   let sideDragging = $state(false);
   let composerHeight = $state(0);
   let opening = $state(false);
+
+  const surface = $derived(chat.mods.state.surface);
+  const modBackground = $derived(chatBackground.current === MOD_BACKGROUND);
+  const overBackdrop = $derived(windowBackdrop.shown);
+  const borrowed = $derived(overBackdrop && windowBackdrop.owner !== chat);
+  const look = $derived(borrowed ? (windowBackdrop.owner?.mods.look ?? null) : chat.mods.look);
+  const scheme = $derived(lookScheme(look, theme.dark));
+  const lookCss = $derived(lookCssOf(borrowed ? null : look, modBackground, overBackdrop));
+  const bodyCss = $derived(lookCss && !overBackdrop ? `${lookCss}; background-color: var(--c-background)` : lookCss);
+  const lookSyntax = $derived.by(() => {
+    const id = look?.colors?.codeTheme[scheme];
+    return id && packs.hasSyntax(id) ? id : null;
+  });
+
+  provideSyntax(() => lookSyntax ?? theme.syntax);
+
+  $effect(() => {
+    if (surface && modBackground) return chat.mods.mount(lookSite(THEME_LOOK));
+  });
+
+  $effect(() => {
+    if (surface && modBackground) return chat.mods.mount(lookSite(THEME_SCENE));
+  });
 
   const closeSide = () => {
     chat.closeSideChat();
@@ -446,6 +473,7 @@
   title={chat.agent ? chat.agentName : t("APP_NAME")}
   subtitle={status.text}
   subtitleCopy={sessionCopy}
+  style={lookCss || undefined}
   {navigationIcon}
 >
   {#snippet subtitleLeading()}
@@ -522,13 +550,11 @@
     accepts: () => !chat.viewOnly && canAttach,
     drop: (files) => chat.addAttachments(files),
   }}
-  class="relative isolate flex min-h-0 flex-1 flex-col"
+  style={bodyCss || undefined}
+  class="{overBackdrop ? 'over-backdrop' : ''} relative isolate flex min-h-0 flex-1 flex-col"
 >
-  {#if chatBackground.current !== NO_BACKGROUND}
-    <ChatBackdrop id={chatBackground.current} effects={chatBackground.effects} class="-z-10 behind-keyboard" />
-  {/if}
   <DropOverlay />
-  <div class="relative min-h-0 flex-1 overflow-hidden">
+  <div class="relative min-h-0 flex-1" style="--composer-height: {composerHeight}px">
     {#if opening}
       <CenteredProgress class="absolute inset-0 z-10" />
     {:else if !chat.view.length && (chat.agent || !chat.sessionId || chat.link === "disconnected") && !chat.streaming}
@@ -546,6 +572,7 @@
     >
       {#key viewKey}
         <MessageList
+          column={!settings.chatFullWidth}
           messages={chat.view}
           pendingToolIds={chat.runningView}
           streaming={chat.streaming}
@@ -610,12 +637,15 @@
         onAnswer={(requestId, optionId) => chat.answerInteraction(requestId, optionId)}
         {component}
         bottomInset={dockLift}
+        glass={overBackdrop}
+        underInset={composerHeight}
+        column={!settings.chatFullWidth}
       />
     {/if}
   </div>
 
   {#if !chat.viewOnly}
-    <div class="shrink-0 {chat.sideOpen ? 'bg-background' : ''}" bind:clientHeight={composerHeight}>
+    <div class="relative z-30 shrink-0" bind:clientHeight={composerHeight}>
       {#snippet band()}
         {#if chat.agent}
           <AgentStatusCard {chat} />
@@ -632,6 +662,7 @@
       {/snippet}
       <Composer
         {band}
+        column={!settings.chatFullWidth}
         bind:this={composer}
         ghost={chat.sideOpen ? null : chat.mods.suggestion}
         onKey={chat.sideOpen ? undefined : bandKey}
@@ -658,7 +689,7 @@
         onCommand={(command) =>
           command.requireConfirmation ? (confirmCommand = command) : chat.runCommand(command)}
         onInterrupt={() => (chat.sideOpen ? chat.stopSide() : chat.interrupt())}
-        onAttach={(files) => chat.addAttachments(files)}
+        onAttach={chat.sideOpen ? null : (files) => chat.addAttachments(files)}
         onRemoveAttachment={(id) => chat.removeAttachment(id)}
         onCloseSide={chat.sideOpen ? closeSide : null}
         sessionColor={chat.sessionColor}

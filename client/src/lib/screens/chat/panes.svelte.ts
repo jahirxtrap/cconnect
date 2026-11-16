@@ -256,6 +256,12 @@ class Panes {
     return role === "right" ? this.rightTab : (tabs.active ?? null);
   }
 
+  chatAt(role: PaneRole) {
+    const tab = this.tabAt(role);
+    if (tab) return tabs.stateFor(tab);
+    return this.shownAt(role) && this.viewAt(role) === AGENTS ? agentTabs.usableState(agentTabs.activeIn(role)) : null;
+  }
+
   environmentAt(role: PaneRole): string | null {
     if (this.groupAt(role) !== null) return this.tabAt(role)?.environmentId ?? null;
     if (this.shownAt(role) && this.viewAt(role) === AGENTS) return agentTabs.activeIn(role)?.environmentId ?? null;

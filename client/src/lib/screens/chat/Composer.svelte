@@ -39,6 +39,7 @@
   import StopButton from "$lib/ui/StopButton.svelte";
   import ModDecorations from "$lib/screens/mods/ModDecorations.svelte";
   import type { Attachment, ComposerElement } from "./state.svelte";
+  import { CHAT_COLUMN_CLASS } from "./paneChrome";
   import { TOOLBAR_GAP_CLASS } from "./toolbarChips";
   import { pastedName } from "$lib/data/pastedFile";
   import { elementLabel, splitElements } from "$lib/data/pickedElements";
@@ -63,7 +64,7 @@
     onSend: (text: string) => void;
     history: () => string[];
     onInterrupt: () => void;
-    onAttach: (files: File[]) => void;
+    onAttach?: ((files: File[]) => void) | null;
     onRemoveAttachment: (id: number) => void;
     onCloseSide?: (() => void) | null;
     sessionColor?: string | null;
@@ -76,6 +77,7 @@
     decorations?: ModDecoration[];
     controls?: Snippet;
     band?: Snippet;
+    column?: boolean;
   }
 
   const {
@@ -96,7 +98,7 @@
     onSend,
     history,
     onInterrupt,
-    onAttach,
+    onAttach = null,
     onRemoveAttachment,
     onCloseSide = null,
     sessionColor = null,
@@ -107,6 +109,7 @@
     onEdit,
     completions = null,
     decorations = [],
+    column = false,
     controls,
     band,
   }: Props = $props();
@@ -420,7 +423,7 @@
 
   const pick = (event: Event) => {
     const input = event.currentTarget as HTMLInputElement;
-    onAttach(Array.from(input.files ?? []));
+    onAttach?.(Array.from(input.files ?? []));
     input.value = "";
   };
 
@@ -505,7 +508,7 @@
 
   const onpaste = (event: ClipboardEvent) => {
     const files = Array.from(event.clipboardData?.files ?? []).map(pastedName);
-    if (!files.length) return;
+    if (!files.length || !onAttach) return;
     event.preventDefault();
     onAttach(files);
   };
@@ -565,7 +568,7 @@
   {/if}
 {/snippet}
 
-<div class="relative shrink-0 px-(--page-inset) pt-2.5 pb-4 in-data-[layout=mobile]:pb-3">
+<div class="relative shrink-0 px-(--page-inset) pt-2.5 pb-4 in-data-[layout=mobile]:pb-3 {column ? CHAT_COLUMN_CLASS : ''}">
   {@render band?.()}
   <div
     style={ring}

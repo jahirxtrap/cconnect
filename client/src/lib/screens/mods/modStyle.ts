@@ -126,8 +126,8 @@ const NEUTRAL = new Set(["gray", "grey", "white", "whiteBright", "black", "black
 
 const borderColorOf = (props: Props): string => {
   const own = typeof props.borderColor === "string" && !NEUTRAL.has(props.borderColor) ? modColor(props.borderColor) : null;
-  if (props.borderDimColor) return own ? `rgb(from ${own} r g b / 45%)` : "var(--color-outline-variant)";
-  return own ?? "var(--color-outline)";
+  if (props.borderDimColor) return own ? `rgb(from ${own} r g b / 45%)` : "var(--c-outline-variant)";
+  return own ?? "var(--c-outline)";
 };
 
 export const unpadded = (props: Props): Props => {
@@ -176,8 +176,8 @@ export const textStyle = (props: Props): string => {
   const decoration = [props.underline && "underline", props.strikethrough && "line-through"].filter(Boolean).join(" ");
   const size = typeof props.size === "string" && Object.hasOwn(SIZES, props.size) ? SIZES[props.size] : null;
   return rules([
-    ["color", props.inverse ? (background ?? "var(--color-surface)") : color],
-    ["background-color", props.inverse ? (color ?? "var(--color-on-surface)") : background],
+    ["color", props.inverse ? (background ?? "var(--c-surface)") : color],
+    ["background-color", props.inverse ? (color ?? "var(--c-on-background)") : background],
     ["font-weight", weight],
     ["font-style", props.italic ? "italic" : null],
     ["font-size", size],

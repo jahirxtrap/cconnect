@@ -553,7 +553,11 @@ class LiveSession:
             "offset": offset,
         }
         sent = tool_props.to_engine(component, props)
-        drawn = await mods.render(client, component, instance_id, sent, site)
+        drawn = await (
+            mods.render_in_chat(client, component, instance_id, sent)
+            if component == mods.THEME
+            else mods.render(client, component, instance_id, sent, site)
+        )
         return {**drawn, "props": tool_props.to_page(component, props, sent, drawn["props"])}
 
     async def mod_client_module(self, plugin):

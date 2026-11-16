@@ -22,7 +22,13 @@
   import AgentList from "$lib/screens/agents/AgentList.svelte";
   import ChatView from "./ChatView.svelte";
   import PaneActions from "./PaneActions.svelte";
-  import { PANE_CARD_CLASS } from "./paneChrome";
+  import { chatBackground } from "$lib/data/chatBackground.svelte";
+  import { MOD_BACKGROUND } from "$lib/design/backgrounds";
+  import ModBackdrop from "$lib/screens/mods/ModBackdrop.svelte";
+  import { backdropOf, glassOf, lookCssOf, windowBackdrop } from "./backdrop.svelte";
+  import ChatBackdrop from "./ChatBackdrop.svelte";
+  import GlassBand from "./GlassBand.svelte";
+  import { paneCardClass } from "./paneChrome";
   import PaneContent from "./PaneContent.svelte";
   import PanelPreview, { previewFills } from "./PanelPreview.svelte";
   import PaneViewMenu from "./PaneViewMenu.svelte";
@@ -155,6 +161,50 @@
   const instantLayout = $derived(tabShift.active);
   const still = $derived(resizing || routeShift.active || modeShift.active || sizeShift.active);
 
+  let frame = $state<HTMLDivElement | null>(null);
+  let frameWidth = $state(0);
+  let frameHeight = $state(0);
+  let gapPx = $state(0);
+  let cornerPx = $state(0);
+
+  const lengthOf = (host: HTMLElement, token: string) => {
+    const probe = document.createElement("div");
+    probe.style.position = "absolute";
+    probe.style.visibility = "hidden";
+    probe.style.width = `var(${token})`;
+    host.appendChild(probe);
+    const width = probe.getBoundingClientRect().width;
+    probe.remove();
+    return width;
+  };
+
+  $effect(() => {
+    if (!frame) return;
+    gapPx = lengthOf(frame, "--pane-gap");
+    cornerPx = lengthOf(frame, "--radius-panel");
+  });
+
+  const roundedHole = (left: number, right: number, top: number, bottom: number) => {
+    const r = Math.min(cornerPx, (right - left) / 2, (bottom - top) / 2);
+    const arc = `A${r} ${r} 0 0 1`;
+    return (
+      `M${left + r} ${top}H${right - r}${arc} ${right} ${top + r}V${bottom - r}${arc} ${right - r} ${bottom}` +
+      `H${left + r}${arc} ${left} ${bottom - r}V${top + r}${arc} ${left + r} ${top}Z`
+    );
+  };
+
+  const holePath = $derived.by(() => {
+    const top = gapPx;
+    const bottom = frameHeight - gapPx;
+    const centerRight = frameWidth - (rightShown ? panelWidth + 2 * gapPx : gapPx);
+    const rightEnd = frameWidth - gapPx;
+    return [
+      `M0 0H${frameWidth}V${frameHeight}H0Z`,
+      roundedHole(leftShown, centerChat ? centerRight : leftShown, top, bottom),
+      roundedHole(rightChat ? rightEnd - panelWidth : rightEnd, rightEnd, top, bottom),
+    ].join("");
+  });
+
   $effect(() => {
     layout.bottomInset = (panes.centerBusy || centerGroup === null ? 0 : composerHeight) + paneGap;
     return () => (layout.bottomInset = 0);
@@ -179,6 +229,38 @@
   };
 
   const chatsSide = $derived(panes.open && centerGroup !== null && panes.groupAt("right") !== null);
+  const centerChat = $derived<ChatState | null>(
+    navigation.centered || centerFilled
+      ? null
+      : centerGroup !== null
+        ? shownTab
+          ? tabs.stateFor(shownTab)
+          : null
+        : panes.chatAt("center"),
+  );
+  const rightChat = $derived(rightShown && !layout.mobile && !previewFills("right") ? panes.chatAt("right") : null);
+  const layerChat = $derived(paneLayer && !previewFills("right") ? panes.chatAt("right") : null);
+  const paneChats = $derived(
+    paneLayer
+      ? [layerChat]
+      : !layout.mobile && panes.focused === "right"
+        ? [rightChat, centerChat]
+        : [centerChat, rightChat],
+  );
+  const modBackground = $derived(chatBackground.current === MOD_BACKGROUND);
+  const draws = (chat: ChatState | null): chat is ChatState =>
+    chat !== null && backdropOf(chat.mods.look, modBackground, chatBackground.current);
+  const owner = $derived(paneChats.find((chat) => draws(chat) && !!chat.mods.look) ?? paneChats.find(draws) ?? null);
+  const backdropShown = $derived(owner !== null);
+  const layerArt = $derived(paneLayer && backdropShown);
+  const glass = $derived(owner ? glassOf(owner.mods.look, modBackground, chatBackground.effects) : null);
+  const paletteChat = $derived(owner ?? paneChats.find((chat) => chat !== null) ?? null);
+  const lookCss = $derived(lookCssOf(paletteChat?.mods.look ?? null, modBackground, backdropShown));
+
+  $effect(() => {
+    windowBackdrop.shown = backdropShown;
+    windowBackdrop.owner = owner;
+  });
 
   $effect(() =>
     navigation.intercept(() => {
@@ -256,18 +338,39 @@
 
 {#if paneKept}
   <div
-    class="safe-area fixed inset-x-0 top-0 z-40 bg-background {paneLayer ? '' : 'invisible'}"
-    style="height: calc(100% - var(--keyboard, 0px)); {rightAccent}"
+    class="safe-area fixed inset-x-0 top-0 z-40 {layerArt ? 'over-backdrop' : 'bg-background'} {paneLayer
+      ? ''
+      : 'invisible'}"
+    style="height: calc(100% - var(--keyboard, 0px)); {rightAccent}; {layerArt ? lookCss : ''}"
     inert={!paneLayer}
   >
+    {#if layerArt && owner}
+      {@render windowArt(owner)}
+      {@render chatBand()}
+    {/if}
     <PaneContent instant={instantLayout} centerView={false} {terminalCwd} />
   </div>
 {/if}
 
-<div class="flex h-full {layout.mobile ? '' : 'bg-surface'}">
+<div
+  bind:this={frame}
+  bind:clientWidth={frameWidth}
+  bind:clientHeight={frameHeight}
+  class="relative isolate flex h-full {backdropShown ? 'over-backdrop' : layout.mobile ? '' : 'bg-surface'}"
+  style={lookCss || undefined}
+>
+  {#if owner && !layerArt}
+    {@render windowArt(owner)}
+    {#if !layout.mobile}
+      <svg aria-hidden="true" class="behind-keyboard pointer-events-none absolute inset-0 -z-10 h-full w-full">
+        <path class="gutter-veil {still ? 'gutter-veil-still' : ''}" fill-rule="evenodd" style="d: path('{holePath}')" />
+      </svg>
+    {/if}
+  {/if}
   {#if !layout.mobile}
     <LeftPane
       accent={leftAccent}
+      glass={backdropShown}
       {expanded}
       width={leftShown}
       max={sideRoom - (rightShown ? MIN_SIDE_WIDTH : 0)}
@@ -289,11 +392,16 @@
 
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
-    class="relative flex min-w-0 flex-1 flex-col {layout.mobile ? '' : `my-(--pane-gap) ${PANE_CARD_CLASS}`}"
+    class="relative flex min-w-0 flex-1 flex-col {layout.mobile
+      ? ''
+      : `my-(--pane-gap) ${paneCardClass(backdropShown, centerChat !== null)}`}"
     style={centerAccent}
     data-unfocused={centerFocused || navigation.centered ? undefined : true}
     onpointerdowncapture={(event) => focusFrom(event, "center")}
   >
+    {#if centerChat}
+      {@render chatBand()}
+    {/if}
     {#if navigation.centered}
       <div class="flex min-h-0 flex-1 flex-col">
         <RouteScreen />
@@ -383,7 +491,10 @@
             onDragging: pinWidths,
           }}
         ></div>
-        <div class="relative flex min-w-0 flex-1 flex-col {PANE_CARD_CLASS}">
+        <div class="relative flex min-w-0 flex-1 flex-col {paneCardClass(backdropShown, rightChat !== null)}">
+          {#if rightChat}
+            {@render chatBand()}
+          {/if}
           <PaneContent
             instant={instantLayout}
             {centerView}
@@ -417,6 +528,22 @@
       onDismiss={() => dismissNotice(notice)}
     />
   {/each}
+{/snippet}
+
+{#snippet windowArt(chat: ChatState)}
+  {#if modBackground}
+    <ModBackdrop mods={chat.mods} effects={chatBackground.effects} class="behind-keyboard -z-10" />
+  {:else}
+    <ChatBackdrop id={chatBackground.current} effects={chatBackground.effects} class="behind-keyboard -z-10" />
+  {/if}
+{/snippet}
+
+{#snippet chatBand()}
+  {#if glass}
+    <div aria-hidden="true" class="behind-keyboard pointer-events-none absolute inset-0 -z-10">
+      <GlassBand blur={glass.blur} tint={glass.tint} opacity={glass.opacity} screen={modBackground} column={!settings.chatFullWidth} />
+    </div>
+  {/if}
 {/snippet}
 
 {#snippet dropHint()}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { theme } from "$lib/design/theme.svelte";
+  import { contextSyntax } from "$lib/design/syntaxScope";
   import { VISIBLE_LINES, highlightSlices, resolveLang } from "$lib/markdown/highlighter";
   import { DIFF_LINE } from "./diffTones";
   import { viewportScrollbar } from "./scrollbar";
@@ -64,10 +64,12 @@
     coloredSource = null;
   };
 
+  const syntaxOf = contextSyntax();
+
   $effect(() => {
     const body = source;
     const target = language;
-    const syntax = theme.syntax;
+    const syntax = syntaxOf();
     if (coloredSource !== body || !target) uncolor();
     if (!target) return;
     const slices = highlightSlices(body, target, syntax, (untrack(() => anchor) ?? 0) + VISIBLE_LINES);

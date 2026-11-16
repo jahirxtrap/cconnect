@@ -1,6 +1,6 @@
 import { strFromU8 } from "fflate";
 import { compareNames } from "$lib/data/format";
-import { rgbOf, withAlpha } from "../accents";
+import { derivedColor, rgbOf } from "../accents";
 import { BUILTIN_BACKGROUNDS } from "../backgrounds";
 import { textOn } from "../contrast";
 import { BUILTIN_FONTS, DEFAULT_FONTS, SYSTEM_FAMILIES, SYSTEM_FONT } from "../fonts";
@@ -43,8 +43,9 @@ const resolveThemes = (packs: readonly Pack[]): PackTheme[] => {
     const parent = files.get(file.extends ?? DEFAULT_THEMES[file.kind]);
     const base = parent && parent.id !== file.id ? resolve(parent) : null;
     const colors = { ...base?.colors, ...file.colors };
-    for (const [key, { from, alpha }] of Object.entries(DERIVED_COLORS)) {
-      if (!(key in file.colors) && from in file.colors) colors[key] = withAlpha(file.colors[from], alpha);
+    for (const [key, rule] of Object.entries(DERIVED_COLORS)) {
+      const value = key in file.colors ? null : derivedColor(rule, file.colors);
+      if (value) colors[key] = value;
     }
     colors[`${RGB_SOURCE}-rgb`] = rgbOf(colors[RGB_SOURCE]);
     colors[`on-${DANGER_FILL}`] = textOn(colors[DANGER_FILL], colors);
@@ -142,6 +143,10 @@ class Packs {
     const fonts = this.fontsOf(kind);
     const find = (wanted: string) => (wanted === SYSTEM_FONT ? this.systemFont(kind) : fonts.find((font) => font.id === wanted));
     return find(id) ?? find(DEFAULT_FONTS[kind]) ?? fonts[0] ?? this.systemFont(kind);
+  }
+
+  hasSyntax(id: string): boolean {
+    return id in BUILTIN_SYNTAX || this.all.some((pack) => pack.syntax.some((item) => item.id === id));
   }
 
   async loadSyntax(id: string): Promise<unknown> {

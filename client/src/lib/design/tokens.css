@@ -32,9 +32,6 @@
   --color-accent-soft: var(--c-accent-soft);
   --color-accent-ring: var(--c-accent-ring);
   --color-on-accent: var(--c-on-accent);
-}
-
-@theme {
   --color-background: var(--c-background);
   --color-on-background: var(--c-on-background);
   --color-surface: var(--c-surface);
@@ -49,12 +46,6 @@
   --color-outline: var(--c-outline);
   --color-outline-variant: var(--c-outline-variant);
   --color-error: var(--c-error);
-
-  --shadow-float: 0 0 0 1px var(--c-outline-variant), 0 10px 15px -3px var(--c-shadow), 0 4px 6px -4px var(--c-shadow);
-  --float-shadow-reach: 1.25rem;
-  --shadow-composer: 0 0 0 1px var(--c-accent-ring);
-  --shadow-raised: 0 1px 3px var(--c-shadow-soft);
-
   --color-red: var(--c-red);
   --color-on-red: var(--c-on-red);
   --color-red-bg: var(--c-red-bg);
@@ -62,6 +53,7 @@
   --color-green-bg: var(--c-green-bg);
   --color-blue: var(--c-blue);
   --color-blue-bg: var(--c-blue-bg);
+  --color-code-bg: var(--c-code-bg);
   --color-yellow: var(--c-yellow);
   --color-orange: var(--c-orange);
   --color-cyan: var(--c-cyan);
@@ -70,6 +62,13 @@
   --color-logo: var(--c-logo);
   --color-logo-ring: var(--c-logo-ring);
   --color-logo-mark: var(--c-logo-mark);
+  --shadow-float: 0 0 0 1px var(--c-outline-variant), 0 10px 15px -3px var(--c-shadow), 0 4px 6px -4px var(--c-shadow);
+  --shadow-composer: 0 0 0 1px var(--c-accent-ring);
+  --shadow-raised: 0 1px 3px var(--c-shadow-soft);
+}
+
+@theme {
+  --float-shadow-reach: 1.25rem;
 
   --chat-gap-lg: 16px;
   --chat-gap-md: 8px;
@@ -152,6 +151,10 @@
   --page-inset-full: 16px;
   --page-inset: var(--page-inset-full);
   --page-inset-compact: 8px;
+  --chat-column: 56rem;
+  --glass-fade: 4rem;
+  --glass-blur: 16px;
+  --gutter-shade: 0.5;
   --pane-gap: 0.375rem;
   --dialog-max-height: min(40rem, calc(var(--safe-height) - 2rem));
   --dot-size: 8px;

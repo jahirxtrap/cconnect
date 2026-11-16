@@ -14,7 +14,7 @@ jobs:
     outputs:
       apps: ${{ steps.version.outputs.apps }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Compare the tag with the apps' version
         id: version
@@ -39,9 +39,9 @@ jobs:
         shell: bash
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -79,7 +79,7 @@ jobs:
             mv "$file" "$(dirname "$file")/cconnect-tauri-$version.${file##*.}"
           done
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           body_path: CHANGELOG.md
@@ -107,20 +107,20 @@ jobs:
         shell: bash
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: client/package-lock.json
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
 
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
 
@@ -153,7 +153,7 @@ jobs:
             --key-pass "pass:${{ secrets.SIGNING_KEY_PASSWORD }}" \
             --out "cconnect-tauri-${GITHUB_REF_NAME}.apk" aligned.apk
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/')
         with:
           body_path: CHANGELOG.md
@@ -176,9 +176,9 @@ jobs:
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10.1.0
+      - uses: astral-sh/setup-uv@v10.3.3
 
       - name: Take the README into the backend package
         run: cp README.md backend/README.md
@@ -208,7 +208,7 @@ jobs:
         working-directory: backend
         run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/cconnect/
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/') && needs.plan.outputs.apps == 'false'
         with:
           body_path: CHANGELOG.md
@@ -219,9 +219,9 @@ jobs:
     if: needs.plan.outputs.apps == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -236,7 +236,7 @@ jobs:
           npm run build
 
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
+        uses: cloudflare/wrangler-action@v4
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

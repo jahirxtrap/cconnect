@@ -203,6 +203,13 @@ class Settings {
     this.#write("chat_view_full", value);
   }
 
+  get chatFullWidth() {
+    return this.#read<boolean>("chat_full_width");
+  }
+  set chatFullWidth(value: boolean) {
+    this.#write("chat_full_width", value);
+  }
+
   get projectCommitOpen() {
     return this.#read<boolean>("project_commit_open");
   }

@@ -15,6 +15,7 @@
   import type { ModSurface } from "$lib/screens/mods/modSurface.svelte";
   import type { BlockExpansion } from "./blockExpansion.svelte";
   import ChatScroller from "./ChatScroller.svelte";
+  import { CHAT_COLUMN_CLASS } from "./paneChrome";
   import Collapsible from "./blocks/Collapsible.svelte";
   import ChatSeparator from "./blocks/ChatSeparator.svelte";
   import { gapAbove, gapBelow, NO_GAP, rowGap, type GapRole } from "./blocks/gaps";
@@ -58,6 +59,7 @@
     replies?: ReplyCommands | null;
     repliesBusy?: boolean;
     onResume?: ((resume: Resume) => void) | null;
+    column?: boolean;
   }
 
   interface ReplyCommands {
@@ -65,6 +67,7 @@
   }
 
   let {
+    column = false,
     messages,
     pendingToolIds,
     streaming,
@@ -360,6 +363,7 @@
   hasContent={visible.length > 0}
   {bottomInset}
   dock
+  contentClass={column ? CHAT_COLUMN_CLASS : ""}
   onScroll={onScrollTop}
   onNearTop={onLoadOlder}
 >

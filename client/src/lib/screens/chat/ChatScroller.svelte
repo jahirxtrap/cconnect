@@ -18,6 +18,7 @@
     onScroll?: ((top: number) => void) | null;
     onNearTop?: (() => void) | null;
     onMove?: (() => void) | null;
+    contentClass?: string;
     children: Snippet;
   }
 
@@ -30,6 +31,7 @@
     onScroll = null,
     onNearTop = null,
     onMove = null,
+    contentClass = "",
     children,
   }: Props = $props();
 
@@ -40,6 +42,9 @@
 
   let container = $state<HTMLDivElement | null>(null);
   let content = $state<HTMLDivElement | null>(null);
+  let containerWidth = $state(0);
+  let contentWidth = $state(0);
+  const centered = $derived(contentClass !== "" && contentWidth > 0 && contentWidth < containerWidth);
   let belowFold = $state(0);
   let viewport = $state(0);
   let horizontalScrollbar = $state(0);
@@ -223,12 +228,21 @@
 <div class="relative h-full">
   <div
     bind:this={container}
+    bind:clientWidth={containerWidth}
     {onscroll}
     use:viewportScrollbar
     use:dockArea={dock}
+    style={centered
+      ? `--viewport-shift: calc(var(--scrollbar-width, 0px) / 2); --viewport-inset: calc(${(containerWidth - contentWidth) / 2}px + var(--page-inset))`
+      : undefined}
     class="selectable rounded-viewport isolate flex h-full flex-col overflow-x-hidden overflow-y-auto"
   >
-    <div bind:this={content} class="shrink-0">
+    <div
+      bind:this={content}
+      bind:clientWidth={contentWidth}
+      class="shrink-0 {contentClass}"
+      style={centered ? "translate: calc(var(--scrollbar-width, 0px) / 2)" : undefined}
+    >
       {@render children()}
     </div>
   </div>

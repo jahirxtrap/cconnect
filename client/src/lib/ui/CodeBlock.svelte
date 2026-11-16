@@ -1,7 +1,7 @@
 <script lang="ts">
   import Check from "@lucide/svelte/icons/check";
   import Copy from "@lucide/svelte/icons/copy";
-  import { theme } from "$lib/design/theme.svelte";
+  import { contextSyntax } from "$lib/design/syntaxScope";
   import { highlight, resolveLang } from "$lib/markdown/highlighter";
   import { CopyFeedback } from "./copyFeedback.svelte";
   import { HSCROLL_CLASS, hscrollbar } from "./scrollbar";
@@ -17,6 +17,7 @@
   const LINE_STYLE = "line-height: var(--chat-line-code)";
 
   const feedback = new CopyFeedback();
+  const syntaxOf = contextSyntax();
 
   const body = $derived(code.replace(/\n+$/, ""));
   const resolved = $derived(resolveLang(lang));
@@ -25,7 +26,7 @@
 
   $effect(() => {
     const language = resolved;
-    const syntax = theme.syntax;
+    const syntax = syntaxOf();
     if (!language) {
       html = null;
       return;

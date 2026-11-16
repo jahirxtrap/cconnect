@@ -21,6 +21,7 @@
     subtitleCopy?: { label: string; value: string } | null;
     server?: boolean;
     class?: string;
+    style?: string;
     contained?: boolean;
     navigationIcon?: Snippet;
     subtitleLeading?: Snippet;
@@ -36,6 +37,7 @@
     subtitleCopy = null,
     server = false,
     class: className = "",
+    style,
     contained = false,
     navigationIcon,
     subtitleLeading,
@@ -82,7 +84,7 @@
   <StatusDot class={look?.dot ?? "bg-green"} loading={look?.spinner ?? false} />
 {/snippet}
 
-<header class="flex h-12 shrink-0 items-center pr-2 {navigationIcon ? 'pl-2' : 'pl-(--page-inset)'} {className}">
+<header {style} class="flex h-12 shrink-0 items-center pr-2 {navigationIcon ? 'pl-2' : 'pl-(--page-inset)'} {className}">
   <div class="flex min-w-0 flex-1 items-center gap-1 {contained ? 'mx-auto max-w-3xl' : ''}">
     {@render navigationIcon?.()}
     <div class="min-w-0 shrink">

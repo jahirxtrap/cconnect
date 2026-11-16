@@ -20,7 +20,7 @@
   const { environmentId, onEnvironment, onNewChat, drawerMode, onClose, children }: Props = $props();
 </script>
 
-<div class="flex h-full min-h-0 flex-col gap-1 bg-surface pt-2.5 pb-2">
+<div class="flex h-full min-h-0 flex-col gap-1 pt-2.5 pb-2">
   <div class="mb-1 flex shrink-0 items-center px-2">
     <EnvironmentSelector class="flex-1" selected={environmentId} onSelect={onEnvironment} />
     <TooltipIconButton label={t("NEW_CHAT")} onclick={onNewChat}>

@@ -143,6 +143,7 @@ ModComponent = Literal[
     "ToolGroup",
     "CommandOutput",
     "AskUserQuestion",
+    "Theme",
 ]
 
 
